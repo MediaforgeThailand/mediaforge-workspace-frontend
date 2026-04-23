@@ -1,0 +1,1005 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* MediaForge "Midnight Neon" Design System
+   Background: Deep Navy (#0a0e1a)
+   Card: Slightly lighter navy (#141827)
+   Primary: Electric Purple
+   Accent: Magenta-Purple
+   Text: Near-white (#f1f5f9)
+   Muted: Light slate (#94a3b8)
+   Dark-only — no light theme
+*/
+
+@layer base {
+  :root {
+    --background: 150 50% 1%;
+    --foreground: 0 0% 100%;
+
+    --card: 220 30% 6%;
+    --card-foreground: 0 0% 100%;
+
+    --popover: 220 30% 6%;
+    --popover-foreground: 0 0% 100%;
+
+    --primary: 262.1 83.3% 57.8%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 25% 10%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 25% 10%;
+    --muted-foreground: 0 0% 80%;
+
+    --accent: 283 55% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 25% 12%;
+    --input: 220 25% 12%;
+    --ring: 262.1 83.3% 57.8%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 150 20% 2%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 262.1 83.3% 57.8%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 283 55% 65%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 220 25% 12%;
+    --sidebar-ring: 262.1 83.3% 57.8%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(262 83% 58%) 0%, hsl(283 47% 45%) 100%);
+    --gradient-subtle: linear-gradient(135deg, hsl(150 20% 2%) 0%, hsl(220 30% 6%) 100%);
+
+    --pf-panel: 248 31% 9%;
+    --pf-panel-elevated: 248 27% 12%;
+    --pf-preview-surface: 22 49% 10%;
+    --pf-result-surface: 0 0% 9%;
+    --pf-border: 247 20% 18%;
+    --pf-border-strong: 258 32% 34%;
+    --pf-text-soft: 240 20% 78%;
+    --pf-text-faint: 240 8% 52%;
+    --pf-brand-soft: 262 83% 74%;
+    --pf-brand: 262 83% 58%;
+    --pf-success: 152 69% 57%;
+    --pf-danger: 343 49% 54%;
+    --pf-warning: 40 96% 61%;
+
+    /* CI Aether unprefixed aliases (used by src/components/play/*) */
+    --brand: 262 83% 58%;
+    --accent-success: 152 69% 57%;
+    --text-dim: 240 20% 78%;
+    --text-faint: 240 8% 52%;
+    --text-2: 240 20% 78%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Prompt', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+}
+
+@layer utilities {
+  /* Stronger border for surfaces that need clearer separation than the default --border (which is intentionally subtle). */
+  .border-strong {
+    border-color: hsl(220 18% 26%);
+  }
+  .border-b-strong {
+    border-bottom-color: hsl(220 18% 26%);
+  }
+  .border-l-strong {
+    border-left-color: hsl(220 18% 26%);
+  }
+  .border-t-strong {
+    border-top-color: hsl(220 18% 26%);
+  }
+  .divide-strong > * + * {
+    border-color: hsl(220 18% 26%);
+  }
+
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(262 83% 58%) 0%, hsl(283 47% 55%) 100%);
+  }
+
+  .gradient-text {
+    color: hsl(0 0% 100%);
+  }
+
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient-shift 8s ease infinite;
+  }
+
+  @keyframes gradient-shift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  @keyframes meshDrift1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(-80px, 50px) scale(1.15); }
+    66% { transform: translate(50px, -40px) scale(0.9); }
+  }
+
+  @keyframes meshDrift2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(60px, -60px) scale(1.2); }
+    66% { transform: translate(-50px, 40px) scale(0.85); }
+  }
+
+  @keyframes meshDrift3 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(40px, 60px) scale(1.15); }
+  }
+
+  @keyframes meshDrift4 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    40% { transform: translate(70px, 30px) scale(1.1); }
+    80% { transform: translate(-30px, -50px) scale(0.95); }
+  }
+
+  @keyframes meshDrift5 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(-50px, -40px) scale(1.2); }
+  }
+
+  .glow {
+    box-shadow: 0 0 40px hsl(262 83% 58% / 0.3), 
+                0 0 80px hsl(283 47% 45% / 0.2);
+  }
+
+  .glow-subtle {
+    box-shadow: 0 0 20px hsl(262 83% 58% / 0.15),
+                0 0 40px hsl(283 47% 45% / 0.1);
+  }
+
+  /* ── Official Badge Premium ── */
+  .official-badge-premium {
+    background: linear-gradient(135deg, rgba(110,96,238,0.25) 0%, rgba(124,113,247,0.15) 100%);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow:
+      0 0 12px rgba(110, 96, 238, 0.4),
+      0 0 24px rgba(110, 96, 238, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(110, 96, 238, 0.35);
+  }
+  .official-badge-premium::before {
+    content: "";
+    position: absolute;
+    top: 0; left: -100%;
+    width: 60%; height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.25) 50%,
+      transparent 100%
+    );
+    animation: official-shine 3s ease-in-out infinite;
+  }
+  @keyframes official-shine {
+    0% { left: -100%; }
+    60% { left: 150%; }
+    100% { left: 150%; }
+  }
+
+  /* Tech card hover glow */
+  .tech-card {
+    position: relative;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  .tech-card:hover {
+    border-color: hsl(257 61% 47% / 0.4);
+    box-shadow: 0 0 24px hsl(257 61% 47% / 0.08), 0 0 0 1px hsl(257 61% 47% / 0.1);
+  }
+
+  /* Scan line animation */
+  @keyframes scan {
+    0% { top: -2px; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+  .animate-scan {
+    animation: scan 8s linear infinite;
+  }
+
+  /* Status dot pulse */
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: hsl(var(--primary));
+    box-shadow: 0 0 8px hsl(var(--primary) / 0.6);
+    animation: status-pulse 2s ease-in-out infinite;
+  }
+  @keyframes status-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  /* Marquee animation */
+  @keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .animate-marquee {
+    animation: marquee 20s linear infinite;
+  }
+
+  /* Hide scrollbar */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ── Play Flow: minimal floating scrollbar ── */
+  .play-flow-bg ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .play-flow-bg ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .play-flow-bg ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    transition: background 0.2s;
+  }
+  .play-flow-bg ::-webkit-scrollbar-thumb:hover {
+    background: rgba(167, 139, 250, 0.35);
+  }
+  .play-flow-bg {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
+  }
+
+  /* ── Glass Border (pseudo-element gradient border) ── */
+  .glass-border {
+    position: relative;
+    border: none;
+  }
+  .glass-border::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    pointer-events: none;
+    background: linear-gradient(
+      174deg,
+      rgba(255, 255, 255, 0.4) 0%,
+      rgba(40, 40, 40, 0.3) 20%,
+      rgba(40, 40, 40, 0.3) 80%,
+      rgba(255, 255, 255, 0.4) 100%
+    );
+    mask:
+      linear-gradient(white, white) content-box exclude,
+      linear-gradient(white, white) border-box;
+    -webkit-mask:
+      linear-gradient(white, white) content-box exclude,
+      linear-gradient(white, white) border-box;
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+
+  /* ── Space Editor Handle Styles (Freepik-style) ── */
+  .space-handle {
+    width: 10px !important;
+    height: 10px !important;
+    background: rgba(255, 255, 255, 0.12) !important;
+    border: 2px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 50% !important;
+    transition: all 0.2s ease !important;
+    z-index: 10 !important;
+  }
+
+  .space-handle-target {
+    left: -6px !important;
+  }
+
+  .space-handle-source {
+    right: -6px !important;
+  }
+
+  .space-handle:hover,
+  .group\/node:hover .space-handle {
+    width: 14px !important;
+    height: 14px !important;
+    background: rgba(255, 255, 255, 0.25) !important;
+    border-color: rgba(255, 255, 255, 0.4) !important;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.15) !important;
+  }
+
+  .space-handle-target:hover,
+  .group\/node:hover .space-handle-target {
+    left: -8px !important;
+  }
+
+  .space-handle-source:hover,
+  .group\/node:hover .space-handle-source {
+    right: -8px !important;
+  }
+
+  /* Connecting state */
+  .react-flow__handle.connecting {
+    width: 16px !important;
+    height: 16px !important;
+    background: rgba(255, 255, 255, 0.35) !important;
+    border-color: rgba(255, 255, 255, 0.5) !important;
+  }
+
+  /* Edge styling — base for non-custom edges */
+  .react-flow__edge-path {
+    stroke: rgba(255, 255, 255, 0.08);
+    stroke-width: 1.5;
+  }
+
+  .react-flow__edge.selected .react-flow__edge-path,
+  .react-flow__edge:hover .react-flow__edge-path {
+    stroke: rgba(255, 255, 255, 0.2);
+  }
+
+  /* Flow edge dash animation */
+  @keyframes flowDash {
+    to {
+      stroke-dashoffset: -10;
+    }
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  .animate-shimmer {
+    animation: shimmer 1.6s linear infinite;
+  }
+
+  @keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.5); }
+    70% { box-shadow: 0 0 0 14px hsl(var(--primary) / 0); }
+    100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
+  }
+  .pulse-ring { animation: pulse-ring 2s ease-out infinite; }
+
+  /* ── Prompt contentEditable mention pills ── */
+  .prompt-editable:empty.is-empty::before {
+    content: attr(data-placeholder);
+    color: hsl(0 0% 100% / 0.2);
+    pointer-events: none;
+  }
+
+  .prompt-editable .mention-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 5px;
+    margin: 0 1px;
+    border-radius: 4px;
+    background: hsl(217 80% 50% / 0.2);
+    border: 1px solid hsl(217 80% 60% / 0.3);
+    color: hsl(210 100% 75%);
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.6;
+    vertical-align: baseline;
+    white-space: nowrap;
+    user-select: all;
+    cursor: default;
+  }
+
+  .prompt-editable .mention-pill-icon {
+    font-size: 10px;
+    line-height: 1;
+  }
+
+  .prompt-editable .textvar-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 5px;
+    margin: 0 1px;
+    border-radius: 4px;
+    background: hsl(142 60% 40% / 0.2);
+    border: 1px solid hsl(142 60% 50% / 0.3);
+    color: hsl(142 70% 70%);
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.6;
+    vertical-align: baseline;
+    white-space: nowrap;
+    user-select: all;
+    cursor: default;
+  }
+
+  .prompt-editable .textvar-pill-icon {
+    font-size: 10px;
+    line-height: 1;
+  }
+
+  /* ── Shine Border Animation ── */
+  @keyframes shine-trail {
+    0%   { offset-distance: 0%; }
+    100% { offset-distance: 100%; }
+  }
+  @keyframes shine-trail-offset {
+    0%   { offset-distance: 50%; }
+    100% { offset-distance: 150%; }
+  }
+
+  .shine-light {
+    position: absolute;
+    aspect-ratio: 2 / 1;
+    width: var(--shine-light-width, 250px);
+    background: var(--shine-gradient);
+    offset-path: border-box;
+    offset-anchor: 100% 50%;
+    offset-rotate: auto;
+    animation: shine-trail var(--shine-speed) infinite linear;
+    filter: blur(12px);
+    mix-blend-mode: plus-lighter;
+  }
+  .shine-light--2 {
+    animation-name: shine-trail-offset;
+  }
+
+  .shine-glow-orb::before {
+    content: "";
+    position: absolute;
+    width: var(--shine-orb-width, 60px);
+    aspect-ratio: 2 / 1;
+    background: var(--shine-glow-gradient);
+    offset-path: border-box;
+    offset-anchor: 60% 50%;
+    offset-rotate: auto;
+    filter: blur(30px);
+    opacity: 0.7;
+    animation: shine-trail var(--shine-speed) infinite linear;
+  }
+  .shine-glow-orb--2::before {
+    animation-name: shine-trail-offset;
+  }
+
+  /* ── Sidebar Glassmorphism (Test2 Redesign — violet CI palette) ── */
+  .sidebar-glass {
+    background: rgba(20, 18, 36, 0.6);
+    backdrop-filter: blur(24px) saturate(1.2);
+    -webkit-backdrop-filter: blur(24px) saturate(1.2);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 0 0 1px rgba(167, 139, 250, 0.02),
+      0 30px 60px -20px rgba(0, 0, 0, 0.6);
+  }
+
+  /* ── Refined glass button (violet inner-glow border) ── */
+  .btn-glass {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    position: relative;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .btn-glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    pointer-events: none;
+    background: linear-gradient(135deg, rgba(167, 139, 250, 0.4) 0%, transparent 40%, transparent 60%, rgba(167, 139, 250, 0.25) 100%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0.8;
+  }
+  .btn-glass:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  /* ── Primary action button (violet gradient + glow) ── */
+  .btn-primary-violet {
+    background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%);
+    color: #fff;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.25),
+      0 0 0 1px rgba(167, 139, 250, 0.3),
+      0 8px 24px -8px rgba(124, 58, 237, 0.6),
+      0 2px 8px rgba(124, 58, 237, 0.2);
+  }
+  .btn-primary-violet:hover:not(:disabled) {
+    background: linear-gradient(180deg, #9b6cff 0%, #8b4aff 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      0 0 0 1px rgba(167, 139, 250, 0.5),
+      0 10px 30px -8px rgba(124, 58, 237, 0.7);
+  }
+
+  /* ── ShineBorder animation (rotating conic gradient) ── */
+  @property --shine-angle {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
+  }
+  .shine {
+    position: relative;
+    isolation: isolate;
+  }
+  .shine::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1.5px;
+    pointer-events: none;
+    z-index: 2;
+    background: conic-gradient(
+      from var(--shine-angle),
+      transparent 0deg,
+      transparent 220deg,
+      rgba(110, 96, 238, 0.15) 255deg,
+      rgba(110, 96, 238, 0.55) 300deg,
+      #a78bfa 335deg,
+      #ffffff 357deg,
+      transparent 360deg
+    );
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    mix-blend-mode: plus-lighter;
+    animation: shine-spin 18s linear infinite;
+  }
+  @keyframes shine-spin {
+    from { --shine-angle: 0deg; }
+    to { --shine-angle: 360deg; }
+  }
+
+  /* ── Glassmorphic node surface (Flow Studio — violet CI) ── */
+  .node-glass {
+    background: linear-gradient(180deg, rgba(28, 28, 36, 0.78) 0%, rgba(18, 18, 24, 0.78) 100%);
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 18px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+      0 1px 0 rgba(0, 0, 0, 0.6),
+      0 20px 50px -20px rgba(0, 0, 0, 0.7);
+  }
+  .node-glass.selected {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+      0 0 0 1px var(--node-accent, #a78bfa),
+      0 0 32px -4px var(--node-accent-glow, rgba(167, 139, 250, 0.35)),
+      0 20px 50px -20px rgba(0, 0, 0, 0.7);
+  }
+
+  /* ── Ringed port handle (Flow Studio) ── */
+  .port-ring {
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    border: 1.5px solid var(--port-c, #a78bfa);
+    background: #07070a;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .port-ring::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border-radius: 999px;
+    background: var(--port-c, #a78bfa);
+    box-shadow: 0 0 6px var(--port-c, #a78bfa);
+  }
+  .port-ring.dim::after { opacity: 0.55; }
+  .port-ring.connected::after {
+    box-shadow: 0 0 10px var(--port-c, #a78bfa), 0 0 2px #fff inset;
+  }
+
+  /* ── Edge particle flow animation ── */
+  @keyframes edge-flow-dash {
+    to { stroke-dashoffset: -24; }
+  }
+  .edge-flow {
+    stroke-dasharray: 4 8;
+    animation: edge-flow-dash 1.2s linear infinite;
+  }
+
+  /* ── Flow Studio: param row, chips, scene cards, model select button ── */
+  .fs-param-row {
+    padding: 7px 6px;
+    margin-left: -6px;
+    margin-right: -6px;
+    border-radius: 8px;
+    transition: background 0.15s;
+  }
+  .fs-param-row.exposed {
+    background: linear-gradient(90deg, rgba(251, 191, 36, 0.04), transparent 60%);
+    box-shadow: inset 2px 0 0 rgba(251, 191, 36, 0.4);
+  }
+  .fs-eye-btn {
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    color: rgba(255, 255, 255, 0.2);
+    transition: color 0.12s, background 0.12s, opacity 0.12s;
+    opacity: 0;
+  }
+  .fs-param-row:hover .fs-eye-btn,
+  .group:hover .fs-eye-btn,
+  .fs-eye-btn.active {
+    opacity: 1;
+  }
+  .fs-eye-btn:hover {
+    color: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.05);
+  }
+  .fs-eye-btn.active {
+    color: #fbbf24;
+    background: rgba(251, 191, 36, 0.1);
+  }
+  .fs-eye-btn.active:hover {
+    background: rgba(251, 191, 36, 0.2);
+  }
+
+  /* Inline @mention / #textvar pills used inside prompts */
+  .fs-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 6px 1px 5px;
+    border-radius: 5px;
+    font-size: 10.5px;
+    font-weight: 500;
+    line-height: 1.3;
+    vertical-align: baseline;
+    margin: 0 1px;
+    white-space: nowrap;
+  }
+  .fs-chip.mention {
+    background: rgba(96, 165, 250, 0.14);
+    color: #93c5fd;
+    border: 1px solid rgba(96, 165, 250, 0.25);
+  }
+  .fs-chip.textvar {
+    background: rgba(134, 239, 172, 0.14);
+    color: #bbf7d0;
+    border: 1px solid rgba(134, 239, 172, 0.25);
+  }
+
+  /* Scene card used by MultiShotBuilder */
+  .fs-scene-card {
+    background: linear-gradient(180deg, rgba(167, 139, 250, 0.045), rgba(167, 139, 250, 0.015));
+    border: 1px solid rgba(167, 139, 250, 0.18);
+    border-radius: 10px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .fs-scene-card:hover {
+    border-color: rgba(167, 139, 250, 0.3);
+    background: linear-gradient(180deg, rgba(167, 139, 250, 0.06), rgba(167, 139, 250, 0.02));
+  }
+
+  /* Model select rich button (two-line) */
+  .fs-model-select {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px 7px 8px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: background 0.15s, border-color 0.15s;
+    cursor: pointer;
+  }
+  .fs-model-select:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+
+  /* ── Field input (text/select/textarea) shared in Flow Studio nodes ── */
+  .fs-field {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: #f0f0f2;
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 12px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .fs-field:hover { border-color: rgba(255, 255, 255, 0.1); }
+  .fs-field:focus {
+    outline: none;
+    border-color: rgba(167, 139, 250, 0.5);
+    background: rgba(167, 139, 250, 0.04);
+  }
+  .fs-field-textarea {
+    padding: 8px 10px;
+    min-height: 56px;
+    line-height: 1.5;
+    font-family: var(--font-mono, ui-monospace, "SF Mono", monospace);
+    font-size: 11.5px;
+  }
+
+  /* ── Upload zone (dashed accent dropzone) ── */
+  .fs-upload-zone {
+    background: linear-gradient(135deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01));
+    border: 1.5px dashed rgba(255,255,255,0.14);
+    border-radius: 12px;
+    transition: border-color 0.15s, background 0.15s;
+    cursor: pointer;
+  }
+  .fs-upload-zone:hover {
+    border-color: var(--node-accent, #a78bfa);
+    background: linear-gradient(135deg, var(--node-accent-glow, rgba(167,139,250,0.08)), transparent);
+  }
+
+  /* ── Native range slider re-skin (used in nodes) ── */
+  .fs-slider {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    outline: none;
+    cursor: pointer;
+  }
+  .fs-slider::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(
+      to right,
+      var(--node-accent, #a78bfa) 0%,
+      var(--node-accent, #a78bfa) var(--fs-slider-pct, 50%),
+      rgba(255,255,255,0.06) var(--fs-slider-pct, 50%),
+      rgba(255,255,255,0.06) 100%
+    );
+    box-shadow: 0 0 8px var(--node-accent-glow, rgba(167,139,250,0.35));
+  }
+  .fs-slider::-moz-range-track {
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+  }
+  .fs-slider::-moz-range-progress {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--node-accent, #a78bfa);
+    box-shadow: 0 0 8px var(--node-accent-glow, rgba(167,139,250,0.35));
+  }
+  .fs-slider::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    background: #fff;
+    border: 2px solid var(--node-accent, #a78bfa);
+    margin-top: -5px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4), 0 0 0 4px var(--node-accent-glow, rgba(167,139,250,0.18));
+  }
+  .fs-slider::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 999px;
+    background: #fff; border: 2px solid var(--node-accent, #a78bfa);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4), 0 0 0 4px var(--node-accent-glow, rgba(167,139,250,0.18));
+  }
+
+  /* Override existing prompt pills to match Flow Studio chip aesthetic */
+  .prompt-editable .mention-pill {
+    background: rgba(96, 165, 250, 0.15);
+    border-color: rgba(96, 165, 250, 0.35);
+    color: #bfdbfe;
+    border-radius: 6px;
+    padding: 2px 7px 2px 4px;
+    font-family: var(--font-mono, ui-monospace, "SF Mono", monospace);
+    font-size: 10.5px;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+  .prompt-editable .textvar-pill {
+    background: rgba(134, 239, 172, 0.12);
+    border-color: rgba(134, 239, 172, 0.30);
+    color: #bbf7d0;
+    border-radius: 6px;
+    padding: 2px 7px 2px 4px;
+    font-family: var(--font-mono, ui-monospace, "SF Mono", monospace);
+    font-size: 10.5px;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+}
+
+/* ============================================================
+   Play Flow — CI Aether tokens (scoped)
+   Loaded globally for ShineBorderV2 keyframes; visual tokens
+   are scoped under .play-flow-theme so other surfaces are
+   unaffected.
+   ============================================================ */
+
+@property --shine-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes shine-spin {
+  from { --shine-angle: 0deg; }
+  to   { --shine-angle: 360deg; }
+}
+
+/* Mobile Bottom Sheet animations */
+@keyframes mf-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes mf-sheet-up {
+  from { transform: translateY(110%); opacity: 0.6; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.animate-fade-in { animation: mf-fade-in 200ms ease-out both; }
+.animate-sheet-up { animation: mf-sheet-up 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Glass panel utility — Play Flow CI spec */
+.glass-panel {
+  background: rgba(20, 18, 36, 0.6);
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 0 1px rgba(167, 139, 250, 0.02),
+    0 30px 60px -20px rgba(0, 0, 0, 0.6);
+}
+
+
+/* ─── Play Flow scoped background ─── */
+.play-flow-bg {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background-color: #030305;
+  background:
+    radial-gradient(ellipse 1200px 900px at 20% 10%, #120a24 0%, transparent 55%),
+    radial-gradient(ellipse 1000px 800px at 85% 90%, #0d0618 0%, transparent 55%),
+    linear-gradient(180deg, #030305 0%, #000000 50%, #050308 100%);
+}
+.play-flow-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 700px 500px at 15% 20%, rgba(124,58,237,0.08), transparent 65%),
+    radial-gradient(ellipse 600px 500px at 85% 80%, rgba(168,85,247,0.06), transparent 65%);
+}
+/* Stack content above ::before overlay without breaking fixed/absolute children */
+.play-flow-bg > *:not(.fixed):not(.absolute) {
+  position: relative;
+  z-index: 1;
+}
+.play-flow-bg > .fixed,
+.play-flow-bg > .absolute {
+  z-index: 40;
+}
+
+/* ─── PlayFlow Results Panel — micro motion ─── */
+@keyframes mf-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(6px, -4px) scale(1.05); }
+  66%      { transform: translate(-4px, 6px) scale(0.97); }
+}
+@keyframes mf-fade-in-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.anim-fadeInUp { animation: mf-fade-in-up .5s cubic-bezier(.22,1,.36,1) both; }
+
+@keyframes mf-glow-pulse {
+  0%, 100% { filter: drop-shadow(0 0 8px rgba(167,139,250,0.35)); }
+  50%      { filter: drop-shadow(0 0 18px rgba(167,139,250,0.65)); }
+}
+@keyframes mf-orbit-a { from { transform: rotate(0)      translateX(34px) rotate(0);     } to { transform: rotate(360deg) translateX(34px) rotate(-360deg); } }
+@keyframes mf-orbit-b { from { transform: rotate(120deg) translateX(28px) rotate(-120deg);} to { transform: rotate(480deg) translateX(28px) rotate(-480deg); } }
+@keyframes mf-orbit-c { from { transform: rotate(240deg) translateX(40px) rotate(-240deg);} to { transform: rotate(600deg) translateX(40px) rotate(-600deg); } }
+
+.scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(167,139,250,0.15); border-radius: 999px; }
+.scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(167,139,250,0.35); }
+
+.drop-zone-hot {
+  border-color: #a78bfa !important;
+  background: linear-gradient(135deg, rgba(167,139,250,0.18), rgba(124,58,237,0.08)) !important;
+  box-shadow: 0 0 0 2px rgba(167,139,250,.35), 0 0 40px rgba(167,139,250,.3) inset !important;
+}
+
+/* ── MF Spark loader (PlayFlow generation) ── */
+.mf-spark { position: relative; display: flex; align-items: center; justify-content: center; }
+.mf-spark .mf-logo {
+  width: 50%;
+  animation: mf-float 2.8s ease-in-out infinite;
+  filter: drop-shadow(0 0 18px rgba(167,139,250,0.55));
+}
+.mf-spark .mf-sp {
+  position: absolute;
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: #c4b5fd;
+  box-shadow: 0 0 8px #a78bfa, 0 0 2px #fff;
+  animation: mf-spark-rise 2.6s ease-out infinite;
+}
+.mf-spark .s1 { left: 30%; bottom: 24%; animation-delay: 0s; }
+.mf-spark .s2 { left: 44%; bottom: 20%; animation-delay: 0.4s; width: 3px; height: 3px; }
+.mf-spark .s3 { left: 58%; bottom: 26%; animation-delay: 0.8s; width: 5px; height: 5px; }
+.mf-spark .s4 { left: 68%; bottom: 20%; animation-delay: 1.2s; width: 3px; height: 3px; background: #e9d5ff; }
+.mf-spark .s5 { left: 22%; bottom: 20%; animation-delay: 1.6s; width: 2.5px; height: 2.5px; }
+.mf-spark .s6 { left: 50%; bottom: 18%; animation-delay: 2s; width: 4px; height: 4px; }
+
+@keyframes mf-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+@keyframes mf-spark-rise {
+  0%   { transform: translateY(20px)  scale(0);   opacity: 0; }
+  15%  { transform: translateY(0)     scale(1);   opacity: 1; }
+  100% { transform: translateY(-70px) scale(0.3); opacity: 0; }
+}
+
+/* ─── Bundle Play page additions ─── */
+.bundle-drag-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  width: 80px;
+  height: 80px;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow:
+    0 24px 50px -8px rgba(0,0,0,.7),
+    0 0 0 2px rgba(167,139,250,.5),
+    0 0 40px rgba(167,139,250,.5);
+  transform: translate(-50%, -50%) rotate(-4deg);
+  transition: transform .2s;
+}
+.bundle-drag-ghost img,
+.bundle-drag-ghost video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@keyframes mf-pulse-glow {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .55; }
+}
+.anim-pulseGlow { animation: mf-pulse-glow 2.2s ease-in-out infinite; }
+
+@keyframes mf-slide-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.anim-slideInR { animation: mf-slide-in-right .45s cubic-bezier(.22,1,.36,1) both; }
