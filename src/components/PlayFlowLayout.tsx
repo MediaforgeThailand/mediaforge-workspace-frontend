@@ -31,7 +31,8 @@ function formatRunDate(dateStr: string): string {
 import { downloadMedia } from "@/lib/downloadMedia";
 import { DifficultyBadge } from "@/components/DifficultyBadge";
 import { motion } from "framer-motion";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import {
   ChevronDown,
   ChevronLeft,
@@ -206,6 +207,7 @@ function ExampleInputsGallery({ items }: { items: string[] }) {
 
       <Dialog open={!!fullscreenUrl} onOpenChange={() => setFullscreenUrl(null)}>
         <DialogContent className="max-w-[95vw] max-h-[95vh] p-2 bg-black/90 border-none flex items-center justify-center">
+          <VisuallyHidden.Root><DialogTitle>Media preview</DialogTitle></VisuallyHidden.Root>
           {fullscreenUrl && (
             VIDEO_EXTS.test(fullscreenUrl) ? (
               <video src={fullscreenUrl} controls autoPlay muted loop className="max-w-full max-h-[90vh] object-contain" />
@@ -397,6 +399,7 @@ function ResultCard({
       {/* Fullscreen dialog */}
       <Dialog open={!!fullscreenUrl} onOpenChange={() => setFullscreenUrl(null)}>
         <DialogContent className="max-w-[95vw] max-h-[95vh] p-2 bg-black/90 border-none flex items-center justify-center">
+          <VisuallyHidden.Root><DialogTitle>Media preview</DialogTitle></VisuallyHidden.Root>
           {fullscreenUrl && (
             VIDEO_EXTS.test(fullscreenUrl) ? (
               <video src={fullscreenUrl} controls autoPlay muted loop className="max-w-full max-h-[90vh] object-contain" />
@@ -547,6 +550,7 @@ function OutputGallery({
       {/* Fullscreen dialog */}
       <Dialog open={!!fullscreenUrl} onOpenChange={() => setFullscreenUrl(null)}>
         <DialogContent className="max-w-[95vw] max-h-[95vh] p-2 bg-black/90 border-none flex items-center justify-center">
+          <VisuallyHidden.Root><DialogTitle>Media preview</DialogTitle></VisuallyHidden.Root>
           {fullscreenUrl && (
             VIDEO_EXTS.test(fullscreenUrl) ? (
               <video src={fullscreenUrl} controls autoPlay muted loop className="max-w-full max-h-[90vh] object-contain" />

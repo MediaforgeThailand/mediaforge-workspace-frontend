@@ -9,6 +9,7 @@ import { extractVideoDuration } from "@/hooks/useVideoDuration";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getFreshToken } from "@/lib/getFreshToken";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCredits } from "@/hooks/useCredits";
@@ -331,8 +332,7 @@ const BundleFlowEngine = ({
       setIsPricing(true);
       setPricingError(null);
       try {
-        const { data: session } = await supabase.auth.getSession();
-        const token = session?.session?.access_token;
+        const token = await getFreshToken();
         if (!token) { setIsPricing(false); return; }
 
         const sanitizedNodes = sanitizeGraphNodes(graph.nodes);
@@ -433,8 +433,7 @@ const BundleFlowEngine = ({
       const elapsed = Date.now() - pollStartRef.current;
       if (elapsed > MAX_POLL_DURATION_MS) {
         try {
-          const { data: session } = await supabase.auth.getSession();
-          const tkn = session?.session?.access_token;
+          const tkn = await getFreshToken();
           if (tkn && runId) {
             await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/run-flow-status`, {
               method: "POST",
@@ -454,8 +453,7 @@ const BundleFlowEngine = ({
       else if (elapsed > 60000) setStatusMessage(t("pfStillGenerating"));
 
       try {
-        const { data: session } = await supabase.auth.getSession();
-        const token = session?.session?.access_token;
+        const token = await getFreshToken();
         if (!token) throw new Error("Not authenticated");
         const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/run-flow-status`, {
           method: "POST",
@@ -936,7 +934,7 @@ const BundleFlowEngine = ({
       // ── Robust ID extraction — prefer optimistic ID, fallback to server response ──
       const run_id = optimisticRunId || initData.run_id || initData.id || initData.runId;
       console.log("[PlayFlow] run-flow-init response:", { status, run_id, task_id, execution_id, keys: Object.keys(initData) });
-      phFlowExecuted(flowId!, { cost_credits: credit_cost, provider: providerInfo.provider });
+      phFlowExecuted(flowId!, { flow_name: flow?.name || undefined, cost_credits: credit_cost, provider: providerInfo.provider });
 
       if (initData.simulated && status === "failed_refunded") {
         toast.info(t("pfSimulatedFailure"), { duration: 6000 });

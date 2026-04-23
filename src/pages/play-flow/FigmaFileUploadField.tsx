@@ -2,7 +2,8 @@ import { useCallback, useState } from "react";
 import { X, ImageIcon, Plus, Info } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import type { InputField } from "./types";
 
 interface FigmaFileUploadFieldProps {
@@ -180,6 +181,7 @@ export default function FigmaFileUploadField({ field, file, preview, onSelect }:
       {/* Fullscreen image dialog */}
       <Dialog open={!!fullscreenUrl} onOpenChange={() => setFullscreenUrl(null)}>
         <DialogContent className="max-w-[95vw] max-h-[95vh] p-2 bg-black/90 border-none flex items-center justify-center">
+          <VisuallyHidden.Root><DialogTitle>Image preview</DialogTitle></VisuallyHidden.Root>
           {fullscreenUrl && (
             <img src={fullscreenUrl} alt="" className="max-w-full max-h-[90vh] object-contain" />
           )}

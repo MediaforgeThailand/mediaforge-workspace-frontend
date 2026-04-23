@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, CheckCircle2, XCircle, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { getFreshToken } from "@/lib/getFreshToken";
 import { useBackgroundExecutionStore, type BackgroundTask } from "@/store/useBackgroundExecutionStore";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -190,8 +191,7 @@ export default function GlobalExecutionWatcher() {
   const pollTasks = useCallback(async () => {
     if (processingTasks.length === 0) return;
 
-    const { data: session } = await supabase.auth.getSession();
-    const token = session?.session?.access_token;
+    const token = await getFreshToken();
     if (!token) return;
 
     for (const task of processingTasks) {

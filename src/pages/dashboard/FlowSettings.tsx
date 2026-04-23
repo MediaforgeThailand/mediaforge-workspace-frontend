@@ -257,16 +257,22 @@ const FlowSettingsPage = () => {
     setIsUploadingPreview(true);
     try {
       const newUrls: string[] = [];
+      const rejected: string[] = [];
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
         const isValid = f.type.startsWith("image/") || f.type === "video/mp4" || f.type === "video/webm";
-        if (!isValid) continue;
-        if (f.size > 10 * 1024 * 1024) continue;
+        if (!isValid) { rejected.push(`${f.name}: ${t("fsOnlyImageOrVideo")}`); continue; }
+        if (f.size > 10 * 1024 * 1024) { rejected.push(`${f.name}: ${t("fsMaxFileSize")}`); continue; }
         const url = await uploadImage(f, `flow-preview-${flowId}-${Date.now()}-${i}`);
         newUrls.push(url);
       }
       setPreviewImages((prev) => [...prev, ...newUrls]);
-      toast.success(t("fsImagesUploaded").replace("{n}", String(newUrls.length)));
+      if (newUrls.length > 0) {
+        toast.success(t("fsImagesUploaded").replace("{n}", String(newUrls.length)));
+      }
+      if (rejected.length > 0) {
+        toast.error(rejected.join("\n"));
+      }
     } catch (err: any) { toast.error(err.message); }
     finally { setIsUploadingPreview(false); }
   };
@@ -282,15 +288,22 @@ const FlowSettingsPage = () => {
     setIsUploadingExample(true);
     try {
       const newUrls: string[] = [];
+      const rejected: string[] = [];
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
         const isValid = f.type.startsWith("image/") || f.type === "video/mp4" || f.type === "video/webm";
-        if (!isValid || f.size > 10 * 1024 * 1024) continue;
+        if (!isValid) { rejected.push(`${f.name}: ${t("fsOnlyImageOrVideo")}`); continue; }
+        if (f.size > 10 * 1024 * 1024) { rejected.push(`${f.name}: ${t("fsMaxFileSize")}`); continue; }
         const url = await uploadImage(f, `flow-example-input-${flowId}-${Date.now()}-${i}`);
         newUrls.push(url);
       }
       setExampleInputs((prev) => [...prev, ...newUrls]);
-      toast.success(t("fsExamplesUploaded").replace("{n}", String(newUrls.length)));
+      if (newUrls.length > 0) {
+        toast.success(t("fsExamplesUploaded").replace("{n}", String(newUrls.length)));
+      }
+      if (rejected.length > 0) {
+        toast.error(rejected.join("\n"));
+      }
     } catch (err: any) { toast.error(err.message); }
     finally { setIsUploadingExample(false); }
   };

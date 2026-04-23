@@ -2,7 +2,6 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { execSync } from "child_process";
-import { componentTagger } from "lovable-tagger";
 
 // Build version = git commit count on current branch (main).
 // Increments with every commit pushed to GitHub. Falls back to date-based number if git unavailable.
@@ -36,7 +35,7 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

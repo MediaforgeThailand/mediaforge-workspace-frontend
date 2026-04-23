@@ -123,7 +123,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      // Handle expired/revoked refresh tokens gracefully
+      if (error && (error.message?.includes("refresh_token_not_found") || error.message?.includes("Invalid Refresh Token"))) {
+        console.info("Session expired, clearing auth state");
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+
       setSession(session);
       setUser(session?.user ?? null);
 
