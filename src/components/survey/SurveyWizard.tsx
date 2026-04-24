@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -229,6 +230,7 @@ const SurveyWizard = () => {
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
+        <VisuallyHidden.Root><DialogTitle>Welcome survey</DialogTitle></VisuallyHidden.Root>
         {/* Progress + Language toggle */}
         <div className="relative shrink-0">
         <div className="h-1 bg-white/[0.06]">

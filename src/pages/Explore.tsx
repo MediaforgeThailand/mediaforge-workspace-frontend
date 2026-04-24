@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useFlowCategories } from "@/hooks/useFlowCategories";
 import { useDebounce } from "@/hooks/useDebounce";
 import { hybridSearchFlows } from "@/lib/hybridSearch";
+import { enrichBundlesWithFlows, findBundlesByCategoryIds, type BundleBaseRow } from "@/lib/bundleEnrichment";
 import FlowDataCard, { FlowDataCardSkeleton, getBentoSpan } from "@/components/FlowDataCard";
 import type { FlowCardData } from "@/components/FlowDataCard";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -58,13 +59,18 @@ const Explore = () => {
 
         if (results.length === 0) return [];
 
-        const fIds = results.map((r) => r.id);
+        // Only flow rows need node/runs enrichment — bundles skip these joins.
+        const flowOnlyIds = results.filter((r) => !r.is_bundle).map((r) => r.id);
         const creatorIds = [...new Set(results.map((r) => r.user_id))];
 
         const [nodesRes, creatorsRes, runsRes] = await Promise.all([
-          supabase.from("flow_nodes").select("flow_id, node_type").in("flow_id", fIds),
+          flowOnlyIds.length
+            ? supabase.from("flow_nodes").select("flow_id, node_type").in("flow_id", flowOnlyIds)
+            : Promise.resolve({ data: [] }),
           supabase.from("profiles_public").select("user_id, display_name, avatar_url").in("user_id", creatorIds),
-          supabase.from("flow_runs").select("flow_id, status").in("flow_id", fIds),
+          flowOnlyIds.length
+            ? supabase.from("flow_runs").select("flow_id, status").in("flow_id", flowOnlyIds)
+            : Promise.resolve({ data: [] }),
         ]);
 
         const flowNodeMap: Record<string, string[]> = {};
@@ -97,10 +103,12 @@ const Explore = () => {
             tags: f.tags,
             thumbnail_url: f.thumbnail_url,
             is_official: f.is_official,
-            model_badge: modelInfo?.label || "AI",
+            is_bundle: f.is_bundle,
+            model_badge: f.is_bundle ? "Bundle" : (modelInfo?.label || "AI"),
             estimated_credits: 0,
             final_price: f.selling_price || f.base_cost || 0,
-            output_type: modelInfo?.output || ("unknown" as const),
+            price_range_max: f.is_bundle ? (f.price_range_max ?? null) : null,
+            output_type: f.is_bundle ? ("unknown" as const) : (modelInfo?.output || ("unknown" as const)),
             creator_name: creator?.name || null,
             creator_avatar: creator?.avatar || null,
           };
@@ -137,12 +145,54 @@ const Explore = () => {
         );
       }
 
-      const { data: flowsData } = await query;
+      // Fetch published bundles in parallel. Category filter is satisfied by
+      // matching any constituent flow via flow_category_mappings.
+      const bundleIdsByCategoryPromise = activeCategories.length > 0
+        ? findBundlesByCategoryIds(activeCategories)
+        : Promise.resolve<string[] | null>(null);
 
-      if (!flowsData || flowsData.length === 0) return [];
+      const [flowsRes, bundleIdsByCategory] = await Promise.all([
+        query,
+        bundleIdsByCategoryPromise,
+      ]);
 
-      const fIds = flowsData.map((f) => f.id);
-      const creatorIds = [...new Set(flowsData.map((f) => f.user_id))];
+      let bundleQuery = supabase
+        .from("bundles" as any)
+        .select("id, user_id, name, description, thumbnail_url, tags, is_official, keywords")
+        .eq("status", "published")
+        .order("updated_at", { ascending: false })
+        .limit(30);
+
+      if (bundleIdsByCategory !== null) {
+        if (bundleIdsByCategory.length === 0) {
+          bundleQuery = bundleQuery.in("id", ["__no_match__"]); // force empty
+        } else {
+          bundleQuery = bundleQuery.in("id", bundleIdsByCategory);
+        }
+      }
+
+      if (hasSearch) {
+        const term = debouncedSearch.trim();
+        bundleQuery = bundleQuery.or(
+          `name.ilike.%${term}%,description.ilike.%${term}%,keywords.cs.{"${term.toLowerCase()}"}`,
+        );
+      }
+
+      const bundlesRes = await bundleQuery;
+      const flowsData = flowsRes.data;
+      const bundleBaseRows = ((bundlesRes as any).data ?? []) as BundleBaseRow[];
+      const enrichedBundles = await enrichBundlesWithFlows(bundleBaseRows);
+      const filteredBundles = enrichedBundles;
+
+      if ((!flowsData || flowsData.length === 0) && filteredBundles.length === 0) return [];
+
+      const fIds = (flowsData ?? []).map((f) => f.id);
+      const creatorIds = [
+        ...new Set([
+          ...(flowsData ?? []).map((f) => f.user_id),
+          ...filteredBundles.map((b) => b.user_id),
+        ]),
+      ];
 
       const [nodesRes, costsRes, creatorsRes, runsRes] = await Promise.all([
         supabase.from("flow_nodes").select("flow_id, node_type").in("flow_id", fIds),
@@ -173,7 +223,7 @@ const Explore = () => {
         runCountMap[r.flow_id] = (runCountMap[r.flow_id] || 0) + 1;
       });
 
-      const enriched: FlowCardData[] = flowsData.map((f) => {
+      const enriched: FlowCardData[] = (flowsData ?? []).map((f) => {
         const nodeTypes = flowNodeMap[f.id] || [];
         const actionNode = nodeTypes.find((nt) => NODE_MODEL_MAP[nt]);
         const modelInfo = actionNode ? NODE_MODEL_MAP[actionNode] : null;
@@ -206,7 +256,30 @@ const Explore = () => {
         };
       });
 
-      // Trend sorting: official first, then by run count
+      // Map enriched bundles into FlowCardData shape and append. Category and
+      // price are derived from the bundle's constituent flows.
+      for (const b of filteredBundles) {
+        const creator = creatorMap[b.user_id];
+        enriched.push({
+          id: b.id,
+          name: b.name,
+          description: b.description,
+          category: b.categories[0] ?? "Bundle",
+          tags: b.tags,
+          thumbnail_url: b.thumbnail_url,
+          is_official: b.is_official,
+          is_bundle: true,
+          model_badge: "Bundle",
+          estimated_credits: 0,
+          final_price: b.min_price,
+          price_range_max: b.max_price,
+          output_type: "unknown" as const,
+          creator_name: creator?.name ?? null,
+          creator_avatar: creator?.avatar ?? null,
+        });
+      }
+
+      // Trend sorting: official first, then by run count (bundles have 0 runs).
       enriched.sort((a, b) => {
         if (a.is_official && !b.is_official) return -1;
         if (!a.is_official && b.is_official) return 1;

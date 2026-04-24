@@ -39,11 +39,17 @@ export function useNotifications() {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  // Realtime subscription
+  // Realtime subscription — guard against duplicate channels
   useEffect(() => {
     if (!user) return;
+    const topic = "notifications-realtime";
+    const alreadyOwned = supabase
+      .getChannels()
+      .some((c) => c.topic === `realtime:${topic}`);
+    if (alreadyOwned) return;
+
     const channel = supabase
-      .channel("notifications-realtime")
+      .channel(topic)
       .on(
         "postgres_changes",
         {

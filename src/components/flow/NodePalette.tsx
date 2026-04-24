@@ -80,7 +80,7 @@ export const NODE_PALETTE: PaletteNodeDef[] = [
   },
   {
     type: "bananaProNode",
-    label: "Banana Pro (Image Gen)",
+    label: "Image Gen (Banana Pro)",
     icon: Layers,
     category: "ai",
     description: "nodeDescImageGen",
@@ -100,6 +100,22 @@ export const NODE_PALETTE: PaletteNodeDef[] = [
     category: "ai",
     description: "nodeDescRemoveBg",
     highlight: "#a855f7",
+  },
+  {
+    type: "seedDanceNode",
+    label: "Image to Video (SeedDance)",
+    icon: Film,
+    category: "ai",
+    description: "nodeDescSeedDanceVideo",
+    highlight: "#2dd4bf",
+  },
+  {
+    type: "seedDreamNode",
+    label: "Image Gen (SeedDream)",
+    icon: Sparkles,
+    category: "ai",
+    description: "nodeDescSeedDreamImage",
+    highlight: "#22d3ee",
   },
   {
     type: "mergeAudioNode",

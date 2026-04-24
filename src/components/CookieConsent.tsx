@@ -4,7 +4,7 @@ import { Cookie, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { motion, AnimatePresence } from "framer-motion";
-import { initPostHog, posthog } from "@/lib/posthog";
+import { upgradePostHogConsent, posthog } from "@/lib/posthog";
 
 const CookieConsent = () => {
   const [visible, setVisible] = useState(false);
@@ -20,7 +20,7 @@ const CookieConsent = () => {
 
   const accept = () => {
     localStorage.setItem("mf-cookie-consent", "accepted");
-    initPostHog();
+    upgradePostHogConsent();
     setVisible(false);
   };
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MediaForge — AI-powered media creation SaaS for Thai SMEs. React SPA frontend with Supabase backend (Edge Functions in Deno), deployed via Lovable.
+MediaForge — AI-powered media creation SaaS for Thai SMEs. React SPA frontend with Supabase backend (Edge Functions in Deno), deployed via Vercel.
 
 ## Commands
 

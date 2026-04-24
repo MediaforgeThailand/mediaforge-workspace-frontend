@@ -30,6 +30,7 @@ import { ResultsPanel } from "@/components/play/ResultsPanel";
 import { MobileScreen } from "@/components/play/mobile/MobileScreen";
 import { usePlayBundle } from "@/hooks/useBundles";
 import { registerBundleRun, getBundleRunIds, getAllBundleRunIds } from "@/lib/bundleRunRegistry";
+import { getFreshToken } from "@/lib/getFreshToken";
 
 // Re-export utils for tests and external consumers
 export { extractFields, findActionNode, findAllActionNodes, buildNodeParams, normalizeExampleMedia, formatTimer, getParamRegistry, classifyPollResult, resolveOutputNodeResults } from "./utils";
@@ -84,6 +85,8 @@ const PlayFlow = () => {
   const pollStartRef = useRef<number>(0);
   const abortRef = useRef(false);
   const elapsedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** Active run ID for realtime completion fallback */
+  const activeRunIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -102,6 +105,43 @@ const PlayFlow = () => {
     }
     return () => { if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current); };
   }, [executionState]);
+
+  // Realtime fallback: if polling gets stuck, catch completion via DB subscription
+  useEffect(() => {
+    const runId = activeRunIdRef.current;
+    if (!runId || executionState !== "processing") return;
+
+    const channel = supabase
+      .channel(`play-run-${runId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "flow_runs", filter: `id=eq.${runId}` },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          if (row?.status !== "completed") return;
+          const outputs = row.outputs as Record<string, string> | null;
+          const url = outputs?.result_url;
+          if (!url) return;
+
+          console.log("[PlayFlow] Realtime fallback caught completion for run", runId);
+          const isVideo = /\.(mp4|webm|mov|m4v|avi)(\?|$)/i.test(url);
+          setResultUrl(url);
+          setResultType(isVideo ? "video" : "image");
+          setPollProgress(100);
+          setExecutionState("done");
+          setStatusMessage(t("pfGenerationCompleteMsg"));
+          setLastRunId(runId);
+          refetchCredits();
+          toast.success(t("pfGenerationCompleteMsg"));
+          // Stop any active polling
+          abortRef.current = true;
+          if (pollTimerRef.current) { clearTimeout(pollTimerRef.current); pollTimerRef.current = null; }
+        },
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [executionState, t, refetchCredits]);
 
   /* ─── Fetch flow ─── */
   const { data: flow, isLoading } = useQuery({
@@ -349,8 +389,7 @@ const PlayFlow = () => {
       setIsPricing(true);
       setPricingError(null);
       try {
-        const { data: session } = await supabase.auth.getSession();
-        const token = session?.session?.access_token;
+        const token = await getFreshToken();
         if (!token) { setIsPricing(false); return; }
 
         const sanitizedNodes = sanitizeGraphNodes(graph.nodes);
@@ -451,8 +490,7 @@ const PlayFlow = () => {
       const elapsed = Date.now() - pollStartRef.current;
       if (elapsed > MAX_POLL_DURATION_MS) {
         try {
-          const { data: session } = await supabase.auth.getSession();
-          const tkn = session?.session?.access_token;
+          const tkn = await getFreshToken();
           if (tkn && runId) {
             await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/run-flow-status`, {
               method: "POST",
@@ -472,8 +510,7 @@ const PlayFlow = () => {
       else if (elapsed > 60000) setStatusMessage(t("pfStillGenerating"));
 
       try {
-        const { data: session } = await supabase.auth.getSession();
-        const token = session?.session?.access_token;
+        const token = await getFreshToken();
         if (!token) throw new Error("Not authenticated");
         const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/run-flow-status`, {
           method: "POST",
@@ -932,8 +969,7 @@ const PlayFlow = () => {
       setStatusMessage(t("pfStarting"));
       setPollProgress(25);
 
-      const { data: session } = await supabase.auth.getSession();
-      const token = session?.session?.access_token;
+      const token = await getFreshToken();
       if (!token) throw new Error("Not authenticated");
 
       // ── Pre-flight payload sanitization ──
@@ -999,8 +1035,10 @@ const PlayFlow = () => {
 
       // ── Robust ID extraction — prefer optimistic ID, fallback to server response ──
       const run_id = optimisticRunId || initData.run_id || initData.id || initData.runId;
+      activeRunIdRef.current = run_id || null;
+      abortRef.current = false;
       console.log("[PlayFlow] run-flow-init response:", { status, run_id, task_id, execution_id, levels: steps_by_level?.length, keys: Object.keys(initData) });
-      phFlowExecuted(flowId!, { cost_credits: credit_cost, provider: providerInfo.provider });
+      phFlowExecuted(flowId!, { flow_name: flow?.name || undefined, cost_credits: credit_cost, provider: providerInfo.provider });
 
       if (initData.simulated && status === "failed_refunded") {
         toast.info(t("pfSimulatedFailure"), { duration: 6000 });
@@ -1142,6 +1180,7 @@ const PlayFlow = () => {
 
   const resetExecution = useCallback(() => {
     abortRef.current = true;
+    activeRunIdRef.current = null;
     if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     setExecutionState("idle");
     setResultUrl(null);

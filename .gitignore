@@ -41,4 +41,6 @@ screenshots
 *.branches
 
 supabase/snippets
-supabase/.temp
+supabase/.tempvite.config.ts.timestamp-*.mjs
+.env
+.env.local

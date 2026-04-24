@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
+import { getFreshToken } from "@/lib/getFreshToken";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import FlowStatusBadge from "@/components/flow/FlowStatusBadge";
@@ -80,12 +81,12 @@ export default function CreatorFlowStatus() {
   const handleSubmit = async (flowId: string) => {
     setSubmitting(flowId);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const token = await getFreshToken();
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/submit-flow-for-review`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token}`,
+          Authorization: `Bearer ${token}`,
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
         body: JSON.stringify({ flow_id: flowId }),

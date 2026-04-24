@@ -30,6 +30,7 @@ import {
 import { useNavigate, useParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { getFreshToken } from "@/lib/getFreshToken";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -46,6 +47,8 @@ import TextInputNode from "@/components/flow/nodes/TextInputNode";
 import OutputNode from "@/components/flow/nodes/OutputNode";
 import Mp3InputNode from "@/components/flow/nodes/Mp3InputNode";
 import MergeAudioNode from "@/components/flow/nodes/MergeAudioNode";
+import SeedDanceNode from "@/components/flow/nodes/SeedDanceNode";
+import SeedDreamNode from "@/components/flow/nodes/SeedDreamNode";
 import AnimatedEdge from "@/components/flow/AnimatedEdge";
 import NodePalette from "@/components/flow/NodePalette";
 import { NODE_API_SCHEMA } from "@/components/flow/nodes/nodeApiSchema";
@@ -60,6 +63,8 @@ const nodeTypes = {
   removeBackgroundNode: RemoveBackgroundNode,
   mp3InputNode: Mp3InputNode,
   mergeAudioNode: MergeAudioNode,
+  seedDanceNode: SeedDanceNode,
+  seedDreamNode: SeedDreamNode,
   outputNode: OutputNode,
 };
 
@@ -103,7 +108,9 @@ const getDefaultData = (type: string, label: string): Record<string, unknown> =>
     case "bananaProNode":
     case "klingVideoNode":
     case "chatAiNode":
-    case "removeBackgroundNode": {
+    case "removeBackgroundNode":
+    case "seedDanceNode":
+    case "seedDreamNode": {
       const schemaDef = NODE_API_SCHEMA[type];
       if (schemaDef) {
         const params: Record<string, unknown> = {};
@@ -596,10 +603,10 @@ const FlowStudioInner = () => {
     await saveNow();
     setIsSubmitting(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const token = await getFreshToken();
       const res = await supabase.functions.invoke("submit-flow-for-review", {
         body: { flow_id: flowId },
-        headers: { Authorization: `Bearer ${session?.access_token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.error) throw res.error;
       setFlowStatus("submitted");

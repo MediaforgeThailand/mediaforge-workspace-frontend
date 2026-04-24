@@ -9,9 +9,21 @@ import FlowDataCard, { FlowDataCardSkeleton, type FlowCardData } from "@/compone
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { getDifficultyFromGraph } from "@/components/DifficultyBadge";
+import {
+  enrichBundlesWithFlows,
+  findBundlesByCategoryIds,
+  type BundleBaseRow,
+} from "@/lib/bundleEnrichment";
 
 /* ─── Sort options ─── */
 type SortKey = "trending" | "latest" | "most_gen";
+type ContentType = "all" | "flow" | "bundle";
+
+const CONTENT_TYPE_OPTIONS: Array<{ key: ContentType; label: string }> = [
+  { key: "all", label: "All" },
+  { key: "flow", label: "Flow" },
+  { key: "bundle", label: "Bundle" },
+];
 
 interface SortOption {
   key: SortKey;
@@ -33,7 +45,15 @@ async function fetchCommunityFlows(
   useCaseId: string | null,
   sort: SortKey,
   page: number,
+  contentType: ContentType = "all",
 ): Promise<FlowCardData[]> {
+  // Bundle-only: skip flow query entirely, return enriched bundles on page 0,
+  // empty on subsequent pages so infinite scroll terminates cleanly.
+  if (contentType === "bundle") {
+    if (page !== 0) return [];
+    return fetchBundlesAsFlowCards(industryId, useCaseId);
+  }
+
   // If categories are selected, get flow IDs from junction table
   let flowIdFilter: string[] | null = null;
 
@@ -83,7 +103,77 @@ async function fetchCommunityFlows(
   const { data, error } = await query;
   if (error || !data) return [];
 
-  return enrichFlows(data, sort);
+  const enrichedFlows = await enrichFlows(data, sort);
+
+  // Flow-only or non-first page: no bundle merging.
+  if (contentType === "flow" || page !== 0) return enrichedFlows;
+
+  // "all" on page 0: blend bundles into the grid.
+  const bundleCards = await fetchBundlesAsFlowCards(industryId, useCaseId);
+  if (bundleCards.length === 0) return enrichedFlows;
+
+  // Official bundles float to the very top alongside official flows.
+  const officialBundles = bundleCards.filter((b) => b.is_official);
+  const regularBundles = bundleCards.filter((b) => !b.is_official);
+  return [...officialBundles, ...enrichedFlows, ...regularBundles];
+}
+
+/**
+ * Fetch published bundles and shape them as FlowCardData so the same
+ * FlowDataCard grid can render them. Respects the active category filter by
+ * matching any constituent flow via flow_category_mappings.
+ */
+async function fetchBundlesAsFlowCards(
+  industryId: string | null,
+  useCaseId: string | null,
+): Promise<FlowCardData[]> {
+  const categoryIds = [industryId, useCaseId].filter(Boolean) as string[];
+
+  let bundleQuery = supabase
+    .from("bundles" as any)
+    .select("id, user_id, name, description, thumbnail_url, tags, is_official, keywords")
+    .eq("status", "published")
+    .order("is_official", { ascending: false })
+    .order("updated_at", { ascending: false })
+    .limit(20);
+
+  if (categoryIds.length > 0) {
+    const matchingBundleIds = await findBundlesByCategoryIds(categoryIds);
+    if (matchingBundleIds.length === 0) return [];
+    bundleQuery = bundleQuery.in("id", matchingBundleIds);
+  }
+
+  const { data } = await bundleQuery;
+  const rows = (data as unknown as BundleBaseRow[]) ?? [];
+  if (rows.length === 0) return [];
+
+  const enriched = await enrichBundlesWithFlows(rows);
+
+  // Resolve creator profiles
+  const userIds = [...new Set(enriched.map((b) => b.user_id))];
+  const { data: profiles } = userIds.length
+    ? await supabase.from("profiles").select("user_id, display_name, avatar_url").in("user_id", userIds)
+    : { data: [] };
+  const profileMap = new Map((profiles ?? []).map((p: any) => [p.user_id, p]));
+
+  return enriched.map((b): FlowCardData => {
+    const profile = profileMap.get(b.user_id);
+    return {
+      id: b.id,
+      name: b.name,
+      description: b.description,
+      category: b.categories[0] ?? "Bundle",
+      tags: b.tags,
+      thumbnail_url: b.thumbnail_url,
+      is_official: b.is_official,
+      is_bundle: true,
+      model_badge: "Bundle",
+      final_price: b.min_price,
+      price_range_max: b.max_price,
+      creator_name: profile?.display_name || undefined,
+      creator_avatar: profile?.avatar_url || undefined,
+    };
+  });
 }
 
 export async function enrichFlows(data: any[], sort?: SortKey): Promise<FlowCardData[]> {
@@ -112,6 +202,7 @@ export async function enrichFlows(data: any[], sort?: SortKey): Promise<FlowCard
     const profile = profileMap.get(f.user_id);
     const metric = metricsMap.get(f.id);
     const graph = (f.settings as Record<string, unknown> | null)?.graph ?? null;
+    const isBundle = !!f.is_bundle;
     return {
       id: f.id,
       name: f.name,
@@ -120,11 +211,16 @@ export async function enrichFlows(data: any[], sort?: SortKey): Promise<FlowCard
       tags: f.tags,
       thumbnail_url: f.thumbnail_url,
       final_price: f.selling_price || Math.ceil((f.base_cost || 0) * (f.markup_multiplier || 1)),
+      // Preserve bundle-specific fields so search results link correctly
+      // and display the price range from constituent flows.
+      price_range_max: f.price_range_max ?? null,
+      is_bundle: isBundle || undefined,
+      model_badge: isBundle ? "Bundle" : undefined,
       is_official: f.is_official,
       creator_name: profile?.display_name || undefined,
       creator_avatar: profile?.avatar_url || undefined,
       avg_rating: metric?.avg_rating ?? null,
-      difficulty: getDifficultyFromGraph(graph as any),
+      difficulty: isBundle ? undefined : getDifficultyFromGraph(graph as any),
     };
   });
 
@@ -197,6 +293,7 @@ const CommunityFlows = forwardRef<CommunityFlowsHandle>((_, ref) => {
   const [industryFilter, setIndustryFilter] = useState<string | null>(null);
   const [useCaseFilter, setUseCaseFilter] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("latest");
+  const [contentType, setContentType] = useState<ContentType>("all");
   const sectionRef = useRef<HTMLDivElement>(null);
   const { t } = useLanguage();
 
@@ -215,7 +312,7 @@ const CommunityFlows = forwardRef<CommunityFlowsHandle>((_, ref) => {
     },
   }));
 
-  const queryKey = ["community-flows", industryFilter, useCaseFilter, sortKey];
+  const queryKey = ["community-flows", industryFilter, useCaseFilter, sortKey, contentType];
 
   const {
     data,
@@ -228,7 +325,7 @@ const CommunityFlows = forwardRef<CommunityFlowsHandle>((_, ref) => {
   } = useInfiniteQuery({
     queryKey,
     queryFn: ({ pageParam = 0 }) =>
-      fetchCommunityFlows(industryFilter, useCaseFilter, sortKey, pageParam),
+      fetchCommunityFlows(industryFilter, useCaseFilter, sortKey, pageParam, contentType),
     getNextPageParam: (lastPage, allPages) =>
       lastPage.length < PAGE_SIZE ? undefined : allPages.length,
     initialPageParam: 0,
@@ -303,6 +400,25 @@ const CommunityFlows = forwardRef<CommunityFlowsHandle>((_, ref) => {
           >
             <opt.icon className="w-3 h-3" />
             {t(opt.labelKey as any)}
+          </button>
+        ))}
+
+        {/* Divider */}
+        <div className="h-5 w-px bg-border/40 shrink-0" />
+
+        {/* Content type toggle (All / Flow / Bundle) */}
+        {CONTENT_TYPE_OPTIONS.map((opt) => (
+          <button
+            key={opt.key}
+            onClick={() => setContentType(opt.key)}
+            className={cn(
+              "shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 border",
+              contentType === opt.key
+                ? "bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/20"
+                : "bg-card/50 text-muted-foreground border-border/40 hover:border-border hover:text-foreground hover:bg-card",
+            )}
+          >
+            {opt.label}
           </button>
         ))}
 

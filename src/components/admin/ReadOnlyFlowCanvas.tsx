@@ -20,6 +20,8 @@ import OutputNode from "@/components/flow/nodes/OutputNode";
 import TextInputNode from "@/components/flow/nodes/TextInputNode";
 import Mp3InputNode from "@/components/flow/nodes/Mp3InputNode";
 import MergeAudioNode from "@/components/flow/nodes/MergeAudioNode";
+import SeedDanceNode from "@/components/flow/nodes/SeedDanceNode";
+import SeedDreamNode from "@/components/flow/nodes/SeedDreamNode";
 
 const nodeTypes = {
   inputNode: InputNode,
@@ -29,6 +31,8 @@ const nodeTypes = {
   bananaProNode: BananaProNode,
   klingVideoNode: KlingVideoNode,
   chatAiNode: ChatAiNode,
+  seedDanceNode: SeedDanceNode,
+  seedDreamNode: SeedDreamNode,
   outputNode: OutputNode,
 };
 

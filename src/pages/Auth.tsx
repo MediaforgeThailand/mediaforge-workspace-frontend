@@ -9,7 +9,6 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, MailCheck, ArrowLeft, Phone } from "lucide-react";
 import logo from "@/assets/logo-white.png";
-import { lovable } from "@/integrations/lovable/index";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import PhoneOtpLogin from "@/components/auth/PhoneOtpLogin";
@@ -57,14 +56,15 @@ const Auth = () => {
     const callbackUrl = redirectParam
       ? `${window.location.origin}/auth?redirect=${encodeURIComponent(redirectParam)}`
       : `${window.location.origin}/auth`;
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: callbackUrl,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: callbackUrl },
     });
-    if (result.error) {
+    if (error) {
       toast({
         variant: "destructive",
         title: "Google Sign In Failed",
-        description: result.error.message,
+        description: error.message,
       });
       setIsGoogleLoading(false);
     }

@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useBundle, useUpdateBundle, useSetBundleFlows } from "@/hooks/useBundles";
 import { useFlows } from "@/hooks/useFlows";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,7 @@ const BundleEditor = () => {
   const { bundleId } = useParams<{ bundleId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const thumbInputRef = useRef<HTMLInputElement>(null);
 
   const { data: bundleData, isLoading } = useBundle(bundleId);
@@ -71,14 +73,14 @@ const BundleEditor = () => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     e.target.value = "";
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("Max 10MB");
-      return;
-    }
     const isImage = file.type.startsWith("image/");
     const isVideo = file.type === "video/mp4" || file.type === "video/webm";
     if (!isImage && !isVideo) {
-      toast.error("Image or video only");
+      toast.error(`${file.name}: ${t("fsOnlyImageOrVideo")}`);
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error(`${file.name}: ${t("fsMaxFileSize")}`);
       return;
     }
     setIsUploadingThumb(true);

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,7 +7,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, MailCheck, ArrowLeft, Lock, Phone } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { lovable } from "@/integrations/lovable/index";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import PhoneOtpLogin from "@/components/auth/PhoneOtpLogin";
@@ -68,8 +67,9 @@ const LoginRequiredDialog = ({ open, onOpenChange }: LoginRequiredDialogProps) =
     const callbackUrl = currentPath && currentPath !== "/auth"
       ? `${window.location.origin}/auth?redirect=${encodeURIComponent(currentPath)}`
       : `${window.location.origin}/auth`;
-    const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: callbackUrl,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: callbackUrl },
     });
     if (error) {
       toast({ variant: "destructive", title: "Google Sign In Failed", description: error.message });
@@ -136,12 +136,12 @@ const LoginRequiredDialog = ({ open, onOpenChange }: LoginRequiredDialogProps) =
             <Lock className="w-7 h-7 text-primary-foreground" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-foreground">
+            <DialogTitle className="text-lg font-bold text-foreground">
               {t("authSignInToContinue")}
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground mt-1">
               {t("authFeatureRequiresAccount")}
-            </p>
+            </DialogDescription>
           </div>
         </div>
 
