@@ -66,11 +66,30 @@ function normalizePromptTokens(raw: string): string {
 /* ── Helpers ── */
 
 function getNodeIcon(nodeType: string, data: Record<string, unknown>): MentionOption["icon"] {
-  if (nodeType === "textInputNode") return "textvar";
-  if (nodeType === "inputNode") {
-    return (data.fieldType as string) === "video" ? "video" : "image";
+  // Text variable nodes (# trigger): both legacy `textInputNode` and
+  // workspace V2 `textNode`.
+  if (nodeType === "textInputNode" || nodeType === "textNode") return "textvar";
+
+  // Image/video sources: legacy uses `inputNode`, workspace V2 uses `assetNode`.
+  if (nodeType === "inputNode" || nodeType === "assetNode") {
+    const ft = (data.fieldType as string) ?? "";
+    if (ft === "video") return "video";
+    if (ft === "audio") return "text"; // no audio icon → fall back to message
+    return "image";
   }
-  if (nodeType === "bananaProNode" || nodeType === "klingVideoNode") return "ai";
+
+  // Workspace V2 element node — show as ai sparkle (it's a saved character/object).
+  if (nodeType === "elementNode") return "ai";
+
+  // Tool nodes — legacy + workspace V2 share the "ai" sparkle icon.
+  if (
+    nodeType === "bananaProNode" ||
+    nodeType === "klingVideoNode" ||
+    nodeType === "imageGenNode" ||
+    nodeType === "videoGenNode"
+  ) {
+    return "ai";
+  }
   if (nodeType === "chatAiNode") return "text";
   if (nodeType === "outputNode") {
     const t = data.outputType as string;
@@ -226,8 +245,26 @@ const PromptMentionTextarea = memo(({
   placeholder,
   className,
   excludeNodeId,
-  allowedNodeTypes = ["inputNode"],
-  allowedTextVarTypes = ["textInputNode"],
+  // Defaults cover BOTH editors: legacy Flow Studio (`inputNode`,
+  // `textInputNode`) AND workspace V2 (`assetNode`, `textNode`,
+  // `elementNode`, plus tool-node outputs `imageGenNode`/`videoGenNode`/
+  // `bananaProNode`/`klingVideoNode`/`chatAiNode` so users can mention
+  // a previous Run's output as a ref). The two editors never share a
+  // canvas, so listing both is safe.
+  allowedNodeTypes = [
+    // legacy
+    "inputNode",
+    "bananaProNode",
+    "klingVideoNode",
+    "chatAiNode",
+    "outputNode",
+    // workspace V2
+    "assetNode",
+    "elementNode",
+    "imageGenNode",
+    "videoGenNode",
+  ],
+  allowedTextVarTypes = ["textInputNode", "textNode"],
   maxLength,
 }: PromptMentionTextareaProps) => {
   const { t } = useLanguage();

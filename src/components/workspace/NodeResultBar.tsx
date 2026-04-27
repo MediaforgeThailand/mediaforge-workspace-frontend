@@ -1,0 +1,113 @@
+/**
+ * Result bar — sits directly above the node body, visually merged with
+ * it via `.workspace-node-merged` CSS (no seam, shared card look).
+ *
+ * Always renders, with 3 visual states:
+ *   - empty        → "Results will appear here" placeholder (like Krea)
+ *   - with output  → thumbnail at natural aspect ratio
+ *   - multiple     → "n/N" badge + history filmstrip in the expand dialog
+ */
+
+import { memo, useState } from "react";
+import { Maximize2 } from "lucide-react";
+import NodeResultDialog from "./NodeResultDialog";
+
+export interface Generation {
+  id: string;
+  type: "image" | "video" | "text";
+  url?: string;
+  text?: string;
+  createdAt: number;
+}
+
+interface Props {
+  generations?: Generation[];
+  /** Index into generations[] to display as current (default 0 = newest). */
+  selectedIndex?: number;
+  onSelectIndex?: (i: number) => void;
+  /** Match the wrapped node's width so the stack looks unified. */
+  width?: number;
+}
+
+const EMPTY_MIN_HEIGHT = 140;
+
+const NodeResultBar = memo(
+  ({ generations, selectedIndex = 0, onSelectIndex, width = 300 }: Props) => {
+    const [expanded, setExpanded] = useState(false);
+
+    const hasGens = !!generations && generations.length > 0;
+    const current = hasGens ? (generations![selectedIndex] ?? generations![0]) : null;
+
+    return (
+      <>
+        <div
+          className="node-result-bar overflow-hidden border border-white/10 bg-black/60"
+          style={{ width, borderRadius: 10 }}
+        >
+          {current ? (
+            <div
+              className="group relative cursor-zoom-in"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded(true);
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              {current.type === "image" && current.url && (
+                <img src={current.url} className="block h-auto w-full" alt="" />
+              )}
+              {current.type === "video" && current.url && (
+                <video
+                  src={current.url}
+                  muted
+                  playsInline
+                  className="block h-auto w-full"
+                  onMouseEnter={(e) => (e.target as HTMLVideoElement).play().catch(() => {})}
+                  onMouseLeave={(e) => {
+                    const v = e.target as HTMLVideoElement;
+                    v.pause();
+                    v.currentTime = 0;
+                  }}
+                />
+              )}
+              {current.type === "text" && (
+                <div className="max-h-[140px] overflow-y-auto p-3 text-[11px] leading-snug text-white/80">
+                  {current.text}
+                </div>
+              )}
+
+              {generations!.length > 1 && (
+                <div className="absolute left-1.5 top-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white/80">
+                  {selectedIndex + 1}/{generations!.length}
+                </div>
+              )}
+              <div className="absolute right-1.5 top-1.5 rounded bg-black/70 p-1 opacity-0 transition-opacity group-hover:opacity-100">
+                <Maximize2 className="h-3 w-3 text-white/80" />
+              </div>
+            </div>
+          ) : (
+            <div
+              className="flex items-center justify-center text-[11px] text-white/30"
+              style={{ minHeight: EMPTY_MIN_HEIGHT }}
+            >
+              Results will appear here
+            </div>
+          )}
+        </div>
+
+        {hasGens && (
+          <NodeResultDialog
+            open={expanded}
+            onOpenChange={setExpanded}
+            generations={generations!}
+            selectedIndex={selectedIndex}
+            onSelect={onSelectIndex}
+          />
+        )}
+      </>
+    );
+  },
+);
+
+NodeResultBar.displayName = "NodeResultBar";
+export default NodeResultBar;

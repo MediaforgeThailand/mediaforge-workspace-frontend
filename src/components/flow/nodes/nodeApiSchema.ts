@@ -54,6 +54,11 @@ export interface NodeIOHandle {
   required?: boolean;
   /** If set, this handle is only rendered when model_name matches one of these values */
   supportedModels?: string[];
+  /** Max simultaneous incoming edges for this handle. Defaults to 1
+   *  when unspecified. Used by the workspace canvas to gate
+   *  connections per provider doc limits (Banana 14, gpt-image-2 16,
+   *  Kling Omni elements 4, etc.). */
+  maxConnections?: number;
 }
 
 export interface NodeApiDef {

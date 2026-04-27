@@ -66,6 +66,10 @@ const PartnerApply = lazyWithRetry(() => import("./pages/partner/Apply"));
 const PartnerStatus = lazyWithRetry(() => import("./pages/partner/Status"));
 const PartnerDashboard = lazyWithRetry(() => import("./pages/partner/Dashboard"));
 
+// Workspace (new feature — wireframe)
+const WorkspaceDashboard = lazyWithRetry(() => import("./pages/workspace"));
+const WorkspaceCanvasPage = lazyWithRetry(() => import("./pages/workspace/Canvas"));
+
 // Admin pages
 const DevDebug = lazyWithRetry(() => import("./pages/DevDebug"));
 
@@ -170,6 +174,7 @@ const App = () => (
                       }
                     />
                     <Route path="analytics" element={<Analytics />} />
+                    <Route path="workspace" element={<WorkspaceDashboard />} />
                     <Route
                       path="partner/apply"
                       element={
@@ -270,6 +275,9 @@ const App = () => (
                       </ProtectedRoute>
                     }
                   />
+
+                  {/* Workspace canvas editor — full-screen, outside layouts */}
+                  <Route path="/app/workspace/:canvasId" element={<WorkspaceCanvasPage />} />
 
                   {/* Dev debug route */}
                   <Route
