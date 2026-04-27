@@ -17,6 +17,10 @@ export interface Generation {
   type: "image" | "video" | "text";
   url?: string;
   text?: string;
+  /** GLB / GLTF URL — populated by the Image-to-3D (Tripo3D) node so
+   *  the preview can render <model-viewer> instead of the rendered
+   *  image. `url` still holds the rendered preview thumbnail. */
+  model_url?: string;
   createdAt: number;
 }
 

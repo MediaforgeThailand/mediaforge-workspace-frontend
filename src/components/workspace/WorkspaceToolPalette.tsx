@@ -17,7 +17,7 @@
 
 import {
   Sparkles, Film, Scissors, Combine, FileVideo,
-  Users, Type, type LucideIcon,
+  Users, Type, Box, type LucideIcon,
 } from "lucide-react";
 
 interface PaletteItem {
@@ -83,6 +83,14 @@ const ITEMS: PaletteItem[] = [
     description:
       "Read a video clip and write a scene-by-scene prompt breakdown — useful as input for a downstream Image / Video generator.",
     icon: FileVideo,
+  },
+  {
+    type: "imageTo3dNode",
+    label: "Image to 3D",
+    category: "AI · 3D",
+    description:
+      "Turn a reference image into a 3D model (GLB) via Tripo3D. Outputs the GLB on the model3d port plus a rendered preview thumbnail.",
+    icon: Box,
   },
 ];
 

@@ -57,39 +57,45 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
   }, [d.content]);
 
   return (
+    // Outer wrapper — `overflow-visible` so the floating title sits
+    // OUTSIDE the body box and ports can overhang the corners.
     <div
-      className={cn(
-        "workspace-node-shell relative overflow-visible rounded-md border bg-zinc-900 text-zinc-200",
-        selected ? "border-zinc-500" : "border-zinc-700",
-      )}
+      className="ws-clean-node relative"
       data-state={selected ? "selected" : "idle"}
       style={{ width: 260 }}
     >
-      {/* Header — editable name. */}
-      <div className="flex items-center gap-1.5 border-b border-zinc-700 bg-zinc-900/80 px-2 py-1.5">
-        <Type className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+      {/* Floating title — icon + editable name, NO background, NO
+       *  border, sits above the body (matches the design reference). */}
+      <div className="ws-clean-title">
+        <Type className="ws-clean-title-icon" style={{ color: TEXT_COLOR }} />
         <input
           value={d.label ?? ""}
           onChange={(e) => updateField("label", e.target.value)}
           onMouseDown={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
-          className="nodrag min-w-0 flex-1 truncate bg-transparent text-xs font-medium text-zinc-200 outline-none"
+          className="ws-clean-title-input nodrag"
           placeholder="Text name…"
         />
       </div>
 
-      {/* Body — rich-text mention editor. */}
-      <div className="p-2">
+      {/* Body — single clean rounded box, no internal dividers. */}
+      <div
+        className={cn(
+          "workspace-node-shell ws-clean-body",
+          selected && "is-selected",
+        )}
+        data-state={selected ? "selected" : "idle"}
+      >
         <PromptMentionTextarea
           value={d.content ?? ""}
           onChange={onContentChange}
-          placeholder='Type "@" to reference another node…'
+          placeholder='Try "Happy dog with sunglasses and floating ring"'
           excludeNodeId={id}
           // Workspace assets show up under `assetNode`. Include the
           // legacy `inputNode` so a flow imported from the main
           // editor still resolves its mentions here.
           allowedNodeTypes={["assetNode", "inputNode"]}
-          className="min-h-[88px] rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-xs leading-relaxed text-zinc-100 focus-within:border-zinc-600"
+          className="ws-clean-textarea min-h-[110px] text-xs leading-relaxed text-zinc-100"
         />
 
         {mentionCount > 0 && (

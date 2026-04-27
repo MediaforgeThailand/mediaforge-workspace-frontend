@@ -15,7 +15,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type NodeProps, useEdges, useReactFlow } from "@xyflow/react";
 import {
   Film, Loader2, Play, RotateCw, Sparkles, Scissors, Combine, FileVideo,
-  Maximize2,
+  Maximize2, Box,
   type LucideIcon,
 } from "lucide-react";
 import { PortIcon } from "./PortIcon";
@@ -40,6 +40,7 @@ import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useDebugLogStore } from "@/store/useDebugLogStore";
 import NodeResultDialog from "./NodeResultDialog";
 import type { Generation } from "./NodeResultBar";
+import { findVoice, VOICE_TINT_GRADIENT } from "./geminiVoices";
 // Workspace-local schema + helpers — kept out of the shared file so
 // the main flow editor stays untouched.
 import {
@@ -383,6 +384,7 @@ const ICONS: Record<string, LucideIcon> = {
   removeBackgroundNode: Scissors,
   mergeAudioNode: Combine,
   videoToPromptNode: FileVideo,
+  imageTo3dNode: Box,
 };
 
 const OMNI_MODELS = new Set(["kling-v3-omni"]);
@@ -395,6 +397,11 @@ interface NodeData {
    *  picks an older one via the history dialog. */
   generations?: Generation[];
   selectedGenIndex?: number;
+  /** User-controlled card width (Space + drag). Default 400. The
+   *  number drives the outer wrapper's pixel width directly; the
+   *  preview image fills the new width while ports/settings stay
+   *  the same fixed size. */
+  compactWidth?: number;
 }
 
 const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
@@ -580,7 +587,12 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         prompt_used?: string;
         prompt_source?: string;
         task_id?: string;
-        provider_meta?: { poll_endpoint?: string };
+        provider_meta?: {
+          poll_endpoint?: string;
+          provider?: string;
+          model_url?: string;
+          rendered_image?: string;
+        };
       };
 
       log({
@@ -590,23 +602,31 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         payload: r,
       });
 
-      // ── Async poll path (Kling video tasks) ──
-      // Edge function compute budget is too tight to poll inline, so
-      // we ping `action="poll_kling"` every 5s until the video is ready
-      // (cap at 6 minutes — Kling Omni typically lands in 60-180s).
+      // ── Async poll path ──
+      // Each poll is one short edge-fn call (~1s) — no risk of the
+      // platform's 150s worker limit even on multi-minute jobs. We
+      // dispatch by `provider_meta.provider`:
+      //   - "tripo3d" → POST action="poll_tripo3d"
+      //   - else      → POST action="poll_kling"  (default for video)
       const pollEndpoint = r.provider_meta?.poll_endpoint;
+      const pollProvider = String(r.provider_meta?.provider ?? "kling").toLowerCase();
       if (r.task_id && !r.url && pollEndpoint) {
         const pollStart = Date.now();
-        const POLL_INTERVAL_MS = 5_000;
-        const POLL_TIMEOUT_MS = 6 * 60_000;
+        const isTripo3d = pollProvider === "tripo3d";
+        const POLL_INTERVAL_MS = isTripo3d ? 4_000 : 5_000;
+        const POLL_TIMEOUT_MS = isTripo3d ? 8 * 60_000 : 6 * 60_000;
+        const pollAction = isTripo3d ? "poll_tripo3d" : "poll_kling";
+        const providerLabel = isTripo3d ? "Tripo3D" : "Kling";
         let polledUrl: string | undefined;
+        let polledModelUrl: string | undefined;
+        let polledPreview: string | undefined;
         let polledStatus = "submitted";
 
         log({
           level: "info",
           nodeId: id,
-          title: `⏳ Polling Kling task ${r.task_id.slice(0, 8)}…`,
-          payload: { task_id: r.task_id, poll_endpoint: pollEndpoint },
+          title: `⏳ Polling ${providerLabel} task ${r.task_id.slice(0, 8)}…`,
+          payload: { task_id: r.task_id, poll_endpoint: pollEndpoint, action: pollAction },
         });
 
         while (Date.now() - pollStart < POLL_TIMEOUT_MS) {
@@ -615,7 +635,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             RUN_EDGE_FUNCTION,
             {
               body: {
-                action: "poll_kling",
+                action: pollAction,
                 task_id: r.task_id,
                 poll_endpoint: pollEndpoint,
               },
@@ -629,21 +649,29 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             });
             continue;
           }
-          const p = pollResp as { status?: string; url?: string; message?: string };
+          const p = pollResp as {
+            status?: string;
+            url?: string;
+            model_url?: string;
+            preview_image?: string;
+            message?: string;
+          };
           polledStatus = String(p?.status ?? "");
           if (polledStatus === "succeed" || polledStatus === "success") {
             polledUrl = p?.url;
+            polledModelUrl = p?.model_url;
+            polledPreview = p?.preview_image;
             break;
           }
           if (polledStatus === "failed" || polledStatus === "fail") {
-            throw new Error(`Kling task failed: ${p?.message ?? "no detail"}`);
+            throw new Error(`${providerLabel} task failed: ${p?.message ?? "no detail"}`);
           }
-          // submitted / processing / queued — keep waiting
+          // submitted / processing / queued / running — keep waiting
         }
 
         if (!polledUrl) {
           throw new Error(
-            `Kling polling timed out after ${Math.round(
+            `${providerLabel} polling timed out after ${Math.round(
               (Date.now() - pollStart) / 1000,
             )}s (last status: ${polledStatus})`,
           );
@@ -651,13 +679,27 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
         // Patch the response so the persistence path below sees the URL.
         r.url = polledUrl;
+        // Tripo3D gives us both a rendered preview (image) and the
+        // GLB itself — stash the latter on provider_meta so the
+        // node's UI can hand it to <model-viewer> down the line.
+        if (polledModelUrl) {
+          r.provider_meta = {
+            ...(r.provider_meta ?? {}),
+            model_url: polledModelUrl,
+            rendered_image: polledPreview ?? polledUrl,
+          };
+        }
         log({
           level: "recv",
           nodeId: id,
-          title: `← video ready · ${shortUrl(polledUrl)} (${Math.round(
+          title: `← ready · ${shortUrl(polledUrl)} (${Math.round(
             (Date.now() - pollStart) / 1000,
           )}s polling)`,
-          payload: { url: polledUrl, task_id: r.task_id },
+          payload: {
+            url: polledUrl,
+            model_url: polledModelUrl,
+            task_id: r.task_id,
+          },
         });
       }
 
@@ -666,6 +708,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         type: r.type,
         url: r.url,
         text: r.text,
+        // Tripo3D rides the GLB URL back via provider_meta.model_url
+        // (set in either the inline executor response or the poll
+        // loop above). Persist it so the preview can render
+        // <model-viewer> for that specific generation.
+        model_url: r.provider_meta?.model_url,
         prompt_used: r.prompt_used,
         prompt_source: r.prompt_source,
         createdAt: Date.now(),
@@ -958,6 +1005,27 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       const effectiveLabels = resolved?.optionLabels ?? param.optionLabels;
       const value = params[param.key] ?? resolved?.default ?? param.default;
 
+      // Audio-gen Voice picker — replace the default MiniSelect with a
+      // bespoke button that fires the rich picker dialog (avatar grid
+      // + use-case cards + preview play). The select-style fallback
+      // would still work for keyboard users but the button gives the
+      // primary visual affordance.
+      if (param.key === "voice" && schemaKey === "audioGenNode") {
+        return (
+          <VoicePickerButton
+            key={param.key}
+            voiceId={String(value)}
+            onClick={() => {
+              window.dispatchEvent(
+                new CustomEvent("workspace-open-voice-picker", {
+                  detail: { nodeId: id, voiceId: String(value) },
+                }),
+              );
+            }}
+          />
+        );
+      }
+
       if (effectiveType === "select") {
         if (isBinarySelect(effectiveOptions)) {
           return (
@@ -1003,12 +1071,67 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       // toolbar; falls through to nothing.
       return null;
     },
-    [params, selectedModel, updateParam],
+    [params, selectedModel, updateParam, schemaKey, id],
   );
+
+  // Some node types (Image to 3D / Tripo3D) take only an image input
+  // — the model's API doesn't accept a text prompt, so showing the
+  // prompt textarea is misleading. Detect by checking whether the
+  // schema's params actually declare a `prompt` entry; if it doesn't,
+  // we hide the prompt overlay AND don't ship a `prompt` field in
+  // the run request.
+  const hasPromptParam = useMemo(
+    () => schema?.params?.some((p) => p.key === "prompt") ?? false,
+    [schema],
+  );
+
+  // The Tripo3D rendered_image is a small square thumbnail — letting
+  // it drive the preview's height collapses the node to a tiny
+  // landscape strip. Force the preview area to a 1:1 box so the
+  // node looks consistent before AND after a 3D generation lands.
+  const forceSquarePreview = schemaKey === "imageTo3dNode";
 
   // History dialog — opens when user clicks the preview's expand
   // affordance so they can scrub through previous generations.
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  /* ── Manual resize via the bottom-right corner handle ──────
+   * Drag the small dot in the corner to scale the node's body
+   * uniformly (width drives the layout — height auto-follows the
+   * preview's aspect ratio, so the card stays in its current shape).
+   * Settings widgets, ports, and the prompt text all stay at fixed
+   * pixel sizes — only the rounded card / preview area grows. */
+  const onResizeStart = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX;
+      const startWidth = (d.compactWidth as number | undefined) ?? 400;
+      const onMove = (ev: PointerEvent) => {
+        const delta = ev.clientX - startX;
+        const next = Math.max(
+          320,
+          Math.min(1200, Math.round(startWidth + delta)),
+        );
+        setNodes((ns) =>
+          ns.map((n) =>
+            n.id === id
+              ? { ...n, data: { ...n.data, compactWidth: next } }
+              : n,
+          ),
+        );
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        document.body.classList.remove("ws-resizing");
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      document.body.classList.add("ws-resizing");
+    },
+    [id, d.compactWidth, setNodes],
+  );
   const onSelectHistoryIndex = useCallback(
     (i: number) => updateNodeField("selectedGenIndex", i),
     [updateNodeField],
@@ -1022,15 +1145,15 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   return (
     <>
       <div
-        className="ws-compact-node nodrag-shell"
+        className="ws-clean-node nodrag-shell"
         data-state={selected ? "selected" : "idle"}
         data-status={runStatus}
-        style={{ width: 400 }}
+        style={{ width: d.compactWidth ?? 400 }}
       >
-        {/* ── Header — icon + editable title + category badge ── */}
-        <div className="ws-compact-header">
+        {/* ── Floating title — sits ABOVE the body, no border. ── */}
+        <div className="ws-clean-title">
           <Icon
-            className="ws-compact-header-icon"
+            className="ws-clean-title-icon"
             style={{ color: colorOf(schema.accentColor) }}
           />
           <input
@@ -1040,20 +1163,71 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             }
             onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
-            className="ws-compact-header-title nodrag"
+            className="ws-clean-title-input nodrag"
             placeholder={schema.displayName}
           />
           {nodeCost != null && !creditCostsLoading && (
-            <span className="ws-compact-header-badge">
+            <span
+              className="ws-compact-header-badge"
+              style={{ pointerEvents: "auto" }}
+            >
               {nodeCost}
               {costSuffix ?? ""}
             </span>
           )}
         </div>
 
-        {/* ── Preview area — image / video / placeholder ── */}
-        <div className="ws-compact-preview ws-preview-zone">
-          {currentGen?.type === "image" && currentGen.url && (
+        {/* Body card — single rounded container holding the preview
+         *  (top) and prompt (bottom). No internal border between
+         *  them; the whole node reads as one frame with a label
+         *  floating above. */}
+        <div
+          className="ws-compact-node workspace-node-shell"
+          data-state={selected ? "selected" : "idle"}
+          data-status={runStatus}
+        >
+
+        {/* ── Preview area — 3D model / image / video / placeholder ── */}
+        <div
+          className="ws-compact-preview ws-preview-zone"
+          data-square={forceSquarePreview ? "true" : undefined}
+        >
+          {/* 3D model output — render the rendered_image PNG as a
+           *  static preview. Mounting `<model-viewer>` per node
+           *  spins up a WebGL context per node, which collapses the
+           *  whole canvas to ~5fps once you have a few 3D nodes.
+           *  The interactive 3D viewer lives in the lightbox (one
+           *  context, on demand) — double-click the node to open it.
+           *  The "3D" chip tells users there's a real model behind
+           *  the thumbnail. */}
+          {currentGen?.model_url ? (
+            <div className="relative h-full w-full">
+              {currentGen.url ? (
+                <img
+                  src={currentGen.url}
+                  alt="3D model preview"
+                  draggable={false}
+                  style={{
+                    width: "100%",
+                    aspectRatio: "1 / 1",
+                    objectFit: "contain",
+                    background: "hsl(0 0% 6%)",
+                    display: "block",
+                  }}
+                />
+              ) : (
+                <div
+                  className="flex w-full items-center justify-center text-zinc-600"
+                  style={{ aspectRatio: "1 / 1", background: "hsl(0 0% 6%)" }}
+                >
+                  <span className="text-xs">3D model</span>
+                </div>
+              )}
+              <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wide text-amber-300">
+                3D · double-click to view
+              </span>
+            </div>
+          ) : currentGen?.type === "image" && currentGen.url && (
             <img
               src={currentGen.url}
               alt=""
@@ -1115,41 +1289,68 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             </div>
           </div>
 
-          {/* ── Run button — circular, bottom-right of overlay ── */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              void runNode();
-            }}
-            onMouseDown={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-            disabled={isRunning}
-            className={cn(
-              "ws-compact-run nodrag",
-              runStatus === "error" && "is-error",
-            )}
-            title={
-              isRunning
-                ? "Running…"
-                : runStatus === "error"
-                  ? "Retry"
-                  : "Run (Ctrl+Enter)"
-            }
-          >
-            {isRunning ? (
-              <Loader2 className="animate-spin" />
-            ) : runStatus === "error" ? (
-              <RotateCw />
-            ) : (
-              <Play className="fill-current" />
-            )}
-          </button>
+          {/* ── Prompt + Run row — pinned to the bottom of the
+           *  preview. When the schema doesn't accept a text prompt
+           *  (e.g. Tripo3D image_to_model) we drop the textarea and
+           *  keep just the Run button on the right. */}
+          {!isMultiShot && (
+            <div
+              className={cn(
+                "ws-compact-prompt-overlay",
+                !hasPromptParam && "is-no-prompt",
+              )}
+            >
+              {hasPromptParam ? (
+                <PromptMentionTextarea
+                  value={String(params.prompt ?? "")}
+                  onChange={(v) => updateParam("prompt", v)}
+                  placeholder={`Describe the ${schema.displayName.toLowerCase().includes("video") ? "video" : "image"} you want to generate…`}
+                  excludeNodeId={id}
+                  className="ws-compact-prompt-input"
+                />
+              ) : (
+                <span className="ws-compact-prompt-hint">
+                  Wire an image into the input port and press Run
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void runNode();
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                disabled={isRunning}
+                className={cn(
+                  "ws-compact-run nodrag",
+                  runStatus === "error" && "is-error",
+                )}
+                title={
+                  isRunning
+                    ? "Running…"
+                    : runStatus === "error"
+                      ? "Retry"
+                      : "Run (Ctrl+Enter)"
+                }
+              >
+                {isRunning ? (
+                  <Loader2 className="animate-spin" />
+                ) : runStatus === "error" ? (
+                  <RotateCw />
+                ) : (
+                  <Play className="fill-current" />
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* ── Multi-shot scene builder (Kling Omni only) ── */}
+        {/* ── Multi-shot scene builder (Kling Omni only) — keeps its
+         *  own row below the preview because the scene list grows
+         *  too tall to overlay sensibly. */}
         {isMultiShot && (
-          <div className="border-t border-white/10 bg-zinc-900/60 p-2">
+          <div className="bg-zinc-900/60 p-2">
             <MultiShotBuilder
               scenes={multiShotScenes}
               onChange={handleScenesChange}
@@ -1158,17 +1359,19 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           </div>
         )}
 
-        {/* ── Always-visible prompt input ── */}
-        {!isMultiShot && (
-          <div className="ws-compact-prompt">
-            <PromptMentionTextarea
-              value={String(params.prompt ?? "")}
-              onChange={(v) => updateParam("prompt", v)}
-              placeholder={`Describe the ${schema.displayName.toLowerCase().includes("video") ? "video" : "image"} you want to generate…`}
-              excludeNodeId={id}
-            />
-          </div>
-        )}
+        {/* Corner resize handle — drag from the bottom-right corner
+         *  to scale the card. Visible only when the node is hovered
+         *  or selected. The handle uses pointerdown capture (in the
+         *  inline JS handler above) to take ownership of the gesture
+         *  so React Flow's drag-node doesn't fight us. */}
+        <div
+          className="ws-compact-resize-handle nodrag"
+          onPointerDown={onResizeStart}
+          onMouseDown={(e) => e.stopPropagation()}
+          title="Drag to resize"
+          aria-label="Resize node"
+        />
+        </div> {/* end ws-compact-node body card */}
       </div>
 
       {/* History dialog (shared with the legacy NodeResultBar). */}
@@ -1211,3 +1414,43 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
 WorkspaceToolNode.displayName = "WorkspaceToolNode";
 export default WorkspaceToolNode;
+
+/* ── Voice picker pill (audioGenNode only) ──────────────────
+ *
+ * Renders the currently-selected Gemini voice as a small pill with
+ * an avatar (initial letter on a tinted gradient) + the name. The
+ * actual picker UI lives in `VoicePickerDialog`, opened via a window
+ * event so the canvas owns the dialog state and the node body stays
+ * pure. We don't render the dialog here — that would mount one per
+ * audio node, which is wasteful AND would compete for keyboard /
+ * Esc focus across multiple nodes.
+ */
+function VoicePickerButton({
+  voiceId,
+  onClick,
+}: {
+  voiceId: string;
+  onClick: () => void;
+}) {
+  const voice = findVoice(voiceId);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      className="nodrag flex h-7 items-center gap-2 rounded-full bg-white/[0.05] px-1 pr-3 text-[11px] text-zinc-100 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.10]"
+      title={`Voice: ${voice.name} (${voice.characteristic}) — click to browse`}
+    >
+      <span
+        className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white ring-1 ring-inset ring-white/15"
+        style={{ background: VOICE_TINT_GRADIENT[voice.tint] }}
+      >
+        {voice.name.charAt(0)}
+      </span>
+      <span className="font-medium">{voice.name}</span>
+      <span className="text-zinc-500">·</span>
+      <span className="text-zinc-400">{voice.characteristic}</span>
+    </button>
+  );
+}

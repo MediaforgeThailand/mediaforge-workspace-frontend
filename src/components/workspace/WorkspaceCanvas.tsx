@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ConnectionLineType,
   ReactFlow,
   ReactFlowProvider,
   SelectionMode,
@@ -29,8 +30,18 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import "./workspace.css";
+// Side-effect import — registers the <model-viewer> custom element
+// the moment the workspace canvas mounts. Bundled locally instead
+// of via CDN so it always loads (the previous CDN tag occasionally
+// failed to attach the element class, leaving 3D previews blank).
+// `<model-viewer>` is loaded from a CDN script in index.html (per
+// the official guide at modelviewer.dev). The npm bundle path was
+// unreliable under Vite — keep this comment as a breadcrumb so we
+// don't reach for `import "@google/model-viewer";` again. The
+// custom element is globally registered before main.tsx runs.
 import { toast } from "sonner";
 
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
@@ -40,6 +51,7 @@ import AssetNode from "./AssetNode";
 import ElementNode from "./ElementNode";
 import TextNode from "./TextNode";
 import GroupNode from "./GroupNode";
+import StickyNoteNode from "./StickyNoteNode";
 import NodeQuickToolbar from "./NodeQuickToolbar";
 import MultiSelectionFrame from "./MultiSelectionFrame";
 import NodePreviewLightbox, {
@@ -51,7 +63,16 @@ import CanvasNodePicker, {
   type CanvasNodePickerState,
   type PickerOption,
 } from "./CanvasNodePicker";
+import CanvasContextMenu, {
+  type ContextMenuState,
+  type ToolItem,
+} from "./CanvasContextMenu";
+import CanvasFloatingSidebar from "./CanvasFloatingSidebar";
+import ShortcutsDialog from "./ShortcutsDialog";
+import VoicePickerDialog from "./VoicePickerDialog";
+import { useCanvasToolStore } from "./useCanvasToolStore";
 import { useWorkspaceShortcuts } from "./useWorkspaceShortcuts";
+import { useCanvasAutosave } from "./useCanvasAutosave";
 
 const VIEWPORT_KEY = (canvasId: string) => `workspace-viewport-${canvasId}`;
 const STORAGE_BUCKET = "ai-media";
@@ -190,6 +211,7 @@ const VIDEO_TARGETS = new Set([
 ]);
 const AUDIO_TARGETS = new Set(["audio", "ref_audio"]);
 const ELEMENT_TARGETS = new Set(["elements", "element"]);
+const MODEL3D_TARGETS = new Set(["model3d", "model_3d", "ref_model"]);
 
 const nodeTypes = {
   // All schema-driven tools route through WorkspaceToolNode — that's
@@ -200,14 +222,17 @@ const nodeTypes = {
   // The previous `withResultHistory` HOC is no longer needed here.
   imageGenNode: WorkspaceToolNode,
   videoGenNode: WorkspaceToolNode,
+  audioGenNode: WorkspaceToolNode,
   removeBackgroundNode: WorkspaceToolNode,
   mergeAudioNode: WorkspaceToolNode,
   videoToPromptNode: WorkspaceToolNode,
+  imageTo3dNode: WorkspaceToolNode,
   // Workspace-only.
   assetNode: AssetNode,
   elementNode: ElementNode,
   textNode: TextNode,
   groupNode: GroupNode,
+  stickyNoteNode: StickyNoteNode,
 };
 
 /**
@@ -308,6 +333,17 @@ const Inner = () => {
   const { screenToFlowPosition, setViewport, getViewport, setNodes } = useReactFlow();
   const { user } = useAuth();
   useConnectingAttribute();
+  // Server-side autosave (Figma-style). Pushes the active canvas
+  // to `workspace_canvases` on every change (debounced 600ms) +
+  // flushes via fetch keepalive on tab close. The `saveState`
+  // value is also broadcast to the tab bar via a window event so
+  // a small "Saved / Saving…" indicator can render up there.
+  const saveState = useCanvasAutosave();
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("workspace-save-state", { detail: { state: saveState } }),
+    );
+  }, [saveState]);
 
   const canvasId = useWorkspaceStore((s) => s.current?.id);
   const nodes = useWorkspaceStore((s) => s.current?.nodes ?? []);
@@ -346,13 +382,23 @@ const Inner = () => {
       const isVideo = file.type.startsWith("video/");
       const isImage = file.type.startsWith("image/");
       const isAudio = file.type.startsWith("audio/");
-      if (!isImage && !isVideo && !isAudio) {
-        toast.error("Only image, video, and audio files are supported");
+      // 3D mesh detection — extension-based because browsers usually
+      // give us empty / generic mime types for .glb / .gltf / .usdz.
+      // The extensions match what `<model-viewer>` can load, so we
+      // route them straight into a 3d-typed AssetNode.
+      const isModel3d = /\.(glb|gltf|usdz|obj|fbx)$/i.test(file.name);
+      if (!isImage && !isVideo && !isAudio && !isModel3d) {
+        toast.error(
+          "Supported files: image, video, audio, 3D model (.glb / .gltf / .usdz / .obj / .fbx)",
+        );
         return;
       }
 
-      const fieldType: "image" | "video" | "audio" =
-        isVideo ? "video" : isAudio ? "audio" : "image";
+      const fieldType: "image" | "video" | "audio" | "model3d" =
+        isModel3d ? "model3d"
+        : isVideo ? "video"
+        : isAudio ? "audio"
+        : "image";
       const localPreview = URL.createObjectURL(file);
       const defaultLabel = file.name.replace(/\.[^.]+$/, "").slice(0, 40);
 
@@ -393,7 +439,7 @@ const Inner = () => {
 
       const ext =
         file.name.split(".").pop() ||
-        (isVideo ? "mp4" : isAudio ? "mp3" : "png");
+        (isModel3d ? "glb" : isVideo ? "mp4" : isAudio ? "mp3" : "png");
       const storagePath = `${user.id}/${crypto.randomUUID()}.${ext}`;
 
       const { error: upErr } = await supabase.storage
@@ -509,10 +555,13 @@ const Inner = () => {
       if (reuseRaw) {
         try {
           const reuse = JSON.parse(reuseRaw) as {
-            fieldType: "image" | "video" | "audio";
+            fieldType: "image" | "video" | "audio" | "model3d";
             url: string;
             label?: string;
             fileName?: string;
+            /** Optional poster (3D rendered_image) so AssetNode
+             *  doesn't render as a black box while the GLB streams. */
+            posterUrl?: string;
           };
           if (reuse?.url && reuse?.fieldType) {
             const newId = addAssetNode(
@@ -520,6 +569,7 @@ const Inner = () => {
                 label: reuse.label ?? reuse.fileName ?? "asset",
                 fieldType: reuse.fieldType,
                 previewUrl: reuse.url,
+                posterUrl: reuse.posterUrl,
                 fileName: reuse.fileName,
                 uploading: false,
               },
@@ -553,7 +603,52 @@ const Inner = () => {
     (_e, node) => setSelectedNode(node.id),
     [setSelectedNode],
   );
-  const onPaneClick = useCallback(() => setSelectedNode(null), [setSelectedNode]);
+  const onPaneClick = useCallback(
+    (e: React.MouseEvent) => {
+      // Sticky mode: a click on empty canvas plants a Post-it where
+      // the cursor is. Falls through to deselection for the default
+      // (select / cursor) tool so single-clicks still clear focus.
+      const t = useCanvasToolStore.getState().tool;
+      if (t === "sticky") {
+        const flowPos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+        const id = `s_${crypto.randomUUID()}`;
+        useWorkspaceStore.setState((s) => {
+          const stickyNode: Node = {
+            id,
+            type: "stickyNoteNode",
+            position: flowPos,
+            data: { text: "" },
+          };
+          if (!s.current) return {};
+          const nextNodes = [...s.current.nodes, stickyNode];
+          return {
+            current: { ...s.current, nodes: nextNodes },
+            graphs: { ...s.graphs, [s.current.id]: { ...s.current, nodes: nextNodes } },
+          };
+        });
+        reparentSpawned(id, flowPos);
+        // Drop the user back into select mode after planting one — a
+        // single sticky is the common case; if they want to spam
+        // them, they can re-click the sticky tool.
+        useCanvasToolStore.getState().setTool("select");
+        return;
+      }
+      setSelectedNode(null);
+    },
+    [setSelectedNode, screenToFlowPosition, reparentSpawned],
+  );
+
+  /** Cut tool: clicking a wire deletes it. Bound to React Flow's
+   *  `onEdgeClick`. We early-out for any other tool so clicks behave
+   *  normally (selecting the edge for highlight). */
+  const onEdgeClick = useCallback(
+    (_e: React.MouseEvent, edge: Edge) => {
+      const t = useCanvasToolStore.getState().tool;
+      if (t !== "cut") return;
+      onEdgesChange([{ id: edge.id, type: "remove" }]);
+    },
+    [onEdgesChange],
+  );
 
   /* ── Drag-to-empty-canvas → spawn picker ─────────────────────
    *  Track which port the user grabbed in onConnectStart, then in
@@ -568,6 +663,119 @@ const Inner = () => {
   } | null>(null);
   const [picker, setPicker] = useState<CanvasNodePickerState | null>(null);
   const [preview, setPreview] = useState<PreviewPayload | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // Voice picker — single instance owned by the canvas, opened via
+  // a window event from any audioGenNode that wants to swap voices.
+  // Stores the requesting node id so we know who to write back to.
+  const [voicePicker, setVoicePicker] = useState<{
+    nodeId: string;
+    voiceId: string;
+  } | null>(null);
+  // Tool mode (select / hand / cut / sticky). Read once at the top
+  // so we can flip ReactFlow props (panOnDrag, selectionOnDrag) and
+  // handle pane / edge clicks based on the active tool.
+  const tool = useCanvasToolStore((s) => s.tool);
+
+  /** Right-click on canvas → open the categorised tool picker at the
+   *  click point. We block both the browser context menu and the
+   *  React-Flow pane click that would otherwise deselect everything. */
+  const onPaneContextMenu = useCallback(
+    (e: React.MouseEvent | MouseEvent) => {
+      e.preventDefault();
+      const flow = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      setContextMenu({
+        screen: { x: e.clientX, y: e.clientY },
+        flow,
+      });
+    },
+    [screenToFlowPosition],
+  );
+
+  /** Picking a tool from the right-click menu spawns it at the
+   *  original click position (flow coords) and closes the menu.
+   *  Schema-driven nodes go through `addSchemaNode`; the special
+   *  built-ins (Text / Sticky / Element) route through their own
+   *  paths so they pick up the right defaults. */
+  const onContextMenuPick = useCallback(
+    (item: ToolItem) => {
+      if (!contextMenu) return;
+      const pos = contextMenu.flow;
+      let newId: string | null = null;
+      if (item.nodeType === "stickyNoteNode") {
+        // Sticky uses addSchemaNode-style path but with no schema —
+        // just stamp a node directly via the store.
+        const id = `s_${crypto.randomUUID()}`;
+        useWorkspaceStore.setState((s) => {
+          const stickyNode: Node = {
+            id,
+            type: "stickyNoteNode",
+            position: pos,
+            data: { text: "" },
+          };
+          const nextNodes = [...(s.current?.nodes ?? []), stickyNode];
+          return s.current
+            ? {
+                current: { ...s.current, nodes: nextNodes },
+                graphs: { ...s.graphs, [s.current.id]: { ...s.current, nodes: nextNodes } },
+              }
+            : {};
+        });
+        newId = id;
+      } else {
+        newId = addSchemaNode(item.nodeType, item.defaultLabel, pos);
+      }
+      if (newId) reparentSpawned(newId, pos);
+      setContextMenu(null);
+    },
+    [contextMenu, addSchemaNode, reparentSpawned],
+  );
+
+  /** Non-spawn actions from the right-click menu — Upload / Assets /
+   *  Stock. Bridges to the pre-existing event channels so we don't
+   *  duplicate logic. Stock is a "soon" placeholder. */
+  const onContextMenuAction = useCallback(
+    (item: ToolItem) => {
+      if (item.action === "assets") {
+        // Pop the AllAssetsDialog. The asset panel owns its own
+        // toggle, but a window event lets the menu open it without
+        // prop drilling. We listen for this event in
+        // WorkspaceAssetPanel.
+        window.dispatchEvent(new CustomEvent("workspace-open-all-assets"));
+      } else if (item.action === "upload") {
+        // Click a hidden file input by dispatching to the canvas's
+        // upload bridge. The user gets a native picker; selected
+        // files go through the existing uploadAsset flow.
+        window.dispatchEvent(new CustomEvent("workspace-trigger-upload"));
+      } else if (item.action === "stock") {
+        toast.info("Stock library coming soon");
+      }
+      setContextMenu(null);
+    },
+    [],
+  );
+
+  /** "+" button in the floating sidebar — opens the same picker, but
+   *  anchored next to the trigger button instead of at the screen
+   *  centre. The sidebar passes us the button's `getBoundingClientRect`
+   *  so the menu reads as a popover off the "+" rather than appearing
+   *  detached in the middle of the canvas. We still resolve the *flow*
+   *  position from the centre of the viewport — that's where the
+   *  spawned node should land, NOT next to the toolbar pill (which
+   *  is way off in the corner). */
+  const openContextMenuAtAnchor = useCallback(
+    (anchor: { x: number; y: number }) => {
+      if (!wrapperRef.current) return;
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      setContextMenu({
+        screen: anchor, // popover anchor — visible on screen
+        flow: screenToFlowPosition({ x: cx, y: cy }), // spawn point
+      });
+    },
+    [screenToFlowPosition],
+  );
 
   /* ── Keyboard shortcuts ───────────────────────────────────
    * Single global listener handles copy/cut/paste/duplicate,
@@ -615,6 +823,189 @@ const Inner = () => {
     },
     [],
   );
+
+  /* Asset panel → lightbox bridge.
+   *
+   * The asset panel lives in the right sidebar and doesn't share a
+   * React tree with the lightbox state, so we use a window event as
+   * the open command. Payload shape mirrors PreviewPayload so the
+   * panel doesn't need to know about node shapes — it just hands
+   * over a `{ url, fieldType }` for the asset it owns. */
+  useEffect(() => {
+    const handler = (evt: Event) => {
+      const detail = (evt as CustomEvent).detail as
+        | {
+            url?: string;
+            fieldType?: "image" | "video" | "audio" | "model3d";
+            label?: string;
+            fileName?: string;
+            poster?: string;
+          }
+        | undefined;
+      if (!detail?.url) return;
+      const ft = detail.fieldType ?? "image";
+      if (ft === "model3d") {
+        setPreview({
+          type: "model3d",
+          model_url: detail.url,
+          poster: detail.poster,
+          label: detail.label ?? "3d model",
+          caption: (detail.fileName ?? "") + " · drag to rotate",
+        });
+        return;
+      }
+      setPreview({
+        type:
+          ft === "video" ? "video" : ft === "audio" ? "audio" : "image",
+        url: detail.url,
+        label: detail.label ?? "asset",
+        caption: detail.fileName,
+      });
+    };
+    window.addEventListener("workspace-open-asset-preview", handler);
+    return () =>
+      window.removeEventListener("workspace-open-asset-preview", handler);
+  }, []);
+
+  /* All-assets dialog → canvas spawn bridge.
+   *
+   * The dialog hands us an array of asset descriptors and the canvas
+   * spawns one AssetNode per item, fanned out from the current
+   * viewport centre so they don't all stack on top of each other.
+   * Same payload shape the dialog uses for single-asset drag-reuse
+   * — keeps the dialog dumb (no canvas math) and the spawn rules
+   *   centralised here. */
+  useEffect(() => {
+    const onSpawn = (evt: Event) => {
+      const detail = (evt as CustomEvent).detail as
+        | {
+            assets?: Array<{
+              fieldType: "image" | "video" | "audio" | "model3d";
+              url: string;
+              label?: string;
+              fileName?: string;
+              posterUrl?: string;
+            }>;
+          }
+        | undefined;
+      const list = detail?.assets ?? [];
+      if (list.length === 0 || !wrapperRef.current) return;
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const centre = screenToFlowPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      });
+      // Tile in a grid so multiple assets don't stack — 5 per row,
+      // 240px gap matches a comfortable AssetNode spacing.
+      const PER_ROW = 5;
+      const STEP_X = 240;
+      const STEP_Y = 280;
+      list.forEach((a, i) => {
+        const col = i % PER_ROW;
+        const row = Math.floor(i / PER_ROW);
+        const pos = {
+          x: centre.x + (col - (PER_ROW - 1) / 2) * STEP_X,
+          y: centre.y + row * STEP_Y,
+        };
+        const newId = addAssetNode(
+          {
+            label: a.label ?? a.fileName ?? "asset",
+            fieldType: a.fieldType,
+            previewUrl: a.url,
+            posterUrl: a.posterUrl,
+            fileName: a.fileName,
+            uploading: false,
+          },
+          pos,
+        );
+        reparentSpawned(newId, pos);
+      });
+    };
+    window.addEventListener("workspace-spawn-assets", onSpawn);
+    return () => window.removeEventListener("workspace-spawn-assets", onSpawn);
+  }, [addAssetNode, screenToFlowPosition, reparentSpawned]);
+
+  /* Voice picker → audioGenNode bridge.
+   *
+   * Any audio node renders a "Voice" pill that dispatches
+   * `workspace-open-voice-picker` with its node id + current voice.
+   * We open the dialog here (one instance per canvas), and on
+   * select write the new voice id back into the node's
+   * `data.params.voice`. The dialog handles its own preview play +
+   * use-case filtering — we just listen for select / close. */
+  useEffect(() => {
+    const onOpen = (evt: Event) => {
+      const detail = (evt as CustomEvent).detail as
+        | { nodeId?: string; voiceId?: string }
+        | undefined;
+      if (!detail?.nodeId) return;
+      setVoicePicker({
+        nodeId: detail.nodeId,
+        voiceId: detail.voiceId ?? "Charon",
+      });
+    };
+    window.addEventListener("workspace-open-voice-picker", onOpen);
+    return () =>
+      window.removeEventListener("workspace-open-voice-picker", onOpen);
+  }, []);
+
+  const onVoicePicked = useCallback((voiceId: string) => {
+    if (!voicePicker) return;
+    const nodeId = voicePicker.nodeId;
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === nodeId
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                params: {
+                  ...((n.data?.params as Record<string, unknown>) ?? {}),
+                  voice: voiceId,
+                },
+              },
+            }
+          : n,
+      ),
+    );
+    setVoicePicker(null);
+  }, [voicePicker, setNodes]);
+
+  /* All-assets dialog → upload bridge.
+   *
+   * The dialog can hand us OS files (file picker or drag-drop into
+   * the modal). We route them through the existing uploadAsset path
+   * so re-parenting + storage upload + signed-URL refresh stay in
+   * one place. Files tile out from viewport centre, same fan-out as
+   * the spawn-assets handler so the placement pattern stays familiar. */
+  useEffect(() => {
+    const onUpload = (evt: Event) => {
+      const detail = (evt as CustomEvent).detail as
+        | { files?: File[] }
+        | undefined;
+      const files = detail?.files ?? [];
+      if (files.length === 0 || !wrapperRef.current) return;
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const centre = screenToFlowPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      });
+      const PER_ROW = 5;
+      const STEP_X = 240;
+      const STEP_Y = 280;
+      files.forEach((file, i) => {
+        const col = i % PER_ROW;
+        const row = Math.floor(i / PER_ROW);
+        const pos = {
+          x: centre.x + (col - (PER_ROW - 1) / 2) * STEP_X,
+          y: centre.y + row * STEP_Y,
+        };
+        void uploadAsset(file, pos);
+      });
+    };
+    window.addEventListener("workspace-upload-files", onUpload);
+    return () => window.removeEventListener("workspace-upload-files", onUpload);
+  }, [uploadAsset, screenToFlowPosition]);
 
   /**
    * Live grouping — figures out whether the node the user just
@@ -929,6 +1320,7 @@ const Inner = () => {
       if (ft === "image") typeOk = IMAGE_TARGETS.has(th);
       else if (ft === "video") typeOk = VIDEO_TARGETS.has(th);
       else if (ft === "audio") typeOk = AUDIO_TARGETS.has(th);
+      else if (ft === "model3d") typeOk = MODEL3D_TARGETS.has(th);
     } else if (srcType === "groupNode") {
       // Group has multiple typed output ports — `image` / `video` /
       // `audio`. The edge's `sourceHandle` tells us which one was
@@ -948,6 +1340,7 @@ const Inner = () => {
       else if (srcKind === "text") typeOk = TEXT_TARGETS.has(th);
       else if (srcKind === "audio") typeOk = AUDIO_TARGETS.has(th);
       else if (srcKind === "element") typeOk = ELEMENT_TARGETS.has(th);
+      else if (srcKind === "model3d") typeOk = MODEL3D_TARGETS.has(th);
     }
     if (!typeOk) return false;
 
@@ -1000,6 +1393,38 @@ const Inner = () => {
       className="workspace-root relative h-full w-full bg-zinc-950"
       onDragOver={onDragOver}
       onDrop={onDrop}
+      onContextMenu={(e) => {
+        // Wrapper-level right-click handler — fires for clicks on
+        // the pane AND on nodes. We open the categorised picker at
+        // the cursor regardless of what was under it. Skip when the
+        // user right-clicked an interactive child (input / textarea /
+        // button) so contextual edits like "Inspect" or text-field
+        // copy-paste still work — those targets have their own
+        // implicit behaviour we don't want to hijack.
+        const target = e.target as HTMLElement | null;
+        const tag = target?.tagName ?? "";
+        if (
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "BUTTON" ||
+          tag === "SELECT" ||
+          target?.isContentEditable === true
+        ) {
+          return;
+        }
+        // React Flow's own onPaneContextMenu also fires for pane
+        // clicks — guard against opening the menu twice. We open
+        // here for "anywhere on the canvas wrapper" coverage; the
+        // pane handler is left wired up as a defensive secondary
+        // path but we close it via onPaneContextMenu doing the same
+        // setContextMenu call (idempotent).
+        e.preventDefault();
+        const flow = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+        setContextMenu({
+          screen: { x: e.clientX, y: e.clientY },
+          flow,
+        });
+      }}
     >
       <div className="workspace-grid-surface" />
 
@@ -1017,26 +1442,41 @@ const Inner = () => {
         onNodeDoubleClick={onNodeDoubleClick}
         onNodeDragStop={onNodeDragStop}
         onPaneClick={onPaneClick}
+        onPaneContextMenu={onPaneContextMenu}
+        onEdgeClick={onEdgeClick}
         isValidConnection={isValidConnection}
         deleteKeyCode={["Delete", "Backspace"]}
         fitView
         proOptions={{ hideAttribution: true }}
         minZoom={0.25}
         maxZoom={2.5}
-        // ── Marquee selection ──
-        // Left-drag on empty canvas draws a selection box (Photoshop /
-        // Figma feel). Pan moves to middle-click / right-click — that
-        // matches design tools and keeps left-click as the primary
-        // "select / drag-box" interaction.
+        // Edges are bezier-curved by default — matches the soft,
+        // organic look of Figma / Krea wires. The colour palette
+        // (resting / hover / selected / dragging) is owned by
+        // workspace.css so it stays consistent with our theme; we
+        // just declare the SHAPE here and let CSS style the strokes.
+        defaultEdgeOptions={{ type: "default" }}
+        connectionLineType={ConnectionLineType.Bezier}
+        // ── Marquee vs hand selection ──
+        // Tool-mode reactive: in "select" we marquee on left-drag and
+        // pan on middle/right; in "hand" we pan on left-drag too and
+        // disable marquee (Figma's H key behaviour). The CSS class
+        // also flips the cursor on the canvas so the active tool is
+        // visible without looking at the sidebar.
         //
         // SelectionMode.Partial: a node is grabbed as soon as the
         // marquee TOUCHES it, not only when it fully encloses it.
         // Default `Full` mode forced users to drag the box past every
         // node's edges, which felt sticky on dense canvases.
-        selectionOnDrag
+        selectionOnDrag={tool === "select"}
         selectionMode={SelectionMode.Partial}
-        panOnDrag={[1, 2]}
+        panOnDrag={tool === "hand" ? [0, 1, 2] : [1, 2]}
         multiSelectionKeyCode={["Shift", "Meta", "Control"]}
+        className={cn(
+          tool === "hand" && "ws-tool-hand",
+          tool === "cut" && "ws-tool-cut",
+          tool === "sticky" && "ws-tool-sticky",
+        )}
       >
         {/* Floating action bar — appears above the bbox of any
          *  current selection, with context-aware buttons. Lives
@@ -1056,9 +1496,31 @@ const Inner = () => {
           onClose={() => setPicker(null)}
         />
       )}
+      {contextMenu && (
+        <CanvasContextMenu
+          state={contextMenu}
+          onPick={onContextMenuPick}
+          onAction={onContextMenuAction}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
       {preview && (
         <NodePreviewLightbox preview={preview} onClose={() => setPreview(null)} />
       )}
+      <CanvasFloatingSidebar
+        onAddNode={openContextMenuAtAnchor}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
+      <ShortcutsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
+      <VoicePickerDialog
+        open={!!voicePicker}
+        value={voicePicker?.voiceId}
+        onClose={() => setVoicePicker(null)}
+        onSelect={onVoicePicked}
+      />
     </div>
   );
 };

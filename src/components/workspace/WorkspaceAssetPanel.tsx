@@ -21,17 +21,20 @@
  * this axis". Click a pill to add it; click again to clear.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Image as ImageIcon,
   Film,
   Music,
+  Box,
   Sparkles,
   Upload,
   Layers,
   Users,
   Trash2,
+  Maximize2,
 } from "lucide-react";
+import AllAssetsDialog from "./AllAssetsDialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
@@ -40,13 +43,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useFreshSignedUrl } from "./useFreshSignedUrl";
 
 type AssetSource = "generated" | "uploaded" | "element";
-type AssetType = "image" | "video" | "audio";
+type AssetType = "image" | "video" | "audio" | "model3d";
 
 interface PanelAsset {
   /** Stable across re-renders so React keys behave. */
   id: string;
   source: "generated" | "uploaded" | "element";
-  fieldType: "image" | "video" | "audio";
+  fieldType: AssetType;
   url: string;
   label: string;
   fileName?: string;
@@ -57,6 +60,10 @@ interface PanelAsset {
   brandElementId?: string;
   referenceImages?: string[];
   frontalImageUrl?: string;
+  /** Static thumbnail to show while a 3D model loads (or as a
+   *  permanent fallback if the GLB fetch is blocked / fails).
+   *  For Tripo3D generations this is the `rendered_image` PNG. */
+  posterUrl?: string;
 }
 
 interface BrandElementRow {
@@ -69,12 +76,22 @@ interface BrandElementRow {
   created_at: string;
 }
 
-/** Heuristic: figure out an asset's media type from a generation entry. */
-function genFieldType(gen: { type?: string; url?: string }): "image" | "video" | "audio" | null {
+/** Heuristic: figure out an asset's media type from a generation entry.
+ *  3D meshes are detected via the dedicated `model_url` field (set by
+ *  the Tripo3D run path) — falls back to extension sniffing for both
+ *  meshes and the regular media types. */
+function genFieldType(
+  gen: { type?: string; url?: string; model_url?: string },
+): AssetType | null {
+  // Prefer the mesh URL if present — Tripo3D returns a rendered_image
+  // alongside the GLB; we want the GLB to drive the asset row, not
+  // the still preview.
+  if (gen.model_url) return "model3d";
   const t = (gen.type ?? "").toLowerCase();
   if (t === "image" || t === "video" || t === "audio") return t;
-  // Sniff from URL extension as a fallback.
+  if (t === "model3d" || t === "model_3d") return "model3d";
   const url = gen.url ?? "";
+  if (/\.(glb|gltf|usdz|obj|fbx)(\?|#|$)/i.test(url)) return "model3d";
   if (/\.(png|jpe?g|webp|gif|avif)(\?|$)/i.test(url)) return "image";
   if (/\.(mp4|mov|webm|m4v)(\?|$)/i.test(url)) return "video";
   if (/\.(mp3|wav|m4a|aac|ogg)(\?|$)/i.test(url)) return "audio";
@@ -104,17 +121,27 @@ const onAssetDragStart = (e: React.DragEvent, a: PanelAsset) => {
         url: a.url,
         label: a.label,
         fileName: a.fileName,
+        posterUrl: a.posterUrl,
       }),
     );
   }
   e.dataTransfer.effectAllowed = "move";
 };
 
+// Module-level stable references so the Zustand selector can return
+// the same array identity across renders when the underlying state
+// is unset. Without this React's `useSyncExternalStore` warns about
+// "getSnapshot should be cached" — every `?? []` allocates a new
+// array and triggers an infinite re-render loop.
+const EMPTY_NODES: ReadonlyArray<{ id: string; data: unknown; type?: string }> = [];
+
 const WorkspaceAssetPanel = () => {
   // Walk EVERY canvas's graph — assets from other tabs surface here
   // automatically, without the user having to re-open them.
   const allGraphs = useWorkspaceStore((s) => s.graphs);
-  const currentNodes = useWorkspaceStore((s) => s.current?.nodes ?? []);
+  const currentNodes = useWorkspaceStore(
+    (s) => s.current?.nodes ?? (EMPTY_NODES as typeof s.current.nodes),
+  );
   const { user } = useAuth();
   const [sourceFilters, setSourceFilters] = useState<Set<AssetSource>>(
     () => new Set(),
@@ -123,6 +150,33 @@ const WorkspaceAssetPanel = () => {
     () => new Set(),
   );
   const [brandElements, setBrandElements] = useState<BrandElementRow[]>([]);
+  // Toggle for the full-screen "All assets" dialog. Owned here so
+  // the open-button can sit in the panel header without prop drilling.
+  const [allOpen, setAllOpen] = useState(false);
+
+  // Bridge: the right-click "Assets" tool in CanvasContextMenu and
+  // any other surface that wants to pop the dialog can dispatch
+  // `workspace-open-all-assets` and we'll flip the local state.
+  // Saves us from lifting `allOpen` to a global store for what's
+  // really one boolean.
+  useEffect(() => {
+    const onOpen = () => setAllOpen(true);
+    window.addEventListener("workspace-open-all-assets", onOpen);
+    return () =>
+      window.removeEventListener("workspace-open-all-assets", onOpen);
+  }, []);
+
+  // Bridge: right-click "Upload" tool. We can't reach the canvas's
+  // uploadAsset directly from here (different React tree path), so
+  // we mount a hidden file input and click() it. Selected files are
+  // forwarded to the canvas via `workspace-upload-files`.
+  const triggerUploadRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    const onTrigger = () => triggerUploadRef.current?.click();
+    window.addEventListener("workspace-trigger-upload", onTrigger);
+    return () =>
+      window.removeEventListener("workspace-trigger-upload", onTrigger);
+  }, []);
 
   // Refetch trigger for brand_elements — fires when the *current*
   // canvas creates a new element (which is the only way new elements
@@ -220,14 +274,33 @@ const WorkspaceAssetPanel = () => {
         for (let i = 0; i < gens.length; i++) {
           const g = gens[i] ?? {};
           const ft = genFieldType(g);
-          if (!ft || !g.url) continue;
-          if (seenUrls.has(g.url)) continue;
-          seenUrls.add(g.url);
+          if (!ft) continue;
+          // For 3D generations the meaningful URL is `model_url`
+          // (the GLB), NOT `url` (which is the still preview thumb).
+          // The asset library should reuse the GLB so dragging it
+          // back onto canvas spawns a 3D AssetNode.
+          const assetUrl =
+            ft === "model3d" && typeof g.model_url === "string"
+              ? (g.model_url as string)
+              : (g.url as string | undefined);
+          if (!assetUrl) continue;
+          if (seenUrls.has(assetUrl)) continue;
+          seenUrls.add(assetUrl);
+          // For 3D rows, keep the rendered_image as a separate poster
+          // so the tile + lightbox can show *something* even if the
+          // GLB fetch is blocked (CORS, expired token, network blip).
+          // Without this, model-viewer renders an empty rectangle and
+          // the tile looks broken.
+          const posterUrl =
+            ft === "model3d" && typeof g.url === "string" && g.url !== assetUrl
+              ? (g.url as string)
+              : undefined;
           out.push({
             id: `g_${canvasId}_${n.id}_${g.id ?? i}`,
             source: "generated",
             fieldType: ft,
-            url: g.url as string,
+            url: assetUrl,
+            posterUrl,
             label: d.label || d.params?.nodeName || n.type || "output",
             fromNodeId: n.id,
             fromNodeLabel: d.label || d.params?.nodeName || n.type || "node",
@@ -282,7 +355,7 @@ const WorkspaceAssetPanel = () => {
     const c = {
       all: assets.length,
       generated: 0, uploaded: 0, element: 0,
-      image: 0, video: 0, audio: 0,
+      image: 0, video: 0, audio: 0, model3d: 0,
     };
     for (const a of assets) {
       c[a.source] += 1;
@@ -292,21 +365,41 @@ const WorkspaceAssetPanel = () => {
   }, [assets]);
 
   return (
-    // Outer wrapper (width / border-l / bg) is provided by the parent
-    // WorkspaceRightSidebar tab shell — this panel just supplies the
-    // inner column and keeps its own header showing the live count.
-    <div className="flex h-full flex-col text-zinc-200">
-      {/* Header */}
-      <div className="flex items-center gap-2 border-b border-zinc-800 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-        <Layers className="h-3.5 w-3.5" />
-        Assets
-        <span className="ml-auto font-mono text-[10px] text-zinc-500">
+    // Outer wrapper (width / border / glass bg) is provided by the
+    // parent WorkspaceRightSidebar — this panel just supplies the
+    // inner column. Visual language matches CanvasContextMenu so the
+    // canvas reads as one cohesive product (rounded-xl tiles, white-
+    // alpha surfaces, no chrome borders).
+    <div
+      className="flex h-full flex-col text-zinc-200"
+      style={{ fontFamily: "'Prompt', system-ui, sans-serif" }}
+    >
+      {/* Header — soft title strip with the live count + a maximise
+       *  shortcut to the All-Assets dialog. No uppercase / mono
+       *  styling here; that's the old "API console" vibe we're
+       *  moving away from. */}
+      <div className="flex items-center gap-2 px-4 pt-3 pb-2">
+        <Layers className="h-4 w-4 text-zinc-400" />
+        <span className="text-[13px] font-semibold tracking-tight text-zinc-100">
+          Assets
+        </span>
+        <span className="ml-auto font-mono text-[10.5px] text-zinc-500">
           {filtered.length}/{counts.all}
         </span>
+        <button
+          type="button"
+          onClick={() => setAllOpen(true)}
+          className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100"
+          title="Browse all assets"
+        >
+          <Maximize2 className="h-3.5 w-3.5" />
+        </button>
       </div>
 
-      {/* Source filter pills — multi-select toggle. Empty = no filter. */}
-      <div className="flex flex-wrap gap-1 border-b border-zinc-800 px-2 py-1.5">
+      {/* Source filters — three pill row, multi-select. Active state
+       *  is a soft white-alpha fill (matches the menu's segment style
+       *  rather than the old saturated sky-blue). */}
+      <div className="flex flex-wrap gap-1.5 px-3 pb-1.5">
         <FilterPill
           active={sourceFilters.has("generated")}
           onClick={() => toggleSource("generated")}
@@ -330,8 +423,8 @@ const WorkspaceAssetPanel = () => {
         />
       </div>
 
-      {/* Type filter pills — multi-select toggle. Empty = no filter. */}
-      <div className="flex flex-wrap gap-1 border-b border-zinc-800 px-2 py-1.5">
+      {/* Type filters */}
+      <div className="flex flex-wrap gap-1.5 px-3 pb-2">
         <FilterPill
           active={typeFilters.has("image")}
           onClick={() => toggleType("image")}
@@ -353,18 +446,29 @@ const WorkspaceAssetPanel = () => {
           label="Audio"
           count={counts.audio}
         />
+        <FilterPill
+          active={typeFilters.has("model3d")}
+          onClick={() => toggleType("model3d")}
+          icon={Box}
+          label="3D"
+          count={counts.model3d}
+        />
       </div>
 
+      {/* Hairline above the grid — gives the filter rail a "lid"
+       *  without the heavy border-b style. */}
+      <div className="mx-3 h-px shrink-0 bg-white/5" />
+
       {/* Grid */}
-      <div className="flex-1 overflow-y-auto p-2">
+      <div className="ws-scroll-hide flex-1 overflow-y-auto px-3 py-3">
         {filtered.length === 0 ? (
-          <div className="flex h-full items-center justify-center px-6 text-center text-xs italic text-zinc-500">
+          <div className="flex h-full items-center justify-center px-6 text-center text-[12px] italic text-zinc-500">
             {assets.length === 0
               ? "No assets yet — drop a file or run a tool."
-              : "No assets match the current filter."}
+              : "Nothing matches the current filter."}
           </div>
         ) : (
-          <ul className="grid grid-cols-2 gap-2">
+          <ul className="grid grid-cols-2 gap-2.5">
             {filtered.map((a) => (
               <AssetTile
                 key={a.id}
@@ -394,9 +498,36 @@ const WorkspaceAssetPanel = () => {
         )}
       </div>
 
-      <div className="border-t border-zinc-800 px-3 py-2 text-[11px] leading-snug text-zinc-500">
-        Drag a tile onto the canvas to re-use it as an Asset node.
+      {/* Footer hint — dim, mono. Same styling as the context menu's
+       *  footer row so users feel they're in a consistent system. */}
+      <div className="border-t border-white/5 px-4 py-2.5 text-[11px] text-zinc-500">
+        Drag a tile to the canvas to re-use it.
       </div>
+
+      <AllAssetsDialog open={allOpen} onClose={() => setAllOpen(false)} />
+
+      {/* Hidden file picker — fired by the right-click "Upload" tool
+       *  via `workspace-trigger-upload`. Selected files are handed
+       *  off to the canvas's uploadAsset path through the existing
+       *  `workspace-upload-files` event channel so we don't
+       *  duplicate the supabase upload logic on this panel. */}
+      <input
+        ref={triggerUploadRef}
+        type="file"
+        multiple
+        accept="image/*,video/*,audio/*,.glb,.gltf,.usdz,.obj,.fbx"
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files?.length) {
+            window.dispatchEvent(
+              new CustomEvent("workspace-upload-files", {
+                detail: { files: Array.from(e.target.files) },
+              }),
+            );
+          }
+          e.target.value = "";
+        }}
+      />
     </div>
   );
 };
@@ -429,10 +560,10 @@ const FilterPill = ({
     onClick={onClick}
     aria-pressed={active}
     className={cn(
-      "flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[10.5px] font-medium transition-colors",
+      "flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[10.5px] font-medium transition-colors ring-1 ring-inset",
       active
-        ? "border-sky-500/60 bg-sky-500/15 text-sky-200 shadow-[inset_0_0_0_1px_hsl(199_89%_60%/0.25)]"
-        : "border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-200",
+        ? "bg-white/[0.10] text-zinc-50 ring-white/15"
+        : "bg-white/[0.02] text-zinc-400 ring-white/5 hover:bg-white/[0.06] hover:text-zinc-200",
     )}
     title={
       active
@@ -445,7 +576,7 @@ const FilterPill = ({
     <span
       className={cn(
         "font-mono text-[9px] tabular-nums",
-        active ? "text-sky-300/70" : "text-zinc-500",
+        active ? "text-zinc-300" : "text-zinc-500",
       )}
     >
       {count}
@@ -461,20 +592,41 @@ const AssetTile = ({
   onDeleteElement?: () => void;
 }) => {
   // The URL we store in node.data was signed with whatever TTL was
-  // active at upload time. If it's expired, the hook re-signs in the
-  // background and swaps in the fresh URL. Drag-payload still uses
-  // the original `asset.url` (which the receiver can also re-sign).
+  // active at upload time. If it's expired, the hook re-signs in
+  // the background and swaps in the fresh URL.
   const liveUrl = useFreshSignedUrl(asset.url);
   const displayUrl = liveUrl ?? asset.url;
+  // Click anywhere on the tile (except the delete X) to pop the
+  // fullscreen lightbox preview. The canvas owns the lightbox state;
+  // we hand over the asset's URL via a window event so this panel
+  // doesn't need cross-tree access.
+  const openPreview = () => {
+    window.dispatchEvent(
+      new CustomEvent("workspace-open-asset-preview", {
+        detail: {
+          url: displayUrl,
+          fieldType: asset.fieldType,
+          label: asset.label,
+          fileName: asset.fileName,
+        },
+      }),
+    );
+  };
+
   return (
     <li
       draggable
       onDragStart={(e) => onAssetDragStart(e, asset)}
-      className="group cursor-grab overflow-hidden rounded border border-zinc-800 bg-zinc-900 transition-colors hover:border-zinc-600 active:cursor-grabbing"
-      title={`${asset.label} (${asset.fieldType}, ${asset.source}) — drag onto canvas to reuse`}
+      onClick={openPreview}
+      className={cn(
+        "group relative cursor-pointer overflow-hidden rounded-xl bg-white/[0.02] ring-1 ring-inset ring-white/[0.06]",
+        "transition-all hover:bg-white/[0.05] hover:ring-white/[0.12] hover:shadow-[0_6px_18px_-8px_hsl(0_0%_0%/0.6)]",
+        "active:cursor-grabbing",
+      )}
+      title={`${asset.label} (${asset.fieldType}, ${asset.source}) — click to preview, drag onto canvas to reuse`}
     >
       {/* Preview */}
-      <div className="relative aspect-square overflow-hidden bg-black">
+      <div className="relative aspect-square overflow-hidden bg-black/60">
         {asset.fieldType === "image" ? (
           <img
             src={displayUrl}
@@ -496,23 +648,56 @@ const AssetTile = ({
               v.currentTime = 0;
             }}
           />
+        ) : asset.fieldType === "model3d" ? (
+          // Static thumbnail. Spinning up `<model-viewer>` in every
+          // tile would mount 5–20 WebGL canvases at once and grind
+          // the page to ~5fps. The poster (rendered_image PNG) is
+          // cheap to render and instantly visible. The interactive
+          // 3D viewer fires up ONLY when the user clicks the tile
+          // (one lightbox = one WebGL context). The amber "3D"
+          // chip tells the user there's a real model behind it.
+          <>
+            {asset.posterUrl ? (
+              <img
+                src={asset.posterUrl}
+                alt={asset.label}
+                className="h-full w-full object-cover"
+                draggable={false}
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-zinc-900 text-zinc-600">
+                <Box className="h-8 w-8" />
+              </div>
+            )}
+          </>
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-amber-950/30">
             <Music className="h-7 w-7 text-amber-400" />
           </div>
         )}
-        {/* Source badge */}
+        {/* Source badge — small dot+label pill, frosted background.
+         *  Less shouty than the saturated old colour blocks. */}
         <span
           className={cn(
-            "absolute left-1 top-1 rounded px-1 py-px text-[8px] font-mono uppercase tracking-wide",
+            "absolute left-1.5 top-1.5 flex items-center gap-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[8.5px] font-medium uppercase tracking-wider backdrop-blur",
             asset.source === "generated"
-              ? "bg-violet-900/80 text-violet-200"
+              ? "text-violet-200"
               : asset.source === "element"
-                ? "bg-pink-900/80 text-pink-200"
-                : "bg-blue-900/80 text-blue-200",
+                ? "text-pink-200"
+                : "text-sky-200",
           )}
         >
-          {asset.source === "generated" ? "gen" : asset.source === "element" ? "el" : "up"}
+          <span
+            className={cn(
+              "h-1 w-1 rounded-full",
+              asset.source === "generated"
+                ? "bg-violet-300"
+                : asset.source === "element"
+                  ? "bg-pink-300"
+                  : "bg-sky-300",
+            )}
+          />
+          {asset.source === "generated" ? "GEN" : asset.source === "element" ? "EL" : "UP"}
         </span>
         {/* Delete X — only on saved elements (DB row), shown on hover. */}
         {onDeleteElement && (
@@ -524,7 +709,7 @@ const AssetTile = ({
               void onDeleteElement();
             }}
             onMouseDown={(e) => e.stopPropagation()}
-            className="absolute right-1 top-1 rounded bg-black/65 p-1 text-zinc-300 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
+            className="absolute right-1.5 top-1.5 rounded-md bg-black/60 p-1 text-zinc-300 opacity-0 backdrop-blur transition-opacity hover:text-red-400 group-hover:opacity-100"
             title="Delete this saved element"
           >
             <Trash2 className="h-3 w-3" />
@@ -532,12 +717,13 @@ const AssetTile = ({
         )}
       </div>
 
-      {/* Footer */}
-      <div className="px-1.5 py-1">
-        <div className="truncate text-[10px] font-medium text-zinc-200">
+      {/* Footer — name + sub. Two-tone hierarchy keeps the tile from
+       *  feeling like a single block of text. */}
+      <div className="px-2.5 pb-2 pt-1.5">
+        <div className="truncate text-[11px] font-medium leading-tight text-zinc-100">
           {asset.label}
         </div>
-        <div className="truncate text-[9px] text-zinc-500">
+        <div className="mt-0.5 truncate text-[9.5px] leading-tight text-zinc-500">
           {asset.fromNodeLabel}
         </div>
       </div>

@@ -182,6 +182,20 @@
   --port-opacity: 1;
 }
 
+/* Connected ports stay extended + visible all the time so the
+ * user can see the wires they've already built without hovering
+ * each node. Same look as the "active" hover/selected state. */
+.react-flow__handle.workspace-handle[data-connected="true"][data-port-anchor="left"] {
+  --port-tx: -16px;
+  --port-scale: 1;
+  --port-opacity: 1;
+}
+.react-flow__handle.workspace-handle[data-connected="true"][data-port-anchor="right"] {
+  --port-tx: 16px;
+  --port-scale: 1;
+  --port-opacity: 1;
+}
+
 /* …THIS handle hovered specifically — pop bigger + tooltip,
  * extending the slide a little further so the port sits visibly
  * away from the node corner. */
@@ -231,7 +245,11 @@ body[data-rfc="true"][data-rfc-type="audio"][data-rfc-dir="target"]
 body[data-rfc="true"][data-rfc-type="element"][data-rfc-dir="source"]
   .react-flow__handle.workspace-handle.target[data-port-type="element"][data-port-anchor="left"],
 body[data-rfc="true"][data-rfc-type="element"][data-rfc-dir="target"]
-  .react-flow__handle.workspace-handle.source[data-port-type="element"][data-port-anchor="left"] {
+  .react-flow__handle.workspace-handle.source[data-port-type="element"][data-port-anchor="left"],
+body[data-rfc="true"][data-rfc-type="model3d"][data-rfc-dir="source"]
+  .react-flow__handle.workspace-handle.target[data-port-type="model3d"][data-port-anchor="left"],
+body[data-rfc="true"][data-rfc-type="model3d"][data-rfc-dir="target"]
+  .react-flow__handle.workspace-handle.source[data-port-type="model3d"][data-port-anchor="left"] {
   --port-tx: -16px !important;
   --port-scale: 1 !important;
   --port-opacity: 1 !important;
@@ -257,7 +275,11 @@ body[data-rfc="true"][data-rfc-type="audio"][data-rfc-dir="target"]
 body[data-rfc="true"][data-rfc-type="element"][data-rfc-dir="source"]
   .react-flow__handle.workspace-handle.target[data-port-type="element"][data-port-anchor="right"],
 body[data-rfc="true"][data-rfc-type="element"][data-rfc-dir="target"]
-  .react-flow__handle.workspace-handle.source[data-port-type="element"][data-port-anchor="right"] {
+  .react-flow__handle.workspace-handle.source[data-port-type="element"][data-port-anchor="right"],
+body[data-rfc="true"][data-rfc-type="model3d"][data-rfc-dir="source"]
+  .react-flow__handle.workspace-handle.target[data-port-type="model3d"][data-port-anchor="right"],
+body[data-rfc="true"][data-rfc-type="model3d"][data-rfc-dir="target"]
+  .react-flow__handle.workspace-handle.source[data-port-type="model3d"][data-port-anchor="right"] {
   --port-tx: 16px !important;
   --port-scale: 1 !important;
   --port-opacity: 1 !important;
@@ -286,21 +308,201 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
     0 0 0 3px hsl(160 84% 39% / 0.35);
 }
 
-/* ── Edge drawing animation when a new connection is made ── */
+/* ── Tool-mode cursors ─────────────────────────────────────────
+ *
+ * When the user picks Hand / Cut / Sticky from the floating sidebar,
+ * the canvas surface gets a class that swaps the cursor so the
+ * active mode is obvious without looking at the toolbar. Each cursor
+ * uses the standard CSS keyword first; the `not-allowed` fallback on
+ * `cut` reads as "click to delete" without needing a custom SVG.
+ */
+.ws-tool-hand .react-flow__pane {
+  cursor: grab;
+}
+.ws-tool-hand .react-flow__pane:active {
+  cursor: grabbing;
+}
+.ws-tool-cut .react-flow__pane {
+  cursor: crosshair;
+}
+.ws-tool-cut .react-flow__edge-path,
+.ws-tool-cut .react-flow__edge-interaction {
+  cursor: not-allowed;
+}
+.ws-tool-sticky .react-flow__pane {
+  cursor: copy;
+}
+
+/* ── Edges (bezier connectors between node ports) ──────────────
+ *
+ * Resting state is INTENTIONALLY low-contrast — wires are scaffolding,
+ * not content. They should hint at "this is plumbed" without grabbing
+ * the eye away from the previews and prompts that the user is
+ * actually working with. We pump the contrast back up only when the
+ * user is interacting with a wire (hover / selected) or actively
+ * dragging a new one.
+ *
+ *   Resting   → soft zinc, ~22% opacity
+ *   Hover     → brighter zinc, ~50% opacity (tells the user they
+ *                 *can* click to select)
+ *   Selected  → full-saturation violet (matches the dragging-line
+ *                 colour, so the "what I just connected" wire reads
+ *                 the same as a wire I'm about to act on)
+ *   Animated  → marching-ants dashes — used while a node is running
+ *                 so the user can trace data flow live
+ *
+ * Stroke width also bumps on hover/selected; on the resting wires we
+ * keep it thin so a busy graph doesn't look like a tangle of cables.
+ *
+ * Note: `transition` covers both stroke colour AND width so the
+ * hover/select handoff is smooth, not jumpy. */
+.react-flow__edge-path {
+  stroke: hsl(0 0% 78% / 0.22);
+  stroke-width: 1.5;
+  transition:
+    stroke var(--ws-dur) var(--ws-ease),
+    stroke-width var(--ws-dur) var(--ws-ease),
+    filter var(--ws-dur) var(--ws-ease);
+}
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: hsl(0 0% 86% / 0.55);
+  stroke-width: 2;
+}
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge:focus .react-flow__edge-path,
+.react-flow__edge:focus-visible .react-flow__edge-path {
+  stroke: hsl(258 88% 72%);
+  stroke-width: 2.25;
+  filter: drop-shadow(0 0 6px hsl(258 88% 72% / 0.4));
+}
+
+/* The invisible-but-clickable `interaction` overlay path React Flow
+ * draws on top of every edge — widen the hit area so users can grab
+ * a wire even when it's at its dimmest. Without this, the resting
+ * 1.5px stroke needs near-pixel precision to click. */
+.react-flow__edge-interaction {
+  stroke-width: 18;
+  stroke: transparent;
+}
+
+/* In-progress connection (the dashed line that follows the cursor
+ * while the user is dragging out from a port). Saturated so it pops
+ * over both the canvas and any resting edges underneath. */
+.react-flow__connection-path,
+.react-flow__connectionline path {
+  stroke: hsl(258 88% 72%);
+  stroke-width: 2.25;
+  filter: drop-shadow(0 0 6px hsl(258 88% 72% / 0.45));
+}
+
+/* Edge drawing animation — used when a node is mid-run, so the user
+ * can see data flowing along the wire (marching ants left-to-right). */
 @keyframes ws-draw-edge {
   from { stroke-dashoffset: var(--path-length, 1000); }
   to   { stroke-dashoffset: 0; }
 }
-.react-flow__edge-path {
-  transition: stroke var(--ws-dur) var(--ws-ease);
-  stroke-width: 1.75;
-}
 .react-flow__edge.animated .react-flow__edge-path {
+  stroke: hsl(258 88% 72%);
   stroke-dasharray: 8 6;
   animation: ws-flow 1.2s linear infinite;
 }
 @keyframes ws-flow {
   to { stroke-dashoffset: -28; }
+}
+
+/* ── Clean node shell — floating title + body box ────────────
+ *
+ * All workspace nodes (Text / Asset / Element / Tool / Group) use
+ * this pattern so the canvas reads as a single visual language:
+ *
+ *   ┌─ ws-clean-title (icon + editable name)
+ *   │  - sits OUTSIDE the body, no background, no border
+ *   │  - reads as a label, not a header strip
+ *   │
+ *   └─ ws-clean-body
+ *      - single rounded card, ONE border, NO internal dividers
+ *      - holds whatever the node renders (textarea, preview, etc.)
+ *
+ * The previous design had an inline header bar with its own border
+ * and bg, plus inner sections separated by horizontal rules. That
+ * looked like a stack of tabs glued together. The cleaner pattern
+ * (per the user-supplied reference) is one card with a label
+ * floating above it, like a Figma frame title. */
+
+.ws-clean-node {
+  /* Reserve space above the body for the floating title — keeps
+   * adjacent nodes from overlapping the label region when nodes
+   * are placed close together. */
+  padding-top: 22px;
+}
+
+.ws-clean-title {
+  position: absolute;
+  top: 0;
+  left: 4px;
+  right: 4px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+  pointer-events: none; /* re-enabled on the input below */
+}
+.ws-clean-title-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+.ws-clean-title-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(0 0% 92%);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  pointer-events: auto; /* override the wrapper's pointer-events: none */
+}
+.ws-clean-title-input::placeholder {
+  color: hsl(0 0% 35%);
+}
+
+/* Body — one rounded card. No inner section borders. */
+.ws-clean-body {
+  position: relative;
+  border-radius: 14px;
+  border: 1px solid hsl(0 0% 22%);
+  background: hsl(0 0% 7%);
+  padding: 12px;
+  transition:
+    border-color var(--ws-dur) var(--ws-ease),
+    box-shadow var(--ws-dur) var(--ws-ease);
+}
+.ws-clean-body.is-selected,
+.ws-clean-body[data-state="selected"] {
+  border-color: hsl(0 0% 55%);
+}
+
+/* Internal textarea / inputs sit transparent inside the body so
+ * there's only one visible card boundary. */
+.ws-clean-textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  color: hsl(0 0% 90%);
+  font-family: inherit;
+  line-height: 1.5;
+}
+.ws-clean-textarea::placeholder,
+.ws-clean-textarea [data-placeholder]::before {
+  color: hsl(0 0% 35%);
 }
 
 /* ── Compact tool node — preview-first layout ────────────────
@@ -320,10 +522,14 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
  * keeps the controls readable over any image; controls themselves
  * use translucent white pills so they don't drown out the media.
  */
+/* Compact tool node — uses the shared `ws-clean-node` shell (with
+ * floating title above), so the body itself is one rounded card
+ * containing the preview and the prompt textarea fused together.
+ * No internal section borders. */
 .ws-compact-node {
-  width: 320px;
-  position: relative;
-  border-radius: 12px;
+  /* Title space comes from `.ws-clean-node`; just set the rounded
+   * card the preview + prompt live inside. */
+  border-radius: 14px;
   border: 1px solid hsl(0 0% 22%);
   background: hsl(0 0% 7%);
   color: hsl(0 0% 92%);
@@ -333,36 +539,10 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
     box-shadow var(--ws-dur) var(--ws-ease);
 }
 .ws-compact-node[data-state="selected"] {
-  border-color: hsl(0 0% 60%);
+  border-color: hsl(0 0% 55%);
 }
 
-/* Header — node title + icon. Sits above the preview, no
- * border-bottom for a flush look (the preview's natural edge is
- * enough). */
-.ws-compact-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px 6px;
-}
-.ws-compact-header-icon {
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
-}
-.ws-compact-header-title {
-  flex: 1;
-  min-width: 0;
-  background: transparent;
-  outline: none;
-  border: none;
-  font-size: 12px;
-  font-weight: 600;
-  color: hsl(0 0% 92%);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  overflow: hidden;
-}
+/* Tiny credit-cost badge that sits inside the floating title row. */
 .ws-compact-header-badge {
   font-size: 9px;
   font-weight: 600;
@@ -373,6 +553,7 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   border: 1px solid hsl(258 90% 50% / 0.3);
   border-radius: 4px;
   padding: 2px 5px;
+  flex-shrink: 0;
 }
 
 /* Preview area — wraps the image/video and the bottom toolbar
@@ -396,12 +577,15 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   justify-content: center;
   flex-direction: column;
   gap: 8px;
-  min-height: 240px;
+  /* Square placeholder — keeps the node-body 1:1 until a real
+   *  image / video lands and dictates its own aspect ratio.
+   *  Matches the user's "ให้เป็นจตุรัส" request. */
+  aspect-ratio: 1 / 1;
+  width: 100%;
   color: hsl(0 0% 30%);
   font-size: 11px;
   text-align: center;
   padding: 24px;
-  /* Solid dark fill — clean canvas vibe, no busy pattern. */
   background: hsl(0 0% 5%);
 }
 
@@ -431,11 +615,12 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
  * for the floating Run button. */
 .ws-compact-overlay {
   position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 10px;
+  left: 12px;
+  right: 12px;
+  /* Sits ABOVE the prompt area. Prompt is now floating text +
+   * Run button (~28px tall). 12 + 28 + 8 gap ≈ 48. */
+  bottom: 48px;
   padding: 0;
-  padding-right: 40px; /* reserve space for the Run button */
   background: transparent;
   border: none;
   box-shadow: none;
@@ -461,48 +646,38 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   gap: 5px;
 }
 
-/* Run button — circular, sits inside the bottom overlay's
- * reserved right gutter. Smaller than before to stay in scale
- * with the minimal toolbar; visible only when the overlay is
- * visible (hover/select), tracking the panel's fade. */
+/* Run button — circular, sits INSIDE the prompt overlay row on
+ * the right. Always visible alongside the prompt since they're a
+ * pair (type → submit). Smaller than the old absolutely-positioned
+ * version to stay in scale with the prompt strip. */
 .ws-compact-run {
-  position: absolute;
-  right: 14px;
-  bottom: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 28px;
   height: 28px;
+  flex-shrink: 0;
   border-radius: 50%;
   background: hsl(0 0% 100%);
   color: hsl(0 0% 8%);
   border: none;
   cursor: pointer;
   box-shadow:
-    0 3px 10px hsl(0 0% 0% / 0.5),
+    0 2px 6px hsl(0 0% 0% / 0.5),
     0 0 0 1px hsl(0 0% 0% / 0.35);
-  opacity: 0;
-  transform: translateY(4px);
-  pointer-events: none;
   transition:
-    opacity 160ms var(--ws-ease),
-    transform 160ms var(--ws-ease),
+    transform 120ms var(--ws-ease),
     background 120ms var(--ws-ease);
-}
-.react-flow__node:hover .ws-compact-run,
-.react-flow__node.selected .ws-compact-run {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
 }
 .ws-compact-run:hover {
   background: hsl(0 0% 95%);
+  transform: scale(1.05);
 }
 .ws-compact-run:disabled {
   cursor: wait;
   background: hsl(0 0% 22%);
   color: hsl(0 0% 60%);
+  transform: none;
 }
 .ws-compact-run.is-error {
   background: hsl(0 84% 60%);
@@ -513,12 +688,83 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   height: 12px;
 }
 
-/* Prompt textarea — always-visible bottom strip. Sits below the
- * preview, full width, monospace-ish for prompt readability. */
-.ws-compact-prompt {
-  padding: 8px 10px;
-  border-top: 1px solid hsl(0 0% 16%);
-  background: hsl(0 0% 5%);
+/* Prompt input — floats at the BOTTOM of the preview area as a
+ * translucent strip. Always visible (it's the most-used control)
+ * but unobtrusive when nothing's focused. While the textarea has
+ * focus the preview image/video blurs (see the :focus-within rule
+ * on `.ws-compact-preview` below) so typed text stays legible
+ * over any image. */
+/* Prompt overlay — NO box / NO border / NO blur background. Text
+ * sits directly on the preview image with a soft drop-shadow so it
+ * stays legible over both bright and dark photos. The Run button
+ * keeps its own background (it's a button, needs an affordance). */
+.ws-compact-prompt-overlay {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 12px;
+  z-index: 6;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+}
+/* Prompt textarea stretches to fill remaining width. */
+.ws-compact-prompt-overlay > div:first-child,
+.ws-compact-prompt-overlay > .ws-compact-prompt-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The textarea / contenteditable inside the overlay is fully
+ * transparent — the text floats DIRECTLY on the preview. A soft
+ * dark drop-shadow keeps it legible over light photos. */
+.ws-compact-prompt-input,
+.ws-compact-prompt-overlay textarea,
+.ws-compact-prompt-overlay [contenteditable="true"] {
+  width: 100%;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  resize: none;
+  color: hsl(0 0% 98%);
+  font-size: 12px;
+  line-height: 1.45;
+  font-family: inherit;
+  font-weight: 500;
+  min-height: 22px;
+  max-height: 120px;
+  padding: 0 !important;
+  text-shadow:
+    0 1px 2px hsl(0 0% 0% / 0.85),
+    0 0 6px hsl(0 0% 0% / 0.55);
+}
+.ws-compact-prompt-overlay textarea::placeholder,
+.ws-compact-prompt-overlay [data-placeholder]::before {
+  color: hsl(0 0% 75%);
+  text-shadow:
+    0 1px 2px hsl(0 0% 0% / 0.85),
+    0 0 6px hsl(0 0% 0% / 0.55);
+}
+
+/* Blur the preview's media (img / video) while the prompt is
+ * focused — keeps the typing area readable without removing the
+ * image entirely. The blur fades in for a soft transition. */
+.ws-compact-preview > img,
+.ws-compact-preview > video,
+.ws-compact-preview > .ws-compact-preview-empty {
+  transition: filter 220ms var(--ws-ease);
+}
+.ws-compact-preview:has(.ws-compact-prompt-overlay:focus-within) > img,
+.ws-compact-preview:has(.ws-compact-prompt-overlay:focus-within) > video,
+.ws-compact-preview:has(.ws-compact-prompt-overlay:focus-within)
+  > .ws-compact-preview-empty {
+  filter: blur(12px) brightness(0.55);
 }
 .ws-compact-prompt textarea,
 .ws-compact-prompt .ws-compact-prompt-input {
@@ -742,6 +988,134 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
               0 8px 24px -8px hsl(0 0% 0% / 0.6);
 }
 
+/* Square-locked preview area — applied to nodes whose result is
+ * inherently square (Image to 3D / Tripo3D's rendered_image is a
+ * tiny thumbnail; without this lock the node body collapses to a
+ * thin landscape strip after the gen lands). The aspect-ratio
+ * declaration drives BOTH the empty placeholder and any rendered
+ * media child (img / video / model-viewer) so the box stays 1:1
+ * across every state. */
+.ws-compact-preview[data-square="true"] {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  background: hsl(0 0% 5%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.ws-compact-preview[data-square="true"] > img,
+.ws-compact-preview[data-square="true"] > video,
+.ws-compact-preview[data-square="true"] > model-viewer {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.ws-compact-preview[data-square="true"] > .ws-compact-preview-empty {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+}
+
+/* When the schema doesn't define a prompt param (Image to 3D's
+ * Tripo3D image_to_model takes only an image input), the prompt
+ * row collapses to a tiny hint + Run button on the right. */
+.ws-compact-prompt-overlay.is-no-prompt {
+  justify-content: space-between;
+  align-items: center;
+}
+.ws-compact-prompt-hint {
+  flex: 1;
+  font-size: 10.5px;
+  color: hsl(0 0% 65%);
+  text-shadow:
+    0 1px 2px hsl(0 0% 0% / 0.85),
+    0 0 6px hsl(0 0% 0% / 0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── 3D model viewer (Tripo3D output) ────────────────────────
+ *
+ * `<model-viewer>` is a Web Component that mounts a WebGL canvas
+ * inside the node. By default it's grabbed by React Flow's drag
+ * (the press starts a node drag, no orbit). The component classes
+ * + the inline pointerdown stopPropagation in WorkspaceToolNode
+ * together hand the gesture to the viewer's own camera controls.
+ *
+ * The `ws-preview-zone` click-gate would also disable pointer
+ * events on the wrapper while the node is unselected — we override
+ * that for `<model-viewer>` so the user can orbit immediately
+ * without first clicking-to-select. 3D previews should feel native.
+ *
+ * `cursor: grabbing` flips during an active drag so the rotate
+ * gesture has the right affordance. */
+.ws-model-viewer {
+  pointer-events: auto !important;
+  cursor: grab;
+}
+.ws-model-viewer:active {
+  cursor: grabbing;
+}
+/* Bypass the parent ws-preview-zone pointer-events: none gate
+ * specifically for 3D viewers — they should be drag-orbittable
+ * without a prior select-click. */
+.react-flow__node:not(.selected) .ws-preview-zone .ws-model-viewer {
+  pointer-events: auto !important;
+}
+
+/* ── Corner resize handle ────────────────────────────────────
+ *
+ * A small dot in the BOTTOM-RIGHT corner of the compact tool node.
+ * Drag it to scale the card uniformly — width grows, the preview
+ * image scales proportionally (height auto-follows the natural
+ * aspect ratio), settings widgets / ports / prompt text stay at
+ * fixed pixel sizes. Hidden by default, fades in when the node is
+ * hovered or selected so the idle node stays clean.
+ *
+ * `body.ws-resizing` is toggled by the pointerdown handler so the
+ * resize cursor stays applied even when the pointer drifts off the
+ * handle mid-drag. */
+.ws-compact-resize-handle {
+  position: absolute;
+  bottom: -3px;
+  right: -3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: hsl(0 0% 98%);
+  border: 2px solid hsl(0 0% 12%);
+  box-shadow:
+    0 1px 3px hsl(0 0% 0% / 0.6),
+    0 0 0 1px hsl(0 0% 0% / 0.4);
+  cursor: nwse-resize;
+  pointer-events: auto;
+  opacity: 0;
+  transform: scale(0.7);
+  transition:
+    opacity 150ms var(--ws-ease),
+    transform 150ms var(--ws-ease);
+  z-index: 12;
+}
+.react-flow__node:hover .ws-compact-resize-handle,
+.react-flow__node.selected .ws-compact-resize-handle {
+  opacity: 0.85;
+  transform: scale(1);
+}
+.ws-compact-resize-handle:hover {
+  opacity: 1;
+  transform: scale(1.2);
+}
+
+/* While dragging, lock the cursor everywhere so it doesn't blink
+ * back to default when the pointer drifts onto a sibling element. */
+body.ws-resizing,
+body.ws-resizing * {
+  cursor: nwse-resize !important;
+  user-select: none;
+}
+
 /* ── Click-to-select interaction gate ─────────────────────────
  *
  * Photoshop / Figma feel: FIRST click on a node = SELECT it (the
@@ -867,6 +1241,22 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
 }
 .ws-quick-toolbar {
   animation: ws-quick-toolbar-in 110ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+/* ── Hidden scrollbars — keeps scroll functionality but removes the
+ * visible track / thumb. Used on tile grids in the right sidebar
+ * and the All-Assets dialog where the chunky default scrollbar
+ * (especially Windows' wide grey rail) cluttered the panel chrome.
+ * Apply `ws-scroll-hide` to any `overflow-y-auto` container that
+ * should scroll silently. */
+.ws-scroll-hide {
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* IE / old Edge */
+}
+.ws-scroll-hide::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;               /* Chromium / Safari */
 }
 
 /* ── Tab bar — slim horizontal scroll for many tabs ───────── */

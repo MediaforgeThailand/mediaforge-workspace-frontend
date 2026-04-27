@@ -503,6 +503,185 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
       },
     ],
   },
+
+  /**
+   * Image to 3D Model — Tripo3D.
+   * Submits a single reference image to Tripo3D's `image_to_model`
+   * pipeline; backend polls until the GLB is ready, then returns
+   * both the rendered preview thumbnail (so the workspace UI has
+   * something to render in the result strip) and the GLB URL on a
+   * separate `model3d` output handle for downstream consumers.
+   */
+  /**
+   * Audio Generator (Gemini 2.5 TTS).
+   *
+   * Wraps Google's prebuilt voice catalogue (30 named voices —
+   * Achernar, Aoede, Charon, … — see `geminiVoices.ts`). The user
+   * picks a voice via the VoicePickerDialog (opened by clicking the
+   * "Voice" param row in the node body) and writes a script. Output
+   * is a single MP3 / WAV asset suitable for downstream Merge A/V
+   * nodes or a direct download.
+   *
+   * Param notes:
+   *   - `model_name` defaults to gemini-2.5-flash-preview-tts —
+   *     cheaper and fast enough for short clips. The Pro variant is
+   *     available for production-grade narration.
+   *   - `voice` stores the Gemini voice id (e.g. "Charon"). A select
+   *     widget is provided as a fallback, but the picker dialog is
+   *     the intended UX. The default is "Charon" (Informative —
+   *     reads as a neutral baseline for most copy).
+   *   - `style_prompt` is an OPTIONAL per-clip directive that
+   *     Gemini's TTS supports — it lets the user say things like
+   *     "Read this with a calm, gentle tone" without needing to
+   *     change the underlying voice.
+   */
+  audioGenNode: {
+    displayName: "Audio Generation",
+    category: "AI PROCESS",
+    accentColor: "amber",
+    supportedModels: [
+      "gemini-2.5-flash-preview-tts",
+      "gemini-2.5-pro-preview-tts",
+    ],
+    defaultModel: "gemini-2.5-flash-preview-tts",
+    inputs: [
+      { id: "text", label: "text (script)", color: "sky" },
+    ],
+    outputs: [{ id: "audio", label: "AUDIO", color: "amber" }],
+    params: [
+      {
+        key: "model_name",
+        label: "Model",
+        type: "select",
+        options: [
+          "gemini-2.5-flash-preview-tts",
+          "gemini-2.5-pro-preview-tts",
+        ],
+        optionLabels: {
+          "gemini-2.5-flash-preview-tts": "Gemini 2.5 Flash TTS",
+          "gemini-2.5-pro-preview-tts": "Gemini 2.5 Pro TTS",
+        },
+        default: "gemini-2.5-flash-preview-tts",
+        required: true,
+      },
+      {
+        key: "voice",
+        label: "Voice",
+        type: "select",
+        // The full 30-voice catalogue; the in-canvas widget is a
+        // dropdown, but the floating "Browse voices…" button on the
+        // node opens the rich VoicePickerDialog (with use-case
+        // cards, search, preview play, etc.).
+        options: [
+          "Achernar","Achird","Algenib","Algieba","Alnilam","Aoede",
+          "Autonoe","Callirrhoe","Charon","Despina","Enceladus","Erinome",
+          "Fenrir","Gacrux","Iapetus","Kore","Laomedeia","Leda","Orus",
+          "Puck","Pulcherrima","Rasalgethi","Sadachbia","Sadaltager",
+          "Schedar","Sulafat","Umbriel","Vindemiatrix","Zephyr","Zubenelgenubi",
+        ],
+        default: "Charon",
+        required: true,
+      },
+      {
+        key: "prompt",
+        label: "Script",
+        type: "textarea",
+        default: "",
+        placeholder: "Type the line you want spoken…",
+        required: true,
+      },
+      {
+        key: "style_prompt",
+        label: "Style direction (optional)",
+        type: "textarea",
+        default: "",
+        placeholder:
+          "e.g. Read this in a calm, reassuring tone, slowing down on the technical terms.",
+      },
+    ],
+  },
+
+  imageTo3dNode: {
+    displayName: "Image to 3D",
+    category: "AI PROCESS",
+    accentColor: "amber",
+    supportedModels: [
+      "tripo3d-p1",
+      "tripo3d-v3.1",
+      "tripo3d-v3.0",
+      "tripo3d-turbo",
+      "tripo3d-v2.5",
+      "tripo3d-v2.0",
+      "tripo3d-v1.4",
+    ],
+    defaultModel: "tripo3d-v3.1",
+    inputs: [
+      {
+        id: "image",
+        label: "image",
+        color: "emerald",
+        required: true,
+        maxConnections: 1,
+      },
+    ],
+    // No output ports — a generated 3D model isn't wireable into any
+    // other node in the workspace (image / video tools can't consume
+    // a GLB). The result lives in the node's preview + the user's
+    // asset library; downstream needs would be served by a future
+    // node type that takes 3d as input.
+    outputs: [],
+    params: [
+      {
+        key: "model_name",
+        label: "Model",
+        type: "select",
+        options: [
+          "tripo3d-p1",
+          "tripo3d-v3.1",
+          "tripo3d-v3.0",
+          "tripo3d-turbo",
+          "tripo3d-v2.5",
+          "tripo3d-v2.0",
+          "tripo3d-v1.4",
+        ],
+        optionLabels: {
+          "tripo3d-p1":   "Tripo P1 (Newest, preview)",
+          "tripo3d-v3.1": "Tripo v3.1 (Gold standard, Detailed)",
+          "tripo3d-v3.0": "Tripo v3.0",
+          "tripo3d-turbo":"Tripo Turbo v1.0 (Fast)",
+          "tripo3d-v2.5": "Tripo v2.5",
+          "tripo3d-v2.0": "Tripo v2.0",
+          "tripo3d-v1.4": "Tripo v1.4 (Legacy)",
+        },
+        default: "tripo3d-v3.1",
+        required: true,
+      },
+      {
+        key: "texture",
+        label: "Texture",
+        type: "select",
+        options: ["false", "true"],
+        optionLabels: { "false": "Off", "true": "On" },
+        default: "true",
+      },
+      {
+        key: "pbr",
+        label: "PBR Materials",
+        type: "select",
+        options: ["false", "true"],
+        optionLabels: { "false": "Off", "true": "On" },
+        default: "true",
+      },
+      {
+        key: "auto_size",
+        label: "Auto Size",
+        type: "select",
+        options: ["false", "true"],
+        optionLabels: { "false": "Off", "true": "On" },
+        default: "true",
+      },
+    ],
+  },
 };
 
 /* ── Port-type inference ───────────────────────────────────────
@@ -518,7 +697,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
  * tagging — both must stay in sync or visual feedback diverges
  * from the actual connect rules.
  */
-export type WirePortType = "text" | "image" | "video" | "audio" | "element";
+export type WirePortType = "text" | "image" | "video" | "audio" | "element" | "model3d";
 
 const TEXT_HANDLE_IDS = new Set([
   "text",
@@ -546,6 +725,7 @@ const IMAGE_HANDLE_IDS = new Set([
   "output_start_frame",
   "output_end_frame",
   "output_last_frame",
+  "preview_image",
 ]);
 const VIDEO_HANDLE_IDS = new Set([
   "video",
@@ -558,6 +738,12 @@ const AUDIO_HANDLE_IDS = new Set([
   "output_audio",
 ]);
 const ELEMENT_HANDLE_IDS = new Set(["elements", "element"]);
+const MODEL3D_HANDLE_IDS = new Set([
+  "model3d",
+  "model_3d",
+  "output_model",
+  "ref_model",
+]);
 
 /** Map a Handle's id → its data type. Falls back to "image" for
  *  unknown ids since most workspace ports are image-shaped; the
@@ -567,6 +753,7 @@ export function portTypeFromHandleId(id: string): WirePortType {
   if (VIDEO_HANDLE_IDS.has(id)) return "video";
   if (AUDIO_HANDLE_IDS.has(id)) return "audio";
   if (ELEMENT_HANDLE_IDS.has(id)) return "element";
+  if (MODEL3D_HANDLE_IDS.has(id)) return "model3d";
   if (IMAGE_HANDLE_IDS.has(id)) return "image";
   return "image";
 }

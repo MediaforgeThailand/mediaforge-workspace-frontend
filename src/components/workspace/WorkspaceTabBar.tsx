@@ -21,16 +21,16 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { ChevronLeft, Plus, X } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ChevronLeft, Plus, X, Check, CloudOff, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import type { SaveState } from "./useCanvasAutosave";
 
 const TAB_MIN_W = 120;
 const TAB_MAX_W = 200;
 
 const WorkspaceTabBar = () => {
-  const navigate = useNavigate();
   // CRITICAL — `canvases` was the FLAT, top-level list (which surfaced
   // every tab as its own row on the dashboard, the bug the user
   // reported). After the v2 schema split, tabs live under workspaces;
@@ -65,10 +65,17 @@ const WorkspaceTabBar = () => {
     el?.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
   }, [currentId]);
 
-  /* ── Tab actions ────────────────────────────────────────── */
+  /* ── Tab actions ────────────────────────────────────────────
+   *
+   * URL stays constant at `/app/workspace/:workspaceId` — the
+   * active tab lives in the store as `current.id`, NOT in the URL.
+   * Switching / creating / deleting tabs only nudges store state;
+   * navigate() is reserved for actual workspace switches (which
+   * the user does via the dashboard, not this bar). */
+  const openCanvasAction = useWorkspaceStore((s) => s.openCanvas);
   const openTab = (id: string) => {
     if (id === currentId) return;
-    navigate(`/app/workspace/${id}`);
+    openCanvasAction(id);
   };
 
   const newTab = () => {
@@ -76,8 +83,8 @@ const WorkspaceTabBar = () => {
     // showing. Without an explicit workspaceId, createCanvas would
     // fall back to the most-recent workspace which usually matches
     // but isn't guaranteed when the user has many workspaces open.
-    const id = createCanvas(currentWorkspaceId ?? undefined, "Untitled");
-    navigate(`/app/workspace/${id}`);
+    const id = createCanvas(currentWorkspaceId ?? undefined);
+    openCanvasAction(id);
   };
 
   const closeTab = (id: string, e: React.MouseEvent) => {
@@ -100,7 +107,7 @@ const WorkspaceTabBar = () => {
     // Where to land after deletion: the next tab to the right, else
     // the previous, else create a fresh "Untitled" so we never end
     // up in a no-tabs state (which would trigger a back-to-dashboard
-    // bounce in Canvas.tsx).
+    // bounce).
     const idx = canvases.findIndex((c) => c.id === id);
     let landingId: string | null = null;
     if (canvases.length > 1) {
@@ -111,13 +118,12 @@ const WorkspaceTabBar = () => {
 
     if (id === currentId) {
       if (landingId) {
-        navigate(`/app/workspace/${landingId}`);
+        openCanvasAction(landingId);
       } else {
         // Closing the LAST tab in this workspace — auto-spawn a fresh
-        // tab in the SAME workspace so the bar isn't empty + the user
-        // doesn't get bounced to the dashboard.
-        const fresh = createCanvas(currentWorkspaceId ?? undefined, "Untitled");
-        navigate(`/app/workspace/${fresh}`);
+        // tab in the SAME workspace so the bar isn't empty.
+        const fresh = createCanvas(currentWorkspaceId ?? undefined);
+        openCanvasAction(fresh);
       }
     }
   };
@@ -156,21 +162,27 @@ const WorkspaceTabBar = () => {
   // argument. Leave the toggle out.
 
   return (
-    <div className="flex h-9 shrink-0 items-end gap-0.5 border-b border-zinc-800 bg-zinc-900 pl-1 pr-1">
-      {/* Back to dashboard — sits on the same row as the tabs, replacing
-       *  the old WorkspaceTopBar entirely. Vertically aligned with the
-       *  tab labels (items-end on parent), so it reads as a sibling
-       *  control rather than a header above the tabs. */}
+    // Header — minimal, cleaner. We dropped the heavy zinc-900 strip
+    // for a transparent bar that lets the canvas tone show through;
+    // the only visible separator is a hairline at the bottom. Tabs
+    // are softer pills that don't try to look like document tabs
+    // (the old "skeuomorphic" rounded-t-md card stack felt dated).
+    <div
+      className="flex h-11 shrink-0 items-center gap-1 bg-zinc-950/70 pl-2 pr-2 backdrop-blur-sm"
+      style={{ fontFamily: "'Prompt', system-ui, sans-serif" }}
+    >
+      {/* Back to dashboard — minimal pill rather than a chrome-style
+       *  link. */}
       <Link
         to="/app/workspace"
-        className="mb-px flex h-8 shrink-0 items-center gap-1 rounded px-2 text-[11px] text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+        className="flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[11.5px] text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-100"
         title="Back to workspaces"
       >
         <ChevronLeft className="h-3.5 w-3.5" />
         Back
       </Link>
 
-      <div className="mx-1 mb-1 h-5 w-px bg-zinc-800" />
+      <div className="mx-1 h-4 w-px bg-white/10" />
 
       <div
         ref={tabsScrollRef}
@@ -188,10 +200,10 @@ const WorkspaceTabBar = () => {
               onClick={() => openTab(c.id)}
               onDoubleClick={(e) => startRename(c.id, c.name, e)}
               className={cn(
-                "group relative flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-t-md px-3 text-[11px] transition-colors",
+                "group relative flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-3 text-[11.5px] transition-colors",
                 isActive
-                  ? "border-l border-r border-t border-zinc-800 bg-zinc-950 text-zinc-100"
-                  : "bg-zinc-900 text-zinc-400 hover:bg-zinc-850 hover:text-zinc-200",
+                  ? "bg-white/10 text-zinc-50 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.05)]"
+                  : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200",
               )}
               style={{ minWidth: TAB_MIN_W, maxWidth: TAB_MAX_W }}
               title={
@@ -200,11 +212,6 @@ const WorkspaceTabBar = () => {
                   : `${c.name}\nDouble-click to rename · ${nodeCount} node(s)`
               }
             >
-              {/* Active-tab marker — soft accent strip on top */}
-              {isActive && (
-                <span className="absolute inset-x-2 top-0 h-px bg-zinc-200/40" />
-              )}
-
               {isEditing ? (
                 <input
                   ref={inputRef}
@@ -257,14 +264,90 @@ const WorkspaceTabBar = () => {
       <button
         type="button"
         onClick={newTab}
-        className="flex h-8 shrink-0 items-center gap-1 rounded-t-md px-2 text-[11px] text-zinc-400 hover:bg-zinc-850 hover:text-zinc-200"
+        className="flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[11.5px] text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-100"
         title="New tab (creates a new canvas)"
         aria-label="New tab"
       >
         <Plus className="h-3.5 w-3.5" />
       </button>
+
+      {/* Autosave indicator — small badge that flashes "Saving…" /
+       *  "Saved" so the user has the same Figma-style confidence
+       *  that nothing's lost on tab close. */}
+      <SaveStateBadge />
     </div>
   );
 };
+
+/* ── Atom: autosave indicator ──────────────────────────────────
+ *
+ * `useCanvasAutosave` lives inside the React Flow tree (canvas
+ * surface) but the badge belongs up here. We bridge the two with
+ * a window event ("workspace-save-state") so the canvas hook can
+ * push state without forcing the tab bar to mount inside a flow
+ * provider. */
+function SaveStateBadge() {
+  const [state, setState] = useState<SaveState>("idle");
+  useEffect(() => {
+    const onState = (e: Event) => {
+      const detail = (e as CustomEvent<{ state: SaveState }>).detail;
+      if (detail?.state) setState(detail.state);
+    };
+    window.addEventListener("workspace-save-state", onState as EventListener);
+    return () =>
+      window.removeEventListener(
+        "workspace-save-state",
+        onState as EventListener,
+      );
+  }, []);
+
+  const config: Record<
+    SaveState,
+    { label: string; icon: React.ComponentType<{ className?: string }>; color: string } | null
+  > = {
+    idle: null,
+    guest: null,
+    saving: {
+      label: "Saving…",
+      icon: Loader2,
+      color: "text-amber-300",
+    },
+    saved: {
+      label: "Saved",
+      icon: Check,
+      color: "text-emerald-300",
+    },
+    error: {
+      label: "Save failed — retry on next change",
+      icon: CloudOff,
+      color: "text-rose-300",
+    },
+    tableMissing: {
+      label: "Local-only (apply migration to enable cloud autosave)",
+      icon: CloudOff,
+      color: "text-amber-300/80",
+    },
+  };
+  const c = config[state];
+  if (!c) return null;
+  const Icon = c.icon;
+  return (
+    <div
+      className={cn(
+        "ml-2 mb-1 flex h-6 shrink-0 items-center gap-1 rounded px-2 text-[10.5px]",
+        c.color,
+      )}
+      title={c.label}
+    >
+      <Icon
+        className={cn(
+          "h-3 w-3",
+          state === "saving" && "animate-spin",
+        )}
+      />
+      {c.label}
+    </div>
+  );
+}
 
 export default WorkspaceTabBar;

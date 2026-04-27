@@ -155,30 +155,39 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
 
   return (
     <div
-      className={cn(
-        "workspace-node-shell rounded-md border bg-zinc-900 text-zinc-200",
-        selected ? "border-zinc-500" : "border-zinc-700",
-      )}
+      className="ws-clean-node relative"
       data-state={selected ? "selected" : "idle"}
       style={{ width }}
     >
-      {/* Header */}
-      <div className="flex items-center gap-1.5 border-b border-zinc-700 bg-zinc-900/80 px-2 py-1.5">
-        <Users className="h-3.5 w-3.5 shrink-0 text-pink-400" />
+      {/* Floating title — icon + name (+ saved-badge). */}
+      <div className="ws-clean-title">
+        <Users className="ws-clean-title-icon" style={{ color: "hsl(328 86% 70%)" }} />
         <input
           value={d.label ?? ""}
           onChange={(e) => updateField({ label: e.target.value })}
           onMouseDown={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
-          className="nodrag min-w-0 flex-1 truncate bg-transparent text-xs font-medium text-zinc-200 outline-none"
+          className="ws-clean-title-input nodrag"
           placeholder="Character / element name…"
           disabled={isSaved}
         />
         {isSaved && (
-          <Check className="h-3 w-3 shrink-0 text-emerald-400" titleAccess="Saved" />
+          <Check
+            className="h-3 w-3 shrink-0 text-emerald-400"
+            titleAccess="Saved"
+            style={{ pointerEvents: "auto" }}
+          />
         )}
       </div>
 
+      <div
+        className={cn(
+          "workspace-node-shell ws-clean-body",
+          selected && "is-selected",
+        )}
+        data-state={selected ? "selected" : "idle"}
+        style={{ padding: 0 }}
+      >
       {isSaved ? (
         /* ── Saved mode — show thumbnails + read-only metadata ── */
         <div className="p-2">
@@ -204,21 +213,19 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
         </div>
       ) : (
         /* ── Creator mode — ref slots + Create button ── */
-        <>
+        <div className="p-2">
           {/* Description */}
-          <div className="border-b border-zinc-800 px-2 py-1.5">
-            <input
-              value={d.description ?? ""}
-              onChange={(e) => updateField({ description: e.target.value })}
-              onMouseDown={(e) => e.stopPropagation()}
-              onPointerDown={(e) => e.stopPropagation()}
-              className="nodrag w-full truncate bg-transparent text-[10px] text-zinc-400 outline-none placeholder:text-zinc-600"
-              placeholder="Description (optional)"
-            />
-          </div>
+          <input
+            value={d.description ?? ""}
+            onChange={(e) => updateField({ description: e.target.value })}
+            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="nodrag mb-2 w-full truncate bg-transparent text-[10px] text-zinc-400 outline-none placeholder:text-zinc-600"
+            placeholder="Description (optional)"
+          />
 
           {/* Ref slot rows */}
-          <div className="relative px-3 py-2 text-[10px] text-zinc-400">
+          <div className="relative text-[10px] text-zinc-400">
             <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-zinc-500">
               Reference images ({wiredRefs.refs.length}/4)
             </div>
@@ -242,15 +249,13 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
                 );
               })}
             </ul>
-            <div className="mt-2 border-t border-zinc-800 pt-1.5">
-              <div className="text-[9px] font-semibold uppercase tracking-wide text-zinc-500">
-                Frontal {wiredRefs.frontal ? "✓" : "(optional)"}
-              </div>
+            <div className="mt-2 text-[9px] font-semibold uppercase tracking-wide text-zinc-500">
+              Frontal {wiredRefs.frontal ? "✓" : "(optional)"}
             </div>
           </div>
 
           {/* Create button */}
-          <div className="border-t border-zinc-800 p-2">
+          <div className="mt-2">
             <button
               type="button"
               onClick={(e) => {
@@ -275,30 +280,35 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
               {creating ? "Creating…" : "Create Element"}
             </button>
           </div>
+        </div>
+      )}
+      </div>
 
-          {/* Reference image inputs — clustered as icons at the top.
-           *  Slot order matches REF_SLOTS so wiringa visual at index
-           *  N targets `ref_{N+1}` consistently with collectElementRefs. */}
-          {REF_SLOTS.map((slot, i) => (
-            <PortIcon
-              key={slot.id}
-              dir="target"
-              handleId={slot.id}
-              label={slot.label}
-              portType="image"
-              color={IMAGE_COLOR}
-              index={i}
-            />
-          ))}
+      {/* Reference image inputs — clustered as icons at the top.
+       *  Slot order matches REF_SLOTS so wiring a visual at index
+       *  N targets `ref_{N+1}` consistently with collectElementRefs.
+       *  Only shown in creator mode (saved-mode hides them). */}
+      {!isSaved &&
+        REF_SLOTS.map((slot, i) => (
           <PortIcon
+            key={slot.id}
             dir="target"
-            handleId="frontal"
-            label="Frontal (optional)"
+            handleId={slot.id}
+            label={slot.label}
             portType="image"
             color={IMAGE_COLOR}
-            index={REF_SLOTS.length}
+            index={i}
           />
-        </>
+        ))}
+      {!isSaved && (
+        <PortIcon
+          dir="target"
+          handleId="frontal"
+          label="Frontal (optional)"
+          portType="image"
+          color={IMAGE_COLOR}
+          index={REF_SLOTS.length}
+        />
       )}
 
       {/* Output — element shape always emitted, both modes */}

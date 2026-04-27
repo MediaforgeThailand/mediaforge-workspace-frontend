@@ -276,8 +276,10 @@ const App = () => (
                     }
                   />
 
-                  {/* Workspace canvas editor — full-screen, outside layouts */}
-                  <Route path="/app/workspace/:canvasId" element={<WorkspaceCanvasPage />} />
+                  {/* Workspace canvas editor — full-screen, outside layouts.
+                   *  URL is the WORKSPACE id; tabs (canvases) are tracked
+                   *  in store state, not the URL. */}
+                  <Route path="/app/workspace/:workspaceId" element={<WorkspaceCanvasPage />} />
 
                   {/* Dev debug route */}
                   <Route

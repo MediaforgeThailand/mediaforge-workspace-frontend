@@ -121,6 +121,12 @@ interface WorkspaceState {
   openCanvas: (id: string) => void;
   renameCanvas: (id: string, name: string) => void;
   deleteCanvas: (id: string) => void;
+  /** Replace a canvas's cached graph wholesale — used by the server
+   *  autosave loader to overwrite stale localStorage with the truth
+   *  from `workspace_canvases`. Inserts the canvas into the meta list
+   *  if it wasn't there yet (e.g. user opens a server-only canvas
+   *  from a different device). */
+  replaceCanvasGraph: (graph: CanvasGraph) => void;
 
   // node-level
   /** Returns the new node's id — lets callers wire up edges right after. */
@@ -198,6 +204,29 @@ const uid = () =>
   globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2, 10);
 const now = () => Date.now();
 
+/** Default name for a new canvas tab inside a workspace. We use the
+ *  pattern "Page N" where N is one greater than the highest existing
+ *  Page number in the workspace — so creating tabs in order yields
+ *  Page 1, Page 2, Page 3, … even after renames or deletes (the
+ *  scan only looks at canvases that still match `Page <number>`).
+ *
+ *  Renamed tabs don't claim a number — if the user renames "Page 2"
+ *  to "Brainstorm" and then makes a new tab, the new tab becomes
+ *  "Page 3" (it considers Page 1 + Page 3 already taken). That's
+ *  intentional: skipping numbers signals "something used to live
+ *  here" without forcing the user to restate the renamed tab. */
+function nextPageName(canvases: CanvasMeta[], workspaceId: string): string {
+  let max = 0;
+  for (const c of canvases) {
+    if (c.workspaceId !== workspaceId) continue;
+    const m = c.name.match(/^Page\s+(\d+)$/i);
+    if (!m) continue;
+    const n = Number(m[1]);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return `Page ${max + 1}`;
+}
+
 /** Pre-fill params with each ParamDef.default so the node is usable immediately. */
 const defaultParamsFor = (nodeType: string): Record<string, unknown> => {
   const schema = getWorkspaceSchema(nodeType);
@@ -239,8 +268,16 @@ function withCurrent(
   return {
     current: stamped,
     graphs: { ...state.graphs, [stamped.id]: stamped },
+    // CRITICAL: keep ALL existing meta fields (`workspaceId` chief
+    // among them) when rebuilding the canvas row. The previous
+    // version explicitly listed `{ id, name, updatedAt }` which
+    // silently dropped `workspaceId` on every node mutation —
+    // tab bar then filters by workspaceId and the active tab
+    // appeared to vanish the moment the user added a node.
     canvases: state.canvases.map((c) =>
-      c.id === stamped.id ? { id: stamped.id, name: stamped.name, updatedAt: stamped.updatedAt } : c,
+      c.id === stamped.id
+        ? { ...c, name: stamped.name, updatedAt: stamped.updatedAt }
+        : c,
     ),
     ...extra,
   };
@@ -270,12 +307,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         };
         // Every workspace starts with one empty canvas — opening a
         // workspace with zero tabs would surface as a hostile UX
-        // (no canvas to land on, blank tab bar).
+        // (no canvas to land on, blank tab bar). The first canvas is
+        // always "Page 1" — subsequent tabs auto-increment via
+        // `nextPageName` in createCanvas.
         const canvasId = uid();
         const canvasMeta: CanvasMeta = {
           id: canvasId,
           workspaceId: wsId,
-          name: "Untitled canvas",
+          name: "Page 1",
           updatedAt: now(),
         };
         const fresh: CanvasGraph = { ...canvasMeta, nodes: [], edges: [] };
@@ -357,10 +396,20 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         }
 
         const id = uid();
+        // Auto-name the tab "Page N" when the caller didn't supply
+        // an explicit non-empty name OR passed the legacy "Untitled"
+        // placeholder (the old default before Page-numbering was
+        // introduced — kept here so we don't have to touch every
+        // call-site at once).
+        const wantsAutoName =
+          !name || name === "Untitled" || name === "Untitled canvas";
+        const resolvedName = wantsAutoName
+          ? nextPageName(state.canvases, wsId)
+          : name;
         const meta: CanvasMeta = {
           id,
           workspaceId: wsId,
-          name: name || "Untitled canvas",
+          name: resolvedName,
           updatedAt: now(),
         };
         const fresh: CanvasGraph = { ...meta, nodes: [], edges: [] };
@@ -409,6 +458,32 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           redoStack: [],
         }));
       },
+
+      replaceCanvasGraph: (graph) =>
+        set((s) => {
+          const meta: CanvasMeta = {
+            id: graph.id,
+            workspaceId: graph.workspaceId,
+            name: graph.name,
+            updatedAt: graph.updatedAt,
+          };
+          const existsInList = s.canvases.some((c) => c.id === graph.id);
+          return {
+            graphs: { ...s.graphs, [graph.id]: graph },
+            canvases: existsInList
+              ? s.canvases.map((c) => (c.id === graph.id ? meta : c))
+              : [meta, ...s.canvases],
+            // If this is the currently-open canvas, swap its in-memory
+            // copy too — without this the React Flow surface keeps
+            // showing the stale local nodes while the store changes
+            // around it.
+            current: s.current?.id === graph.id ? graph : s.current,
+            // Drop history because the local actions don't apply to
+            // the server-loaded graph state.
+            history: s.current?.id === graph.id ? [] : s.history,
+            redoStack: s.current?.id === graph.id ? [] : s.redoStack,
+          };
+        }),
 
       renameCanvas: (id, name) =>
         set((s) => {
@@ -1000,11 +1075,21 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       storage: createJSONStorage(() => localStorage),
       // Skip ephemeral fields: current is derived from graphs, the
       // selection/streaming flags shouldn't outlive the tab.
+      //
+      // CRITICAL: chatMessages are NOT persisted here. They contain
+      // base64 image attachments (paste / upload) that easily blow
+      // past localStorage's ~5MB quota — when the write throws
+      // QuotaExceededError zustand silently swallows it and the
+      // ENTIRE state stops persisting from that point on, so the
+      // user's nodes appear to vanish on the next reload. The chat
+      // panel reloads its history from Supabase on canvas change
+      // anyway, so dropping it here is lossless for signed-in users
+      // (guests lose their in-memory chat on refresh — that's the
+      // same as before).
       partialize: (state) => ({
         workspaces: state.workspaces,
         canvases: state.canvases,
         graphs: state.graphs,
-        chatMessages: state.chatMessages,
       }),
       // ── Forward-migration ────────────────────────────────
       // v1 → v2: every existing canvas was a top-level entry on the

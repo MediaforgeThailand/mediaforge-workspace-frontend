@@ -16,20 +16,27 @@
  * Closing: click backdrop, hit Esc, or press `A` again.
  */
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, ImageOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Node } from "@xyflow/react";
+import { useMirroredTripoUrl } from "./useMirroredTripoUrl";
 
 export interface PreviewPayload {
-  type: "image" | "video" | "audio" | "text" | "grid";
+  type: "image" | "video" | "audio" | "text" | "grid" | "model3d";
   /** image / video / audio source URL */
   url?: string;
   /** plain-text payload (textNode, chat output, video-to-prompt) */
   text?: string;
   /** Multi-image preview (group node = contact sheet). */
   urls?: string[];
+  /** GLB / GLTF URL — drives the fullscreen 3D viewer (Tripo3D
+   *  outputs). When set, the lightbox renders a `<model-viewer>`
+   *  with full orbit controls. */
+  model_url?: string;
+  /** Optional poster (rendered_image) shown while the GLB loads. */
+  poster?: string;
   label?: string;
   caption?: string;
 }
@@ -40,6 +47,49 @@ interface Props {
 }
 
 const NodePreviewLightbox = ({ preview, onClose }: Props) => {
+  // For 3D previews coming from Tripo3D generations, the model_url
+  // is a CORS-blocked Tripo CDN URL — pipe through the mirror hook
+  // so model-viewer can actually fetch the GLB. For non-Tripo URLs
+  // the hook returns the input unchanged (synchronously).
+  const mirroredModelUrl = useMirroredTripoUrl(preview.model_url);
+
+  // Loading-screen state for the 3D viewer.
+  //
+  // The flow:
+  //   1. Open lightbox → model-viewer src = Tripo URL → loader shows
+  //   2. Tripo CDN CORS-rejects the fetch → model-viewer fires `error`
+  //   3. mirror-on-demand finishes → mirroredModelUrl swaps to a
+  //      Supabase signed URL → model-viewer src updates → fires `load`
+  //   4. We dismiss the loader.
+  //
+  // We INTENTIONALLY ignore the `error` event in step 2: the first
+  // load attempt is GUARANTEED to fail (that's why we mirror). If we
+  // dismissed the loader on `error`, the user would see the loader
+  // disappear for ~1s, then come back the moment the mirror lands
+  // and the second URL starts loading — a confusing flicker the user
+  // reported. The 15s safety timeout below still rescues us if the
+  // mirrored URL also fails to load (corrupt GLB, network blip, etc.).
+  const modelViewerRef = useRef<HTMLElement | null>(null);
+  const [modelLoaded, setModelLoaded] = useState(false);
+  useEffect(() => {
+    // Reset on every new preview payload — if the user closes one
+    // 3D and opens another, the loader has to come back.
+    setModelLoaded(false);
+    if (preview.type !== "model3d") return;
+    const el = modelViewerRef.current;
+    if (!el) return;
+    const onLoad = () => setModelLoaded(true);
+    el.addEventListener("load", onLoad);
+    // Safety net — never trap the user behind the loader if the
+    // load event somehow doesn't fire (cached model, browser quirks,
+    // mirror endpoint returning a corrupt GLB, etc.).
+    const fallback = window.setTimeout(() => setModelLoaded(true), 15_000);
+    return () => {
+      el.removeEventListener("load", onLoad);
+      window.clearTimeout(fallback);
+    };
+  }, [preview.type, preview.model_url, mirroredModelUrl]);
+
   // Close on Esc OR `A` (toggle — same key opens/closes via the global
   // `A` shortcut). The `A` branch DOES NOT fire while the user is
   // typing into a text input/contenteditable somewhere on the page —
@@ -144,6 +194,81 @@ const NodePreviewLightbox = ({ preview, onClose }: Props) => {
           </div>
         )}
 
+        {preview.type === "model3d" && preview.model_url && (
+          // Fullscreen 3D viewer — drag to rotate, scroll to zoom.
+          // `pointer-events: auto` and stopPropagation on the wrapper
+          // are NOT needed here because the lightbox's outer overlay
+          // already swallows pan-canvas gestures; the model-viewer
+          // owns the whole rectangle.
+          <div className="relative w-[min(900px,90vw)] aspect-square rounded-md bg-zinc-950 shadow-2xl shadow-black overflow-hidden">
+            <model-viewer
+              ref={(el) => {
+                modelViewerRef.current = el as HTMLElement | null;
+              }}
+              src={mirroredModelUrl ?? preview.model_url}
+              alt={preview.label ?? "3D model"}
+              auto-rotate
+              camera-controls
+              shadow-intensity="1.2"
+              exposure="1"
+              loading="eager"
+              interaction-prompt="auto"
+              style={{
+                width: "100%",
+                height: "100%",
+                background: "hsl(0 0% 4%)",
+                cursor: "grab",
+              }}
+            />
+            {/* Loading mascot — keeps the user's brain occupied
+             *  while the GLB streams in (mirror + model-viewer
+             *  parse can take 3–8s on a fresh tile).
+             *
+             *  Sized down to ~140px (was 75% of viewport) so it
+             *  reads as an "animation badge" rather than a hero
+             *  preview, and `mix-blend-mode: screen` was REMOVED:
+             *  per-frame compositing against a layered backdrop
+             *  caused visible flickering on every frame swap (Chrome
+             *  re-rasterises the blend each tick). Letting the video
+             *  draw onto its own opaque rectangle keeps decoding on
+             *  the GPU's fast path with no per-frame work — looks
+             *  smooth even on slower machines.
+             *
+             *  Faded out the instant model-viewer fires `load` so
+             *  the orbit takes over without a hard cut. */}
+            <div
+              aria-hidden
+              className={cn(
+                "pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 transition-opacity duration-500",
+                modelLoaded ? "opacity-0" : "opacity-100",
+              )}
+              style={{ background: "hsl(0 0% 4%)" }}
+            >
+              <video
+                src="/videos/cheeky.webm"
+                autoPlay
+                loop
+                muted
+                playsInline
+                disablePictureInPicture
+                className="h-[140px] w-[140px] rounded-md object-contain"
+              />
+              <span className="text-[11px] font-mono uppercase tracking-[0.25em] text-zinc-400">
+                Loading 3D…
+              </span>
+            </div>
+            <a
+              href={mirroredModelUrl ?? preview.model_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              download
+              className="absolute bottom-3 right-3 rounded-md border border-zinc-700 bg-black/70 px-3 py-1.5 text-[11px] text-zinc-200 backdrop-blur hover:bg-black/90"
+            >
+              Download .glb
+            </a>
+          </div>
+        )}
+
         {preview.type === "grid" && Array.isArray(preview.urls) && (
           <div className="grid w-[min(900px,90vw)] grid-cols-3 gap-3">
             {preview.urls.length === 0 ? (
@@ -199,6 +324,21 @@ export function getNodePreview(
       (d.storagePath as string | undefined);
     if (!url) return null;
     const ft = (d.fieldType as string | undefined) ?? "image";
+    // 3D mesh — open in the model viewer with full orbit. The
+    // GLB/GLTF lives at `previewUrl`; there's no separate poster
+    // for uploads (vs. Tripo3D-generated nodes which DO have a
+    // rendered_image), so the lightbox renders model-viewer with
+    // its built-in spinner while the GLB streams in.
+    if (ft === "model3d") {
+      return {
+        type: "model3d",
+        model_url: url,
+        label: labelOf("3d model"),
+        caption:
+          ((d.fileName as string | undefined) ?? "") +
+          " · drag to rotate",
+      };
+    }
     const previewType: PreviewPayload["type"] =
       ft === "video" ? "video" : ft === "audio" ? "audio" : "image";
     return {
@@ -284,6 +424,19 @@ export function getNodePreview(
         : 0;
     const g = gens[idx] ?? gens[0];
     const gType = (g.type as string | undefined) ?? "image";
+    // 3D model output (Tripo3D) — render fullscreen viewer rather
+    // than the still preview image. `model_url` is set alongside the
+    // rendered_image `url` whenever a GLB is available.
+    const modelUrl = g.model_url as string | undefined;
+    if (modelUrl) {
+      return {
+        type: "model3d",
+        model_url: modelUrl,
+        poster: g.url as string | undefined,
+        label: labelOf(),
+        caption: `Generation ${idx + 1} / ${gens.length} · drag to rotate`,
+      };
+    }
     if (gType === "text") {
       return {
         type: "text",

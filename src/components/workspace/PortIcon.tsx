@@ -41,16 +41,17 @@
  *   only when THIS handle is hovered specifically.
  */
 
-import { Handle, Position } from "@xyflow/react";
+import { Handle, Position, useEdges, useNodeId } from "@xyflow/react";
 import {
   Image as ImageIcon,
   Film,
   Music,
   Type,
   Users,
+  Box,
   type LucideIcon,
 } from "lucide-react";
-import type { CSSProperties } from "react";
+import { useMemo, type CSSProperties } from "react";
 import type { WirePortType } from "./workspaceSchema";
 
 export const PORT_GAP_PX = 36;
@@ -62,6 +63,7 @@ const ICON_BY_TYPE: Record<WirePortType, LucideIcon> = {
   audio: Music,
   text: Type,
   element: Users,
+  model3d: Box,
 };
 
 interface PortIconProps {
@@ -111,6 +113,25 @@ export function PortIcon({
     style.bottom = "auto";
     style.top = `${offset}px`;
   }
+
+  /* Detect whether THIS handle has a wire attached. Connected
+   * ports stay visible at their full "extended" state instead of
+   * fading out with the node — the user wants the wires they've
+   * already built to be readable without hovering each node. */
+  const nodeId = useNodeId();
+  const edges = useEdges();
+  const isConnected = useMemo(() => {
+    if (!nodeId) return false;
+    if (dir === "target") {
+      return edges.some(
+        (e) => e.target === nodeId && (e.targetHandle ?? "") === handleId,
+      );
+    }
+    return edges.some(
+      (e) => e.source === nodeId && (e.sourceHandle ?? "") === handleId,
+    );
+  }, [edges, nodeId, dir, handleId]);
+
   return (
     <Handle
       type={dir}
@@ -119,6 +140,7 @@ export function PortIcon({
       className="workspace-handle"
       data-port-type={portType}
       data-port-anchor={side}
+      data-connected={isConnected ? "true" : undefined}
       style={style}
     >
       <Icon className="ws-port-glyph" />
