@@ -744,22 +744,25 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
 .react-flow__node:hover .ws-compact-prompt-overlay,
 .react-flow__node.selected .ws-compact-prompt-overlay,
 .react-flow__node .ws-compact-prompt-overlay:focus-within {
-  /* Settings strip lives at `bottom: 12px`, ~28px tall → its TOP
-   * edge sits at ≈ 40px from the bottom of the preview. We park
-   * the prompt's BOTTOM edge at 48px so there's only an 8px gap
-   * between the last line of typed text and the top of the
-   * settings pills — visually continuous without overlapping.
+  /* Dynamic lift — prompt parks JUST ABOVE the settings toolbar
+   * with an 8px visual gap, no matter how many rows the toolbar
+   * wrapped onto.
    *
-   * Same value for hover/select AND focus-within. The earlier
-   * version lifted the focused prompt all the way to 80px so the
-   * 9-line expanded editor would have "breathing room", but that
-   * left a 40px empty corridor between text and pills (reported by
-   * user as "ห่างกันมากเกินไป"). The expanded editor grows UP into
-   * the preview area regardless — the bottom edge anchor doesn't
-   * affect how much typing room there is. Keeping focus and hover
-   * at the same anchor also kills the jump that used to happen the
-   * moment the user clicked into the prompt. */
-  bottom: 48px;
+   * `--ws-toolbar-h` is published by a ResizeObserver in
+   * WorkspaceToolNode (watches `.ws-compact-toolbar`). Single-row
+   * toolbar ≈ 28px; once it wraps to two rows (Kling Omni:
+   * Model + Aspect + Duration + Audio + Keep Sound + Multi-Shot)
+   * it grows to ~56-64px and the prompt lifts in lockstep. The
+   * fallback `28px` is the single-row default for the brief frame
+   * before the observer fires, plus any node that doesn't render
+   * a toolbar at all.
+   *
+   * Math: 12 (toolbar baseline) + 8 (gap) = 20 — added to the
+   * toolbar's measured height for the prompt's `bottom`.
+   *
+   * Earlier hard-coded 48px was correct for one row but produced
+   * the "text ทับกับ setting" overlap on multi-row toolbars. */
+  bottom: calc(var(--ws-toolbar-h, 28px) + 20px);
 }
 /* Prompt textarea stretches to fill remaining width. */
 .ws-compact-prompt-overlay > div:first-child,
