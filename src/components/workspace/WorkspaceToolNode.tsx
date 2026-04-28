@@ -445,6 +445,42 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const edges = useEdges();
   const prevHasRefVideo = useRef<boolean | undefined>(undefined);
 
+  // Refs + ResizeObserver for the dynamic prompt-lift logic. The
+  // prompt overlay sits above the settings toolbar and used to lift
+  // by a HARD-CODED 48px on hover/select — fine for a single-row
+  // toolbar (~28px tall) but the moment a model exposed enough
+  // params to wrap to two rows (Kling Omni: Model + Aspect + Duration
+  // + Audio + Keep Original Sound + Multi-Shot) the toolbar grew to
+  // ~56-64px and the prompt text ran on top of the second row.
+  // Reported by user: "ตัว text ทับกับ setting" on a multi-row toolbar.
+  //
+  // Solution: measure the toolbar's actual rendered height with a
+  // ResizeObserver and publish it as `--ws-toolbar-h` on the
+  // preview element. The CSS rule for `:hover`/`:selected`/
+  // `:focus-within` then computes `bottom: calc(var(--ws-toolbar-h) +
+  // gap)` so the prompt always parks just above whatever height the
+  // toolbar happens to be. Pure DOM mutation (no setState) so this
+  // can't trigger a render loop or React #185.
+  const previewRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const target = toolbarRef.current;
+    const root = previewRef.current;
+    if (!target || !root) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        // contentRect doesn't include padding — the toolbar's
+        // padding is 0 so this == its visual height. Round up so
+        // a sub-pixel size doesn't leave a 0.4px gap below the
+        // text.
+        const h = Math.ceil(entry.contentRect.height);
+        root.style.setProperty("--ws-toolbar-h", `${h}px`);
+      }
+    });
+    ro.observe(target);
+    return () => ro.disconnect();
+  }, []);
+
   const d = (data ?? {}) as NodeData & { status?: "idle" | "processing" | "done" | "error" };
   const params = d.params ?? {};
   const selectedModel = (params.model_name as string) ?? schema?.defaultModel ?? "";
@@ -1385,6 +1421,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
         {/* ── Preview area — 3D model / image / video / placeholder ── */}
         <div
+          ref={previewRef}
           className="ws-compact-preview ws-preview-zone"
           data-square={forceSquarePreview ? "true" : undefined}
         >
@@ -1480,7 +1517,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
           {/* ── Settings overlay — fades in on hover/select ── */}
           <div className="ws-compact-overlay">
-            <div className="ws-compact-toolbar">
+            <div ref={toolbarRef} className="ws-compact-toolbar">
               {toolbarParams.map((p) => renderToolbarParam(p))}
             </div>
           </div>
