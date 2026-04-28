@@ -4,7 +4,7 @@ import { Move } from "lucide-react";
 import { NODE_API_SCHEMA, getVisibleParams, cleanParamsOnModelChange, type ParamDef } from "./nodeApiSchema";
 import NodeParamRenderer from "./NodeParamRenderer";
 import BaseNodeWrapper, { type PortDef } from "./BaseNodeWrapper";
-import { useCreatorCreditCosts } from "@/hooks/useCreatorCreditCosts";
+import { useNodeCreditCosts as useCreatorCreditCosts } from "@/hooks/useNodeCreditCosts";
 import { calculateNodeCost } from "@/lib/nodeCostCalculator";
 
 const SCHEMA = NODE_API_SCHEMA.motionControlNode;

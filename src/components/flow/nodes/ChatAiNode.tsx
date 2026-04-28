@@ -4,7 +4,7 @@ import { MessageSquare } from "lucide-react";
 import { NODE_API_SCHEMA } from "./nodeApiSchema";
 import NodeParamGroups from "./NodeParamGroups";
 import BaseNodeWrapper, { type PortDef } from "./BaseNodeWrapper";
-import { useCreatorCreditCosts } from "@/hooks/useCreatorCreditCosts";
+import { useNodeCreditCosts as useCreatorCreditCosts } from "@/hooks/useNodeCreditCosts";
 import { calculateNodeCost } from "@/lib/nodeCostCalculator";
 
 export interface ChatAiNodeData {

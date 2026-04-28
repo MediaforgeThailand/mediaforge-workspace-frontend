@@ -13,7 +13,7 @@ import NodeParamRenderer from "./NodeParamRenderer";
 import BaseNodeWrapper, { type PortDef } from "./BaseNodeWrapper";
 import { CollapsibleGroup, ModelSelectButton, EyeBtn } from "./primitives";
 import { cn } from "@/lib/utils";
-import { useCreatorCreditCosts } from "@/hooks/useCreatorCreditCosts";
+import { useNodeCreditCosts as useCreatorCreditCosts } from "@/hooks/useNodeCreditCosts";
 import { calculateNodeCost } from "@/lib/nodeCostCalculator";
 import MultiShotBuilder, { type SceneBlock } from "./MultiShotBuilder";
 

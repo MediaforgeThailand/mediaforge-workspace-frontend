@@ -7,8 +7,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useSearchParams } from "react-router-dom";
 import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
-import LoginRequiredDialog from "@/components/LoginRequiredDialog";
-import { useLoginRequired } from "@/hooks/useLoginRequired";
 import PricingHero, { BillingCycleView } from "@/components/pricing/PricingHero";
 import PricingCard from "@/components/pricing/PricingCard";
 import PricingCompare from "@/components/pricing/PricingCompare";
@@ -95,8 +93,6 @@ const Pricing = () => {
   const [checkoutMode, setCheckoutMode] = useState<"subscription" | "topup">("subscription");
   const [checkoutPkgId, setCheckoutPkgId] = useState("");
 
-  const { requireLogin, showLogin, onOpenChange: onLoginOpenChange } = useLoginRequired();
-
   useEffect(() => {
     Promise.all([
       supabase.from("subscription_plans").select("*").eq("is_active", true).order("sort_order"),
@@ -120,20 +116,19 @@ const Pricing = () => {
   const monthlyPlans = plans.filter(p => p.target === audience && p.billing_cycle === "monthly");
   const currentPlanId = (profile as any)?.subscription_plan_id || (profile as any)?.current_plan_id;
 
+  // /app/pricing lives behind ProtectedRoute so user is guaranteed
+  // signed-in. The legacy `requireLogin()` gate (which popped a sign-
+  // in dialog when called pre-auth) is gone in Wave 3 cleanup.
   const handleSubscribe = (plan: SubscriptionPlan) => {
-    requireLogin(() => {
-      setCheckoutPkgId(plan.id);
-      setCheckoutMode("subscription");
-      setCheckoutOpen(true);
-    });
+    setCheckoutPkgId(plan.id);
+    setCheckoutMode("subscription");
+    setCheckoutOpen(true);
   };
 
   const handleTopup = (pkg: TopupPackage) => {
-    requireLogin(() => {
-      setCheckoutPkgId(pkg.id);
-      setCheckoutMode("topup");
-      setCheckoutOpen(true);
-    });
+    setCheckoutPkgId(pkg.id);
+    setCheckoutMode("topup");
+    setCheckoutOpen(true);
   };
 
   const handleCheckoutClose = (open: boolean) => {
@@ -231,7 +226,6 @@ const Pricing = () => {
         billingInterval={view === "annual" ? "annual" : "monthly"}
       />
 
-      <LoginRequiredDialog open={showLogin} onOpenChange={onLoginOpenChange} />
     </div>
   );
 };

@@ -2,7 +2,7 @@ import { memo, useCallback, useMemo } from "react";
 import { type NodeProps, useReactFlow } from "@xyflow/react";
 import { FastForward, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useCreatorCreditCosts } from "@/hooks/useCreatorCreditCosts";
+import { useNodeCreditCosts as useCreatorCreditCosts } from "@/hooks/useNodeCreditCosts";
 import { calculateNodeCost } from "@/lib/nodeCostCalculator";
 import BaseNodeWrapper, { type PortDef } from "./BaseNodeWrapper";
 

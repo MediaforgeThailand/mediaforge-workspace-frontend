@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 
 import { type ParamDef } from "@/components/flow/nodes/nodeApiSchema";
-import { useCreatorCreditCosts } from "@/hooks/useCreatorCreditCosts";
+import { useNodeCreditCosts as useCreatorCreditCosts } from "@/hooks/useNodeCreditCosts";
 import { calculateNodeCost } from "@/lib/nodeCostCalculator";
 import PromptMentionTextarea from "@/components/flow/nodes/PromptMentionTextarea";
 import MultiShotBuilder, {

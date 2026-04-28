@@ -6,7 +6,7 @@
  * params (model_name, duration, has_audio).
  */
 
-import type { CreditCostRow } from "@/hooks/useCreatorCreditCosts";
+import type { CreditCostRow } from "@/hooks/useNodeCreditCosts";
 
 interface NodeCostParams {
   /** Schema key: "bananaProNode" | "klingVideoNode" | "chatAiNode" */

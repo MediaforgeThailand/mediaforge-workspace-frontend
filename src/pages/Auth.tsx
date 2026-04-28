@@ -12,14 +12,6 @@ import logo from "@/assets/logo-white.png";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import PhoneOtpLogin from "@/components/auth/PhoneOtpLogin";
-import PageLoadingAnim from "@/components/ui/PageLoadingAnim";
-import {
-  beginDemoRedemption,
-  clearStoredDemoRedemption,
-  endDemoRedemption,
-  getStoredDemoRedemption,
-  redeemDemoCredits,
-} from "@/lib/demoRedemption";
 import { useSearchParams } from "react-router-dom";
 const Auth = () => {
   const navigate = useNavigate();
@@ -39,8 +31,6 @@ const Auth = () => {
   const [showPhoneLogin, setShowPhoneLogin] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [sentEmail, setSentEmail] = useState("");
-  const [isDemoRedeeming, setIsDemoRedeeming] = useState(false);
-
   // Form states
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -87,71 +77,33 @@ const Auth = () => {
     }
   };
 
+  /**
+   * After successful sign-in we land on the workspace dashboard.
+   * Honour `?redirect=/some/path` if the caller passed one (workspace
+   * uses it to bounce back to a canvas after auth), otherwise fall
+   * through to the default landing.
+   *
+   * Wave 1 cleanup removed the consumer demo-redemption flow that
+   * used to hijack this hook with token-handoff logic; the workspace
+   * product doesn't grant credits via shareable links.
+   */
   const resolveRedirect = () => {
     const r = searchParams.get("redirect");
     if (r && r.startsWith("/") && !r.startsWith("//")) return r;
-    return "/app/home";
+    return "/app/workspace";
   };
 
   const handlePostAuthSuccess = () => {
-    const { token } = getStoredDemoRedemption();
-    if (!token) {
-      navigate(resolveRedirect(), { replace: true });
-    }
+    navigate(resolveRedirect(), { replace: true });
   };
 
   useEffect(() => {
     if (!user) return;
-
-    const { token, credits } = getStoredDemoRedemption();
-    if (!token) {
-      navigate(resolveRedirect(), { replace: true });
-      return;
-    }
-
-    const demoUrl = new URLSearchParams({ token });
-    if (credits) demoUrl.set("credits", credits);
-
-    if (!beginDemoRedemption(token)) return;
-
-    setIsDemoRedeeming(true);
-
-    (async () => {
-      try {
-        const result = await redeemDemoCredits({
-          token,
-          creditsHint: credits,
-          userId: user.id,
-          userEmail: user.email,
-        });
-
-        clearStoredDemoRedemption();
-
-        toast({
-          title: result.alreadyRedeemed ? t("demoAlreadyRedeemed") : t("demoAutoSuccess"),
-          description: result.repairedLink
-            ? t("demoRepairedLink")
-            : t("demoAutoSuccessDesc", { credits: result.credits.toLocaleString() }),
-        });
-
-        navigate("/app/home", { replace: true });
-      } catch (error) {
-        toast({
-          variant: "destructive",
-          title: t("demoAutoFailed"),
-          description: error instanceof Error ? error.message : t("demoAutoError"),
-        });
-        navigate(`/demo?${demoUrl.toString()}`, { replace: true });
-      } finally {
-        endDemoRedemption(token);
-        setIsDemoRedeeming(false);
-      }
-    })();
-  }, [navigate, toast, user]);
-
-  if (user && isDemoRedeeming) {
-    return <PageLoadingAnim />;
-  }
+    navigate(resolveRedirect(), { replace: true });
+    // resolveRedirect is stable for our purposes — only depends on
+    // searchParams which the URL controls.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate, user]);
 
   if (user) return null;
 
