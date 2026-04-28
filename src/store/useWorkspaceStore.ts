@@ -508,26 +508,62 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             (w) => !(w.id in tombstones),
           );
 
-          // Build a quick lookup of what we already have locally.
+          // SERVER IS THE SOURCE OF TRUTH for workspace meta. Build
+          // the merged list by starting from the server response,
+          // not from the local list:
+          //
+          //   1. Every server row → in the merged list.
+          //   2. Local rows the server DOESN'T have → only kept if
+          //      they're "pending push" (created locally, not yet
+          //      synced — recognised by being absent from BOTH the
+          //      tombstones and the server set, with a fresh
+          //      `updatedAt` within the last 60 seconds).
+          //
+          // The earlier version added server entries to local without
+          // removing any local entries the server had stopped
+          // returning. That meant a workspace deleted on Device A
+          // (gone from server) would PERSIST in Device B's local
+          // store forever — and the dashboard's "push local-only"
+          // branch would resurrect it on the server. Reported by
+          // user as "Recovered space ลบเท่าไหร่ก็ไม่หาย".
+          //
+          // Last-write-wins by `updatedAt` still applies for rows
+          // present on BOTH sides — a stale server row never
+          // clobbers a fresher local rename.
+          const PENDING_PUSH_WINDOW_MS = 60_000;
+          const nowMs = Date.now();
+          const serverIds = new Set(liveServer.map((w) => w.id));
           const localById = new Map(s.workspaces.map((w) => [w.id, w]));
-          // Last-write-wins by updatedAt — same row but the server
-          // is fresher means we adopt the server name; vice-versa
-          // we keep what's local (the upsert will catch the server
-          // up shortly via the dashboard's fire-and-forget hook).
+
+          const merged: WorkspaceMeta[] = [];
           for (const server of liveServer) {
             const local = localById.get(server.id);
-            if (!local) {
-              localById.set(server.id, server);
-            } else if (server.updatedAt > local.updatedAt) {
-              localById.set(server.id, { ...local, ...server });
+            if (local && local.updatedAt > server.updatedAt) {
+              // Keep the local fresher copy (rename in flight). The
+              // dashboard's fire-and-forget upsert will catch the
+              // server up shortly.
+              merged.push(local);
+            } else {
+              merged.push(server);
             }
-            // else: keep local — it's fresher than the server copy.
+          }
+          // Local-only rows: keep ONLY the very-recently-created
+          // ones (likely a brand-new workspace not yet pushed).
+          // Anything older than the window is treated as stale —
+          // either it was deleted on the server side (intent: gone)
+          // or its push has long since either succeeded (would be on
+          // server) or failed (next sync will retry). Either way
+          // pruning prevents the resurrection loop.
+          for (const local of s.workspaces) {
+            if (serverIds.has(local.id)) continue;
+            if (local.id in tombstones) continue;
+            if (nowMs - local.updatedAt < PENDING_PUSH_WINDOW_MS) {
+              merged.push(local);
+            }
           }
           // Re-sort newest-first so dashboard's default ordering
           // stays stable.
-          const merged = Array.from(localById.values()).sort(
-            (a, b) => b.updatedAt - a.updatedAt,
-          );
+          merged.sort((a, b) => b.updatedAt - a.updatedAt);
           return { workspaces: merged };
         }),
 
