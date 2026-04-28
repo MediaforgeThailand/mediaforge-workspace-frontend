@@ -104,11 +104,23 @@ const App = () => (
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/terms" element={<Terms />} />
 
-                  {/* Authed app — dashboard chrome wraps the
-                   *  workspace dashboard + account pages */}
+                  {/* Workspace dashboard owns its own sidebar (Home /
+                   *  Spaces / Community / Projects / All tools / Stock),
+                   *  so it sits outside DashboardLayout — no chrome
+                   *  competition with the legacy consumer sidebar. */}
+                  <Route path="/app" element={<Navigate to="/app/workspace" replace />} />
+                  <Route
+                    path="/app/workspace"
+                    element={
+                      <ProtectedRoute>
+                        <WorkspaceDashboard />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* Account pages still use the dashboard chrome until
+                   *  Wave 2 rebuilds them around workspace concepts. */}
                   <Route path="/app" element={<DashboardLayout />}>
-                    <Route index element={<Navigate to="workspace" replace />} />
-                    <Route path="workspace" element={<WorkspaceDashboard />} />
                     <Route path="settings" element={<Settings />} />
                     <Route path="usage" element={<Transactions />} />
                     <Route path="pricing" element={<Pricing />} />
