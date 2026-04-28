@@ -1,10 +1,35 @@
-# CLAUDE.md
+# CLAUDE.md — mediaforge-workspace-frontend
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-MediaForge — AI-powered media creation SaaS for Thai SMEs. React SPA frontend with Supabase backend (Edge Functions in Deno), deployed via Vercel.
+The MediaForge **Workspace** product — node-based canvas editor for
+chaining AI tools. Split out from the consumer app per CTO directive
+to ship as a standalone subdomain at **workspace.mediaforge.co**.
+
+The repo started as a fork of `mediaforge-frontend` so a lot of
+consumer-app pages / components are still present (creator, partner,
+play-flow, etc.). Those are scheduled for removal in a Phase 4
+cleanup once the workspace.mediaforge.co subdomain is verified
+stable. Until then they coexist — only the workspace routes will be
+exposed by the subdomain DNS.
+
+Companion backend: `mediaforge-workspace-backend`
+(Supabase project `fymncypboeubdikpbmqc`, dedicated to workspace).
+
+## Workspace V2 entry points
+
+- `/app/workspace`              — Dashboard (list of spaces)
+- `/app/workspace/:workspaceId` — Full-screen canvas page
+
+Code surface:
+- `src/components/workspace/*`         — node UIs, canvas, side-panels
+- `src/store/useWorkspaceStore.ts`     — store (workspaces, canvases, history, tombstones)
+- `src/store/useDebugLogStore.ts`      — run / retry log lines
+- `src/pages/workspace/{index,Canvas}.tsx` — dashboard + canvas pages
+- `src/components/flow/nodes/PromptMentionTextarea.tsx` — @-mention textarea
+- Backend edge fn: `workspace-run-node` (in workspace-backend repo)
 
 ## Commands
 
