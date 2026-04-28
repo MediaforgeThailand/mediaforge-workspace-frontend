@@ -26,6 +26,7 @@ import { ChevronLeft, Plus, X, Check, CloudOff, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import type { SaveState } from "./useCanvasAutosave";
+import { deleteCanvasFromServer } from "./canvasPersistence";
 
 const TAB_MIN_W = 120;
 const TAB_MAX_W = 200;
@@ -115,6 +116,15 @@ const WorkspaceTabBar = () => {
     }
 
     deleteCanvas(id);
+    // Cascade to the server too — without this, the closed tab
+    // resurrects on the next workspace mount because Canvas.tsx
+    // fetches every server canvas for the workspace and replays
+    // them into the local store. User reported: closing a tab,
+    // leaving the workspace, and coming back showed two "Page 1"
+    // tabs (the original from server + the auto-spawned fresh tab
+    // below). Fire-and-forget — local state already reflects the
+    // delete; server catches up async.
+    void deleteCanvasFromServer(id);
 
     if (id === currentId) {
       if (landingId) {
