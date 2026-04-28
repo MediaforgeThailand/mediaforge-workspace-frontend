@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
@@ -15,6 +15,7 @@ import PhoneOtpLogin from "@/components/auth/PhoneOtpLogin";
 import { useSearchParams } from "react-router-dom";
 const Auth = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { t } = useLanguage();
   const isMobile = useIsMobile();
@@ -79,15 +80,27 @@ const Auth = () => {
 
   /**
    * After successful sign-in we land on the workspace dashboard.
-   * Honour `?redirect=/some/path` if the caller passed one (workspace
-   * uses it to bounce back to a canvas after auth), otherwise fall
-   * through to the default landing.
+   * Two ways the caller can override that default:
+   *   • `?redirect=/some/path` query param (legacy contract, used by
+   *     direct deep-links into auth)
+   *   • `location.state.from` set by `ProtectedRoute` when an
+   *     unauthenticated user was bounced here from a protected page
+   *     (the workspace canvas, account pages, etc.)
+   *
+   * The state-from path takes precedence — it's the direct
+   * "remember where I was going" signal — and we fall back to the
+   * query param then to the default. Same-origin path safety check
+   * stops `redirect=//evil.com` style open-redirects.
    *
    * Wave 1 cleanup removed the consumer demo-redemption flow that
    * used to hijack this hook with token-handoff logic; the workspace
    * product doesn't grant credits via shareable links.
    */
   const resolveRedirect = () => {
+    const fromState = (location.state as { from?: { pathname?: string; search?: string } } | null)?.from;
+    if (fromState?.pathname && fromState.pathname.startsWith("/") && !fromState.pathname.startsWith("//")) {
+      return `${fromState.pathname}${fromState.search ?? ""}`;
+    }
     const r = searchParams.get("redirect");
     if (r && r.startsWith("/") && !r.startsWith("//")) return r;
     return "/app/workspace";

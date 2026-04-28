@@ -136,6 +136,10 @@ const App = () => (
                     <Route path="settings" element={<Settings />} />
                     <Route path="usage" element={<Transactions />} />
                     <Route path="pricing" element={<Pricing />} />
+                    {/* Unknown /app/<x> sub-route → bounce back to the
+                     *  dashboard. Without this AccountShell would
+                     *  render with an empty content area. */}
+                    <Route path="*" element={<Navigate to="/app/workspace" replace />} />
                   </Route>
 
                   {/* Canvas page — top-level so it gets the full
