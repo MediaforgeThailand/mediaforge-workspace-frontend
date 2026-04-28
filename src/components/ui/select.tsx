@@ -66,6 +66,11 @@ const SelectContent = React.forwardRef<
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
+        // Container itself is allowed to scroll vertically — the
+        // Viewport child below adopts native overflow:auto, replacing
+        // Radix's hover-arrow scroll buttons (which felt stuttery
+        // because they auto-scroll the moment the cursor enters
+        // them — reported by user as "เลื่อนลูกกลิ้นลงดูกระตุกเลื่อนยาก").
         "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
         position === "popper" &&
           "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
@@ -74,17 +79,44 @@ const SelectContent = React.forwardRef<
       position={position}
       {...props}
     >
-      <SelectScrollUpButton />
+      {/* Viewport now uses native vertical scroll (overflow-y-auto +
+        * inherited max-height from the parent Content's max-h-*).
+        *
+        * Two intentional removals from the shadcn template:
+        *
+        *   1. The `h-[var(--radix-select-trigger-height)]` rule that
+        *      pinned the viewport to the trigger's pixel height — that
+        *      was the reason the dropdown looked like only a sliver of
+        *      the list was visible at once and the user had to fight
+        *      the scroll buttons to reveal more. Pinning to trigger
+        *      height was a Radix-recommended hack for a different
+        *      layout case; for our compact pill triggers it produced
+        *      a 32-px tall popper with 12 model rows hidden behind
+        *      it.
+        *
+        *   2. `SelectScrollUpButton` / `SelectScrollDownButton` — the
+        *      hover-to-auto-scroll arrows. Native wheel scroll on the
+        *      viewport feels predictable; the arrows jumped to the
+        *      next item on every hover frame. Removing them lets the
+        *      OS scroll behaviour drive the list.
+        *
+        * Custom thin scrollbar styling so the picker still reads as
+        * intentional dark-mode UI rather than the OS default.
+        */}
       <SelectPrimitive.Viewport
         className={cn(
-          "p-1 bg-popover",
-          position === "popper" &&
-            "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]",
+          "p-1 bg-popover overflow-y-auto",
+          position === "popper" && "w-full min-w-[var(--radix-select-trigger-width)]",
         )}
+        style={{
+          // Tailwind `scrollbar-*` utilities aren't in vanilla Tailwind;
+          // inline these so the rule lands without a plugin.
+          scrollbarWidth: "thin",
+          scrollbarColor: "hsl(0 0% 100% / 0.22) transparent",
+        }}
       >
         {children}
       </SelectPrimitive.Viewport>
-      <SelectScrollDownButton />
     </SelectPrimitive.Content>
   </SelectPrimitive.Portal>
 ));
