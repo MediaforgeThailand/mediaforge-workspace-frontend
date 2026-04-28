@@ -42,6 +42,15 @@ const Settings = lazy(() => import("./pages/dashboard/Settings"));
 const Transactions = lazy(() => import("./pages/dashboard/Transactions"));
 const History = lazy(() => import("./pages/dashboard/History"));
 const Analytics = lazy(() => import("./pages/dashboard/Analytics"));
+
+// Workspace V2 — node-based canvas editor (this repo's primary product
+// once the workspace.mediaforge.co subdomain ships). Dashboard at
+// /app/workspace lists all spaces; canvas page at
+// /app/workspace/:workspaceId is full-screen (no DashboardLayout
+// chrome). The active canvas tab inside is tracked in store state,
+// not the URL — one workspace = one URL = one tab bar.
+const WorkspaceDashboard = lazy(() => import("./pages/workspace"));
+const WorkspaceCanvasPage = lazy(() => import("./pages/workspace/Canvas"));
 const ReferEarn = lazy(() => import("./pages/settings/ReferEarn"));
 const PartnerApply = lazy(() => import("./pages/partner/Apply"));
 const PartnerStatus = lazy(() => import("./pages/partner/Status"));
@@ -151,6 +160,19 @@ const App = () => (
                       }
                     />
                     <Route path="analytics" element={<Analytics />} />
+                    {/* Workspace V2 — dashboard list of spaces. The
+                     *  full-screen canvas page is registered as a
+                     *  top-level route below (outside this
+                     *  DashboardLayout) so the chrome doesn't sit on
+                     *  top of the canvas. Once this app moves to
+                     *  workspace.mediaforge.co we may collapse
+                     *  /app/workspace → / for cleaner URLs; keeping
+                     *  the consumer-app path for now so existing
+                     *  bookmarks survive the migration. */}
+                    <Route
+                      path="workspace"
+                      element={<WorkspaceDashboard />}
+                    />
                     <Route
                       path="partner/apply"
                       element={
@@ -258,6 +280,23 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <DevDebug />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* Workspace V2 — full-screen canvas page. URL is the
+                   *  WORKSPACE id; the tabs (canvases) inside it are
+                   *  tracked in store state, not the URL. The
+                   *  /app/workspace dashboard route (in DashboardLayout
+                   *  above) shows the list of workspaces. Lives at
+                   *  TOP-level (outside DashboardLayout) so the canvas
+                   *  fills the viewport with no sidebar / top-bar
+                   *  chrome competing for space. */}
+                  <Route
+                    path="/app/workspace/:workspaceId"
+                    element={
+                      <ProtectedRoute>
+                        <WorkspaceCanvasPage />
                       </ProtectedRoute>
                     }
                   />

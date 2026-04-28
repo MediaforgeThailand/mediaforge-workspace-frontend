@@ -1,0 +1,1726 @@
+/**
+ * Workspace Canvas — React Flow surface.
+ *
+ * Unified tool nodes (imageGenNode, videoGenNode) go through the
+ * workspace-specific `WorkspaceToolNode` renderer, which reads the
+ * shared schema + handles Kling custom logic when it applies.
+ *
+ * Simple AI tools (BG remove, Merge audio) still use their legacy
+ * per-tool components directly.
+ *
+ * All are wrapped with `withResultHistory` so they gain the result-
+ * bar / history-dialog affordance when `data.generations` is populated.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ConnectionLineType,
+  ReactFlow,
+  ReactFlowProvider,
+  SelectionMode,
+  useConnection,
+  useEdges,
+  useReactFlow,
+  useStore,
+  type Connection,
+  type Edge,
+  type Node,
+  type NodeMouseHandler,
+  type OnConnectStartParams,
+  type Viewport,
+  type XYPosition,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import "./workspace.css";
+// Side-effect import — registers the <model-viewer> custom element
+// the moment the workspace canvas mounts. Bundled locally instead
+// of via CDN so it always loads (the previous CDN tag occasionally
+// failed to attach the element class, leaving 3D previews blank).
+// `<model-viewer>` is loaded from a CDN script in index.html (per
+// the official guide at modelviewer.dev). The npm bundle path was
+// unreliable under Vite — keep this comment as a breadcrumb so we
+// don't reach for `import "@google/model-viewer";` again. The
+// custom element is globally registered before main.tsx runs.
+import { toast } from "sonner";
+
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+
+import WorkspaceToolNode from "./WorkspaceToolNode";
+import AssetNode from "./AssetNode";
+import ElementNode from "./ElementNode";
+import TextNode from "./TextNode";
+import GroupNode from "./GroupNode";
+import StickyNoteNode from "./StickyNoteNode";
+import NodeQuickToolbar from "./NodeQuickToolbar";
+import { cloneNodeFresh } from "./cloneNode";
+import MultiSelectionFrame from "./MultiSelectionFrame";
+import NodePreviewLightbox, {
+  getNodePreview,
+  type PreviewPayload,
+} from "./NodePreviewLightbox";
+import { getWorkspaceSchema, portTypeFromHandleId } from "./workspaceSchema";
+import CanvasNodePicker, {
+  type CanvasNodePickerState,
+  type PickerOption,
+} from "./CanvasNodePicker";
+import CanvasContextMenu, {
+  type ContextMenuState,
+  type ToolItem,
+} from "./CanvasContextMenu";
+import CanvasFloatingSidebar from "./CanvasFloatingSidebar";
+import ShortcutsDialog from "./ShortcutsDialog";
+import VoicePickerDialog from "./VoicePickerDialog";
+import { useCanvasToolStore } from "./useCanvasToolStore";
+import { useWorkspaceShortcuts } from "./useWorkspaceShortcuts";
+import { useCanvasAutosave } from "./useCanvasAutosave";
+
+const VIEWPORT_KEY = (canvasId: string) => `workspace-viewport-${canvasId}`;
+const STORAGE_BUCKET = "ai-media";
+// Supabase Storage signed-URL TTL. Was 24h — way too short for a
+// canvas the user keeps open across sessions. The previous value
+// turned every asset into a ticking time-bomb (URL 403'd at the
+// 24h mark, image broke, looked like data loss). Bump to ~1 year
+// (Supabase max). Long-term fix is `useFreshSignedUrl` below which
+// re-signs on display, but generous TTL up front is belt-and-braces.
+const SIGNED_URL_TTL_SEC = 60 * 60 * 24 * 365;
+
+/**
+ * Port-type compatibility table. Used by `isValidConnection` to reject
+ * nonsense wiring (e.g. dropping a TextNode edge into a ref_image slot).
+ * Matched by handle id — keep in sync with schema port ids.
+ */
+// NOTE on the *_TARGETS sets below: keep in sync with the
+// `*_HANDLE_IDS` sets in `workspaceSchema.ts` (which feed
+// `portTypeFromHandleId`) AND with the backend `HANDLE_SCHEMA` in
+// `mediaforge-workspace-backend/.../workspace-run-node/index.ts`.
+// Drift between any of these means a wire visible to one layer is
+// rejected by another. Audit Round 2 caught `mask` / `image_input` /
+// `context_text` / `ref_audio` missing here.
+const TEXT_TARGETS = new Set(["text", "context", "context_text"]);
+
+/**
+ * Find the topmost groupNode whose absolute bbox contains the given
+ * point. Used both by `onDrop` (sidebar drops landing on a group's
+ * frame) and `onNodeDragStop` (canvas-to-canvas drags) so the
+ * grouping behaviour is consistent: drop a node anywhere inside a
+ * group's frame → it becomes a child of that group.
+ *
+ * Bbox check is point-in-rect (drop point or dragged-node centre),
+ * NOT bbox-overlap, so dragging through a group on the way somewhere
+ * else doesn't accidentally re-parent.
+ */
+function findContainingGroup(
+  point: { x: number; y: number },
+  allNodes: ReadonlyArray<Node>,
+  excludeNodeId?: string,
+): Node | null {
+  for (const n of allNodes) {
+    if (n.type !== "groupNode") continue;
+    if (excludeNodeId && n.id === excludeNodeId) continue;
+    if (!n.position || typeof n.position.x !== "number") continue;
+    const gx = n.position.x;
+    const gy = n.position.y;
+    const gw =
+      (n.style?.width as number | undefined) ??
+      (n as Node & { measured?: { width?: number } }).measured?.width ??
+      400;
+    const gh =
+      (n.style?.height as number | undefined) ??
+      (n as Node & { measured?: { height?: number } }).measured?.height ??
+      300;
+    if (point.x >= gx && point.x <= gx + gw && point.y >= gy && point.y <= gy + gh) {
+      return n;
+    }
+  }
+  return null;
+}
+
+/**
+ * Count how many children of the given group emit the given media
+ * type. Used by the connection validator: a group with 10 image
+ * children can't legally land on a port that maxes out at 9 refs,
+ * and a group with > 1 child can't land on a single-slot port like
+ * `start_frame` at all.
+ *
+ * Resolution per child mirrors WorkspaceToolNode.resolveInputs so
+ * the validator's count matches what actually gets sent at Run time.
+ */
+function countGroupChildrenOfType(
+  groupId: string,
+  type: "image" | "video" | "audio",
+  allNodes: ReadonlyArray<Node>,
+): number {
+  // Mirror GroupNode.outputTypes: count ONLY children that produce a
+  // real URL right now — tool nodes without generations contribute
+  // zero, so the port doesn't advertise (GroupNode hides it) and
+  // this counter doesn't over-promise. Keeps validator and renderer
+  // in lockstep.
+  let count = 0;
+  for (const child of allNodes) {
+    if (child.parentId !== groupId) continue;
+    const cd = (child.data ?? {}) as Record<string, unknown>;
+    let childType: "image" | "video" | "audio" | null = null;
+
+    if (child.type === "assetNode") {
+      const ft = cd.fieldType as string | undefined;
+      const url =
+        (cd.previewUrl as string | undefined) ??
+        (cd.storagePath as string | undefined);
+      if ((ft === "image" || ft === "video" || ft === "audio") && url) {
+        childType = ft;
+      }
+    } else if (child.type === "elementNode") {
+      const refs = Array.isArray(cd.reference_images)
+        ? (cd.reference_images as unknown[]).filter(
+            (u): u is string => typeof u === "string" && !!u,
+          )
+        : [];
+      const hasUrl =
+        refs.length > 0 ||
+        typeof cd.frontal_image_url === "string" ||
+        typeof cd.thumbnail_url === "string";
+      if (hasUrl) childType = "image";
+    } else if (Array.isArray(cd.generations) && cd.generations.length > 0) {
+      const gens = cd.generations as Array<{ type?: string; url?: string }>;
+      const idx =
+        typeof cd.selectedGenIndex === "number"
+          ? (cd.selectedGenIndex as number)
+          : 0;
+      const g = gens[idx] ?? gens[0];
+      if (g?.url) {
+        const t = g.type;
+        childType = t === "video" ? "video" : t === "audio" ? "audio" : "image";
+      }
+    }
+    // Tool node with no generations yet → contributes nothing.
+
+    if (childType === type) count++;
+  }
+  return count;
+}
+/** TextNode's img_1/2/3 slots accept either image OR video, so they   */
+/* appear in both sets below.                                         */
+const IMAGE_TARGETS = new Set([
+  "image", "image_input", "ref_image", "start_frame", "end_frame", "mask",
+  "img_1", "img_2", "img_3",
+  // ElementNode (Kling element) — 4 reference slots + 1 frontal
+  "ref_1", "ref_2", "ref_3", "ref_4", "frontal",
+]);
+const VIDEO_TARGETS = new Set([
+  "video", "ref_video",
+  "img_1", "img_2", "img_3",
+]);
+const AUDIO_TARGETS = new Set(["audio", "ref_audio"]);
+const ELEMENT_TARGETS = new Set(["elements", "element"]);
+const MODEL3D_TARGETS = new Set(["model3d", "model_3d", "ref_model"]);
+
+/**
+ * Module-level stable empty arrays. Zustand selectors return these
+ * when `current` is null/undefined so the snapshot identity stays
+ * stable across renders. Returning a fresh `[]` literal each call
+ * — which `s.current?.nodes ?? []` does — makes `useSyncExternalStore`
+ * detect a "change" on every render → triggers a re-render → calls
+ * the selector again → another fresh `[]` → infinite loop. React
+ * raises invariant #185 ("Maximum update depth exceeded") and the
+ * WorkspaceErrorBoundary catches it as a full-screen crash card.
+ *
+ * Read more: https://zustand-demo.pmnd.rs/ "getSnapshot" warning.
+ */
+const STABLE_EMPTY_NODES: Node[] = [];
+const STABLE_EMPTY_EDGES: Edge[] = [];
+
+/**
+ * Module-level stable references for ReactFlow PROP arrays — same
+ * identity-stability problem as the selector empty arrays above.
+ *
+ * Background: ReactFlow stores these arrays in its internal store
+ * via useSyncExternalStore. When we passed `[1, 2]` / `["Delete",
+ * "Backspace"]` / `["Shift", "Meta", "Control"]` as inline literals
+ * EVERY render allocated a new array → ReactFlow's snapshot check
+ * saw a "change" → the ReactFlow store published an update → React
+ * scheduled a re-render of every store subscriber (which includes
+ * THIS component, because we read nodes/edges) → re-render →
+ * inline `[1, 2]` again → loop.
+ *
+ * The bisect that disabled DebugPanel / RightSidebar / Mascot kept
+ * failing because the loop's source isn't in those panels — it's
+ * here, in the props of the ReactFlow component itself. Lifting
+ * the literals out of render breaks the cycle.
+ */
+const PAN_ON_DRAG_HAND: number[] = [0, 1, 2];
+const PAN_ON_DRAG_DEFAULT: number[] = [1, 2];
+const DELETE_KEYS: string[] = ["Delete", "Backspace"];
+const MULTI_SELECT_KEYS: string[] = ["Shift", "Meta", "Control"];
+const DEFAULT_EDGE_OPTIONS = { type: "default" } as const;
+const PRO_OPTIONS = { hideAttribution: true } as const;
+
+const nodeTypes = {
+  // All schema-driven tools route through WorkspaceToolNode — that's
+  // the only place where the V2 Run button + workspace-run-node
+  // dispatcher live. WorkspaceToolNode now uses the preview-first
+  // compact layout (see CompactParamWidgets / workspace.css), so the
+  // result strip and history dialog are baked into the node itself.
+  // The previous `withResultHistory` HOC is no longer needed here.
+  imageGenNode: WorkspaceToolNode,
+  videoGenNode: WorkspaceToolNode,
+  audioGenNode: WorkspaceToolNode,
+  removeBackgroundNode: WorkspaceToolNode,
+  mergeAudioNode: WorkspaceToolNode,
+  videoToPromptNode: WorkspaceToolNode,
+  imageTo3dNode: WorkspaceToolNode,
+  // Workspace-only.
+  assetNode: AssetNode,
+  elementNode: ElementNode,
+  textNode: TextNode,
+  groupNode: GroupNode,
+  stickyNoteNode: StickyNoteNode,
+};
+
+/**
+ * Reflects React Flow's "connection in progress" state onto the
+ * document body as data attributes:
+ *
+ *   data-rfc="true"            anyone is dragging a wire right now
+ *   data-rfc-type="image|…"    the data type of the dragged port
+ *                              (derived from its handle id)
+ *   data-rfc-dir="source|target"   which side the drag started from
+ *                              source = drag from an OUTPUT  → reveal
+ *                                       compatible INPUT bubbles
+ *                              target = drag from an INPUT   → reveal
+ *                                       compatible OUTPUT bubbles
+ *
+ * The CSS layer in workspace.css uses these attrs to fade in ONLY
+ * handles whose `data-port-type` matches AND whose React-Flow side
+ * (.react-flow__handle-source / -target) is the opposite of where
+ * the drag started — i.e. real compatibility, not "show everything".
+ */
+const useConnectingAttribute = () => {
+  const connection = useConnection();
+  useEffect(() => {
+    const body = document.body;
+    if (connection.inProgress) {
+      body.setAttribute("data-rfc", "true");
+      const handleId = connection.fromHandle?.id ?? "";
+      const fromNodeId = connection.fromNode?.id ?? null;
+      // Side: handle.type is "source" (output) or "target" (input).
+      const dir = connection.fromHandle?.type ?? "source";
+
+      /* Resolve the wire's data type from two sources:
+       *   1. DOM `data-port-type` attribute on the actual handle —
+       *      authoritative because every PortIcon writes it. This
+       *      covers the generic `id="default"` handles too (TextNode
+       *      tags as "text", AssetNode tags as its fieldType).
+       *   2. Schema-based lookup by handle id — fallback for handles
+       *      that somehow lost their DOM attribute.
+       *
+       * Earlier version had a third fallback that called
+       * `getNode(fromNodeId)` from useReactFlow. That was the
+       * source of a React #185 infinite loop because `getNode`'s
+       * identity changes on every internal React Flow state update,
+       * making this useEffect re-run on every mousemove during a
+       * drag. Dropped it — every PortIcon-rendered handle has
+       * `data-port-type` set, so the DOM read alone covers every
+       * real case. */
+      let dataType: string = portTypeFromHandleId(handleId);
+      if (fromNodeId) {
+        const handleEl = document.querySelector(
+          `.react-flow__node[data-id="${CSS.escape(fromNodeId)}"] ` +
+            `.react-flow__handle[data-handleid="${CSS.escape(handleId)}"]`,
+        ) as HTMLElement | null;
+        const domType = handleEl?.getAttribute("data-port-type");
+        if (domType) dataType = domType;
+      }
+
+      body.setAttribute("data-rfc-dir", dir);
+      body.setAttribute("data-rfc-type", dataType);
+    } else {
+      body.removeAttribute("data-rfc");
+      body.removeAttribute("data-rfc-dir");
+      body.removeAttribute("data-rfc-type");
+    }
+    return () => {
+      body.removeAttribute("data-rfc");
+      body.removeAttribute("data-rfc-dir");
+      body.removeAttribute("data-rfc-type");
+    };
+  }, [
+    connection.inProgress,
+    connection.fromHandle?.id,
+    connection.fromHandle?.type,
+    connection.fromNode?.id,
+  ]);
+};
+
+/**
+ * Highlight the wires touching the currently-selected node(s).
+ *
+ * UX problem: clicking a node didn't visually show what it was
+ * connected to. Users had to either click each connected wire
+ * one by one OR mentally trace the lines through a busy canvas.
+ * Rendering all connected edges with a glow when the node is
+ * selected gives instant visual feedback ("this node connects to
+ * THESE 3 things").
+ *
+ * Implementation: instead of mutating each edge's `selected` /
+ * `className` (which would dirty the autosave fingerprint and
+ * trigger network writes on every click), we inject a single
+ * `<style>` element with rules targeting React-Flow's per-edge
+ * `data-id` attribute. Pure presentational, no edge data
+ * touched. Cleared automatically when no node is selected (the
+ * component returns null, the style tag unmounts).
+ */
+const EdgeHighlightOnNodeSelect = () => {
+  // Subscribe to the SET of selected node ids, encoded as a sorted
+  // comma-joined string so React's referential equality short-
+  // circuits when the selection hasn't actually changed (just
+  // hovered, just panned, etc.).
+  const selectedKey = useStore(
+    (s) => {
+      const ids: string[] = [];
+      for (const n of s.nodeLookup.values()) {
+        if (n.selected) ids.push(n.id);
+      }
+      ids.sort();
+      return ids.join(",");
+    },
+  );
+  const edges = useEdges();
+
+  const css = useMemo(() => {
+    if (!selectedKey) return "";
+    const selected = new Set(selectedKey.split(","));
+    const matchedEdgeIds: string[] = [];
+    for (const e of edges) {
+      if (selected.has(e.source) || selected.has(e.target)) {
+        matchedEdgeIds.push(e.id);
+      }
+    }
+    if (matchedEdgeIds.length === 0) return "";
+    // CSS.escape keeps edge ids that contain `:` / `-` / `.` legal
+    // inside the attribute selector.
+    const selector = matchedEdgeIds
+      .map(
+        (id) =>
+          `.react-flow__edge[data-id="${CSS.escape(id)}"] .react-flow__edge-path`,
+      )
+      .join(", ");
+    return `${selector} {
+      stroke: hsl(217 91% 70%) !important;
+      stroke-width: 2.5px !important;
+      filter: drop-shadow(0 0 6px hsl(217 91% 60% / 0.7));
+      transition:
+        stroke 120ms var(--ws-ease),
+        stroke-width 120ms var(--ws-ease),
+        filter 120ms var(--ws-ease);
+    }`;
+  }, [selectedKey, edges]);
+
+  if (!css) return null;
+  return <style dangerouslySetInnerHTML={{ __html: css }} />;
+};
+
+const Inner = () => {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const {
+    screenToFlowPosition,
+    setViewport,
+    getViewport,
+    setNodes,
+    setEdges,
+    getEdges,
+  } = useReactFlow();
+  const { user } = useAuth();
+  // RE-ENABLED after the React #185 refactor: dropped the unstable
+  // `getNode` dep in favour of a DOM-only data-port-type read, so
+  // the effect now only re-runs when the connection target changes
+  // (not on every mousemove). Drives the "fade incompatible handles"
+  // CSS during a wire drag — without it, users had to manually
+  // hover the target node to see its input ports, which led to the
+  // user complaint that only `ref_image` showed (it was the only
+  // already-extended port; start_frame/end_frame stayed tucked in
+  // until the node was actively hovered).
+  useConnectingAttribute();
+  // Server-side autosave (Figma-style). Pushes the active canvas
+  // to `workspace_canvases` on every change (debounced 600ms) +
+  // flushes via fetch keepalive on tab close. The `saveState`
+  // value is also broadcast to the tab bar via a window event so
+  // a small "Saved / Saving…" indicator can render up there.
+  const saveState = useCanvasAutosave();
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("workspace-save-state", { detail: { state: saveState } }),
+    );
+  }, [saveState]);
+
+  const canvasId = useWorkspaceStore((s) => s.current?.id);
+  // STABLE_EMPTY_* — see comment near the top of this file. Returning a
+  // fresh `[]` literal each call would loop the store-snapshot check.
+  const nodes = useWorkspaceStore((s) => (s.current?.nodes as Node[] | undefined) ?? STABLE_EMPTY_NODES);
+  const edges = useWorkspaceStore((s) => (s.current?.edges as Edge[] | undefined) ?? STABLE_EMPTY_EDGES);
+  const onNodesChange = useWorkspaceStore((s) => s.onNodesChange);
+  const onEdgesChange = useWorkspaceStore((s) => s.onEdgesChange);
+  const onConnect = useWorkspaceStore((s) => s.onConnect);
+  const addSchemaNode = useWorkspaceStore((s) => s.addSchemaNode);
+  const addAssetNode = useWorkspaceStore((s) => s.addAssetNode);
+  const updateNodeData = useWorkspaceStore((s) => s.updateNodeData);
+  const setSelectedNode = useWorkspaceStore((s) => s.setSelectedNode);
+  const pushHistory = useWorkspaceStore((s) => s.pushHistory);
+
+  useEffect(() => {
+    if (!canvasId) return;
+    const raw = localStorage.getItem(VIEWPORT_KEY(canvasId));
+    if (!raw) return;
+    try {
+      const vp = JSON.parse(raw) as Viewport;
+      setViewport(vp);
+    } catch {
+      /* ignore */
+    }
+  }, [canvasId, setViewport]);
+
+  const onMoveEnd = useCallback(() => {
+    if (!canvasId) return;
+    localStorage.setItem(VIEWPORT_KEY(canvasId), JSON.stringify(getViewport()));
+  }, [canvasId, getViewport]);
+
+  const uploadAsset = useCallback(
+    async (file: File, position: XYPosition) => {
+      if (!user) {
+        toast.error("Please log in to upload files");
+        return;
+      }
+      const isVideo = file.type.startsWith("video/");
+      const isImage = file.type.startsWith("image/");
+      const isAudio = file.type.startsWith("audio/");
+      // 3D mesh detection — extension-based because browsers usually
+      // give us empty / generic mime types for .glb / .gltf / .usdz.
+      // The extensions match what `<model-viewer>` can load, so we
+      // route them straight into a 3d-typed AssetNode.
+      const isModel3d = /\.(glb|gltf|usdz|obj|fbx)$/i.test(file.name);
+      if (!isImage && !isVideo && !isAudio && !isModel3d) {
+        toast.error(
+          "Supported files: image, video, audio, 3D model (.glb / .gltf / .usdz / .obj / .fbx)",
+        );
+        return;
+      }
+
+      const fieldType: "image" | "video" | "audio" | "model3d" =
+        isModel3d ? "model3d"
+        : isVideo ? "video"
+        : isAudio ? "audio"
+        : "image";
+      const localPreview = URL.createObjectURL(file);
+      const defaultLabel = file.name.replace(/\.[^.]+$/, "").slice(0, 40);
+
+      const nodeId = addAssetNode(
+        {
+          label: defaultLabel,
+          fieldType,
+          previewUrl: localPreview,
+          fileName: file.name,
+          uploading: true,
+        },
+        position,
+      );
+
+      // If the file was dropped over a group's frame, re-parent the
+      // freshly-spawned AssetNode so it becomes a child of that
+      // group. Same logic the sync drop paths use, but here we run
+      // it inline because uploadAsset is async and the new node is
+      // already on canvas before storage upload finishes.
+      const allNodes = useWorkspaceStore.getState().current?.nodes ?? [];
+      const target = findContainingGroup(position, allNodes, nodeId);
+      if (target) {
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === nodeId
+              ? {
+                  ...n,
+                  parentId: target.id,
+                  position: {
+                    x: position.x - target.position.x,
+                    y: position.y - target.position.y,
+                  },
+                }
+              : n,
+          ),
+        );
+      }
+
+      const ext =
+        file.name.split(".").pop() ||
+        (isModel3d ? "glb" : isVideo ? "mp4" : isAudio ? "mp3" : "png");
+      const storagePath = `${user.id}/${crypto.randomUUID()}.${ext}`;
+
+      const { error: upErr } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(storagePath, file, { contentType: file.type, upsert: true });
+
+      if (upErr) {
+        toast.error(`Upload failed: ${file.name}`);
+        updateNodeData(nodeId, { uploading: false });
+        URL.revokeObjectURL(localPreview);
+        return;
+      }
+
+      const { data: signed } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .createSignedUrl(storagePath, SIGNED_URL_TTL_SEC);
+
+      updateNodeData(nodeId, {
+        previewUrl: signed?.signedUrl ?? localPreview,
+        storagePath,
+        uploading: false,
+      });
+      URL.revokeObjectURL(localPreview);
+    },
+    [user, addAssetNode, updateNodeData, setNodes],
+  );
+
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = e.dataTransfer.types.includes("Files") ? "copy" : "move";
+  }, []);
+
+  /**
+   * After a fresh node is spawned via onDrop (sidebar tile / file
+   * drop / asset re-use / element re-use), check whether the drop
+   * point landed inside any groupNode's frame; if so, re-parent the
+   * new node so it becomes a child of that group, with its position
+   * converted to be relative to the group origin. Without this,
+   * sidebar drops on top of a group would visually overlap the
+   * frame but stay free, which is what the user reported as
+   * "not becoming a group asset".
+   */
+  const reparentSpawned = useCallback(
+    (newId: string, dropPointAbs: { x: number; y: number }) => {
+      const all = useWorkspaceStore.getState().current?.nodes ?? [];
+      const target = findContainingGroup(dropPointAbs, all, newId);
+      if (!target) return;
+      setNodes((nds) =>
+        nds.map((n) => {
+          if (n.id !== newId) return n;
+          return {
+            ...n,
+            parentId: target.id,
+            position: {
+              x: dropPointAbs.x - target.position.x,
+              y: dropPointAbs.y - target.position.y,
+            },
+          };
+        }),
+      );
+    },
+    [setNodes],
+  );
+
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+
+      const files = e.dataTransfer.files;
+      if (files && files.length > 0) {
+        // File uploads spawn AssetNodes asynchronously inside
+        // uploadAsset. The async path means we can't easily intercept
+        // the new id here; uploadAsset itself handles the parent
+        // assignment via the same group-bbox check below.
+        Array.from(files).forEach((file, i) => {
+          const offset = { x: position.x + i * 28, y: position.y + i * 28 };
+          void uploadAsset(file, offset);
+        });
+        return;
+      }
+
+      // Saved-element re-use payload — spawn an ElementNode in saved
+      // mode (cached refs already on the row, no edge wiring needed).
+      const elemReuseRaw = e.dataTransfer.getData("application/reactflow-element-reuse");
+      if (elemReuseRaw) {
+        try {
+          const er = JSON.parse(elemReuseRaw) as {
+            brand_element_id: string;
+            name: string;
+            thumbnail_url?: string;
+            reference_images?: string[];
+            frontal_image_url?: string;
+          };
+          if (er?.brand_element_id) {
+            const newId = addSchemaNode("elementNode", er.name ?? "Element", position, {
+              brand_element_id: er.brand_element_id,
+              reference_images: er.reference_images ?? [],
+              frontal_image_url: er.frontal_image_url,
+              thumbnail_url: er.thumbnail_url,
+            });
+            reparentSpawned(newId, position);
+            return;
+          }
+        } catch {
+          /* ignore malformed payload */
+        }
+      }
+
+      // Re-use payload from WorkspaceAssetPanel — spawn an AssetNode
+      // pointing at the existing URL without re-uploading.
+      const reuseRaw = e.dataTransfer.getData("application/reactflow-asset-reuse");
+      if (reuseRaw) {
+        try {
+          const reuse = JSON.parse(reuseRaw) as {
+            fieldType: "image" | "video" | "audio" | "model3d";
+            url: string;
+            label?: string;
+            fileName?: string;
+            /** Optional poster (3D rendered_image) so AssetNode
+             *  doesn't render as a black box while the GLB streams. */
+            posterUrl?: string;
+          };
+          if (reuse?.url && reuse?.fieldType) {
+            const newId = addAssetNode(
+              {
+                label: reuse.label ?? reuse.fileName ?? "asset",
+                fieldType: reuse.fieldType,
+                previewUrl: reuse.url,
+                posterUrl: reuse.posterUrl,
+                fileName: reuse.fileName,
+                uploading: false,
+              },
+              position,
+            );
+            reparentSpawned(newId, position);
+            return;
+          }
+        } catch {
+          /* ignore malformed payload */
+        }
+      }
+
+      const type = e.dataTransfer.getData("application/reactflow-type");
+      if (!type) return;
+      const label = e.dataTransfer.getData("application/reactflow-label") || type;
+      const overridesRaw = e.dataTransfer.getData("application/reactflow-overrides");
+      let overrides: Record<string, unknown> = {};
+      try {
+        if (overridesRaw) overrides = JSON.parse(overridesRaw);
+      } catch {
+        /* ignore */
+      }
+      const newId = addSchemaNode(type, label, position, overrides);
+      reparentSpawned(newId, position);
+    },
+    [uploadAsset, addSchemaNode, addAssetNode, screenToFlowPosition, reparentSpawned],
+  );
+
+  const onNodeClick: NodeMouseHandler = useCallback(
+    (_e, node) => setSelectedNode(node.id),
+    [setSelectedNode],
+  );
+  const onPaneClick = useCallback(
+    (e: React.MouseEvent) => {
+      // Sticky mode: a click on empty canvas plants a Post-it where
+      // the cursor is. Falls through to deselection for the default
+      // (select / cursor) tool so single-clicks still clear focus.
+      const t = useCanvasToolStore.getState().tool;
+      if (t === "sticky") {
+        const flowPos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+        const id = `s_${crypto.randomUUID()}`;
+        useWorkspaceStore.setState((s) => {
+          const stickyNode: Node = {
+            id,
+            type: "stickyNoteNode",
+            position: flowPos,
+            data: { text: "" },
+          };
+          if (!s.current) return {};
+          const nextNodes = [...s.current.nodes, stickyNode];
+          return {
+            current: { ...s.current, nodes: nextNodes },
+            graphs: { ...s.graphs, [s.current.id]: { ...s.current, nodes: nextNodes } },
+          };
+        });
+        reparentSpawned(id, flowPos);
+        // Drop the user back into select mode after planting one — a
+        // single sticky is the common case; if they want to spam
+        // them, they can re-click the sticky tool.
+        useCanvasToolStore.getState().setTool("select");
+        return;
+      }
+      setSelectedNode(null);
+    },
+    [setSelectedNode, screenToFlowPosition, reparentSpawned],
+  );
+
+  /** Cut tool: clicking a wire deletes it. Bound to React Flow's
+   *  `onEdgeClick`. We early-out for any other tool so clicks behave
+   *  normally (selecting the edge for highlight). */
+  const onEdgeClick = useCallback(
+    (_e: React.MouseEvent, edge: Edge) => {
+      const t = useCanvasToolStore.getState().tool;
+      if (t !== "cut") return;
+      onEdgesChange([{ id: edge.id, type: "remove" }]);
+    },
+    [onEdgesChange],
+  );
+
+  /* ── Drag-to-empty-canvas → spawn picker ─────────────────────
+   *  Track which port the user grabbed in onConnectStart, then in
+   *  onConnectEnd check whether the drop landed on empty canvas (no
+   *  handle / no node under the cursor). If so, surface the picker
+   *  with node types whose ports can complete the wire.
+   */
+  const connectStartRef = useRef<{
+    nodeId: string | null;
+    handleId: string | null;
+    handleType: "source" | "target" | null;
+  } | null>(null);
+  const [picker, setPicker] = useState<CanvasNodePickerState | null>(null);
+  const [preview, setPreview] = useState<PreviewPayload | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // Voice picker — single instance owned by the canvas, opened via
+  // a window event from any audioGenNode that wants to swap voices.
+  // Stores the requesting node id so we know who to write back to.
+  const [voicePicker, setVoicePicker] = useState<{
+    nodeId: string;
+    voiceId: string;
+  } | null>(null);
+  // Tool mode (select / hand / cut / sticky). Read once at the top
+  // so we can flip ReactFlow props (panOnDrag, selectionOnDrag) and
+  // handle pane / edge clicks based on the active tool.
+  const tool = useCanvasToolStore((s) => s.tool);
+
+  /** Right-click on canvas → open the categorised tool picker at the
+   *  click point. We block both the browser context menu and the
+   *  React-Flow pane click that would otherwise deselect everything. */
+  const onPaneContextMenu = useCallback(
+    (e: React.MouseEvent | MouseEvent) => {
+      e.preventDefault();
+      const flow = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      setContextMenu({
+        screen: { x: e.clientX, y: e.clientY },
+        flow,
+      });
+    },
+    [screenToFlowPosition],
+  );
+
+  /** Picking a tool from the right-click menu spawns it at the
+   *  original click position (flow coords) and closes the menu.
+   *  Schema-driven nodes go through `addSchemaNode`; the special
+   *  built-ins (Text / Sticky / Element) route through their own
+   *  paths so they pick up the right defaults. */
+  const onContextMenuPick = useCallback(
+    (item: ToolItem) => {
+      if (!contextMenu) return;
+      const pos = contextMenu.flow;
+      let newId: string | null = null;
+      if (item.nodeType === "stickyNoteNode") {
+        // Sticky uses addSchemaNode-style path but with no schema —
+        // just stamp a node directly via the store.
+        const id = `s_${crypto.randomUUID()}`;
+        useWorkspaceStore.setState((s) => {
+          const stickyNode: Node = {
+            id,
+            type: "stickyNoteNode",
+            position: pos,
+            data: { text: "" },
+          };
+          const nextNodes = [...(s.current?.nodes ?? []), stickyNode];
+          return s.current
+            ? {
+                current: { ...s.current, nodes: nextNodes },
+                graphs: { ...s.graphs, [s.current.id]: { ...s.current, nodes: nextNodes } },
+              }
+            : {};
+        });
+        newId = id;
+      } else {
+        newId = addSchemaNode(item.nodeType, item.defaultLabel, pos);
+      }
+      if (newId) reparentSpawned(newId, pos);
+      setContextMenu(null);
+    },
+    [contextMenu, addSchemaNode, reparentSpawned],
+  );
+
+  /** Non-spawn actions from the right-click menu — Upload / Assets /
+   *  Stock. Bridges to the pre-existing event channels so we don't
+   *  duplicate logic. Stock is a "soon" placeholder. */
+  const onContextMenuAction = useCallback(
+    (item: ToolItem) => {
+      if (item.action === "assets") {
+        // Pop the AllAssetsDialog. The asset panel owns its own
+        // toggle, but a window event lets the menu open it without
+        // prop drilling. We listen for this event in
+        // WorkspaceAssetPanel.
+        window.dispatchEvent(new CustomEvent("workspace-open-all-assets"));
+      } else if (item.action === "upload") {
+        // Click a hidden file input by dispatching to the canvas's
+        // upload bridge. The user gets a native picker; selected
+        // files go through the existing uploadAsset flow.
+        window.dispatchEvent(new CustomEvent("workspace-trigger-upload"));
+      } else if (item.action === "stock") {
+        toast.info("Stock library coming soon");
+      }
+      setContextMenu(null);
+    },
+    [],
+  );
+
+  /** "+" button in the floating sidebar — opens the same picker, but
+   *  anchored next to the trigger button instead of at the screen
+   *  centre. The sidebar passes us the button's `getBoundingClientRect`
+   *  so the menu reads as a popover off the "+" rather than appearing
+   *  detached in the middle of the canvas. We still resolve the *flow*
+   *  position from the centre of the viewport — that's where the
+   *  spawned node should land, NOT next to the toolbar pill (which
+   *  is way off in the corner). */
+  const openContextMenuAtAnchor = useCallback(
+    (anchor: { x: number; y: number }) => {
+      if (!wrapperRef.current) return;
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      setContextMenu({
+        screen: anchor, // popover anchor — visible on screen
+        flow: screenToFlowPosition({ x: cx, y: cy }), // spawn point
+      });
+    },
+    [screenToFlowPosition],
+  );
+
+  /* ── Keyboard shortcuts ───────────────────────────────────
+   * Single global listener handles copy/cut/paste/duplicate,
+   * select-all, undo/redo, viewport zoom, generation flip, and
+   * Run dispatch. The `N` key opens the picker at the current
+   * viewport centre. The `A` key triggers a fullscreen preview of
+   * the currently-selected node. See useWorkspaceShortcuts.ts for
+   * the full key map. */
+  useWorkspaceShortcuts({
+    onAddNode: () => {
+      if (!wrapperRef.current) return;
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const screenCentre = {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      };
+      const flow = screenToFlowPosition(screenCentre);
+      setPicker({
+        screen: screenCentre,
+        flow,
+        // No source — picker behaves the same as drag-to-empty (no
+        // edge gets created on pick). CanvasNodePicker treats null
+        // fromNode as "show every catalog entry unfiltered".
+        fromNode: null,
+        fromHandleId: null,
+        fromIsOutput: false,
+      });
+    },
+    onPreviewSelected: () => {
+      const all = useWorkspaceStore.getState().current?.nodes ?? [];
+      const sel = all.find((n) => n.selected);
+      if (!sel) return;
+      const p = getNodePreview(sel, all);
+      if (p) setPreview(p);
+    },
+  });
+
+  /** Double-click on a node opens the same fullscreen preview. */
+  const onNodeDoubleClick = useCallback(
+    (e: React.MouseEvent, node: Node) => {
+      e.stopPropagation();
+      const all = useWorkspaceStore.getState().current?.nodes ?? [];
+      const p = getNodePreview(node, all);
+      if (p) setPreview(p);
+    },
+    [],
+  );
+
+  /* Asset panel → lightbox bridge.
+   *
+   * The asset panel lives in the right sidebar and doesn't share a
+   * React tree with the lightbox state, so we use a window event as
+   * the open command. Payload shape mirrors PreviewPayload so the
+   * panel doesn't need to know about node shapes — it just hands
+   * over a `{ url, fieldType }` for the asset it owns. */
+  useEffect(() => {
+    const handler = (evt: Event) => {
+      const detail = (evt as CustomEvent).detail as
+        | {
+            url?: string;
+            fieldType?: "image" | "video" | "audio" | "model3d";
+            label?: string;
+            fileName?: string;
+            poster?: string;
+          }
+        | undefined;
+      if (!detail?.url) return;
+      const ft = detail.fieldType ?? "image";
+      if (ft === "model3d") {
+        setPreview({
+          type: "model3d",
+          model_url: detail.url,
+          poster: detail.poster,
+          label: detail.label ?? "3d model",
+          caption: (detail.fileName ?? "") + " · drag to rotate",
+        });
+        return;
+      }
+      setPreview({
+        type:
+          ft === "video" ? "video" : ft === "audio" ? "audio" : "image",
+        url: detail.url,
+        label: detail.label ?? "asset",
+        caption: detail.fileName,
+      });
+    };
+    window.addEventListener("workspace-open-asset-preview", handler);
+    return () =>
+      window.removeEventListener("workspace-open-asset-preview", handler);
+  }, []);
+
+  /* All-assets dialog → canvas spawn bridge.
+   *
+   * The dialog hands us an array of asset descriptors and the canvas
+   * spawns one AssetNode per item, fanned out from the current
+   * viewport centre so they don't all stack on top of each other.
+   * Same payload shape the dialog uses for single-asset drag-reuse
+   * — keeps the dialog dumb (no canvas math) and the spawn rules
+   *   centralised here. */
+  useEffect(() => {
+    const onSpawn = (evt: Event) => {
+      const detail = (evt as CustomEvent).detail as
+        | {
+            assets?: Array<{
+              fieldType: "image" | "video" | "audio" | "model3d";
+              url: string;
+              label?: string;
+              fileName?: string;
+              posterUrl?: string;
+            }>;
+          }
+        | undefined;
+      const list = detail?.assets ?? [];
+      if (list.length === 0 || !wrapperRef.current) return;
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const centre = screenToFlowPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      });
+      // Tile in a grid so multiple assets don't stack — 5 per row,
+      // 240px gap matches a comfortable AssetNode spacing.
+      const PER_ROW = 5;
+      const STEP_X = 240;
+      const STEP_Y = 280;
+      list.forEach((a, i) => {
+        const col = i % PER_ROW;
+        const row = Math.floor(i / PER_ROW);
+        const pos = {
+          x: centre.x + (col - (PER_ROW - 1) / 2) * STEP_X,
+          y: centre.y + row * STEP_Y,
+        };
+        const newId = addAssetNode(
+          {
+            label: a.label ?? a.fileName ?? "asset",
+            fieldType: a.fieldType,
+            previewUrl: a.url,
+            posterUrl: a.posterUrl,
+            fileName: a.fileName,
+            uploading: false,
+          },
+          pos,
+        );
+        reparentSpawned(newId, pos);
+      });
+    };
+    window.addEventListener("workspace-spawn-assets", onSpawn);
+    return () => window.removeEventListener("workspace-spawn-assets", onSpawn);
+  }, [addAssetNode, screenToFlowPosition, reparentSpawned]);
+
+  /* Voice picker → audioGenNode bridge.
+   *
+   * Any audio node renders a "Voice" pill that dispatches
+   * `workspace-open-voice-picker` with its node id + current voice.
+   * We open the dialog here (one instance per canvas), and on
+   * select write the new voice id back into the node's
+   * `data.params.voice`. The dialog handles its own preview play +
+   * use-case filtering — we just listen for select / close. */
+  useEffect(() => {
+    const onOpen = (evt: Event) => {
+      const detail = (evt as CustomEvent).detail as
+        | { nodeId?: string; voiceId?: string }
+        | undefined;
+      if (!detail?.nodeId) return;
+      setVoicePicker({
+        nodeId: detail.nodeId,
+        voiceId: detail.voiceId ?? "Charon",
+      });
+    };
+    window.addEventListener("workspace-open-voice-picker", onOpen);
+    return () =>
+      window.removeEventListener("workspace-open-voice-picker", onOpen);
+  }, []);
+
+  const onVoicePicked = useCallback((voiceId: string) => {
+    if (!voicePicker) return;
+    const nodeId = voicePicker.nodeId;
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === nodeId
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                params: {
+                  ...((n.data?.params as Record<string, unknown>) ?? {}),
+                  voice: voiceId,
+                },
+              },
+            }
+          : n,
+      ),
+    );
+    setVoicePicker(null);
+  }, [voicePicker, setNodes]);
+
+  /* All-assets dialog → upload bridge.
+   *
+   * The dialog can hand us OS files (file picker or drag-drop into
+   * the modal). We route them through the existing uploadAsset path
+   * so re-parenting + storage upload + signed-URL refresh stay in
+   * one place. Files tile out from viewport centre, same fan-out as
+   * the spawn-assets handler so the placement pattern stays familiar. */
+  useEffect(() => {
+    const onUpload = (evt: Event) => {
+      const detail = (evt as CustomEvent).detail as
+        | { files?: File[] }
+        | undefined;
+      const files = detail?.files ?? [];
+      if (files.length === 0 || !wrapperRef.current) return;
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const centre = screenToFlowPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      });
+      const PER_ROW = 5;
+      const STEP_X = 240;
+      const STEP_Y = 280;
+      files.forEach((file, i) => {
+        const col = i % PER_ROW;
+        const row = Math.floor(i / PER_ROW);
+        const pos = {
+          x: centre.x + (col - (PER_ROW - 1) / 2) * STEP_X,
+          y: centre.y + row * STEP_Y,
+        };
+        void uploadAsset(file, pos);
+      });
+    };
+    window.addEventListener("workspace-upload-files", onUpload);
+    return () => window.removeEventListener("workspace-upload-files", onUpload);
+  }, [uploadAsset, screenToFlowPosition]);
+
+  /**
+   * Live grouping — figures out whether the node the user just
+   * finished dragging should be parented to a group, taken out of
+   * one, or moved between groups.
+   *
+   * Rule: if the dragged node's centre is inside a `groupNode`'s
+   * bbox, it becomes a child of that group; otherwise it's free.
+   * Position is converted between absolute / relative-to-parent
+   * accordingly so the visual location stays exactly where the
+   * user dropped it.
+   *
+   * GroupNodes themselves don't get re-parented (no nested groups
+   * for now), and we don't try to auto-resize the group frame to
+   * fit the new child — keeps the math simple, user can re-Group
+   * if they want a tight fit.
+   */
+  /**
+   * Alt+drag → duplicate the dragged selection (Figma-style).
+   *
+   * On drag-start, if Alt is held, clone every node currently being
+   * dragged (RF passes the full drag set as the third arg — covers
+   * single-node drag and multi-select drag uniformly). Connected
+   * edges are cloned too: any edge whose source OR target is in the
+   * drag set gets a copy with the corresponding endpoint rewritten
+   * to the clone's id, so external connections survive AND
+   * inter-selection wires (between two cloned nodes) come along.
+   *
+   * The original keeps the drag focus — RF was already tracking it
+   * before we ran — so visually the cloned copy stays anchored at
+   * the original's start position while the user drags the original
+   * to the new location. End state: original at new position, copy
+   * at old position, both fully wired.
+   *
+   * Note: we do NOT cancel the drag or swap the dragged node. RF
+   * doesn't expose a clean way to do that mid-drag and the result
+   * would feel jumpy. Original-moves / copy-stays is functionally
+   * equivalent for the user's purpose ("I want a duplicate with the
+   * same connections at a different location").
+   */
+  const onNodeDragStart = useCallback(
+    (event: React.MouseEvent, _node: Node, draggedNodes: Node[]) => {
+      if (!event.altKey) return;
+      if (!draggedNodes || draggedNodes.length === 0) return;
+
+      const idMap = new Map<string, string>();
+      const cloned: Node[] = draggedNodes.map((n) => {
+        const newId = `n_${crypto.randomUUID()}`;
+        idMap.set(n.id, newId);
+        // `cloneNodeFresh` deep-copies data, strips run-state
+        // (status / generations / selectedGenIndex) so the copy doesn't
+        // appear to be mid-generation, and bumps the display label
+        // ("Foo" → "Foo copy", "Foo copy" → "Foo copy 2"). User
+        // reported the previous version dragged the spinner along
+        // with the duplicate, which read as "the copy is somehow
+        // running too" — clearly wrong.
+        return cloneNodeFresh(n, newId);
+      });
+
+      const allEdges = getEdges();
+      const clonedEdges: Edge[] = [];
+      for (const e of allEdges) {
+        const newSource = idMap.get(e.source);
+        const newTarget = idMap.get(e.target);
+        if (!newSource && !newTarget) continue;
+        clonedEdges.push({
+          ...e,
+          id: `e_${crypto.randomUUID()}`,
+          source: newSource ?? e.source,
+          target: newTarget ?? e.target,
+          selected: false,
+        });
+      }
+
+      // Snapshot for Ctrl+Z BEFORE the clone lands so undo removes
+      // both the cloned node and its cloned edges in one step.
+      pushHistory();
+      setNodes((nds) => [...nds, ...cloned]);
+      setEdges((eds) => [...eds, ...clonedEdges]);
+    },
+    [getEdges, setNodes, setEdges, pushHistory],
+  );
+
+  const onNodeDragStop = useCallback(
+    (_e: React.MouseEvent | React.TouchEvent, dragged: Node) => {
+      // Don't reparent groups themselves.
+      if (dragged.type === "groupNode") return;
+      // Hard guard — React Flow occasionally emits a drag-stop with an
+      // un-positioned node (e.g. mid-flight cancel). Any access to
+      // `.x` / `.y` on undefined would throw and the
+      // WorkspaceErrorBoundary would catch it as a full-screen crash
+      // card. Bail silently instead — the next drag will recover.
+      if (!dragged.position || typeof dragged.position.x !== "number") return;
+
+      const allNodes = useWorkspaceStore.getState().current?.nodes ?? [];
+
+      // Compute dragged node's ABSOLUTE position. parentId-aware,
+      // 1 level deep (we don't allow nested groups).
+      const draggedParent = dragged.parentId
+        ? allNodes.find((n) => n.id === dragged.parentId)
+        : null;
+      const dpx = draggedParent?.position?.x ?? 0;
+      const dpy = draggedParent?.position?.y ?? 0;
+      const absX = dpx + dragged.position.x;
+      const absY = dpy + dragged.position.y;
+      const w =
+        (dragged as Node & { measured?: { width?: number } }).measured?.width ??
+        dragged.width ??
+        260;
+      const h =
+        (dragged as Node & { measured?: { height?: number } }).measured?.height ??
+        dragged.height ??
+        200;
+      const cx = absX + w / 2;
+      const cy = absY + h / 2;
+
+      // Find which group (if any) contains the centre point.
+      const targetGroup = allNodes.find((n) => {
+        if (n.type !== "groupNode") return false;
+        if (n.id === dragged.id) return false;
+        if (!n.position) return false;
+        const gx = n.position.x;
+        const gy = n.position.y;
+        if (typeof gx !== "number" || typeof gy !== "number") return false;
+        const gw =
+          (n.style?.width as number | undefined) ??
+          (n as Node & { measured?: { width?: number } }).measured?.width ??
+          400;
+        const gh =
+          (n.style?.height as number | undefined) ??
+          (n as Node & { measured?: { height?: number } }).measured?.height ??
+          300;
+        return cx >= gx && cx <= gx + gw && cy >= gy && cy <= gy + gh;
+      });
+
+      const currentParent = dragged.parentId ?? null;
+      const newParent = targetGroup?.id ?? null;
+      if (currentParent === newParent) return;
+
+      // Re-parent — convert position to be relative to the new
+      // parent (or absolute when leaving every group).
+      const reactFlow = useWorkspaceStore.getState();
+      void reactFlow;
+      const updateAll = (nds: Node[]) =>
+        nds.map((n) => {
+          if (n.id !== dragged.id) return n;
+          let newPos = { x: absX, y: absY };
+          if (newParent) {
+            const parent = allNodes.find((p) => p.id === newParent);
+            if (parent) {
+              newPos = { x: absX - parent.position.x, y: absY - parent.position.y };
+            }
+          }
+          // Strip parentId / extent if leaving a group.
+          const { parentId: _p, extent: _e, ...rest } = n as typeof n & {
+            extent?: unknown;
+          };
+          if (newParent) {
+            return {
+              ...rest,
+              parentId: newParent,
+              position: newPos,
+            } as Node;
+          }
+          return { ...rest, position: newPos } as Node;
+        });
+
+      // Keep group BEFORE its children in the array — z-order rule.
+      // After updating positions/parentage, re-sort so all groupNodes
+      // come first, then everything else (preserving relative order
+      // within each bucket).
+      setNodes((nds) => {
+        const updated = updateAll(nds);
+        const groups = updated.filter((n) => n.type === "groupNode");
+        const others = updated.filter((n) => n.type !== "groupNode");
+        return [...groups, ...others];
+      });
+    },
+    [setNodes],
+  );
+
+  const onConnectStart = useCallback(
+    (_e: React.MouseEvent | React.TouchEvent, params: OnConnectStartParams) => {
+      connectStartRef.current = {
+        nodeId: params.nodeId,
+        handleId: params.handleId,
+        handleType: params.handleType,
+      };
+    },
+    [],
+  );
+
+  const onConnectEnd = useCallback(
+    (
+      event: MouseEvent | TouchEvent,
+      connectionState?: { isValid: boolean | null; toHandle?: { nodeId?: string; id?: string | null } | null },
+    ) => {
+      const start = connectStartRef.current;
+      connectStartRef.current = null;
+      if (!start?.nodeId || !start.handleType) return;
+
+      const targetEl = event.target as HTMLElement | null;
+      const droppedOnHandle =
+        targetEl?.classList.contains("react-flow__handle") ||
+        connectionState?.toHandle?.nodeId != null;
+      const droppedOnNode = targetEl?.closest(".react-flow__node");
+
+      // Drop landed on a handle but React Flow rejected it → tell the user why.
+      if (droppedOnHandle && connectionState && connectionState.isValid === false) {
+        const tgtNodeId = connectionState.toHandle?.nodeId;
+        const tgtHandle = connectionState.toHandle?.id ?? "";
+        const state = useWorkspaceStore.getState();
+        const allNodes = state.current?.nodes ?? [];
+        const allEdges = state.current?.edges ?? [];
+        const tgt = allNodes.find((n) => n.id === tgtNodeId);
+        const src = allNodes.find((n) => n.id === start.nodeId);
+
+        // Compose the most-specific reason we can. The order matters
+        // — port-full beats type-mismatch which beats group-overflow.
+        let reason = "Connection rejected — incompatible port types.";
+        if (tgt) {
+          const schema = getWorkspaceSchema(tgt.type ?? "");
+          if (schema) {
+            const selectedModel =
+              ((tgt.data as any)?.params?.model_name as string | undefined) ??
+              schema.defaultModel;
+            const handle = schema.inputs.find(
+              (i) =>
+                i.id === tgtHandle &&
+                (!i.supportedModels || i.supportedModels.includes(selectedModel)),
+            );
+            const max = handle?.maxConnections ?? 1;
+            const portLabel = handle?.label ?? tgtHandle;
+            const existing = allEdges.filter(
+              (e) => e.target === tgtNodeId && e.targetHandle === tgtHandle,
+            ).length;
+
+            if (existing >= max) {
+              reason = `Port "${portLabel}" is full — accepts max ${max} connection(s) for ${selectedModel}.`;
+            } else if (src?.type === "groupNode") {
+              // Group → count children of the dragged port's type and
+              // report the exact mismatch so the user can either pick
+              // a wider port or trim the group.
+              const sh = (start.handleId ?? "image") as
+                | "image"
+                | "video"
+                | "audio";
+              const childCount = countGroupChildrenOfType(src.id, sh, allNodes);
+              if (childCount > max) {
+                reason =
+                  max === 1
+                    ? `Port "${portLabel}" only accepts a single ${sh} ref, ` +
+                      `but the group has ${childCount} ${sh} item(s). ` +
+                      `Wire one asset directly, or pick a port that accepts multiple refs.`
+                    : `Group has ${childCount} ${sh} item(s) but "${portLabel}" ` +
+                      `accepts max ${max} for ${selectedModel}. Trim the group or change model.`;
+              } else if (handle && tgtHandle) {
+                // Type mismatch despite count fitting — e.g. dragging a
+                // group's video port into an audio target.
+                const portTypeFromHandle = (id: string): string => {
+                  if (TEXT_TARGETS.has(id)) return "text";
+                  if (IMAGE_TARGETS.has(id)) return "image";
+                  if (VIDEO_TARGETS.has(id)) return "video";
+                  if (AUDIO_TARGETS.has(id)) return "audio";
+                  if (ELEMENT_TARGETS.has(id)) return "element";
+                  return "?";
+                };
+                const tgtKind = portTypeFromHandle(tgtHandle);
+                const srcKind = sh;
+                if (tgtKind !== srcKind) {
+                  reason = `Type mismatch — group's ${srcKind} output can't connect to ${tgtKind} port "${portLabel}".`;
+                }
+              }
+            } else {
+              // Generic source → describe the type mismatch in plain
+              // language. Pull source type from src's data / schema.
+              let srcKind: string = "media";
+              if (src?.type === "textNode") srcKind = "text";
+              else if (src?.type === "elementNode") srcKind = "element";
+              else if (src?.type === "assetNode") {
+                srcKind = ((src.data as any)?.fieldType as string) ?? "media";
+              } else if (src?.type) {
+                const sh = start.handleId ?? "";
+                if (sh === "output_video" || sh === "video") srcKind = "video";
+                else if (sh === "audio") srcKind = "audio";
+                else if (sh === "text") srcKind = "text";
+                else srcKind = "image";
+              }
+              const portKindOf = (id: string): string => {
+                if (TEXT_TARGETS.has(id)) return "text";
+                if (IMAGE_TARGETS.has(id)) return "image";
+                if (VIDEO_TARGETS.has(id)) return "video";
+                if (AUDIO_TARGETS.has(id)) return "audio";
+                if (ELEMENT_TARGETS.has(id)) return "element";
+                return "?";
+              };
+              const tgtKind = portKindOf(tgtHandle);
+              if (tgtKind !== "?" && srcKind !== tgtKind) {
+                reason = `Type mismatch — ${srcKind} output can't connect to ${tgtKind} port "${portLabel}".`;
+              }
+            }
+          }
+        }
+        toast.warning(reason);
+        return;
+      }
+
+      // Dropped on a node body (not a specific handle) or a real handle
+      // that succeeded → React Flow's own onConnect handles it. No picker.
+      if (droppedOnHandle || droppedOnNode) return;
+
+      // Empty canvas → spawn picker.
+      const clientX = "clientX" in event ? event.clientX : event.changedTouches[0]?.clientX ?? 0;
+      const clientY = "clientY" in event ? event.clientY : event.changedTouches[0]?.clientY ?? 0;
+
+      const state = useWorkspaceStore.getState();
+      const fromNode = (state.current?.nodes ?? []).find((n) => n.id === start.nodeId);
+      if (!fromNode) return;
+
+      setPicker({
+        screen: { x: clientX, y: clientY },
+        flow: screenToFlowPosition({ x: clientX, y: clientY }),
+        fromNode,
+        fromHandleId: start.handleId ?? "",
+        fromIsOutput: start.handleType === "source",
+      });
+    },
+    [screenToFlowPosition],
+  );
+
+  const onPickerPick = useCallback(
+    (option: PickerOption) => {
+      if (!picker) return;
+      const newId = addSchemaNode(option.nodeType, option.defaultLabel, picker.flow);
+      // No source (keyboard `N` shortcut) → just spawn the node, no
+      // edge to create. Drag-from-port path → wire the new node back
+      // to the source on the matching handle.
+      if (picker.fromNode && picker.fromHandleId) {
+        const conn: Connection = picker.fromIsOutput
+          ? {
+              source: picker.fromNode.id,
+              sourceHandle: picker.fromHandleId || null,
+              target: newId,
+              targetHandle: option.newNodeHandle,
+            }
+          : {
+              source: newId,
+              sourceHandle: option.newNodeHandle,
+              target: picker.fromNode.id,
+              targetHandle: picker.fromHandleId || null,
+            };
+        onConnect(conn);
+      }
+      setPicker(null);
+    },
+    [picker, addSchemaNode, onConnect],
+  );
+
+  /**
+   * Reject wires whose data types don't line up — e.g. a TextNode's
+   * output can only plug into handles in TEXT_TARGETS, not ref_image.
+   * React Flow calls this while the user is dragging; returning false
+   * keeps the connection line red and prevents the edge from being
+   * added on release.
+   */
+  const isValidConnection = useCallback((conn: Connection | Edge) => {
+    const state = useWorkspaceStore.getState();
+    const nodeList = state.current?.nodes ?? [];
+    const edgeList = state.current?.edges ?? [];
+    const src = nodeList.find((n) => n.id === conn.source);
+    if (!src) return true;
+
+    const th = conn.targetHandle ?? "";
+    const srcType = src.type ?? "";
+
+    /* ── 1. Type compatibility ─────────────────────────────────
+     * IMPORTANT: default to `false` (fail-closed). The previous code
+     * defaulted to `true` so any source-handle id we forgot to enumerate
+     * would silently allow any wire — meaning a typo in a node's
+     * sourceHandle would bypass type checking entirely. With this fix,
+     * unknown handle ids are rejected and surface a toast so we can fix
+     * the schema instead of silently accepting garbage edges. */
+    let typeOk = false;
+    if (srcType === "textNode") typeOk = TEXT_TARGETS.has(th);
+    else if (srcType === "elementNode") typeOk = ELEMENT_TARGETS.has(th);
+    else if (srcType === "assetNode") {
+      const ft = (src.data as any)?.fieldType;
+      if (ft === "image") typeOk = IMAGE_TARGETS.has(th);
+      else if (ft === "video") typeOk = VIDEO_TARGETS.has(th);
+      else if (ft === "audio") typeOk = AUDIO_TARGETS.has(th);
+      else if (ft === "model3d") typeOk = MODEL3D_TARGETS.has(th);
+    } else if (srcType === "groupNode") {
+      // Group has multiple typed output ports — `image` / `video` /
+      // `audio`. The edge's `sourceHandle` tells us which one was
+      // dragged, and the target handle has to accept that media type.
+      const sh = conn.sourceHandle ?? "image";
+      if (sh === "video") typeOk = VIDEO_TARGETS.has(th);
+      else if (sh === "audio") typeOk = AUDIO_TARGETS.has(th);
+      else typeOk = IMAGE_TARGETS.has(th); // default + "image" port
+    } else {
+      // Tool nodes — derive type from sourceHandle id. Centralised in
+      // workspaceSchema's `portTypeFromHandleId` so adding a new port
+      // type only requires updating that table.
+      const sh = conn.sourceHandle ?? "";
+      const srcKind = portTypeFromHandleId(sh);
+      if (srcKind === "image") typeOk = IMAGE_TARGETS.has(th);
+      else if (srcKind === "video") typeOk = VIDEO_TARGETS.has(th);
+      else if (srcKind === "text") typeOk = TEXT_TARGETS.has(th);
+      else if (srcKind === "audio") typeOk = AUDIO_TARGETS.has(th);
+      else if (srcKind === "element") typeOk = ELEMENT_TARGETS.has(th);
+      else if (srcKind === "model3d") typeOk = MODEL3D_TARGETS.has(th);
+    }
+    if (!typeOk) return false;
+
+    /* ── 2. Per-handle maxConnections (from schema) ────────── */
+    if (conn.target && conn.targetHandle) {
+      const tgt = nodeList.find((n) => n.id === conn.target);
+      const schema = tgt ? getWorkspaceSchema(tgt.type ?? "") : undefined;
+      if (schema && tgt) {
+        const selectedModel =
+          ((tgt.data as any)?.params?.model_name as string | undefined) ??
+          schema.defaultModel;
+        // Find the visible variant of this handle for the active model
+        // (handles can be split per provider, e.g. ref_image with
+        // different maxConnections for Banana 14 vs OpenAI 16).
+        const handle = schema.inputs.find(
+          (i) =>
+            i.id === conn.targetHandle &&
+            (!i.supportedModels || i.supportedModels.includes(selectedModel)),
+        );
+        const max = handle?.maxConnections ?? 1;
+        const existing = edgeList.filter(
+          (e) => e.target === conn.target && e.targetHandle === conn.targetHandle,
+        ).length;
+        if (existing >= max) return false;
+
+        /* ── 3. Group source: child count must fit the port ──
+         * A group emits N child URLs. If the target port caps refs
+         * at M (e.g. start_frame = 1, ref_image = 14), a group with
+         * N > M can't legally land — onConnectEnd surfaces a toast
+         * explaining exactly why. */
+        if (srcType === "groupNode") {
+          const sh = (conn.sourceHandle ?? "image") as
+            | "image"
+            | "video"
+            | "audio";
+          const childCount = countGroupChildrenOfType(src.id, sh, nodeList);
+          if (childCount > max) return false;
+        }
+      }
+    }
+
+    return true;
+  }, []);
+
+  const memoNodeTypes = useMemo(() => nodeTypes, []);
+
+  return (
+    <div
+      ref={wrapperRef}
+      className="workspace-root relative h-full w-full bg-zinc-950"
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onContextMenu={(e) => {
+        // Wrapper-level right-click handler — fires for clicks on
+        // the pane AND on nodes. We open the categorised picker at
+        // the cursor regardless of what was under it. Skip when the
+        // user right-clicked an interactive child (input / textarea /
+        // button) so contextual edits like "Inspect" or text-field
+        // copy-paste still work — those targets have their own
+        // implicit behaviour we don't want to hijack.
+        const target = e.target as HTMLElement | null;
+        const tag = target?.tagName ?? "";
+        if (
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "BUTTON" ||
+          tag === "SELECT" ||
+          target?.isContentEditable === true
+        ) {
+          return;
+        }
+        // React Flow's own onPaneContextMenu also fires for pane
+        // clicks — guard against opening the menu twice. We open
+        // here for "anywhere on the canvas wrapper" coverage; the
+        // pane handler is left wired up as a defensive secondary
+        // path but we close it via onPaneContextMenu doing the same
+        // setContextMenu call (idempotent).
+        e.preventDefault();
+        const flow = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+        setContextMenu({
+          screen: { x: e.clientX, y: e.clientY },
+          flow,
+        });
+      }}
+    >
+      <div className="workspace-grid-surface" />
+
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={memoNodeTypes}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onConnectStart={onConnectStart}
+        onConnectEnd={onConnectEnd}
+        onMoveEnd={onMoveEnd}
+        onNodeClick={onNodeClick}
+        onNodeDoubleClick={onNodeDoubleClick}
+        onNodeDragStart={onNodeDragStart}
+        onNodeDragStop={onNodeDragStop}
+        onPaneClick={onPaneClick}
+        onPaneContextMenu={onPaneContextMenu}
+        onEdgeClick={onEdgeClick}
+        isValidConnection={isValidConnection}
+        deleteKeyCode={DELETE_KEYS}
+        fitView
+        proOptions={PRO_OPTIONS}
+        minZoom={0.25}
+        maxZoom={2.5}
+        // Edges are bezier-curved by default — matches the soft,
+        // organic look of Figma / Krea wires. The colour palette
+        // (resting / hover / selected / dragging) is owned by
+        // workspace.css so it stays consistent with our theme; we
+        // just declare the SHAPE here and let CSS style the strokes.
+        defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
+        connectionLineType={ConnectionLineType.Bezier}
+        // ── Marquee vs hand selection ──
+        // Tool-mode reactive: in "select" we marquee on left-drag and
+        // pan on middle/right; in "hand" we pan on left-drag too and
+        // disable marquee (Figma's H key behaviour). The arrays must
+        // be MODULE-LEVEL constants (not inline literals) — see the
+        // STABLE_* / PAN_ON_DRAG_* comment at the top of this file
+        // for the React #185 loop they cause if recreated per render.
+        selectionOnDrag={tool === "select"}
+        selectionMode={SelectionMode.Partial}
+        panOnDrag={tool === "hand" ? PAN_ON_DRAG_HAND : PAN_ON_DRAG_DEFAULT}
+        multiSelectionKeyCode={MULTI_SELECT_KEYS}
+        className={cn(
+          tool === "hand" && "ws-tool-hand",
+          tool === "cut" && "ws-tool-cut",
+          tool === "sticky" && "ws-tool-sticky",
+        )}
+      >
+        {/* Floating action bar — appears above the bbox of any
+         *  current selection, with context-aware buttons. Lives
+         *  inside the ReactFlow tree so it can subscribe to
+         *  selection / viewport via useOnSelectionChange and
+         *  useViewport hooks. */}
+        <NodeQuickToolbar />
+        {/* Translucent bounding frame behind 2+ selected nodes.
+         *  Mounts into `.react-flow__viewport` via portal so it
+         *  inherits the viewport's pan/zoom transform. */}
+        <MultiSelectionFrame />
+        {/* Glow on edges that touch the selected node(s). Reads
+         *  selection from React-Flow store + edges from useEdges()
+         *  → injects a `<style>` tag with rules keyed off each
+         *  edge's `data-id`. Pure presentational, no edge data
+         *  mutation, no autosave dirty. */}
+        <EdgeHighlightOnNodeSelect />
+      </ReactFlow>
+      {picker && (
+        <CanvasNodePicker
+          state={picker}
+          onPick={onPickerPick}
+          onClose={() => setPicker(null)}
+        />
+      )}
+      {contextMenu && (
+        <CanvasContextMenu
+          state={contextMenu}
+          onPick={onContextMenuPick}
+          onAction={onContextMenuAction}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+      {preview && (
+        <NodePreviewLightbox preview={preview} onClose={() => setPreview(null)} />
+      )}
+      <CanvasFloatingSidebar
+        onAddNode={openContextMenuAtAnchor}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
+      <ShortcutsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
+      <VoicePickerDialog
+        open={!!voicePicker}
+        value={voicePicker?.voiceId}
+        onClose={() => setVoicePicker(null)}
+        onSelect={onVoicePicked}
+      />
+    </div>
+  );
+};
+
+const WorkspaceCanvas = () => (
+  <ReactFlowProvider>
+    <Inner />
+  </ReactFlowProvider>
+);
+
+export default WorkspaceCanvas;
