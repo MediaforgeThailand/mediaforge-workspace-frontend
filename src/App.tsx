@@ -68,8 +68,16 @@ const Analytics = lazy(() => import("./pages/dashboard/Analytics"));
 // /app/workspace/:workspaceId is full-screen (no DashboardLayout
 // chrome). The active canvas tab inside is tracked in store state,
 // not the URL — one workspace = one URL = one tab bar.
-const WorkspaceDashboard = lazy(() => import("./pages/workspace"));
-const WorkspaceCanvasPage = lazy(() => import("./pages/workspace/Canvas"));
+//
+// Use `lazyWithRetry` (not bare `lazy`) so a stale-chunk fetch after
+// a Vercel deploy auto-reloads the page once instead of rendering a
+// blank tree. Reported by user as: pressing browser-back from the
+// canvas to the dashboard left a black screen until F5. The
+// dashboard's chunk hash had rolled forward in the new deploy; the
+// in-flight tab still asked for the old hash, the lazy import threw,
+// and the Suspense fallback finished but no children mounted.
+const WorkspaceDashboard = lazyWithRetry(() => import("./pages/workspace"));
+const WorkspaceCanvasPage = lazyWithRetry(() => import("./pages/workspace/Canvas"));
 const ReferEarn = lazy(() => import("./pages/settings/ReferEarn"));
 const PartnerApply = lazy(() => import("./pages/partner/Apply"));
 const PartnerStatus = lazy(() => import("./pages/partner/Status"));
@@ -293,10 +301,12 @@ const App = () => (
                     }
                   />
 
-                  {/* Workspace canvas editor — full-screen, outside layouts.
-                   *  URL is the WORKSPACE id; tabs (canvases) are tracked
-                   *  in store state, not the URL. */}
-                  <Route path="/app/workspace/:workspaceId" element={<WorkspaceCanvasPage />} />
+                  {/* (Duplicate `/app/workspace/:workspaceId` route was
+                   *  here without ProtectedRoute. Removed — the
+                   *  ProtectedRoute-wrapped version below is the live
+                   *  one. Two `<Route>`s with the same path matched
+                   *  the first one, which bypassed the auth guard for
+                   *  this URL.) */}
 
                   {/* Dev debug route */}
                   <Route
