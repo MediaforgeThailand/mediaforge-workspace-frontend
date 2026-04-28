@@ -15,6 +15,7 @@ import { Image as ImageIcon, Film, Music, Box, Loader2, Maximize2 } from "lucide
 import { cn } from "@/lib/utils";
 import { useFreshSignedUrl } from "./useFreshSignedUrl";
 import { PortIcon } from "./PortIcon";
+import { MiniSelect } from "./CompactParamWidgets";
 
 export interface AssetNodeData {
   /** Editable label — this is what @-mentions reference. */
@@ -222,21 +223,21 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
         {d.fieldType !== "model3d" && (
           <div className="ws-compact-overlay">
             <div className="ws-compact-toolbar">
-              <select
+              {/* Reference role picker — shares the Radix-based
+               *  MiniSelect with every AI-gen tool node so the look /
+               *  open animation / dropdown chrome match exactly.
+               *  (The native <select> here used to render with the
+               *  OS picker which felt out-of-place against the
+               *  custom-styled gen-node settings.) */}
+              <MiniSelect
                 value={d.referenceType ?? "general"}
-                onChange={(e) => onRoleChange(e.target.value as ReferenceRole)}
-                onMouseDown={(e) => e.stopPropagation()}
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => e.stopPropagation()}
-                className="ws-mini-select-trigger nodrag"
-                title="How should models use this asset when referenced?"
-              >
-                {REFERENCE_ROLE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                options={REFERENCE_ROLE_OPTIONS.map((o) => o.value)}
+                optionLabels={Object.fromEntries(
+                  REFERENCE_ROLE_OPTIONS.map((o) => [o.value, o.label]),
+                )}
+                onChange={(v) => onRoleChange(v as ReferenceRole)}
+                truncateAt={28}
+              />
             </div>
           </div>
         )}

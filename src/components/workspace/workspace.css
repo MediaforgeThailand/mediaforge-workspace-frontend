@@ -1345,6 +1345,33 @@ body.ws-resizing * {
   pointer-events: all !important;
 }
 
+/* ── Hover-bypass for settings + prompt overlays ─────────────
+ *
+ * Default behaviour above gates EVERY interactive child of a
+ * non-selected node so the first click selects (Photoshop / Figma
+ * feel). Users reported that this felt one click too many for the
+ * settings strip and the prompt input — both fade in on hover, so
+ * the *intent* of clicking them is already obvious and forcing a
+ * select-first round-trip just made the gen-node feel sluggish.
+ *
+ * Carve-out: anything inside `.ws-compact-overlay` (settings
+ * pills / MiniSelects / toggles) and `.ws-compact-prompt-overlay`
+ * (prompt textarea + Run button) bypasses the gate so a single
+ * click on those overlays acts immediately, without the user having
+ * to click the node first.
+ *
+ * Specificity note: these selectors live AFTER the broad gate
+ * rules above, and they target descendants — they win even though
+ * the gate uses the same class-count weight. The `!important` on
+ * the auto value belts-and-braces against any remaining `nodrag`
+ * rule that fires first. */
+.react-flow__node:not(.selected) .ws-compact-overlay,
+.react-flow__node:not(.selected) .ws-compact-overlay *,
+.react-flow__node:not(.selected) .ws-compact-prompt-overlay,
+.react-flow__node:not(.selected) .ws-compact-prompt-overlay * {
+  pointer-events: auto !important;
+}
+
 /* ── Group resize handles ───────────────────────────────────
  * React Flow's NodeResizer renders one element per edge (the
  * "line") plus 4 corner / 4 mid-edge handles. Default styling
