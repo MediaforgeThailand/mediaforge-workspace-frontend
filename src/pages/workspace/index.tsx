@@ -30,7 +30,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   loadWorkspacesFromServer,
@@ -177,8 +177,52 @@ function groupByMonth<T extends { updatedAt: number }>(
  * Page
  * ════════════════════════════════════════════════════════════ */
 
+const VALID_SECTIONS: Section[] = [
+  "home",
+  "spaces",
+  "community",
+  "projects",
+  "tools",
+  "stock",
+];
+
 const WorkspaceDashboard = () => {
-  const [section, setSection] = useState<Section>("home");
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Initial section comes from `?section=…` (set by the AccountShell
+  // sidebar when the user jumps in from /app/settings etc.). If the
+  // param isn't a valid section we fall back to "home".
+  const initialSection = (() => {
+    const v = searchParams.get("section");
+    return (v && VALID_SECTIONS.includes(v as Section)
+      ? (v as Section)
+      : "home");
+  })();
+  const [section, setSection] = useState<Section>(initialSection);
+
+  // Two-way bind URL ↔ state. When the user clicks a sidebar item we
+  // also update the URL so a refresh / shared link lands on the same
+  // section. We use `replace` to avoid stacking history entries for
+  // every section toggle.
+  useEffect(() => {
+    const current = searchParams.get("section");
+    if (section === "home") {
+      // Strip the param entirely on the default section so the URL
+      // stays clean.
+      if (current !== null) {
+        const next = new URLSearchParams(searchParams);
+        next.delete("section");
+        setSearchParams(next, { replace: true });
+      }
+    } else if (current !== section) {
+      const next = new URLSearchParams(searchParams);
+      next.set("section", section);
+      setSearchParams(next, { replace: true });
+    }
+    // Intentionally only re-runs when `section` changes — we don't
+    // want a `searchParams` change (e.g. another effect tweaking an
+    // unrelated query key) to ricochet back into our state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section]);
 
   return (
     <div
