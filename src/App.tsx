@@ -1,23 +1,46 @@
+/**
+ * Workspace product — slim app shell.
+ *
+ * After the Wave 1 cleanup this repo is the workspace-only product
+ * (companion to mediaforge-workspace-backend). The huge consumer
+ * surface — flow studio, creator dashboard, partner / affiliate,
+ * play-flow runner, admin pages, demo redemption, marketing landing
+ * — was removed; what remains is the canvas editor + the auth shell
+ * around it.
+ *
+ * Routes:
+ *   /                          → redirect to /app/workspace
+ *   /auth                      → sign-in / sign-up
+ *   /reset-password            → password reset
+ *   /privacy, /terms           → legal pages (still served at this
+ *                                  domain so existing inbound links
+ *                                  don't 404)
+ *   /app/workspace             → spaces dashboard
+ *   /app/workspace/:id         → full-screen canvas
+ *   /app/settings              → user settings (workspace-shaped,
+ *                                  Wave 2 will rebuild the inside)
+ *   /app/usage                 → credit usage (formerly "Transactions")
+ *   /app/pricing               → plan picker
+ *   *                          → 404
+ *
+ * Anything that lazy-loaded a deleted page is gone. App.tsx is back
+ * to ~80 lines from the consumer-app's ~400+.
+ */
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { lazy, Suspense, useEffect } from "react";
-import { captureFromUrl } from "@/lib/tracking/referralCapture";
+import { lazy, Suspense } from "react";
 import NotFound from "./pages/NotFound";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import CookieConsent from "./components/CookieConsent";
-import DemoAutoRedeemer from "./components/DemoAutoRedeemer";
-import GlobalExecutionWatcher from "./components/GlobalExecutionWatcher";
-import { usePresenceTracker } from "./hooks/useOnlinePresence";
 import ProtectedRoute from "./components/ProtectedRoute";
-import CreatorRoute from "./components/CreatorRoute";
 import DashboardLayout from "./components/DashboardLayout";
 import PageLoadingAnim from "./components/ui/PageLoadingAnim";
 
@@ -35,297 +58,64 @@ function lazyWithRetry(factory: () => Promise<{ default: React.ComponentType<any
         return new Promise(() => {}); // never resolves — page is reloading
       }
       sessionStorage.removeItem(key);
-      throw err; // second failure → let it crash normally
+      throw err;
     })
   );
 }
 
-// Lazy-loaded pages
+// ── Auth shell ────────────────────────────────────────────────
 const Auth = lazyWithRetry(() => import("./pages/Auth"));
 const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
-const PlayFlow = lazyWithRetry(() => import("./pages/play-flow"));
-// Explore page hidden — redirects to Home
-const PartnerProgram = lazyWithRetry(() => import("./pages/PartnerProgram"));
-const RedeemCode = lazyWithRetry(() => import("./pages/RedeemCode"));
-const DemoLanding = lazyWithRetry(() => import("./pages/DemoLanding"));
 
-// Dashboard pages
-const DashboardHome = lazy(() => import("./pages/dashboard/Home"));
-const AssetManager = lazy(() => import("./pages/dashboard/AssetManager"));
-const FlowAssetDetail = lazy(() => import("./pages/dashboard/FlowAssetDetail"));
-const FlowStudioDashboard = lazy(() => import("./pages/dashboard/FlowStudioDashboard"));
-const FlowStudio = lazy(() => import("./pages/dashboard/FlowStudio"));
-const FlowSettings = lazy(() => import("./pages/dashboard/FlowSettings"));
-const Pricing = lazy(() => import("./pages/dashboard/Pricing"));
-const Settings = lazy(() => import("./pages/dashboard/Settings"));
-const Transactions = lazy(() => import("./pages/dashboard/Transactions"));
-const History = lazy(() => import("./pages/dashboard/History"));
-const Analytics = lazy(() => import("./pages/dashboard/Analytics"));
-
-// Workspace V2 — node-based canvas editor (this repo's primary product
-// once the workspace.mediaforge.co subdomain ships). Dashboard at
-// /app/workspace lists all spaces; canvas page at
-// /app/workspace/:workspaceId is full-screen (no DashboardLayout
-// chrome). The active canvas tab inside is tracked in store state,
-// not the URL — one workspace = one URL = one tab bar.
-//
-// Use `lazyWithRetry` (not bare `lazy`) so a stale-chunk fetch after
-// a Vercel deploy auto-reloads the page once instead of rendering a
-// blank tree. Reported by user as: pressing browser-back from the
-// canvas to the dashboard left a black screen until F5. The
-// dashboard's chunk hash had rolled forward in the new deploy; the
-// in-flight tab still asked for the old hash, the lazy import threw,
-// and the Suspense fallback finished but no children mounted.
+// ── Workspace surfaces ────────────────────────────────────────
+// Dashboard (list of spaces) lives inside DashboardLayout chrome.
+// Canvas page is full-screen; mounted at top level so it claims the
+// whole viewport without competing with sidebar/topbar.
 const WorkspaceDashboard = lazyWithRetry(() => import("./pages/workspace"));
 const WorkspaceCanvasPage = lazyWithRetry(() => import("./pages/workspace/Canvas"));
-const ReferEarn = lazy(() => import("./pages/settings/ReferEarn"));
-const PartnerApply = lazy(() => import("./pages/partner/Apply"));
-const PartnerStatus = lazy(() => import("./pages/partner/Status"));
-const PartnerDashboard = lazy(() => import("./pages/partner/Dashboard"));
 
-// Admin pages
-const DevDebug = lazyWithRetry(() => import("./pages/DevDebug"));
-
-// Creator pages
-const CreatorLayout = lazyWithRetry(() => import("./components/CreatorLayout"));
-const CreatorHome = lazyWithRetry(() => import("./pages/creator/CreatorHome"));
-const CreatorStudio = lazyWithRetry(() => import("./pages/creator/CreatorStudio"));
-const PublishedFlows = lazyWithRetry(() => import("./pages/creator/PublishedFlows"));
-
-const CreatorFlowStatus = lazyWithRetry(() => import("./pages/creator/CreatorFlowStatus"));
-const BundleStudio = lazyWithRetry(() => import("./pages/creator/BundleStudio"));
-const BundleEditor = lazyWithRetry(() => import("./pages/creator/BundleEditor"));
-const PlayBundle = lazyWithRetry(() => import("./pages/play-flow/PlayBundle"));
-
-// Admin pages
-const AdminLogin = lazyWithRetry(() => import("./pages/admin/AdminLogin"));
-const AdminDashboard = lazyWithRetry(() => import("./pages/admin/AdminDashboard"));
-const ReviewQueue = lazyWithRetry(() => import("./pages/admin/ReviewQueue"));
-const FlowReview = lazyWithRetry(() => import("./pages/admin/FlowReview"));
-const FlowActive = lazyWithRetry(() => import("./pages/admin/FlowActive"));
-
-const AdminLayout = lazyWithRetry(() => import("./components/admin/AdminLayout"));
-const AdminProtectedRoute = lazyWithRetry(() => import("./components/admin/AdminProtectedRoute"));
-
-const AdminWrapper = () => (
-  <AdminAuthProvider>
-    <Outlet />
-  </AdminAuthProvider>
-);
+// ── Account chrome (Wave 2 will rebuild internals) ─────────────
+const Settings = lazyWithRetry(() => import("./pages/dashboard/Settings"));
+const Transactions = lazyWithRetry(() => import("./pages/dashboard/Transactions"));
+const Pricing = lazyWithRetry(() => import("./pages/dashboard/Pricing"));
 
 const queryClient = new QueryClient();
-
 const PageLoader = () => <PageLoadingAnim />;
-
-const AnalyticsTracker = () => {
-  usePresenceTracker();
-  useEffect(() => {
-    captureFromUrl();
-  }, []);
-  return null;
-};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark" enableSystem={false}>
-      <AuthProvider>
-        <LanguageProvider>
+    <ThemeProvider>
+      <LanguageProvider>
+        <AuthProvider>
           <TooltipProvider>
             <Toaster />
             <Sonner />
             <BrowserRouter>
-              <AnalyticsTracker />
-              <DemoAutoRedeemer />
-              <GlobalExecutionWatcher />
               <Suspense fallback={<PageLoader />}>
                 <Routes>
-                  <Route path="/" element={<Navigate to="/app/home" replace />} />
+                  {/* Root → redirect to workspace dashboard. The
+                   *  consumer landing page was removed in Wave 1
+                   *  (this repo is now workspace-only). */}
+                  <Route path="/" element={<Navigate to="/app/workspace" replace />} />
 
-                  <Route path="/terms" element={<Terms />} />
-                  <Route path="/privacy" element={<Privacy />} />
+                  {/* Auth + legal — public */}
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/privacy" element={<Privacy />} />
+                  <Route path="/terms" element={<Terms />} />
 
-                  {/* Consumer app routes — open to guests */}
+                  {/* Authed app — dashboard chrome wraps the
+                   *  workspace dashboard + account pages */}
                   <Route path="/app" element={<DashboardLayout />}>
-                    <Route path="home" element={<DashboardHome />} />
-                    <Route path="assets" element={<AssetManager />} />
-                    <Route
-                      path="assets/flow/:flowId"
-                      element={
-                        <ProtectedRoute>
-                          <FlowAssetDetail />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route path="flow-studio" element={<FlowStudioDashboard />} />
-                    <Route
-                      path="flow-studio/:flowId"
-                      element={
-                        <ProtectedRoute>
-                          <FlowSettings />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route path="pricing" element={<Pricing />} />
+                    <Route index element={<Navigate to="workspace" replace />} />
+                    <Route path="workspace" element={<WorkspaceDashboard />} />
                     <Route path="settings" element={<Settings />} />
-                    <Route
-                      path="settings/refer"
-                      element={
-                        <ProtectedRoute>
-                          <ReferEarn />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route path="transactions" element={<Transactions />} />
-                    <Route
-                      path="history"
-                      element={
-                        <ProtectedRoute>
-                          <History />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route path="analytics" element={<Analytics />} />
-                    {/* Workspace V2 — dashboard list of spaces. The
-                     *  full-screen canvas page is registered as a
-                     *  top-level route below (outside this
-                     *  DashboardLayout) so the chrome doesn't sit on
-                     *  top of the canvas. Once this app moves to
-                     *  workspace.mediaforge.co we may collapse
-                     *  /app/workspace → / for cleaner URLs; keeping
-                     *  the consumer-app path for now so existing
-                     *  bookmarks survive the migration. */}
-                    <Route
-                      path="workspace"
-                      element={<WorkspaceDashboard />}
-                    />
-                    <Route
-                      path="partner/apply"
-                      element={
-                        <ProtectedRoute>
-                          <PartnerApply />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="partner/status"
-                      element={
-                        <ProtectedRoute>
-                          <PartnerStatus />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="partner/dashboard"
-                      element={
-                        <ProtectedRoute>
-                          <PartnerDashboard />
-                        </ProtectedRoute>
-                      }
-                    />
+                    <Route path="usage" element={<Transactions />} />
+                    <Route path="pricing" element={<Pricing />} />
                   </Route>
 
-                  {/* Explore redirects to Home */}
-                  <Route element={<DashboardLayout />}>
-                    <Route path="/explore" element={<DashboardHome />} />
-                  </Route>
-
-                  {/* Play flow — no sidebar, has its own config panel */}
-                  <Route
-                    path="/play/bundle/:bundleId"
-                    element={
-                      <ProtectedRoute>
-                        <PlayBundle />
-                      </ProtectedRoute>
-                    }
-                  />
-                  {/* Play flow — open to guests; Generate gates auth + credits */}
-                  <Route path="/play/:flowId" element={<PlayFlow />} />
-
-                  <Route path="/demo" element={<DemoLanding />} />
-                  <Route path="/partner-program" element={<PartnerProgram />} />
-                  <Route
-                    path="/redeem"
-                    element={
-                      <ProtectedRoute>
-                        <RedeemCode />
-                      </ProtectedRoute>
-                    }
-                  />
-
-                  {/* Creator workspace routes */}
-                  <Route
-                    path="/creator"
-                    element={
-                      <CreatorRoute>
-                        <CreatorLayout />
-                      </CreatorRoute>
-                    }
-                  >
-                    <Route index element={<CreatorHome />} />
-                    <Route path="studio" element={<CreatorStudio />} />
-                    <Route path="published" element={<PublishedFlows />} />
-                    <Route path="flows" element={<CreatorFlowStatus />} />
-                    <Route path="bundles" element={<BundleStudio />} />
-                    <Route path="bundles/:bundleId" element={<BundleEditor />} />
-                    
-                  </Route>
-
-                  {/* Admin routes — isolated auth */}
-                  <Route element={<AdminWrapper />}>
-                    <Route path="/admin/login" element={<AdminLogin />} />
-                    <Route
-                      path="/admin"
-                      element={
-                        <AdminProtectedRoute>
-                          <AdminLayout />
-                        </AdminProtectedRoute>
-                      }
-                    >
-                      <Route index element={<AdminDashboard />} />
-
-                      <Route path="review-queue" element={<ReviewQueue />} />
-                      <Route path="review/:flowId" element={<FlowReview />} />
-                      <Route path="flow-active" element={<FlowActive />} />
-                    </Route>
-                  </Route>
-
-                  {/* Flow Studio node editor — full-screen, outside layouts */}
-                  <Route
-                    path="/app/flow-studio/:flowId/editor"
-                    element={
-                      <ProtectedRoute>
-                        <FlowStudio />
-                      </ProtectedRoute>
-                    }
-                  />
-
-                  {/* (Duplicate `/app/workspace/:workspaceId` route was
-                   *  here without ProtectedRoute. Removed — the
-                   *  ProtectedRoute-wrapped version below is the live
-                   *  one. Two `<Route>`s with the same path matched
-                   *  the first one, which bypassed the auth guard for
-                   *  this URL.) */}
-
-                  {/* Dev debug route */}
-                  <Route
-                    path="/dev/debug"
-                    element={
-                      <ProtectedRoute>
-                        <DevDebug />
-                      </ProtectedRoute>
-                    }
-                  />
-
-                  {/* Workspace V2 — full-screen canvas page. URL is the
-                   *  WORKSPACE id; the tabs (canvases) inside it are
-                   *  tracked in store state, not the URL. The
-                   *  /app/workspace dashboard route (in DashboardLayout
-                   *  above) shows the list of workspaces. Lives at
-                   *  TOP-level (outside DashboardLayout) so the canvas
-                   *  fills the viewport with no sidebar / top-bar
-                   *  chrome competing for space. */}
+                  {/* Canvas page — top-level so it gets the full
+                   *  viewport without DashboardLayout chrome */}
                   <Route
                     path="/app/workspace/:workspaceId"
                     element={
@@ -341,8 +131,8 @@ const App = () => (
               <CookieConsent />
             </BrowserRouter>
           </TooltipProvider>
-        </LanguageProvider>
-      </AuthProvider>
+        </AuthProvider>
+      </LanguageProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );
