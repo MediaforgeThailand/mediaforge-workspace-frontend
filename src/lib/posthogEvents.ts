@@ -11,7 +11,7 @@ export const phNodeAdded = (flowId: string, nodeType: string) =>
   posthog.capture("node_added", { flow_id: flowId, node_type: nodeType });
 
 // PlayFlow execution
-export const phFlowExecuted = (flowId: string, props: { node_count?: number; cost_credits?: number; provider?: string }) =>
+export const phFlowExecuted = (flowId: string, props: { flow_name?: string; node_count?: number; cost_credits?: number; provider?: string }) =>
   posthog.capture("flow_executed", { flow_id: flowId, ...props });
 
 // Generation results

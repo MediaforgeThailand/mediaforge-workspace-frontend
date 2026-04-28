@@ -1443,6 +1443,9 @@ const translations = {
     nodeDescImageGen: "Generate or edit images",
     nodeDescVideoGen: "Generate video from image — supports all Kling models",
     nodeDescMp3Input: "Creator-uploaded MP3 background track (max 3MB)",
+    nodeDescRemoveBg: "Remove image background using AI",
+    nodeDescSeedDanceVideo: "Generate video from text or image — BytePlus SeedDance",
+    nodeDescSeedDreamImage: "Generate images from text or image — BytePlus SeedDream",
     nodeDescMergeAudio: "Combine a video and an audio track via Shotstack",
     nodeDescOutput: "Display the final result (image or video)",
 
@@ -3152,6 +3155,9 @@ const translations = {
     nodeDescImageGen: "สร้างหรือแก้ไขรูปภาพ",
     nodeDescVideoGen: "สร้างวิดีโอจากรูปภาพ — รองรับทุกโมเดล Kling",
     nodeDescMp3Input: "ไฟล์เพลง MP3 ที่ Creator อัปโหลด (สูงสุด 3MB)",
+    nodeDescRemoveBg: "ลบพื้นหลังรูปภาพด้วย AI",
+    nodeDescSeedDanceVideo: "สร้างวิดีโอจากข้อความหรือรูปภาพ — BytePlus SeedDance",
+    nodeDescSeedDreamImage: "สร้างรูปภาพจากข้อความหรือรูปภาพ — BytePlus SeedDream",
     nodeDescMergeAudio: "รวมวิดีโอกับเสียงเข้าด้วยกันผ่าน Shotstack",
     nodeDescOutput: "แสดงผลลัพธ์สุดท้าย (รูปภาพหรือวิดีโอ)",
 
@@ -3491,8 +3497,26 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+/** Fallback used when useLanguage is called outside LanguageProvider (e.g. error boundaries). */
+const fallbackContext: LanguageContextType = {
+  language: "en",
+  setLanguage: () => {},
+  t: (key, params) => {
+    let text: string = translations.en[key] || key;
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        text = text.replace(`{${k}}`, String(v));
+      });
+    }
+    return text;
+  },
+};
+
 export const useLanguage = () => {
   const context = useContext(LanguageContext);
-  if (!context) throw new Error("useLanguage must be used within LanguageProvider");
+  if (!context) {
+    console.warn("useLanguage called outside LanguageProvider — using English fallback");
+    return fallbackContext;
+  }
   return context;
 };

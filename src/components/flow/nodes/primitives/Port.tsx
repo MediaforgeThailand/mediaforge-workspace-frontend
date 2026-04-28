@@ -6,6 +6,7 @@ import { memo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { getTone } from "./accent";
+import { portTypeFromHandleId } from "@/components/workspace/workspaceSchema";
 
 interface PortProps {
   id: string;
@@ -19,6 +20,9 @@ interface PortProps {
 const Port = memo(({ id, label, accent, side, dim = false }: PortProps) => {
   const tone = getTone(accent);
   const isRight = side === "right";
+  // CSS layer in workspace.css filters handle visibility during a
+  // connection drag based on this attribute — image / video / etc.
+  const portType = portTypeFromHandleId(id);
 
   return (
     <div
@@ -31,7 +35,11 @@ const Port = memo(({ id, label, accent, side, dim = false }: PortProps) => {
         type={isRight ? "source" : "target"}
         position={isRight ? Position.Right : Position.Left}
         id={id}
+        data-port-type={portType}
         className={cn(
+          // `ws-port-handle` lets the workspace CSS target this style
+          // of handle without affecting any other Handle on the page.
+          "ws-port-handle",
           "!absolute !top-1/2 !-translate-y-1/2 !w-[14px] !h-[14px] !rounded-full !bg-[#07070a]",
           isRight ? "!-right-[7px]" : "!-left-[7px]"
         )}

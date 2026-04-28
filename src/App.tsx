@@ -21,14 +21,33 @@ import CreatorRoute from "./components/CreatorRoute";
 import DashboardLayout from "./components/DashboardLayout";
 import PageLoadingAnim from "./components/ui/PageLoadingAnim";
 
+/**
+ * Wrap lazy imports so a stale-chunk 404 after deployment
+ * automatically reloads the page once (instead of crashing).
+ */
+function lazyWithRetry(factory: () => Promise<{ default: React.ComponentType<any> }>) {
+  return lazy(() =>
+    factory().catch((err) => {
+      const key = "chunk-reload";
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, "1");
+        window.location.reload();
+        return new Promise(() => {}); // never resolves — page is reloading
+      }
+      sessionStorage.removeItem(key);
+      throw err; // second failure → let it crash normally
+    })
+  );
+}
+
 // Lazy-loaded pages
-const Auth = lazy(() => import("./pages/Auth"));
-const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const PlayFlow = lazy(() => import("./pages/play-flow"));
+const Auth = lazyWithRetry(() => import("./pages/Auth"));
+const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
+const PlayFlow = lazyWithRetry(() => import("./pages/play-flow"));
 // Explore page hidden — redirects to Home
-const PartnerProgram = lazy(() => import("./pages/PartnerProgram"));
-const RedeemCode = lazy(() => import("./pages/RedeemCode"));
-const DemoLanding = lazy(() => import("./pages/DemoLanding"));
+const PartnerProgram = lazyWithRetry(() => import("./pages/PartnerProgram"));
+const RedeemCode = lazyWithRetry(() => import("./pages/RedeemCode"));
+const DemoLanding = lazyWithRetry(() => import("./pages/DemoLanding"));
 
 // Dashboard pages
 const DashboardHome = lazy(() => import("./pages/dashboard/Home"));
@@ -57,28 +76,28 @@ const PartnerStatus = lazy(() => import("./pages/partner/Status"));
 const PartnerDashboard = lazy(() => import("./pages/partner/Dashboard"));
 
 // Admin pages
-const DevDebug = lazy(() => import("./pages/DevDebug"));
+const DevDebug = lazyWithRetry(() => import("./pages/DevDebug"));
 
 // Creator pages
-const CreatorLayout = lazy(() => import("./components/CreatorLayout"));
-const CreatorHome = lazy(() => import("./pages/creator/CreatorHome"));
-const CreatorStudio = lazy(() => import("./pages/creator/CreatorStudio"));
-const PublishedFlows = lazy(() => import("./pages/creator/PublishedFlows"));
+const CreatorLayout = lazyWithRetry(() => import("./components/CreatorLayout"));
+const CreatorHome = lazyWithRetry(() => import("./pages/creator/CreatorHome"));
+const CreatorStudio = lazyWithRetry(() => import("./pages/creator/CreatorStudio"));
+const PublishedFlows = lazyWithRetry(() => import("./pages/creator/PublishedFlows"));
 
-const CreatorFlowStatus = lazy(() => import("./pages/creator/CreatorFlowStatus"));
-const BundleStudio = lazy(() => import("./pages/creator/BundleStudio"));
-const BundleEditor = lazy(() => import("./pages/creator/BundleEditor"));
-const PlayBundle = lazy(() => import("./pages/play-flow/PlayBundle"));
+const CreatorFlowStatus = lazyWithRetry(() => import("./pages/creator/CreatorFlowStatus"));
+const BundleStudio = lazyWithRetry(() => import("./pages/creator/BundleStudio"));
+const BundleEditor = lazyWithRetry(() => import("./pages/creator/BundleEditor"));
+const PlayBundle = lazyWithRetry(() => import("./pages/play-flow/PlayBundle"));
 
 // Admin pages
-const AdminLogin = lazy(() => import("./pages/admin/AdminLogin"));
-const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
-const ReviewQueue = lazy(() => import("./pages/admin/ReviewQueue"));
-const FlowReview = lazy(() => import("./pages/admin/FlowReview"));
-const FlowActive = lazy(() => import("./pages/admin/FlowActive"));
+const AdminLogin = lazyWithRetry(() => import("./pages/admin/AdminLogin"));
+const AdminDashboard = lazyWithRetry(() => import("./pages/admin/AdminDashboard"));
+const ReviewQueue = lazyWithRetry(() => import("./pages/admin/ReviewQueue"));
+const FlowReview = lazyWithRetry(() => import("./pages/admin/FlowReview"));
+const FlowActive = lazyWithRetry(() => import("./pages/admin/FlowActive"));
 
-const AdminLayout = lazy(() => import("./components/admin/AdminLayout"));
-const AdminProtectedRoute = lazy(() => import("./components/admin/AdminProtectedRoute"));
+const AdminLayout = lazyWithRetry(() => import("./components/admin/AdminLayout"));
+const AdminProtectedRoute = lazyWithRetry(() => import("./components/admin/AdminProtectedRoute"));
 
 const AdminWrapper = () => (
   <AdminAuthProvider>
@@ -273,6 +292,11 @@ const App = () => (
                       </ProtectedRoute>
                     }
                   />
+
+                  {/* Workspace canvas editor — full-screen, outside layouts.
+                   *  URL is the WORKSPACE id; tabs (canvases) are tracked
+                   *  in store state, not the URL. */}
+                  <Route path="/app/workspace/:workspaceId" element={<WorkspaceCanvasPage />} />
 
                   {/* Dev debug route */}
                   <Route

@@ -41,4 +41,9 @@ screenshots
 *.branches
 
 supabase/snippets
-supabase/.temp
+supabase/.tempvite.config.ts.timestamp-*.mjs
+.env
+.env.local
+
+# Workspace mascot — keep the .webm (1.6MB), drop the giant raw .mov source.
+public/videos/*.mov

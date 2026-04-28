@@ -79,7 +79,6 @@ function getNodeIcon(nodeType: string, data: Record<string, unknown>): MentionOp
   if (nodeType === "inputNode" || nodeType === "assetNode") {
     return (data.fieldType as string) === "video" ? "video" : "image";
   }
-  if (nodeType === "bananaProNode" || nodeType === "klingVideoNode") return "ai";
   if (nodeType === "chatAiNode") return "text";
   if (nodeType === "outputNode") {
     const t = data.outputType as string;

@@ -422,7 +422,6 @@ const KlingNode = ({ id, nodeType, selected, config, nodeCost }: {
 }) => {
   const { setNodes } = useReactFlow();
   const def = KLING_NODE_DEFS[nodeType];
-  if (!def) return null;
 
   const cat = CATEGORY_CONFIG.ai;
 
@@ -435,6 +434,8 @@ const KlingNode = ({ id, nodeType, selected, config, nodeCost }: {
       )
     );
   }, [id, setNodes]);
+
+  if (!def) return null;
 
   return (
     <div className={cn(

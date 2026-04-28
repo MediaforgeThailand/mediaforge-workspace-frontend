@@ -54,6 +54,11 @@ export interface NodeIOHandle {
   required?: boolean;
   /** If set, this handle is only rendered when model_name matches one of these values */
   supportedModels?: string[];
+  /** Max simultaneous incoming edges for this handle. Defaults to 1
+   *  when unspecified. Used by the workspace canvas to gate
+   *  connections per provider doc limits (Banana 14, gpt-image-2 16,
+   *  Kling Omni elements 4, etc.). */
+  maxConnections?: number;
 }
 
 export interface NodeApiDef {
@@ -476,6 +481,183 @@ export const NODE_API_SCHEMA: Record<string, NodeApiDef> = {
         placeholder: '[{"prompt":"Scene 1...","duration":3},{"prompt":"Scene 2...","duration":2}]',
         supportedModels: ["kling-v3-omni", "kling-video-o1"],
         visibleWhen: { multi_shot: "true" },
+      },
+    ],
+  },
+
+  /**
+   * SeedDance Video Node — Video generation via BytePlus ModelArk API
+   * Supports text-to-video and image-to-video with optional audio generation
+   */
+  seedDanceNode: {
+    displayName: "SeedDance Video",
+    category: "AI PROCESS",
+    accentColor: "teal",
+    supportedModels: [
+      "seedance-1-0-pro-250528",
+      "seedance-1-0-pro-fast-251015",
+      "seedance-1-5-pro-251215",
+    ],
+    defaultModel: "seedance-1-5-pro-251215",
+    inputs: [
+      { id: "start_frame", label: "start_frame", color: "blue" },
+      { id: "end_frame", label: "end_frame", color: "white/30" },
+    ],
+    outputs: [
+      { id: "output_video", label: "Video", color: "emerald" },
+      { id: "output_last_frame", label: "Last Frame", color: "amber" },
+    ],
+    params: [
+      {
+        key: "model_name",
+        label: "Model",
+        type: "select",
+        options: [
+          "seedance-1-0-pro-250528",
+          "seedance-1-0-pro-fast-251015",
+          "seedance-1-5-pro-251215",
+        ],
+        optionLabels: {
+          "seedance-1-0-pro-250528": "SeedDance 1.0 Pro",
+          "seedance-1-0-pro-fast-251015": "SeedDance 1.0 Pro Fast (3x)",
+          "seedance-1-5-pro-251215": "SeedDance 1.5 Pro (Latest)",
+        },
+        default: "seedance-1-5-pro-251215",
+        required: true,
+      },
+      {
+        key: "prompt",
+        label: "Prompt",
+        type: "textarea",
+        default: "",
+        placeholder: "subject + movement + scene + camera, style...",
+        required: true,
+      },
+      {
+        key: "resolution",
+        label: "Resolution",
+        type: "select",
+        options: ["480p", "720p", "1080p"],
+        default: "720p",
+      },
+      {
+        key: "ratio",
+        label: "Aspect Ratio",
+        type: "select",
+        options: ["16:9", "9:16", "1:1", "4:3"],
+        default: "16:9",
+      },
+      {
+        key: "duration",
+        label: "Duration (s)",
+        type: "slider",
+        default: 5,
+        min: 2,
+        max: 12,
+        step: 1,
+      },
+      {
+        key: "generate_audio",
+        label: "Generate Audio",
+        type: "select",
+        options: ["false", "true"],
+        optionLabels: { "false": "No Audio", "true": "With Audio" },
+        default: "false",
+      },
+      {
+        key: "return_last_frame",
+        label: "Return Last Frame",
+        type: "select",
+        options: ["false", "true"],
+        optionLabels: { "false": "No", "true": "Yes" },
+        default: "false",
+      },
+    ],
+  },
+
+  /**
+   * SeedDream Image Node — Image generation via BytePlus ModelArk API
+   * Supports text-to-image and image-to-image
+   */
+  seedDreamNode: {
+    displayName: "SeedDream Image",
+    category: "AI PROCESS",
+    accentColor: "cyan",
+    supportedModels: [
+      "seedream-5-0-260128",
+      "seedream-5-0-lite-260128",
+      "seedream-4-5-251128",
+    ],
+    defaultModel: "seedream-5-0-260128",
+    inputs: [
+      { id: "ref_image", label: "ref_image", color: "blue" },
+    ],
+    outputs: [
+      { id: "image", label: "IMAGE", color: "emerald" },
+    ],
+    params: [
+      {
+        key: "model_name",
+        label: "Model",
+        type: "select",
+        options: [
+          "seedream-5-0-260128",
+          "seedream-5-0-lite-260128",
+          "seedream-4-5-251128",
+        ],
+        optionLabels: {
+          "seedream-5-0-260128": "SeedDream 5.0",
+          "seedream-5-0-lite-260128": "SeedDream 5.0 Lite",
+          "seedream-4-5-251128": "SeedDream 4.5",
+        },
+        default: "seedream-5-0-260128",
+        required: true,
+      },
+      {
+        key: "prompt",
+        label: "Prompt",
+        type: "textarea",
+        default: "",
+        placeholder: "Describe the image you want to generate (max ~600 words)...",
+        required: true,
+      },
+      {
+        key: "size",
+        label: "Resolution",
+        type: "select",
+        options: ["2K", "3K"],
+        default: "2K",
+      },
+      {
+        key: "sequential_image_generation",
+        label: "Batch Generation",
+        type: "select",
+        options: ["disabled", "auto"],
+        optionLabels: {
+          disabled: "Single Image",
+          auto: "Batch (auto)",
+        },
+        default: "disabled",
+      },
+      {
+        key: "optimize_prompt",
+        label: "Prompt Optimization",
+        type: "select",
+        options: ["off", "standard", "fast"],
+        optionLabels: {
+          off: "Off",
+          standard: "Standard (higher quality)",
+          fast: "Fast",
+        },
+        default: "off",
+      },
+      {
+        key: "watermark",
+        label: "Watermark",
+        type: "select",
+        options: ["false", "true"],
+        optionLabels: { "false": "No", "true": "Yes" },
+        default: "false",
       },
     ],
   },

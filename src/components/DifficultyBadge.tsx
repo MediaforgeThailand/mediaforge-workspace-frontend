@@ -9,9 +9,8 @@ export interface DifficultyConfig {
   level: DifficultyLevel;
   label: string;
   icon: typeof Zap;
-  color: string;
-  bg: string;
-  border: string;
+  /** Tailwind gradient classes for the pill background */
+  gradient: string;
 }
 
 const DIFFICULTY_MAP: Record<DifficultyLevel, DifficultyConfig> = {
@@ -19,25 +18,19 @@ const DIFFICULTY_MAP: Record<DifficultyLevel, DifficultyConfig> = {
     level: "easy",
     label: "ง่าย",
     icon: Zap,
-    color: "text-emerald-300",
-    bg: "bg-emerald-500/15",
-    border: "border-emerald-500/30",
+    gradient: "bg-gradient-to-br from-emerald-400 via-green-500 to-teal-500",
   },
   medium: {
     level: "medium",
     label: "ปานกลาง",
     icon: SlidersHorizontal,
-    color: "text-amber-300",
-    bg: "bg-amber-500/15",
-    border: "border-amber-500/30",
+    gradient: "bg-gradient-to-br from-yellow-400 via-amber-500 to-orange-500",
   },
   pro: {
     level: "pro",
     label: "มืออาชีพ",
     icon: Wrench,
-    color: "text-rose-300",
-    bg: "bg-rose-500/15",
-    border: "border-rose-500/30",
+    gradient: "bg-gradient-to-br from-fuchsia-500 via-purple-600 to-indigo-600",
   },
 };
 
@@ -75,23 +68,15 @@ export function DifficultyBadge({
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border backdrop-blur-sm",
-        cfg.bg,
-        cfg.border,
-        size === "sm" ? "px-1.5 py-0.5" : "px-2.5 py-1",
+        "inline-flex items-center gap-1 rounded-full font-semibold text-white",
+        "shadow-lg shadow-black/40 ring-1 ring-white/20",
+        cfg.gradient,
+        size === "sm" ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-1 text-[11px]",
         className,
       )}
     >
-      <Icon className={cn(cfg.color, size === "sm" ? "w-2.5 h-2.5" : "w-3.5 h-3.5")} />
-      <span
-        className={cn(
-          "font-semibold tracking-wide",
-          cfg.color,
-          size === "sm" ? "text-[8px]" : "text-[11px]",
-        )}
-      >
-        {cfg.label}
-      </span>
+      <Icon className={cn(size === "sm" ? "w-2.5 h-2.5" : "w-3.5 h-3.5")} />
+      <span className="tracking-wide">{cfg.label}</span>
     </div>
   );
 }

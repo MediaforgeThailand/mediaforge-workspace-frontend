@@ -52,7 +52,12 @@ export async function getSignedUrl(fileUrl: string): Promise<string> {
     .createSignedUrl(ref.path, SIGNED_URL_EXPIRY);
 
   if (error || !data?.signedUrl) {
-    console.warn("Failed to create signed URL:", error?.message);
+    // "Object not found" is expected for deleted assets — don't spam console
+    if (error?.message?.includes("Object not found")) {
+      console.debug("Signed URL: object not found, using original URL");
+    } else {
+      console.warn("Failed to create signed URL:", error?.message);
+    }
     return fileUrl; // Fallback to original
   }
 

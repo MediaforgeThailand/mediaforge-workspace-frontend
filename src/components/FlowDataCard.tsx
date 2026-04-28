@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 const MotionLink = motion.create(Link);
-import { Sparkles } from "lucide-react";
+import { Sparkles, Gift } from "lucide-react";
 import logoIcon from "@/assets/logo-icon.png";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DifficultyBadge, type DifficultyLevel } from "@/components/DifficultyBadge";
@@ -36,10 +36,13 @@ export interface FlowCardData {
   creator_avatar?: string | null;
   creator_name?: string | null;
   final_price?: number;
+  /** Upper bound for bundles — when set and > final_price, display as "min – max" */
+  price_range_max?: number | null;
   is_official?: boolean;
   avg_rating?: number | null;
   is_new?: boolean;
   difficulty?: DifficultyLevel;
+  is_bundle?: boolean;
 }
 
 type CardSpan = "normal" | "wide" | "tall";
@@ -66,7 +69,7 @@ const FlowDataCard = memo(({ flow, index = 0, gridMode }: FlowDataCardProps) => 
 
   return (
     <MotionLink
-      to={`/play/${flow.id}`}
+      to={flow.is_bundle ? `/play/bundle/${flow.id}` : `/play/${flow.id}`}
       initial={shouldAnimate ? { opacity: 0, y: 16 } : false}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: shouldAnimate ? 0.03 * index : 0, duration: shouldAnimate ? 0.45 : 0, ease: [0.25, 0.46, 0.45, 0.94] }}
@@ -119,6 +122,21 @@ const FlowDataCard = memo(({ flow, index = 0, gridMode }: FlowDataCardProps) => 
           : "from-black/75 via-transparent to-transparent group-hover:from-black/75 group-hover:via-black/30 group-hover:to-transparent"
       )} />
 
+      {/* ── Top-right: Bundle ribbon badge ── */}
+      {flow.is_bundle && (
+        <div
+          className={cn(
+            "absolute z-10 flex items-center gap-1 rounded-full font-semibold text-white",
+            "bg-gradient-to-br from-amber-400 via-orange-500 to-pink-500",
+            "shadow-lg shadow-black/40 ring-1 ring-white/20",
+            isMobile ? "top-2 right-2 px-1.5 py-0.5 text-[9px]" : "top-4 right-4 px-2 py-1 text-[11px]",
+          )}
+        >
+          <Gift className={cn(isMobile ? "w-2.5 h-2.5" : "w-3 h-3")} />
+          <span>Bundle</span>
+        </div>
+      )}
+
       {/* ── Top-left badges (creator/new + difficulty) ── */}
       {(showNewBadge || flow.difficulty) && (
         <div className={cn("absolute z-10 flex items-center gap-1.5", isMobile ? "top-2 left-2" : "top-4 left-4")}>
@@ -127,7 +145,10 @@ const FlowDataCard = memo(({ flow, index = 0, gridMode }: FlowDataCardProps) => 
               <motion.img
                 src={logoIcon}
                 alt="Official"
-                className={cn("drop-shadow-[0_0_8px_rgba(110,96,238,0.9)]", isMobile ? "w-5 h-5" : "w-6 h-6")}
+                className={cn(
+                  "object-contain drop-shadow-[0_0_8px_rgba(110,96,238,0.9)]",
+                  isMobile ? "h-5 w-auto" : "h-6 w-auto",
+                )}
                 animate={{
                   filter: [
                     "drop-shadow(0 0 4px rgba(110,96,238,0.5))",

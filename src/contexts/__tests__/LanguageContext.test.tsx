@@ -46,9 +46,12 @@ describe("LanguageContext", () => {
     expect(getByTestId("translated").textContent).toBe("สถิติ");
   });
 
-  it("throws when used outside provider", () => {
-    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    expect(() => render(<TestConsumer />)).toThrow("useLanguage must be used within LanguageProvider");
+  it("falls back to English when used outside provider", () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { getByTestId } = render(<TestConsumer />);
+    expect(getByTestId("lang").textContent).toBe("en");
+    expect(getByTestId("translated").textContent).toBe("Analytics");
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("useLanguage called outside LanguageProvider"));
     spy.mockRestore();
   });
 });

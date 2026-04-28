@@ -38,6 +38,13 @@
 
   <body>
     <div id="root"></div>
+    <!-- <model-viewer> custom element — loaded directly from Google's
+         CDN per the official guide at https://modelviewer.dev/. The
+         Vite bundle path was unreliable: ESM tree-shaking sometimes
+         dropped the side-effect that calls `customElements.define`,
+         so the tag rendered as an inert <div> showing the poster
+         image only. The CDN bundle ALWAYS registers the element. -->
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {

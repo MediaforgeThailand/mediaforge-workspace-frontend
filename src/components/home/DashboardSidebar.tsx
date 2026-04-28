@@ -21,7 +21,7 @@ import LoginRequiredDialog from "@/components/LoginRequiredDialog";
 import {
   Home, Search, LayoutGrid, Maximize2, Settings, Coins,
   Bell, ArrowLeftRight, LogOut, Clock, CreditCard, BarChart3,
-  Crown, Globe, Plus, LogIn, Zap, Gift, Sparkles,
+  Crown, Globe, Plus, LogIn, Zap, Gift, Sparkles, Layers,
 } from "lucide-react";
 
 interface SidebarItem {
@@ -33,6 +33,7 @@ interface SidebarItem {
 const NAV_ITEMS: SidebarItem[] = [
   { icon: Home, label: "navHome", path: "/app/home" },
   { icon: LayoutGrid, label: "navLibrary", path: "/app/assets" },
+  { icon: Layers, label: "Workspace", path: "/app/workspace" },
 ];
 
 const BOTTOM_ITEMS: SidebarItem[] = [
