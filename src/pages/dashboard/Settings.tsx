@@ -1,5 +1,5 @@
-import { useState, useEffect, lazy, Suspense } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,9 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { User, Building2, Camera, Save, Loader2, CreditCard, ExternalLink, Receipt, Globe, Shield, BarChart3, Plus, Sparkles } from "lucide-react";
-import BrandContextForm from "@/components/dashboard/BrandContextForm";
-import ThemeToggle from "@/components/ThemeToggle";
+import { User, Camera, Save, Loader2, Globe, Shield, BarChart3, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -17,11 +15,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
-const Transactions = lazy(() => import("./Transactions"));
-const Pricing = lazy(() => import("./Pricing"));
+/**
+ * Workspace-shaped Settings page.
+ *
+ * Wave 2 cleanup removed the consumer-only "Brand context" tab
+ * (consumer brand kit) and the inline Transactions / Pricing sub-
+ * tabs. Usage / Pricing now live as siblings under AccountShell
+ * (top-bar account sub-nav), so this page focuses on PROFILE +
+ * PREFERENCES + a small CREDIT-USAGE strip.
+ */
 
-
-type SettingsTab = "profile" | "brand" | "preferences" | "usage" | "transactions" | "billing";
+type SettingsTab = "profile" | "preferences" | "usage";
 
 const Settings = () => {
   const { profile, user, refreshProfile } = useAuth();
@@ -35,7 +39,6 @@ const Settings = () => {
   const [company, setCompany] = useState(profile?.company || "");
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || "");
   const [uploading, setUploading] = useState(false);
-  const [loadingPortal, setLoadingPortal] = useState(false);
 
   const handleSave = async () => {
     if (!user) return;
@@ -81,13 +84,10 @@ const Settings = () => {
 
   const toggleLanguage = () => setLanguage(language === "en" ? "th" : "en");
 
-  const sidebarItems: { key: SettingsTab; icon: React.ElementType; label: string; group?: string }[] = [
-    { key: "profile", icon: User, label: t("profile"), group: t("account") },
-    
+  const sidebarItems: { key: SettingsTab; icon: React.ElementType; label: string }[] = [
+    { key: "profile", icon: User, label: t("profile") },
     { key: "preferences", icon: Shield, label: t("settings") },
-    
-    { key: "transactions", icon: Receipt, label: t("transactions") },
-    { key: "billing", icon: CreditCard, label: t("billing") },
+    { key: "usage", icon: BarChart3, label: t("usage") },
   ];
 
   return (
@@ -230,11 +230,6 @@ const Settings = () => {
             </div>
           )}
 
-          {/* ── Brand Context Tab ── */}
-          {activeTab === "brand" && (
-            <BrandContextForm />
-          )}
-
           {/* ── Preferences Tab ── */}
           {activeTab === "preferences" && (
             <div className="space-y-6">
@@ -291,19 +286,6 @@ const Settings = () => {
             </div>
           )}
 
-          {/* ── Transactions Tab (inline) ── */}
-          {activeTab === "transactions" && (
-            <Suspense fallback={<div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>}>
-              <Transactions />
-            </Suspense>
-          )}
-
-          {/* ── Billing Tab (inline) ── */}
-          {activeTab === "billing" && (
-            <Suspense fallback={<div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>}>
-              <Pricing />
-            </Suspense>
-          )}
         </div>
       </div>
     </div>

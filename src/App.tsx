@@ -41,7 +41,7 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import CookieConsent from "./components/CookieConsent";
 import ProtectedRoute from "./components/ProtectedRoute";
-import DashboardLayout from "./components/DashboardLayout";
+import AccountShell from "./components/workspace/AccountShell";
 import PageLoadingAnim from "./components/ui/PageLoadingAnim";
 
 /**
@@ -74,7 +74,10 @@ const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
 const WorkspaceDashboard = lazyWithRetry(() => import("./pages/workspace"));
 const WorkspaceCanvasPage = lazyWithRetry(() => import("./pages/workspace/Canvas"));
 
-// ── Account chrome (Wave 2 will rebuild internals) ─────────────
+// ── Account surfaces — wrapped in AccountShell (workspace-shaped
+//     chrome) instead of the legacy DashboardLayout. The pages
+//     themselves were lightly-rewired in Wave 2 to drop consumer
+//     concepts (brand context form, etc.). ────────────────────
 const Settings = lazyWithRetry(() => import("./pages/dashboard/Settings"));
 const Transactions = lazyWithRetry(() => import("./pages/dashboard/Transactions"));
 const Pricing = lazyWithRetry(() => import("./pages/dashboard/Pricing"));
@@ -118,9 +121,18 @@ const App = () => (
                     }
                   />
 
-                  {/* Account pages still use the dashboard chrome until
-                   *  Wave 2 rebuilds them around workspace concepts. */}
-                  <Route path="/app" element={<DashboardLayout />}>
+                  {/* Account pages — same workspace sidebar as the
+                   *  dashboard, but content area shows Settings /
+                   *  Usage / Pricing tab content. Sidebar items
+                   *  navigate back to /app/workspace?section=…. */}
+                  <Route
+                    path="/app"
+                    element={
+                      <ProtectedRoute>
+                        <AccountShell />
+                      </ProtectedRoute>
+                    }
+                  >
                     <Route path="settings" element={<Settings />} />
                     <Route path="usage" element={<Transactions />} />
                     <Route path="pricing" element={<Pricing />} />
