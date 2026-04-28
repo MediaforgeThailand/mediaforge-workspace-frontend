@@ -27,6 +27,15 @@ interface PromptMentionTextareaProps {
   allowedTextVarTypes?: string[];
   /** Maximum allowed characters (after stripping mention tokens). When set, a counter is shown. */
   maxLength?: number | null;
+  /** When set, restrict the mention dropdown to ONLY this set of node ids
+   *  (intersected with `allowedNodeTypes` / `allowedTextVarTypes`). Used by
+   *  workspace tool nodes to show only nodes connected via an upstream
+   *  edge — typing `@` in a Video Gen prompt should only surface nodes
+   *  that are actually wired into this node's input ports, not every
+   *  asset on the canvas. Pass `null` (default) to keep the legacy
+   *  "show every node of the allowed types" behaviour (e.g. TextNode
+   *  uses globally-mentionable assets). */
+  allowedNodeIds?: ReadonlySet<string> | null;
 }
 
 interface MentionOption {
@@ -66,8 +75,8 @@ function normalizePromptTokens(raw: string): string {
 /* ── Helpers ── */
 
 function getNodeIcon(nodeType: string, data: Record<string, unknown>): MentionOption["icon"] {
-  if (nodeType === "textInputNode") return "textvar";
-  if (nodeType === "inputNode") {
+  if (nodeType === "textInputNode" || nodeType === "textNode") return "textvar";
+  if (nodeType === "inputNode" || nodeType === "assetNode") {
     return (data.fieldType as string) === "video" ? "video" : "image";
   }
   if (nodeType === "bananaProNode" || nodeType === "klingVideoNode") return "ai";
@@ -75,6 +84,28 @@ function getNodeIcon(nodeType: string, data: Record<string, unknown>): MentionOp
   if (nodeType === "outputNode") {
     const t = data.outputType as string;
     return t === "video" ? "video" : t === "audio" ? "text" : "image";
+  }
+  // Workspace tool-node types — pick the icon by the gen kind they
+  // produce. We look at the most-recent generation (if any) so a
+  // freshly-created node still gets a sensible default icon while
+  // its label is empty.
+  if (nodeType === "imageGenNode") return "image";
+  if (nodeType === "videoGenNode") return "video";
+  if (nodeType === "audioGenNode" || nodeType === "mergeAudioNode")
+    return "text";
+  if (nodeType === "videoToPromptNode") return "text";
+  if (nodeType === "imageTo3dNode") return "image";
+  if (nodeType === "removeBackgroundNode") return "image";
+  // Fallback to whichever the latest generation says it is — covers
+  // any new tool node the schema adds without a hardcoded entry.
+  const gens = Array.isArray(data.generations)
+    ? (data.generations as Array<{ type?: string }>)
+    : [];
+  if (gens.length > 0) {
+    const t = gens[0]?.type;
+    if (t === "video") return "video";
+    if (t === "image") return "image";
+    if (t === "text") return "text";
   }
   return "ai";
 }
@@ -226,9 +257,10 @@ const PromptMentionTextarea = memo(({
   placeholder,
   className,
   excludeNodeId,
-  allowedNodeTypes = ["inputNode"],
+  allowedNodeTypes = ["inputNode", "assetNode"],
   allowedTextVarTypes = ["textInputNode"],
   maxLength,
+  allowedNodeIds = null,
 }: PromptMentionTextareaProps) => {
   const { t } = useLanguage();
   const { getNodes } = useReactFlow();
@@ -246,11 +278,27 @@ const PromptMentionTextarea = memo(({
   // Track whether we're doing an internal DOM update to avoid re-render loops
   const suppressSync = useRef(false);
 
-  /* ── Mention options (@ trigger — image/video/ai nodes) ── */
+  /* ── Mention options (@ trigger — image/video/ai nodes) ──
+   *
+   * The list is filtered down to nodes that:
+   *   1. Aren't this same node (no self-mention)
+   *   2. Have an allowed type (default: assets / inputs)
+   *   3. Are in the `allowedNodeIds` set IF one was provided
+   *      (workspace tool nodes pass the set of upstream-connected
+   *      node ids so the dropdown only surfaces nodes the prompt
+   *      can actually resolve at run time).
+   * Setting `allowedNodeIds = null` keeps the legacy "every node of
+   * the allowed types is mentionable" behaviour — used by TextNode
+   * which doesn't have input ports. */
   const mentionOptions = useMemo((): MentionOption[] => {
     const nodes = getNodes();
     return nodes
-      .filter((n) => n.id !== excludeNodeId && allowedNodeTypes.includes(n.type || ""))
+      .filter((n) => {
+        if (n.id === excludeNodeId) return false;
+        if (!allowedNodeTypes.includes(n.type || "")) return false;
+        if (allowedNodeIds && !allowedNodeIds.has(n.id)) return false;
+        return true;
+      })
       .map((n) => {
         const data = n.data as Record<string, unknown>;
         return {
@@ -260,13 +308,21 @@ const PromptMentionTextarea = memo(({
           icon: getNodeIcon(n.type || "", data),
         };
       });
-  }, [getNodes, excludeNodeId, allowedNodeTypes]);
+  }, [getNodes, excludeNodeId, allowedNodeTypes, allowedNodeIds]);
 
-  /* ── Text var options (# trigger — textInputNode) ── */
+  /* ── Text var options (# trigger — textInputNode) ──
+   * Same connection-aware filter as @ mentions: a #variable that
+   * references a TextNode the user hasn't actually wired up would
+   * silently fail at run time, so we hide them from the dropdown. */
   const textVarOptions = useMemo((): MentionOption[] => {
     const nodes = getNodes();
     return nodes
-      .filter((n) => n.id !== excludeNodeId && allowedTextVarTypes.includes(n.type || ""))
+      .filter((n) => {
+        if (n.id === excludeNodeId) return false;
+        if (!allowedTextVarTypes.includes(n.type || "")) return false;
+        if (allowedNodeIds && !allowedNodeIds.has(n.id)) return false;
+        return true;
+      })
       .map((n) => {
         const data = n.data as Record<string, unknown>;
         return {
@@ -277,7 +333,7 @@ const PromptMentionTextarea = memo(({
           isTextVar: true,
         };
       });
-  }, [getNodes, excludeNodeId, allowedTextVarTypes]);
+  }, [getNodes, excludeNodeId, allowedTextVarTypes, allowedNodeIds]);
 
   const filteredOptions = useMemo(() => {
     const baseOptions = activeTriggerRef.current === "#" ? textVarOptions : mentionOptions;
@@ -396,10 +452,22 @@ const PromptMentionTextarea = memo(({
 
     const rect = mentionRange.getBoundingClientRect();
 
+    // Guard: if no mentionable nodes exist for this trigger, silently drop the
+    // dropdown instead of showing an empty popover. Workspace-side assetNodes
+    // re-use this component; when the current graph has zero of them the list
+    // would otherwise render as an empty floating panel.
+    const optionsForTrigger =
+      triggerChar === "#" ? textVarOptions : mentionOptions;
+    if (optionsForTrigger.length === 0) {
+      setShowMentions(false);
+      mentionRangeRef.current = null;
+      return;
+    }
+
     setShowMentions(true);
     setMentionQuery(query);
     setMentionCaretRect({ top: rect.top, left: rect.left });
-  }, []);
+  }, [mentionOptions, textVarOptions]);
 
   const handleInput = useCallback(() => {
     syncFromDom();
@@ -628,7 +696,14 @@ const PromptMentionTextarea = memo(({
     };
   }, [mentionCaretRect]);
 
-  const isEmpty = !normalizePromptTokens(value);
+  // Treat whitespace-only values (newlines, spaces) as empty so the
+  // placeholder reappears after the user types something then deletes
+  // it all. Chrome leaves a stray `<br>` inside an empty contenteditable
+  // — `domToRaw` faithfully converts that to `"\n"`, and without this
+  // trim the resulting string was truthy and `is-empty` never came
+  // back, so the placeholder stayed gone forever (user reported the
+  // gen node turning into a blank black box after a delete-all).
+  const isEmpty = !normalizePromptTokens(value).trim();
 
   // ── Character count + over-limit detection ──
   const charCount = useMemo(() => countPromptChars(value), [value]);
