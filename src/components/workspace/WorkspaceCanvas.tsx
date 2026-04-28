@@ -926,9 +926,29 @@ const Inner = () => {
     },
   });
 
-  /** Double-click on a node opens the same fullscreen preview. */
+  /** Double-click on a node opens the same fullscreen preview —
+   *  EXCEPT when the user double-clicked on an editable element
+   *  inside the node (title input, prompt textarea, contenteditable
+   *  mention area, etc.). Double-clicking inside a text field is
+   *  the OS-level "select word" gesture; opening a lightbox there
+   *  hijacks a basic text-editing reflex.
+   *
+   *  Reported by user as: double-clicking the node-name input opens
+   *  the preview lightbox instead of letting them rename. */
   const onNodeDoubleClick = useCallback(
     (e: React.MouseEvent, node: Node) => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName ?? "";
+      const isEditable =
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        tag === "BUTTON" ||
+        target?.isContentEditable === true ||
+        target?.closest?.(
+          'input, textarea, [contenteditable="true"], select, button',
+        ) != null;
+      if (isEditable) return;
       e.stopPropagation();
       const all = useWorkspaceStore.getState().current?.nodes ?? [];
       const p = getNodePreview(node, all);
