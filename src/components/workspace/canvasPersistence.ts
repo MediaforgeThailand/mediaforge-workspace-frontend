@@ -165,6 +165,31 @@ export async function loadCanvasesByWorkspaceFromServer(
  *  user — RLS rejects writes with mismatched user_id. Throws on
  *  network/permission errors so the caller can surface a save
  *  state to the user; silently no-ops when the table is missing. */
+/** Delete a canvas from the server. Used by the tab-close button so
+ *  the closed tab doesn't resurrect on the next mount via the
+ *  workspace's `loadCanvasesByWorkspaceFromServer` fetch.
+ *
+ *  RLS scopes the delete to the caller's own user_id; passing the
+ *  wrong canvas id silently affects 0 rows. Fire-and-forget — the
+ *  caller updates local state synchronously and doesn't wait. */
+export async function deleteCanvasFromServer(canvasId: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from("workspace_canvases")
+      .delete()
+      .eq("id", canvasId);
+    if (error) {
+      if (isMissingTableError(error)) {
+        warnOnceAboutMissingTable();
+        return;
+      }
+      console.warn("[canvasPersistence] delete canvas failed:", error.message);
+    }
+  } catch (err) {
+    console.warn("[canvasPersistence] delete canvas threw:", err);
+  }
+}
+
 export async function saveCanvasToServer(
   graph: CanvasGraph,
   userId: string,

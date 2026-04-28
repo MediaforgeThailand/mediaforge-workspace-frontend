@@ -39,6 +39,10 @@ export interface AssetNodeData {
    * Mirror of the main project's input-node `referenceType` field.
    */
   referenceType?: ReferenceRole;
+  /** User-controlled card width via the corner resize handle. Default
+   *  219. Same field-name + range used by WorkspaceToolNode so the
+   *  resize gesture feels identical across node types. */
+  compactWidth?: number;
 }
 
 export type ReferenceRole =
@@ -96,6 +100,43 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
     [id, setNodes],
   );
 
+  /* ── Manual resize via the bottom-right corner handle ──────
+   * Same drag-to-scale gesture WorkspaceToolNode uses. Width
+   * drives the layout; the inner image keeps its natural aspect
+   * ratio inside the new card width. Title input + role picker
+   * stay at fixed pixel sizes. */
+  const onResizeStart = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX;
+      const startWidth = (d.compactWidth as number | undefined) ?? 219;
+      const onMove = (ev: PointerEvent) => {
+        const delta = ev.clientX - startX;
+        const next = Math.max(
+          160,
+          Math.min(640, Math.round(startWidth + delta)),
+        );
+        setNodes((ns) =>
+          ns.map((n) =>
+            n.id === id
+              ? { ...n, data: { ...n.data, compactWidth: next } }
+              : n,
+          ),
+        );
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        document.body.classList.remove("ws-resizing");
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      document.body.classList.add("ws-resizing");
+    },
+    [id, d.compactWidth, setNodes],
+  );
+
   // Preview opens via the canvas-level `onNodeDoubleClick` handler
   // (WorkspaceCanvas → NodePreviewLightbox). Asset node no longer
   // owns its own expanded dialog — single source of truth, and the
@@ -117,12 +158,13 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
     <div
       className="ws-clean-node relative"
       data-state={selected ? "selected" : "idle"}
-      // Default tile width — 219 (200 → 230 → 219). Bumped to 230
-      // for canvas-zoom legibility, then trimmed 5% per follow-up
-      // feedback that nodes felt slightly too wide for the canvas
-      // density. Inner text (label input, role select) is
-      // unchanged size so the bump only enlarges the visual tile.
-      style={{ width: 219 }}
+      // Default tile width — 219 (200 → 230 → 219). Now also
+      // user-resizable via the corner handle below; persists in
+      // `data.compactWidth` so the card keeps the chosen size
+      // across re-mounts. Inner text (label input, role picker
+      // chip) stays at fixed pixel sizes so the gesture only
+      // enlarges the visual tile.
+      style={{ width: d.compactWidth ?? 219 }}
     >
       {/* Floating title — icon + editable name. */}
       <div className="ws-clean-title">
@@ -142,10 +184,14 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
         />
       </div>
 
-      {/* Body — single rounded card holding the role picker + preview.
-       *  The previous design split these into separate bordered
-       *  sections; we keep them visually fused here so the asset
-       *  reads as one card with a subtle role chip on top. */}
+      {/* Body — single rounded card holding the preview. The role
+       *  picker used to sit at the TOP as a permanent select chip,
+       *  but team feedback was that it cluttered the asset card
+       *  and looked nothing like the AI-gen tool nodes (whose
+       *  settings live in a hover/select-floating overlay). Moved
+       *  to `.ws-compact-overlay` inside the preview wrapper below
+       *  so it now fades in only on hover/select — same affordance
+       *  as the gen-node settings strip. */}
       <div
         className={cn(
           "workspace-node-shell ws-clean-body overflow-hidden",
@@ -154,29 +200,6 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
         data-state={selected ? "selected" : "idle"}
         style={{ padding: 0 }}
       >
-        {/* Reference role picker — tiny chip; no internal divider.
-         *  3D models don't get one: they aren't referenced by image
-         *  prompts (they're not an "image input") so a "general /
-         *  subject / scene" role wouldn't change downstream behaviour
-         *  in any way the dispatcher cares about. */}
-        {d.fieldType !== "model3d" && (
-          <div className="px-2 pt-2 pb-1">
-            <select
-              value={d.referenceType ?? "general"}
-              onChange={(e) => onRoleChange(e.target.value as ReferenceRole)}
-              onMouseDown={(e) => e.stopPropagation()}
-              onPointerDown={(e) => e.stopPropagation()}
-              className="nodrag w-full rounded bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-zinc-300 outline-none hover:bg-white/[0.08]"
-              title="How should models use this asset when referenced?"
-            >
-              {REFERENCE_ROLE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
 
         {/* Preview — natural aspect ratio. Single click does NOTHING
          *  beyond selecting the node (handled by React Flow). The
@@ -190,6 +213,33 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
             !d.uploading && d.previewUrl && "cursor-pointer",
           )}
         >
+        {/* Reference role picker — fades in on hover/select via the
+         *  shared `.ws-compact-overlay` rule (same affordance the
+         *  AI-gen tool nodes use for their settings strip). 3D
+         *  models still skip this — they aren't referenced as
+         *  image inputs and a "general / subject / scene" role
+         *  doesn't change downstream behaviour for them. */}
+        {d.fieldType !== "model3d" && (
+          <div className="ws-compact-overlay">
+            <div className="ws-compact-toolbar">
+              <select
+                value={d.referenceType ?? "general"}
+                onChange={(e) => onRoleChange(e.target.value as ReferenceRole)}
+                onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                className="ws-mini-select-trigger nodrag"
+                title="How should models use this asset when referenced?"
+              >
+                {REFERENCE_ROLE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
         {livePreviewUrl ? (
           d.fieldType === "model3d" ? (
             // 3D models render as a STATIC poster on the canvas —
@@ -293,6 +343,17 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
         portType={d.fieldType}
         color={PORT_COLOR[d.fieldType]}
         index={0}
+      />
+
+      {/* Bottom-right corner resize handle — drag to scale the
+       *  asset card uniformly. Same gesture / styling as the AI-gen
+       *  tool nodes. Visible only on hover/select via shared CSS. */}
+      <div
+        className="ws-compact-resize-handle nodrag"
+        onPointerDown={onResizeStart}
+        onMouseDown={(e) => e.stopPropagation()}
+        title="Drag to resize"
+        aria-label="Resize asset card"
       />
     </div>
   );
