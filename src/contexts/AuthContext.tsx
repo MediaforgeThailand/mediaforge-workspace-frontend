@@ -44,8 +44,14 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const DEMO_EMAIL = "dmd@psc.com";
-const DEMO_PASSWORD = "123456";
+// Demo bypass disabled — real Supabase auth for every account, including
+// dmd@psc.com / cmo@gmail.com. The fake demo user was minting a non-UUID
+// `id` ("psc-dmd-demo-user") which made every workspace_canvases write
+// 22P02 and surfaced as "Offline" in the SaveStateBadge. Sentinels below
+// keep the email comparisons in signIn() / useEffect from ever matching
+// while the dead demo helpers stay in place for later cleanup.
+const DEMO_EMAIL = "__demo_disabled__";
+const DEMO_PASSWORD = "__demo_disabled__";
 const DEMO_SESSION_KEY = "mf_psc_demo_session";
 
 export const useAuth = () => {
@@ -138,21 +144,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     );
 
     supabase.auth.getSession().then(({ data: { session }, error }) => {
-      const demoSessionActive = (() => {
-        try {
-          return localStorage.getItem(DEMO_SESSION_KEY) === "1";
-        } catch {
-          return false;
-        }
-      })();
-
-      if (!session && demoSessionActive) {
-        const demoUser = createDemoUser();
-        setSession(null);
-        setUser(demoUser);
-        setProfile(createDemoProfile());
-        setLoading(false);
-        return;
+      // Demo bypass disabled (see DEMO_EMAIL note above). Also clear any
+      // stale flag a previous session may have left in localStorage so it
+      // never resurrects the broken demo user on refresh.
+      try {
+        localStorage.removeItem(DEMO_SESSION_KEY);
+      } catch {
+        // localStorage may be blocked — fine, the constant above keeps
+        // the demo path off regardless.
       }
 
       // Handle expired/revoked refresh tokens gracefully
