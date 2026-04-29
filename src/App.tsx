@@ -114,6 +114,10 @@ const Pricing = lazyWithRetry(() => import("./pages/dashboard/Pricing"));
 // scanning a teacher's QR. Page handles its own guest → /auth bounce.
 const TeacherCenter = lazyWithRetry(() => import("./pages/teacher-center"));
 const ClassEnroll = lazyWithRetry(() => import("./pages/ClassEnroll"));
+// ERP-style pricing manager — admins edit credit_costs rows through a UI
+// instead of running INSERTs in the SQL editor. Lives under /app/org-admin
+// so it inherits the OrgUserBlockGate allowlist.
+const OrgAdminPricing = lazyWithRetry(() => import("./pages/org-admin/pricing"));
 
 const queryClient = new QueryClient();
 const PageLoader = () => <PageLoadingAnim />;
@@ -167,6 +171,19 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <TeacherCenter />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* ERP pricing manager — admin-only CRUD over credit_costs.
+                      Component re-uses the org-admin auth gate (signed-in +
+                      isOrgAdmin) and writes via the admin_workspace_pricing
+                      edge function. */}
+                  <Route
+                    path="/app/org-admin/pricing"
+                    element={
+                      <ProtectedRoute>
+                        <OrgAdminPricing />
                       </ProtectedRoute>
                     }
                   />

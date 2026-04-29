@@ -44,6 +44,7 @@ import {
   Sun,
   MoreHorizontal,
   Crown,
+  Coins,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -217,14 +218,16 @@ export default function WorkspaceSidebar({
   );
 }
 
-/** "Manage Org" button — visible only to teachers + org_admins.
- *  Routes to /app/org-admin (the Teacher Command Center). */
+/** "Manage Org" cluster — visible only to teachers + org_admins.
+ *  Top button routes to /app/org-admin (the Teacher Command Center).
+ *  "Pricing" sub-link routes to /app/org-admin/pricing (ERP credit-cost
+ *  manager) — same gate, same auth surface. */
 const OrgAdminLink = () => {
   const isOrgAdmin = useIsOrgAdmin();
   const navigate = useNavigate();
   if (!isOrgAdmin) return null;
   return (
-    <div className="px-3 pt-3 pb-2 border-t border-white/5 mt-3">
+    <div className="px-3 pt-3 pb-2 border-t border-white/5 mt-3 space-y-0.5">
       <button
         type="button"
         onClick={() => navigate("/app/org-admin")}
@@ -233,6 +236,15 @@ const OrgAdminLink = () => {
       >
         <Crown className="h-3.5 w-3.5" />
         Manage Org
+      </button>
+      <button
+        type="button"
+        onClick={() => navigate("/app/org-admin/pricing")}
+        className="flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 text-[12px] text-amber-200/70 hover:bg-amber-300/10 hover:text-amber-100 transition-colors"
+        title="Edit credit costs for AI models"
+      >
+        <Coins className="h-3.5 w-3.5" />
+        Pricing
       </button>
     </div>
   );
