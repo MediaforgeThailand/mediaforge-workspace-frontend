@@ -20,6 +20,17 @@ import { useSearchParams } from "react-router-dom";
 const PSC_DEMO_EMAIL = "dmd@psc.com";
 const PSC_DEMO_PASSWORD = "123456";
 const PSC_DEMO_SESSION_KEY = "mf_psc_demo_session";
+const DEFAULT_POST_AUTH_PATH = "/app/workspace";
+
+const normalizePostAuthPath = (path: string) => {
+  // /app/university is a demo surface that should only be entered by
+  // pressing the PSC sidebar button after login. Never make it the
+  // automatic post-auth landing page.
+  if (path === "/app/university" || path.startsWith("/app/university?")) {
+    return DEFAULT_POST_AUTH_PATH;
+  }
+  return path;
+};
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -137,11 +148,11 @@ const Auth = () => {
   const resolveRedirect = () => {
     const fromState = (location.state as { from?: { pathname?: string; search?: string } } | null)?.from;
     if (fromState?.pathname && fromState.pathname.startsWith("/") && !fromState.pathname.startsWith("//")) {
-      return `${fromState.pathname}${fromState.search ?? ""}`;
+      return normalizePostAuthPath(`${fromState.pathname}${fromState.search ?? ""}`);
     }
     const r = searchParams.get("redirect");
-    if (r && r.startsWith("/") && !r.startsWith("//")) return r;
-    return "/app/workspace";
+    if (r && r.startsWith("/") && !r.startsWith("//")) return normalizePostAuthPath(r);
+    return DEFAULT_POST_AUTH_PATH;
   };
 
   const handlePostAuthSuccess = () => {
@@ -166,7 +177,7 @@ const Auth = () => {
       } catch {
         // Ignore storage failures; this is only a local demo shortcut.
       }
-      window.location.href = "/app/university";
+      window.location.href = DEFAULT_POST_AUTH_PATH;
       return;
     }
 
