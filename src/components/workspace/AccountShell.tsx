@@ -31,8 +31,6 @@ import {
   Library,
   ChevronLeft,
   Settings as SettingsIcon,
-  Receipt,
-  CreditCard,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -58,14 +56,16 @@ const NAV_BOTTOM: Array<{ id: SectionKey; label: string; icon: LucideIcon }> = [
   { id: "stock", label: "Stock", icon: Library },
 ];
 
+/* Wave 2 trim — Usage + Pricing tabs removed from the visible sub-
+ * nav until billing on the workspace project is fully wired. The
+ * routes themselves still exist (so deep-links don't 404) but they
+ * aren't promoted in the chrome. */
 const ACCOUNT_TABS: Array<{
   path: string;
   label: string;
   icon: LucideIcon;
 }> = [
   { path: "/app/settings", label: "Settings", icon: SettingsIcon },
-  { path: "/app/usage", label: "Usage", icon: Receipt },
-  { path: "/app/pricing", label: "Pricing", icon: CreditCard },
 ];
 
 /**

@@ -31,8 +31,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Settings as SettingsIcon,
-  Receipt,
-  CreditCard,
   Sun,
   Moon,
   LogOut,
@@ -91,26 +89,17 @@ export function UserMenu() {
 
         <DropdownMenuSeparator className="bg-white/[0.06]" />
 
+        {/* Account links — Wave 2 trimmed this list down to surfaces
+         *  that are actually wired. Usage + Pricing were dropped
+         *  because billing isn't fully connected on the workspace
+         *  project yet (Stripe checkout, credit ledger reconciliation
+         *  etc.); they'll come back when that work lands. */}
         <DropdownMenuItem
           onSelect={() => navigate("/app/settings")}
           className="cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50"
         >
           <SettingsIcon className="h-3.5 w-3.5 text-zinc-400" />
           Settings
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={() => navigate("/app/usage")}
-          className="cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50"
-        >
-          <Receipt className="h-3.5 w-3.5 text-zinc-400" />
-          Usage
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={() => navigate("/app/pricing")}
-          className="cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50"
-        >
-          <CreditCard className="h-3.5 w-3.5 text-zinc-400" />
-          Pricing
         </DropdownMenuItem>
 
         <DropdownMenuSeparator className="bg-white/[0.06]" />
