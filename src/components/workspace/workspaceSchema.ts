@@ -88,7 +88,9 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         label: "ref_image",
         color: "blue",
         supportedModels: [...SEEDREAM_MODELS],
-        maxConnections: 4, // BytePlus SeedDream — accepts up to 4 ref images
+        // Backend currently forwards one SeedDream reference image.
+        // Keep the UI honest so extra refs are not silently ignored.
+        maxConnections: 1,
       },
     ],
     outputs: [{ id: "image", label: "IMAGE", color: "emerald" }],
@@ -320,6 +322,65 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         optionLabels: { "false": "No", "true": "Yes" },
         default: "false",
         supportedModels: [...SEEDREAM_MODELS],
+      },
+    ],
+  },
+
+  chatAiNode: {
+    displayName: "Chat AI",
+    category: "AI PROCESS",
+    accentColor: "sky",
+    supportedModels: ["google/gemini-3-pro-preview", "google/gemini-3-flash-preview"],
+    defaultModel: "google/gemini-3-pro-preview",
+    inputs: [
+      { id: "context", label: "context", color: "sky", required: false },
+    ],
+    outputs: [
+      { id: "text", label: "TEXT", color: "sky" },
+    ],
+    params: [
+      {
+        key: "model_name",
+        label: "Model",
+        type: "select",
+        options: ["google/gemini-3-pro-preview", "google/gemini-3-flash-preview"],
+        optionLabels: {
+          "google/gemini-3-pro-preview": "Gemini 3 Pro Preview",
+          "google/gemini-3-flash-preview": "Gemini 3 Flash Preview",
+        },
+        default: "google/gemini-3-pro-preview",
+        required: true,
+      },
+      {
+        key: "system_prompt",
+        label: "System Prompt",
+        type: "textarea",
+        default: "You are a helpful AI assistant.",
+        placeholder: "Set the AI's role and behavior...",
+      },
+      {
+        key: "prompt",
+        label: "User Prompt",
+        type: "textarea",
+        default: "",
+        placeholder: "What should the AI do?",
+        required: true,
+      },
+      {
+        key: "temperature",
+        label: "Temperature",
+        type: "slider",
+        default: 0.7,
+        min: 0,
+        max: 2,
+        step: 0.1,
+      },
+      {
+        key: "max_tokens",
+        label: "Max Tokens",
+        type: "select",
+        options: ["256", "512", "1024", "2048", "4096"],
+        default: "1024",
       },
     ],
   },
@@ -566,8 +627,8 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     displayName: "Video to Prompt",
     category: "AI PROCESS",
     accentColor: "sky",
-    supportedModels: ["gemini-3.1-pro-preview", "gemini-3-flash-preview"],
-    defaultModel: "gemini-3.1-pro-preview",
+    supportedModels: ["gemini-3-pro-preview", "gemini-3-flash-preview"],
+    defaultModel: "gemini-3-pro-preview",
     inputs: [
       { id: "video", label: "video", color: "violet", required: true, maxConnections: 1 },
     ],
@@ -579,12 +640,12 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         key: "model_name",
         label: "Model",
         type: "select",
-        options: ["gemini-3.1-pro-preview", "gemini-3-flash-preview"],
+        options: ["gemini-3-pro-preview", "gemini-3-flash-preview"],
         optionLabels: {
-          "gemini-3.1-pro-preview": "Gemini 3.1 Pro (best, slower)",
+          "gemini-3-pro-preview": "Gemini 3 Pro (best, slower)",
           "gemini-3-flash-preview": "Gemini 3 Flash (fast)",
         },
-        default: "gemini-3.1-pro-preview",
+        default: "gemini-3-pro-preview",
         required: true,
       },
       {
@@ -614,7 +675,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
    * separate `model3d` output handle for downstream consumers.
    */
   /**
-   * Audio Generator (Gemini 2.5 TTS).
+   * Audio Generator (Gemini TTS).
    *
    * Wraps Google's prebuilt voice catalogue (30 named voices —
    * Achernar, Aoede, Charon, … — see `geminiVoices.ts`). The user
@@ -624,9 +685,8 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
    * nodes or a direct download.
    *
    * Param notes:
-   *   - `model_name` defaults to gemini-2.5-flash-preview-tts —
-   *     cheaper and fast enough for short clips. The Pro variant is
-   *     available for production-grade narration.
+   *   - `model_name` defaults to gemini-2.5-flash-preview-tts.
+   *     Gemini 2.5 Pro remains available for higher quality.
    *   - `voice` stores the Gemini voice id (e.g. "Charon"). A select
    *     widget is provided as a fallback, but the picker dialog is
    *     the intended UX. The default is "Charon" (Informative —
@@ -641,11 +701,10 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     category: "AI PROCESS",
     accentColor: "amber",
     supportedModels: [
-      "gemini-3.1-flash-tts-preview",
       "gemini-2.5-flash-preview-tts",
       "gemini-2.5-pro-preview-tts",
     ],
-    defaultModel: "gemini-3.1-flash-tts-preview",
+    defaultModel: "gemini-2.5-flash-preview-tts",
     inputs: [
       { id: "text", label: "text (script)", color: "sky" },
     ],
@@ -656,16 +715,14 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         label: "Model",
         type: "select",
         options: [
-          "gemini-3.1-flash-tts-preview",
           "gemini-2.5-flash-preview-tts",
           "gemini-2.5-pro-preview-tts",
         ],
         optionLabels: {
-          "gemini-3.1-flash-tts-preview": "Gemini 3.1 Flash TTS",
           "gemini-2.5-flash-preview-tts": "Gemini 2.5 Flash TTS",
           "gemini-2.5-pro-preview-tts": "Gemini 2.5 Pro TTS",
         },
-        default: "gemini-3.1-flash-tts-preview",
+        default: "gemini-2.5-flash-preview-tts",
         required: true,
       },
       {

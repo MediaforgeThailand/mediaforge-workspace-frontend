@@ -132,7 +132,7 @@ const CATALOG: ToolItem[] = [
     label: "Audio Generator",
     defaultLabel: "Audio Generation",
     description:
-      "Text-to-speech with Gemini 2.5 TTS — 30 named voices, per-clip style direction.",
+      "Text-to-speech with Gemini TTS — 30 named voices, per-clip style direction.",
     category: "audio",
     icon: Lucide.AudioLines,
     tint: "amber",

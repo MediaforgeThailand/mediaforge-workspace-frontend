@@ -123,7 +123,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
 
   // ── Chat AI ──
   if (schemaKey === "chatAiNode") {
-    const apiSlug = modelName || "google/gemini-3.1-pro-preview";
+    const apiSlug = modelName || "google/gemini-3-pro-preview";
     const match = creditCosts.find(
       (r) => r.feature === "chat_ai" && r.model === apiSlug,
     );
@@ -132,7 +132,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
 
   // ── Unified Video (Kling I2V / Extension / Motion / Omni) ──
   if (schemaKey === "audioGenNode") {
-    const apiModel = modelName || "gemini-3.1-flash-tts-preview";
+    const apiModel = modelName || "gemini-2.5-flash-preview-tts";
     const match = creditCosts.find(
       (r) => r.feature === "text_to_speech" && r.model === apiModel,
     );
@@ -145,7 +145,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
   }
 
   if (schemaKey === "videoToPromptNode") {
-    const apiModel = modelName || "gemini-video-understanding";
+    const apiModel = modelName || "gemini-3-pro-preview";
     const match = creditCosts.find(
       (r) => r.feature === "video_to_prompt" && r.model === apiModel,
     );

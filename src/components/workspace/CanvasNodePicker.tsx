@@ -148,6 +148,7 @@ const CATALOG: CatalogEntry[] = [
       { id: "output_video", type: "video", hint: "video" },
       { id: "output_start_frame", type: "image", hint: "first frame" },
       { id: "output_end_frame", type: "image", hint: "last frame" },
+      { id: "output_last_frame", type: "image", hint: "last frame" },
     ],
   },
   {
@@ -176,6 +177,30 @@ const CATALOG: CatalogEntry[] = [
     icon: "MessageSquare",
     inputs: [{ id: "context", type: "text", hint: "→ context" }],
     outputs: [{ id: "text", type: "text", hint: "text" }],
+  },
+  {
+    nodeType: "audioGenNode",
+    label: "Audio Gen",
+    defaultLabel: "Audio Generation",
+    icon: "AudioLines",
+    inputs: [{ id: "text", type: "text", hint: "→ script" }],
+    outputs: [{ id: "audio", type: "audio", hint: "audio" }],
+  },
+  {
+    nodeType: "videoToPromptNode",
+    label: "Video to Prompt",
+    defaultLabel: "Video to Prompt",
+    icon: "FileVideo",
+    inputs: [{ id: "video", type: "video", hint: "→ video" }],
+    outputs: [{ id: "text", type: "text", hint: "prompt" }],
+  },
+  {
+    nodeType: "imageTo3dNode",
+    label: "Image to 3D",
+    defaultLabel: "Image to 3D",
+    icon: "Box",
+    inputs: [{ id: "image", type: "image", hint: "→ image" }],
+    outputs: [],
   },
 ];
 

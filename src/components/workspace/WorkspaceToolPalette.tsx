@@ -11,12 +11,12 @@
  *   application/reactflow-label  → default display label
  *
  * Categories survive only as the tooltip subtitle. The bar itself is
- * a flat list because dividing 7 icons into named sections costs
+ * a flat list because dividing the icons into named sections costs
  * more vertical space than it pays back.
  */
 
 import {
-  Sparkles, Film, Scissors, Combine, FileVideo,
+  Sparkles, Film, AudioLines, Scissors, Combine, FileVideo,
   Users, Type, Box, type LucideIcon,
 } from "lucide-react";
 
@@ -54,6 +54,14 @@ const ITEMS: PaletteItem[] = [
     icon: Film,
   },
   {
+    type: "audioGenNode",
+    label: "Audio Gen",
+    category: "AI · Audio",
+    description:
+      "Generate narration with Gemini TTS voices. Output is an audio asset ready for Merge A/V.",
+    icon: AudioLines,
+  },
+  {
     type: "removeBackgroundNode",
     label: "Remove BG",
     category: "AI · Image",
@@ -89,7 +97,7 @@ const ITEMS: PaletteItem[] = [
     label: "Image to 3D",
     category: "AI · 3D",
     description:
-      "Turn a reference image into a 3D model (GLB) via Tripo3D. Outputs the GLB on the model3d port plus a rendered preview thumbnail.",
+      "Turn a reference image into a 3D model (GLB) via Tripo3D. The result is saved to the node preview and asset library.",
     icon: Box,
   },
 ];
