@@ -540,6 +540,15 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           const isV3 = model === "kling-v3-omni" || model === "kling-v3-pro";
           if (isV3)
             return { type: "slider" as const, min: 3, max: 15, step: 1, default: 5 };
+          // Seedance 2.0 (UI slug seedance-2-0-* and direct BytePlus
+          // ID dreamina-seedance-*) accepts 4–14s per the BytePlus
+          // model spec — narrower than the slider would imply, but
+          // matches what BytePlus actually validates against.
+          if (
+            model.startsWith("seedance-2-0") ||
+            model.startsWith("dreamina-seedance")
+          )
+            return { type: "slider" as const, min: 4, max: 14, step: 1, default: 5 };
           if (model.startsWith("seedance-"))
             return { type: "slider" as const, min: 2, max: 12, step: 1, default: 5 };
           return { type: "select" as const, options: ["5", "10"], default: "5" };

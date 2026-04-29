@@ -952,7 +952,19 @@ function VideoControls({
   onUploadEnd: () => void;
 }) {
   const isSeedance = form.model.startsWith("seedance");
-  const durations = isSeedance ? [2, 3, 4, 5, 6, 8, 10, 12] : [5, 10];
+  // Seedance 2.0 (seedance-2-0-* UI slug or dreamina-seedance-* direct
+  // BytePlus ID) accepts 4..14s — the BytePlus dreamina-seedance-2-0
+  // model rejects 3s with InvalidParameter and the upstream Freepik UI
+  // exposes the same 4..14 range. Legacy 1.x retains the wider 2..12s
+  // window the older endpoints accept.
+  const isSeedanceV2 =
+    form.model.startsWith("seedance-2-0") ||
+    form.model.startsWith("dreamina-seedance");
+  const durations = isSeedanceV2
+    ? [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    : isSeedance
+      ? [2, 3, 4, 5, 6, 8, 10, 12]
+      : [5, 10];
   return (
     <>
       <div className="grid grid-cols-2 gap-2">
