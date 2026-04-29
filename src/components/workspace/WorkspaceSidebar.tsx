@@ -46,10 +46,12 @@ import {
   Crown,
   Coins,
   Palette,
+  School,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 import { useIsOrgAdmin } from "@/hooks/useIsOrgUser";
 import { useOrgBranding } from "@/hooks/useOrgBranding";
 import OrgCreditBadge from "@/components/OrgCreditBadge";
@@ -107,6 +109,8 @@ export default function WorkspaceSidebar({
   onCreate,
 }: WorkspaceSidebarProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isPscDemoUser = user?.email?.toLowerCase() === "dmd@psc.com";
   // Tenant branding override (e.g. dmd.mediaforge.co → DMD logo +
   // "DMD" short name). Returns null on the bare workspace.mediaforge.co
   // host or while the lookup is in flight; we render the default
@@ -222,6 +226,20 @@ export default function WorkspaceSidebar({
       <div className="px-4 py-2">
         <OrgCreditBadge variant="card" />
       </div>
+
+      {isPscDemoUser && (
+        <div className="px-3 pt-2">
+          <button
+            type="button"
+            onClick={() => navigate("/app/university")}
+            className="flex h-9 w-full items-center gap-2.5 rounded-md border border-fuchsia-400/25 bg-fuchsia-500/10 px-2.5 text-[12.5px] font-semibold text-fuchsia-100 transition-colors hover:bg-fuchsia-500/18 hover:text-white"
+            title="PSC college demo"
+          >
+            <School className="h-3.5 w-3.5" />
+            PSC
+          </button>
+        </div>
+      )}
 
       {/* Org admin / class teacher entry to the management surface. */}
       <OrgAdminLink />

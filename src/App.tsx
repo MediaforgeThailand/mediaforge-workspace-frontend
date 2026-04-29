@@ -122,6 +122,7 @@ const OrgAdminPricing = lazyWithRetry(() => import("./pages/org-admin/pricing"))
 // org-admin section. Lazy so the upload-form code only ships when
 // someone actually opens it.
 const OrgBranding = lazyWithRetry(() => import("./pages/org-admin/branding"));
+const UniversityMockup = lazyWithRetry(() => import("./pages/university"));
 
 const queryClient = new QueryClient();
 const PageLoader = () => <PageLoadingAnim />;
@@ -200,6 +201,17 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <OrgBranding />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/app/university"
+                    element={
+                      <ProtectedRoute>
+                        <WorkspacePageShell>
+                          <UniversityMockup />
+                        </WorkspacePageShell>
                       </ProtectedRoute>
                     }
                   />
