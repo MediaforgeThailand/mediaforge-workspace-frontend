@@ -32,6 +32,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import WorkspaceErrorBoundary from "@/components/workspace/WorkspaceErrorBoundary";
 import {
   loadWorkspacesFromServer,
   upsertWorkspaceToServer,
@@ -184,7 +185,39 @@ const VALID_SECTIONS: Section[] = [
   "stock",
 ];
 
-const WorkspaceDashboard = () => {
+/* ─── Body class watchdog ─────────────────────────────────────
+ *
+ * A handful of canvas-only body classes (`ws-lightbox-open` toggled
+ * by NodePreviewLightbox; `ws-resizing` toggled by node-resize
+ * pointerdown handlers in AssetNode / WorkspaceToolNode) can stick
+ * around if the canvas page unmounts mid-interaction — e.g. user
+ * hits the browser back button while a resize drag is active and
+ * the pointerup never reaches our window listener.
+ *
+ * Today none of those classes paint a black screen on the dashboard
+ * (their CSS rules only target canvas-internal selectors), but the
+ * blast radius is still wrong: a stuck `ws-resizing` would leave
+ * the dashboard with a `cursor: nwse-resize !important` everywhere
+ * until the next refresh. Force-clearing them on every dashboard
+ * mount is a one-line guarantee that no canvas-side state can leak.
+ *
+ * Keep the list narrow on purpose — only `ws-*` classes that are
+ * known to exist somewhere in the workspace tree. Don't blanket-
+ * remove everything from <body>: theme/mode classes (.dark, .light)
+ * are added by ThemeProvider and we'd nuke them.
+ */
+const STALE_BODY_CLASSES = ["ws-lightbox-open", "ws-resizing"];
+
+const WorkspaceDashboardInner = () => {
+  // Force-clear any canvas-only body classes that might have leaked
+  // from the previous route. Runs once on mount — the cleanup return
+  // is intentionally absent because we do NOT want to re-add them
+  // when this dashboard unmounts (the canvas page manages its own
+  // class lifecycle).
+  useEffect(() => {
+    document.body.classList.remove(...STALE_BODY_CLASSES);
+  }, []);
+
   const [searchParams, setSearchParams] = useSearchParams();
   // Initial section comes from `?section=…` (set by the AccountShell
   // sidebar when the user jumps in from /app/settings etc.). If the
@@ -238,6 +271,24 @@ const WorkspaceDashboard = () => {
     </div>
   );
 };
+
+/* Wrap the dashboard in an error boundary so a render-time throw
+ * (lazy-chunk failure that escaped the Suspense retry, broken store
+ * hydration, third-party hook assertion, etc.) shows the recoverable
+ * "Workspace ขัดข้อง" card instead of leaving the user staring at the
+ * near-black `--background` of a torn-down React tree. Tightly
+ * scoped to the dashboard mount only — global error swallowing
+ * elsewhere would hide real bugs.
+ *
+ * The boundary lives OUTSIDE WorkspaceDashboardInner so a fatal error
+ * during the first render still has somewhere to land. The watchdog
+ * useEffect for stale body classes runs INSIDE the inner component
+ * because it's tied to the dashboard's own mount. */
+const WorkspaceDashboard = () => (
+  <WorkspaceErrorBoundary>
+    <WorkspaceDashboardInner />
+  </WorkspaceErrorBoundary>
+);
 
 export default WorkspaceDashboard;
 
