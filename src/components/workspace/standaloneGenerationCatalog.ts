@@ -279,28 +279,57 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
     icon: Mic2,
     outputType: "audio",
     accent: "hsl(38 92% 56%)",
-    defaultModel: "gemini-3.1-flash-tts-preview",
+    defaultModel: "google-tts-studio",
+    // Synced with the audioGenNode supportedModels in workspaceSchema.
+    // Backend dispatcher routes by model_name prefix:
+    //   google-tts-*   → Google Cloud TTS
+    //   elevenlabs-*   → ElevenLabs API
+    //   gemini-*       → Gemini TTS preview
     models: [
+      // ── Google Cloud TTS ───────────────────────────────────
       {
-        id: "gemini-3.1-flash-tts-preview",
-        label: "Gemini 3.1 Flash TTS",
-        provider: "Google Gemini",
-        badge: "Latest",
-        description: "Gemini text-to-speech with controllable style prompts.",
+        id: "google-tts-studio",
+        label: "Google Cloud TTS",
+        provider: "Google Cloud",
+        badge: "Studio",
+        description: "Studio / Neural2 / WaveNet voices in 30+ languages.",
       },
+      // ── ElevenLabs ─────────────────────────────────────────
+      {
+        id: "elevenlabs-multilingual-v2",
+        label: "ElevenLabs Multilingual v2",
+        provider: "ElevenLabs",
+        badge: "Best",
+        description: "Best-quality ElevenLabs model — multilingual, expressive.",
+      },
+      {
+        id: "elevenlabs-turbo-v2-5",
+        label: "ElevenLabs Turbo v2.5",
+        provider: "ElevenLabs",
+        badge: "Fast",
+        description: "Faster ElevenLabs tier — good balance of speed and fidelity.",
+      },
+      {
+        id: "elevenlabs-flash-v2-5",
+        label: "ElevenLabs Flash v2.5",
+        provider: "ElevenLabs",
+        badge: "Fastest",
+        description: "Fastest ElevenLabs tier for real-time / cost-sensitive use.",
+      },
+      // ── Gemini ─────────────────────────────────────────────
       {
         id: "gemini-2.5-flash-preview-tts",
         label: "Gemini 2.5 Flash TTS",
         provider: "Google Gemini",
-        badge: "Fast",
-        description: "Fast Gemini TTS fallback with the same voice presets.",
+        badge: "Flash",
+        description: "Fast Gemini TTS with star-name preset voices.",
       },
       {
         id: "gemini-2.5-pro-preview-tts",
         label: "Gemini 2.5 Pro TTS",
         provider: "Google Gemini",
         badge: "Pro",
-        description: "Higher quality Gemini TTS fallback for narration.",
+        description: "Higher quality Gemini TTS for narration.",
       },
     ],
   },

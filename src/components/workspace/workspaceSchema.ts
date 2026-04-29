@@ -743,11 +743,22 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     displayName: "Audio Generation",
     category: "AI PROCESS",
     accentColor: "amber",
+    // Three providers all behind one node. The dispatcher in
+    // workspace-run-node routes:
+    //   model_name starts with "gemini-"     → executeGeminiTts
+    //   model_name starts with "elevenlabs-" → executeElevenLabsTts
+    //   any en-US-/en-GB-/th-TH- voice id    → executeGoogleTts
+    // The voice picker swaps `voice` between catalogs when the user
+    // changes the provider tab; this node accepts any of them.
     supportedModels: [
       "gemini-2.5-flash-preview-tts",
       "gemini-2.5-pro-preview-tts",
+      "google-tts-studio",
+      "elevenlabs-multilingual-v2",
+      "elevenlabs-turbo-v2-5",
+      "elevenlabs-flash-v2-5",
     ],
-    defaultModel: "gemini-2.5-flash-preview-tts",
+    defaultModel: "google-tts-studio",
     inputs: [
       { id: "text", label: "text (script)", color: "sky" },
     ],
@@ -758,14 +769,22 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         label: "Model",
         type: "select",
         options: [
+          "google-tts-studio",
+          "elevenlabs-multilingual-v2",
+          "elevenlabs-turbo-v2-5",
+          "elevenlabs-flash-v2-5",
           "gemini-2.5-flash-preview-tts",
           "gemini-2.5-pro-preview-tts",
         ],
         optionLabels: {
+          "google-tts-studio":           "Google Cloud TTS",
+          "elevenlabs-multilingual-v2":  "ElevenLabs Multilingual v2",
+          "elevenlabs-turbo-v2-5":       "ElevenLabs Turbo v2.5 (Fast)",
+          "elevenlabs-flash-v2-5":       "ElevenLabs Flash v2.5 (Fastest)",
           "gemini-2.5-flash-preview-tts": "Gemini 2.5 Flash TTS",
-          "gemini-2.5-pro-preview-tts": "Gemini 2.5 Pro TTS",
+          "gemini-2.5-pro-preview-tts":   "Gemini 2.5 Pro TTS",
         },
-        default: "gemini-2.5-flash-preview-tts",
+        default: "google-tts-studio",
         required: true,
       },
       {

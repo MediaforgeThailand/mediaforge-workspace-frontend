@@ -52,15 +52,21 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import {
   GOOGLE_VOICES,
   GOOGLE_VOICE_USE_CASES,
   GOOGLE_VOICE_TINT_GRADIENT,
-  voicePreviewUrl,
   type GoogleVoice,
   type GoogleVoiceLean,
   type GoogleVoiceUseCase,
 } from "./googleTtsVoices";
+import { GEMINI_VOICES as GEMINI_TTS_VOICES, type GeminiVoice as GeminiTTSVoice } from "./geminiVoices";
+import {
+  ELEVENLABS_VOICES,
+  ELEVENLABS_VOICE_TINT_GRADIENT,
+  type ElevenLabsVoice,
+} from "./elevenlabsVoices";
 
 /* Aliases — the rest of this file was written against the legacy
  * Gemini types. Keeping the local names stable means the JSX body
@@ -69,9 +75,70 @@ import {
 type GeminiVoice = GoogleVoice;
 type VoiceLean = GoogleVoiceLean;
 type VoiceUseCase = GoogleVoiceUseCase;
-const GEMINI_VOICES = GOOGLE_VOICES;
 const VOICE_USE_CASES = GOOGLE_VOICE_USE_CASES;
 const VOICE_TINT_GRADIENT = GOOGLE_VOICE_TINT_GRADIENT;
+
+/** Provider tabs let the user switch between Google Cloud TTS,
+ *  Gemini's prebuilt voice family, and ElevenLabs presets without
+ *  juggling three different pickers. Each catalog is normalised to
+ *  the same row shape (defined by `GoogleVoice` fields) so the JSX
+ *  below renders all three identically. */
+type ProviderTab = "google" | "gemini" | "elevenlabs";
+
+const PROVIDER_TABS: Array<{ id: ProviderTab; label: string }> = [
+  { id: "google",     label: "Google TTS" },
+  { id: "gemini",     label: "Gemini" },
+  { id: "elevenlabs", label: "ElevenLabs" },
+];
+
+/** Coerce a Gemini voice (no language / family / flag fields) to the
+ *  GoogleVoice shape so the row renderer doesn't need a per-provider
+ *  branch. Gemini voices are non-localised in the API; we display
+ *  them as "All langs" and surface an "AI" tier badge. */
+function geminiToRow(v: GeminiTTSVoice): GoogleVoice {
+  return {
+    id: v.id,
+    name: v.name,
+    characteristic: v.characteristic,
+    lean: v.lean === "neutral" ? "female" : v.lean,
+    languageCode: "en-US", // Gemini voices speak any language Gemini supports
+    family: "Standard",     // not really standard but the badge variant we want to render
+    flag: "🌐",
+    useCases: v.useCases,
+    tint: v.tint,
+  };
+}
+
+/** Same coercion for ElevenLabs — accent maps to the flag chip and
+ *  we surface the ElevenLabs name where the Google voice family
+ *  would normally sit. */
+function elevenLabsToRow(v: ElevenLabsVoice): GoogleVoice {
+  return {
+    id: v.id,
+    name: v.name,
+    characteristic: v.characteristic,
+    lean: v.lean === "neutral" ? "female" : v.lean,
+    languageCode: v.accent === "British" ? "en-GB" : "en-US",
+    family: "Standard",
+    flag: v.flag,
+    useCases: v.useCases,
+    tint: v.tint,
+  };
+}
+
+function catalogFor(p: ProviderTab): GoogleVoice[] {
+  if (p === "google") return GOOGLE_VOICES.slice();
+  if (p === "gemini") return GEMINI_TTS_VOICES.map(geminiToRow);
+  return ELEVENLABS_VOICES.map(elevenLabsToRow);
+}
+
+/** Tint-gradient lookup that works for any provider's tint value
+ *  (the palettes are kept identical across catalogs on purpose, but
+ *  defensive merging means a future addition can't break the row). */
+const ALL_TINT_GRADIENT: Record<GoogleVoice["tint"], string> = {
+  ...GOOGLE_VOICE_TINT_GRADIENT,
+  ...ELEVENLABS_VOICE_TINT_GRADIENT,
+};
 
 interface Props {
   open: boolean;
@@ -90,6 +157,7 @@ const PREVIEW_TEXT =
   "Hi, I'm a sample voice from Google Cloud. Try me out for your next project.";
 
 const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
+  const [provider, setProvider] = useState<ProviderTab>("google");
   const [genderFilter, setGenderFilter] = useState<"all" | VoiceLean>("all");
   const [useCaseFilter, setUseCaseFilter] = useState<VoiceUseCase | null>(null);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
@@ -99,10 +167,16 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
   const [sortOpen, setSortOpen] = useState(false);
   const [sort, setSort] = useState<"recent" | "alpha">("recent");
   const [playing, setPlaying] = useState<string | null>(null);
-  // Banner state — shown once when the first preview 404s, so users
-  // know previews aren't broken (the bucket just hasn't been
-  // populated yet by the generate-voice-previews script).
-  const [previewMissing, setPreviewMissing] = useState(false);
+  /** Set when the on-demand voice-preview endpoint failed for a given
+   *  voice — surfaces a per-row warning chip without spamming the
+   *  global banner. Cleared on next successful play. */
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  /** Showing a spinner on the play button while we wait for synth.
+   *  First click on a fresh voice can take 1-3s while ElevenLabs /
+   *  Google produces the sample, so the user needs visual feedback. */
+  const [synthing, setSynthing] = useState<string | null>(null);
+  // Catalog list reactive to provider tab.
+  const GEMINI_VOICES: GeminiVoice[] = useMemo(() => catalogFor(provider), [provider]);
 
   // One <audio> element per dialog instance — re-target by setting
   // .src when a new voice is picked. Keeping a single element means
@@ -158,7 +232,23 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
 
   if (!open) return null;
 
-  const handlePreview = (v: GeminiVoice, e: React.MouseEvent) => {
+  /** Resolve a playable URL for the given voice — this is where the
+   *  "preview button stays silent" bug used to live. The new flow:
+   *
+   *  1. POST `/functions/v1/voice-preview` with `{ provider, voice_id }`.
+   *     The edge fn checks the `voice-previews` bucket cache first
+   *     (sub-second response) and on cache miss synthesises the
+   *     sample via the right provider, uploads to bucket, returns
+   *     the public URL. Either way the client sees a single API call
+   *     and gets back a URL to feed into <audio>.
+   *  2. If the endpoint itself errors (auth / rate limit / provider
+   *     keys missing) we surface that on the row instead of a global
+   *     "previews not generated" banner — the message is more useful.
+   *
+   *  Catching previewError per-row also means a working Google preview
+   *  doesn't get blamed for a broken ElevenLabs preview if the API
+   *  key isn't configured for both. */
+  const handlePreview = async (v: GeminiVoice, e: React.MouseEvent) => {
     e.stopPropagation();
     // Re-click the playing voice → stop.
     if (playing === v.id) {
@@ -168,34 +258,45 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
     }
     // Stop any currently-playing audio before kicking off a new one.
     stopAudio(audioRef.current);
-
-    const url = voicePreviewUrl(v.id);
-    if (!url) {
-      // No Supabase URL configured (env var missing) — skip the
-      // network round-trip and surface the banner.
-      setPreviewMissing(true);
-      return;
+    setPreviewError(null);
+    setSynthing(v.id);
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "voice-preview",
+        { body: { provider, voice_id: v.id } },
+      );
+      const payload = data as { url?: string; error?: string } | null;
+      if (error || payload?.error || !payload?.url) {
+        const msg =
+          payload?.error ??
+          (error as { message?: string } | null)?.message ??
+          "Preview unavailable";
+        setPreviewError(`${v.id}: ${msg}`);
+        setSynthing(null);
+        return;
+      }
+      setSynthing(null);
+      setPlaying(v.id);
+      if (!audioRef.current) {
+        audioRef.current = new Audio();
+        audioRef.current.preload = "auto";
+      }
+      const a = audioRef.current;
+      a.src = payload.url;
+      a.onended = () => setPlaying(null);
+      a.onerror = () => {
+        setPreviewError(`${v.id}: failed to play`);
+        setPlaying(null);
+      };
+      a.play().catch((err) => {
+        setPreviewError(`${v.id}: ${err?.message ?? "blocked"}`);
+        setPlaying(null);
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setPreviewError(`${v.id}: ${msg}`);
+      setSynthing(null);
     }
-
-    setPlaying(v.id);
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-      audioRef.current.preload = "auto";
-    }
-    const a = audioRef.current;
-    a.src = url;
-    a.onended = () => setPlaying(null);
-    a.onerror = () => {
-      // 404 / CORS / decoding error → show the banner once and clear
-      // the spinner. Common during local dev before the previews
-      // bucket has been populated by the generator script.
-      setPreviewMissing(true);
-      setPlaying(null);
-    };
-    a.play().catch(() => {
-      setPreviewMissing(true);
-      setPlaying(null);
-    });
   };
 
   const handleSelect = (v: GeminiVoice) => {
@@ -298,17 +399,48 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
         {/* Preview-bucket-empty banner — shown after the first 404
          *  so users know the picker still works (selection is fine,
          *  preview MP3s just haven't been populated yet). */}
-        {previewMissing && (
+        {/* Provider tabs — Google / Gemini / ElevenLabs. Switching
+         *  tabs swaps the entire grid; the selected voice id is
+         *  preserved in the dialog's `value` prop so a row stays
+         *  highlighted if the user comes back to its tab. */}
+        <div className="mx-6 mb-3 inline-flex w-fit items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[12px]">
+          {PROVIDER_TABS.map((t) => {
+            const active = provider === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setProvider(t.id)}
+                className={cn(
+                  "rounded-md px-3 py-1 transition-colors",
+                  active
+                    ? "bg-white/[0.10] text-zinc-50"
+                    : "text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100",
+                )}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Per-row preview-error chip — replaces the old "scripts not
+         *  run" banner. Only shows when the most recent preview attempt
+         *  failed; we keep it small and dismissible so a single broken
+         *  voice doesn't crowd the rest of the picker. */}
+        {previewError && (
           <div className="mx-6 mb-3 flex items-center gap-2 rounded-lg border border-amber-400/15 bg-amber-400/[0.06] px-3 py-2 text-[11.5px] text-amber-200">
             <span aria-hidden>⚠</span>
-            <span>
-              Voice previews not generated yet — voices still work, but
-              the play button stays silent until an admin runs
-              <code className="mx-1 rounded bg-black/30 px-1 py-0.5 font-mono text-[10px]">
-                scripts/generate-voice-previews.ts
-              </code>
-              .
+            <span className="flex-1 truncate">
+              Preview failed — {previewError}
             </span>
+            <button
+              type="button"
+              onClick={() => setPreviewError(null)}
+              className="rounded p-1 text-amber-200/70 hover:bg-white/[0.05] hover:text-amber-100"
+            >
+              <X className="h-3 w-3" />
+            </button>
           </div>
         )}
 
@@ -460,14 +592,24 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
                       <button
                         type="button"
                         onClick={(e) => handlePreview(v, e)}
+                        disabled={synthing === v.id}
                         className={cn(
                           "shrink-0 rounded-full bg-white/[0.08] p-1.5 text-zinc-200 ring-1 ring-inset ring-white/[0.08] transition-all",
                           "hover:bg-white/[0.16] hover:text-white",
                           isPlaying && "bg-emerald-500/20 text-emerald-300 ring-emerald-400/30",
+                          synthing === v.id && "animate-pulse",
                         )}
-                        title={isPlaying ? "Stop preview" : "Play preview"}
+                        title={
+                          synthing === v.id
+                            ? "Generating preview…"
+                            : isPlaying
+                              ? "Stop preview"
+                              : "Play preview"
+                        }
                       >
-                        {isPlaying ? (
+                        {synthing === v.id ? (
+                          <span className="block h-3.5 w-3.5 rounded-full border-2 border-zinc-400 border-t-transparent animate-spin" />
+                        ) : isPlaying ? (
                           <Pause className="h-3.5 w-3.5" />
                         ) : (
                           <Play className="h-3.5 w-3.5" />
@@ -493,7 +635,7 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
 const VoiceAvatar = ({ voice }: { voice: GeminiVoice }) => (
   <span
     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-white shadow-inner ring-1 ring-inset ring-white/15"
-    style={{ background: VOICE_TINT_GRADIENT[voice.tint] }}
+    style={{ background: ALL_TINT_GRADIENT[voice.tint] }}
   >
     {voice.name.charAt(0).toUpperCase()}
   </span>
