@@ -48,6 +48,7 @@ import {
   Search,
   Pencil,
   Trash2,
+  Copy,
   Lock,
   Users,
   ChevronDown,
@@ -60,6 +61,7 @@ import {
   Pin,
   type LucideIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { UserMenu } from "@/components/workspace/UserMenu";
@@ -801,6 +803,7 @@ const SpacesView = () => {
   const createWorkspace = useWorkspaceStore((s) => s.createWorkspace);
   const renameWorkspace = useWorkspaceStore((s) => s.renameWorkspace);
   const deleteWorkspace = useWorkspaceStore((s) => s.deleteWorkspace);
+  const duplicateWorkspace = useWorkspaceStore((s) => s.duplicateWorkspace);
   const mergeServerWorkspaces = useWorkspaceStore(
     (s) => s.mergeServerWorkspaces,
   );
@@ -892,6 +895,85 @@ const SpacesView = () => {
     deleteWorkspace(id);
     if (user?.id) void deleteWorkspaceFromServer(id);
   };
+
+  /** Clone a space + every canvas inside. Store mutation is sync, the
+   *  server push is async — we surface a "Duplicating…" toast that
+   *  resolves into "Duplicated" once both legs are done. We push every
+   *  canvas in parallel because Supabase upsert-by-id is well-suited
+   *  for it and ordering doesn't matter to the UX (the toast lands
+   *  whenever the slowest write finishes). */
+  const handleDuplicate = (id: string) => {
+    const toastId = toast.loading("Duplicating…");
+    let newWorkspaceId: string;
+    try {
+      const res = duplicateWorkspace(id);
+      newWorkspaceId = res.workspaceId;
+    } catch (err) {
+      console.error("[workspace] duplicate failed:", err);
+      toast.error("Couldn't duplicate this space.", { id: toastId });
+      return;
+    }
+    // Source vanished — duplicateWorkspace returns the source id
+    // unchanged in that case, so bail with an error toast.
+    if (newWorkspaceId === id) {
+      toast.error("Couldn't duplicate this space.", { id: toastId });
+      return;
+    }
+
+    const newMeta = useWorkspaceStore
+      .getState()
+      .workspaces.find((w) => w.id === newWorkspaceId);
+    const newName = newMeta?.name ?? "Duplicated space";
+
+    if (user?.id) {
+      void (async () => {
+        try {
+          if (newMeta) await upsertWorkspaceToServer(newMeta, user.id);
+          const newCanvases = useWorkspaceStore
+            .getState()
+            .canvases.filter((c) => c.workspaceId === newWorkspaceId);
+          const graphs = useWorkspaceStore.getState().graphs;
+          await Promise.all(
+            newCanvases.map((c) =>
+              graphs[c.id]
+                ? saveCanvasToServer(graphs[c.id], user.id)
+                : Promise.resolve(),
+            ),
+          );
+          toast.success(`Duplicated as “${newName}”`, {
+            id: toastId,
+            action: {
+              label: "Open",
+              onClick: () => navigate(`/app/workspace/${newWorkspaceId}`),
+            },
+          });
+        } catch (err) {
+          console.warn("[workspace] duplicate server push failed:", err);
+          // Local copy is already there — surface a soft warning, not
+          // a hard error. The user can still open the duplicate; the
+          // canvas's own autosave will retry the server push.
+          toast.warning(`Duplicated as “${newName}” (offline)`, {
+            id: toastId,
+            description: "Server sync failed — try again from the canvas.",
+            action: {
+              label: "Open",
+              onClick: () => navigate(`/app/workspace/${newWorkspaceId}`),
+            },
+          });
+        }
+      })();
+    } else {
+      // Guest — no server push, resolve the toast right away.
+      toast.success(`Duplicated as “${newName}”`, {
+        id: toastId,
+        action: {
+          label: "Open",
+          onClick: () => navigate(`/app/workspace/${newWorkspaceId}`),
+        },
+      });
+    }
+  };
+
   const handleOpen = (id: string) => navigate(`/app/workspace/${id}`);
 
   return (
@@ -925,6 +1007,7 @@ const SpacesView = () => {
                       ws={ws}
                       onOpen={() => handleOpen(ws.id)}
                       onRename={() => handleRename(ws.id, ws.name)}
+                      onDuplicate={() => handleDuplicate(ws.id)}
                       onDelete={() => handleDelete(ws.id, ws.name)}
                     />
                   ))}
@@ -960,11 +1043,13 @@ const SpaceCard = ({
   ws,
   onOpen,
   onRename,
+  onDuplicate,
   onDelete,
 }: {
   ws: SpaceCardData;
   onOpen: () => void;
   onRename: () => void;
+  onDuplicate: () => void;
   onDelete: () => void;
 }) => (
   <li
@@ -994,6 +1079,7 @@ const SpaceCard = ({
 
     <div className="pointer-events-none absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
       <ActionButton title="Rename" onClick={(e) => { e.stopPropagation(); onRename(); }} icon={Pencil} />
+      <ActionButton title="Duplicate" onClick={(e) => { e.stopPropagation(); onDuplicate(); }} icon={Copy} />
       <ActionButton title="Delete" danger onClick={(e) => { e.stopPropagation(); onDelete(); }} icon={Trash2} />
     </div>
   </li>
