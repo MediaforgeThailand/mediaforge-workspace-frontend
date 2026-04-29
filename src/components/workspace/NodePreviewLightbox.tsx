@@ -91,6 +91,26 @@ const NodePreviewLightbox = ({ preview, onClose }: Props) => {
     };
   }, [preview.type, preview.model_url, mirroredModelUrl]);
 
+  // While the lightbox is mounted, tag <body> with a class so global
+  // workspace CSS can suppress every floating node overlay (quick
+  // toolbar, compact run anchor, settings cog, node titles, etc.).
+  // Those floats live inside the React Flow node tree (or are portal'd
+  // to body and positioned over a node's screen coords) and were
+  // bleeding into the lightbox view because the canvas behind the
+  // backdrop is still painted. Hiding them via body class is cheap,
+  // immediately effective, and doesn't require threading a context
+  // through every node component.
+  //
+  // Defensive cleanup: the class MUST be removed on unmount even if
+  // the lightbox is unmounted directly (parent flips its `preview`
+  // state) — otherwise floats stay hidden after close.
+  useEffect(() => {
+    document.body.classList.add("ws-lightbox-open");
+    return () => {
+      document.body.classList.remove("ws-lightbox-open");
+    };
+  }, []);
+
   // Close on Esc OR `A` (toggle — same key opens/closes via the global
   // `A` shortcut). The `A` branch DOES NOT fire while the user is
   // typing into a text input/contenteditable somewhere on the page —
