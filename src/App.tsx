@@ -42,6 +42,7 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import CookieConsent from "./components/CookieConsent";
 import ProtectedRoute from "./components/ProtectedRoute";
+import OrgUserBlockGate from "./components/OrgUserBlockGate";
 import AccountShell from "./components/workspace/AccountShell";
 import WorkspacePageShell from "./components/workspace/WorkspacePageShell";
 import PageLoadingAnim from "./components/ui/PageLoadingAnim";
@@ -104,6 +105,16 @@ const Settings = lazyWithRetry(() => import("./pages/dashboard/Settings"));
 const Transactions = lazyWithRetry(() => import("./pages/dashboard/Transactions"));
 const Pricing = lazyWithRetry(() => import("./pages/dashboard/Pricing"));
 
+// ── Org/workspace surfaces ────────────────────────────────────
+// TeacherCenter — Variant A "Command Center" for teachers + org_admins.
+// Replaces the older OrgAdminPanel. Sidebar lists classes the user can
+// manage; main area shows tabs (Overview / Members / AI Usage / Codes /
+// Activity) with AI model ranking + analytics for the demo.
+// ClassEnroll — public landing page where students arrive after
+// scanning a teacher's QR. Page handles its own guest → /auth bounce.
+const TeacherCenter = lazyWithRetry(() => import("./pages/teacher-center"));
+const ClassEnroll = lazyWithRetry(() => import("./pages/ClassEnroll"));
+
 const queryClient = new QueryClient();
 const PageLoader = () => <PageLoadingAnim />;
 
@@ -117,6 +128,10 @@ const App = () => (
             <Sonner />
             <BrowserRouter>
               <Suspense fallback={<PageLoader />}>
+                {/* OrgUserBlockGate is a no-op for non-org users; for org
+                 *  users (profile.org_id != null) it gates routes via an
+                 *  allow-list, redirecting any other path → /app/workspace. */}
+                <OrgUserBlockGate>
                 <Routes>
                   {/* Root → redirect to workspace dashboard. The
                    *  consumer landing page was removed in Wave 1
@@ -139,6 +154,19 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <WorkspaceDashboard />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* Org-admin panel — DEFINED BEFORE the AccountShell outlet
+                      below because the outlet's `*` catch-all otherwise
+                      swallows /app/<anything> and redirects back to workspace.
+                      Must come before /app/<sub> outlet routes. */}
+                  <Route
+                    path="/app/org-admin"
+                    element={
+                      <ProtectedRoute>
+                        <TeacherCenter />
                       </ProtectedRoute>
                     }
                   />
@@ -190,8 +218,15 @@ const App = () => (
                     }
                   />
 
+                  {/* Class enrolment landing — students arrive here after
+                      scanning a teacher's QR. Public route (the page
+                      handles its own guest → /auth bounce so we preserve
+                      the redirect target). */}
+                  <Route path="/enroll-class/:code" element={<ClassEnroll />} />
+
                   <Route path="*" element={<NotFound />} />
                 </Routes>
+                </OrgUserBlockGate>
               </Suspense>
               <CookieConsent />
             </BrowserRouter>

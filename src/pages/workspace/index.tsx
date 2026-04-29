@@ -58,6 +58,7 @@ import {
   Mic2,
   Wand2,
   Pin,
+  Crown,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
