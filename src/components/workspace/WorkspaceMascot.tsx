@@ -2,15 +2,13 @@
  * Workspace mascot — small looping video pinned to the bottom-left
  * corner of the canvas page.
  *
- * The current export carries a real VP9 alpha channel, so we render
- * it with a plain `<video>` element and let the browser composite
- * it directly — no canvas keying, no luminance threshold. The
- * earlier canvas-keyed pipeline was clipping the cat's BLACK EYES
- * (luminance under the threshold looked the same as a solid-black
- * backdrop to the keyer), and that's the kind of false-positive
- * pixel keying always loses on. With a real alpha channel in the
- * source the browser handles every transparent / semi-transparent
- * pixel correctly out of the box.
+ * Source is a plain MP4 (H.264) — no alpha channel. We render it
+ * with a `<video>` element straight onto the page; the dark canvas
+ * background absorbs the matching dark frame around the subject so
+ * no keying / blend-mode workarounds are needed. (Previous attempts
+ * at runtime bg-removal clipped intentionally-dark detail like the
+ * subject's eyes / hoodie, so the team explicitly asked for the
+ * "as-is" rendering.)
  *
  * Hide via the dev-only `?mascot=off` query param if it gets in
  * the way (`/app/workspace/<id>?mascot=off`).
@@ -18,7 +16,7 @@
 
 import { useMemo } from "react";
 
-const SRC = "/videos/workspace-mascot-3.webm";
+const SRC = "/videos/workspace-mascot-4.mp4";
 
 /* Display width in CSS px. Bumped DOWN from 180 → 130 — the team
  * felt the previous clip ate too much corner real-estate next to
