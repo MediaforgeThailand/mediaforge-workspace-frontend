@@ -45,7 +45,7 @@ import {
 import NodeResultDialog from "./NodeResultDialog";
 import { RunTimer } from "./RunTimer";
 import type { Generation } from "./NodeResultBar";
-import { findVoice, VOICE_TINT_GRADIENT } from "./geminiVoices";
+import { findAnyVoice, voiceTintGradient } from "./voiceCatalogs";
 // Workspace-local schema + helpers — kept out of the shared file so
 // the main flow editor stays untouched.
 import {
@@ -541,18 +541,13 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     const nodeLabelForLog =
       (d.params?.nodeName as string) || schema?.displayName || schemaKey;
 
-    // ── Pre-GA guard: audioGenNode has UI (voice picker + browser-TTS
-    //    preview) but the backend handler isn't wired yet. Hitting Run
-    //    would dispatch to workspace-run-node which doesn't recognise
-    //    the action, returning an opaque "Unsupported node type" error.
-    //    Surface a clear toast instead of letting the user think the
-    //    feature is broken. Drop this branch when the backend lands.
-    if (schemaKey === "audioGenNode") {
-      toast.info("Audio Generation อยู่ใน preview — กดเล่นที่ปุ่มเสียงเพื่อฟัง voice ได้ แต่ generation จริงยังไม่พร้อม", {
-        duration: 5000,
-      });
-      return;
-    }
+    // (audioGenNode previously short-circuited here with a "preview
+    // only" toast because workspace-run-node had no executor. The
+    // backend now ships a Google Cloud TTS executor — see
+    // `executeGoogleTts` in workspace-run-node — so the run goes
+    // through the same path as every other node type. Provider
+    // selection is driven by `params.model_name` (google-tts-* /
+    // gemini-2.5-*-tts).)
 
     // Set processing status (drives the node-shell glow ring too).
     // Stamp `runStartedAt` so <RunTimer /> can show elapsed time
@@ -857,7 +852,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       });
 
       const r = resp as {
-        type: "image" | "video" | "text";
+        type: "image" | "video" | "text" | "audio";
         url?: string;
         text?: string;
         prompt_used?: string;
@@ -1797,7 +1792,7 @@ function VoicePickerButton({
   voiceId: string;
   onClick: () => void;
 }) {
-  const voice = findVoice(voiceId);
+  const voice = findAnyVoice(voiceId);
   return (
     <button
       type="button"
@@ -1809,7 +1804,7 @@ function VoicePickerButton({
     >
       <span
         className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white ring-1 ring-inset ring-white/15"
-        style={{ background: VOICE_TINT_GRADIENT[voice.tint] }}
+        style={{ background: voiceTintGradient(voice.tint) }}
       >
         {voice.name.charAt(0)}
       </span>

@@ -595,37 +595,54 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
    * separate `model3d` output handle for downstream consumers.
    */
   /**
-   * Audio Generator (Gemini 2.5 TTS).
+   * Audio Generator (Google Cloud Text-to-Speech).
    *
-   * Wraps Google's prebuilt voice catalogue (30 named voices —
-   * Achernar, Aoede, Charon, … — see `geminiVoices.ts`). The user
-   * picks a voice via the VoicePickerDialog (opened by clicking the
-   * "Voice" param row in the node body) and writes a script. Output
-   * is a single MP3 / WAV asset suitable for downstream Merge A/V
-   * nodes or a direct download.
+   * Default provider is Google Cloud TTS — the same family Freepik
+   * uses (Studio / Neural2 / WaveNet). Voices have recognisable
+   * personality names (Aria, Liam, Mali, …) instead of the legacy
+   * Gemini star/moon ids, and the picker dialog plays a real
+   * pre-generated MP3 sample so users can hear the voice before
+   * committing.
+   *
+   * Catalog: see `googleTtsVoices.ts` (~16 curated voices covering
+   *   en-US / en-GB / th-TH × male/female × Studio/Neural2/WaveNet).
+   *
+   * Provider switching: the legacy Gemini provider is still wired
+   *   server-side but hidden behind a model picker. Gemini voices
+   *   (the star-named catalog) are kept under
+   *   `gemini-2.5-flash-preview-tts` / `gemini-2.5-pro-preview-tts`
+   *   for users who want the conversational tone that Gemini's TTS
+   *   produces — Google Cloud TTS is more "broadcast read" by
+   *   default.
    *
    * Param notes:
-   *   - `model_name` defaults to gemini-2.5-flash-preview-tts —
-   *     cheaper and fast enough for short clips. The Pro variant is
-   *     available for production-grade narration.
-   *   - `voice` stores the Gemini voice id (e.g. "Charon"). A select
-   *     widget is provided as a fallback, but the picker dialog is
-   *     the intended UX. The default is "Charon" (Informative —
-   *     reads as a neutral baseline for most copy).
-   *   - `style_prompt` is an OPTIONAL per-clip directive that
-   *     Gemini's TTS supports — it lets the user say things like
-   *     "Read this with a calm, gentle tone" without needing to
-   *     change the underlying voice.
+   *   - `model_name` defaults to `google-tts-studio` (the high-quality
+   *     Google Cloud tier, billed at the Studio rate). The Neural2
+   *     and WaveNet tiers are exposed as `google-tts-neural2` /
+   *     `google-tts-wavenet` for users that want cheaper runs.
+   *   - `voice` stores the Google voice id (e.g. "en-US-Studio-O").
+   *     Select dropdown lists the friendly NAME (Aria, Liam, …) but
+   *     the stored value is always the Google id so the backend can
+   *     pass it verbatim to the synthesize endpoint. The picker
+   *     dialog is the intended UX — opened by clicking the "Voice"
+   *     pill on the node body.
+   *   - `style_prompt` is an optional per-clip SSML hint forwarded
+   *     to Google TTS as a `<prosody>` wrapper. Empty by default;
+   *     advanced users can write things like "calm, slow" and the
+   *     backend translates that into rate/pitch attributes.
    */
   audioGenNode: {
     displayName: "Audio Generation",
     category: "AI PROCESS",
     accentColor: "amber",
     supportedModels: [
+      "google-tts-studio",
+      "google-tts-neural2",
+      "google-tts-wavenet",
       "gemini-2.5-flash-preview-tts",
       "gemini-2.5-pro-preview-tts",
     ],
-    defaultModel: "gemini-2.5-flash-preview-tts",
+    defaultModel: "google-tts-studio",
     inputs: [
       { id: "text", label: "text (script)", color: "sky" },
     ],
@@ -636,32 +653,67 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         label: "Model",
         type: "select",
         options: [
+          "google-tts-studio",
+          "google-tts-neural2",
+          "google-tts-wavenet",
           "gemini-2.5-flash-preview-tts",
           "gemini-2.5-pro-preview-tts",
         ],
         optionLabels: {
-          "gemini-2.5-flash-preview-tts": "Gemini 2.5 Flash TTS",
-          "gemini-2.5-pro-preview-tts": "Gemini 2.5 Pro TTS",
+          "google-tts-studio": "Google Cloud TTS · Studio",
+          "google-tts-neural2": "Google Cloud TTS · Neural2",
+          "google-tts-wavenet": "Google Cloud TTS · WaveNet",
+          "gemini-2.5-flash-preview-tts": "Gemini 2.5 Flash TTS (legacy)",
+          "gemini-2.5-pro-preview-tts": "Gemini 2.5 Pro TTS (legacy)",
         },
-        default: "gemini-2.5-flash-preview-tts",
+        default: "google-tts-studio",
         required: true,
       },
       {
         key: "voice",
         label: "Voice",
         type: "select",
-        // The full 30-voice catalogue; the in-canvas widget is a
-        // dropdown, but the floating "Browse voices…" button on the
-        // node opens the rich VoicePickerDialog (with use-case
-        // cards, search, preview play, etc.).
+        // The full Google Cloud TTS catalog (curated 16 voices) — the
+        // in-canvas widget is a dropdown, but the floating "Browse
+        // voices…" pill on the node opens VoicePickerDialog with
+        // play-preview, use-case cards, search, etc.
         options: [
-          "Achernar","Achird","Algenib","Algieba","Alnilam","Aoede",
-          "Autonoe","Callirrhoe","Charon","Despina","Enceladus","Erinome",
-          "Fenrir","Gacrux","Iapetus","Kore","Laomedeia","Leda","Orus",
-          "Puck","Pulcherrima","Rasalgethi","Sadachbia","Sadaltager",
-          "Schedar","Sulafat","Umbriel","Vindemiatrix","Zephyr","Zubenelgenubi",
+          "en-US-Studio-O",
+          "en-US-Studio-Q",
+          "en-US-Neural2-F",
+          "en-US-Neural2-J",
+          "en-US-Neural2-C",
+          "en-US-Neural2-D",
+          "en-GB-Studio-B",
+          "en-GB-Studio-C",
+          "en-GB-Neural2-A",
+          "en-GB-Neural2-D",
+          "th-TH-Standard-A",
+          "th-TH-Neural2-C",
+          "th-TH-Wavenet-A",
+          "th-TH-Standard-D",
+          "en-US-Wavenet-H",
+          "en-US-Wavenet-B",
         ],
-        default: "Charon",
+        optionLabels: {
+          "en-US-Studio-O": "Aria (US, Studio)",
+          "en-US-Studio-Q": "Brian (US, Studio)",
+          "en-US-Neural2-F": "Sky (US, Neural2)",
+          "en-US-Neural2-J": "Liam (US, Neural2)",
+          "en-US-Neural2-C": "Ella (US, Neural2)",
+          "en-US-Neural2-D": "Marcus (US, Neural2)",
+          "en-GB-Studio-B": "Oliver (UK, Studio)",
+          "en-GB-Studio-C": "Charlotte (UK, Studio)",
+          "en-GB-Neural2-A": "Sophie (UK, Neural2)",
+          "en-GB-Neural2-D": "James (UK, Neural2)",
+          "th-TH-Standard-A": "Mali / มาลี (TH)",
+          "th-TH-Neural2-C": "Niran / นิรันดร์ (TH, Neural2)",
+          "th-TH-Wavenet-A": "Ploy / พลอย (TH, WaveNet)",
+          "th-TH-Standard-D": "Anan / อนันต์ (TH)",
+          "en-US-Wavenet-H": "Maya (US, WaveNet)",
+          "en-US-Wavenet-B": "Theo (US, WaveNet)",
+        },
+        default: "en-US-Studio-O",
         required: true,
       },
       {

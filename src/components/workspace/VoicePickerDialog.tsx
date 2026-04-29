@@ -1,6 +1,7 @@
 /**
- * Voice picker — full-viewport dialog for choosing a Gemini 2.5 TTS
- * voice. Mirrors Krea / ElevenLabs conventions:
+ * Voice picker — full-viewport dialog for choosing a Google Cloud
+ * Text-to-Speech voice. Mirrors Krea / ElevenLabs / Freepik
+ * conventions:
  *
  *   ┌──────────────────────────────────────────────────────────────┐
  *   │ Voices            [All genders ▾] [Last used ▾] [♡] [🔍] [×] │
@@ -20,11 +21,13 @@
  * Each voice row:
  *   - Avatar circle (initial letter on a tinted gradient — we don't
  *     have real photos for the API voices, so this stays minimal).
- *   - Name + "All languages" sub.
- *   - Hover reveals a play button. Click → triggers the Web Speech
- *     API as an instant offline preview while we wait for backend
- *     TTS to be wired (the real Gemini TTS preview will replace the
- *     fallback once the edge function ships).
+ *   - Name + language flag + family badge (Studio / Neural2 / WaveNet).
+ *   - Hover reveals a play button. Click → fetches the pre-generated
+ *     MP3 from Supabase Storage `voice-previews/google/<id>.mp3` and
+ *     plays it via a real <audio> element. If the file is missing
+ *     (e.g. before `scripts/generate-voice-previews.ts` has been
+ *     run on a fresh project) the row falls back to a silent
+ *     "preview unavailable" toast — picking still works.
  *   - Click the row body → selects + closes.
  *
  * Top filters:
@@ -50,13 +53,25 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  GEMINI_VOICES,
-  VOICE_USE_CASES,
-  VOICE_TINT_GRADIENT,
-  type GeminiVoice,
-  type VoiceLean,
-  type VoiceUseCase,
-} from "./geminiVoices";
+  GOOGLE_VOICES,
+  GOOGLE_VOICE_USE_CASES,
+  GOOGLE_VOICE_TINT_GRADIENT,
+  voicePreviewUrl,
+  type GoogleVoice,
+  type GoogleVoiceLean,
+  type GoogleVoiceUseCase,
+} from "./googleTtsVoices";
+
+/* Aliases — the rest of this file was written against the legacy
+ * Gemini types. Keeping the local names stable means the JSX body
+ * below doesn't need to change shape, only the underlying data
+ * source. */
+type GeminiVoice = GoogleVoice;
+type VoiceLean = GoogleVoiceLean;
+type VoiceUseCase = GoogleVoiceUseCase;
+const GEMINI_VOICES = GOOGLE_VOICES;
+const VOICE_USE_CASES = GOOGLE_VOICE_USE_CASES;
+const VOICE_TINT_GRADIENT = GOOGLE_VOICE_TINT_GRADIENT;
 
 interface Props {
   open: boolean;
@@ -66,11 +81,13 @@ interface Props {
   onSelect: (voiceId: string) => void;
 }
 
-/* Sample text the preview button speaks. Kept short so first-byte
- * latency is low and the user gets a feel for the voice without
- * waiting for a paragraph to play out. */
+/* Sample text the preview button speaks. (Used by the offline
+ * fallback only — the real preview is a pre-generated MP3 served
+ * from Supabase Storage.) Kept short so first-byte latency is low
+ * and the user gets a feel for the voice without waiting for a
+ * paragraph to play out. */
 const PREVIEW_TEXT =
-  "Hi, I'm your voice from Gemini. Try me out for your next project.";
+  "Hi, I'm a sample voice from Google Cloud. Try me out for your next project.";
 
 const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
   const [genderFilter, setGenderFilter] = useState<"all" | VoiceLean>("all");
@@ -82,6 +99,15 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
   const [sortOpen, setSortOpen] = useState(false);
   const [sort, setSort] = useState<"recent" | "alpha">("recent");
   const [playing, setPlaying] = useState<string | null>(null);
+  // Banner state — shown once when the first preview 404s, so users
+  // know previews aren't broken (the bucket just hasn't been
+  // populated yet by the generate-voice-previews script).
+  const [previewMissing, setPreviewMissing] = useState(false);
+
+  // One <audio> element per dialog instance — re-target by setting
+  // .src when a new voice is picked. Keeping a single element means
+  // a fresh play implicitly stops the previous one.
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Mocked favorites — survives only the session; can be wired to
   // user_settings or a `voice_favorites` table later.
@@ -100,9 +126,13 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
   }, [open, onClose]);
 
   // Cancel any running preview when the dialog closes — leaving a
-  // sentence half-spoken across the workspace is unsettling.
+  // half-played MP3 in the background is unsettling.
   useEffect(() => {
-    if (!open) stopPreview();
+    if (!open) {
+      stopPreview();
+      stopAudio(audioRef.current);
+      setPlaying(null);
+    }
   }, [open]);
 
   const filtered = useMemo(() => {
@@ -130,14 +160,42 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
 
   const handlePreview = (v: GeminiVoice, e: React.MouseEvent) => {
     e.stopPropagation();
+    // Re-click the playing voice → stop.
     if (playing === v.id) {
-      stopPreview();
+      stopAudio(audioRef.current);
       setPlaying(null);
       return;
     }
-    stopPreview();
+    // Stop any currently-playing audio before kicking off a new one.
+    stopAudio(audioRef.current);
+
+    const url = voicePreviewUrl(v.id);
+    if (!url) {
+      // No Supabase URL configured (env var missing) — skip the
+      // network round-trip and surface the banner.
+      setPreviewMissing(true);
+      return;
+    }
+
     setPlaying(v.id);
-    speakPreview(v, () => setPlaying(null));
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+      audioRef.current.preload = "auto";
+    }
+    const a = audioRef.current;
+    a.src = url;
+    a.onended = () => setPlaying(null);
+    a.onerror = () => {
+      // 404 / CORS / decoding error → show the banner once and clear
+      // the spinner. Common during local dev before the previews
+      // bucket has been populated by the generator script.
+      setPreviewMissing(true);
+      setPlaying(null);
+    };
+    a.play().catch(() => {
+      setPreviewMissing(true);
+      setPlaying(null);
+    });
   };
 
   const handleSelect = (v: GeminiVoice) => {
@@ -236,6 +294,23 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
             />
           </div>
         </div>
+
+        {/* Preview-bucket-empty banner — shown after the first 404
+         *  so users know the picker still works (selection is fine,
+         *  preview MP3s just haven't been populated yet). */}
+        {previewMissing && (
+          <div className="mx-6 mb-3 flex items-center gap-2 rounded-lg border border-amber-400/15 bg-amber-400/[0.06] px-3 py-2 text-[11.5px] text-amber-200">
+            <span aria-hidden>⚠</span>
+            <span>
+              Voice previews not generated yet — voices still work, but
+              the play button stays silent until an admin runs
+              <code className="mx-1 rounded bg-black/30 px-1 py-0.5 font-mono text-[10px]">
+                scripts/generate-voice-previews.ts
+              </code>
+              .
+            </span>
+          </div>
+        )}
 
         {/* Inline search field — slides in below the header when toggled */}
         {searchOpen && (
@@ -353,11 +428,13 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
                     >
                       <VoiceAvatar voice={v} />
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-[13px] font-semibold text-zinc-50">
-                          {v.name}
+                        <div className="flex items-center gap-1.5 truncate text-[13px] font-semibold text-zinc-50">
+                          <span className="shrink-0">{v.flag}</span>
+                          <span className="truncate">{v.name}</span>
+                          <FamilyBadge family={v.family} />
                         </div>
                         <div className="truncate text-[11px] text-zinc-500">
-                          {v.characteristic} · All languages
+                          {v.characteristic} · {v.languageCode}
                         </div>
                       </div>
                       {/* Favourite — only shows on hover OR when set */}
@@ -421,6 +498,37 @@ const VoiceAvatar = ({ voice }: { voice: GeminiVoice }) => (
     {voice.name.charAt(0).toUpperCase()}
   </span>
 );
+
+/** Tiny pill that surfaces the Google TTS family — Studio is the
+ *  premium tier (and most expensive), so it gets an amber accent so
+ *  users notice when they're picking it. */
+const FamilyBadge = ({ family }: { family: GoogleVoice["family"] }) => {
+  const label =
+    family === "Studio"
+      ? "Studio"
+      : family === "Neural2"
+        ? "N2"
+        : family === "WaveNet"
+          ? "Wav"
+          : "Std";
+  const tone =
+    family === "Studio"
+      ? "bg-amber-400/15 text-amber-200 ring-amber-300/20"
+      : family === "Neural2"
+        ? "bg-sky-400/12 text-sky-200 ring-sky-300/18"
+        : "bg-white/[0.06] text-zinc-300 ring-white/[0.08]";
+  return (
+    <span
+      className={cn(
+        "shrink-0 rounded-md px-1.5 py-0.5 text-[9.5px] font-semibold tracking-wide ring-1 ring-inset",
+        tone,
+      )}
+      title={`${family} tier`}
+    >
+      {label}
+    </span>
+  );
+};
 
 const ChromeIconBtn = ({
   icon: Icon,
@@ -513,14 +621,35 @@ const DropdownButton = ({
 
 /* ── Preview playback ──────────────────────────────────────────
  *
- * MVP uses the browser's `SpeechSynthesis` API as an instant offline
- * preview. The actual Gemini voice timbre obviously isn't reproduced
- * — the browser uses its OS voices — but the user gets a feel for
- * the cadence and characteristic (Bright vs. Mature vs. Casual) by
- * picking the closest local voice that matches the lean. When the
- * backend Gemini TTS endpoint ships, swap this for a fetch + audio
- * playback path.
+ * Primary path: a real <audio> element fetches the pre-generated
+ * MP3 from `voice-previews/google/<voice-id>.mp3` (Supabase Storage
+ * public bucket). Each voice gets one short clip (~5s) generated
+ * by `scripts/generate-voice-previews.ts`. The dialog's per-row
+ * play handler points the audio element at the URL and calls
+ * `.play()`.
+ *
+ * Fallback (kept for offline / no-Supabase-URL local dev): the
+ * browser's `SpeechSynthesis` API speaks a sample line. The actual
+ * Google voice timbre obviously isn't reproduced — the browser
+ * uses its OS voices — but the user gets at least *some* signal.
+ * We DON'T auto-fall-through to this from the primary path on a
+ * 404; instead we surface a "preview unavailable" banner so the
+ * user knows the bucket needs populating. The `speakPreview`
+ * helper stays exported only for ad-hoc reuse.
  */
+
+/** Stop a possibly-playing <audio> element. Safe on null/undefined. */
+function stopAudio(a: HTMLAudioElement | null) {
+  if (!a) return;
+  try {
+    a.pause();
+    a.removeAttribute("src");
+    a.load();
+  } catch {
+    /* fine — element may already be torn down */
+  }
+}
+
 let currentUtterance: SpeechSynthesisUtterance | null = null;
 
 function stopPreview() {
