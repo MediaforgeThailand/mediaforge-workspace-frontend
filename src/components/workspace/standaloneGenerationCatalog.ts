@@ -130,27 +130,53 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
     outputType: "image",
     accent: "hsl(258 86% 64%)",
     defaultModel: "nano-banana-2",
+    // Keep this list in sync with `imageGenNode.supportedModels` in
+    // workspaceSchema.ts. The canvas image-gen node accepts the union
+    // of BANANA + SEEDREAM + OPENAI image models; the standalone tool
+    // surface previously exposed only 3 of them which made users
+    // think the new SeedDream / GPT Image SKUs were missing.
     models: [
       {
         id: "nano-banana-2",
-        label: "Google Nano Banana 2",
+        label: "Nano Banana 2 (Standard)",
         provider: "Google",
         badge: "Fast",
-        description: "Fast general image generation with references.",
-      },
-      {
-        id: "gpt-image-2",
-        label: "GPT Image 2",
-        provider: "OpenAI",
-        badge: "4K",
-        description: "Best for precise style and quality control.",
+        description: "Fast general image generation with up to 14 reference images.",
       },
       {
         id: "nano-banana-pro",
-        label: "Google Nano Banana Pro",
+        label: "Nano Banana Pro (Flex)",
         provider: "Google",
         badge: "Flex",
-        description: "Higher quality image generation with 4K support.",
+        description: "Higher quality Banana with 4K support and Flex tier control.",
+      },
+      {
+        id: "seedream-5-0-260128",
+        label: "SeedDream 5.0",
+        provider: "BytePlus",
+        badge: "Latest",
+        description: "BytePlus's latest image model, great for stylised renders.",
+      },
+      {
+        id: "seedream-5-0-lite-260128",
+        label: "SeedDream 5.0 Lite",
+        provider: "BytePlus",
+        badge: "Lite",
+        description: "Lighter SeedDream 5.0 — faster and cheaper.",
+      },
+      {
+        id: "seedream-4-5-251128",
+        label: "SeedDream 4.5",
+        provider: "BytePlus",
+        badge: "v4.5",
+        description: "Previous-generation SeedDream — broad style coverage.",
+      },
+      {
+        id: "gpt-image-2",
+        label: "GPT Image 2 (OpenAI)",
+        provider: "OpenAI",
+        badge: "4K",
+        description: "Best for precise style and quality control.",
       },
     ],
   },
@@ -163,35 +189,84 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
     icon: Film,
     outputType: "video",
     accent: "hsl(156 72% 42%)",
-    defaultModel: "seedance-1-5-pro-251215",
+    defaultModel: "kling-v2-6-pro",
+    // Keep in sync with KLING_MODELS + SEEDANCE_MODELS in
+    // nodeApiSchema.ts / workspaceSchema.ts. The canvas video node
+    // accepts all 5 Kling SKUs + all 5 Seedance SKUs — the standalone
+    // surface previously surfaced only 4 which is why the
+    // user-reported list was "incomplete".
     models: [
-      {
-        id: "seedance-1-5-pro-251215",
-        label: "Seedance 1.5 Pro",
-        provider: "BytePlus",
-        badge: "I2V",
-        description: "Reliable text or start-frame video generation.",
-      },
-      {
-        id: "seedance-1-0-pro-fast-251015",
-        label: "Seedance 1.0 Pro Fast",
-        provider: "BytePlus",
-        badge: "Fast",
-        description: "Faster video jobs for drafts and social clips.",
-      },
+      // ── Kling family ───────────────────────────────────────
       {
         id: "kling-v2-6-pro",
         label: "Kling 2.6 Pro",
         provider: "Kling",
         badge: "Pro",
-        description: "Classic text/image to video workflow.",
+        description: "Classic text/image-to-video workflow.",
+      },
+      {
+        id: "kling-v2-6-motion-pro",
+        label: "Kling 2.6 Motion Pro",
+        provider: "Kling",
+        badge: "Motion",
+        description: "Motion-controlled video — drives subject from a reference clip.",
       },
       {
         id: "kling-v3-pro",
-        label: "Kling 3 Pro",
+        label: "Kling 3.0 Pro",
         provider: "Kling",
         badge: "V3",
         description: "Newer Kling model with longer duration control.",
+      },
+      {
+        id: "kling-v3-motion-pro",
+        label: "Kling 3.0 Motion Pro",
+        provider: "Kling",
+        badge: "V3 Motion",
+        description: "V3 motion-controlled variant.",
+      },
+      {
+        id: "kling-v3-omni",
+        label: "Kling 3.0 Omni Pro",
+        provider: "Kling",
+        badge: "Omni",
+        description: "Multi-input Kling 3 with audio and video reference.",
+      },
+      // ── Seedance family ────────────────────────────────────
+      {
+        id: "seedance-1-0-pro-250528",
+        label: "SeedDance 1.0 Pro",
+        provider: "BytePlus",
+        badge: "Pro",
+        description: "Original Seedance Pro pipeline.",
+      },
+      {
+        id: "seedance-1-0-pro-fast-251015",
+        label: "SeedDance 1.0 Pro Fast (3x)",
+        provider: "BytePlus",
+        badge: "Fast",
+        description: "Faster Seedance 1.0 for drafts and social clips.",
+      },
+      {
+        id: "seedance-1-5-pro-251215",
+        label: "SeedDance 1.5 Pro (Latest)",
+        provider: "BytePlus",
+        badge: "I2V",
+        description: "Reliable text or start-frame video generation.",
+      },
+      {
+        id: "seedance-2-0-lite",
+        label: "SeedDance 2.0 Fast",
+        provider: "BytePlus",
+        badge: "v2 Fast",
+        description: "Latest Seedance 2.0 — fast tier with broad input support.",
+      },
+      {
+        id: "seedance-2-0-pro",
+        label: "SeedDance 2.0 Pro",
+        provider: "BytePlus",
+        badge: "v2 Pro",
+        description: "Latest Seedance 2.0 — premium quality.",
       },
     ],
   },
@@ -239,27 +314,68 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
     outputType: "image",
     accent: "hsl(48 87% 50%)",
     defaultModel: "tripo3d-v3.1",
+    // Sync with `imageTo3dNode.supportedModels` in workspaceSchema.ts.
+    // Backend dispatch (workspace-run-node `getProviderForNodeType`)
+    // routes tripo3d-* to executeTripo3D and hyper3d-* to
+    // executeHyper3D, so both vendors share this single tool surface.
     models: [
+      // ── Tripo3D family ────────────────────────────────────
+      {
+        id: "tripo3d-p1",
+        label: "Tripo P1 (Newest, preview)",
+        provider: "Tripo3D",
+        badge: "Preview",
+        description: "Newest preview model for high detail.",
+      },
       {
         id: "tripo3d-v3.1",
-        label: "Tripo v3.1",
+        label: "Tripo v3.1 (Gold standard)",
         provider: "Tripo3D",
         badge: "GLB",
-        description: "Detailed image-to-3D model output.",
+        description: "Detailed image-to-3D model output — the default.",
+      },
+      {
+        id: "tripo3d-v3.0",
+        label: "Tripo v3.0",
+        provider: "Tripo3D",
+        badge: "v3",
+        description: "Previous-gen Tripo v3 — solid baseline.",
       },
       {
         id: "tripo3d-turbo",
-        label: "Tripo Turbo",
+        label: "Tripo Turbo v1.0 (Fast)",
         provider: "Tripo3D",
         badge: "Fast",
         description: "Faster drafts for 3D concept checks.",
       },
       {
-        id: "tripo3d-p1",
-        label: "Tripo P1",
+        id: "tripo3d-v2.5",
+        label: "Tripo v2.5",
         provider: "Tripo3D",
-        badge: "New",
-        description: "Newest preview model for high detail.",
+        badge: "v2.5",
+        description: "Tripo v2.5 — legacy model.",
+      },
+      {
+        id: "tripo3d-v2.0",
+        label: "Tripo v2.0",
+        provider: "Tripo3D",
+        badge: "v2",
+        description: "Tripo v2.0 — legacy model.",
+      },
+      {
+        id: "tripo3d-v1.4",
+        label: "Tripo v1.4 (Legacy)",
+        provider: "Tripo3D",
+        badge: "v1",
+        description: "Oldest Tripo model kept for compatibility.",
+      },
+      // ── Hyper3D family ────────────────────────────────────
+      {
+        id: "hyper3d-gen2-260112",
+        label: "Hyper3D Gen 2",
+        provider: "BytePlus",
+        badge: "Gen 2",
+        description: "BytePlus image-to-3D — alternative engine to Tripo.",
       },
     ],
   },

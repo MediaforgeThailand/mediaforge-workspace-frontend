@@ -809,6 +809,11 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     displayName: "Image to 3D",
     category: "AI PROCESS",
     accentColor: "amber",
+    // Tripo + Hyper3D share the same 3D-from-image surface. The
+    // backend dispatcher (`getProviderForNodeType` in
+    // workspace-run-node) routes by model prefix:
+    //   tripo3d-* → executeTripo3D
+    //   hyper3d-* → executeHyper3D
     supportedModels: [
       "tripo3d-p1",
       "tripo3d-v3.1",
@@ -817,6 +822,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
       "tripo3d-v2.5",
       "tripo3d-v2.0",
       "tripo3d-v1.4",
+      "hyper3d-gen2-260112",
     ],
     defaultModel: "tripo3d-v3.1",
     inputs: [
@@ -847,15 +853,17 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           "tripo3d-v2.5",
           "tripo3d-v2.0",
           "tripo3d-v1.4",
+          "hyper3d-gen2-260112",
         ],
         optionLabels: {
-          "tripo3d-p1":   "Tripo P1 (Newest, preview)",
-          "tripo3d-v3.1": "Tripo v3.1 (Gold standard, Detailed)",
-          "tripo3d-v3.0": "Tripo v3.0",
-          "tripo3d-turbo":"Tripo Turbo v1.0 (Fast)",
-          "tripo3d-v2.5": "Tripo v2.5",
-          "tripo3d-v2.0": "Tripo v2.0",
-          "tripo3d-v1.4": "Tripo v1.4 (Legacy)",
+          "tripo3d-p1":          "Tripo P1 (Newest, preview)",
+          "tripo3d-v3.1":        "Tripo v3.1 (Gold standard, Detailed)",
+          "tripo3d-v3.0":        "Tripo v3.0",
+          "tripo3d-turbo":       "Tripo Turbo v1.0 (Fast)",
+          "tripo3d-v2.5":        "Tripo v2.5",
+          "tripo3d-v2.0":        "Tripo v2.0",
+          "tripo3d-v1.4":        "Tripo v1.4 (Legacy)",
+          "hyper3d-gen2-260112": "Hyper3D Gen 2 (BytePlus)",
         },
         default: "tripo3d-v3.1",
         required: true,
