@@ -21,7 +21,7 @@
  * this axis". Click a pill to add it; click again to clear.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Image as ImageIcon,
   Film,
@@ -34,7 +34,6 @@ import {
   Trash2,
   Maximize2,
 } from "lucide-react";
-import AllAssetsDialog from "./AllAssetsDialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
@@ -150,33 +149,11 @@ const WorkspaceAssetPanel = () => {
     () => new Set(),
   );
   const [brandElements, setBrandElements] = useState<BrandElementRow[]>([]);
-  // Toggle for the full-screen "All assets" dialog. Owned here so
-  // the open-button can sit in the panel header without prop drilling.
-  const [allOpen, setAllOpen] = useState(false);
-
-  // Bridge: the right-click "Assets" tool in CanvasContextMenu and
-  // any other surface that wants to pop the dialog can dispatch
-  // `workspace-open-all-assets` and we'll flip the local state.
-  // Saves us from lifting `allOpen` to a global store for what's
-  // really one boolean.
-  useEffect(() => {
-    const onOpen = () => setAllOpen(true);
-    window.addEventListener("workspace-open-all-assets", onOpen);
-    return () =>
-      window.removeEventListener("workspace-open-all-assets", onOpen);
-  }, []);
-
-  // Bridge: right-click "Upload" tool. We can't reach the canvas's
-  // uploadAsset directly from here (different React tree path), so
-  // we mount a hidden file input and click() it. Selected files are
-  // forwarded to the canvas via `workspace-upload-files`.
-  const triggerUploadRef = useRef<HTMLInputElement | null>(null);
-  useEffect(() => {
-    const onTrigger = () => triggerUploadRef.current?.click();
-    window.addEventListener("workspace-trigger-upload", onTrigger);
-    return () =>
-      window.removeEventListener("workspace-trigger-upload", onTrigger);
-  }, []);
+  // The "Browse all assets" Maximize2 button dispatches the
+  // `workspace-open-all-assets` event; the dialog itself, plus the
+  // right-click Upload bridge, are mounted by `WorkspaceRightSidebar`
+  // so they survive when the sidebar is collapsed (this panel
+  // unmounts in that state).
 
   // Refetch trigger for brand_elements — fires when the *current*
   // canvas creates a new element (which is the only way new elements
@@ -388,7 +365,9 @@ const WorkspaceAssetPanel = () => {
         </span>
         <button
           type="button"
-          onClick={() => setAllOpen(true)}
+          onClick={() =>
+            window.dispatchEvent(new CustomEvent("workspace-open-all-assets"))
+          }
           className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100"
           title="Browse all assets"
         >
@@ -504,30 +483,9 @@ const WorkspaceAssetPanel = () => {
         Drag a tile to the canvas to re-use it.
       </div>
 
-      <AllAssetsDialog open={allOpen} onClose={() => setAllOpen(false)} />
-
-      {/* Hidden file picker — fired by the right-click "Upload" tool
-       *  via `workspace-trigger-upload`. Selected files are handed
-       *  off to the canvas's uploadAsset path through the existing
-       *  `workspace-upload-files` event channel so we don't
-       *  duplicate the supabase upload logic on this panel. */}
-      <input
-        ref={triggerUploadRef}
-        type="file"
-        multiple
-        accept="image/*,video/*,audio/*,.glb,.gltf,.usdz,.obj,.fbx"
-        className="hidden"
-        onChange={(e) => {
-          if (e.target.files?.length) {
-            window.dispatchEvent(
-              new CustomEvent("workspace-upload-files", {
-                detail: { files: Array.from(e.target.files) },
-              }),
-            );
-          }
-          e.target.value = "";
-        }}
-      />
+      {/* AllAssetsDialog and the hidden upload-trigger input are mounted
+       *  by `WorkspaceRightSidebar` so they remain available when this
+       *  panel is unmounted (sidebar collapsed). */}
     </div>
   );
 };
