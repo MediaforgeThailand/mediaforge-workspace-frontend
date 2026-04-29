@@ -44,7 +44,6 @@ import {
   Sun,
   MoreHorizontal,
   Crown,
-  Coins,
   Palette,
   School,
   type LucideIcon,
@@ -255,9 +254,9 @@ export default function WorkspaceSidebar({
   );
 }
 
-/** "Manage Org" + "Pricing" + "Branding" buttons — visible only to
+/** "Manage Org" + "Branding" buttons — visible only to
  *  teachers + org_admins. Manage Org → Teacher Command Center;
- *  Pricing → credit_costs CRUD; Branding → logo / short name /
+ *  Branding → logo / short name /
  *  subdomain admin. Branding is also reachable by host-resolved org
  *  admins (no class memberships) via direct URL — useful for the
  *  DMD demo where the admin user hasn't been enrolled into any
@@ -276,15 +275,6 @@ const OrgAdminLink = () => {
       >
         <Crown className="h-3.5 w-3.5" />
         Manage Org
-      </button>
-      <button
-        type="button"
-        onClick={() => navigate("/app/org-admin/pricing")}
-        className="flex h-10 w-full items-center gap-2.5 rounded-md px-2.5 text-[12px] text-amber-200/70 transition-colors hover:bg-amber-300/10 hover:text-amber-100 lg:h-8"
-        title="Edit credit costs for AI models"
-      >
-        <Coins className="h-3.5 w-3.5" />
-        Pricing
       </button>
       <button
         type="button"
