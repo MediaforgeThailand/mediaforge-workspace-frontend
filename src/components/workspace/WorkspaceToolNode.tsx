@@ -705,7 +705,6 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       console.log("[workspace-run-node] sending", requestBody);
 
       {
-        const jobStartedAt = Date.now();
         const { data: enqueueResp, error: enqueueErr } = await supabase.functions.invoke(
           RUN_EDGE_FUNCTION,
           {
@@ -750,65 +749,142 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           payload: enqueueData,
         });
 
-        const pollJob = async (): Promise<Record<string, unknown>> => {
-          let lastStatus = "queued";
-          while (Date.now() - jobStartedAt < MAX_VISIBLE_RUN_MS + STALE_RUN_GRACE_MS) {
-            if (!runStillActive()) throw new Error("__RUN_CANCELLED__");
-            await new Promise((res) => setTimeout(res, 3_000));
-            const { data: jobResp, error: jobErr } = await supabase.functions.invoke(
-              RUN_EDGE_FUNCTION,
-              {
-                body: {
-                  action: "get_workspace_job",
-                  job_id: jobId,
+        // ── Realtime job tracking ──────────────────────────────────
+        // Subscribe to the row's UPDATE events instead of polling
+        // every 3s. The user's SELECT RLS policy on
+        // workspace_generation_jobs gates Realtime delivery, so each
+        // user only sees their own job updates. We still do a single
+        // catch-up SELECT after subscribe lands, in case the worker
+        // already updated the row between INSERT and our subscription
+        // becoming active (e.g. fast Banana 2 generations finishing
+        // in 2-3s while the WebSocket handshake is still happening).
+        // Hard timeout falls back to the same MAX_VISIBLE_RUN_MS as
+        // before; the DB-side sweep cron will mark anything stuck
+        // beyond 5 min as failed and refund credits, so the UI
+        // resolves either way.
+        const pollJob = (): Promise<Record<string, unknown>> =>
+          new Promise((resolve, reject) => {
+            let lastStatus = "queued";
+            let settled = false;
+
+            const handleJob = (job: Record<string, unknown> | null | undefined) => {
+              if (settled || !job) return;
+              const status = String(job.status ?? "");
+              const attempts = Number(job.attempts ?? 0);
+              if (status !== lastStatus) {
+                lastStatus = status;
+                setNodes((ns) =>
+                  ns.map((n) =>
+                    n.id === id &&
+                    ((n.data as NodeData | undefined)?.activeRunId ?? null) === runId
+                      ? { ...n, data: { ...n.data, jobStatus: status, jobAttempts: attempts } }
+                      : n,
+                  ),
+                );
+                log({
+                  level: "info",
+                  nodeId: id,
+                  title: `Background job ${status} · attempt ${attempts}`,
+                  payload: job,
+                });
+              }
+              if (status === "completed") {
+                const result = job.result as Record<string, unknown> | undefined;
+                if (!result) {
+                  settled = true;
+                  cleanup();
+                  reject(new Error("Background job completed without result"));
+                  return;
+                }
+                settled = true;
+                cleanup();
+                resolve(result);
+                return;
+              }
+              if (status === "failed" || status === "permanent_failed") {
+                settled = true;
+                cleanup();
+                reject(new Error(String(job.error ?? job.last_error ?? "Generation failed")));
+              }
+            };
+
+            // Realtime channel — filtered to this single row so we
+            // don't get fanned-out updates for every job in the table.
+            const channel = supabase
+              .channel(`ws-job-${jobId}`)
+              .on(
+                "postgres_changes",
+                {
+                  event: "UPDATE",
+                  schema: "public",
+                  table: "workspace_generation_jobs",
+                  filter: `id=eq.${jobId}`,
                 },
-              },
-            );
-            if (jobErr) {
-              log({
-                level: "info",
-                nodeId: id,
-                title: `Job status retry · ${(jobErr as { message?: string }).message ?? "unknown"}`,
+                (payload) => handleJob(payload.new as Record<string, unknown>),
+              )
+              .subscribe(async (subStatus) => {
+                if (subStatus === "SUBSCRIBED") {
+                  // Catch-up: fetch the current row in case the
+                  // worker already updated it during the subscribe
+                  // handshake. If the job is already terminal we
+                  // settle immediately without waiting for an event.
+                  try {
+                    const { data: catchUp } = await supabase
+                      .from("workspace_generation_jobs")
+                      .select("*")
+                      .eq("id", jobId)
+                      .maybeSingle();
+                    if (catchUp) handleJob(catchUp as Record<string, unknown>);
+                  } catch (_err) {
+                    // Non-fatal — realtime will still deliver future
+                    // updates. Logged as info so it shows in the
+                    // debug panel without alarming the user.
+                    log({
+                      level: "info",
+                      nodeId: id,
+                      title: "Job catch-up SELECT failed (realtime still active)",
+                    });
+                  }
+                }
               });
-              continue;
-            }
-            const job = (jobResp as { job?: Record<string, unknown>; error?: string } | null)?.job;
-            if (!job) {
-              const err = (jobResp as { error?: string } | null)?.error;
-              if (err) throw new Error(err);
-              continue;
-            }
-            const status = String(job.status ?? "");
-            const attempts = Number(job.attempts ?? 0);
-            if (status !== lastStatus) {
-              lastStatus = status;
-              setNodes((ns) =>
-                ns.map((n) =>
-                  n.id === id && ((n.data as NodeData | undefined)?.activeRunId ?? null) === runId
-                    ? { ...n, data: { ...n.data, jobStatus: status, jobAttempts: attempts } }
-                    : n,
+
+            // Cancel-watch — frontend cancellations (user clicks
+            // Stop or runs the node again) flip runStillActive to
+            // false; we surface that here so the spinner clears.
+            const cancelInterval = setInterval(() => {
+              if (settled) return;
+              if (!runStillActive()) {
+                settled = true;
+                cleanup();
+                reject(new Error("__RUN_CANCELLED__"));
+              }
+            }, 1_000);
+
+            // Hard wall — sweep cron will already have marked the
+            // row failed long before this fires (5-min threshold vs
+            // 30-min wall here), but keep the timer as a safety net
+            // in case the realtime channel disconnects silently.
+            const timeoutId = setTimeout(() => {
+              if (settled) return;
+              settled = true;
+              cleanup();
+              reject(
+                new Error(
+                  `Generation timed out after ${Math.round(MAX_VISIBLE_RUN_MS / 60_000)} minutes.`,
                 ),
               );
-              log({
-                level: "info",
-                nodeId: id,
-                title: `Background job ${status} · attempt ${attempts}`,
-                payload: job,
-              });
-            }
-            if (status === "completed") {
-              const result = job.result as Record<string, unknown> | undefined;
-              if (!result) throw new Error("Background job completed without result");
-              return result;
-            }
-            if (status === "failed" || status === "permanent_failed") {
-              throw new Error(String(job.error ?? job.last_error ?? "Generation failed"));
-            }
-          }
-          throw new Error(
-            `Generation timed out after ${Math.round(MAX_VISIBLE_RUN_MS / 60_000)} minutes.`,
-          );
-        };
+            }, MAX_VISIBLE_RUN_MS + STALE_RUN_GRACE_MS);
+
+            const cleanup = () => {
+              clearInterval(cancelInterval);
+              clearTimeout(timeoutId);
+              try {
+                supabase.removeChannel(channel);
+              } catch (_err) {
+                /* ignore — channel already torn down */
+              }
+            };
+          });
 
         const jobResult = await pollJob();
         if (!runStillActive()) return;
@@ -1352,6 +1428,64 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     const timer = window.setInterval(clearIfStale, 15_000);
     return () => window.clearInterval(timer);
   }, [d.activeRunId, d.runStartedAt, id, isRunning, setNodes]);
+
+  /**
+   * User-initiated cancel for the currently-running background job.
+   *
+   * Calls `cancel_workspace_job` RPC which marks the row failed and
+   * refunds unused credits. The realtime subscription set up in
+   * `runNode` will receive the resulting UPDATE event (status='failed',
+   * error='Cancelled by user') and resolve the inner pollJob promise
+   * with a rejection — the existing outer catch then transitions the
+   * node into the error state, so we don't need to mutate node state
+   * here ourselves.
+   *
+   * We also flip `activeRunId` to null as a belt-and-braces cleanup in
+   * case realtime is delayed (e.g. on a slow connection) — the
+   * cancel-watch interval inside pollJob will detect it within ~1s
+   * and reject with __RUN_CANCELLED__.
+   */
+  const cancelRun = useCallback(async () => {
+    const cur = getNodes().find((node) => node.id === id) as Node | undefined;
+    const jobId = (cur?.data as NodeData | undefined)?.backgroundJobId;
+    if (!jobId) return;
+    try {
+      const { error } = await supabase.rpc("cancel_workspace_job", { p_job_id: jobId });
+      if (error) {
+        console.error("[cancel_workspace_job] error", error);
+        toast.error(`Cancel failed: ${error.message}`);
+        return;
+      }
+      toast.success("Generation cancelled — credits refunded");
+      useDebugLogStore.getState().push({
+        level: "info",
+        nodeId: id,
+        title: `Cancelled job ${jobId.slice(0, 8)}`,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Cancel failed: ${msg}`);
+    } finally {
+      // Force-clear local active run so pollJob's cancel-watch
+      // unwinds without waiting for the realtime UPDATE to land.
+      setNodes((ns) =>
+        ns.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  status: "error",
+                  runStartedAt: null,
+                  activeRunId: null,
+                  lastRunError: "Cancelled by user",
+                },
+              }
+            : n,
+        ),
+      );
+    }
+  }, [getNodes, id, setNodes]);
 
   const updateMultiGenCount = useCallback(
     (next: number) => {
@@ -2157,6 +2291,28 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                 <RunTimer
                   startedAt={(d.runStartedAt as number | null | undefined) ?? null}
                 />
+              )}
+              {isRunning && d.backgroundJobId && (
+                <Tooltip delayDuration={150}>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void cancelRun();
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      className="ws-compact-cancel nodrag"
+                      aria-label="Cancel generation"
+                    >
+                      <span className="block leading-none">×</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" align="end">
+                    <div className="text-xs">Cancel · refunds credits</div>
+                  </TooltipContent>
+                </Tooltip>
               )}
             </div>
           )}

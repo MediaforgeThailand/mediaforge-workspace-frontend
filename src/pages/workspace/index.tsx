@@ -70,6 +70,7 @@ import WorkspaceSidebar, {
 import StandaloneGenerator, {
   type StandaloneProjectOption,
 } from "@/components/workspace/StandaloneGenerator";
+import HistoryView from "@/components/workspace/HistoryView";
 import {
   STANDALONE_TOOLS,
   STANDALONE_TOOL_ORDER,
@@ -187,6 +188,7 @@ function groupByMonth<T extends { updatedAt: number }>(
 
 const VALID_SECTIONS: Section[] = [
   "home",
+  "history",
   "spaces",
   "image_gen",
   "video_gen",
@@ -251,6 +253,7 @@ const WorkspaceDashboardInner = () => {
   const [section, setSection] = useState<Section>(initialSection);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const projects = useWorkspaceStore((s) => s.projects);
   const activeProjectId = useWorkspaceStore((s) => s.activeProjectId);
   const workspaces = useWorkspaceStore((s) => s.workspaces);
@@ -438,6 +441,20 @@ const WorkspaceDashboardInner = () => {
           />
         )}
         {section === "spaces" && <SpacesView activeProjectId={activeProjectId} />}
+        {section === "history" && (
+          <HistoryView
+            onOpenCanvas={(canvasId, nodeId) => {
+              // Drop straight into the workspace shell with the
+              // canvas pre-selected. The canvas page handles the
+              // node-focus param so the user lands on the exact
+              // tile they generated. Use a query string instead of
+              // a path segment to keep the route table thin.
+              const qp = new URLSearchParams({ canvas: canvasId });
+              if (nodeId) qp.set("node", nodeId);
+              navigate(`/app/workspace?${qp.toString()}`);
+            }}
+          />
+        )}
         {isStandaloneSection(section) && (
           <StandaloneGenerator
             activeTool={section}
@@ -449,9 +466,12 @@ const WorkspaceDashboardInner = () => {
             onCreateProject={handleCreateProject}
           />
         )}
-        {section !== "home" && section !== "spaces" && !isStandaloneSection(section) && (
-          <Placeholder section={section} />
-        )}
+        {section !== "home" &&
+          section !== "spaces" &&
+          section !== "history" &&
+          !isStandaloneSection(section) && (
+            <Placeholder section={section} />
+          )}
       </main>
     </div>
   );

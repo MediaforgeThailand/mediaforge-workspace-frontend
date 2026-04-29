@@ -29,6 +29,7 @@
  */
 import {
   Home as HomeIcon,
+  History as HistoryIcon,
   Workflow,
   Image as ImageIcon,
   Video,
@@ -56,6 +57,7 @@ export const DEFAULT_BRAND_NAME = "Workspace";
 
 export type SectionKey =
   | "home"
+  | "history"
   | "search"
   | "stock"
   | "community"
@@ -69,7 +71,8 @@ export type SectionKey =
   | "tools"; // legacy "All tools" placeholder — still accepted
 
 const NAV_TOP: Array<{ id: SectionKey; label: string; icon: LucideIcon }> = [
-  { id: "home",       label: "Home",       icon: HomeIcon },
+  { id: "home",    label: "Home",    icon: HomeIcon },
+  { id: "history", label: "History", icon: HistoryIcon },
 ];
 
 const NAV_TOOLS: Array<{ id: SectionKey; label: string; icon: LucideIcon }> = [
