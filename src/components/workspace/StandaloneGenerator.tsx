@@ -1737,7 +1737,15 @@ async function uploadReference(
     throw new Error("Only image references are supported on this surface.");
   }
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 80);
-  const storagePath = `standalone/${userId}/${projectId}/${Date.now()}-${safeName}`;
+  // Storage RLS on `ai-media` requires the FIRST folder segment to
+  // equal `auth.uid()`:
+  //   policy: `(auth.uid())::text = (storage.foldername(name))[1]`
+  // The previous path put `standalone/<userId>/...`, which made
+  // `standalone` the first folder and the policy reject every
+  // upload with "new row violates row-level security policy". Move
+  // the userId to the front so the policy passes; the rest of the
+  // hierarchy (per-project bucketing) is preserved.
+  const storagePath = `${userId}/standalone/${projectId}/${Date.now()}-${safeName}`;
   const { error: uploadError } = await supabase.storage
     .from(STORAGE_BUCKET)
     .upload(storagePath, file, {
