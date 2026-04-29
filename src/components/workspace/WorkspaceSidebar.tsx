@@ -81,10 +81,18 @@ export default function WorkspaceSidebar({
           onClick={() => navigate("/app/workspace")}
           className="flex items-center gap-2 text-[13.5px] font-semibold tracking-tight text-zinc-50 transition-colors hover:text-white"
         >
-          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-fuchsia-500 to-violet-600 text-[10px] font-bold text-white shadow-[inset_0_-1px_0_hsl(0_0%_0%/0.25)]">
-            M
-          </span>
-          MediaForge
+          {/* Mascot logo replaces the older gradient "M" tile. The
+           *  cat face was supplied by design; sits in /public so
+           *  Vite serves it at /mascot-logo.png without bundling.
+           *  Slightly larger (h-7 w-7) than the old square because
+           *  the rendered cat reads small at 24 px. */}
+          <img
+            src="/mascot-logo.png"
+            alt=""
+            className="h-7 w-7 shrink-0 select-none"
+            draggable={false}
+          />
+          Workspace
         </button>
       </div>
 
