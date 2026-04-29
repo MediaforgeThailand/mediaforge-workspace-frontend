@@ -18,13 +18,14 @@ interface NodeCostParams {
 /** Omni model slugs that use the /omni-video endpoint */
 const OMNI_MODELS = new Set(["kling-v3-omni"]);
 
-function resolutionTier(size: unknown): "1k" | "2k" | "4k" | "auto" {
+function resolutionTier(size: unknown): "1k" | "2k" | "3k" | "4k" | "auto" {
   const s = String(size ?? "1024x1024").toLowerCase();
   if (s === "auto") return "auto";
   const m = s.match(/^(\d+)x(\d+)$/);
-  if (!m) return s.includes("4k") ? "4k" : s.includes("2k") ? "2k" : "1k";
+  if (!m) return s.includes("4k") ? "4k" : s.includes("3k") ? "3k" : s.includes("2k") ? "2k" : "1k";
   const maxEdge = Math.max(Number(m[1]), Number(m[2]));
-  if (maxEdge >= 3000) return "4k";
+  if (maxEdge >= 3600) return "4k";
+  if (maxEdge >= 2800) return "3k";
   if (maxEdge >= 1900) return "2k";
   return "1k";
 }
@@ -61,6 +62,15 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
     const apiModel = modelName || "nano-banana-pro";
     if (apiModel.startsWith("gpt-image") || apiModel.startsWith("dall-e")) {
       return findOpenAiImageCost({ ...params, model_name: apiModel }, creditCosts);
+    }
+    if (apiModel.startsWith("seedream")) {
+      const size = String(params.size ?? params.resolution ?? "").toLowerCase();
+      const keys = size ? [`${apiModel}:${size}`, apiModel] : [apiModel];
+      for (const key of keys) {
+        const row = creditCosts.find((r) => r.feature === "generate_seedream_image" && r.model === key);
+        if (row) return row.cost;
+      }
+      return null;
     }
     const imageSize = String(params.image_size ?? "").toLowerCase();
     if (imageSize) {
@@ -258,7 +268,36 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
     // ── Standard models: fixed pricing (duration + audio match) preferred ──
     const rawDuration = params.duration ?? params.extend_duration ?? "5";
     const duration = parseInt(String(rawDuration), 10) || 5;
-    const hasAudio = params.has_audio === true || params.has_audio === "true";
+    const hasAudio =
+      params.has_audio === true ||
+      params.has_audio === "true" ||
+      params.generate_audio === true ||
+      params.generate_audio === "true";
+    const resolution = String(params.resolution ?? "").trim().toLowerCase();
+
+    if (resolution) {
+      const resolutionExact = creditCosts.find(
+        (r) =>
+          r.feature === "generate_freepik_video" &&
+          r.model === model &&
+          r.pricing_type === "per_second" &&
+          String(r.resolution ?? "").toLowerCase() === resolution &&
+          (r.has_audio ?? false) === hasAudio,
+      );
+      if (resolutionExact) return Math.ceil(resolutionExact.cost * duration);
+
+      if (hasAudio) {
+        const noAudioResolution = creditCosts.find(
+          (r) =>
+            r.feature === "generate_freepik_video" &&
+            r.model === model &&
+            r.pricing_type === "per_second" &&
+            String(r.resolution ?? "").toLowerCase() === resolution &&
+            (r.has_audio ?? false) === false,
+        );
+        if (noAudioResolution) return Math.ceil(noAudioResolution.cost * duration);
+      }
+    }
 
     // 1. Exact match: model + duration + audio (highest priority)
     const exactMatch = creditCosts.find(
