@@ -577,7 +577,6 @@ const HomeView = ({
   // straight from the store mirrors how `workspaces`/`canvases`/`graphs`
   // are wired and avoids relying on a prop the type contract doesn't
   // even declare.
-  const projects = useWorkspaceStore((s) => s.projects);
   const createWorkspace = useWorkspaceStore((s) => s.createWorkspace);
   const mergeServerWorkspaces = useWorkspaceStore(
     (s) => s.mergeServerWorkspaces,
