@@ -1061,6 +1061,39 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     return () => window.removeEventListener("workspace-run-shortcut", handler);
   }, [id, runNode]);
 
+  /* ── Multi-gen auto-run on mount ──────────────────────────
+   * When NodeQuickToolbar's "x2 / x3" multi-gen picker clones
+   * the source node, each clone is stamped with
+   * `data.runOnMount = true`. The toolbar can't dispatch the
+   * run-shortcut event right after `setNodes(...)` because
+   * this <WorkspaceToolNode> hasn't mounted yet — so its
+   * window listener (above) isn't registered → the event would
+   * be dropped on the floor. Instead, the clone fires its own
+   * runNode() once mounted, and clears the flag in the same
+   * setNodes pass so a render re-fire from upstream state
+   * doesn't trigger a duplicate run.
+   *
+   * Only runs once on mount: the effect intentionally has
+   * empty deps + reads `data.runOnMount` from the closure
+   * snapshot at mount time. Subsequent data updates don't
+   * re-trigger it. */
+  useEffect(() => {
+    const flag = (data as { runOnMount?: boolean } | undefined)?.runOnMount;
+    if (!flag) return;
+    setNodes((ns) =>
+      ns.map((n) =>
+        n.id === id
+          ? {
+              ...n,
+              data: { ...n.data, runOnMount: false },
+            }
+          : n,
+      ),
+    );
+    void runNode();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const visibleParams = useMemo(
     () => (schema ? getWsVisibleParams(schemaKey, selectedModel) : []),
     [schema, schemaKey, selectedModel],

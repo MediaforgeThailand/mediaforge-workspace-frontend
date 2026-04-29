@@ -46,6 +46,7 @@ import {
   LayoutGrid,
   Play,
   Download,
+  Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -65,6 +66,35 @@ const TOOL_NODE_TYPES = new Set([
   "bananaProNode",
   "klingVideoNode",
 ]);
+
+/** Subset of tool nodes where Multi-Gen (x2 / x3) is meaningful — i.e.
+ *  *generators* whose output is non-deterministic per run, so firing N
+ *  parallel runs returns N distinct candidates the user can pick from
+ *  (mirrors Freepik's x1/x2/x3 button on their generator nodes).
+ *
+ *  Excluded:
+ *   • removeBackgroundNode  — deterministic transform, x3 = same output
+ *   • videoToPromptNode      — deterministic captioning of a fixed video
+ *   • mergeAudioNode         — deterministic audio mixdown
+ *
+ *  Included (image / video generators):
+ *   • imageGenNode, bananaProNode, videoGenNode, klingVideoNode,
+ *     chatAiNode (LLMs are non-deterministic too).
+ */
+const MULTI_GEN_NODE_TYPES = new Set([
+  "imageGenNode",
+  "videoGenNode",
+  "chatAiNode",
+  "bananaProNode",
+  "klingVideoNode",
+]);
+
+const MULTI_GEN_MAX = 3 as const;
+/** Horizontal spacing between source and each clone. ~Default node
+ *  width (437) + a 43px gap so the clones sit visually adjacent
+ *  without overlapping, matching Freepik's "row of generator nodes"
+ *  layout. */
+const MULTI_GEN_X_OFFSET = 480;
 
 const NEW_ID = (): string =>
   globalThis.crypto?.randomUUID?.() ??
@@ -87,10 +117,15 @@ const NodeQuickToolbar = memo(() => {
   const pushHistory = useWorkspaceStore((s) => s.pushHistory);
 
   const [selected, setSelected] = useState<Node[]>([]);
+  const [multiGenOpen, setMultiGenOpen] = useState(false);
 
   useOnSelectionChange({
     onChange: ({ nodes }) => {
       setSelected(nodes ?? []);
+      // Close the multi-gen popover whenever the selection changes —
+      // it's anchored to the current single-node selection so leaving
+      // it open while the anchor moves looks broken.
+      setMultiGenOpen(false);
     },
   });
 
@@ -133,6 +168,15 @@ const NodeQuickToolbar = memo(() => {
   const multi = selected.length >= 2;
   const isGroup = single?.type === "groupNode";
   const isToolNode = single ? TOOL_NODE_TYPES.has(single.type ?? "") : false;
+  const isMultiGenNode = single
+    ? MULTI_GEN_NODE_TYPES.has(single.type ?? "")
+    : false;
+  // Disable multi-gen while the source is mid-run — kicking off another
+  // 2-3 parallel runs on a node whose own request is still inflight is
+  // a foot-gun (would burn double credits before the first completes).
+  const sourceIsRunning = single
+    ? (single.data as { status?: string } | undefined)?.status === "processing"
+    : false;
 
   /* ── Actions ────────────────────────────────────────────── */
   const onGroup = useCallback(() => {
@@ -296,6 +340,119 @@ const NodeQuickToolbar = memo(() => {
     );
   }, [single]);
 
+  /**
+   * Multi-gen — clone the source generator node N-1 times to its
+   * right, copy every incoming edge to each clone (so all N nodes
+   * read the same upstream inputs), then fire Run on every node in
+   * the group at once. Mirrors Freepik's "x1 / x2 / x3" button:
+   * picking x3 yields a row of three identical generators all
+   * processing in parallel, giving the user 3 candidate outputs to
+   * choose from for the cost of 3 runs.
+   *
+   * Edge handling:
+   *   • Incoming edges (target === source.id) → cloned for each
+   *     new node, preserving `targetHandle` so multi-port wiring
+   *     (e.g. Banana's ref_image[1..14]) lands on the same handle.
+   *   • Outgoing edges (source === source.id) → NOT cloned. Each
+   *     clone is a parallel candidate; the user picks one and
+   *     wires its output downstream manually. Auto-cloning out-
+   *     edges would fan out the rest of the graph N× which is
+   *     almost never what's wanted.
+   *
+   * Run dispatch:
+   *   • The source node is run via the existing `workspace-run-
+   *     shortcut` window event.
+   *   • Each clone is stamped with `data.runOnMount = true`. The
+   *     WorkspaceToolNode mount effect picks up that flag and
+   *     auto-calls runNode() once it's mounted + has its event
+   *     listener wired. This avoids a fragile setTimeout race
+   *     between setNodes() and the new component mounting.
+   *
+   * Hard cap:
+   *   • Count is clamped to MULTI_GEN_MAX (3). The popover UI
+   *     only exposes 1/2/3 anyway, but we belt-and-brace.
+   */
+  const runMulti = useCallback(
+    (count: number) => {
+      if (!single) return;
+      const n = Math.min(Math.max(count, 1), MULTI_GEN_MAX);
+      // x1 = same as the regular Run button — short-circuit to keep
+      // the code path obvious (no clones, no edge copying).
+      if (n === 1) {
+        window.dispatchEvent(
+          new CustomEvent("workspace-run-shortcut", {
+            detail: { nodeId: single.id },
+          }),
+        );
+        return;
+      }
+
+      pushHistory();
+
+      const sourceNode = single;
+      const incomingEdges = getEdges().filter(
+        (e) => e.target === sourceNode.id,
+      );
+
+      // Build N-1 clones, each offset to the right of the previous.
+      const cloned: Node[] = [];
+      const newEdges: typeof incomingEdges = [];
+      for (let i = 1; i < n; i++) {
+        const cloneId = NEW_ID();
+        const fresh = cloneNodeFresh(sourceNode, cloneId);
+        cloned.push({
+          ...fresh,
+          // Stamp `runOnMount` so the WorkspaceToolNode auto-fires
+          // its run as soon as it mounts. We can't dispatch the
+          // run-shortcut event right after setNodes() because the
+          // new <WorkspaceToolNode> hasn't mounted yet → its
+          // window listener isn't registered → the event is
+          // dropped on the floor.
+          data: { ...fresh.data, runOnMount: true },
+          position: {
+            x: sourceNode.position.x + MULTI_GEN_X_OFFSET * i,
+            y: sourceNode.position.y,
+          },
+          selected: false,
+        });
+        // Mirror every incoming edge from the source to this clone,
+        // preserving `targetHandle` so multi-port handles (Banana's
+        // ref_image[1..14], etc.) land on the matching slot.
+        for (const e of incomingEdges) {
+          newEdges.push({
+            ...e,
+            id: NEW_ID(),
+            target: cloneId,
+            selected: false,
+          });
+        }
+      }
+
+      setNodes((nds) => [
+        // Deselect everything; the multi-gen group runs as a unit
+        // and the toolbar would otherwise re-anchor to a stale
+        // selection bbox mid-clone.
+        ...nds.map((nd) =>
+          nd.selected ? { ...nd, selected: false } : nd,
+        ),
+        ...cloned,
+      ]);
+      setEdges((eds) => [...eds, ...newEdges]);
+
+      // Fire the source's run synchronously — its listener is already
+      // attached. Clones fire themselves via `runOnMount` in their
+      // own mount effect.
+      window.dispatchEvent(
+        new CustomEvent("workspace-run-shortcut", {
+          detail: { nodeId: sourceNode.id },
+        }),
+      );
+
+      toast.success(`Generating ${n} variations in parallel`);
+    },
+    [single, getEdges, setNodes, setEdges, pushHistory],
+  );
+
   // Single-node download — only surfaces when the selected node has a
   // downloadable artefact (uploaded asset OR a generation with a URL).
   const downloadable = single ? getNodeDownloadable(single) : null;
@@ -405,6 +562,22 @@ const NodeQuickToolbar = memo(() => {
             label="Run (Ctrl+Enter)"
             onClick={onRunSingle}
           />
+          {/* Multi-gen — Freepik-style x1/x2/x3 selector. Only
+           *  surfaces on generator nodes (image / video / LLM)
+           *  where parallel runs return distinct candidates;
+           *  deterministic transforms (remove-bg, video-to-prompt,
+           *  audio merge) hide it because x3 = same output 3x. */}
+          {isMultiGenNode && (
+            <MultiGenButton
+              disabled={sourceIsRunning}
+              open={multiGenOpen}
+              onOpenChange={setMultiGenOpen}
+              onPick={(c) => {
+                setMultiGenOpen(false);
+                runMulti(c);
+              }}
+            />
+          )}
           <Separator />
         </>
       )}
@@ -469,4 +642,84 @@ function ToolbarBtn({
 
 function Separator() {
   return <div className="mx-0.5 h-5 w-px bg-zinc-800" />;
+}
+
+/**
+ * Multi-gen control — anchor button + inline x1/x2/x3 picker.
+ *
+ * Click the anchor to expand the picker; click an x-count to fire
+ * `onPick(count)`. When `disabled` (source node mid-run) the anchor
+ * is greyed out and click is no-op'd, with a hover title explaining
+ * why so the user isn't left guessing.
+ *
+ * Layout: when `open`, the picker replaces the anchor in the toolbar
+ * row so the toolbar's overall horizontal extent stays stable (the
+ * portal-positioned toolbar reanchors on each render based on
+ * selection bbox; an anchor that grows + collapses inline would
+ * cause the toolbar to jitter horizontally as the user opens/closes).
+ */
+function MultiGenButton({
+  disabled,
+  open,
+  onOpenChange,
+  onPick,
+}: {
+  disabled: boolean;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onPick: (count: number) => void;
+}) {
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => !disabled && onOpenChange(true)}
+        disabled={disabled}
+        title={
+          disabled
+            ? "Wait for the current run to finish before queuing a multi-gen"
+            : "Multi-generate (x2 / x3 parallel runs)"
+        }
+        aria-label="Multi-generate"
+        className={cn(
+          "flex h-7 items-center gap-1 rounded px-1.5 transition-colors",
+          disabled
+            ? "cursor-not-allowed text-zinc-600"
+            : "text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100",
+        )}
+      >
+        <Layers className="h-4 w-4" />
+        <span className="text-[10px] font-semibold tabular-nums">x</span>
+      </button>
+    );
+  }
+
+  return (
+    <div
+      className="flex items-center gap-0.5 rounded bg-zinc-800/80 p-0.5"
+      onMouseLeave={() => onOpenChange(false)}
+    >
+      {[1, 2, 3].map((c) => (
+        <button
+          key={c}
+          type="button"
+          onClick={() => onPick(c)}
+          title={
+            c === 1
+              ? "Single run (same as Run button)"
+              : `Generate ${c} variations in parallel`
+          }
+          aria-label={`x${c}`}
+          className={cn(
+            "flex h-6 min-w-[26px] items-center justify-center rounded px-1 text-[11px] font-semibold tabular-nums transition-colors",
+            c === 1
+              ? "text-zinc-400 hover:bg-zinc-700 hover:text-zinc-100"
+              : "text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200",
+          )}
+        >
+          x{c}
+        </button>
+      ))}
+    </div>
+  );
 }
