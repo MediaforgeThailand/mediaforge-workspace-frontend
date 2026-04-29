@@ -47,10 +47,12 @@ import {
   Play,
   Download,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { getNodeDownloadable } from "./NodePreviewLightbox";
 import { downloadFromUrl } from "./downloadAsset";
+import { bundleNodesAsZip, harvestAssetsFromNode } from "./bundleNodes";
 import { cloneNodeFresh } from "./cloneNode";
 
 const TOOL_NODE_TYPES = new Set([
@@ -296,15 +298,54 @@ const NodeQuickToolbar = memo(() => {
 
   // Single-node download — only surfaces when the selected node has a
   // downloadable artefact (uploaded asset OR a generation with a URL).
-  // Multi-select doesn't get a download button: zip-bundling N files
-  // is its own UX (queue + progress chip) and isn't worth shipping
-  // before the demo. Users can still click each node and hit
-  // download individually.
   const downloadable = single ? getNodeDownloadable(single) : null;
   const onDownload = useCallback(() => {
     if (!downloadable) return;
     void downloadFromUrl(downloadable.url, downloadable.label);
   }, [downloadable]);
+
+  // Multi-selection download — bundles every harvestable asset across
+  // the selection into a single ZIP via `bundleNodesAsZip`, with a
+  // sonner toast pair (loading → success/error) that surfaces partial
+  // failures (e.g. one signed URL expired but the other 4 packed
+  // fine). Mirrors the right-click "Download all as ZIP" path so the
+  // two entry points behave identically.
+  const multiDownloadable = useMemo(() => {
+    if (!multi) return 0;
+    return selected.reduce(
+      (acc, n) => acc + harvestAssetsFromNode(n).length,
+      0,
+    );
+  }, [multi, selected]);
+  const onDownloadMulti = useCallback(async () => {
+    if (selected.length === 0) return;
+    const refCount = multiDownloadable;
+    if (refCount === 0) {
+      toast.error("Nothing to download — selection has no output yet");
+      return;
+    }
+    const id = toast.loading(`Bundling ${refCount} assets...`);
+    try {
+      const res = await bundleNodesAsZip(selected);
+      if (res.succeeded === 0) {
+        toast.error(
+          `Bundle failed${res.firstError ? `: ${res.firstError}` : ""}`,
+          { id },
+        );
+        return;
+      }
+      const partial =
+        res.failed > 0
+          ? ` (${res.failed} failed: ${res.firstError ?? "unknown"})`
+          : "";
+      toast.success(`Downloaded ${res.bundleName}${partial}`, { id });
+    } catch (err) {
+      toast.error(
+        `Bundle failed: ${err instanceof Error ? err.message : String(err)}`,
+        { id },
+      );
+    }
+  }, [selected, multiDownloadable]);
 
   if (!screenPos || selected.length === 0) return null;
 
@@ -331,6 +372,16 @@ const NodeQuickToolbar = memo(() => {
             icon={LayoutGrid}
             label="Arrange as grid"
             onClick={onArrange}
+          />
+          {/* Download all as ZIP — same handler as the right-click
+           *  multi-download. Greyed (still clickable, just toasts
+           *  "nothing to download") when the selection has no
+           *  harvestable assets. Mirrors the spec's "add Download
+           *  next to Copy / Delete" requirement. */}
+          <ToolbarBtn
+            icon={Download}
+            label={`Download all (${selected.length}) as ZIP`}
+            onClick={() => void onDownloadMulti()}
           />
           <Separator />
         </>

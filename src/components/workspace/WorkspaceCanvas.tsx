@@ -59,6 +59,7 @@ import { cloneNodeFresh } from "./cloneNode";
 import MultiSelectionFrame from "./MultiSelectionFrame";
 import NodePreviewLightbox, {
   getNodePreview,
+  getNodeDownloadable,
   type PreviewPayload,
 } from "./NodePreviewLightbox";
 import { getWorkspaceSchema, portTypeFromHandleId } from "./workspaceSchema";
@@ -71,6 +72,18 @@ import CanvasContextMenu, {
   type ContextMenuState,
   type ToolItem,
 } from "./CanvasContextMenu";
+import NodeContextMenu, {
+  type NodeContextMenuItem,
+} from "./NodeContextMenu";
+import {
+  Copy as CtxCopyIcon,
+  Download as CtxDownloadIcon,
+  Files as CtxFilesIcon,
+  FileArchive as CtxFileArchiveIcon,
+  Trash2 as CtxTrash2Icon,
+} from "lucide-react";
+import { downloadFromUrl } from "./downloadAsset";
+import { bundleNodesAsZip, harvestAssetsFromNode } from "./bundleNodes";
 import CanvasFloatingSidebar from "./CanvasFloatingSidebar";
 import ShortcutsDialog from "./ShortcutsDialog";
 import VoicePickerDialog from "./VoicePickerDialog";
@@ -778,6 +791,22 @@ const Inner = () => {
   const [picker, setPicker] = useState<CanvasNodePickerState | null>(null);
   const [preview, setPreview] = useState<PreviewPayload | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  // Right-click on a NODE (single or multi-selected) → small action
+  // menu with Download / Download all generations / Copy / Delete (and
+  // the multi-selection "Download all as ZIP" variant). Empty-canvas
+  // right-click is owned by the `contextMenu` state above
+  // (CanvasContextMenu / tool palette) — these two never collide
+  // because React Flow's `onNodeContextMenu` and `onPaneContextMenu`
+  // are mutually exclusive event channels, and the wrapper-level
+  // onContextMenu skips when the cursor was on a node element.
+  const [nodeContextMenu, setNodeContextMenu] = useState<{
+    position: { x: number; y: number };
+    /** The actual nodes the menu is acting on. For a right-click on a
+     *  node that's NOT part of the current selection, this is just
+     *  [that-node]; for a right-click anywhere on a multi-selection,
+     *  it's the full selection. */
+    targetNodes: Node[];
+  } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Voice picker — single instance owned by the canvas, opened via
   // a window event from any audioGenNode that wants to swap voices.
@@ -793,10 +822,28 @@ const Inner = () => {
 
   /** Right-click on canvas → open the categorised tool picker at the
    *  click point. We block both the browser context menu and the
-   *  React-Flow pane click that would otherwise deselect everything. */
+   *  React-Flow pane click that would otherwise deselect everything.
+   *
+   *  EXCEPTION: when the user has a multi-selection active and right-
+   *  clicks on empty canvas, surface the NODE context menu (with
+   *  "Download all as ZIP" etc.) instead of the tool palette — that's
+   *  the gesture they reach for to act on the selection without
+   *  re-clicking individual tiles. */
   const onPaneContextMenu = useCallback(
     (e: React.MouseEvent | MouseEvent) => {
       e.preventDefault();
+      // Active multi-selection? Route to node menu, not tool palette.
+      const allNodes =
+        useWorkspaceStore.getState().current?.nodes ?? [];
+      const sel = allNodes.filter((n) => n.selected);
+      if (sel.length >= 2) {
+        setContextMenu(null);
+        setNodeContextMenu({
+          position: { x: e.clientX, y: e.clientY },
+          targetNodes: sel,
+        });
+        return;
+      }
       const flow = screenToFlowPosition({ x: e.clientX, y: e.clientY });
       setContextMenu({
         screen: { x: e.clientX, y: e.clientY },
@@ -805,6 +852,275 @@ const Inner = () => {
     },
     [screenToFlowPosition],
   );
+
+  /** Right-click on a SINGLE node → small action menu (Download /
+   *  Download all generations / Copy / Delete). If the right-clicked
+   *  node is part of the current multi-selection, we treat the gesture
+   *  as a "act on the whole selection" and surface the multi variant
+   *  ("Download all (N) as ZIP" etc.) instead. React Flow fires this
+   *  event INSTEAD of `onPaneContextMenu` when the cursor is on a
+   *  node, so the two never compete. */
+  const onNodeContextMenu = useCallback(
+    (e: React.MouseEvent, node: Node) => {
+      // Suppress the browser's native context menu and the pane-level
+      // tool palette — both would steal focus from our menu.
+      e.preventDefault();
+      e.stopPropagation();
+      // Always close the tool palette first (defensive — multiple
+      // right-click variants in flight create stacked overlays).
+      setContextMenu(null);
+
+      const allNodes =
+        useWorkspaceStore.getState().current?.nodes ?? [];
+      const sel = allNodes.filter((n) => n.selected);
+      const isPartOfSelection = sel.some((n) => n.id === node.id);
+      const targetNodes =
+        isPartOfSelection && sel.length >= 2 ? sel : [node];
+
+      setNodeContextMenu({
+        position: { x: e.clientX, y: e.clientY },
+        targetNodes,
+      });
+    },
+    [],
+  );
+
+  /** Right-click on the multi-selection bounding box (React Flow's
+   *  `onSelectionContextMenu` event — fires when the click lands
+   *  inside the selection rectangle even if not on a specific node).
+   *  We route to the same node-context handler with the full
+   *  selection. */
+  const onSelectionContextMenu = useCallback(
+    (e: React.MouseEvent, nodes: Node[]) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu(null);
+      if (nodes.length === 0) return;
+      setNodeContextMenu({
+        position: { x: e.clientX, y: e.clientY },
+        targetNodes: nodes,
+      });
+    },
+    [],
+  );
+
+  /* ── Right-click action handlers ──
+   *
+   *  These mirror the existing keyboard / toolbar paths so behaviour
+   *  is identical regardless of how the user fires the action. Each
+   *  one is a *closure* the menu fires on item click — the menu
+   *  itself is dumb (no business logic). */
+  const onCtxDownloadSingle = useCallback((node: Node) => {
+    const downloadable = getNodeDownloadable(node);
+    if (!downloadable) {
+      toast.error("Nothing to download — node has no output yet");
+      return;
+    }
+    void downloadFromUrl(downloadable.url, downloadable.label);
+  }, []);
+
+  const onCtxDownloadAllGenerations = useCallback(async (node: Node) => {
+    const refs = harvestAssetsFromNode(node);
+    if (refs.length === 0) {
+      toast.error("Nothing to download — node has no generations yet");
+      return;
+    }
+    if (refs.length === 1) {
+      // Avoid wrapping a single file in a ZIP (annoying UX) — fall
+      // back to a direct single-asset download.
+      void downloadFromUrl(refs[0].url, refs[0].filename);
+      return;
+    }
+    const id = toast.loading(`Bundling ${refs.length} assets...`);
+    try {
+      const res = await bundleNodesAsZip([node]);
+      if (res.succeeded === 0) {
+        toast.error(
+          `Bundle failed${res.firstError ? `: ${res.firstError}` : ""}`,
+          { id },
+        );
+        return;
+      }
+      const partial =
+        res.failed > 0
+          ? ` (${res.failed} failed: ${res.firstError ?? "unknown"})`
+          : "";
+      toast.success(`Downloaded ${res.bundleName}${partial}`, { id });
+    } catch (err) {
+      toast.error(
+        `Bundle failed: ${err instanceof Error ? err.message : String(err)}`,
+        { id },
+      );
+    }
+  }, []);
+
+  const onCtxDownloadZip = useCallback(async (nodes: Node[]) => {
+    // Aggregate harvest count up front so we can show an accurate
+    // "Bundling N assets..." message — `nodes.length` would lie when
+    // the selection includes zero-output nodes (they contribute zero
+    // files to the ZIP).
+    const refs = nodes.flatMap((n) => harvestAssetsFromNode(n));
+    if (refs.length === 0) {
+      toast.error("Nothing to download — selection has no output yet");
+      return;
+    }
+    const id = toast.loading(`Bundling ${refs.length} assets...`);
+    try {
+      const res = await bundleNodesAsZip(nodes);
+      if (res.succeeded === 0) {
+        toast.error(
+          `Bundle failed${res.firstError ? `: ${res.firstError}` : ""}`,
+          { id },
+        );
+        return;
+      }
+      const partial =
+        res.failed > 0
+          ? ` (${res.failed} failed: ${res.firstError ?? "unknown"})`
+          : "";
+      toast.success(`Downloaded ${res.bundleName}${partial}`, { id });
+    } catch (err) {
+      toast.error(
+        `Bundle failed: ${err instanceof Error ? err.message : String(err)}`,
+        { id },
+      );
+    }
+  }, []);
+
+  const onCtxDuplicate = useCallback(
+    (nodes: Node[]) => {
+      if (nodes.length === 0) return;
+      pushHistory();
+      const idMap = new Map<string, string>();
+      const cloned: Node[] = nodes.map((n) => {
+        const newId = `n_${crypto.randomUUID()}`;
+        idMap.set(n.id, newId);
+        const fresh = cloneNodeFresh(n, newId);
+        return {
+          ...fresh,
+          position: { x: n.position.x + 30, y: n.position.y + 30 },
+          selected: true,
+        };
+      });
+      // Keep edges that are fully internal to the duplicated subgraph.
+      const internalEdges = getEdges()
+        .filter((e) => idMap.has(e.source) && idMap.has(e.target))
+        .map((e) => ({
+          ...e,
+          id: `e_${crypto.randomUUID()}`,
+          source: idMap.get(e.source)!,
+          target: idMap.get(e.target)!,
+          selected: false,
+        }));
+      setNodes((nds) => [
+        ...nds.map((n) => (n.selected ? { ...n, selected: false } : n)),
+        ...cloned,
+      ]);
+      setEdges((eds) => [...eds, ...internalEdges]);
+    },
+    [getEdges, setNodes, setEdges, pushHistory],
+  );
+
+  const onCtxDelete = useCallback(
+    (nodes: Node[]) => {
+      if (nodes.length === 0) return;
+      pushHistory();
+      const ids = new Set(nodes.map((n) => n.id));
+      setNodes((nds) => nds.filter((n) => !ids.has(n.id)));
+      setEdges((eds) =>
+        eds.filter((e) => !ids.has(e.source) && !ids.has(e.target)),
+      );
+    },
+    [setNodes, setEdges, pushHistory],
+  );
+
+  /** Build the action list for the current right-click target — used
+   *  by the menu render below. Memo'd against the menu state so we
+   *  don't recompute every parent render. */
+  const nodeContextMenuItems = useMemo<NodeContextMenuItem[]>(() => {
+    if (!nodeContextMenu) return [];
+    const targets = nodeContextMenu.targetNodes;
+    if (targets.length === 0) return [];
+
+    if (targets.length === 1) {
+      const node = targets[0];
+      const downloadable = getNodeDownloadable(node);
+      const data = (node.data ?? {}) as Record<string, unknown>;
+      const gens = Array.isArray(data.generations)
+        ? (data.generations as unknown[])
+        : [];
+      const items: NodeContextMenuItem[] = [
+        {
+          key: "download",
+          label: "Download",
+          icon: CtxDownloadIcon,
+          disabled: !downloadable,
+          onSelect: () => onCtxDownloadSingle(node),
+        },
+      ];
+      if (gens.length > 1) {
+        items.push({
+          key: "download-all-gens",
+          label: `Download all generations (${gens.length})`,
+          icon: CtxFilesIcon,
+          onSelect: () => void onCtxDownloadAllGenerations(node),
+        });
+      }
+      items.push(
+        {
+          key: "duplicate",
+          label: "Duplicate",
+          icon: CtxCopyIcon,
+          separatorBefore: true,
+          onSelect: () => onCtxDuplicate([node]),
+        },
+        {
+          key: "delete",
+          label: "Delete",
+          icon: CtxTrash2Icon,
+          danger: true,
+          onSelect: () => onCtxDelete([node]),
+        },
+      );
+      return items;
+    }
+
+    // Multi-selection — `Download all (N) as ZIP` headline action.
+    const downloadable = targets.reduce(
+      (acc, n) => acc + harvestAssetsFromNode(n).length,
+      0,
+    );
+    return [
+      {
+        key: "download-zip",
+        label: `Download all (${targets.length} items) as ZIP`,
+        icon: CtxFileArchiveIcon,
+        disabled: downloadable === 0,
+        onSelect: () => void onCtxDownloadZip(targets),
+      },
+      {
+        key: "duplicate-all",
+        label: `Duplicate all (${targets.length})`,
+        icon: CtxCopyIcon,
+        separatorBefore: true,
+        onSelect: () => onCtxDuplicate(targets),
+      },
+      {
+        key: "delete-all",
+        label: `Delete all (${targets.length})`,
+        icon: CtxTrash2Icon,
+        danger: true,
+        onSelect: () => onCtxDelete(targets),
+      },
+    ];
+  }, [
+    nodeContextMenu,
+    onCtxDownloadSingle,
+    onCtxDownloadAllGenerations,
+    onCtxDownloadZip,
+    onCtxDuplicate,
+    onCtxDelete,
+  ]);
 
   /** Picking a tool from the right-click menu spawns it at the
    *  original click position (flow coords) and closes the menu.
@@ -1636,6 +1952,19 @@ const Inner = () => {
         ) {
           return;
         }
+        // Skip when the cursor is over a NODE — React Flow's
+        // `onNodeContextMenu` (or `onSelectionContextMenu`) handles
+        // those clicks and surfaces the per-node action menu
+        // (Download / Duplicate / Delete). Without this guard, the
+        // wrapper would race the React Flow event and pop the
+        // tool palette ON TOP of the node menu.
+        if (
+          target?.closest?.(
+            ".react-flow__node, .react-flow__nodesselection",
+          ) != null
+        ) {
+          return;
+        }
         // React Flow's own onPaneContextMenu also fires for pane
         // clicks — guard against opening the menu twice. We open
         // here for "anywhere on the canvas wrapper" coverage; the
@@ -1643,6 +1972,20 @@ const Inner = () => {
         // path but we close it via onPaneContextMenu doing the same
         // setContextMenu call (idempotent).
         e.preventDefault();
+        // Active multi-selection on empty canvas → node action menu
+        // (matches `onPaneContextMenu`'s behaviour exactly so the
+        // wrapper-level path doesn't undo what the pane handler
+        // would have done).
+        const allNodes =
+          useWorkspaceStore.getState().current?.nodes ?? [];
+        const sel = allNodes.filter((n) => n.selected);
+        if (sel.length >= 2) {
+          setNodeContextMenu({
+            position: { x: e.clientX, y: e.clientY },
+            targetNodes: sel,
+          });
+          return;
+        }
         const flow = screenToFlowPosition({ x: e.clientX, y: e.clientY });
         setContextMenu({
           screen: { x: e.clientX, y: e.clientY },
@@ -1668,6 +2011,8 @@ const Inner = () => {
         onNodeDragStop={onNodeDragStop}
         onPaneClick={onPaneClick}
         onPaneContextMenu={onPaneContextMenu}
+        onNodeContextMenu={onNodeContextMenu}
+        onSelectionContextMenu={onSelectionContextMenu}
         onEdgeClick={onEdgeClick}
         isValidConnection={isValidConnection}
         deleteKeyCode={DELETE_KEYS}
@@ -1729,6 +2074,13 @@ const Inner = () => {
           onPick={onContextMenuPick}
           onAction={onContextMenuAction}
           onClose={() => setContextMenu(null)}
+        />
+      )}
+      {nodeContextMenu && nodeContextMenuItems.length > 0 && (
+        <NodeContextMenu
+          position={nodeContextMenu.position}
+          items={nodeContextMenuItems}
+          onClose={() => setNodeContextMenu(null)}
         />
       )}
       {preview && (
