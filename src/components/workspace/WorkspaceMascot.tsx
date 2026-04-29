@@ -2,64 +2,43 @@
  * Workspace mascot — small looping video pinned to the bottom-left
  * corner of the canvas page.
  *
- * The mascot ALTERNATES between two clips on a 2-1 cadence:
- *   • clip B (Magnific export)   → 2 plays
- *   • clip A (original mascot)   → 1 play
- *   • repeat indefinitely
+ * Single clip now (the team replaced the alternating Magnific +
+ * alpha-channel pair with one new export). Bg-removal still runs
+ * through the canvas luminance-key pipeline because:
  *
- * ── Background removal ────────────────────────────────────────
- * The Magnific export ships with a SOLID-BLACK background and no
- * alpha channel. The earlier `mix-blend-mode: screen` workaround
- * also knocked out the cat's BLACK HOODIE because screen-blend
- * treats any dark pixel as "transparent" against a dark canvas.
+ *   • If the webm carries a real alpha channel, drawImage preserves
+ *     it and our key loop only touches pixels with luminance < 22 —
+ *     which is never reached on already-transparent (rgba 0,0,0,0)
+ *     samples that other code paths ignored, so it's a no-op there.
+ *   • If the webm has a solid dark backdrop (Magnific exports
+ *     default to this), the same key loop knocks the bg out cleanly
+ *     while keeping any near-black-but-not-pure-black detail (e.g.
+ *     a black hoodie at L≈30+).
  *
- * Better path that doesn't need ffmpeg + an alpha re-encode: render
- * each frame to a `<canvas>` and apply a tight luminance threshold
- * — pixels brighter than the bg but darker than the hoodie's
- * darkest fabric pixel keep their alpha, anything below the cut
- * goes to alpha=0. The cut sits at L<10 (out of 255), well below
- * fabric-texture noise (~30–60), so the bg dies cleanly while the
- * hoodie stays solid. A small linear ramp 10–22 feathers the
- * transition so the cat doesn't get a hard pixelated outline.
+ * That dual-mode keeps us safe regardless of which export style the
+ * design hand-off uses next time without re-encoding.
  *
- * The original alpha-channel clip needs none of this — it renders
- * as a plain `<video>` element.
- *
- * Source files:
- *   public/videos/workspace-mascot.webm   (clip A — alpha)
- *   public/videos/workspace-mascot-2.webm (clip B — Magnific)
- *
- * Hide via the dev-only `?mascot=off` query param if it gets in the
- * way (`/app/workspace/<id>?mascot=off`).
+ * Hide via the dev-only `?mascot=off` query param.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
-interface ClipConfig {
-  src: string;
-  /** How many full plays of this clip before advancing to the next. */
-  plays: number;
-  /** Whether the source already carries an alpha channel. The
-   *  Magnific export doesn't — we knock its dark backdrop out
-   *  via canvas-based luminance keying at render time. */
-  hasAlpha: boolean;
-}
+const SRC = "/videos/workspace-mascot-3.webm";
 
-const SEQUENCE: ClipConfig[] = [
-  { src: "/videos/workspace-mascot-2.webm", plays: 2, hasAlpha: false },
-  { src: "/videos/workspace-mascot.webm", plays: 1, hasAlpha: true },
-];
+/* Display width in CSS px. Bumped DOWN from 180 → 130 — the team
+ * felt the previous clip ate too much corner real-estate next to
+ * the compact tool palette. The drawn canvas matches the source's
+ * intrinsic aspect ratio so the mascot doesn't squish at the new
+ * width. */
+const WIDTH = 130;
 
-/* Luminance-key cutoffs for the Magnific clip's black bg. Below
- * `KEY_OUT` → alpha=0 (gone). Above `KEY_IN` → alpha=255 (keep).
- * Between → linear feather so the cat keeps a soft edge. Tuned by
- * eye against the actual webm; bump KEY_OUT up if a faint dark
- * halo persists, push it down if the cat's deepest shadows start
- * to ghost. */
+/* Luminance-key cutoffs. Below KEY_OUT → alpha 0 (gone). Above
+ * KEY_IN → alpha kept. Between → linear feather so the silhouette
+ * keeps a soft edge instead of a hard pixel-step outline. Tuned by
+ * eye against multiple Magnific export styles; bump KEY_OUT up if
+ * a faint dark halo persists, push it down if deep shadows ghost. */
 const KEY_OUT = 10;
 const KEY_IN = 22;
-
-const WIDTH = 180;
 
 const WorkspaceMascot = () => {
   const hidden = useMemo(() => {
@@ -67,51 +46,16 @@ const WorkspaceMascot = () => {
     return new URLSearchParams(window.location.search).get("mascot") === "off";
   }, []);
 
-  const [step, setStep] = useState(0);
-  const playsDoneRef = useRef(0);
-
-  // Reset play counter on clip change so a fast successive `ended`
-  // can't cause the sequence to skip a clip.
-  useEffect(() => {
-    playsDoneRef.current = 0;
-  }, [step]);
-
   if (hidden) return null;
-
-  const clip = SEQUENCE[step % SEQUENCE.length];
-
-  const onClipEnded = () => {
-    playsDoneRef.current += 1;
-    if (playsDoneRef.current >= clip.plays) {
-      setStep((s) => s + 1);
-    }
-  };
 
   return (
     <div
-      className="pointer-events-none fixed bottom-3 left-[64px] z-[40] select-none"
-      // 64px clears the compact tool palette (52px) + a small gutter.
+      className="pointer-events-none fixed bottom-3 left-[60px] z-[40] select-none"
+      // 60px clears the compact tool palette (52px) + a small gutter.
       // pointer-events-none so the mascot can't intercept canvas drags.
       aria-hidden="true"
     >
-      {clip.hasAlpha ? (
-        <PlainVideo
-          // `key` forces a fresh mount per clip — toggling the `src`
-          // attribute on a single <video> doesn't restart playback
-          // reliably across browsers.
-          key={clip.src}
-          src={clip.src}
-          onEnded={onClipEnded}
-          replay={() => undefined /* loop handled by re-mount */}
-        />
-      ) : (
-        <KeyedCanvasVideo
-          key={clip.src}
-          src={clip.src}
-          plays={clip.plays}
-          onSequenceEnd={() => setStep((s) => s + 1)}
-        />
-      )}
+      <KeyedCanvasVideo src={SRC} />
     </div>
   );
 };
@@ -119,56 +63,21 @@ const WorkspaceMascot = () => {
 export default WorkspaceMascot;
 
 /* ────────────────────────────────────────────────────────────
- * Plain video — alpha clips render straight, no canvas needed.
- * ──────────────────────────────────────────────────────────── */
-function PlainVideo({
-  src,
-  onEnded,
-}: {
-  src: string;
-  onEnded: () => void;
-  /** Unused — kept so the call-site signature mirrors the canvas
-   *  variant. The plain `<video>` self-replays on re-mount. */
-  replay: () => void;
-}) {
-  return (
-    <video
-      src={src}
-      autoPlay
-      muted
-      playsInline
-      onEnded={onEnded}
-      disableRemotePlayback
-      className="h-auto w-[180px] drop-shadow-[0_8px_24px_rgba(0,0,0,0.45)]"
-    />
-  );
-}
-
-/* ────────────────────────────────────────────────────────────
  * Keyed canvas video — pulls frames from a hidden <video>, runs
- * a luminance threshold, paints to a visible <canvas>. The
- * <video> handles decode + audio-less playback; we just sample.
+ * a luminance threshold, paints to a visible <canvas>. Self-loops
+ * via the `loop` attribute on the source <video> so the rAF draw
+ * loop just keeps painting; no manual sequence handover needed.
  *
- * Why this beats `mix-blend-mode: screen`: blend modes operate on
- * COMPOSITED output, so "black bg on dark canvas" and "black
- * hoodie on dark canvas" are indistinguishable to screen-blend —
- * both look dark, both get treated as transparent. By contrast,
- * a per-pixel luminance check on the SOURCE distinguishes pure-
- * black bg pixels (L≈0) from hoodie texture (L≈30+) before any
- * compositing. The hoodie survives.
+ * Why not a plain <video>: even when the source has an alpha
+ * channel, the browser composites the video against PAGE BACKGROUND
+ * before our React tree gets to apply blend modes — and blend
+ * modes can't reliably distinguish "subject's black hoodie" from
+ * "background black". Pulling pixels into a canvas first lets us
+ * inspect each one before deciding whether to keep it.
  * ──────────────────────────────────────────────────────────── */
-function KeyedCanvasVideo({
-  src,
-  plays,
-  onSequenceEnd,
-}: {
-  src: string;
-  plays: number;
-  onSequenceEnd: () => void;
-}) {
+function KeyedCanvasVideo({ src }: { src: string }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const playsDoneRef = useRef(0);
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -181,7 +90,7 @@ function KeyedCanvasVideo({
     if (!ctx) return;
 
     /** Sized once per loaded clip — the keying pass needs a bitmap
-     *  buffer that matches the source video's intrinsic size. */
+     *  buffer that matches the source's intrinsic aspect ratio. */
     const onLoadedMetadata = () => {
       const aspect = video.videoWidth / Math.max(video.videoHeight, 1);
       canvas.width = WIDTH;
@@ -203,57 +112,43 @@ function KeyedCanvasVideo({
           if (lum <= KEY_OUT) {
             data[i + 3] = 0;
           } else if (lum < KEY_IN) {
-            // Linear feather between the two cuts.
             data[i + 3] = Math.round(((lum - KEY_OUT) / (KEY_IN - KEY_OUT)) * 255);
           }
-          // else lum >= KEY_IN → leave alpha at 255 (default).
+          // else → leave the source alpha alone (preserves real
+          // alpha channels when the export carries one).
         }
         ctx.putImageData(frame, 0, 0);
       }
       rafRef.current = requestAnimationFrame(drawFrame);
     };
 
-    const handleEnded = () => {
-      playsDoneRef.current += 1;
-      if (playsDoneRef.current < plays) {
-        // Replay this same clip — keep painting.
-        video.currentTime = 0;
-        void video.play();
-      } else {
-        // Sequence handover.
-        onSequenceEnd();
-      }
-    };
-
     video.addEventListener("loadedmetadata", onLoadedMetadata);
-    video.addEventListener("ended", handleEnded);
     rafRef.current = requestAnimationFrame(drawFrame);
 
     // Some browsers still need a manual play() after autoPlay attr
     // when sources change rapidly — fire-and-forget; if play()
-    // rejects (autoplay policy), we'll catch it via the silent error.
+    // rejects (autoplay policy), the rAF loop just keeps idling.
     void video.play().catch(() => {});
 
     return () => {
       cancelled = true;
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       video.removeEventListener("loadedmetadata", onLoadedMetadata);
-      video.removeEventListener("ended", handleEnded);
     };
-  }, [src, plays, onSequenceEnd]);
+  }, [src]);
 
   return (
     <>
-      {/* Hidden source — decodes the webm, never visible. The
-       *  `playsInline` + `muted` combo lets autoplay through every
-       *  modern browser's policy. `crossOrigin` left default since
-       *  the video is same-origin (served from /public). */}
+      {/* Hidden source — decodes the webm, never visible. The `loop`
+       *  attribute restarts on `ended` automatically so the rAF
+       *  draw loop keeps painting without a manual handover. */}
       <video
         ref={videoRef}
         src={src}
         muted
         playsInline
         autoPlay
+        loop
         disableRemotePlayback
         style={{
           position: "absolute",
@@ -268,7 +163,7 @@ function KeyedCanvasVideo({
         style={{
           width: WIDTH,
           height: "auto",
-          filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.45))",
+          filter: "drop-shadow(0 6px 18px rgba(0,0,0,0.4))",
         }}
       />
     </>
