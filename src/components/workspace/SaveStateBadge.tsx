@@ -50,6 +50,11 @@ const SaveStateBadge = ({ variant = "block", className }: Props) => {
   > = {
     idle: null,
     guest: null,
+    // Viewer & editor-readonly states are surfaced via the
+    // ShareModeBanner across the top of the canvas, so the badge
+    // itself stays silent — no need to double up.
+    viewer: null,
+    "editor-readonly": null,
     saving: {
       label: "Saving…",
       icon: Loader2,

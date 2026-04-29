@@ -26,14 +26,15 @@
  * rows read as one continuous header.
  */
 
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Users, Layers } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import { useWorkspaceShareRole } from "@/store/useWorkspaceShareRole";
 import { UserMenu } from "@/components/workspace/UserMenu";
+import ShareDialog from "@/components/workspace/ShareDialog";
 
 const CanvasHeader = () => {
-  const { toast } = useToast();
   const currentWorkspaceId = useWorkspaceStore(
     (s) => s.current?.workspaceId ?? null,
   );
@@ -42,17 +43,15 @@ const CanvasHeader = () => {
       ? s.workspaces.find((w) => w.id === currentWorkspaceId) ?? null
       : null,
   );
+  // Only owners can mint share links. Visitors who arrived via a
+  // viewer/editor token shouldn't see the Share button — they
+  // can't (and shouldn't be able to) re-share someone else's space.
+  const shareRole = useWorkspaceShareRole((s) => s.role);
+  const canShare = shareRole === "owner" && !!currentWorkspaceId;
+  const [shareOpen, setShareOpen] = useState(false);
 
   const projectLabel = "Personal";
   const projectAccent = "hsl(35 90% 55%)"; // matches the Personal colour swatch on the dashboard
-
-  const handleShare = () => {
-    toast({
-      title: "Sharing is on the way",
-      description:
-        "Multi-user workspaces ship with the Teams + SSO rollout. Stay tuned.",
-    });
-  };
 
   return (
     <div
@@ -96,17 +95,28 @@ const CanvasHeader = () => {
 
       {/* Right — Share + UserMenu */}
       <div className="flex shrink-0 items-center gap-2">
-        <button
-          type="button"
-          onClick={handleShare}
-          className="flex h-8 items-center gap-1.5 rounded-md bg-white px-3 text-[12px] font-medium text-zinc-900 transition-colors hover:bg-zinc-200"
-          title="Share workspace"
-        >
-          <Users className="h-3.5 w-3.5" />
-          Share
-        </button>
+        {canShare && (
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            className="flex h-8 items-center gap-1.5 rounded-md bg-white px-3 text-[12px] font-medium text-zinc-900 transition-colors hover:bg-zinc-200"
+            title="Share workspace"
+          >
+            <Users className="h-3.5 w-3.5" />
+            Share
+          </button>
+        )}
         <UserMenu />
       </div>
+
+      {canShare && currentWorkspaceId && (
+        <ShareDialog
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          workspaceId={currentWorkspaceId}
+          workspaceName={workspace?.name ?? ""}
+        />
+      )}
     </div>
   );
 };
