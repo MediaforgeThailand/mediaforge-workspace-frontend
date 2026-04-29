@@ -1086,6 +1086,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         provider_meta?: {
           poll_endpoint?: string;
           provider?: string;
+          model?: string;
+          provider_model_id?: string;
           model_url?: string;
           rendered_image?: string;
         };
@@ -1135,6 +1137,9 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           payload: { task_id: r.task_id, poll_endpoint: pollEndpoint, action: pollAction },
         });
 
+        const pollModel = r.provider_meta?.model ?? r.provider_meta?.provider_model_id;
+        const pollProviderModelId = r.provider_meta?.provider_model_id;
+
         while (Date.now() - pollStart < POLL_TIMEOUT_MS) {
           await new Promise((res) => setTimeout(res, POLL_INTERVAL_MS));
           if (!runStillActive()) return;
@@ -1145,6 +1150,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                 action: pollAction,
                 task_id: r.task_id,
                 poll_endpoint: pollEndpoint,
+                model: pollModel,
+                provider_model_id: pollProviderModelId,
               },
             },
           );
