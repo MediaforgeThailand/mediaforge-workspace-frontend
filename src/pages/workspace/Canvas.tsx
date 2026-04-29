@@ -29,7 +29,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useAuth } from "@/contexts/AuthContext";
-import WorkspaceTabBar from "@/components/workspace/WorkspaceTabBar";
+import WorkspaceCanvasPagePill from "@/components/workspace/WorkspaceCanvasPagePill";
 import CanvasHeader from "@/components/workspace/CanvasHeader";
 // Tool palette is replaced by the in-canvas floating sidebar (see
 // CanvasFloatingSidebar) + the right-click context menu (see
@@ -282,7 +282,6 @@ const WorkspaceCanvasPage = () => {
           black void with no escape but F5. */}
       <WorkspaceErrorBoundary>
         <CanvasHeader />
-        <WorkspaceTabBar />
         <div className="flex flex-1 overflow-hidden">
           <main className="flex-1">
             {hydrated ? (
@@ -302,6 +301,14 @@ const WorkspaceCanvasPage = () => {
         {/* <WorkspaceDebugPanel /> — kept disabled until persist
          *   middleware is audited (not blocking demo). */}
         <WorkspaceMascot />
+        {/* Floating page switcher — bottom-left of the canvas.
+         *  Replaced the old WorkspaceTabBar (top-row strip) so the
+         *  canvas gets a full row of vertical space back. The pill
+         *  is fixed-positioned, so its JSX order doesn't matter — we
+         *  keep it inside the error boundary so a render fault in
+         *  the popover surfaces in the same recoverable card the
+         *  rest of the workspace uses. */}
+        {hydrated && <WorkspaceCanvasPagePill />}
       </WorkspaceErrorBoundary>
     </div>
   );

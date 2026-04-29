@@ -1,3 +1,4 @@
+// DEPRECATED — superseded by WorkspaceCanvasPagePill. Kept for reference / rollback. Will be deleted in a follow-up cleanup.
 /**
  * Workspace Tab Bar — Photoshop / Figma-style document tabs.
  *
@@ -21,11 +22,11 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Plus, X, Check, CloudOff, Loader2 } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
-import type { SaveState } from "./useCanvasAutosave";
 import { deleteCanvasFromServer } from "./canvasPersistence";
+import SaveStateBadge from "./SaveStateBadge";
 
 const TAB_MIN_W = 120;
 const TAB_MAX_W = 200;
@@ -280,76 +281,5 @@ const WorkspaceTabBar = () => {
     </div>
   );
 };
-
-/* ── Atom: autosave indicator ──────────────────────────────────
- *
- * `useCanvasAutosave` lives inside the React Flow tree (canvas
- * surface) but the badge belongs up here. We bridge the two with
- * a window event ("workspace-save-state") so the canvas hook can
- * push state without forcing the tab bar to mount inside a flow
- * provider. */
-function SaveStateBadge() {
-  const [state, setState] = useState<SaveState>("idle");
-  useEffect(() => {
-    const onState = (e: Event) => {
-      const detail = (e as CustomEvent<{ state: SaveState }>).detail;
-      if (detail?.state) setState(detail.state);
-    };
-    window.addEventListener("workspace-save-state", onState as EventListener);
-    return () =>
-      window.removeEventListener(
-        "workspace-save-state",
-        onState as EventListener,
-      );
-  }, []);
-
-  const config: Record<
-    SaveState,
-    { label: string; icon: React.ComponentType<{ className?: string }>; color: string } | null
-  > = {
-    idle: null,
-    guest: null,
-    saving: {
-      label: "Saving…",
-      icon: Loader2,
-      color: "text-amber-300",
-    },
-    saved: {
-      label: "Saved",
-      icon: Check,
-      color: "text-emerald-300",
-    },
-    error: {
-      label: "Save failed — retry on next change",
-      icon: CloudOff,
-      color: "text-rose-300",
-    },
-    tableMissing: {
-      label: "Local-only (apply migration to enable cloud autosave)",
-      icon: CloudOff,
-      color: "text-amber-300/80",
-    },
-  };
-  const c = config[state];
-  if (!c) return null;
-  const Icon = c.icon;
-  return (
-    <div
-      className={cn(
-        "ml-2 mb-1 flex h-6 shrink-0 items-center gap-1 rounded px-2 text-[10.5px]",
-        c.color,
-      )}
-      title={c.label}
-    >
-      <Icon
-        className={cn(
-          "h-3 w-3",
-          state === "saving" && "animate-spin",
-        )}
-      />
-      {c.label}
-    </div>
-  );
-}
 
 export default WorkspaceTabBar;
