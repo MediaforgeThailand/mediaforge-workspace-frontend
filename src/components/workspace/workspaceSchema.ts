@@ -536,21 +536,55 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         key: "duration",
         label: "Duration (s)",
         type: "dynamic",
+        // Per-model valid duration ranges. BytePlus / Kling reject
+        // anything outside these and the user's only feedback is a
+        // 400 InvalidParameter mid-gen — so the UI has to gate the
+        // values, not just hint them.
+        //
+        //   Seedance 1.0 Lite          → discrete [5, 10]
+        //   Seedance 1.0 Pro / Pro Fast → 2-12s slider
+        //   Seedance 1.5 Pro            → discrete [4..12]
+        //   Seedance 2.0 (Lite / Pro)   → 4-15s slider
+        //   Kling v3 Omni / v3 Pro      → 3-15s slider
+        //   everything else (legacy)    → discrete [5, 10]
+        //
+        // Order matters: more specific prefixes (`seedance-1-5-`,
+        // `seedance-2-0-`) must be tested before the generic
+        // `seedance-` fallback or 1.5 Pro would get the 1.0 Pro range.
         dynamicType: (model: string) => {
           const isV3 = model === "kling-v3-omni" || model === "kling-v3-pro";
           if (isV3)
             return { type: "slider" as const, min: 3, max: 15, step: 1, default: 5 };
-          // Seedance 2.0 (UI slug seedance-2-0-* and direct BytePlus
-          // ID dreamina-seedance-*) accepts 4–14s per the BytePlus
-          // model spec — narrower than the slider would imply, but
-          // matches what BytePlus actually validates against.
+
+          // Seedance 2.0 — Lite + Pro share the same window. Direct
+          // BytePlus IDs (`dreamina-seedance-*`) get the same treatment
+          // for the canvas-driven custom-endpoint path.
           if (
             model.startsWith("seedance-2-0") ||
             model.startsWith("dreamina-seedance")
           )
-            return { type: "slider" as const, min: 4, max: 14, step: 1, default: 5 };
-          if (model.startsWith("seedance-"))
+            return { type: "slider" as const, min: 4, max: 15, step: 1, default: 5 };
+
+          // Seedance 1.5 Pro — discrete list, not a continuous range.
+          if (model.startsWith("seedance-1-5"))
+            return {
+              type: "select" as const,
+              options: ["4", "5", "6", "7", "8", "9", "10", "11", "12"],
+              default: "5",
+            };
+
+          // Seedance 1.0 Pro / Pro Fast — slider 2-12.
+          if (
+            model.startsWith("seedance-1-0-pro") ||
+            model.startsWith("seedance-1-0-fast")
+          )
             return { type: "slider" as const, min: 2, max: 12, step: 1, default: 5 };
+
+          // Seedance 1.0 Lite — only 5s and 10s are valid.
+          if (model.startsWith("seedance-1-0-lite"))
+            return { type: "select" as const, options: ["5", "10"], default: "5" };
+
+          // Generic fallback (legacy Kling, unknown providers).
           return { type: "select" as const, options: ["5", "10"], default: "5" };
         },
         options: ["5", "10"],

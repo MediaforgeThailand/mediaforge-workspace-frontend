@@ -952,19 +952,31 @@ function VideoControls({
   onUploadEnd: () => void;
 }) {
   const isSeedance = form.model.startsWith("seedance");
-  // Seedance 2.0 (seedance-2-0-* UI slug or dreamina-seedance-* direct
-  // BytePlus ID) accepts 4..14s — the BytePlus dreamina-seedance-2-0
-  // model rejects 3s with InvalidParameter and the upstream Freepik UI
-  // exposes the same 4..14 range. Legacy 1.x retains the wider 2..12s
-  // window the older endpoints accept.
+  // Per-model valid duration windows. BytePlus / upstream rejects
+  // anything outside these with HTTP 400 InvalidParameter, so we
+  // only ever surface options the API will accept.
+  //
+  //   Seedance 1.0 Lite           → [5, 10]          (Lite is 5s or 10s)
+  //   Seedance 1.0 Pro / Pro Fast → 2..12            (slider-style)
+  //   Seedance 1.5 Pro            → [4..12]          (discrete)
+  //   Seedance 2.0 Lite / Pro     → 4..15            (slider-style)
+  //
+  // Order matters — more specific prefixes have to come first or
+  // the broader `seedance-` fallback would swallow them.
   const isSeedanceV2 =
     form.model.startsWith("seedance-2-0") ||
     form.model.startsWith("dreamina-seedance");
+  const isSeedance15 = form.model.startsWith("seedance-1-5");
+  const isSeedance10Lite = form.model.startsWith("seedance-1-0-lite");
   const durations = isSeedanceV2
-    ? [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
-    : isSeedance
-      ? [2, 3, 4, 5, 6, 8, 10, 12]
-      : [5, 10];
+    ? [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    : isSeedance15
+      ? [4, 5, 6, 7, 8, 9, 10, 11, 12]
+      : isSeedance10Lite
+        ? [5, 10]
+        : isSeedance
+          ? [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+          : [5, 10];
   return (
     <>
       <div className="grid grid-cols-2 gap-2">
