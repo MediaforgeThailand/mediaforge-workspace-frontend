@@ -279,9 +279,8 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
       const resolutionExact = creditCosts.find(
         (r) =>
           r.feature === "generate_freepik_video" &&
-          r.model === model &&
+          r.model === `${model}:${resolution}` &&
           r.pricing_type === "per_second" &&
-          String(r.resolution ?? "").toLowerCase() === resolution &&
           (r.has_audio ?? false) === hasAudio,
       );
       if (resolutionExact) return Math.ceil(resolutionExact.cost * duration);
@@ -290,9 +289,8 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
         const noAudioResolution = creditCosts.find(
           (r) =>
             r.feature === "generate_freepik_video" &&
-            r.model === model &&
+            r.model === `${model}:${resolution}` &&
             r.pricing_type === "per_second" &&
-            String(r.resolution ?? "").toLowerCase() === resolution &&
             (r.has_audio ?? false) === false,
         );
         if (noAudioResolution) return Math.ceil(noAudioResolution.cost * duration);
