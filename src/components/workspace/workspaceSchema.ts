@@ -981,3 +981,104 @@ export function cleanWsParamsOnModelChange(
 /** Re-export the resolver in case a consumer needs the raw concrete
  *  type for a dynamic param (used by the renderer). */
 export { resolveParam as resolveWsParam };
+
+/* ── GPT Image 2 — Aspect Ratio + Resolution split (UI-only) ──
+ *
+ * OpenAI's gpt-image API takes a single `size` field (e.g. "1024x1024",
+ * "1536x1024", "auto"). Cramming all 11 valid sizes into one selector is
+ * confusing — Freepik's UI for the same model splits the choice into
+ * two pills (Aspect Ratio + Resolution). We mirror that UX here:
+ * the schema keeps a single backing `size` field, but the toolbar
+ * renderer for gpt-image-2 shows TWO MiniSelects that compose into
+ * the canonical `size` value before it ever leaves the client.
+ *
+ * Old nodes saved with a combined `size` like "1024x1280" still load:
+ * `splitGptImageSize` parses any known value back into its (AR, res)
+ * pair. Unknown values gracefully fall back to ("1:1", "1K") so the
+ * pills always render something sane.
+ */
+
+/** All gpt-image-2 sizes the schema offers, decomposed into the two
+ *  knobs that creators actually pick by (aspect ratio + resolution
+ *  tier). Keep this in sync with the `size` param's `options` list
+ *  in `imageGenNode`. */
+export const GPT_IMAGE_2_SIZE_MATRIX: Array<{
+  size: string;
+  aspectRatio: string;
+  resolution: string;
+}> = [
+  // Square
+  { size: "1024x1024", aspectRatio: "1:1", resolution: "1K" },
+  { size: "2048x2048", aspectRatio: "1:1", resolution: "2K" },
+  // Landscape
+  { size: "1536x1024", aspectRatio: "3:2", resolution: "1K" },
+  { size: "1280x1024", aspectRatio: "5:4", resolution: "1K" },
+  { size: "2048x1152", aspectRatio: "16:9", resolution: "2K" },
+  { size: "3840x2160", aspectRatio: "16:9", resolution: "4K" },
+  // Portrait / vertical
+  { size: "1024x1536", aspectRatio: "2:3", resolution: "1K" },
+  { size: "1024x1280", aspectRatio: "4:5", resolution: "1K" },
+  { size: "1152x1536", aspectRatio: "3:4", resolution: "1K" },
+  { size: "1152x2048", aspectRatio: "9:16", resolution: "2K" },
+  { size: "2160x3840", aspectRatio: "9:16", resolution: "4K" },
+  // Auto — represented as a single "Auto" pair.
+  { size: "auto", aspectRatio: "Auto", resolution: "Auto" },
+];
+
+/** All distinct aspect ratios in the matrix, in display order. */
+export const GPT_IMAGE_2_ASPECT_RATIOS: string[] = (() => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const e of GPT_IMAGE_2_SIZE_MATRIX) {
+    if (!seen.has(e.aspectRatio)) {
+      seen.add(e.aspectRatio);
+      out.push(e.aspectRatio);
+    }
+  }
+  return out;
+})();
+
+/** Resolutions available for a given aspect ratio (a few ARs only have
+ *  one tier). When the user switches AR, the resolution pill auto-
+ *  filters to the legal options for the new AR. */
+export function gptImage2ResolutionsFor(aspectRatio: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const e of GPT_IMAGE_2_SIZE_MATRIX) {
+    if (e.aspectRatio !== aspectRatio) continue;
+    if (!seen.has(e.resolution)) {
+      seen.add(e.resolution);
+      out.push(e.resolution);
+    }
+  }
+  return out;
+}
+
+/** Parse a stored `size` (combined "WIDTHxHEIGHT" or "auto") back into
+ *  the (aspect ratio, resolution) pair the UI uses. Unknown values
+ *  gracefully fall back to ("1:1", "1K") — that's the schema's default
+ *  pair, so a node that was somehow saved with a junk size won't break
+ *  the renderer. */
+export function splitGptImageSize(size: string): {
+  aspectRatio: string;
+  resolution: string;
+} {
+  const found = GPT_IMAGE_2_SIZE_MATRIX.find((e) => e.size === size);
+  if (found) return { aspectRatio: found.aspectRatio, resolution: found.resolution };
+  return { aspectRatio: "1:1", resolution: "1K" };
+}
+
+/** Compose an (aspect ratio, resolution) pair back into the canonical
+ *  `size` string that gets sent to OpenAI. If the requested combo
+ *  doesn't exist (e.g. user switches AR to "5:4" and the previously-
+ *  selected tier "4K" isn't available for that AR), pick the first
+ *  available resolution for that AR. */
+export function composeGptImageSize(aspectRatio: string, resolution: string): string {
+  const exact = GPT_IMAGE_2_SIZE_MATRIX.find(
+    (e) => e.aspectRatio === aspectRatio && e.resolution === resolution,
+  );
+  if (exact) return exact.size;
+  // Resolution wasn't legal for this AR — pick the first tier we have.
+  const fallback = GPT_IMAGE_2_SIZE_MATRIX.find((e) => e.aspectRatio === aspectRatio);
+  return fallback?.size ?? "1024x1024";
+}

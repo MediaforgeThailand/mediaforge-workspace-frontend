@@ -45,12 +45,16 @@ import { findVoice, VOICE_TINT_GRADIENT } from "./geminiVoices";
 // the main flow editor stays untouched.
 import {
   cleanWsParamsOnModelChange,
+  composeGptImageSize,
   getWorkspaceSchema,
   getWsOverflowingHandles,
   getWsRemovedHandleIds,
   getWsVisibleInputs,
   getWsVisibleParams,
+  GPT_IMAGE_2_ASPECT_RATIOS,
+  gptImage2ResolutionsFor,
   portTypeFromHandleId,
+  splitGptImageSize,
 } from "./workspaceSchema";
 
 const RUN_EDGE_FUNCTION = "workspace-run-node";
@@ -1255,6 +1259,41 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               );
             }}
           />
+        );
+      }
+
+      // GPT Image 2 — Aspect Ratio + Resolution split (UI-only).
+      // The OpenAI gpt-image API takes a single `size` field, but
+      // creators pick by aspect ratio first and resolution tier
+      // second. We render two MiniSelects that compose back into
+      // the canonical `size` value (see workspaceSchema helpers).
+      // Old nodes with a stored `size` parse cleanly via splitGptImageSize.
+      if (param.key === "size" && selectedModel === "gpt-image-2") {
+        const { aspectRatio, resolution } = splitGptImageSize(String(value));
+        const arOptions = GPT_IMAGE_2_ASPECT_RATIOS;
+        const resOptions = gptImage2ResolutionsFor(aspectRatio);
+        return (
+          <span key={param.key} className="contents">
+            <MiniSelect
+              value={aspectRatio}
+              options={arOptions}
+              onChange={(nextAr) => {
+                // When AR changes, keep the same resolution if it's
+                // still valid; otherwise composeGptImageSize falls
+                // back to the first tier available for the new AR.
+                const nextSize = composeGptImageSize(nextAr, resolution);
+                updateParam("size", nextSize);
+              }}
+            />
+            <MiniSelect
+              value={resolution}
+              options={resOptions}
+              onChange={(nextRes) => {
+                const nextSize = composeGptImageSize(aspectRatio, nextRes);
+                updateParam("size", nextSize);
+              }}
+            />
+          </span>
         );
       }
 
