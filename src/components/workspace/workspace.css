@@ -385,6 +385,12 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   stroke: transparent;
 }
 
+@media (pointer: coarse) {
+  .react-flow__edge-interaction {
+    stroke-width: 28;
+  }
+}
+
 /* In-progress connection (the dashed line that follows the cursor
  * while the user is dragging out from a port). Saturated so it pops
  * over both the canvas and any resting edges underneath. */
@@ -1437,6 +1443,34 @@ body.ws-resizing * {
 .ws-group-resize-handle:hover {
   background: hsl(0 0% 90%) !important;
   transform: scale(1.25);
+}
+
+@media (pointer: coarse) {
+  .react-flow__handle.workspace-handle {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+  }
+
+  .workspace-handle .ws-port-glyph {
+    width: 16px;
+    height: 16px;
+  }
+
+  .ws-compact-resize-handle {
+    bottom: -8px;
+    right: -8px;
+    width: 24px;
+    height: 24px;
+    opacity: 0.9;
+    transform: scale(1);
+  }
+
+  .ws-group-resize-handle {
+    width: 18px !important;
+    height: 18px !important;
+    border-radius: 5px !important;
+  }
 }
 
 /* ── Group node — frame sits BEHIND children ────────────────

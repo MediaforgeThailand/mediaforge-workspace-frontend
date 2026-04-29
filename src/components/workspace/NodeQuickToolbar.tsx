@@ -511,7 +511,7 @@ const NodeQuickToolbar = memo(() => {
   // matrix — we already compute screen-space coords above.
   return createPortal(
     <div
-      className="ws-quick-toolbar pointer-events-auto fixed z-[1000] flex -translate-x-1/2 -translate-y-full items-center gap-0.5 rounded-lg border border-zinc-700/80 bg-zinc-900/95 p-1 shadow-xl shadow-black/40 backdrop-blur"
+      className="ws-quick-toolbar pointer-events-auto fixed z-[1000] flex max-w-[calc(100vw-1rem)] -translate-x-1/2 -translate-y-full items-center gap-1 overflow-x-auto rounded-lg border border-zinc-700/80 bg-zinc-900/95 p-1 shadow-xl shadow-black/40 backdrop-blur lg:gap-0.5"
       style={{ left: screenPos.x, top: screenPos.y - 12 }}
       // Don't let clicks here fall through to the canvas (which would
       // deselect the very nodes the toolbar is acting on).
@@ -629,7 +629,7 @@ function ToolbarBtn({
       title={label}
       aria-label={label}
       className={cn(
-        "flex h-7 w-7 items-center justify-center rounded transition-colors",
+        "flex h-11 w-11 shrink-0 items-center justify-center rounded transition-colors lg:h-7 lg:w-7",
         danger
           ? "text-zinc-400 hover:bg-rose-500/15 hover:text-rose-300"
           : "text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100",
@@ -695,10 +695,7 @@ function MultiGenButton({
   }
 
   return (
-    <div
-      className="flex items-center gap-0.5 rounded bg-zinc-800/80 p-0.5"
-      onMouseLeave={() => onOpenChange(false)}
-    >
+    <div className="flex items-center gap-0.5 rounded bg-zinc-800/80 p-0.5 lg:gap-0.5" onMouseLeave={() => onOpenChange(false)}>
       {[1, 2, 3].map((c) => (
         <button
           key={c}
@@ -711,7 +708,7 @@ function MultiGenButton({
           }
           aria-label={`x${c}`}
           className={cn(
-            "flex h-6 min-w-[26px] items-center justify-center rounded px-1 text-[11px] font-semibold tabular-nums transition-colors",
+            "flex h-10 min-w-10 items-center justify-center rounded px-1 text-[11px] font-semibold tabular-nums transition-colors lg:h-6 lg:min-w-[26px]",
             c === 1
               ? "text-zinc-400 hover:bg-zinc-700 hover:text-zinc-100"
               : "text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200",
