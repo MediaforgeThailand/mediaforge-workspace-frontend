@@ -43,7 +43,6 @@ import {
   Plus,
   Layers,
   LayoutGrid,
-  Workflow,
   Heart,
   Search,
   Pencil,
@@ -53,11 +52,6 @@ import {
   ChevronDown,
   ChevronRight,
   List,
-  Home as HomeIcon,
-  Globe,
-  FolderKanban,
-  Boxes,
-  Library,
   Image as ImageIcon,
   Video,
   Mic2,
@@ -68,12 +62,15 @@ import {
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { UserMenu } from "@/components/workspace/UserMenu";
+import WorkspaceSidebar, {
+  type SectionKey,
+} from "@/components/workspace/WorkspaceSidebar";
 
 /* ════════════════════════════════════════════════════════════
  * Types + helpers
  * ════════════════════════════════════════════════════════════ */
 
-type Section = "home" | "spaces" | "community" | "projects" | "tools" | "stock";
+type Section = SectionKey;
 
 interface MiniNode {
   id: string;
@@ -230,7 +227,7 @@ const WorkspaceDashboard = () => {
       className="flex h-screen w-screen overflow-hidden bg-[hsl(0_0%_5%)] text-zinc-100"
       style={{ fontFamily: "'Prompt', system-ui, sans-serif" }}
     >
-      <DashboardSidebar section={section} onSection={setSection} />
+      <WorkspaceSidebar active={section} onNavigate={setSection} />
       <main className="flex flex-1 flex-col overflow-hidden">
         {section === "home" && <HomeView onSection={setSection} />}
         {section === "spaces" && <SpacesView />}
@@ -245,103 +242,13 @@ const WorkspaceDashboard = () => {
 export default WorkspaceDashboard;
 
 /* ════════════════════════════════════════════════════════════
- * Sidebar
+ * Sidebar — see `components/workspace/WorkspaceSidebar.tsx`
+ *
+ * The dashboard passes `onNavigate={setSection}` so sidebar clicks
+ * drive its internal state (no router round-trip). Account /
+ * Pricing pages omit `onNavigate` and let the sidebar router-
+ * navigate to /app/workspace?section=…
  * ════════════════════════════════════════════════════════════ */
-
-const NAV_TOP: Array<{ id: Section; label: string; icon: LucideIcon }> = [
-  { id: "home", label: "Home", icon: HomeIcon },
-  { id: "spaces", label: "Spaces", icon: Workflow },
-  { id: "community", label: "Community", icon: Globe },
-  { id: "projects", label: "Projects", icon: FolderKanban },
-];
-
-const NAV_BOTTOM: Array<{ id: Section; label: string; icon: LucideIcon }> = [
-  { id: "tools", label: "All tools", icon: Boxes },
-  { id: "stock", label: "Stock", icon: Library },
-];
-
-const DashboardSidebar = ({
-  section,
-  onSection,
-}: {
-  section: Section;
-  onSection: (s: Section) => void;
-}) => {
-  return (
-    <aside className="flex h-full w-[228px] shrink-0 flex-col border-r border-white/5 bg-[hsl(0_0%_4%)]">
-      {/* Brand row — placeholder logo + collapse affordance. The real
-       *  logo lives in /public; tied in once design hands one over. */}
-      <div className="flex h-12 items-center justify-between px-4">
-        <div className="flex items-center gap-2 text-[13.5px] font-semibold tracking-tight text-zinc-50">
-          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-fuchsia-500 to-violet-600 text-[10px] font-bold text-white shadow-[inset_0_-1px_0_hsl(0_0%_0%/0.25)]">
-            M
-          </span>
-          MediaForge
-        </div>
-      </div>
-
-      {/* Top group — primary surfaces */}
-      <nav className="flex flex-col gap-0.5 px-3 pt-2 pb-1">
-        {NAV_TOP.map((it) => (
-          <NavLink
-            key={it.id}
-            label={it.label}
-            icon={it.icon}
-            active={section === it.id}
-            onClick={() => onSection(it.id)}
-          />
-        ))}
-      </nav>
-
-      {/* Mid divider — separates "primary navigation" from "utility
-       *  surfaces". Mirrors the Magnific reference. */}
-      <div className="mx-4 my-3 h-px bg-white/[0.06]" />
-
-      {/* Bottom group — utility surfaces */}
-      <nav className="flex flex-col gap-0.5 px-3">
-        {NAV_BOTTOM.map((it) => (
-          <NavLink
-            key={it.id}
-            label={it.label}
-            icon={it.icon}
-            active={section === it.id}
-            onClick={() => onSection(it.id)}
-          />
-        ))}
-      </nav>
-
-      <div className="mt-auto px-4 py-3 text-[10.5px] text-zinc-600">
-        v1.5 · workspace
-      </div>
-    </aside>
-  );
-};
-
-const NavLink = ({
-  label,
-  icon: Icon,
-  active,
-  onClick,
-}: {
-  label: string;
-  icon: LucideIcon;
-  active: boolean;
-  onClick: () => void;
-}) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={cn(
-      "flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[12.5px] transition-colors",
-      active
-        ? "bg-white/[0.07] text-zinc-50 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.05)]"
-        : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100",
-    )}
-  >
-    <Icon className="h-3.5 w-3.5" />
-    {label}
-  </button>
-);
 
 /* ════════════════════════════════════════════════════════════
  * Home view — Magnific-style aggregator

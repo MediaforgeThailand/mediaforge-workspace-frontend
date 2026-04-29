@@ -206,9 +206,9 @@ const Pricing = () => {
         {/* Hero */}
         <section className="w-full py-12 md:py-16 text-center relative">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate("/app/workspace")}
             className="absolute top-4 left-4 md:left-8 w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
-            aria-label="Back"
+            aria-label="Back to workspace"
           >
             <ArrowLeft className="w-5 h-5 text-neutral-400" />
           </button>

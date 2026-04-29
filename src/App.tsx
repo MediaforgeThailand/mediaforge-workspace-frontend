@@ -20,7 +20,8 @@
  *   /app/settings              → user settings (workspace-shaped,
  *                                  Wave 2 will rebuild the inside)
  *   /app/usage                 → credit usage (formerly "Transactions")
- *   /app/pricing               → plan picker
+ *   /app/pricing               → plan picker (full-width — uses
+ *                                  WorkspacePageShell, not AccountShell)
  *   *                          → 404
  *
  * Anything that lazy-loaded a deleted page is gone. App.tsx is back
@@ -42,6 +43,7 @@ import Privacy from "./pages/Privacy";
 import CookieConsent from "./components/CookieConsent";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AccountShell from "./components/workspace/AccountShell";
+import WorkspacePageShell from "./components/workspace/WorkspacePageShell";
 import PageLoadingAnim from "./components/ui/PageLoadingAnim";
 
 /**
@@ -123,8 +125,8 @@ const App = () => (
 
                   {/* Account pages — same workspace sidebar as the
                    *  dashboard, but content area shows Settings /
-                   *  Usage / Pricing tab content. Sidebar items
-                   *  navigate back to /app/workspace?section=…. */}
+                   *  Usage tab content. Sidebar items navigate back
+                   *  to /app/workspace?section=…. */}
                   <Route
                     path="/app"
                     element={
@@ -135,12 +137,27 @@ const App = () => (
                   >
                     <Route path="settings" element={<Settings />} />
                     <Route path="usage" element={<Transactions />} />
-                    <Route path="pricing" element={<Pricing />} />
                     {/* Unknown /app/<x> sub-route → bounce back to the
                      *  dashboard. Without this AccountShell would
                      *  render with an empty content area. */}
                     <Route path="*" element={<Navigate to="/app/workspace" replace />} />
                   </Route>
+
+                  {/* Pricing page — workspace sidebar but no Account
+                   *  breadcrumb header / max-width wrapper. The page
+                   *  owns its full content area (hero + plan cards +
+                   *  comparison table) and reads better edge-to-edge
+                   *  on wide screens. */}
+                  <Route
+                    path="/app/pricing"
+                    element={
+                      <ProtectedRoute>
+                        <WorkspacePageShell>
+                          <Pricing />
+                        </WorkspacePageShell>
+                      </ProtectedRoute>
+                    }
+                  />
 
                   {/* Canvas page — top-level so it gets the full
                    *  viewport without DashboardLayout chrome */}
