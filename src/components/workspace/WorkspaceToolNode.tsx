@@ -1522,14 +1522,17 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             </div>
           </div>
 
-          {/* ── Prompt + Run row — pinned to the bottom of the
-           *  preview. When the schema doesn't accept a text prompt
-           *  (e.g. Tripo3D image_to_model) we drop the textarea and
-           *  keep just the Run button on the right. */}
+          {/* ── Prompt — pinned to the bottom of the preview, lifts
+           *  on hover so it clears the settings toolbar. The Run
+           *  button used to live INSIDE this row, which made it
+           *  rise with the prompt; the team reported the button
+           *  drifting up too high when hovering. The Run button is
+           *  now its own anchor (see below), so the prompt overlay
+           *  is purely the textarea. */}
           {!isMultiShot && (
             <div
               className={cn(
-                "ws-compact-prompt-overlay",
+                "ws-compact-prompt-overlay has-run-anchor",
                 !hasPromptParam && "is-no-prompt",
               )}
             >
@@ -1537,11 +1540,6 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                 <PromptMentionTextarea
                   value={String(params.prompt ?? "")}
                   onChange={(v) => updateParam("prompt", v)}
-                  /* Short, single-line example — fits at the bottom of
-                   * the 3-line clamp without wrapping into clipped
-                   * territory. Pattern matches TextNode's
-                   * `Try "Happy dog with sunglasses…"` so the
-                   * affordance reads consistently across the canvas. */
                   placeholder={
                     schema.displayName.toLowerCase().includes("video")
                       ? `Try "ocean waves at sunset, slow pan"`
@@ -1549,15 +1547,6 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                   }
                   excludeNodeId={id}
                   className="ws-compact-prompt-input"
-                  /* Widen the @-mention pool to include EVERY upstream node
-                   * type that produces media — assets / elements + every
-                   * tool node with a `generations[]` array. Combined with
-                   * `allowedNodeIds` below this still narrows down to
-                   * just the connected ones; widening the type list
-                   * means a connected Image Gen node DOES surface in
-                   * the dropdown (previous default of `["inputNode",
-                   * "assetNode"]` filtered all tool nodes out, which
-                   * is exactly what the user reported as broken). */
                   allowedNodeTypes={[
                     "assetNode",
                     "inputNode",
@@ -1574,9 +1563,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                     "chatAiNode",
                     "groupNode",
                   ]}
-                  /* Restrict to what's actually wired. */
                   allowedNodeIds={connectedSourceIds}
-                  /* Same connection restriction for # text variables. */
                   allowedTextVarTypes={["textInputNode", "textNode"]}
                 />
               ) : (
@@ -1584,6 +1571,17 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                   Wire an image into the input port and press Run
                 </span>
               )}
+            </div>
+          )}
+
+          {/* ── Run button anchor — fixed at the bottom-right corner
+           *  of the preview. Fades in on hover/select with the same
+           *  slide-up animation as the settings toolbar so the user
+           *  reads it as part of the same "controls reveal" gesture.
+           *  Lives outside .ws-compact-prompt-overlay so it doesn't
+           *  inherit the prompt's dynamic-lift behaviour. */}
+          {!isMultiShot && (
+            <div className="ws-compact-run-anchor">
               <button
                 type="button"
                 onClick={(e) => {

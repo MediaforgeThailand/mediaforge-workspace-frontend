@@ -702,6 +702,35 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   height: 12px;
 }
 
+/* Run button anchor — pinned at the bottom-right corner of the
+ * preview. Fades in on hover / select / focus-within (mirroring
+ * the settings overlay) so the controls "reveal as a set". The
+ * button used to sit inside `.ws-compact-prompt-overlay` and
+ * inherited that overlay's dynamic-lift on hover, which made the
+ * Run button drift far above the bottom corner — reported as the
+ * button "ลอยขึ้นไปสูงมาก". Now it always lives at bottom-right
+ * regardless of toolbar / prompt height. */
+.ws-compact-run-anchor {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  z-index: 7;
+  opacity: 0;
+  transform: translateY(16px);
+  pointer-events: none;
+  transition:
+    opacity 200ms var(--ws-ease),
+    transform 220ms var(--ws-ease);
+}
+.react-flow__node:hover .ws-compact-run-anchor,
+.react-flow__node.selected .ws-compact-run-anchor,
+.react-flow__node .ws-compact-run-anchor:focus-within,
+.react-flow__node:has(.ws-compact-prompt-overlay:focus-within) .ws-compact-run-anchor {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
 /* Prompt input — floats at the BOTTOM of the preview area as a
  * translucent strip. Always visible (it's the most-used control)
  * but unobtrusive when nothing's focused. While the textarea has
@@ -1368,8 +1397,20 @@ body.ws-resizing * {
 .react-flow__node:not(.selected) .ws-compact-overlay,
 .react-flow__node:not(.selected) .ws-compact-overlay *,
 .react-flow__node:not(.selected) .ws-compact-prompt-overlay,
-.react-flow__node:not(.selected) .ws-compact-prompt-overlay * {
+.react-flow__node:not(.selected) .ws-compact-prompt-overlay *,
+.react-flow__node:not(.selected) .ws-compact-run-anchor,
+.react-flow__node:not(.selected) .ws-compact-run-anchor * {
   pointer-events: auto !important;
+}
+
+/* When the Run button anchor is in play, reserve a 36-px gutter on
+ * the right of the prompt textarea so typed text never slides
+ * under the button. The selector targets only nodes that opted in
+ * via `.has-run-anchor` — TextNode + other prompt-only surfaces
+ * stay full-width. */
+.ws-compact-prompt-overlay.has-run-anchor textarea,
+.ws-compact-prompt-overlay.has-run-anchor [contenteditable="true"] {
+  padding-right: 36px;
 }
 
 /* ── Group resize handles ───────────────────────────────────
