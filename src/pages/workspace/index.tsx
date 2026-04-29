@@ -67,6 +67,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import { UserMenu } from "@/components/workspace/UserMenu";
 
 /* ════════════════════════════════════════════════════════════
  * Types + helpers
@@ -487,7 +488,7 @@ const HomeView = ({ onSection }: { onSection: (s: Section) => void }) => {
 
   return (
     <>
-      <PageHeader title="Home" />
+      <PageHeader title="Home" rightSlot={<UserMenu />} />
 
       <div className="ws-scroll-hide flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[1400px] px-8 pb-16 pt-6">
@@ -937,7 +938,15 @@ const SpacesView = () => {
 
   return (
     <>
-      <PageHeader title="Spaces" rightSlot={<SpaceToolbar onNew={handleNew} />} />
+      <PageHeader
+        title="Spaces"
+        rightSlot={
+          <div className="flex items-center gap-3">
+            <SpaceToolbar onNew={handleNew} />
+            <UserMenu />
+          </div>
+        }
+      />
 
       <div className="ws-scroll-hide flex-1 overflow-y-auto">
         <div className="px-8 pb-12 pt-4">
@@ -1162,7 +1171,7 @@ const SECTION_LABELS: Record<Section, string> = {
 
 const Placeholder = ({ section }: { section: Section }) => (
   <>
-    <PageHeader title={SECTION_LABELS[section]} />
+    <PageHeader title={SECTION_LABELS[section]} rightSlot={<UserMenu />} />
     <div className="flex flex-1 items-center justify-center p-12">
       <EmptyState
         title="Coming soon"

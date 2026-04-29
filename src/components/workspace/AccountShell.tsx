@@ -36,6 +36,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { UserMenu } from "@/components/workspace/UserMenu";
 
 type SectionKey =
   | "home"
@@ -170,6 +171,14 @@ export default function AccountShell({ children }: { children?: ReactNode }) {
               );
             })}
           </nav>
+
+          {/* Right edge — user menu (Settings re-link is redundant
+           *  since you're on /app/settings, but keeping the same
+           *  avatar everywhere means muscle-memory works across
+           *  surfaces). */}
+          <div className="ml-auto">
+            <UserMenu />
+          </div>
         </header>
 
         <div className="ws-scroll-hide flex-1 overflow-y-auto bg-[hsl(0_0%_5%)]">
