@@ -14,7 +14,7 @@ import NodeResultDialog from "./NodeResultDialog";
 
 export interface Generation {
   id: string;
-  type: "image" | "video" | "text";
+  type: "image" | "video" | "text" | "audio";
   url?: string;
   text?: string;
   /** GLB / GLTF URL — populated by the Image-to-3D (Tripo3D) node so
@@ -77,6 +77,22 @@ const NodeResultBar = memo(
               {current.type === "text" && (
                 <div className="max-h-[140px] overflow-y-auto p-3 text-[11px] leading-snug text-white/80">
                   {current.text}
+                </div>
+              )}
+              {current.type === "audio" && current.url && (
+                // Audio gen output — render a compact player. Stop
+                // click propagation on the controls so the lightbox
+                // expand-on-click doesn't fire when the user just
+                // wants to scrub or pause.
+                <div className="flex items-center justify-center bg-black/60 p-3">
+                  <audio
+                    src={current.url}
+                    controls
+                    preload="metadata"
+                    className="w-full max-w-[260px]"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  />
                 </div>
               )}
 
