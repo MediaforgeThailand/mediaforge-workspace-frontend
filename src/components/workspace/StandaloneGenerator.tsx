@@ -37,12 +37,32 @@ import {
   STANDALONE_TOOLS,
   type StandaloneToolKey,
 } from "./standaloneGenerationCatalog";
+import { GEMINI_VOICES } from "./geminiVoices";
 import {
-  DEFAULT_VOICE_ID,
-  findVoice,
-  GEMINI_VOICES,
-  VOICE_TINT_GRADIENT,
-} from "./geminiVoices";
+  GOOGLE_VOICES,
+  GOOGLE_VOICE_TINT_GRADIENT,
+  DEFAULT_GOOGLE_VOICE_ID,
+} from "./googleTtsVoices";
+import {
+  ELEVENLABS_VOICES,
+  ELEVENLABS_VOICE_TINT_GRADIENT,
+} from "./elevenlabsVoices";
+import { findAnyVoice } from "./voiceCatalogs";
+
+/** Default voice for the standalone surface — matches what the
+ *  canvas voice picker opens to (Aria / en-US-Studio-O). The
+ *  legacy `DEFAULT_VOICE_ID` from geminiVoices was "Charon", which
+ *  meant a fresh standalone form picked a Gemini voice but the
+ *  default model was google-tts-studio — backend then errored out.
+ *  Using the Google default keeps voice + model in sync. */
+const DEFAULT_VOICE_ID = DEFAULT_GOOGLE_VOICE_ID;
+
+/** Per-provider tint palette merge — lets a single VoiceTile render
+ *  any of the 3 catalogs without per-provider branching. */
+const ALL_VOICE_TINT_GRADIENT: Record<string, string> = {
+  ...GOOGLE_VOICE_TINT_GRADIENT,
+  ...ELEVENLABS_VOICE_TINT_GRADIENT,
+};
 
 const RUN_EDGE_FUNCTION = "workspace-run-node";
 const STANDALONE_CANVAS_ID = "standalone";
@@ -1034,6 +1054,38 @@ function VideoControls({
   );
 }
 
+/** Standalone tool voice grid — mirrors the canvas voice picker but
+ *  in a smaller, side-panel-friendly layout. Three provider tabs
+ *  (Google / Gemini / ElevenLabs) with a play button on each tile;
+ *  preview audio is synthesised on demand by the same `voice-preview`
+ *  edge function the canvas picker uses. */
+type StandaloneVoiceProvider = "google" | "gemini" | "elevenlabs";
+
+const STANDALONE_VOICE_TABS: Array<{ id: StandaloneVoiceProvider; label: string }> = [
+  { id: "google",     label: "Google" },
+  { id: "gemini",     label: "Gemini" },
+  { id: "elevenlabs", label: "ElevenLabs" },
+];
+
+interface VoiceTile {
+  id: string;
+  name: string;
+  characteristic: string;
+  tint: string;
+}
+
+function tilesFor(p: StandaloneVoiceProvider): VoiceTile[] {
+  if (p === "google") return GOOGLE_VOICES.map((v) => ({
+    id: v.id, name: v.name, characteristic: `${v.flag} ${v.characteristic}`, tint: v.tint,
+  }));
+  if (p === "gemini") return GEMINI_VOICES.map((v) => ({
+    id: v.id, name: v.name, characteristic: v.characteristic, tint: v.tint,
+  }));
+  return ELEVENLABS_VOICES.map((v) => ({
+    id: v.id, name: v.name, characteristic: `${v.flag} ${v.characteristic}`, tint: v.tint,
+  }));
+}
+
 function VoiceControls({
   form,
   onChange,
@@ -1041,7 +1093,89 @@ function VoiceControls({
   form: StandaloneFormState;
   onChange: (patch: Partial<StandaloneFormState>) => void;
 }) {
-  const selectedVoice = findVoice(form.voice);
+  const selectedVoice = findAnyVoice(form.voice);
+  // Default tab follows the model picked above — if the user has
+  // an ElevenLabs model selected, open ElevenLabs voices first.
+  const initialTab: StandaloneVoiceProvider =
+    typeof form.model === "string" && form.model.startsWith("elevenlabs-")
+      ? "elevenlabs"
+      : typeof form.model === "string" && form.model.startsWith("gemini-")
+        ? "gemini"
+        : "google";
+  const [voiceProvider, setVoiceProvider] =
+    useState<StandaloneVoiceProvider>(initialTab);
+  const [playing, setPlaying] = useState<string | null>(null);
+  const [synthing, setSynthing] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const tiles = useMemo(() => tilesFor(voiceProvider), [voiceProvider]);
+
+  const stopAudio = () => {
+    const a = audioRef.current;
+    if (a) { a.pause(); a.currentTime = 0; }
+  };
+
+  const handlePreview = async (
+    voiceId: string,
+    e: React.MouseEvent,
+  ) => {
+    e.stopPropagation();
+    if (playing === voiceId) {
+      stopAudio();
+      setPlaying(null);
+      return;
+    }
+    stopAudio();
+    setPreviewError(null);
+    setSynthing(voiceId);
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "voice-preview",
+        { body: { provider: voiceProvider, voice_id: voiceId } },
+      );
+      const payload = data as { url?: string; error?: string } | null;
+      if (error || payload?.error || !payload?.url) {
+        const msg =
+          payload?.error ??
+          (error as { message?: string } | null)?.message ??
+          "Preview unavailable";
+        setPreviewError(msg);
+        setSynthing(null);
+        return;
+      }
+      setSynthing(null);
+      setPlaying(voiceId);
+      if (!audioRef.current) {
+        audioRef.current = new Audio();
+        audioRef.current.preload = "auto";
+      }
+      const a = audioRef.current;
+      a.src = payload.url;
+      a.onended = () => setPlaying(null);
+      a.onerror = () => {
+        setPreviewError("Failed to play preview");
+        setPlaying(null);
+      };
+      a.play().catch((err) => {
+        setPreviewError(err?.message ?? "Playback blocked");
+        setPlaying(null);
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setPreviewError(msg);
+      setSynthing(null);
+    }
+  };
+
+  // Stop any running audio when the panel unmounts.
+  useEffect(() => {
+    return () => {
+      const a = audioRef.current;
+      if (a) { a.pause(); a.src = ""; }
+    };
+  }, []);
+
   return (
     <>
       <PromptBox
@@ -1053,37 +1187,114 @@ function VoiceControls({
         maxLength={5000}
       />
       <div>
-        <FieldLabel label="Gemini voice" meta={selectedVoice.characteristic} />
-        <div className="mt-2 grid max-h-[270px] grid-cols-2 gap-2 overflow-y-auto pr-1">
-          {GEMINI_VOICES.map((voice) => {
-            const active = voice.id === form.voice;
+        <FieldLabel label="Voice" meta={selectedVoice.characteristic} />
+        {/* Provider tabs */}
+        <div className="mt-2 inline-flex w-fit items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[11px]">
+          {STANDALONE_VOICE_TABS.map((t) => {
+            const active = voiceProvider === t.id;
             return (
               <button
-                key={voice.id}
+                key={t.id}
                 type="button"
-                onClick={() => onChange({ voice: voice.id })}
+                onClick={() => setVoiceProvider(t.id)}
                 className={cn(
-                  "flex min-h-[72px] flex-col items-start justify-between rounded-lg border border-dashed px-3 py-3 text-left transition",
+                  "rounded-md px-2.5 py-0.5 transition-colors",
+                  active
+                    ? "bg-white/[0.10] text-zinc-50"
+                    : "text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100",
+                )}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {previewError && (
+          <div className="mt-2 flex items-start gap-1.5 rounded-md border border-amber-400/15 bg-amber-400/[0.06] px-2 py-1.5 text-[10.5px] text-amber-200">
+            <span aria-hidden>⚠</span>
+            <span className="flex-1">Preview failed — {previewError}</span>
+            <button
+              type="button"
+              onClick={() => setPreviewError(null)}
+              className="text-amber-200/70 hover:text-amber-100"
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        <div className="mt-2 grid max-h-[270px] grid-cols-2 gap-2 overflow-y-auto pr-1">
+          {tiles.map((voice) => {
+            const active = voice.id === form.voice;
+            const isPlaying = playing === voice.id;
+            const isSynthing = synthing === voice.id;
+            return (
+              <div
+                key={voice.id}
+                className={cn(
+                  "group relative flex min-h-[72px] flex-col items-start justify-between rounded-lg border border-dashed px-3 py-3 text-left transition",
                   active
                     ? "border-amber-300/50 bg-amber-300/10"
                     : "border-white/[0.12] bg-[#242424] hover:bg-[#2d2d2d]",
                 )}
               >
-                <span
-                  className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"
-                  style={{ background: VOICE_TINT_GRADIENT[voice.tint] }}
+                {/* Card body acts as the select target. */}
+                <button
+                  type="button"
+                  onClick={() => onChange({ voice: voice.id })}
+                  className="flex w-full flex-col items-start gap-1 text-left"
                 >
-                  {voice.name.charAt(0)}
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-[11px] font-bold text-white">
-                    {voice.name}
+                  <span
+                    className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"
+                    style={{
+                      background:
+                        ALL_VOICE_TINT_GRADIENT[voice.tint] ??
+                        "linear-gradient(135deg, hsl(0 0% 35%), hsl(0 0% 22%))",
+                    }}
+                  >
+                    {voice.name.charAt(0)}
                   </span>
-                  <span className="block truncate text-[10px] text-zinc-500">
-                    {voice.characteristic}
+                  <span className="min-w-0 w-full">
+                    <span className="block truncate text-[11px] font-bold text-white">
+                      {voice.name}
+                    </span>
+                    <span className="block truncate text-[10px] text-zinc-500">
+                      {voice.characteristic}
+                    </span>
                   </span>
-                </span>
-              </button>
+                </button>
+                {/* Floating preview button — only top-right of the card. */}
+                <button
+                  type="button"
+                  onClick={(e) => handlePreview(voice.id, e)}
+                  disabled={isSynthing}
+                  className={cn(
+                    "absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full text-[11px] transition-colors",
+                    "bg-black/40 text-zinc-200 ring-1 ring-inset ring-white/10",
+                    "hover:bg-black/60 hover:text-white",
+                    isPlaying && "bg-emerald-500/20 text-emerald-200 ring-emerald-400/30",
+                    isSynthing && "animate-pulse",
+                  )}
+                  title={
+                    isSynthing
+                      ? "Generating preview…"
+                      : isPlaying
+                        ? "Stop preview"
+                        : "Play preview"
+                  }
+                  aria-label={isPlaying ? "Stop preview" : "Play preview"}
+                >
+                  {isSynthing ? (
+                    <span className="block h-3 w-3 rounded-full border-2 border-zinc-400 border-t-transparent animate-spin" />
+                  ) : isPlaying ? (
+                    "■"
+                  ) : (
+                    "▶"
+                  )}
+                </button>
+              </div>
             );
           })}
         </div>
