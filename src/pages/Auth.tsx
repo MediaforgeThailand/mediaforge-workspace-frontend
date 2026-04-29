@@ -17,9 +17,6 @@ import OrgLoginPanel from "@/components/auth/OrgLoginPanel";
 import { resolveOrgLogin, type OrgLoginResolution } from "@/lib/orgLoginResolver";
 import { useSearchParams } from "react-router-dom";
 
-const PSC_DEMO_EMAIL = "dmd@psc.com";
-const PSC_DEMO_PASSWORD = "123456";
-const PSC_DEMO_SESSION_KEY = "mf_psc_demo_session";
 const DEFAULT_POST_AUTH_PATH = "/app/workspace";
 
 const normalizePostAuthPath = (path: string) => {
@@ -171,16 +168,6 @@ const Auth = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loginEmail.trim().toLowerCase() === PSC_DEMO_EMAIL && loginPassword === PSC_DEMO_PASSWORD) {
-      try {
-        localStorage.setItem(PSC_DEMO_SESSION_KEY, "1");
-      } catch {
-        // Ignore storage failures; this is only a local demo shortcut.
-      }
-      window.location.href = DEFAULT_POST_AUTH_PATH;
-      return;
-    }
-
     setIsLoading(true);
     const {
       error
