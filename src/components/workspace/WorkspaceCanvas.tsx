@@ -1188,13 +1188,14 @@ const Inner = () => {
       const cloned: Node[] = draggedNodes.map((n) => {
         const newId = `n_${crypto.randomUUID()}`;
         idMap.set(n.id, newId);
-        // `cloneNodeFresh` deep-copies data, strips run-state
-        // (status / generations / selectedGenIndex) so the copy doesn't
-        // appear to be mid-generation, and bumps the display label
-        // ("Foo" → "Foo copy", "Foo copy" → "Foo copy 2"). User
-        // reported the previous version dragged the spinner along
-        // with the duplicate, which read as "the copy is somehow
-        // running too" — clearly wrong.
+        // `cloneNodeFresh` deep-copies data (params, generations,
+        // previewUrl, referenceType, …) so the duplicate keeps the
+        // original's image preview and model/param settings, then
+        // resets only the live `status` flag to "idle" so a copy of
+        // an in-flight node doesn't pretend to also be processing.
+        // Display label is bumped ("Foo" → "Foo copy", "Foo copy"
+        // → "Foo copy 2") so the two are distinguishable in the
+        // title bar without renaming.
         return cloneNodeFresh(n, newId);
       });
 

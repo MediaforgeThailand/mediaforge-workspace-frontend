@@ -5,18 +5,20 @@
  *   • Alt+drag         (WorkspaceCanvas.onNodeDragStart)
  *   • Ctrl+D / button  (NodeQuickToolbar.onDuplicate)
  *
- * Both used to do `structuredClone(n.data)` and ship the result as-is,
- * which carried run-state into the copy:
- *   • `status: "processing"` made the new node display a spinner
- *     even though it hadn't been run yet
- *   • `generations[]` cloned the original's run history into the copy
- *     so deleting one would feel like it deleted the other's results
- *   • `selectedGenIndex` pointed at a generation that didn't logically
- *     belong to the copy
- *
- * This helper produces a "fresh duplicate":
- *   • Run-state fields stripped (status / generations / selectedGenIndex /
- *     dragging / selected — anything ephemeral)
+ * The clone is a faithful deep copy of the original's content with
+ * only transient run-state reset, so:
+ *   • The image preview / generated result stays on the copy
+ *     (`generations[]`, `selectedGenIndex` preserved). Bug report:
+ *     "Alt-drag an Image Generation node with a preview → clone
+ *     showed only the prompt, no image, no model dropdown" — caused
+ *     by the previous version of this helper deleting `generations`
+ *     and `selectedGenIndex` from the copy.
+ *   • A node mid-run reads as idle on the copy (`status` reset to
+ *     "idle"), so a duplicate of an in-flight Image Gen doesn't
+ *     pretend to also be running. The actual results, if any, were
+ *     already captured into `generations[]` by the runner so we keep
+ *     them — only the live "processing" / "error" badge is dropped.
+ *   • Selection / drag flags don't leak from the original to the copy.
  *   • Label is bumped: `Foo` → `Foo copy`, `Foo copy` → `Foo copy 2`,
  *     `Foo copy 2` → `Foo copy 3`, …
  *
@@ -24,6 +26,11 @@
  * (params.nodeName for tool nodes, data.label for TextNode / AssetNode,
  * data.name for ElementNode), so the user sees the new name in the title
  * bar regardless of which node type they cloned.
+ *
+ * `structuredClone` handles the deep copy — it walks nested objects
+ * (`params`, each `generations[]` entry, `referenceType`, …) so no
+ * shared references survive between original and copy. Node data
+ * never holds DOM refs / functions, so structuredClone is safe.
  */
 
 import type { Node } from "@xyflow/react";
@@ -40,16 +47,34 @@ function bumpCopySuffix(name: string): string {
 }
 
 /**
- * Strip transient run-state fields from a node's data so the copy
- * starts fresh. Keep static config (params, label, fieldType, etc.).
+ * Reset only the LIVE run badge so a copy of a mid-run node doesn't
+ * appear to also be running. We keep `generations[]` and
+ * `selectedGenIndex` so the rendered image / video / asset preview
+ * survives onto the copy — that's the user's whole point in
+ * duplicating a finished node.
+ *
+ * Reasoning for resetting `status` to "idle" rather than "done": the
+ * status field drives the running spinner / error chrome, NOT the
+ * preview image (which is read straight off `generations[]`). Setting
+ * "idle" hides the spinner; the preview still renders because
+ * generations[0] is still there. If the original was idle anyway this
+ * is a no-op.
+ *
+ * Static config (params, label, fieldType, previewUrl, posterUrl,
+ * referenceType, …) is left alone — `structuredClone` already gave
+ * us deep copies of those.
  */
-function stripRunState(
+function resetRunBadge(
   rawData: Record<string, unknown>,
 ): Record<string, unknown> {
   const data: Record<string, unknown> = { ...rawData };
-  delete data.status; // "idle" | "processing" | "done" | "error"
-  delete data.generations; // history of past runs
-  delete data.selectedGenIndex;
+  // "idle" | "processing" | "done" | "error" — drop the live badge so
+  // a copy of an in-flight node doesn't pretend to be processing.
+  data.status = "idle";
+  // Defensive: if a downstream node ever introduces an `isRunning`
+  // boolean alongside status, clear it too. Currently unused in
+  // schema but cheap insurance against future drift.
+  if ("isRunning" in data) data.isRunning = false;
   return data;
 }
 
@@ -97,8 +122,8 @@ function bumpDisplayLabel(
  */
 export function cloneNodeFresh(node: Node, newId: string): Node {
   const baseData = structuredClone(node.data ?? {}) as Record<string, unknown>;
-  const cleaned = stripRunState(baseData);
-  const labeled = bumpDisplayLabel(cleaned);
+  const reset = resetRunBadge(baseData);
+  const labeled = bumpDisplayLabel(reset);
   return {
     ...node,
     id: newId,

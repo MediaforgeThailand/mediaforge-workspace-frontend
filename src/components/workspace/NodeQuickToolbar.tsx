@@ -251,12 +251,13 @@ const NodeQuickToolbar = memo(() => {
     const cloned: Node[] = selected.map((n) => {
       const nid = NEW_ID();
       idMap.set(n.id, nid);
-      // `cloneNodeFresh` deep-copies data, strips run-state (status,
-      // generations, selectedGenIndex) and bumps the display label
-      // ("Foo" → "Foo copy", "Foo copy" → "Foo copy 2") — so a
-      // duplicate of an in-flight Image Gen doesn't appear to also
-      // be running, and the user can tell the two apart in the
-      // title bar without renaming.
+      // `cloneNodeFresh` deep-copies data (params, generations,
+      // previewUrl, …) so the duplicate keeps the original's image
+      // preview + model/param settings, resets the live `status`
+      // flag so a copy of an in-flight Image Gen doesn't appear to
+      // also be running, and bumps the display label ("Foo" → "Foo
+      // copy", "Foo copy" → "Foo copy 2") so the two are
+      // distinguishable in the title bar without renaming.
       const fresh = cloneNodeFresh(n, nid);
       // Ctrl+D offsets the duplicate by +30,+30 so it doesn't sit
       // exactly on top of the source. Selected so the user can keep
