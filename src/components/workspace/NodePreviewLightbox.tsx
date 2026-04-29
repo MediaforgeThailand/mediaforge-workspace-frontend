@@ -361,11 +361,15 @@ export function getNodeDownloadable(
   node: Node,
 ): { url: string; label: string } | null {
   const d = (node.data ?? {}) as Record<string, unknown>;
-  const labelOf = (fallback?: string): string =>
-    (d.label as string) ||
-    ((d.params as Record<string, unknown> | undefined)?.nodeName as string) ||
-    fallback ||
-    (node.type ?? "asset");
+  const labelOf = (fallback?: string): string => {
+    const params = d.params as Record<string, unknown> | undefined;
+    return (
+      (typeof params?.nodeName === "string" && params.nodeName.trim()) ||
+      (typeof d.label === "string" && d.label.trim()) ||
+      fallback ||
+      (node.type ?? "asset")
+    );
+  };
 
   // AssetNode — direct upload.
   if (node.type === "assetNode") {
@@ -402,11 +406,15 @@ export function getNodePreview(
   allNodes: ReadonlyArray<Node>,
 ): PreviewPayload | null {
   const d = (node.data ?? {}) as Record<string, unknown>;
-  const labelOf = (fallback?: string): string =>
-    (d.label as string) ||
-    ((d.params as Record<string, unknown> | undefined)?.nodeName as string) ||
-    fallback ||
-    (node.type ?? "node");
+  const labelOf = (fallback?: string): string => {
+    const params = d.params as Record<string, unknown> | undefined;
+    return (
+      (typeof params?.nodeName === "string" && params.nodeName.trim()) ||
+      (typeof d.label === "string" && d.label.trim()) ||
+      fallback ||
+      (node.type ?? "node")
+    );
+  };
 
   // ── AssetNode — direct media file ──
   if (node.type === "assetNode") {

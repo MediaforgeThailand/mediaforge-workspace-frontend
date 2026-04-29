@@ -24,9 +24,14 @@ export type PricingFeature =
   | "text"
   | "model_3d"
   | "remove_background"
-  | "merge_audio_video";
+  | "merge_audio_video"
+  | "generate_openai_image"
+  | "generate_freepik_image"
+  | "generate_freepik_video"
+  | "text_to_speech"
+  | "video_to_prompt";
 
-export type PricingType = "fixed" | "per_second" | "per_operation";
+export type PricingType = "fixed" | "per_second" | "per_operation" | "per_1k_chars";
 
 export interface CreditCostRow {
   id: string;
@@ -38,6 +43,16 @@ export interface CreditCostRow {
   duration_seconds: number | null;
   has_audio: boolean | null;
   created_at: string;
+  provider?: string | null;
+  price_key?: string | null;
+  resolution?: string | null;
+  quality?: string | null;
+  source?: string | null;
+  source_url?: string | null;
+  source_ratio?: number | null;
+  provider_unit?: string | null;
+  notes?: string | null;
+  updated_at?: string | null;
 }
 
 export interface UpsertCreditCostInput {
@@ -50,6 +65,31 @@ export interface UpsertCreditCostInput {
   pricing_type?: string | null;
   duration_seconds?: number | null;
   has_audio?: boolean;
+  provider?: string | null;
+  price_key?: string | null;
+  resolution?: string | null;
+  quality?: string | null;
+  source?: string | null;
+  source_url?: string | null;
+  source_ratio?: number | null;
+  provider_unit?: string | null;
+  notes?: string | null;
+}
+
+export interface PricingCatalogResponse {
+  ratios: {
+    flow_credits_per_thb: number;
+    workspace_credits_per_thb: number;
+    flow_to_workspace_ratio: number;
+  };
+  rows: UpsertCreditCostInput[];
+}
+
+export interface BulkPricingResult {
+  written?: number;
+  imported?: number;
+  ratio: number;
+  rows: CreditCostRow[];
 }
 
 // ─── Internal call helper ───────────────────────────────────────────────
@@ -109,6 +149,18 @@ export const adminPricingApi = {
   deletePrice(id: string): Promise<{ id: string }> {
     return invoke<{ id: string }>("delete_credit_cost", { id });
   },
+
+  getPricingCatalog(): Promise<PricingCatalogResponse> {
+    return invoke<PricingCatalogResponse>("get_pricing_catalog");
+  },
+
+  seedWorkspaceCatalog(): Promise<BulkPricingResult> {
+    return invoke<BulkPricingResult>("seed_workspace_pricing_catalog");
+  },
+
+  importFlowCreditCosts(): Promise<BulkPricingResult> {
+    return invoke<BulkPricingResult>("import_flow_credit_costs");
+  },
 };
 
 // ─── Constants exposed for the form UI ──────────────────────────────────
@@ -118,6 +170,11 @@ export const FEATURE_OPTIONS: ReadonlyArray<{ value: PricingFeature; label: stri
   { value: "video", label: "Video" },
   { value: "audio", label: "Audio" },
   { value: "text", label: "Text / Chat" },
+  { value: "generate_openai_image", label: "OpenAI Image" },
+  { value: "generate_freepik_image", label: "Image Provider" },
+  { value: "generate_freepik_video", label: "Video Provider" },
+  { value: "text_to_speech", label: "Text to Speech" },
+  { value: "video_to_prompt", label: "Video to Prompt" },
   { value: "model_3d", label: "3D Model" },
   { value: "remove_background", label: "Remove Background" },
   { value: "merge_audio_video", label: "Merge Audio + Video" },
@@ -127,4 +184,5 @@ export const PRICING_TYPE_OPTIONS: ReadonlyArray<{ value: PricingType; label: st
   { value: "fixed", label: "Fixed (per generation)" },
   { value: "per_second", label: "Per second" },
   { value: "per_operation", label: "Per operation" },
+  { value: "per_1k_chars", label: "Per 1K characters" },
 ];

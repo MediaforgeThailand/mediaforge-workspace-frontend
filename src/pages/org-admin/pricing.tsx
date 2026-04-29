@@ -32,9 +32,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useIsOrgAdmin } from "@/hooks/useIsOrgUser";
 import {
   usePricingList,
+  usePricingCatalog,
   useCreatePrice,
   useUpdatePrice,
   useDeletePrice,
+  useSeedWorkspacePricingCatalog,
+  useImportFlowCreditCosts,
 } from "@/hooks/useAdminPricing";
 import {
   FEATURE_OPTIONS,
@@ -64,7 +67,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  ArrowLeft, Coins, Loader2, Pencil, Plus, Search, Trash2, RefreshCw,
+  ArrowLeft, Coins, DownloadCloud, Loader2, Pencil, Plus, Search, Settings2, Trash2, RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -88,9 +91,12 @@ export default function OrgAdminPricingPage() {
   const [deleting, setDeleting] = useState<CreditCostRow | null>(null);
 
   const list = usePricingList();
+  const catalog = usePricingCatalog();
   const createMut = useCreatePrice();
   const updateMut = useUpdatePrice();
   const deleteMut = useDeletePrice();
+  const seedCatalogMut = useSeedWorkspacePricingCatalog();
+  const importFlowMut = useImportFlowCreditCosts();
 
   // Auth gating must run before render so we don't fetch from the edge
   // function for a user who isn't allowed to see the page anyway.
@@ -109,6 +115,23 @@ export default function OrgAdminPricingPage() {
       return true;
     });
   }, [list.data, featureFilter, search]);
+
+  const catalogMissing = useMemo(() => {
+    const existing = new Set(
+      (list.data ?? []).map((row) => `${row.feature}:${row.model ?? "__default__"}:${row.duration_seconds ?? 0}:${row.has_audio ? 1 : 0}`),
+    );
+    return (catalog.data?.rows ?? []).filter(
+      (row) => !existing.has(`${row.feature}:${row.model ?? "__default__"}:${row.duration_seconds ?? 0}:${row.has_audio ? 1 : 0}`),
+    );
+  }, [catalog.data?.rows, list.data]);
+
+  const gptRows = useMemo(
+    () =>
+      (list.data ?? [])
+        .filter((row) => row.feature === "generate_openai_image" && String(row.model ?? "").startsWith("gpt-image-2"))
+        .sort((a, b) => String(a.model ?? "").localeCompare(String(b.model ?? ""))),
+    [list.data],
+  );
 
   const handleSubmit = async (input: Omit<UpsertCreditCostInput, "id">) => {
     try {
@@ -134,6 +157,24 @@ export default function OrgAdminPricingPage() {
       setDeleting(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Delete failed");
+    }
+  };
+
+  const handleSeedCatalog = async () => {
+    try {
+      const result = await seedCatalogMut.mutateAsync();
+      toast.success(`Applied ${result.written ?? result.rows.length} recommended Workspace prices`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to apply pricing catalog");
+    }
+  };
+
+  const handleImportFlow = async () => {
+    try {
+      const result = await importFlowMut.mutateAsync();
+      toast.success(`Imported ${result.imported ?? result.rows.length} Flow ERP rows at x${result.ratio}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Flow ERP import failed");
     }
   };
 
@@ -170,6 +211,113 @@ export default function OrgAdminPricingPage() {
             <Plus className="h-4 w-4 mr-2" /> Add new model
           </Button>
         </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+        <Card>
+          <CardHeader>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Settings2 className="h-5 w-5 text-primary" />
+                  Workspace Credit Setup
+                </CardTitle>
+                <CardDescription>
+                  Workspace uses 50 credits per THB. Flow ERP rows are converted from 125 credits per THB.
+                </CardDescription>
+              </div>
+              <Badge variant="secondary">
+                x{catalog.data?.ratios.flow_to_workspace_ratio ?? 0.4}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="text-xs text-muted-foreground">Flow ERP</div>
+                <div className="text-2xl font-bold">1:125</div>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="text-xs text-muted-foreground">Workspace</div>
+                <div className="text-2xl font-bold">1:50</div>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="text-xs text-muted-foreground">Catalog gap</div>
+                <div className="text-2xl font-bold">{catalogMissing.length}</div>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={handleSeedCatalog}
+                disabled={seedCatalogMut.isPending}
+              >
+                {seedCatalogMut.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Settings2 className="h-4 w-4 mr-2" />
+                )}
+                Apply Workspace recommended
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleImportFlow}
+                disabled={importFlowMut.isPending}
+              >
+                {importFlowMut.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <DownloadCloud className="h-4 w-4 mr-2" />
+                )}
+                Import Flow ERP prices
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Recommended rows include GPT Image 2 quality/resolution tiers, Google TTS per-character rows,
+              Video-to-Prompt, and Tripo3D defaults. Every row remains editable below.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">GPT Image 2 Matrix</CardTitle>
+            <CardDescription>
+              Quick check for low / medium / high pricing across 1K, 2K, and 4K.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {gptRows.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                No GPT Image 2 rows yet. Apply the recommended catalog to seed them.
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                {["1K", "2K", "4K"].map((tier) => {
+                  const tierRows = gptRows.filter((row) => (row.resolution ?? "").toUpperCase() === tier || String(row.model ?? "").includes(`:${tier.toLowerCase()}:`));
+                  return (
+                    <div key={tier} className="grid grid-cols-[64px_1fr_1fr_1fr] items-center gap-2 text-sm">
+                      <div className="font-semibold">{tier}</div>
+                      {["low", "medium", "high"].map((quality) => {
+                        const row = tierRows.find((r) => (r.quality ?? "").toLowerCase() === quality || String(r.model ?? "").endsWith(`:${quality}`));
+                        return (
+                          <button
+                            key={quality}
+                            type="button"
+                            onClick={() => row && setEditing(row)}
+                            className="rounded-md border bg-muted/30 px-3 py-2 text-left hover:bg-muted"
+                          >
+                            <div className="text-xs uppercase text-muted-foreground">{quality}</div>
+                            <div className="font-semibold">{row ? `${row.cost} credits` : "missing"}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -247,6 +395,7 @@ export default function OrgAdminPricingPage() {
                     <TableHead>Pricing type</TableHead>
                     <TableHead className="text-right">Duration (s)</TableHead>
                     <TableHead className="text-center">Audio</TableHead>
+                    <TableHead>Source</TableHead>
                     <TableHead>Label</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -273,6 +422,9 @@ export default function OrgAdminPricingPage() {
                       </TableCell>
                       <TableCell className="text-center text-xs">
                         {row.has_audio ? "Yes" : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {row.source ? <Badge variant="outline">{row.source}</Badge> : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="text-sm">{row.label}</TableCell>
                       <TableCell className="text-right">
@@ -431,6 +583,15 @@ function PricingFormFields({ initial, saving, onCancel, onSubmit }: Omit<Pricing
       pricing_type: pricingType || null,
       duration_seconds: durationNum,
       has_audio: hasAudio,
+      provider: initial?.provider ?? null,
+      price_key: initial?.price_key ?? null,
+      resolution: initial?.resolution ?? null,
+      quality: initial?.quality ?? null,
+      source: initial?.source ?? null,
+      source_url: initial?.source_url ?? null,
+      source_ratio: initial?.source_ratio ?? null,
+      provider_unit: initial?.provider_unit ?? null,
+      notes: initial?.notes ?? null,
     });
   };
 

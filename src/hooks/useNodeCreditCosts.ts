@@ -24,6 +24,15 @@ export interface CreditCostRow {
   duration_seconds: number | null;
   has_audio: boolean | null;
   created_at: string;
+  provider?: string | null;
+  price_key?: string | null;
+  resolution?: string | null;
+  quality?: string | null;
+  source?: string | null;
+  source_url?: string | null;
+  source_ratio?: number | null;
+  provider_unit?: string | null;
+  notes?: string | null;
 }
 
 const QUERY_KEY = ["node-credit-costs"] as const;

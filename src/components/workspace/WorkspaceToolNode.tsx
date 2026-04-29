@@ -12,9 +12,9 @@
  */
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type NodeProps, useEdges, useReactFlow } from "@xyflow/react";
+import { type Node, type NodeProps, useEdges, useReactFlow } from "@xyflow/react";
 import {
-  Film, Loader2, Play, RotateCw, Sparkles, Scissors, Combine, FileVideo,
+  ChevronLeft, ChevronRight, Film, Loader2, Play, RotateCw, Sparkles, Scissors, Combine, FileVideo,
   Maximize2, Box, Image as ImageIcon, Music,
   type LucideIcon,
 } from "lucide-react";
@@ -51,6 +51,7 @@ import NodeResultDialog from "./NodeResultDialog";
 import { RunTimer } from "./RunTimer";
 import type { Generation } from "./NodeResultBar";
 import { findAnyVoice, voiceTintGradient } from "./voiceCatalogs";
+import { cloneNodeFresh } from "./cloneNode";
 // Workspace-local schema + helpers — kept out of the shared file so
 // the main flow editor stays untouched.
 import {
@@ -68,6 +69,21 @@ import {
 } from "./workspaceSchema";
 
 const RUN_EDGE_FUNCTION = "workspace-run-node";
+const MAX_VISIBLE_RUN_MS = 30 * 60_000;
+const STALE_RUN_GRACE_MS = 30_000;
+const MULTI_GEN_MAX = 3;
+const MULTI_GEN_X_OFFSET = 480;
+const MULTI_GEN_NODE_TYPES = new Set([
+  "imageGenNode",
+  "videoGenNode",
+  "chatAiNode",
+  "bananaProNode",
+  "klingVideoNode",
+]);
+
+const NEW_ID = (): string =>
+  globalThis.crypto?.randomUUID?.() ??
+  `n_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 /** Trim a long URL down to "host…/last_segment" for one-line debug rows. */
 function shortUrl(u: string | undefined): string {
@@ -462,12 +478,19 @@ interface NodeData {
    *  prefer). Net effect over baseline: +9.25%. Inner UI stays at
    *  fixed pixel sizes; only the outer card width follows. */
   compactWidth?: number;
+  multiGenCount?: number;
+  runStartedAt?: number | null;
+  activeRunId?: string | null;
+  lastRunError?: string | null;
+  backgroundJobId?: string | null;
+  jobStatus?: string | null;
+  jobAttempts?: number | null;
 }
 
 const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const schemaKey = String(type ?? "");
   const schema = getWorkspaceSchema(schemaKey);
-  const { setNodes, setEdges } = useReactFlow();
+  const { getEdges, getNodes, setNodes, setEdges } = useReactFlow();
   const edges = useEdges();
   const prevHasRefVideo = useRef<boolean | undefined>(undefined);
 
@@ -528,6 +551,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const isMultiShot = String(params.multi_shot) === "true";
   const runStatus = d.status ?? "idle";
   const isRunning = runStatus === "processing";
+  const supportsMultiGen = MULTI_GEN_NODE_TYPES.has(schemaKey);
+  const multiGenCount = Math.min(
+    MULTI_GEN_MAX,
+    Math.max(1, Number(d.multiGenCount ?? 1) || 1),
+  );
   // Viewer-mode read-only — runs require a credit deduction
   // and a writable workspace, neither of which a viewer can
   // perform. The Run button below is disabled in this state;
@@ -545,6 +573,12 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     const log = useDebugLogStore.getState().push;
     const nodeLabelForLog =
       (d.params?.nodeName as string) || schema?.displayName || schemaKey;
+    const runId = NEW_ID();
+    const runStartedAt = Date.now();
+    const runStillActive = () => {
+      const current = getNodes().find((node) => node.id === id);
+      return ((current?.data as NodeData | undefined)?.activeRunId ?? null) === runId;
+    };
 
     // (audioGenNode previously short-circuited here with a "preview
     // only" toast because workspace-run-node had no executor. The
@@ -565,7 +599,12 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               data: {
                 ...n.data,
                 status: "processing",
-                runStartedAt: Date.now(),
+                runStartedAt,
+                activeRunId: runId,
+                lastRunError: null,
+                backgroundJobId: null,
+                jobStatus: null,
+                jobAttempts: 0,
               },
             }
           : n,
@@ -647,6 +686,9 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         params: cleanParams,
         inputs,
         mentioned_assets: mentioned,
+        workspace_id: storeState.current?.workspaceId ?? null,
+        canvas_id: storeState.current?.id ?? null,
+        node_id: id,
       };
 
       log({
@@ -660,6 +702,177 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       // are visible in DevTools without having to instrument the edge fn.
       // eslint-disable-next-line no-console
       console.log("[workspace-run-node] sending", requestBody);
+
+      {
+        const jobStartedAt = Date.now();
+        const { data: enqueueResp, error: enqueueErr } = await supabase.functions.invoke(
+          RUN_EDGE_FUNCTION,
+          {
+            body: {
+              ...requestBody,
+              action: "enqueue_workspace_job",
+            },
+          },
+        );
+        const enqueueData = enqueueResp as {
+          job_id?: string;
+          error?: string;
+          status?: string;
+          background?: boolean;
+        } | null;
+        if (enqueueErr || enqueueData?.error || !enqueueData?.job_id) {
+          throw new Error(
+            enqueueData?.error ??
+              (enqueueErr as { message?: string } | null)?.message ??
+              "Failed to enqueue workspace generation",
+          );
+        }
+        const jobId = enqueueData.job_id;
+        setNodes((ns) =>
+          ns.map((n) =>
+            n.id === id && ((n.data as NodeData | undefined)?.activeRunId ?? null) === runId
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    backgroundJobId: jobId,
+                    jobStatus: "queued",
+                  },
+                }
+              : n,
+          ),
+        );
+        log({
+          level: "info",
+          nodeId: id,
+          title: `Background job queued · ${jobId.slice(0, 8)}`,
+          payload: enqueueData,
+        });
+
+        const pollJob = async (): Promise<Record<string, unknown>> => {
+          let lastStatus = "queued";
+          while (Date.now() - jobStartedAt < MAX_VISIBLE_RUN_MS + STALE_RUN_GRACE_MS) {
+            if (!runStillActive()) throw new Error("__RUN_CANCELLED__");
+            await new Promise((res) => setTimeout(res, 3_000));
+            const { data: jobResp, error: jobErr } = await supabase.functions.invoke(
+              RUN_EDGE_FUNCTION,
+              {
+                body: {
+                  action: "get_workspace_job",
+                  job_id: jobId,
+                },
+              },
+            );
+            if (jobErr) {
+              log({
+                level: "info",
+                nodeId: id,
+                title: `Job status retry · ${(jobErr as { message?: string }).message ?? "unknown"}`,
+              });
+              continue;
+            }
+            const job = (jobResp as { job?: Record<string, unknown>; error?: string } | null)?.job;
+            if (!job) {
+              const err = (jobResp as { error?: string } | null)?.error;
+              if (err) throw new Error(err);
+              continue;
+            }
+            const status = String(job.status ?? "");
+            const attempts = Number(job.attempts ?? 0);
+            if (status !== lastStatus) {
+              lastStatus = status;
+              setNodes((ns) =>
+                ns.map((n) =>
+                  n.id === id && ((n.data as NodeData | undefined)?.activeRunId ?? null) === runId
+                    ? { ...n, data: { ...n.data, jobStatus: status, jobAttempts: attempts } }
+                    : n,
+                ),
+              );
+              log({
+                level: "info",
+                nodeId: id,
+                title: `Background job ${status} · attempt ${attempts}`,
+                payload: job,
+              });
+            }
+            if (status === "completed") {
+              const result = job.result as Record<string, unknown> | undefined;
+              if (!result) throw new Error("Background job completed without result");
+              return result;
+            }
+            if (status === "failed" || status === "permanent_failed") {
+              throw new Error(String(job.error ?? job.last_error ?? "Generation failed"));
+            }
+          }
+          throw new Error(
+            `Generation timed out after ${Math.round(MAX_VISIBLE_RUN_MS / 60_000)} minutes.`,
+          );
+        };
+
+        const jobResult = await pollJob();
+        if (!runStillActive()) return;
+        const r = jobResult as {
+          type: "image" | "video" | "text" | "audio";
+          url?: string;
+          text?: string;
+          prompt_used?: string;
+          prompt_source?: string;
+          provider_meta?: {
+            model_url?: string;
+          };
+        };
+
+        storeState.addGeneration(id, {
+          id: (globalThis.crypto?.randomUUID?.() ?? String(Date.now())),
+          type: r.type,
+          url: r.url,
+          text: r.text,
+          model_url: r.provider_meta?.model_url,
+          prompt_used: r.prompt_used,
+          prompt_source: r.prompt_source,
+          createdAt: Date.now(),
+        } as any);
+
+        setNodes((ns) =>
+          ns.map((n) =>
+            n.id === id && ((n.data as NodeData | undefined)?.activeRunId ?? null) === runId
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    status: "done",
+                    runStartedAt: null,
+                    activeRunId: null,
+                    backgroundJobId: jobId,
+                    jobStatus: "completed",
+                    lastRunError: null,
+                  },
+                }
+              : n,
+          ),
+        );
+        const snippet = (r.prompt_used ?? "").slice(0, 60);
+        const srcLabel =
+          r.prompt_source === "text_input_edge"
+            ? "via connected Text"
+            : r.prompt_source === "prompt_param"
+              ? "via Prompt field"
+              : "";
+        log({
+          level: "success",
+          nodeId: id,
+          title: `✓ ${nodeLabelForLog} · ${r.type}${srcLabel ? ` (${srcLabel})` : ""}`,
+          payload: { url: r.url, prompt_used: r.prompt_used, prompt_source: r.prompt_source, job_id: jobId },
+        });
+        toast.success(
+          snippet
+            ? `Generated ${srcLabel ? `(${srcLabel})` : ""}: "${snippet}${
+                (r.prompt_used?.length ?? 0) > 60 ? "…" : ""
+              }"`
+            : "Generated",
+        );
+        return;
+      }
 
       // ────────────────────────────────────────────────────────────
       // Retry loop — Phase 3 of the long-job UX work.
@@ -687,8 +900,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       //     spending the budget on those is wasted UX.
       //   • Transient errors (5xx, our 180s attempt timeout, network
       //     drop, "temporary upstream") loop until budget is spent.
-      const TOTAL_BUDGET_MS = 30 * 60_000;
-      const PER_ATTEMPT_TIMEOUT_MS = 180_000;
+      const TOTAL_BUDGET_MS = MAX_VISIBLE_RUN_MS;
+      const PER_ATTEMPT_TIMEOUT_MS = 120_000;
       const BACKOFF_MS = [3_000, 5_000, 10_000, 15_000, 30_000, 60_000];
       const PERMANENT_ERROR_PATTERNS: RegExp[] = [
         /PROVIDER_BILLING_ERROR/i,
@@ -697,6 +910,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         /content[\s_-]*polic|moderation|blocked|safety system/i,
         /unsupported node type/i,
         /\bnot configured\b|missing.*key/i,
+        /is not defined|is not a function|cannot read prop(?:erty|erties) of (?:undefined|null)/i,
+        /ReferenceError|TypeError|SyntaxError/i,
         /HTTP 4\d\d/,
         /(prompt|input|argument).*required/i,
         /Validation/,
@@ -820,10 +1035,13 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
         // Backoff before next attempt — bail if backoff would push us
         // past the 30-min budget anyway (no point waiting then giving up).
+        if (!runStillActive()) return;
+
         const backoff = computeBackoff(attempt);
         const remaining = TOTAL_BUDGET_MS - (Date.now() - startedAt);
         if (remaining < backoff + 1_000) break retryLoop;
         await new Promise((res) => setTimeout(res, backoff));
+        if (!runStillActive()) return;
       }
 
       const durationMs = Date.now() - startedAt;
@@ -834,8 +1052,9 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         const finalErr =
           lastErr ??
           new Error(
-            `เจนไม่สำเร็จหลังลอง ${attempt} ครั้งใน 30 นาที — ` +
-              "ลองใหม่ภายหลังหรือลด quality / size ดู",
+            `Generation timed out after ${Math.round(
+              TOTAL_BUDGET_MS / 60_000,
+            )} minutes (${attempt} attempts). Try again or reduce quality / size.`,
           );
         log({
           level: "error",
@@ -917,6 +1136,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
         while (Date.now() - pollStart < POLL_TIMEOUT_MS) {
           await new Promise((res) => setTimeout(res, POLL_INTERVAL_MS));
+          if (!runStillActive()) return;
           const { data: pollResp, error: pollErr } = await supabase.functions.invoke(
             RUN_EDGE_FUNCTION,
             {
@@ -989,6 +1209,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         });
       }
 
+      if (!runStillActive()) return;
+
       storeState.addGeneration(id, {
         id: (globalThis.crypto?.randomUUID?.() ?? String(Date.now())),
         type: r.type,
@@ -1006,8 +1228,17 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
       setNodes((ns) =>
         ns.map((n) =>
-          n.id === id
-            ? { ...n, data: { ...n.data, status: "done", runStartedAt: null } }
+          n.id === id && ((n.data as NodeData | undefined)?.activeRunId ?? null) === runId
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  status: "done",
+                  runStartedAt: null,
+                  activeRunId: null,
+                  lastRunError: null,
+                },
+              }
             : n,
         ),
       );
@@ -1034,10 +1265,21 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           : "Generated",
       );
     } catch (e: any) {
+      const errorMessage = String(e?.message ?? e);
+      const shouldToast = runStillActive();
       setNodes((ns) =>
         ns.map((n) =>
-          n.id === id
-            ? { ...n, data: { ...n.data, status: "error", runStartedAt: null } }
+          n.id === id && ((n.data as NodeData | undefined)?.activeRunId ?? null) === runId
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  status: "error",
+                  runStartedAt: null,
+                  activeRunId: null,
+                  lastRunError: errorMessage,
+                },
+              }
             : n,
         ),
       );
@@ -1046,9 +1288,126 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         nodeId: id,
         title: `✗ ${nodeLabelForLog} · ${String(e?.message ?? e)}`,
       });
-      toast.error(String(e?.message ?? e));
+      if (shouldToast) toast.error(errorMessage);
     }
-  }, [id, isRunning, isViewer, params, schemaKey, setNodes, selectedModel, schema, d.params?.nodeName]);
+  }, [getNodes, id, isRunning, isViewer, params, schemaKey, setNodes, selectedModel, schema, d.params?.nodeName]);
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const startedAt =
+      typeof d.runStartedAt === "number" && Number.isFinite(d.runStartedAt)
+        ? d.runStartedAt
+        : null;
+    const activeRunId = d.activeRunId ?? null;
+    if (!startedAt) return;
+
+    let didTimeout = false;
+    const maxElapsedMs = MAX_VISIBLE_RUN_MS + STALE_RUN_GRACE_MS;
+    const timeoutMessage = `Generation timed out after ${Math.round(
+      MAX_VISIBLE_RUN_MS / 60_000,
+    )} minutes. Please retry.`;
+
+    const clearIfStale = () => {
+      if (didTimeout) return;
+      const elapsedMs = Date.now() - startedAt;
+      if (elapsedMs < maxElapsedMs) return;
+      didTimeout = true;
+      setNodes((ns) =>
+        ns.map((n) =>
+          n.id === id &&
+          (activeRunId
+            ? ((n.data as NodeData | undefined)?.activeRunId ?? null) === activeRunId
+            : ((n.data as NodeData | undefined)?.activeRunId ?? null) == null &&
+              (n.data as NodeData | undefined)?.runStartedAt === startedAt)
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  status: "error",
+                  runStartedAt: null,
+                  activeRunId: null,
+                  lastRunError: timeoutMessage,
+                },
+              }
+            : n,
+        ),
+      );
+      useDebugLogStore.getState().push({
+        level: "error",
+        nodeId: id,
+        title: `Run timed out after ${Math.round(elapsedMs / 1000)}s`,
+      });
+      toast.error(timeoutMessage);
+    };
+
+    clearIfStale();
+    const timer = window.setInterval(clearIfStale, 15_000);
+    return () => window.clearInterval(timer);
+  }, [d.activeRunId, d.runStartedAt, id, isRunning, setNodes]);
+
+  const updateMultiGenCount = useCallback(
+    (next: number) => {
+      const clamped = Math.min(MULTI_GEN_MAX, Math.max(1, next));
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === id ? { ...n, data: { ...n.data, multiGenCount: clamped } } : n,
+        ),
+      );
+    },
+    [id, setNodes],
+  );
+
+  const runMultiGen = useCallback(
+    (count: number) => {
+      const n = Math.min(MULTI_GEN_MAX, Math.max(1, count));
+      if (n === 1) {
+        void runNode();
+        return;
+      }
+      if (isRunning || isViewer) return;
+
+      const sourceNode = getNodes().find((node) => node.id === id) as Node | undefined;
+      if (!sourceNode) return;
+
+      useWorkspaceStore.getState().pushHistory();
+
+      const incomingEdges = getEdges().filter((edge) => edge.target === sourceNode.id);
+      const cloned: Node[] = [];
+      const newEdges: typeof incomingEdges = [];
+
+      for (let i = 1; i < n; i++) {
+        const cloneId = NEW_ID();
+        const fresh = cloneNodeFresh(sourceNode, cloneId);
+        cloned.push({
+          ...fresh,
+          data: { ...fresh.data, runOnMount: true },
+          position: {
+            x: sourceNode.position.x + MULTI_GEN_X_OFFSET * i,
+            y: sourceNode.position.y,
+          },
+          selected: false,
+        });
+
+        for (const edge of incomingEdges) {
+          newEdges.push({
+            ...edge,
+            id: NEW_ID(),
+            target: cloneId,
+            selected: false,
+          });
+        }
+      }
+
+      setNodes((nds) => [
+        ...nds.map((node) => (node.selected ? { ...node, selected: false } : node)),
+        ...cloned,
+      ]);
+      setEdges((eds) => [...eds, ...newEdges]);
+      void runNode();
+      toast.success(`Generating ${n} variations in parallel`);
+    },
+    [getEdges, getNodes, id, isRunning, isViewer, runNode, setEdges, setNodes],
+  );
 
   /* ── Listen for Ctrl+Enter / Ctrl+Shift+Enter shortcut ────
    * useWorkspaceShortcuts dispatches a `workspace-run-shortcut`
@@ -1668,6 +2027,13 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           <div className="ws-compact-overlay">
             <div ref={toolbarRef} className="ws-compact-toolbar">
               {toolbarParams.map((p) => renderToolbarParam(p))}
+              {supportsMultiGen && !isMultiShot && (
+                <MultiGenStepper
+                  count={multiGenCount}
+                  disabled={isRunning || isViewer}
+                  onChange={updateMultiGenCount}
+                />
+              )}
             </div>
           </div>
 
@@ -1737,7 +2103,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      void runNode();
+                      runMultiGen(multiGenCount);
                     }}
                     onMouseDown={(e) => e.stopPropagation()}
                     onPointerDown={(e) => e.stopPropagation()}
@@ -1791,6 +2157,12 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         {/* ── Multi-shot scene builder (Kling Omni only) — keeps its
          *  own row below the preview because the scene list grows
          *  too tall to overlay sensibly. */}
+        {runStatus === "error" && d.lastRunError && (
+          <div className="border-t border-red-500/20 bg-red-950/45 px-3 py-2 text-[11px] font-medium leading-snug text-red-100">
+            {d.lastRunError}
+          </div>
+        )}
+
         {isMultiShot && (
           <div className="bg-zinc-900/60 p-2">
             <MultiShotBuilder
@@ -1856,6 +2228,55 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
 WorkspaceToolNode.displayName = "WorkspaceToolNode";
 export default WorkspaceToolNode;
+
+function MultiGenStepper({
+  count,
+  disabled,
+  onChange,
+}: {
+  count: number;
+  disabled: boolean;
+  onChange: (count: number) => void;
+}) {
+  const decDisabled = disabled || count <= 1;
+  const incDisabled = disabled || count >= MULTI_GEN_MAX;
+
+  return (
+    <div
+      className="nodrag flex h-7 items-center gap-0.5 rounded-full bg-black/35 px-1 text-[11px] font-semibold text-zinc-100 ring-1 ring-inset ring-white/10"
+      title="Generate multiple variations when Run is pressed"
+      onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        disabled={decDisabled}
+        onClick={() => onChange(count - 1)}
+        className={cn(
+          "grid h-5 w-5 place-items-center rounded-full transition-colors",
+          decDisabled ? "cursor-not-allowed text-zinc-600" : "text-zinc-300 hover:bg-white/10 hover:text-white",
+        )}
+        aria-label="Decrease variation count"
+      >
+        <ChevronLeft className="h-3.5 w-3.5" />
+      </button>
+      <span className="min-w-6 text-center tabular-nums">x{count}</span>
+      <button
+        type="button"
+        disabled={incDisabled}
+        onClick={() => onChange(count + 1)}
+        className={cn(
+          "grid h-5 w-5 place-items-center rounded-full transition-colors",
+          incDisabled ? "cursor-not-allowed text-zinc-600" : "text-zinc-300 hover:bg-white/10 hover:text-white",
+        )}
+        aria-label="Increase variation count"
+      >
+        <ChevronRight className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
 
 /* ── Voice picker pill (audioGenNode only) ──────────────────
  *

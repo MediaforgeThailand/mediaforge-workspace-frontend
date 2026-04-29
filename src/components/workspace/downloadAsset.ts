@@ -30,6 +30,9 @@
  *  their Downloads folder for `mediaforge_*` and find every workspace
  *  output. */
 export function pickFilename(url: string, label?: string): string {
+  if (label && /^mediaforge_.+\.[a-z0-9]{2,5}$/i.test(label.trim())) {
+    return label.trim();
+  }
   return buildDownloadFilename(label ?? "asset", extFromUrl(url));
 }
 
@@ -70,9 +73,8 @@ export function extFromGenType(t: string | undefined): string {
  *   buildDownloadFilename("Hero Shot", "mp4", 2)          // mediaforge_Hero-Shot-3.mp4
  *
  * Sanitisation rules:
- *   - NFKD normalise so accented characters don't survive as multi-
- *     byte goop in filesystems with shaky Unicode handling.
- *   - Replace anything not [A-Za-z0-9_-] with `-`.
+ *   - NFKC normalise so composed Unicode stays stable across OSes.
+ *   - Replace anything not Unicode letter / number / _ / - with `-`.
  *   - Collapse runs of `-` and trim trailing `-`.
  *   - Cap at 60 chars so even Windows path limits aren't an issue
  *     once you add the `mediaforge_` prefix and the extension.
@@ -89,8 +91,8 @@ export function buildDownloadFilename(
 ): string {
   const safe =
     rawName
-      .normalize("NFKD")
-      .replace(/[^A-Za-z0-9_-]+/g, "-")
+      .normalize("NFKC")
+      .replace(/[^\p{L}\p{N}_-]+/gu, "-")
       .replace(/-+/g, "-")
       .replace(/^-+|-+$/g, "")
       .slice(0, 60) || "asset";

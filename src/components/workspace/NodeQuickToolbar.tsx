@@ -567,17 +567,6 @@ const NodeQuickToolbar = memo(() => {
            *  where parallel runs return distinct candidates;
            *  deterministic transforms (remove-bg, video-to-prompt,
            *  audio merge) hide it because x3 = same output 3x. */}
-          {isMultiGenNode && (
-            <MultiGenButton
-              disabled={sourceIsRunning}
-              open={multiGenOpen}
-              onOpenChange={setMultiGenOpen}
-              onPick={(c) => {
-                setMultiGenOpen(false);
-                runMulti(c);
-              }}
-            />
-          )}
           <Separator />
         </>
       )}
