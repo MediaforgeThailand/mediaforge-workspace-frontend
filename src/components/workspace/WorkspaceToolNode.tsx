@@ -882,17 +882,27 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       // Each poll is one short edge-fn call (~1s) — no risk of the
       // platform's 150s worker limit even on multi-minute jobs. We
       // dispatch by `provider_meta.provider`:
-      //   - "tripo3d" → POST action="poll_tripo3d"
-      //   - else      → POST action="poll_kling"  (default for video)
+      //   - "tripo3d"  → POST action="poll_tripo3d"
+      //   - "seedance" → POST action="poll_seedance"
+      //   - else       → POST action="poll_kling"  (default for video)
       const pollEndpoint = r.provider_meta?.poll_endpoint;
       const pollProvider = String(r.provider_meta?.provider ?? "kling").toLowerCase();
       if (r.task_id && !r.url && pollEndpoint) {
         const pollStart = Date.now();
         const isTripo3d = pollProvider === "tripo3d";
+        const isSeedance = pollProvider === "seedance";
         const POLL_INTERVAL_MS = isTripo3d ? 4_000 : 5_000;
         const POLL_TIMEOUT_MS = isTripo3d ? 8 * 60_000 : 6 * 60_000;
-        const pollAction = isTripo3d ? "poll_tripo3d" : "poll_kling";
-        const providerLabel = isTripo3d ? "Tripo3D" : "Kling";
+        const pollAction = isTripo3d
+          ? "poll_tripo3d"
+          : isSeedance
+            ? "poll_seedance"
+            : "poll_kling";
+        const providerLabel = isTripo3d
+          ? "Tripo3D"
+          : isSeedance
+            ? "Seedance"
+            : "Kling";
         let polledUrl: string | undefined;
         let polledModelUrl: string | undefined;
         let polledPreview: string | undefined;
