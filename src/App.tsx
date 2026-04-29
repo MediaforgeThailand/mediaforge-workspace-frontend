@@ -142,10 +142,10 @@ const App = () => (
                  *  allow-list, redirecting any other path → /app/workspace. */}
                 <OrgUserBlockGate>
                 <Routes>
-                  {/* Root → redirect to workspace dashboard. The
-                   *  consumer landing page was removed in Wave 1
-                   *  (this repo is now workspace-only). */}
-                  <Route path="/" element={<Navigate to="/app/workspace" replace />} />
+                  {/* Root → redirect to workspace dashboard at /app
+                   *  (the dashboard moved up from /app/workspace so
+                   *  the URL matches the consumer-product convention). */}
+                  <Route path="/" element={<Navigate to="/app" replace />} />
 
                   {/* Auth + legal — public */}
                   <Route path="/auth" element={<Auth />} />
@@ -156,16 +156,18 @@ const App = () => (
                   {/* Workspace dashboard owns its own sidebar (Home /
                    *  Spaces / Community / Projects / All tools / Stock),
                    *  so it sits outside DashboardLayout — no chrome
-                   *  competition with the legacy consumer sidebar. */}
-                  <Route path="/app" element={<Navigate to="/app/workspace" replace />} />
+                   *  competition with the legacy consumer sidebar.
+                   *  Mounted at /app (was /app/workspace); the old path
+                   *  redirects below for any bookmarked links. */}
                   <Route
-                    path="/app/workspace"
+                    path="/app"
                     element={
                       <ProtectedRoute>
                         <WorkspaceDashboard />
                       </ProtectedRoute>
                     }
                   />
+                  <Route path="/app/workspace" element={<Navigate to="/app" replace />} />
 
                   {/* Org-admin panel — DEFINED BEFORE the AccountShell outlet
                       below because the outlet's `*` catch-all otherwise
@@ -233,7 +235,7 @@ const App = () => (
                     {/* Unknown /app/<x> sub-route → bounce back to the
                      *  dashboard. Without this AccountShell would
                      *  render with an empty content area. */}
-                    <Route path="*" element={<Navigate to="/app/workspace" replace />} />
+                    <Route path="*" element={<Navigate to="/app" replace />} />
                   </Route>
 
                   {/* Pricing page — workspace sidebar but no Account
