@@ -408,6 +408,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
       mergeServerProjects: (serverList) =>
         set((s) => {
+          const PENDING_PUSH_WINDOW_MS = 60_000;
+          const nowMs = Date.now();
           const localById = new Map(s.projects.map((p) => [p.id, p]));
           const merged = serverList.map((server) => {
             const local = localById.get(server.id);
@@ -415,7 +417,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           });
           for (const local of s.projects) {
             if (!serverList.some((server) => server.id === local.id)) {
-              merged.push(local);
+              if (nowMs - local.updatedAt < PENDING_PUSH_WINDOW_MS) {
+                merged.push(local);
+              }
             }
           }
           merged.sort((a, b) => b.updatedAt - a.updatedAt);
@@ -545,6 +549,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const newWorkspaceId = uid();
         const newWorkspace: WorkspaceMeta = {
           id: newWorkspaceId,
+          projectId: source.projectId,
           name: `${source.name} (copy)`,
           updatedAt: ts,
         };
@@ -563,6 +568,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           idMap[c.id] = newId;
           return {
             id: newId,
+            projectId: source.projectId,
             workspaceId: newWorkspaceId,
             // Keep the page name verbatim — users named these for a
             // reason and a "(copy)" suffix per page would be noise.
@@ -629,6 +635,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           newGraphs[targetCanvasId] = {
             ...sourceGraph,
             id: targetCanvasId,
+            projectId: source.projectId,
             workspaceId: newWorkspaceId,
             name: sourceGraph.name,
             nodes: clonedNodes,

@@ -286,13 +286,17 @@ const WorkspaceDashboardInner = () => {
 
     let cancelled = false;
     (async () => {
+      const PENDING_PUSH_WINDOW_MS = 60_000;
+      const nowMs = Date.now();
       const serverProjects = await loadProjectsFromServer();
       if (cancelled) return;
       if (serverProjects) {
         const localProjectsBefore = useWorkspaceStore.getState().projects;
         const serverProjectIds = new Set(serverProjects.map((p) => p.id));
         const localOnlyProjects = localProjectsBefore.filter(
-          (p) => !serverProjectIds.has(p.id),
+          (p) =>
+            !serverProjectIds.has(p.id) &&
+            nowMs - p.updatedAt < PENDING_PUSH_WINDOW_MS,
         );
         mergeServerProjects(serverProjects);
         for (const p of localOnlyProjects) void upsertProjectToServer(p, user.id);
@@ -303,15 +307,35 @@ const WorkspaceDashboardInner = () => {
       const serverIds = new Set(server.map((w) => w.id));
       const tombstones = useWorkspaceStore.getState().deletedWorkspaceIds;
       const localOnly = localBefore.filter(
-        (w) => !serverIds.has(w.id) && !(w.id in tombstones),
+        (w) =>
+          !serverIds.has(w.id) &&
+          !(w.id in tombstones) &&
+          nowMs - w.updatedAt < PENDING_PUSH_WINDOW_MS,
       );
       mergeServerWorkspaces(server);
       for (const w of localOnly) void upsertWorkspaceToServer(w, user.id);
+
+      const stateAfterSync = useWorkspaceStore.getState();
+      const currentActive = stateAfterSync.activeProjectId;
+      const currentActiveHasSpaces =
+        !!currentActive &&
+        stateAfterSync.workspaces.some((w) => w.projectId === currentActive);
+      if (!currentActiveHasSpaces) {
+        const preferredProjectId =
+          server.find((w) => !!w.projectId)?.projectId ??
+          stateAfterSync.projects.find((p) =>
+            stateAfterSync.workspaces.some((w) => w.projectId === p.id),
+          )?.id ??
+          null;
+        if (preferredProjectId && preferredProjectId !== currentActive) {
+          setActiveProject(preferredProjectId);
+        }
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [authLoading, mergeServerProjects, mergeServerWorkspaces, user?.id]);
+  }, [authLoading, mergeServerProjects, mergeServerWorkspaces, setActiveProject, user?.id]);
 
   useEffect(() => {
     if (standaloneProjects.length === 0) {
@@ -560,13 +584,18 @@ const HomeView = ({
 
     let cancelled = false;
     (async () => {
+      const PENDING_PUSH_WINDOW_MS = 60_000;
+      const nowMs = Date.now();
       const server = await loadWorkspacesFromServer();
       if (cancelled || !server) return;
       const localBefore = useWorkspaceStore.getState().workspaces;
       const serverIds = new Set(server.map((w) => w.id));
       const tombstones = useWorkspaceStore.getState().deletedWorkspaceIds;
       const localOnly = localBefore.filter(
-        (w) => !serverIds.has(w.id) && !(w.id in tombstones),
+        (w) =>
+          !serverIds.has(w.id) &&
+          !(w.id in tombstones) &&
+          nowMs - w.updatedAt < PENDING_PUSH_WINDOW_MS,
       );
       mergeServerWorkspaces(server);
       for (const w of localOnly) void upsertWorkspaceToServer(w, user.id);
@@ -575,7 +604,7 @@ const HomeView = ({
       if (cancelled || serverCanvasIds === null) return;
       const knownWorkspaceIds = new Set([
         ...serverIds,
-        ...localBefore.map((w) => w.id),
+        ...localOnly.map((w) => w.id),
       ]);
       const localGraphs = useWorkspaceStore.getState().graphs;
       for (const [canvasId, graph] of Object.entries(localGraphs)) {
@@ -619,7 +648,10 @@ const HomeView = ({
    * Home carousel previews are real (not placeholders). */
   const recentSpaces = useMemo(() => {
     return [...workspaces]
-      .filter((ws) => !activeProjectId || ws.projectId === activeProjectId)
+      .filter(
+        (ws) =>
+          !activeProjectId || !ws.projectId || ws.projectId === activeProjectId,
+      )
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, 6)
       .map((ws) => buildSpaceCardData(ws, canvases, graphs));
@@ -1044,13 +1076,18 @@ const SpacesView = ({ activeProjectId }: { activeProjectId: string | null }) => 
 
     let cancelled = false;
     (async () => {
+      const PENDING_PUSH_WINDOW_MS = 60_000;
+      const nowMs = Date.now();
       const server = await loadWorkspacesFromServer();
       if (cancelled || !server) return;
       const localBefore = useWorkspaceStore.getState().workspaces;
       const serverIds = new Set(server.map((w) => w.id));
       const tombstones = useWorkspaceStore.getState().deletedWorkspaceIds;
       const localOnly = localBefore.filter(
-        (w) => !serverIds.has(w.id) && !(w.id in tombstones),
+        (w) =>
+          !serverIds.has(w.id) &&
+          !(w.id in tombstones) &&
+          nowMs - w.updatedAt < PENDING_PUSH_WINDOW_MS,
       );
       mergeServerWorkspaces(server);
       for (const w of localOnly) void upsertWorkspaceToServer(w, user.id);
@@ -1059,7 +1096,7 @@ const SpacesView = ({ activeProjectId }: { activeProjectId: string | null }) => 
       if (cancelled || serverCanvasIds === null) return;
       const knownWorkspaceIds = new Set([
         ...serverIds,
-        ...localBefore.map((w) => w.id),
+        ...localOnly.map((w) => w.id),
       ]);
       const localGraphs = useWorkspaceStore.getState().graphs;
       for (const [canvasId, graph] of Object.entries(localGraphs)) {
@@ -1104,7 +1141,12 @@ const SpacesView = ({ activeProjectId }: { activeProjectId: string | null }) => 
   const buckets = useMemo(() => {
     return groupByMonth(
       [...workspaces]
-        .filter((ws) => !activeProjectId || ws.projectId === activeProjectId)
+        .filter(
+          (ws) =>
+            !activeProjectId ||
+            !ws.projectId ||
+            ws.projectId === activeProjectId,
+        )
         .map((ws) => buildSpaceCardData(ws, canvases, graphs)),
     );
   }, [activeProjectId, workspaces, canvases, graphs]);
