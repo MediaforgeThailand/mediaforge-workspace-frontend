@@ -110,7 +110,28 @@ function getNodeIcon(nodeType: string, data: Record<string, unknown>): MentionOp
 }
 
 function getNodeDisplayLabel(data: Record<string, unknown>): string {
-  return (data.nodeName as string) || (data.label as string) || "Untitled";
+  // Resolution order matters — different node families store the
+  // user-editable display name in different places:
+  //
+  //   • Workspace tool nodes (ImageGen / VideoGen / ChatAi / Banana
+  //     / Kling / etc.) save their title-input value under
+  //     `data.params.nodeName`. This is the path the rename UI
+  //     writes to, so it has to come FIRST or a renamed tool node
+  //     will keep showing the schema's default displayName.
+  //   • Legacy flow nodes occasionally use a top-level
+  //     `data.nodeName` — kept as a fallback so historical canvases
+  //     don't lose their labels.
+  //   • AssetNode / TextNode / GroupNode write to `data.label`.
+  //
+  // Empty / whitespace-only strings skip to the next candidate
+  // (otherwise clearing the title input would leave the dropdown
+  // showing nothing instead of the next sensible default).
+  const params = data.params as Record<string, unknown> | undefined;
+  const candidates = [params?.nodeName, data.nodeName, data.label];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c;
+  }
+  return "Untitled";
 }
 
 /**
