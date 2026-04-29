@@ -563,6 +563,15 @@ const HomeView = ({
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const canvases = useWorkspaceStore((s) => s.canvases);
   const graphs = useWorkspaceStore((s) => s.graphs);
+  // `projects` was previously a free reference inside the projectCards
+  // useMemo below — never declared in this scope, never threaded as a
+  // prop (the parent passes it but we ignore the prop). That blew up
+  // at runtime as `ReferenceError: projects is not defined` and broke
+  // the entire workspace shell (no way back to dashboard). Pulling
+  // straight from the store mirrors how `workspaces`/`canvases`/`graphs`
+  // are wired and avoids relying on a prop the type contract doesn't
+  // even declare.
+  const projects = useWorkspaceStore((s) => s.projects);
   const createWorkspace = useWorkspaceStore((s) => s.createWorkspace);
   const mergeServerWorkspaces = useWorkspaceStore(
     (s) => s.mergeServerWorkspaces,
