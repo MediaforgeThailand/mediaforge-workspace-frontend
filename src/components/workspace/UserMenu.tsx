@@ -8,11 +8,11 @@
  *
  * Items:
  *   • Account label (email + display name) — non-interactive
- *   • Settings  → /app/settings
- *   • Usage     → /app/usage
- *   • Pricing   → /app/pricing
- *   • Theme     → toggle the ThemeProvider value
- *   • Sign out  → AuthContext.signOut() then bounce to /auth
+ *   • Upgrade        → /app/pricing (prominent CTA button)
+ *   • Settings       → /app/settings
+ *   • Plan & billing → /app/pricing
+ *   • Theme          → toggle the ThemeProvider value
+ *   • Sign out       → AuthContext.signOut() then bounce to /auth
  *
  * Designed as a drop-in for any PageHeader rightSlot. It owns its
  * own state (the dropdown open/close); the parent only needs to
@@ -34,6 +34,8 @@ import {
   Sun,
   Moon,
   LogOut,
+  CreditCard,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "next-themes";
@@ -87,19 +89,42 @@ export function UserMenu() {
           </div>
         </DropdownMenuLabel>
 
+        {/* Prominent Upgrade CTA — sits between the account header
+         *  and the menu list. Mirrors the reference profile layout
+         *  (big purple button + quieter "Plan & billing" row below).
+         *  TODO: hide this when the user is on the highest tier (Pro)
+         *  once subscription state is reliably populated; for now we
+         *  always show it. */}
+        <div className="px-2 py-2">
+          <button
+            type="button"
+            onClick={() => navigate("/app/pricing")}
+            className="flex w-full items-center justify-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[12.5px] font-medium text-white shadow-sm transition-colors hover:bg-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/60"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Upgrade
+          </button>
+        </div>
+
         <DropdownMenuSeparator className="bg-white/[0.06]" />
 
-        {/* Account links — Wave 2 trimmed this list down to surfaces
-         *  that are actually wired. Usage + Pricing were dropped
-         *  because billing isn't fully connected on the workspace
-         *  project yet (Stripe checkout, credit ledger reconciliation
-         *  etc.); they'll come back when that work lands. */}
+        {/* Account links. Settings stays on top; Plan & billing
+         *  duplicates the Upgrade CTA's destination but follows the
+         *  reference layout (loud CTA + quiet row). */}
         <DropdownMenuItem
           onSelect={() => navigate("/app/settings")}
           className="cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50"
         >
           <SettingsIcon className="h-3.5 w-3.5 text-zinc-400" />
           Settings
+        </DropdownMenuItem>
+
+        <DropdownMenuItem
+          onSelect={() => navigate("/app/pricing")}
+          className="cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50"
+        >
+          <CreditCard className="h-3.5 w-3.5 text-zinc-400" />
+          Plan &amp; billing
         </DropdownMenuItem>
 
         <DropdownMenuSeparator className="bg-white/[0.06]" />
