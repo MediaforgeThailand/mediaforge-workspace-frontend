@@ -63,11 +63,15 @@ import {
   Mic2,
   Wand2,
   Pin,
+  Crown,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { UserMenu } from "@/components/workspace/UserMenu";
+import { useIsOrgAdmin } from "@/hooks/useIsOrgUser";
+import OrgCreditBadge from "@/components/OrgCreditBadge";
+import ActiveClassPicker from "@/components/ActiveClassPicker";
 
 /* ════════════════════════════════════════════════════════════
  * Types + helpers
@@ -310,10 +314,44 @@ const DashboardSidebar = ({
         ))}
       </nav>
 
-      <div className="mt-auto px-4 py-3 text-[10.5px] text-zinc-600">
+      {/* Active class switcher — only renders when student is in 2+
+       *  classes; consumers/single-class students see nothing. */}
+      <div className="px-3 mt-auto">
+        <ActiveClassPicker variant="compact" className="w-full" />
+      </div>
+
+      {/* Org credit badge — visible to org members so they can see
+       *  their balance at a glance. Returns null for consumer/guests. */}
+      <div className="px-4 py-2">
+        <OrgCreditBadge variant="card" />
+      </div>
+
+      {/* Org admin entry — only visible to teachers / org admins. */}
+      <OrgAdminLink />
+
+      <div className="px-4 py-3 text-[10.5px] text-zinc-600">
         v1.5 · workspace
       </div>
     </aside>
+  );
+};
+
+const OrgAdminLink = () => {
+  const isOrgAdmin = useIsOrgAdmin();
+  const navigate = useNavigate();
+  if (!isOrgAdmin) return null;
+  return (
+    <div className="px-3 pt-3 pb-2 border-t border-white/5 mt-3">
+      <button
+        type="button"
+        onClick={() => navigate("/app/org-admin")}
+        className="flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-[12.5px] text-amber-200/90 hover:bg-amber-300/10 hover:text-amber-100 transition-colors"
+        title="Manage organisation members and credits"
+      >
+        <Crown className="h-3.5 w-3.5" />
+        Manage Org
+      </button>
+    </div>
   );
 };
 

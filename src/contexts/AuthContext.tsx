@@ -23,6 +23,13 @@ interface Profile {
   current_plan_id: string | null;
   /** Resolved plan name from subscription_plans table */
   plan_name: string | null;
+  // Org user fields — set by post_auth_assign_org trigger when the user's
+  // email domain matches a verified org domain. NULL for users whose
+  // domain isn't on file (they exist as consumers).
+  account_type: "consumer" | "org_user" | null;
+  organization_id: string | null;
+  /** @deprecated Use `organization_id`. Kept as alias during migration. */
+  org_id: string | null;
 }
 
 interface AuthContextType {
@@ -60,7 +67,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, user_id, display_name, avatar_url, company, role, subscription_status, created_at, updated_at, billing_interval, current_period_end, current_plan_id, subscription_plan_id, subscription_plans(name)")
+        .select("id, user_id, display_name, avatar_url, company, role, subscription_status, created_at, updated_at, billing_interval, current_period_end, current_plan_id, subscription_plan_id, organization_id, account_type, subscription_plans(name)")
         .eq("user_id", userId)
         .maybeSingle();
 
@@ -74,6 +81,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const profile: Profile = {
         ...(data as any),
         plan_name: planRow?.name ?? null,
+        // Schema C: organization_id (was org_id in older schema). Mirror to
+        // both keys so older UI references keep working until rewritten.
+        organization_id: (data as any).organization_id ?? null,
+        org_id: (data as any).organization_id ?? null,
       };
       delete (profile as any).subscription_plans;
       return profile;

@@ -12,6 +12,8 @@ import logo from "@/assets/logo-white.png";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import PhoneOtpLogin from "@/components/auth/PhoneOtpLogin";
+import OrgLoginPanel from "@/components/auth/OrgLoginPanel";
+import { resolveOrgLogin, type OrgLoginResolution } from "@/lib/orgLoginResolver";
 import { useSearchParams } from "react-router-dom";
 const Auth = () => {
   const navigate = useNavigate();
@@ -40,6 +42,31 @@ const Auth = () => {
   const [signupPassword, setSignupPassword] = useState("");
   const [isForgotLoading, setIsForgotLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  // Org SSO detection — when an email's domain is registered to an org,
+  // we replace the consumer login form with OrgLoginPanel (SSO only).
+  const [orgEmail, setOrgEmail] = useState<string>("");
+  const [orgResolution, setOrgResolution] = useState<OrgLoginResolution | null>(null);
+  const [isResolvingOrg, setIsResolvingOrg] = useState(false);
+
+  const checkOrgEmail = async (email: string) => {
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed.includes("@") || !trimmed.includes(".")) return;
+    if (orgEmail === trimmed && orgResolution) return; // already resolved
+    setIsResolvingOrg(true);
+    try {
+      const result = await resolveOrgLogin(trimmed);
+      setOrgEmail(trimmed);
+      setOrgResolution(result);
+    } finally {
+      setIsResolvingOrg(false);
+    }
+  };
+
+  const exitOrgPanel = () => {
+    setOrgEmail("");
+    setOrgResolution(null);
+  };
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
@@ -226,6 +253,21 @@ const Auth = () => {
           <div className="text-center lg:text-left">
           </div>
 
+           {orgResolution && orgResolution.is_org ? (
+             <OrgLoginPanel
+               email={orgEmail}
+               resolution={orgResolution}
+               redirectPath={searchParams.get("redirect")}
+               onBack={exitOrgPanel}
+             />
+           ) : (
+           <>
+           {isResolvingOrg && (
+             <div className="text-center text-xs text-muted-foreground">
+               <Loader2 className="inline h-3 w-3 animate-spin mr-1" />
+               Checking organisation…
+             </div>
+           )}
            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 bg-muted">
               <TabsTrigger value="login">{t("authLoginTab")}</TabsTrigger>
@@ -349,6 +391,8 @@ const Auth = () => {
               )}
             </TabsContent>
           </Tabs>
+          </>
+           )}
 
           <p className="text-center text-sm text-muted-foreground">
             {t("authTermsText")}{" "}
