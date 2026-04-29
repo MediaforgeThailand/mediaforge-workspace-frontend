@@ -39,6 +39,7 @@ import {
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useDebugLogStore } from "@/store/useDebugLogStore";
 import NodeResultDialog from "./NodeResultDialog";
+import { RunTimer } from "./RunTimer";
 import type { Generation } from "./NodeResultBar";
 import { findVoice, VOICE_TINT_GRADIENT } from "./geminiVoices";
 // Workspace-local schema + helpers — kept out of the shared file so
@@ -540,8 +541,21 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     }
 
     // Set processing status (drives the node-shell glow ring too).
+    // Stamp `runStartedAt` so <RunTimer /> can show elapsed time
+    // next to the spinner. Cleared back to null on success/error.
     setNodes((ns) =>
-      ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, status: "processing" } } : n)),
+      ns.map((n) =>
+        n.id === id
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                status: "processing",
+                runStartedAt: Date.now(),
+              },
+            }
+          : n,
+      ),
     );
 
     log({
@@ -967,7 +981,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       } as any);
 
       setNodes((ns) =>
-        ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, status: "done" } } : n)),
+        ns.map((n) =>
+          n.id === id
+            ? { ...n, data: { ...n.data, status: "done", runStartedAt: null } }
+            : n,
+        ),
       );
       // Show which prompt + source so the user can tell at a glance
       // whether the connected Text node was actually honored.
@@ -993,7 +1011,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       );
     } catch (e: any) {
       setNodes((ns) =>
-        ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, status: "error" } } : n)),
+        ns.map((n) =>
+          n.id === id
+            ? { ...n, data: { ...n.data, status: "error", runStartedAt: null } }
+            : n,
+        ),
       );
       log({
         level: "error",
@@ -1664,6 +1686,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                   <Play className="fill-current" />
                 )}
               </button>
+              {isRunning && (
+                <RunTimer
+                  startedAt={(d.runStartedAt as number | null | undefined) ?? null}
+                />
+              )}
             </div>
           )}
         </div>

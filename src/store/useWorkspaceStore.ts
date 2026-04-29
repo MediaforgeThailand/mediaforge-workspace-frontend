@@ -1366,6 +1366,56 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           state.current = null;
           state.selectedNodeId = null;
           state.chatIsStreaming = false;
+
+          // ── Stuck-running recovery ─────────────────────────────
+          // After the persisted state is restored, every node whose
+          // run status is "running"/"processing" is by definition
+          // stale — a real in-flight request can't survive a page
+          // reload. Reset every transient run-state field so the
+          // user can hit Run again instead of staring at a forever-
+          // spinning Loader2 against a request that no longer
+          // exists.
+          //
+          // We clear BOTH naming conventions (`status`/`runStatus`,
+          // `processing`/`running`) defensively — current schema
+          // uses `data.status === "processing"`, but downstream
+          // code may add `runStatus`/`isRunning` over time and we
+          // don't want a future drift to leave stale flags behind.
+          try {
+            for (const graph of Object.values(state.graphs ?? {})) {
+              for (const n of graph.nodes ?? []) {
+                const d = (n.data ?? {}) as Record<string, unknown>;
+                const status = d.status;
+                const runStatus = (d as { runStatus?: unknown }).runStatus;
+                const isRunning = (d as { isRunning?: unknown }).isRunning;
+                if (
+                  status === "processing" ||
+                  status === "running" ||
+                  runStatus === "running" ||
+                  runStatus === "processing" ||
+                  isRunning === true
+                ) {
+                  n.data = {
+                    ...d,
+                    status: "idle",
+                    runStatus: "idle",
+                    isRunning: false,
+                    runId: null,
+                    taskId: null,
+                    pollAt: null,
+                    progress: null,
+                    runStartedAt: null,
+                    runError: null,
+                  } as typeof n.data;
+                }
+              }
+            }
+          } catch (sweepErr) {
+            console.error(
+              "[workspace-store] stale-run-state sweep failed:",
+              sweepErr,
+            );
+          }
         }
       },
     },
