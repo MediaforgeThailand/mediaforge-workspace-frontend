@@ -1399,7 +1399,9 @@ body.ws-resizing * {
 .react-flow__node:not(.selected) .ws-compact-prompt-overlay,
 .react-flow__node:not(.selected) .ws-compact-prompt-overlay *,
 .react-flow__node:not(.selected) .ws-compact-run-anchor,
-.react-flow__node:not(.selected) .ws-compact-run-anchor * {
+.react-flow__node:not(.selected) .ws-compact-run-anchor *,
+.react-flow__node:not(.selected) .ws-history-toggle,
+.react-flow__node:not(.selected) .ws-history-toggle * {
   pointer-events: auto !important;
 }
 
@@ -1598,4 +1600,37 @@ body.ws-resizing * {
 .workspace-node-merged > .node-glass {
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
+}
+
+/* ─────────────────────────────────────────────────────────── */
+/* Lightbox-open suppression of floating node overlays.         */
+/*                                                              */
+/* While `NodePreviewLightbox` is mounted it tags <body> with   */
+/* `.ws-lightbox-open`. Every absolutely-positioned overlay     */
+/* that decorates a React Flow node — the floating quick        */
+/* toolbar (Play/Download/Copy/Delete), the compact settings    */
+/* cog, the inline run anchor, node titles, the group node      */
+/* title bar — gets hidden so they don't bleed through into the */
+/* lightbox view.                                               */
+/*                                                              */
+/* These floats DO live inside the React Flow node tree (or are */
+/* portal'd to body and positioned at node coords); since they  */
+/* track `:hover` / `.selected` on their owning node, they stay */
+/* painted while the lightbox covers the canvas — visually      */
+/* leaking on top of the dim backdrop. Hiding them outright is  */
+/* the surgical fix.                                            */
+/*                                                              */
+/* Carve-outs that MUST stay visible while a lightbox is open:  */
+/*   • the lightbox itself (rendered to body, no node-overlay   */
+/*     class — unaffected by these selectors)                   */
+/*   • the floating tool palette / sidebar / mascot / topbar    */
+/*     (they have their own classes outside this list)          */
+/* ─────────────────────────────────────────────────────────── */
+body.ws-lightbox-open .ws-quick-toolbar,
+body.ws-lightbox-open .ws-compact-overlay,
+body.ws-lightbox-open .ws-compact-run-anchor,
+body.ws-lightbox-open .react-flow__node .ws-clean-title {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
 }

@@ -1546,7 +1546,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                 setHistoryOpen(true);
               }}
               onMouseDown={(e) => e.stopPropagation()}
-              className="absolute left-2 top-2 nodrag flex items-center gap-1 rounded bg-black/65 px-1.5 py-0.5 text-[10px] text-white/80 backdrop-blur-sm hover:bg-black/80"
+              className="ws-history-toggle absolute left-2 top-2 nodrag flex items-center gap-1 rounded bg-black/65 px-1.5 py-0.5 text-[10px] text-white/80 backdrop-blur-sm hover:bg-black/80"
               title="Browse history"
             >
               <Maximize2 className="h-2.5 w-2.5" />
