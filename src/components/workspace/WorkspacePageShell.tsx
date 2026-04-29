@@ -17,8 +17,10 @@ import WorkspaceSidebar from "@/components/workspace/WorkspaceSidebar";
 
 export default function WorkspacePageShell({
   children,
+  hideSidebarBelowLg = false,
 }: {
   children?: ReactNode;
+  hideSidebarBelowLg?: boolean;
 }) {
   return (
     <div
@@ -27,9 +29,11 @@ export default function WorkspacePageShell({
     >
       {/* No `active` — this shell is used for surfaces that aren't
        *  one of the tagged sections (Home/Spaces/etc). */}
-      <WorkspaceSidebar />
+      <div className={hideSidebarBelowLg ? "hidden h-full lg:block" : "h-full"}>
+        <WorkspaceSidebar />
+      </div>
 
-      <main className="ws-scroll-hide flex-1 overflow-y-auto bg-[hsl(0_0%_5%)]">
+      <main className="ws-scroll-hide min-w-0 flex-1 overflow-y-auto bg-[hsl(0_0%_5%)]">
         {children ?? <Outlet />}
       </main>
     </div>

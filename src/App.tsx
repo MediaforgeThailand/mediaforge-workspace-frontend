@@ -209,7 +209,7 @@ const App = () => (
                     path="/app/university"
                     element={
                       <ProtectedRoute>
-                        <WorkspacePageShell>
+                        <WorkspacePageShell hideSidebarBelowLg>
                           <UniversityMockup />
                         </WorkspacePageShell>
                       </ProtectedRoute>

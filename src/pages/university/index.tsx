@@ -53,6 +53,7 @@ const classes = [
 ];
 
 const weeklyDrip = [50, 100, 150, 200, 250, 300, 350, 400];
+const dmdLogoSrc = "/dmd-digital-media-logo.png";
 
 export default function UniversityMockup() {
   const [selectedClass, setSelectedClass] = useState(classes[0]);
@@ -77,14 +78,14 @@ export default function UniversityMockup() {
   }, [selectedClass.model]);
 
   return (
-    <div className="min-h-full bg-[#f6f7fb] text-slate-950">
+    <div className="min-h-full overflow-x-hidden bg-[#f6f7fb] text-slate-950">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-5 px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-5 lg:px-6 lg:py-4">
           <div className="flex min-w-0 items-center gap-4">
             <img
-              src="/dmd-logo-placeholder.svg"
+              src={dmdLogoSrc}
               alt="DMD"
-              className="h-12 w-12 shrink-0 rounded-xl object-contain shadow-sm ring-1 ring-slate-200"
+              className="h-12 w-[132px] shrink-0 object-contain sm:w-[156px]"
             />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -96,32 +97,44 @@ export default function UniversityMockup() {
               </p>
             </div>
           </div>
-          <div className="hidden items-center gap-2 md:flex">
-            <Button variant="outline" className="gap-2">
+          <div className="hidden items-center gap-2 lg:flex">
+            <Button variant="outline" className="h-11 gap-2">
               <Download className="h-4 w-4" />
               ส่งออกรายงาน
             </Button>
-            <Button className="gap-2 bg-slate-950 text-white hover:bg-slate-800">
+            <Button className="h-11 gap-2 bg-slate-950 text-white hover:bg-slate-800">
               <Plus className="h-4 w-4" />
               เพิ่มนักเรียน
             </Button>
-            <Button onClick={() => setQrOpen(true)} className="gap-2 bg-fuchsia-600 text-white hover:bg-fuchsia-700">
+            <Button onClick={() => setQrOpen(true)} className="h-11 gap-2 bg-fuchsia-600 text-white hover:bg-fuchsia-700">
               <QrCode className="h-4 w-4" />
               สร้าง QR Code
             </Button>
           </div>
         </div>
+        <div className="border-t border-slate-100 px-4 py-3 sm:px-5 lg:hidden">
+          <div className="mx-auto grid max-w-7xl grid-cols-2 gap-2">
+            <Button variant="outline" className="h-11 gap-2">
+              <UserPlus className="h-4 w-4" />
+              เพิ่มนักเรียน
+            </Button>
+            <Button onClick={() => setQrOpen(true)} className="h-11 gap-2 bg-fuchsia-600 text-white hover:bg-fuchsia-700">
+              <QrCode className="h-4 w-4" />
+              สร้าง QR
+            </Button>
+          </div>
+        </div>
       </header>
 
-      <main className="mx-auto grid max-w-7xl gap-6 px-6 py-6 xl:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="space-y-4">
+      <main className="mx-auto grid max-w-7xl gap-4 px-4 py-4 sm:px-5 lg:gap-6 lg:px-6 lg:py-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+        <aside className="grid gap-4 md:grid-cols-3 xl:block xl:space-y-4">
           <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
               <Building2 className="h-4 w-4" />
               วิทยาลัย
             </div>
             <button className="flex w-full items-center gap-3 rounded-lg border border-fuchsia-200 bg-fuchsia-50 p-3 text-left">
-              <img src="/dmd-logo-placeholder.svg" alt="DMD" className="h-10 w-10 rounded-lg object-contain" />
+              <img src={dmdLogoSrc} alt="DMD" className="h-10 w-28 shrink-0 object-contain" />
               <div className="min-w-0 flex-1">
                 <div className="font-semibold">Digital Media Design</div>
                 <div className="text-xs text-slate-500">3 คลาส · 105 นักเรียน</div>
@@ -143,7 +156,7 @@ export default function UniversityMockup() {
                     type="button"
                     onClick={() => setSelectedClass(item)}
                     className={cn(
-                      "w-full rounded-md px-3 py-2.5 text-left transition-colors",
+                      "w-full rounded-md px-3 py-3 text-left transition-colors",
                       active ? "bg-slate-950 text-white" : "hover:bg-slate-100",
                     )}
                   >
@@ -187,11 +200,11 @@ export default function UniversityMockup() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" className="gap-2">
+                <Button variant="outline" className="h-11 gap-2">
                   <UserPlus className="h-4 w-4" />
                   เพิ่มนักเรียน
                 </Button>
-                <Button onClick={() => setQrOpen(true)} className="gap-2 bg-fuchsia-600 text-white hover:bg-fuchsia-700">
+                <Button onClick={() => setQrOpen(true)} className="h-11 gap-2 bg-fuchsia-600 text-white hover:bg-fuchsia-700">
                   <QrCode className="h-4 w-4" />
                   สร้าง QR Code
                 </Button>
@@ -199,7 +212,7 @@ export default function UniversityMockup() {
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Metric icon={Users} label="นักเรียนทั้งหมด" value={String(selectedClass.students)} hint="+3 สัปดาห์นี้" />
             <Metric icon={WalletCards} label="เครดิตคงเหลือ" value={remaining.toLocaleString()} hint={`จาก ${selectedClass.total.toLocaleString()}`} />
             <Metric icon={Activity} label="การใช้งานเดือนนี้" value={selectedClass.used.toLocaleString()} hint={`เฉลี่ย ${average}/คน`} />
@@ -207,14 +220,14 @@ export default function UniversityMockup() {
           </div>
 
           <Tabs defaultValue="overview" className="space-y-4">
-            <TabsList className="bg-white shadow-sm ring-1 ring-slate-200">
-              <TabsTrigger value="overview">หน้าแรก</TabsTrigger>
-              <TabsTrigger value="students">นักเรียน</TabsTrigger>
-              <TabsTrigger value="credits">เครดิต</TabsTrigger>
-              <TabsTrigger value="reports">รายงาน</TabsTrigger>
+            <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-lg bg-white p-1 shadow-sm ring-1 ring-slate-200">
+              <TabsTrigger value="overview" className="min-h-11 min-w-24 px-4">หน้าแรก</TabsTrigger>
+              <TabsTrigger value="students" className="min-h-11 min-w-24 px-4">นักเรียน</TabsTrigger>
+              <TabsTrigger value="credits" className="min-h-11 min-w-24 px-4">เครดิต</TabsTrigger>
+              <TabsTrigger value="reports" className="min-h-11 min-w-24 px-4">รายงาน</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="overview" className="m-0 grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
+            <TabsContent value="overview" className="m-0 grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
               <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
@@ -257,7 +270,7 @@ export default function UniversityMockup() {
               <StudentTable selectedStudent={selectedStudent} onSelect={setSelectedStudent} />
             </TabsContent>
 
-            <TabsContent value="credits" className="m-0 grid gap-6 lg:grid-cols-2">
+            <TabsContent value="credits" className="m-0 grid gap-4 xl:grid-cols-2">
               <CreditModelCard
                 title="Monthly Reset Quota"
                 subtitle="200 เครดิต / เดือน / นักเรียน"
@@ -286,7 +299,7 @@ export default function UniversityMockup() {
               </section>
             </TabsContent>
 
-            <TabsContent value="reports" className="m-0 grid gap-6 lg:grid-cols-3">
+            <TabsContent value="reports" className="m-0 grid gap-4 md:grid-cols-3">
               <ReportTile icon={BarChart3} title="การใช้งานรายเดือน" value="5,750 credits" />
               <ReportTile icon={CircleDollarSign} title="งบประมาณคงเหลือ" value="14,250 credits" />
               <ReportTile icon={CalendarClock} title="รอบเครดิตถัดไป" value="1 พ.ค. 2569" />
@@ -296,13 +309,13 @@ export default function UniversityMockup() {
       </main>
 
       <Dialog open={qrOpen} onOpenChange={setQrOpen}>
-        <DialogContent className="max-w-xl border-slate-200 bg-white text-slate-950">
+        <DialogContent className="max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-2xl overflow-y-auto border-slate-200 bg-white p-4 text-slate-950 sm:p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between gap-3 pr-8">
               <span>เริ่มคาบเรียน · {selectedClass.name}</span>
             </DialogTitle>
           </DialogHeader>
-          <div className="grid gap-5 sm:grid-cols-[220px_minmax(0,1fr)]">
+          <div className="grid gap-5 md:grid-cols-[220px_minmax(0,1fr)]">
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-5">
               <div className="grid aspect-square place-items-center rounded-md bg-white shadow-inner">
                 <div className="grid h-36 w-36 grid-cols-5 gap-1">
@@ -332,7 +345,7 @@ export default function UniversityMockup() {
               <div className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">
                 นักเรียนเข้าคลาสแล้ว 38 / 42
               </div>
-              <Button className="w-full bg-slate-950 text-white hover:bg-slate-800">
+              <Button className="h-11 w-full bg-slate-950 text-white hover:bg-slate-800">
                 ฉายหน้าจอนี้บนโปรเจคเตอร์
               </Button>
             </div>
@@ -402,7 +415,31 @@ function StudentTable({
           กำลังจัดการ: {selectedStudent.name}
         </div>
       </div>
-      <div className="overflow-x-auto">
+      <div className="divide-y divide-slate-100 lg:hidden">
+        {students.map((student) => (
+          <button
+            key={student.code}
+            type="button"
+            onClick={() => onSelect(student)}
+            className="flex min-h-[72px] w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50"
+          >
+            <AvatarText>{student.initials}</AvatarText>
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-medium">{student.name}</div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <span className="font-mono">{student.code}</span>
+                <span>{student.credits} / 200 credits</span>
+              </div>
+              <Progress value={(student.credits / 200) * 100} className="mt-2 h-1.5" />
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-2">
+              <StatusBadge status={student.status} />
+              <ChevronRight className="h-4 w-4 text-slate-400" />
+            </div>
+          </button>
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto lg:block">
         <table className="w-full min-w-[760px] text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-[0.12em] text-slate-500">
             <tr>
