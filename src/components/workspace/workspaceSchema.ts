@@ -622,10 +622,11 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     category: "AI PROCESS",
     accentColor: "amber",
     supportedModels: [
+      "gemini-3.1-flash-tts-preview",
       "gemini-2.5-flash-preview-tts",
       "gemini-2.5-pro-preview-tts",
     ],
-    defaultModel: "gemini-2.5-flash-preview-tts",
+    defaultModel: "gemini-3.1-flash-tts-preview",
     inputs: [
       { id: "text", label: "text (script)", color: "sky" },
     ],
@@ -636,14 +637,16 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         label: "Model",
         type: "select",
         options: [
+          "gemini-3.1-flash-tts-preview",
           "gemini-2.5-flash-preview-tts",
           "gemini-2.5-pro-preview-tts",
         ],
         optionLabels: {
+          "gemini-3.1-flash-tts-preview": "Gemini 3.1 Flash TTS",
           "gemini-2.5-flash-preview-tts": "Gemini 2.5 Flash TTS",
           "gemini-2.5-pro-preview-tts": "Gemini 2.5 Pro TTS",
         },
-        default: "gemini-2.5-flash-preview-tts",
+        default: "gemini-3.1-flash-tts-preview",
         required: true,
       },
       {

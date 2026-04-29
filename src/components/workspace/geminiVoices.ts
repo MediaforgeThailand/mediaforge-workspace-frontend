@@ -1,8 +1,9 @@
 /**
  * Gemini 2.5 TTS prebuilt voice catalog.
  *
- * Google ships 30 named voices with the `gemini-2.5-flash-preview-tts`
- * and `gemini-2.5-pro-preview-tts` models. Each name is taken from a
+ * Google ships 30 named voices with the Gemini TTS preview models
+ * (`gemini-3.1-flash-tts-preview`, `gemini-2.5-flash-preview-tts`,
+ * and `gemini-2.5-pro-preview-tts`). Each name is taken from a
  * star or moon (Achernar = α Eridani, Aoede = a moon of Jupiter,
  * etc.) and each ships with a one-word "characteristic" descriptor
  * that hints at its tonal personality.

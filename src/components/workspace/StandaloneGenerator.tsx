@@ -38,11 +38,11 @@ import {
   type StandaloneToolKey,
 } from "./standaloneGenerationCatalog";
 import {
-  DEFAULT_GOOGLE_VOICE_ID,
-  findGoogleVoice,
-  GOOGLE_VOICE_TINT_GRADIENT,
-  GOOGLE_VOICES,
-} from "./googleTtsVoices";
+  DEFAULT_VOICE_ID,
+  findVoice,
+  GEMINI_VOICES,
+  VOICE_TINT_GRADIENT,
+} from "./geminiVoices";
 
 const RUN_EDGE_FUNCTION = "workspace-run-node";
 const STANDALONE_CANVAS_ID = "standalone";
@@ -139,7 +139,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     videoStart: null,
     videoEnd: null,
     script: "",
-    voice: DEFAULT_GOOGLE_VOICE_ID,
+    voice: DEFAULT_VOICE_ID,
     voiceStyle: "Neutral, clear, natural pace",
     modelImage: null,
     texture: true,
@@ -162,7 +162,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     videoStart: null,
     videoEnd: null,
     script: "",
-    voice: DEFAULT_GOOGLE_VOICE_ID,
+    voice: DEFAULT_VOICE_ID,
     voiceStyle: "Neutral, clear, natural pace",
     modelImage: null,
     texture: true,
@@ -185,7 +185,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     videoStart: null,
     videoEnd: null,
     script: "",
-    voice: DEFAULT_GOOGLE_VOICE_ID,
+    voice: DEFAULT_VOICE_ID,
     voiceStyle: "Warm, confident, natural pace",
     modelImage: null,
     texture: true,
@@ -208,7 +208,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     videoStart: null,
     videoEnd: null,
     script: "",
-    voice: DEFAULT_GOOGLE_VOICE_ID,
+    voice: DEFAULT_VOICE_ID,
     voiceStyle: "Neutral",
     modelImage: null,
     texture: true,
@@ -1017,7 +1017,7 @@ function VoiceControls({
   form: StandaloneFormState;
   onChange: (patch: Partial<StandaloneFormState>) => void;
 }) {
-  const selectedVoice = findGoogleVoice(form.voice);
+  const selectedVoice = findVoice(form.voice);
   return (
     <>
       <PromptBox
@@ -1029,9 +1029,9 @@ function VoiceControls({
         maxLength={5000}
       />
       <div>
-        <FieldLabel label="Voice" meta={selectedVoice.family} />
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          {GOOGLE_VOICES.slice(0, 2).map((voice) => {
+        <FieldLabel label="Gemini voice" meta={selectedVoice.characteristic} />
+        <div className="mt-2 grid max-h-[270px] grid-cols-2 gap-2 overflow-y-auto pr-1">
+          {GEMINI_VOICES.map((voice) => {
             const active = voice.id === form.voice;
             return (
               <button
@@ -1047,7 +1047,7 @@ function VoiceControls({
               >
                 <span
                   className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"
-                  style={{ background: GOOGLE_VOICE_TINT_GRADIENT[voice.tint] }}
+                  style={{ background: VOICE_TINT_GRADIENT[voice.tint] }}
                 >
                   {voice.name.charAt(0)}
                 </span>

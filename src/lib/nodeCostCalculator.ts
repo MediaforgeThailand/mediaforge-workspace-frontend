@@ -122,7 +122,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
 
   // ── Unified Video (Kling I2V / Extension / Motion / Omni) ──
   if (schemaKey === "audioGenNode") {
-    const apiModel = modelName || "google-tts-studio";
+    const apiModel = modelName || "gemini-3.1-flash-tts-preview";
     const match = creditCosts.find(
       (r) => r.feature === "text_to_speech" && r.model === apiModel,
     );
