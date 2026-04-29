@@ -40,7 +40,16 @@ const SEEDANCE_MODELS = [
   "seedance-1-0-pro-250528",
   "seedance-1-0-pro-fast-251015",
   "seedance-1-5-pro-251215",
+  "seedance-2-0-lite",
+  "seedance-2-0-pro",
 ] as const;
+const SEEDANCE_LABELS: Record<string, string> = {
+  "seedance-1-0-pro-250528": "SeedDance 1.0 Pro",
+  "seedance-1-0-pro-fast-251015": "SeedDance 1.0 Pro Fast (3x)",
+  "seedance-1-5-pro-251215": "SeedDance 1.5 Pro",
+  "seedance-2-0-lite": "SeedDance 2.0 Lite",
+  "seedance-2-0-pro": "SeedDance 2.0 Pro (Latest)",
+};
 const BANANA_MODELS = ["nano-banana-2", "nano-banana-pro"] as const;
 /** Backend dispatches anything starting with "gpt-image" to OpenAI's
  *  /v1/images/edits or /v1/images/generations endpoint. */
@@ -406,9 +415,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         ],
         optionLabels: {
           ...KLING_LABELS,
-          "seedance-1-0-pro-250528": "SeedDance 1.0 Pro",
-          "seedance-1-0-pro-fast-251015": "SeedDance 1.0 Pro Fast (3x)",
-          "seedance-1-5-pro-251215": "SeedDance 1.5 Pro (Latest)",
+          ...SEEDANCE_LABELS,
         },
         default: "kling-v2-6-pro",
         required: true,
