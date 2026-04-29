@@ -59,6 +59,8 @@ import {
   Mic2,
   Wand2,
   Pin,
+  SlidersHorizontal,
+  UserCircle2,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -976,21 +978,71 @@ const SpacesView = () => {
 
   const handleOpen = (id: string) => navigate(`/app/workspace/${id}`);
 
+  // Tab state for the Magnific-style segmented control. Only "My
+  // spaces" is wired today — Shared and Templates are placeholders
+  // we'll hook up once those features land. Switching to one of them
+  // shows an inline empty-state so the click isn't a dead-end.
+  const [tab, setTab] = useState<"mine" | "shared" | "templates">("mine");
+
   return (
     <>
+      {/* Slim chrome bar — keeps the workspace selector + user menu
+          visible. Title moved to the hero block below per the new
+          Magnific-style layout. */}
       <PageHeader
-        title="Spaces"
+        title=""
         rightSlot={
           <div className="flex items-center gap-3">
-            <SpaceToolbar onNew={handleNew} />
             <UserMenu />
           </div>
         }
       />
 
       <div className="ws-scroll-hide flex-1 overflow-y-auto">
-        <div className="px-8 pb-12 pt-4">
-          {buckets.length === 0 ? (
+        <div className="mx-auto max-w-[1400px] px-8 pb-16 pt-10">
+          {/* ── Hero header — big title + subtitle ─────────────── */}
+          <header className="mb-8">
+            <h1 className="text-[44px] md:text-[56px] font-bold leading-none tracking-tight text-zinc-50">
+              Spaces
+            </h1>
+            <p className="mt-3 text-[14px] text-zinc-400">
+              Build node-based generative workflows and bring your ideas to life.
+            </p>
+          </header>
+
+          {/* ── Tabs row — left: tab switcher / right: actions ──
+              Mirrors the Magnific layout exactly — segmented tabs on
+              the left, "+ New space" + filter / favourites / search
+              icon row on the right. */}
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <SpacesTabs tab={tab} onChange={setTab} />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleNew}
+                className="flex h-9 items-center gap-1.5 rounded-lg bg-white/[0.06] px-3.5 text-[13px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.12]"
+              >
+                <Plus className="h-3.5 w-3.5" /> New space
+              </button>
+              <SpacesIconBtn icon={Heart} title="Favorites" />
+              <SpacesIconBtn icon={SlidersHorizontal} title="Filter" />
+              <SpacesIconBtn icon={Search} title="Search" />
+            </div>
+          </div>
+
+          {/* ── Content — only "My spaces" has data today; Shared /
+              Templates render an empty placeholder so the tabs aren't
+              dead clicks. */}
+          {tab !== "mine" ? (
+            <EmptyState
+              title={tab === "shared" ? "No shared spaces yet" : "No templates yet"}
+              hint={
+                tab === "shared"
+                  ? "Spaces shared with you by teammates will show up here."
+                  : "Pre-built starting points for common workflows are coming soon."
+              }
+            />
+          ) : buckets.length === 0 ? (
             <EmptyState
               title="No spaces yet"
               hint="Create your first space to start chaining AI tools."
@@ -1020,6 +1072,68 @@ const SpacesView = () => {
     </>
   );
 };
+
+/* ─── Spaces tab switcher (My spaces / Shared / Templates) ───
+ * Pill-style segmented control matching the Magnific reference —
+ * active pill gets a soft white surface + subtle ring, inactive
+ * pills are just text with a hover. Three tabs total; only "mine"
+ * is wired up today. */
+const SpacesTabs = ({
+  tab,
+  onChange,
+}: {
+  tab: "mine" | "shared" | "templates";
+  onChange: (t: "mine" | "shared" | "templates") => void;
+}) => {
+  const items: { key: "mine" | "shared" | "templates"; label: string; icon: LucideIcon }[] = [
+    { key: "mine", label: "My spaces", icon: UserCircle2 },
+    { key: "shared", label: "Shared", icon: Users },
+    { key: "templates", label: "Templates", icon: LayoutGrid },
+  ];
+  return (
+    <div className="inline-flex rounded-xl bg-white/[0.03] p-1 ring-1 ring-inset ring-white/[0.05]">
+      {items.map((it) => {
+        const active = tab === it.key;
+        const Icon = it.icon;
+        return (
+          <button
+            key={it.key}
+            type="button"
+            onClick={() => onChange(it.key)}
+            className={cn(
+              "flex h-8 items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-medium transition-colors",
+              active
+                ? "bg-white/[0.08] text-zinc-50 ring-1 ring-inset ring-white/[0.06]"
+                : "text-zinc-400 hover:text-zinc-200",
+            )}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {it.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+/* Square icon button used in the actions row next to "+ New space".
+   Matches the height of the New-space button (h-9) so they line up. */
+const SpacesIconBtn = ({
+  icon: Icon,
+  title,
+}: {
+  icon: LucideIcon;
+  title: string;
+}) => (
+  <button
+    type="button"
+    title={title}
+    aria-label={title}
+    className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.03] text-zinc-400 ring-1 ring-inset ring-white/[0.05] transition-colors hover:bg-white/[0.08] hover:text-zinc-100"
+  >
+    <Icon className="h-3.5 w-3.5" />
+  </button>
+);
 
 const SpaceToolbar = ({ onNew }: { onNew: () => void }) => (
   <div className="flex items-center gap-2">
