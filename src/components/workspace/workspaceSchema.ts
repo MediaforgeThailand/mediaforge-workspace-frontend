@@ -43,6 +43,10 @@ const SEEDANCE_MODELS = [
   "seedance-2-0-lite",
   "seedance-2-0-pro",
 ] as const;
+const SEEDANCE_VIDEO_REF_MODELS = [
+  "seedance-2-0-lite",
+  "seedance-2-0-pro",
+] as const;
 const BANANA_MODELS = ["nano-banana-2", "nano-banana-pro"] as const;
 /** Backend dispatches anything starting with "gpt-image" to OpenAI's
  *  /v1/images/edits or /v1/images/generations endpoint. */
@@ -366,7 +370,12 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         id: "ref_video",
         label: "ref_video",
         color: "rose",
-        supportedModels: ["kling-v2-6-motion-pro", "kling-v3-motion-pro", "kling-v3-omni"],
+        supportedModels: [
+          "kling-v2-6-motion-pro",
+          "kling-v3-motion-pro",
+          "kling-v3-omni",
+          ...SEEDANCE_VIDEO_REF_MODELS,
+        ],
       },
       {
         id: "elements",
