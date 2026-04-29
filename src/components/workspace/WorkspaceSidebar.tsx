@@ -58,6 +58,7 @@ export const DEFAULT_BRAND_NAME = "Workspace";
 export type SectionKey =
   | "home"
   | "history"
+  | "assets"
   | "search"
   | "stock"
   | "community"
@@ -71,8 +72,12 @@ export type SectionKey =
   | "tools"; // legacy "All tools" placeholder — still accepted
 
 const NAV_TOP: Array<{ id: SectionKey; label: string; icon: LucideIcon }> = [
-  { id: "home",    label: "Home",    icon: HomeIcon },
-  { id: "history", label: "History", icon: HistoryIcon },
+  { id: "home",   label: "Home",       icon: HomeIcon },
+  // Sidebar entry points to AssetsView (the Magnific-style asset
+  // library that replaced the old HistoryView). The legacy
+  // `?section=history` URL still resolves to this view because the
+  // dashboard router treats both keys the same.
+  { id: "assets", label: "All assets", icon: HistoryIcon },
 ];
 
 const NAV_TOOLS: Array<{ id: SectionKey; label: string; icon: LucideIcon }> = [
