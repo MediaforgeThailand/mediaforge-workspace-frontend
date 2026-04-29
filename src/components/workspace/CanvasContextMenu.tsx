@@ -274,15 +274,20 @@ const PANEL_MAX_HEIGHT = 540;
  * radii, font-sizes) untouched so the proportions still match the
  * Figma spec, while making the whole panel land smaller on screen.
  * 0.8 = 20 % smaller — what the team asked for. */
-const PANEL_SCALE = 0.8;
-const PANEL_VISUAL_WIDTH = PANEL_WIDTH * PANEL_SCALE;
-const PANEL_VISUAL_MAX_HEIGHT = PANEL_MAX_HEIGHT * PANEL_SCALE;
+const DESKTOP_PANEL_SCALE = 0.8;
 
 const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState<ToolCategory>("all");
   const [highlight, setHighlight] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const panelScale =
+    typeof window !== "undefined" &&
+    window.matchMedia("(pointer: coarse)").matches
+      ? 1
+      : DESKTOP_PANEL_SCALE;
+  const visualWidth = PANEL_WIDTH * panelScale;
+  const visualMaxHeight = PANEL_MAX_HEIGHT * panelScale;
 
   useEffect(() => {
     const t = window.setTimeout(() => inputRef.current?.focus(), 0);
@@ -308,11 +313,11 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
   // bottom edge guard accounts for the actual rendered size.
   const left = Math.min(
     state.screen.x,
-    Math.max(8, window.innerWidth - PANEL_VISUAL_WIDTH - 8),
+    Math.max(8, window.innerWidth - visualWidth - 8),
   );
   const top = Math.min(
     state.screen.y,
-    Math.max(8, window.innerHeight - PANEL_VISUAL_MAX_HEIGHT - 8),
+    Math.max(8, window.innerHeight - visualMaxHeight - 8),
   );
 
   const fire = (it: ToolItem) => {
@@ -388,7 +393,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
           // (left, top) coordinates still correspond to where the
           // user right-clicked. The visual-size constants above are
           // what the edge-clamp uses.
-          transform: `scale(${PANEL_SCALE})`,
+          transform: `scale(${panelScale})`,
           transformOrigin: "top left",
         }}
         onClick={(e) => e.stopPropagation()}
@@ -412,7 +417,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
               onKeyDown={onKey}
               placeholder="Search"
               className={cn(
-                "nodrag w-full rounded-xl border border-white/[0.06] bg-white/[0.04] py-2.5 pl-9 pr-3",
+                "nodrag w-full rounded-xl border border-white/[0.06] bg-white/[0.04] py-3 pl-9 pr-3 lg:py-2.5",
                 "text-[13px] text-zinc-100 outline-none placeholder:text-zinc-500",
                 "transition-colors focus:border-white/10 focus:bg-white/[0.06]",
               )}
@@ -433,7 +438,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
                 title={t.label}
                 aria-pressed={isActive}
                 className={cn(
-                  "flex h-9 flex-1 items-center justify-center rounded-lg transition-all",
+                  "flex h-11 flex-1 items-center justify-center rounded-lg transition-all lg:h-9",
                   isActive
                     ? "bg-white/[0.08] text-zinc-50 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.06)]"
                     : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200",
@@ -471,7 +476,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
                       disabled={it.comingSoon}
                       title={it.description}
                       className={cn(
-                        "group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-colors",
+                        "group flex min-h-12 w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-colors lg:min-h-0",
                         isHighlight
                           ? "bg-white/[0.06]"
                           : "hover:bg-white/[0.04]",

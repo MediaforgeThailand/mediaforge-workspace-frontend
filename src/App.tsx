@@ -118,6 +118,7 @@ const ClassEnroll = lazyWithRetry(() => import("./pages/ClassEnroll"));
 // instead of running INSERTs in the SQL editor. Lives under /app/org-admin
 // so it inherits the OrgUserBlockGate allowlist.
 const OrgAdminPricing = lazyWithRetry(() => import("./pages/org-admin/pricing"));
+const UniversityMockup = lazyWithRetry(() => import("./pages/university"));
 
 const queryClient = new QueryClient();
 const PageLoader = () => <PageLoadingAnim />;
@@ -184,6 +185,17 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <OrgAdminPricing />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/app/university"
+                    element={
+                      <ProtectedRoute>
+                        <WorkspacePageShell hideSidebarBelowLg>
+                          <UniversityMockup />
+                        </WorkspacePageShell>
                       </ProtectedRoute>
                     }
                   />

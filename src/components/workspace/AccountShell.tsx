@@ -64,12 +64,12 @@ export default function AccountShell({ children }: { children?: ReactNode }) {
       <WorkspaceSidebar />
 
       {/* ── Account content area ─────────────────────────────── */}
-      <main className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-white/5 px-6">
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-white/5 px-4 md:px-6 lg:h-12">
           <button
             type="button"
             onClick={() => navigate("/app/workspace")}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-100"
+            className="flex h-10 w-10 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-100 lg:h-7 lg:w-7"
             title="Back to workspace"
             aria-label="Back to workspace"
           >
@@ -77,7 +77,7 @@ export default function AccountShell({ children }: { children?: ReactNode }) {
           </button>
           <span className="text-[13px] font-medium text-zinc-300">Account</span>
           <span className="text-zinc-600">/</span>
-          <nav className="flex items-center gap-0.5">
+          <nav className="flex min-w-0 items-center gap-0.5 overflow-x-auto">
             {ACCOUNT_TABS.map((tab) => {
               const active = location.pathname === tab.path;
               return (
@@ -86,7 +86,7 @@ export default function AccountShell({ children }: { children?: ReactNode }) {
                   type="button"
                   onClick={() => navigate(tab.path)}
                   className={cn(
-                    "flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12px] transition-colors",
+                    "flex h-10 shrink-0 items-center gap-1.5 rounded-md px-3 text-[12px] transition-colors lg:h-7 lg:px-2.5",
                     active
                       ? "bg-white/[0.07] text-zinc-50 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.05)]"
                       : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100",
@@ -109,7 +109,7 @@ export default function AccountShell({ children }: { children?: ReactNode }) {
         </header>
 
         <div className="ws-scroll-hide flex-1 overflow-y-auto bg-[hsl(0_0%_5%)]">
-          <div className="mx-auto w-full max-w-5xl px-6 py-8 text-zinc-200">
+          <div className="mx-auto w-full max-w-5xl px-4 py-6 text-zinc-200 md:px-6 md:py-8">
             {children ?? <Outlet />}
           </div>
         </div>

@@ -12,6 +12,7 @@ import {
 } from "@/lib/adminPricingApi";
 
 export const PRICING_QUERY_KEY = ["admin", "credit_costs"] as const;
+export const PRICING_CATALOG_QUERY_KEY = ["admin", "credit_costs", "catalog"] as const;
 
 /** List all pricing rows (cached for 30s, manually invalidated on writes). */
 export function usePricingList() {
@@ -19,6 +20,14 @@ export function usePricingList() {
     queryKey: PRICING_QUERY_KEY,
     queryFn: () => adminPricingApi.listPricing(),
     staleTime: 30_000,
+  });
+}
+
+export function usePricingCatalog() {
+  return useQuery({
+    queryKey: PRICING_CATALOG_QUERY_KEY,
+    queryFn: () => adminPricingApi.getPricingCatalog(),
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -128,6 +137,28 @@ export function useDeletePrice() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: PRICING_QUERY_KEY });
+    },
+  });
+}
+
+export function useSeedWorkspacePricingCatalog() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => adminPricingApi.seedWorkspaceCatalog(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: PRICING_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: PRICING_CATALOG_QUERY_KEY });
+    },
+  });
+}
+
+export function useImportFlowCreditCosts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => adminPricingApi.importFlowCreditCosts(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: PRICING_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: PRICING_CATALOG_QUERY_KEY });
     },
   });
 }

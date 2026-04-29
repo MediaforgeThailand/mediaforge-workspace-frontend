@@ -10,17 +10,36 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, MailCheck, ArrowLeft, Phone } from "lucide-react";
 import logo from "@/assets/logo-white.png";
 import { supabase } from "@/integrations/supabase/client";
+import { useOrgBranding } from "@/hooks/useOrgBranding";
 import { useIsMobile } from "@/hooks/use-mobile";
 import PhoneOtpLogin from "@/components/auth/PhoneOtpLogin";
 import OrgLoginPanel from "@/components/auth/OrgLoginPanel";
 import { resolveOrgLogin, type OrgLoginResolution } from "@/lib/orgLoginResolver";
 import { useSearchParams } from "react-router-dom";
+
+const DEFAULT_POST_AUTH_PATH = "/app/workspace";
+
+const normalizePostAuthPath = (path: string) => {
+  // /app/university is a demo surface that should only be entered by
+  // pressing the PSC sidebar button after login. Never make it the
+  // automatic post-auth landing page.
+  if (path === "/app/university" || path.startsWith("/app/university?")) {
+    return DEFAULT_POST_AUTH_PATH;
+  }
+  return path;
+};
+
 const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { t } = useLanguage();
   const isMobile = useIsMobile();
+  // Tenant subdomain branding (e.g. dmd.mediaforge.co). When the user
+  // lands on a claimed host we swap the MediaForge logo for the tenant
+  // logo so they see "their" brand on sign-in. Falls back to MediaForge
+  // when the host doesn't match any tenant.
+  const branding = useOrgBranding();
   const {
     signIn,
     signUp,
@@ -126,11 +145,11 @@ const Auth = () => {
   const resolveRedirect = () => {
     const fromState = (location.state as { from?: { pathname?: string; search?: string } } | null)?.from;
     if (fromState?.pathname && fromState.pathname.startsWith("/") && !fromState.pathname.startsWith("//")) {
-      return `${fromState.pathname}${fromState.search ?? ""}`;
+      return normalizePostAuthPath(`${fromState.pathname}${fromState.search ?? ""}`);
     }
     const r = searchParams.get("redirect");
-    if (r && r.startsWith("/") && !r.startsWith("//")) return r;
-    return "/app/workspace";
+    if (r && r.startsWith("/") && !r.startsWith("//")) return normalizePostAuthPath(r);
+    return DEFAULT_POST_AUTH_PATH;
   };
 
   const handlePostAuthSuccess = () => {
@@ -197,8 +216,21 @@ const Auth = () => {
         <div className="absolute w-72 h-72 rounded-full bg-white/10 blur-3xl animate-[float1_6s_ease-in-out_infinite] top-[10%] left-[10%]" />
         <div className="absolute w-56 h-56 rounded-full bg-fuchsia-400/15 blur-3xl animate-[float2_8s_ease-in-out_infinite] bottom-[15%] right-[10%]" />
         <div className="absolute w-40 h-40 rounded-full bg-violet-300/10 blur-2xl animate-[float3_7s_ease-in-out_infinite] top-[50%] left-[50%]" />
-        {/* Logo */}
-        <img src={logo} alt="MediaForge" className="relative z-10 max-w-[45%] h-auto drop-shadow-2xl" />
+        {/* Logo — swaps to tenant brand on claimed subdomains. */}
+        {branding?.logoUrl ? (
+          <div className="relative z-10 flex flex-col items-center gap-4">
+            <img
+              src={branding.logoUrl}
+              alt={branding.displayName}
+              className="max-w-[45%] h-auto drop-shadow-2xl object-contain"
+            />
+            <div className="text-white/90 text-2xl font-semibold tracking-tight">
+              {branding.shortName}
+            </div>
+          </div>
+        ) : (
+          <img src={logo} alt="MediaForge" className="relative z-10 max-w-[45%] h-auto drop-shadow-2xl" />
+        )}
       </div>
 
       {/* Right Side - Auth Form */}
@@ -210,9 +242,22 @@ const Auth = () => {
         <div className="lg:hidden absolute w-72 h-72 rounded-full bg-white/10 blur-3xl animate-[float1_6s_ease-in-out_infinite] top-[10%] left-[10%]" />
         <div className="lg:hidden absolute w-56 h-56 rounded-full bg-fuchsia-400/15 blur-3xl animate-[float2_8s_ease-in-out_infinite] bottom-[15%] right-[10%]" />
         <div className="relative z-10 w-full max-w-md space-y-8">
-          {/* Mobile Logo */}
+          {/* Mobile Logo — same tenant override as the desktop hero. */}
           <div className="lg:hidden flex flex-col items-center mb-8">
-             <img src={logo} alt="MediaForge" className="max-w-[160px] h-auto mb-4" />
+            {branding?.logoUrl ? (
+              <>
+                <img
+                  src={branding.logoUrl}
+                  alt={branding.displayName}
+                  className="max-w-[120px] h-auto mb-2 object-contain"
+                />
+                <div className="text-foreground text-lg font-semibold tracking-tight">
+                  {branding.shortName}
+                </div>
+              </>
+            ) : (
+              <img src={logo} alt="MediaForge" className="max-w-[160px] h-auto mb-4" />
+            )}
           </div>
 
           {/* Email Verification Screen */}

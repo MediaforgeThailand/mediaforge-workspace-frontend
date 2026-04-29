@@ -425,7 +425,7 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
         onContextMenu={(e) => e.preventDefault()}
       />
       <div
-        className="fixed z-50 w-72 rounded-lg border border-zinc-700 bg-zinc-950 shadow-xl"
+        className="fixed z-50 w-80 max-w-[calc(100vw-1rem)] rounded-lg border border-zinc-700 bg-zinc-950 shadow-xl lg:w-72"
         style={{
           left: state.screen.x,
           top: state.screen.y,
@@ -434,17 +434,17 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
         onClick={(e) => e.stopPropagation()}
         onMouseLeave={() => setOpenGroup(null)}
       >
-        <div className="border-b border-zinc-800 px-2 py-1.5">
+        <div className="border-b border-zinc-800 px-2 py-2 lg:py-1.5">
           <input
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKey}
             placeholder="Add node…"
-            className="nodrag w-full rounded bg-transparent px-1.5 py-1 text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
+            className="nodrag w-full rounded bg-transparent px-2 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 lg:px-1.5 lg:py-1"
           />
         </div>
-        <ul className="relative max-h-72 overflow-y-auto p-1">
+        <ul className="relative max-h-[min(22rem,calc(100vh-10rem))] overflow-y-auto p-1 lg:max-h-72">
           {visibleRowCount === 0 ? (
             <li className="px-3 py-4 text-center text-xs italic text-zinc-500">
               No compatible node
@@ -460,7 +460,7 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
                     onClick={() => commit(opt)}
                     onMouseEnter={() => setHighlight(i)}
                     className={cn(
-                      "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs",
+                      "flex min-h-11 w-full items-center gap-2 rounded px-2 text-left text-xs lg:min-h-0 lg:py-1.5",
                       i === highlight
                         ? "bg-zinc-800 text-zinc-100"
                         : "text-zinc-300 hover:bg-zinc-800/60",
@@ -500,9 +500,16 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
                 >
                   <button
                     type="button"
-                    onClick={() => commit(g.children[0])}
+                    onClick={() => {
+                      if (hasChildren) {
+                        setOpenGroup(g.key);
+                        setChildHighlight(0);
+                        return;
+                      }
+                      commit(g.children[0]);
+                    }}
                     className={cn(
-                      "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs",
+                      "flex min-h-11 w-full items-center gap-2 rounded px-2 text-left text-xs lg:min-h-0 lg:py-1.5",
                       i === highlight
                         ? "bg-zinc-800 text-zinc-100"
                         : "text-zinc-300 hover:bg-zinc-800/60",
@@ -533,14 +540,14 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
               if (!g || g.children.length <= 1) return null;
               return (
                 <div
-                  className="absolute left-full ml-2 w-52 rounded-lg border border-zinc-700 bg-zinc-950 shadow-xl"
+                  className="absolute left-full ml-2 w-56 rounded-lg border border-zinc-700 bg-zinc-950 shadow-xl lg:w-52"
                   style={{
                     top: flyoutAnchor ? flyoutAnchor.top : 0,
                     animation: "canvas-picker-flyout-in 100ms ease-out",
                   }}
                   onMouseEnter={() => setOpenGroup(g.key)}
                 >
-                  <ul className="max-h-72 overflow-y-auto p-1">
+                  <ul className="max-h-[min(18rem,calc(100vh-12rem))] overflow-y-auto p-1 lg:max-h-72">
                     {g.children.map((opt, j) => {
                       const ChildIcon = (Lucide as any)[opt.icon] ?? Lucide.Box;
                       return (
@@ -550,7 +557,7 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
                             onClick={() => commit(opt)}
                             onMouseEnter={() => setChildHighlight(j)}
                             className={cn(
-                              "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs",
+                              "flex min-h-11 w-full items-center gap-2 rounded px-2 text-left text-xs lg:min-h-0 lg:py-1.5",
                               j === childHighlight
                                 ? "bg-zinc-800 text-zinc-100"
                                 : "text-zinc-300 hover:bg-zinc-800/60",

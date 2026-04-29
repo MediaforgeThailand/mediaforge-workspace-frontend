@@ -18,6 +18,36 @@ interface NodeCostParams {
 /** Omni model slugs that use the /omni-video endpoint */
 const OMNI_MODELS = new Set(["kling-v3-omni"]);
 
+function resolutionTier(size: unknown): "1k" | "2k" | "4k" | "auto" {
+  const s = String(size ?? "1024x1024").toLowerCase();
+  if (s === "auto") return "auto";
+  const m = s.match(/^(\d+)x(\d+)$/);
+  if (!m) return s.includes("4k") ? "4k" : s.includes("2k") ? "2k" : "1k";
+  const maxEdge = Math.max(Number(m[1]), Number(m[2]));
+  if (maxEdge >= 3000) return "4k";
+  if (maxEdge >= 1900) return "2k";
+  return "1k";
+}
+
+function findOpenAiImageCost(params: Record<string, unknown>, creditCosts: CreditCostRow[]) {
+  const model = String(params.model_name ?? params.model ?? "gpt-image-2").toLowerCase();
+  const rawQuality = String(params.quality ?? "medium").toLowerCase();
+  const quality = ["low", "medium", "high"].includes(rawQuality) ? rawQuality : "medium";
+  const size = String(params.size ?? "1024x1024").toLowerCase();
+  const tier = resolutionTier(size === "auto" ? "1024x1024" : size);
+  const keys = [
+    `${model}:${size === "auto" ? "1024x1024" : size}:${quality}`,
+    `${model}:${tier}:${quality}`,
+    `${model}-${quality}`,
+    model,
+  ];
+  for (const key of keys) {
+    const row = creditCosts.find((r) => r.feature === "generate_openai_image" && r.model === key);
+    if (row) return row.cost;
+  }
+  return null;
+}
+
 /**
  * Returns the base credit cost for a node, or null if pricing is missing.
  */
@@ -27,8 +57,18 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
   const modelName = params.model_name as string | undefined;
 
   // ── Image generation (Banana) ──
-  if (schemaKey === "bananaProNode") {
+  if (schemaKey === "bananaProNode" || schemaKey === "imageGenNode") {
     const apiModel = modelName || "nano-banana-pro";
+    if (apiModel.startsWith("gpt-image") || apiModel.startsWith("dall-e")) {
+      return findOpenAiImageCost({ ...params, model_name: apiModel }, creditCosts);
+    }
+    const imageSize = String(params.image_size ?? "").toLowerCase();
+    if (imageSize) {
+      const sized = creditCosts.find(
+        (r) => r.feature === "generate_freepik_image" && r.model === `${apiModel}:${imageSize}`,
+      );
+      if (sized) return sized.cost;
+    }
     const match = creditCosts.find(
       (r) => r.feature === "generate_freepik_image" && r.model === apiModel,
     );
@@ -81,7 +121,36 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
   }
 
   // ── Unified Video (Kling I2V / Extension / Motion / Omni) ──
-  if (schemaKey === "klingVideoNode") {
+  if (schemaKey === "audioGenNode") {
+    const apiModel = modelName || "google-tts-studio";
+    const match = creditCosts.find(
+      (r) => r.feature === "text_to_speech" && r.model === apiModel,
+    );
+    if (!match) return null;
+    if (match.pricing_type === "per_1k_chars") {
+      const text = String(params.prompt ?? params.text ?? "");
+      return Math.max(1, Math.ceil(match.cost * Math.max(text.length, 1) / 1000));
+    }
+    return match.cost;
+  }
+
+  if (schemaKey === "videoToPromptNode") {
+    const apiModel = modelName || "gemini-video-understanding";
+    const match = creditCosts.find(
+      (r) => r.feature === "video_to_prompt" && r.model === apiModel,
+    );
+    return match?.cost ?? null;
+  }
+
+  if (schemaKey === "imageTo3dNode") {
+    const apiModel = modelName || "tripo3d-v3.1";
+    const match = creditCosts.find(
+      (r) => r.feature === "model_3d" && r.model === apiModel,
+    );
+    return match?.cost ?? null;
+  }
+
+  if (schemaKey === "klingVideoNode" || schemaKey === "videoGenNode") {
     const model = modelName || "kling-v2-6-pro";
     const isMotion = model.includes("motion");
     const isOmni = OMNI_MODELS.has(model);

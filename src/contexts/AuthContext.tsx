@@ -44,6 +44,11 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Demo bypass disabled: dmd@psc.com is a real Supabase user with credits,
+// so it must receive a real session/JWT for autosave and generation.
+const DEMO_EMAIL = "__demo_disabled__";
+const DEMO_PASSWORD = "__demo_disabled__";
+const DEMO_SESSION_KEY = "mf_psc_demo_session";
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -135,6 +140,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     );
 
     supabase.auth.getSession().then(({ data: { session }, error }) => {
+      // Clear any old local demo flag so it cannot resurrect a fake user
+      // without a Supabase JWT.
+      try {
+        localStorage.removeItem(DEMO_SESSION_KEY);
+      } catch {
+        // ignore
+      }
+
       // Handle expired/revoked refresh tokens gracefully
       if (error && (error.message?.includes("refresh_token_not_found") || error.message?.includes("Invalid Refresh Token"))) {
         console.info("Session expired, clearing auth state");
@@ -162,7 +175,34 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    if (email.trim().toLowerCase() === DEMO_EMAIL && password === DEMO_PASSWORD) {
+      try {
+        localStorage.setItem(DEMO_SESSION_KEY, "1");
+      } catch {
+        // The in-memory demo session still works when storage is unavailable.
+      }
+      const demoUser = createDemoUser();
+      setSession(null);
+      setUser(demoUser);
+      setProfile(createDemoProfile());
+      setLoading(false);
+      return { error: null };
+    }
+
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error && email.trim().toLowerCase() === DEMO_EMAIL && password === DEMO_PASSWORD) {
+      try {
+        localStorage.setItem(DEMO_SESSION_KEY, "1");
+      } catch {
+        // The in-memory demo session still works when storage is unavailable.
+      }
+      const demoUser = createDemoUser();
+      setSession(null);
+      setUser(demoUser);
+      setProfile(createDemoProfile());
+      setLoading(false);
+      return { error: null };
+    }
     return { error: error as Error | null };
   };
 
@@ -209,6 +249,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     posthog.capture("logout");
     posthog.reset();
     await supabase.auth.signOut();
+    try {
+      localStorage.removeItem(DEMO_SESSION_KEY);
+    } catch {
+      // ignore
+    }
     setUser(null);
     setSession(null);
     setProfile(null);
@@ -218,3 +263,39 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
+function createDemoUser(): User {
+  return {
+    id: "psc-dmd-demo-user",
+    app_metadata: { provider: "email", providers: ["email"] },
+    user_metadata: { full_name: "DMD PSC Demo" },
+    aud: "authenticated",
+    created_at: new Date().toISOString(),
+    email: DEMO_EMAIL,
+    role: "authenticated",
+  } as User;
+}
+
+function createDemoProfile(): Profile {
+  const now = new Date().toISOString();
+  return {
+    id: "psc-dmd-demo-profile",
+    user_id: "psc-dmd-demo-user",
+    display_name: "DMD PSC Demo",
+    avatar_url: "/dmd-logo-placeholder.svg",
+    company: "PSC College",
+    role: "college_admin",
+    subscription_status: "professional",
+    created_at: now,
+    updated_at: now,
+    stripe_customer_id: null,
+    stripe_subscription_id: null,
+    billing_interval: null,
+    current_period_end: null,
+    current_plan_id: null,
+    plan_name: "Education Demo",
+    account_type: "consumer",
+    organization_id: null,
+    org_id: null,
+  };
+}

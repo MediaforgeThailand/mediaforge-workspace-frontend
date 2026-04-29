@@ -140,13 +140,8 @@ const WorkspaceCanvasPagePill = () => {
 
   return (
     <div
-      className="fixed bottom-4 z-50"
+      className="fixed bottom-4 left-24 z-50 md:left-[220px]"
       style={{
-        // 60px (mascot left) + 130px (mascot width) + 30px gutter
-        // = 220px. Keeps the pill from overlapping the mascot while
-        // staying inside the canvas chrome (the centred tool
-        // palette is on the far-left edge at ~52px).
-        left: 220,
         fontFamily: "'Prompt', system-ui, sans-serif",
       }}
     >
@@ -156,7 +151,7 @@ const WorkspaceCanvasPagePill = () => {
             type="button"
             aria-label={`Page: ${activeName}. Click to switch pages.`}
             className={cn(
-              "group flex h-9 items-center gap-2 rounded-full border border-white/[0.06] bg-zinc-900/85 px-3 text-[12px] text-zinc-100 shadow-lg shadow-black/40 backdrop-blur transition-all",
+              "group flex h-11 items-center gap-2 rounded-full border border-white/[0.06] bg-zinc-900/85 px-4 text-[12px] text-zinc-100 shadow-lg shadow-black/40 backdrop-blur transition-all lg:h-9 lg:px-3",
               "hover:-translate-y-0.5 hover:bg-zinc-800/90 hover:shadow-xl",
               open &&
                 "ring-1 ring-white/15 bg-zinc-800/90 -translate-y-0.5 shadow-xl",
@@ -197,7 +192,7 @@ const WorkspaceCanvasPagePill = () => {
           align="start"
           sideOffset={8}
           className={cn(
-            "w-64 border-zinc-800 bg-zinc-950/95 p-1 text-zinc-100 shadow-2xl shadow-black/50 backdrop-blur",
+            "w-72 border-zinc-800 bg-zinc-950/95 p-1 text-zinc-100 shadow-2xl shadow-black/50 backdrop-blur lg:w-64",
             "animate-in fade-in-0 slide-in-from-bottom-2 duration-150",
           )}
         >
@@ -206,7 +201,7 @@ const WorkspaceCanvasPagePill = () => {
           </div>
 
           {/* Page list — scrolls if there are many pages. */}
-          <div className="max-h-[240px] overflow-y-auto">
+          <div className="max-h-[min(320px,calc(100vh-9rem))] overflow-y-auto lg:max-h-[240px]">
             {canvases.map((c) => {
               const isActive = c.id === currentId;
               const isEditing = editingId === c.id;
@@ -219,7 +214,7 @@ const WorkspaceCanvasPagePill = () => {
                   onClick={() => !isEditing && openTab(c.id)}
                   onDoubleClick={(e) => startRename(c.id, c.name, e)}
                   className={cn(
-                    "group relative flex h-8 cursor-pointer items-center gap-1.5 rounded px-2 text-[12px] transition-colors",
+                    "group relative flex min-h-11 cursor-pointer items-center gap-1.5 rounded px-2 text-[12px] transition-colors lg:min-h-8",
                     isActive
                       ? "bg-white/10 text-zinc-50"
                       : "text-zinc-300 hover:bg-white/5 hover:text-zinc-100",
@@ -271,11 +266,11 @@ const WorkspaceCanvasPagePill = () => {
 
                   {/* Hover affordances — rename + close. */}
                   {!isEditing && (
-                    <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                    <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
                       <button
                         type="button"
                         onClick={(e) => startRename(c.id, c.name, e)}
-                        className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+                        className="flex h-9 w-9 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 lg:h-auto lg:w-auto lg:p-1"
                         title="Rename page"
                         aria-label="Rename page"
                       >
@@ -284,7 +279,7 @@ const WorkspaceCanvasPagePill = () => {
                       <button
                         type="button"
                         onClick={(e) => closeTab(c.id, e)}
-                        className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-rose-300"
+                        className="flex h-9 w-9 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-rose-300 lg:h-auto lg:w-auto lg:p-1"
                         title="Delete page"
                         aria-label="Delete page"
                       >
@@ -302,7 +297,7 @@ const WorkspaceCanvasPagePill = () => {
             <button
               type="button"
               onClick={newTab}
-              className="flex h-8 w-full items-center gap-1.5 rounded px-2 text-[12px] text-zinc-300 transition-colors hover:bg-white/5 hover:text-zinc-100"
+              className="flex h-11 w-full items-center gap-1.5 rounded px-2 text-[12px] text-zinc-300 transition-colors hover:bg-white/5 hover:text-zinc-100 lg:h-8"
             >
               <Plus className="h-3.5 w-3.5" />
               New page
