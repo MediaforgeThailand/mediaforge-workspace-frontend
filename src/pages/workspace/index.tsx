@@ -553,10 +553,16 @@ const ACADEMY_VIDEOS: AcademyVideo[] = [
 
 const HomeView = ({
   onSection,
+  projects,
   activeProjectId,
+  onSelectProject,
+  onCreateProject,
 }: {
   onSection: (s: Section) => void;
+  projects: ProjectMeta[];
   activeProjectId: string | null;
+  onSelectProject: (id: string | null) => void;
+  onCreateProject: () => void;
 }) => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
