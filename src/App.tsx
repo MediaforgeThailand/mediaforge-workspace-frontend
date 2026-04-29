@@ -114,6 +114,10 @@ const Pricing = lazyWithRetry(() => import("./pages/dashboard/Pricing"));
 // scanning a teacher's QR. Page handles its own guest → /auth bounce.
 const TeacherCenter = lazyWithRetry(() => import("./pages/teacher-center"));
 const ClassEnroll = lazyWithRetry(() => import("./pages/ClassEnroll"));
+// Branding admin (logo / short name / subdomains). Sub-route of the
+// org-admin section. Lazy so the upload-form code only ships when
+// someone actually opens it.
+const OrgBranding = lazyWithRetry(() => import("./pages/org-admin/branding"));
 
 const queryClient = new QueryClient();
 const PageLoader = () => <PageLoadingAnim />;
@@ -167,6 +171,18 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <TeacherCenter />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* Org branding admin — logo, short name, subdomains.
+                      Same /app/org-admin/* prefix as the Teacher Command
+                      Center but renders its own page. */}
+                  <Route
+                    path="/app/org-admin/branding"
+                    element={
+                      <ProtectedRoute>
+                        <OrgBranding />
                       </ProtectedRoute>
                     }
                   />

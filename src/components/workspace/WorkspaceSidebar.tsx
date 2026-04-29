@@ -22,13 +22,20 @@ import {
   Boxes,
   Library,
   Crown,
+  Palette,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useIsOrgAdmin } from "@/hooks/useIsOrgUser";
+import { useOrgBranding } from "@/hooks/useOrgBranding";
 import OrgCreditBadge from "@/components/OrgCreditBadge";
 import ActiveClassPicker from "@/components/ActiveClassPicker";
+
+// Default brand (no tenant subdomain match). Centralised so the
+// org-admin branding preview can re-use the exact same fallback.
+export const DEFAULT_BRAND_LOGO = "/mascot-logo.png";
+export const DEFAULT_BRAND_NAME = "Workspace";
 
 export type SectionKey =
   | "home"
@@ -64,6 +71,13 @@ export default function WorkspaceSidebar({
   onNavigate,
 }: WorkspaceSidebarProps) {
   const navigate = useNavigate();
+  // Tenant branding override (e.g. dmd.mediaforge.co → DMD logo +
+  // "DMD" short name). Returns null on the bare workspace.mediaforge.co
+  // host or while the lookup is in flight; we render the default
+  // mascot brand in that case so the chrome doesn't flicker empty.
+  const branding = useOrgBranding();
+  const brandLogo = branding?.logoUrl ?? DEFAULT_BRAND_LOGO;
+  const brandName = branding?.shortName ?? DEFAULT_BRAND_NAME;
 
   const handleClick = (s: SectionKey) => {
     if (onNavigate) {
@@ -85,22 +99,18 @@ export default function WorkspaceSidebar({
           onClick={() => navigate("/app/workspace")}
           className="flex items-center gap-2 text-[13.5px] font-semibold tracking-tight text-zinc-50 transition-colors hover:text-white"
         >
-          {/* Mascot logo replaces the older gradient "M" tile. The
-           *  cat face was supplied by design; sits in /public so
-           *  Vite serves it at /mascot-logo.png without bundling.
-           *  Slightly larger (h-7 w-7) than the old square because
-           *  the rendered cat reads small at 24 px. */}
-          {/* Logo size bumped 20% (h-7 → h-[34px]) per design ask. The
-           *  brand chip needs to read at a glance against the sidebar
-           *  text; 28 px felt undersized once the cat PNG replaced
-           *  the gradient "M" tile. */}
+          {/* Brand logo — defaults to the workspace mascot, swapped
+           *  to the tenant org logo when the user is on a claimed
+           *  subdomain (e.g. dmd.mediaforge.co → DMD logo). The
+           *  square slot uses object-contain so wide wordmark logos
+           *  don't get squashed. */}
           <img
-            src="/mascot-logo.png"
-            alt=""
-            className="h-[34px] w-[34px] shrink-0 select-none"
+            src={brandLogo}
+            alt={brandName}
+            className="h-[34px] w-[34px] shrink-0 select-none object-contain"
             draggable={false}
           />
-          Workspace
+          {brandName}
         </button>
       </div>
 
@@ -154,14 +164,18 @@ export default function WorkspaceSidebar({
   );
 }
 
-/** "Manage Org" button — visible only to teachers + org_admins.
- *  Routes to /app/org-admin (the Teacher Command Center). */
+/** "Manage Org" + "Branding" buttons — visible only to teachers +
+ *  org_admins. Manage Org → Teacher Command Center; Branding →
+ *  logo / short name / subdomain admin. Branding is also reachable
+ *  by host-resolved org admins (no class memberships) via direct
+ *  URL — useful for the DMD demo where the admin user hasn't been
+ *  enrolled into any class yet. */
 const OrgAdminLink = () => {
   const isOrgAdmin = useIsOrgAdmin();
   const navigate = useNavigate();
   if (!isOrgAdmin) return null;
   return (
-    <div className="px-3 pt-3 pb-2 border-t border-white/5 mt-3">
+    <div className="px-3 pt-3 pb-2 border-t border-white/5 mt-3 space-y-1">
       <button
         type="button"
         onClick={() => navigate("/app/org-admin")}
@@ -170,6 +184,15 @@ const OrgAdminLink = () => {
       >
         <Crown className="h-3.5 w-3.5" />
         Manage Org
+      </button>
+      <button
+        type="button"
+        onClick={() => navigate("/app/org-admin/branding")}
+        className="flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-[12.5px] text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100 transition-colors"
+        title="Logo, short name, and subdomains"
+      >
+        <Palette className="h-3.5 w-3.5" />
+        Branding
       </button>
     </div>
   );
