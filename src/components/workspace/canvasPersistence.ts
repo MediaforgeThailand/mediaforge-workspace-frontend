@@ -22,11 +22,16 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
-import type { CanvasGraph, WorkspaceMeta } from "@/store/useWorkspaceStore";
+import type {
+  CanvasGraph,
+  ProjectMeta,
+  WorkspaceMeta,
+} from "@/store/useWorkspaceStore";
 
 interface ServerCanvasRow {
   id: string;
   user_id: string;
+  project_id: string | null;
   workspace_id: string;
   name: string;
   nodes: unknown;
@@ -47,7 +52,7 @@ export async function loadCanvasFromServer(
     const { data, error } = await supabase
       .from("workspace_canvases")
       .select(
-        "id, user_id, workspace_id, name, nodes, edges, viewport, created_at, updated_at",
+        "id, user_id, project_id, workspace_id, name, nodes, edges, viewport, created_at, updated_at",
       )
       .eq("id", canvasId)
       .maybeSingle();
@@ -67,6 +72,7 @@ export async function loadCanvasFromServer(
     const row = data as ServerCanvasRow;
     return {
       id: row.id,
+      projectId: row.project_id ?? null,
       workspaceId: row.workspace_id,
       name: row.name,
       nodes: Array.isArray(row.nodes) ? (row.nodes as CanvasGraph["nodes"]) : [],
@@ -125,7 +131,7 @@ export async function loadCanvasesByWorkspaceFromServer(
     const { data, error } = await supabase
       .from("workspace_canvases")
       .select(
-        "id, user_id, workspace_id, name, nodes, edges, viewport, created_at, updated_at",
+        "id, user_id, project_id, workspace_id, name, nodes, edges, viewport, created_at, updated_at",
       )
       .eq("workspace_id", workspaceId)
       .order("updated_at", { ascending: false });
@@ -145,6 +151,7 @@ export async function loadCanvasesByWorkspaceFromServer(
 
     return (data as ServerCanvasRow[]).map((row) => ({
       id: row.id,
+      projectId: row.project_id ?? null,
       workspaceId: row.workspace_id,
       name: row.name,
       nodes: Array.isArray(row.nodes) ? (row.nodes as CanvasGraph["nodes"]) : [],
@@ -199,6 +206,7 @@ export async function saveCanvasToServer(
       {
         id: graph.id,
         user_id: userId,
+        project_id: graph.projectId ?? null,
         workspace_id: graph.workspaceId,
         name: graph.name,
         nodes: graph.nodes,
@@ -263,6 +271,7 @@ export function flushSaveOnUnload(graph: CanvasGraph, userId: string): void {
     const body = JSON.stringify({
       id: graph.id,
       user_id: userId,
+      project_id: graph.projectId ?? null,
       workspace_id: graph.workspaceId,
       name: graph.name,
       nodes: graph.nodes,
@@ -334,6 +343,15 @@ function warnOnceAboutMissingTable(): void {
 interface ServerWorkspaceRow {
   id: string;
   user_id: string;
+  project_id: string | null;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ServerProjectRow {
+  id: string;
+  user_id: string;
   name: string;
   created_at: string;
   updated_at: string;
@@ -348,7 +366,7 @@ export async function loadWorkspacesFromServer(): Promise<
   try {
     const { data, error } = await supabase
       .from("workspaces")
-      .select("id, user_id, name, created_at, updated_at")
+      .select("id, user_id, project_id, name, created_at, updated_at")
       .order("updated_at", { ascending: false });
 
     if (error) {
@@ -363,6 +381,7 @@ export async function loadWorkspacesFromServer(): Promise<
 
     return (data as ServerWorkspaceRow[]).map((row) => ({
       id: row.id,
+      projectId: row.project_id ?? null,
       name: row.name,
       updatedAt: new Date(row.updated_at).getTime(),
     }));
@@ -385,6 +404,7 @@ export async function upsertWorkspaceToServer(
       {
         id: meta.id,
         user_id: userId,
+        project_id: meta.projectId ?? null,
         name: meta.name,
         // updated_at is set by the table's `workspaces_touch` trigger
         // — don't send it from the client so concurrent writes don't
@@ -482,5 +502,95 @@ function warnOnceAboutMissingWorkspacesTable(): void {
       "Apply migration `20260428180000_workspaces_sync.sql` " +
       "to enable cross-device space sync. Falling back to " +
       "localStorage-only.",
+  );
+}
+
+export async function loadProjectsFromServer(): Promise<ProjectMeta[] | null> {
+  try {
+    const { data, error } = await supabase
+      .from("workspace_projects")
+      .select("id, user_id, name, created_at, updated_at")
+      .order("updated_at", { ascending: false });
+
+    if (error) {
+      if (isMissingProjectsTableError(error)) {
+        warnOnceAboutMissingProjectsTable();
+        return null;
+      }
+      console.warn("[canvasPersistence] load projects failed:", error.message);
+      return null;
+    }
+    if (!Array.isArray(data)) return [];
+    return (data as ServerProjectRow[]).map((row) => ({
+      id: row.id,
+      name: row.name,
+      updatedAt: new Date(row.updated_at).getTime(),
+    }));
+  } catch (err) {
+    console.warn("[canvasPersistence] load projects threw:", err);
+    return null;
+  }
+}
+
+export async function upsertProjectToServer(
+  meta: ProjectMeta,
+  userId: string,
+): Promise<void> {
+  if (!userId) return;
+  try {
+    const { error } = await supabase.from("workspace_projects").upsert(
+      {
+        id: meta.id,
+        user_id: userId,
+        name: meta.name,
+      },
+      { onConflict: "id" },
+    );
+    if (error) {
+      if (isMissingProjectsTableError(error)) {
+        warnOnceAboutMissingProjectsTable();
+        return;
+      }
+      console.warn("[canvasPersistence] upsert project failed:", error.message);
+    }
+  } catch (err) {
+    console.warn("[canvasPersistence] upsert project threw:", err);
+  }
+}
+
+export async function deleteProjectFromServer(projectId: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from("workspace_projects")
+      .delete()
+      .eq("id", projectId);
+    if (error) {
+      if (isMissingProjectsTableError(error)) {
+        warnOnceAboutMissingProjectsTable();
+        return;
+      }
+      console.warn("[canvasPersistence] delete project failed:", error.message);
+    }
+  } catch (err) {
+    console.warn("[canvasPersistence] delete project threw:", err);
+  }
+}
+
+function isMissingProjectsTableError(err: {
+  code?: string;
+  message?: string;
+}): boolean {
+  if (err?.code === "42P01" || err?.code === "42703") return true;
+  return /relation .* does not exist|public\.workspace_projects|project_id/i.test(
+    err?.message ?? "",
+  );
+}
+
+let _warnedMissingProjectsTable = false;
+function warnOnceAboutMissingProjectsTable(): void {
+  if (_warnedMissingProjectsTable) return;
+  _warnedMissingProjectsTable = true;
+  console.warn(
+    "[canvasPersistence] `workspace_projects` table not found. Apply the project hierarchy migration.",
   );
 }

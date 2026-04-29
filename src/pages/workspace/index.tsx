@@ -34,7 +34,9 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import WorkspaceErrorBoundary from "@/components/workspace/WorkspaceErrorBoundary";
 import {
+  loadProjectsFromServer,
   loadWorkspacesFromServer,
+  upsertProjectToServer,
   upsertWorkspaceToServer,
   deleteWorkspaceFromServer,
   listServerCanvasIds,
@@ -61,6 +63,7 @@ import {
   Pin,
   SlidersHorizontal,
   UserCircle2,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -70,6 +73,13 @@ import { UserMenu } from "@/components/workspace/UserMenu";
 import WorkspaceSidebar, {
   type SectionKey,
 } from "@/components/workspace/WorkspaceSidebar";
+import StandaloneGenerator, {
+  type StandaloneProjectOption,
+} from "@/components/workspace/StandaloneGenerator";
+import {
+  STANDALONE_TOOLS,
+  type StandaloneToolKey,
+} from "@/components/workspace/standaloneGenerationCatalog";
 
 /* ════════════════════════════════════════════════════════════
  * Types + helpers
@@ -183,11 +193,22 @@ function groupByMonth<T extends { updatedAt: number }>(
 const VALID_SECTIONS: Section[] = [
   "home",
   "spaces",
-  "community",
-  "projects",
-  "tools",
-  "stock",
+  "image_gen",
+  "video_gen",
+  "voice_gen",
+  "image_to_3d",
 ];
+
+const STANDALONE_SECTIONS = new Set<SectionKey>([
+  "image_gen",
+  "video_gen",
+  "voice_gen",
+  "image_to_3d",
+]);
+
+function isStandaloneSection(section: SectionKey): section is StandaloneToolKey {
+  return STANDALONE_SECTIONS.has(section);
+}
 
 /* ─── Body class watchdog ─────────────────────────────────────
  *
@@ -233,6 +254,94 @@ const WorkspaceDashboardInner = () => {
       : "home");
   })();
   const [section, setSection] = useState<Section>(initialSection);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const { user, loading: authLoading } = useAuth();
+  const projects = useWorkspaceStore((s) => s.projects);
+  const activeProjectId = useWorkspaceStore((s) => s.activeProjectId);
+  const workspaces = useWorkspaceStore((s) => s.workspaces);
+  const createProject = useWorkspaceStore((s) => s.createProject);
+  const createWorkspace = useWorkspaceStore((s) => s.createWorkspace);
+  const setActiveProject = useWorkspaceStore((s) => s.setActiveProject);
+  const mergeServerProjects = useWorkspaceStore((s) => s.mergeServerProjects);
+  const mergeServerWorkspaces = useWorkspaceStore(
+    (s) => s.mergeServerWorkspaces,
+  );
+
+  const standaloneProjects = useMemo<StandaloneProjectOption[]>(
+    () =>
+      [...projects]
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .map((project) => ({
+          id: project.id,
+          name: project.name,
+          updatedAt: project.updatedAt,
+        })),
+    [projects],
+  );
+
+  const standaloneSyncRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user?.id) {
+      standaloneSyncRef.current = null;
+      return;
+    }
+    if (standaloneSyncRef.current === user.id) return;
+    standaloneSyncRef.current = user.id;
+
+    let cancelled = false;
+    (async () => {
+      const serverProjects = await loadProjectsFromServer();
+      if (cancelled) return;
+      if (serverProjects) {
+        const localProjectsBefore = useWorkspaceStore.getState().projects;
+        const serverProjectIds = new Set(serverProjects.map((p) => p.id));
+        const localOnlyProjects = localProjectsBefore.filter(
+          (p) => !serverProjectIds.has(p.id),
+        );
+        mergeServerProjects(serverProjects);
+        for (const p of localOnlyProjects) void upsertProjectToServer(p, user.id);
+      }
+      const server = await loadWorkspacesFromServer();
+      if (cancelled || !server) return;
+      const localBefore = useWorkspaceStore.getState().workspaces;
+      const serverIds = new Set(server.map((w) => w.id));
+      const tombstones = useWorkspaceStore.getState().deletedWorkspaceIds;
+      const localOnly = localBefore.filter(
+        (w) => !serverIds.has(w.id) && !(w.id in tombstones),
+      );
+      mergeServerWorkspaces(server);
+      for (const w of localOnly) void upsertWorkspaceToServer(w, user.id);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, mergeServerProjects, mergeServerWorkspaces, user?.id]);
+
+  useEffect(() => {
+    if (standaloneProjects.length === 0) {
+      if (activeProjectId) setActiveProject(null);
+      return;
+    }
+    if (
+      !activeProjectId ||
+      !standaloneProjects.some((project) => project.id === activeProjectId)
+    ) {
+      setActiveProject(standaloneProjects[0].id);
+    }
+  }, [activeProjectId, setActiveProject, standaloneProjects]);
+
+  const handleCreateProject = () => {
+    const nextName = prompt("Project name:", "Untitled project");
+    if (nextName === null) return;
+    const projectName = nextName.trim() || "Untitled project";
+    const projectId = createProject(projectName);
+    if (user?.id) {
+      const meta = useWorkspaceStore.getState().projects.find((p) => p.id === projectId);
+      if (meta) void upsertProjectToServer(meta, user.id);
+    }
+    toast.success(`Project "${projectName}" created`);
+  };
 
   // Two-way bind URL ↔ state. When the user clicks a sidebar item we
   // also update the URL so a refresh / shared link lands on the same
@@ -264,11 +373,58 @@ const WorkspaceDashboardInner = () => {
       className="flex h-screen w-screen overflow-hidden bg-[hsl(0_0%_5%)] text-zinc-100"
       style={{ fontFamily: "'Prompt', system-ui, sans-serif" }}
     >
-      <WorkspaceSidebar active={section} onNavigate={setSection} />
+      <div className={isStandaloneSection(section) ? "hidden h-full lg:block" : "h-full"}>
+        <WorkspaceSidebar
+          active={section}
+          onNavigate={setSection}
+          onCreate={handleCreateProject}
+        />
+      </div>
+      {isStandaloneSection(section) && mobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 flex lg:hidden">
+          <button
+            type="button"
+            aria-label="Close sidebar"
+            className="absolute inset-0 bg-black/65"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+          <div className="relative z-10 h-full w-[228px] max-w-[84vw]">
+            <WorkspaceSidebar
+              active={section}
+              onCreate={handleCreateProject}
+              onNavigate={(next) => {
+                setSection(next);
+                setMobileSidebarOpen(false);
+              }}
+            />
+            <button
+              type="button"
+              aria-label="Close sidebar"
+              onClick={() => setMobileSidebarOpen(false)}
+              className="absolute -right-12 top-3 grid h-10 w-10 place-items-center rounded-full bg-white/[0.08] text-zinc-100 ring-1 ring-inset ring-white/10"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {section === "home" && <HomeView onSection={setSection} />}
-        {section === "spaces" && <SpacesView />}
-        {section !== "home" && section !== "spaces" && (
+        {section === "home" && (
+          <HomeView onSection={setSection} activeProjectId={activeProjectId} />
+        )}
+        {section === "spaces" && <SpacesView activeProjectId={activeProjectId} />}
+        {isStandaloneSection(section) && (
+          <StandaloneGenerator
+            activeTool={section}
+            onToolChange={(next) => setSection(next)}
+            onOpenSidebar={() => setMobileSidebarOpen(true)}
+            projects={standaloneProjects}
+            activeProjectId={activeProjectId}
+            onSelectProject={setActiveProject}
+            onCreateProject={handleCreateProject}
+          />
+        )}
+        {section !== "home" && section !== "spaces" && !isStandaloneSection(section) && (
           <Placeholder section={section} />
         )}
       </main>
@@ -361,7 +517,13 @@ const MOCK_NEWS: NewsCard[] = [
   { id: "n8", title: "Multi-reference video control", cover: "from-orange-500 via-red-600 to-rose-700" },
 ];
 
-const HomeView = ({ onSection }: { onSection: (s: Section) => void }) => {
+const HomeView = ({
+  onSection,
+  activeProjectId,
+}: {
+  onSection: (s: Section) => void;
+  activeProjectId: string | null;
+}) => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const workspaces = useWorkspaceStore((s) => s.workspaces);
@@ -428,18 +590,29 @@ const HomeView = ({ onSection }: { onSection: (s: Section) => void }) => {
    * Home carousel previews are real (not placeholders). */
   const recentSpaces = useMemo(() => {
     return [...workspaces]
+      .filter((ws) => !activeProjectId || ws.projectId === activeProjectId)
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, 6)
       .map((ws) => buildSpaceCardData(ws, canvases, graphs));
-  }, [workspaces, canvases, graphs]);
+  }, [activeProjectId, workspaces, canvases, graphs]);
 
   const handleNew = () => {
-    const { workspaceId } = createWorkspace("Untitled space");
+    const { workspaceId } = createWorkspace("Untitled space", activeProjectId);
     if (user?.id) {
-      const meta = useWorkspaceStore
-        .getState()
-        .workspaces.find((w) => w.id === workspaceId);
-      if (meta) void upsertWorkspaceToServer(meta, user.id);
+      const state = useWorkspaceStore.getState();
+      const meta = state.workspaces.find((w) => w.id === workspaceId);
+      const project = meta?.projectId
+        ? state.projects.find((p) => p.id === meta.projectId)
+        : null;
+      if (meta) {
+        if (project) {
+          void upsertProjectToServer(project, user.id).then(() =>
+            upsertWorkspaceToServer(meta, user.id),
+          );
+        } else {
+          void upsertWorkspaceToServer(meta, user.id);
+        }
+      }
     }
     navigate(`/app/workspace/${workspaceId}`);
   };
@@ -796,7 +969,7 @@ function buildSpaceCardData(
   };
 }
 
-const SpacesView = () => {
+const SpacesView = ({ activeProjectId }: { activeProjectId: string | null }) => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const workspaces = useWorkspaceStore((s) => s.workspaces);
@@ -864,21 +1037,33 @@ const SpacesView = () => {
   }, [user?.id, authLoading, mergeServerWorkspaces]);
 
   const handleNew = () => {
-    const { workspaceId } = createWorkspace("Untitled space");
+    const { workspaceId } = createWorkspace("Untitled space", activeProjectId);
     if (user?.id) {
-      const meta = useWorkspaceStore
-        .getState()
-        .workspaces.find((w) => w.id === workspaceId);
-      if (meta) void upsertWorkspaceToServer(meta, user.id);
+      const state = useWorkspaceStore.getState();
+      const meta = state.workspaces.find((w) => w.id === workspaceId);
+      const project = meta?.projectId
+        ? state.projects.find((p) => p.id === meta.projectId)
+        : null;
+      if (meta) {
+        if (project) {
+          void upsertProjectToServer(project, user.id).then(() =>
+            upsertWorkspaceToServer(meta, user.id),
+          );
+        } else {
+          void upsertWorkspaceToServer(meta, user.id);
+        }
+      }
     }
     navigate(`/app/workspace/${workspaceId}`);
   };
 
   const buckets = useMemo(() => {
     return groupByMonth(
-      [...workspaces].map((ws) => buildSpaceCardData(ws, canvases, graphs)),
+      [...workspaces]
+        .filter((ws) => !activeProjectId || ws.projectId === activeProjectId)
+        .map((ws) => buildSpaceCardData(ws, canvases, graphs)),
     );
-  }, [workspaces, canvases, graphs]);
+  }, [activeProjectId, workspaces, canvases, graphs]);
 
   const handleRename = (id: string, currentName: string) => {
     const next = prompt("Rename space:", currentName);
@@ -1320,11 +1505,17 @@ const EmptyState = ({
 
 const SECTION_LABELS: Record<Section, string> = {
   home: "Home",
+  search: "Search",
   spaces: "Spaces",
+  image_gen: STANDALONE_TOOLS.image_gen.title,
+  video_gen: STANDALONE_TOOLS.video_gen.title,
+  voice_gen: STANDALONE_TOOLS.voice_gen.title,
+  image_to_3d: STANDALONE_TOOLS.image_to_3d.title,
   community: "Community",
   projects: "Projects",
   tools: "All tools",
   stock: "Stock",
+  assistant: "Assistant",
 };
 
 const Placeholder = ({ section }: { section: Section }) => (

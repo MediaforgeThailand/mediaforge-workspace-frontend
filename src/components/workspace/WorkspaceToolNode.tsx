@@ -686,6 +686,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         params: cleanParams,
         inputs,
         mentioned_assets: mentioned,
+        project_id: storeState.current?.projectId ?? null,
         workspace_id: storeState.current?.workspaceId ?? null,
         canvas_id: storeState.current?.id ?? null,
         node_id: id,

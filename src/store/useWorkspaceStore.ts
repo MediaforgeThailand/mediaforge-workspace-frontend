@@ -61,14 +61,22 @@ export interface ChatMessage {
 
 /** Top-level project / "Workspace" — owns multiple tabs (Canvases).
  *  Maps 1:1 with what the dashboard at /app/workspace lists. */
+export interface ProjectMeta {
+  id: string;
+  name: string;
+  updatedAt: number;
+}
+
 export interface WorkspaceMeta {
   id: string;
+  projectId: string | null;
   name: string;
   updatedAt: number;
 }
 
 export interface CanvasMeta {
   id: string;
+  projectId: string | null;
   /** Which workspace this tab belongs to. Tabs without a workspace
    *  are legacy persisted state from v1 and get migrated on load. */
   workspaceId: string;
@@ -90,6 +98,8 @@ export interface HistorySnap {
 }
 
 interface WorkspaceState {
+  projects: ProjectMeta[];
+  activeProjectId: string | null;
   /** Top-level workspaces shown on /app/workspace dashboard. Each
    *  workspace owns 1+ canvases (= tabs). */
   workspaces: WorkspaceMeta[];
@@ -120,10 +130,19 @@ interface WorkspaceState {
    *  whenever any new mutation lands. */
   redoStack: HistorySnap[];
 
+  createProject: (name?: string) => string;
+  renameProject: (id: string, name: string) => void;
+  deleteProject: (id: string) => void;
+  setActiveProject: (id: string | null) => void;
+  mergeServerProjects: (server: ProjectMeta[]) => void;
+
   // workspace-level (top-level entity)
   /** Creates a workspace + a default "Untitled canvas" tab inside it.
    *  Returns the new canvas id so the caller can navigate to it. */
-  createWorkspace: (name?: string) => { workspaceId: string; canvasId: string };
+  createWorkspace: (
+    name?: string,
+    projectId?: string | null,
+  ) => { workspaceId: string; canvasId: string };
   renameWorkspace: (id: string, name: string) => void;
   /** Deletes a workspace and CASCADES — every canvas owned by this
    *  workspace is removed too. */
@@ -310,6 +329,8 @@ function withCurrent(
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
     (set, get) => ({
+      projects: [],
+      activeProjectId: null,
       workspaces: [],
       canvases: [],
       graphs: {},
@@ -323,10 +344,97 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
       /* ── Workspace-level actions ──────────────────────────── */
 
-      createWorkspace: (name) => {
+      createProject: (name) => {
+        const id = uid();
+        const project: ProjectMeta = {
+          id,
+          name: name || "Untitled project",
+          updatedAt: now(),
+        };
+        set((s) => ({
+          projects: [project, ...s.projects],
+          activeProjectId: id,
+        }));
+        return id;
+      },
+
+      renameProject: (id, name) =>
+        set((s) => ({
+          projects: s.projects.map((p) =>
+            p.id === id ? { ...p, name, updatedAt: now() } : p,
+          ),
+        })),
+
+      deleteProject: (id) =>
+        set((s) => {
+          const ownedWorkspaces = new Set(
+            s.workspaces.filter((w) => w.projectId === id).map((w) => w.id),
+          );
+          const ownedCanvases = new Set(
+            s.canvases
+              .filter((c) => c.projectId === id || ownedWorkspaces.has(c.workspaceId))
+              .map((c) => c.id),
+          );
+          const graphs: Record<string, CanvasGraph> = {};
+          for (const [cid, graph] of Object.entries(s.graphs)) {
+            if (!ownedCanvases.has(cid)) graphs[cid] = graph;
+          }
+          const projects = s.projects.filter((p) => p.id !== id);
+          return {
+            projects,
+            activeProjectId:
+              s.activeProjectId === id ? projects[0]?.id ?? null : s.activeProjectId,
+            workspaces: s.workspaces.filter((w) => w.projectId !== id),
+            canvases: s.canvases.filter((c) => !ownedCanvases.has(c.id)),
+            graphs,
+            current: ownedCanvases.has(s.current?.id ?? "") ? null : s.current,
+          };
+        }),
+
+      setActiveProject: (id) => set(() => ({ activeProjectId: id })),
+
+      mergeServerProjects: (serverList) =>
+        set((s) => {
+          const localById = new Map(s.projects.map((p) => [p.id, p]));
+          const merged = serverList.map((server) => {
+            const local = localById.get(server.id);
+            return local && local.updatedAt > server.updatedAt ? local : server;
+          });
+          for (const local of s.projects) {
+            if (!serverList.some((server) => server.id === local.id)) {
+              merged.push(local);
+            }
+          }
+          merged.sort((a, b) => b.updatedAt - a.updatedAt);
+          return {
+            projects: merged,
+            activeProjectId:
+              s.activeProjectId && merged.some((p) => p.id === s.activeProjectId)
+                ? s.activeProjectId
+                : merged[0]?.id ?? null,
+          };
+        }),
+
+      createWorkspace: (name, projectIdArg) => {
+        const state = get();
+        let projectId =
+          projectIdArg ??
+          state.activeProjectId ??
+          state.projects[0]?.id ??
+          null;
+        let projectToInsert: ProjectMeta | null = null;
+        if (!projectId) {
+          projectId = uid();
+          projectToInsert = {
+            id: projectId,
+            name: "Untitled project",
+            updatedAt: now(),
+          };
+        }
         const wsId = uid();
         const wsMeta: WorkspaceMeta = {
           id: wsId,
+          projectId,
           name: name || "Untitled workspace",
           updatedAt: now(),
         };
@@ -338,6 +446,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const canvasId = uid();
         const canvasMeta: CanvasMeta = {
           id: canvasId,
+          projectId,
           workspaceId: wsId,
           name: "Page 1",
           updatedAt: now(),
@@ -345,6 +454,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const fresh: CanvasGraph = { ...canvasMeta, nodes: [], edges: [] };
         _dragSnapshotTaken = false;
         set((s) => ({
+          projects: projectToInsert ? [projectToInsert, ...s.projects] : s.projects,
+          activeProjectId: projectId,
           workspaces: [wsMeta, ...s.workspaces],
           canvases: [canvasMeta, ...s.canvases],
           graphs: { ...s.graphs, [canvasId]: fresh },
@@ -421,7 +532,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           wsId = undefined;
         }
         if (!wsId && state.current) wsId = state.current.workspaceId;
-        if (!wsId && state.workspaces.length > 0) wsId = state.workspaces[0].id;
+        if (!wsId && state.workspaces.length > 0) {
+          const scoped = state.activeProjectId
+            ? state.workspaces.find((w) => w.projectId === state.activeProjectId)
+            : null;
+          wsId = scoped?.id ?? state.workspaces[0].id;
+        }
         if (!wsId) {
           // No workspace exists — bootstrap one and put this canvas
           // inside it. Same code path as createWorkspace's default
@@ -431,6 +547,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const created = get().createWorkspace(name || "Untitled workspace");
           return created.canvasId;
         }
+        const parentWorkspace = state.workspaces.find((w) => w.id === wsId);
+        const projectId =
+          parentWorkspace?.projectId ??
+          state.current?.projectId ??
+          state.activeProjectId ??
+          state.projects[0]?.id ??
+          null;
 
         const id = uid();
         // Auto-name the tab "Page N" when the caller didn't supply
@@ -445,6 +568,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           : name;
         const meta: CanvasMeta = {
           id,
+          projectId,
           workspaceId: wsId,
           name: resolvedName,
           updatedAt: now(),
@@ -571,6 +695,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((s) => {
           const meta: CanvasMeta = {
             id: graph.id,
+            projectId:
+              graph.projectId ??
+              s.workspaces.find((w) => w.id === graph.workspaceId)?.projectId ??
+              s.activeProjectId ??
+              null,
             workspaceId: graph.workspaceId,
             name: graph.name,
             updatedAt: graph.updatedAt,
@@ -1187,7 +1316,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       //     crash that the WorkspaceErrorBoundary kept catching.
       //     Sanitize on load + drop invalid rows instead of trusting
       //     the wire shape.
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => localStorage),
       // Skip ephemeral fields: current is derived from graphs, the
       // selection/streaming flags shouldn't outlive the tab.
@@ -1203,6 +1332,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       // (guests lose their in-memory chat on refresh — that's the
       // same as before).
       partialize: (state) => ({
+        projects: state.projects,
+        activeProjectId: state.activeProjectId,
         workspaces: state.workspaces,
         canvases: state.canvases,
         graphs: state.graphs,
@@ -1225,6 +1356,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         // we hit corruption / older version and reset to empty so the
         // user lands on the dashboard with a fresh slate.
         const reset = () => ({
+          projects: [],
+          activeProjectId: null,
           workspaces: [],
           canvases: [],
           graphs: {},
@@ -1250,8 +1383,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             const defaultWsId =
               globalThis.crypto?.randomUUID?.() ??
               `ws_${Math.random().toString(36).slice(2, 10)}`;
+            const defaultProjectId =
+              globalThis.crypto?.randomUUID?.() ??
+              `prj_${Math.random().toString(36).slice(2, 10)}`;
             const defaultWs: WorkspaceMeta = {
               id: defaultWsId,
+              projectId: defaultProjectId,
               name: "My workspace",
               updatedAt:
                 Math.max(
@@ -1261,14 +1398,27 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             };
             const newCanvases = oldCanvases.map((c) => ({
               ...c,
+              projectId: defaultProjectId,
               workspaceId: defaultWsId,
             }));
             const newGraphs: Record<string, CanvasGraph> = {};
             for (const [cid, g] of Object.entries(oldGraphs)) {
-              newGraphs[cid] = { ...g, workspaceId: defaultWsId };
+              newGraphs[cid] = {
+                ...g,
+                projectId: defaultProjectId,
+                workspaceId: defaultWsId,
+              };
             }
             working = {
               ...ps,
+              projects: [
+                {
+                  id: defaultProjectId,
+                  name: "My project",
+                  updatedAt: defaultWs.updatedAt,
+                },
+              ],
+              activeProjectId: defaultProjectId,
               workspaces: [defaultWs],
               canvases: newCanvases,
               graphs: newGraphs,
@@ -1283,19 +1433,62 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           // strictly here so the runtime never sees bad data.
           const rawWorkspaces = Array.isArray(working.workspaces)
             ? working.workspaces : [];
+          const rawProjects = Array.isArray(working.projects)
+            ? working.projects : [];
           const rawCanvases = Array.isArray(working.canvases)
             ? working.canvases : [];
           const rawGraphs = (working.graphs && typeof working.graphs === "object"
             ? working.graphs as Record<string, unknown>
             : {});
 
+          let validProjects: ProjectMeta[] = rawProjects.filter(
+            (p: unknown): p is ProjectMeta => {
+              const o = p as Record<string, unknown>;
+              return !!(o && typeof o.id === "string" && typeof o.name === "string");
+            },
+          ).map((p) => ({
+            id: p.id,
+            name: p.name,
+            updatedAt: typeof p.updatedAt === "number" ? p.updatedAt : Date.now(),
+          }));
+
+          if (validProjects.length === 0 && rawWorkspaces.length > 0) {
+            validProjects = [{
+              id:
+                globalThis.crypto?.randomUUID?.() ??
+                `prj_${Math.random().toString(36).slice(2, 10)}`,
+              name: "My project",
+              updatedAt: Date.now(),
+            }];
+          }
+          const projectIds = new Set(validProjects.map((p) => p.id));
+          const fallbackProjectId = validProjects[0]?.id ?? null;
+
           const validWorkspaces: WorkspaceMeta[] = rawWorkspaces.filter(
             (w: unknown): w is WorkspaceMeta => {
               const o = w as Record<string, unknown>;
               return !!(o && typeof o.id === "string" && typeof o.name === "string");
             },
-          );
+          ).map((w) => {
+            const rawProjectId =
+              typeof w.projectId === "string"
+                ? w.projectId
+                : typeof (w as unknown as { project_id?: unknown }).project_id === "string"
+                  ? String((w as unknown as { project_id: string }).project_id)
+                  : null;
+            return {
+              id: w.id,
+              projectId: rawProjectId && projectIds.has(rawProjectId)
+                ? rawProjectId
+                : fallbackProjectId,
+              name: w.name,
+              updatedAt: typeof w.updatedAt === "number" ? w.updatedAt : Date.now(),
+            };
+          });
           const wsIds = new Set(validWorkspaces.map((w) => w.id));
+          const workspaceProject = new Map(
+            validWorkspaces.map((w) => [w.id, w.projectId] as const),
+          );
 
           const validCanvases: CanvasMeta[] = rawCanvases.filter(
             (c: unknown): c is CanvasMeta => {
@@ -1308,7 +1501,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 wsIds.has(o.workspaceId as string)
               );
             },
-          );
+          ).map((c) => ({
+            id: c.id,
+            projectId:
+              (typeof c.projectId === "string" && projectIds.has(c.projectId)
+                ? c.projectId
+                : workspaceProject.get(c.workspaceId)) ?? fallbackProjectId,
+            workspaceId: c.workspaceId,
+            name: c.name,
+            updatedAt: typeof c.updatedAt === "number" ? c.updatedAt : Date.now(),
+          }));
           const canvasIds = new Set(validCanvases.map((c) => c.id));
 
           const validGraphs: Record<string, CanvasGraph> = {};
@@ -1320,6 +1522,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             // canvas is still openable, just without nodes.
             validGraphs[cid] = {
               id: cid,
+              projectId:
+                (typeof o.projectId === "string" && projectIds.has(o.projectId)
+                  ? o.projectId
+                  : workspaceProject.get((o.workspaceId as string) ?? "")) ??
+                fallbackProjectId,
               workspaceId: (o.workspaceId as string) ?? "",
               name: (o.name as string) ?? "Untitled canvas",
               updatedAt: typeof o.updatedAt === "number" ? o.updatedAt : Date.now(),
@@ -1330,6 +1537,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           }
 
           return {
+            projects: validProjects,
+            activeProjectId:
+              typeof working.activeProjectId === "string" &&
+              validProjects.some((p) => p.id === working.activeProjectId)
+                ? working.activeProjectId
+                : validProjects[0]?.id ?? null,
             workspaces: validWorkspaces,
             canvases: validCanvases,
             graphs: validGraphs,

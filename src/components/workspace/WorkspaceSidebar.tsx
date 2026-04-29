@@ -6,10 +6,10 @@
  * Layout:
  *   1. Brand row — workspace mascot + wordmark
  *   2. "Create" button (primary action, pink/magenta solid pill)
- *   3. Top nav group — Home, Search, Stock, Community, Projects
+ *   3. Top nav group — Home
  *   4. Section divider with "ALL TOOLS" label
- *   5. Tools nav group — Spaces, Image / Video / Voice gen, Assistant
- *   6. Bottom utility cluster — Settings, Notifications, Theme, More
+ *   5. Tools nav group — Spaces, Image / Video / Voice / 3D gen
+ *   6. Bottom utility cluster — Settings
  *
  * Behaviour notes:
  *   • If `onNavigate` is provided, clicks drive parent state without
@@ -29,24 +29,16 @@
  */
 import {
   Home as HomeIcon,
-  Search,
-  Library,
-  Globe,
-  FolderKanban,
   Workflow,
   Image as ImageIcon,
   Video,
   Mic2,
-  MessageSquare,
   Plus,
   Settings as SettingsIcon,
-  Bell,
-  Sun,
-  MoreHorizontal,
   Crown,
-  Coins,
   Palette,
   School,
+  Box,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -72,15 +64,12 @@ export type SectionKey =
   | "image_gen"
   | "video_gen"
   | "voice_gen"
+  | "image_to_3d"
   | "assistant"
   | "tools"; // legacy "All tools" placeholder — still accepted
 
 const NAV_TOP: Array<{ id: SectionKey; label: string; icon: LucideIcon }> = [
   { id: "home",       label: "Home",       icon: HomeIcon },
-  { id: "search",     label: "Search",     icon: Search },
-  { id: "stock",      label: "Stock",      icon: Library },
-  { id: "community",  label: "Community",  icon: Globe },
-  { id: "projects",   label: "Projects",   icon: FolderKanban },
 ];
 
 const NAV_TOOLS: Array<{ id: SectionKey; label: string; icon: LucideIcon }> = [
@@ -88,7 +77,7 @@ const NAV_TOOLS: Array<{ id: SectionKey; label: string; icon: LucideIcon }> = [
   { id: "image_gen",  label: "Image Generator", icon: ImageIcon },
   { id: "video_gen",  label: "Video Generator", icon: Video },
   { id: "voice_gen",  label: "Voice Generator", icon: Mic2 },
-  { id: "assistant",  label: "Assistant",       icon: MessageSquare },
+  { id: "image_to_3d", label: "3D Generator",    icon: Box },
 ];
 
 export interface WorkspaceSidebarProps {
@@ -247,17 +236,14 @@ export default function WorkspaceSidebar({
       {/* ── Bottom utility row ─────────────────────────────────── */}
       <div className="flex items-center gap-1 px-3 pb-3 pt-4">
         <UtilityBtn icon={SettingsIcon} title="Settings" onClick={() => navigate("/app/settings")} />
-        <UtilityBtn icon={Bell} title="Notifications" badge />
-        <UtilityBtn icon={Sun} title="Theme" />
-        <UtilityBtn icon={MoreHorizontal} title="More" />
       </div>
     </aside>
   );
 }
 
-/** "Manage Org" + "Pricing" + "Branding" buttons — visible only to
+/** "Manage Org" + "Branding" buttons — visible only to
  *  teachers + org_admins. Manage Org → Teacher Command Center;
- *  Pricing → credit_costs CRUD; Branding → logo / short name /
+ *  Branding → logo / short name /
  *  subdomain admin. Branding is also reachable by host-resolved org
  *  admins (no class memberships) via direct URL — useful for the
  *  DMD demo where the admin user hasn't been enrolled into any
@@ -276,15 +262,6 @@ const OrgAdminLink = () => {
       >
         <Crown className="h-3.5 w-3.5" />
         Manage Org
-      </button>
-      <button
-        type="button"
-        onClick={() => navigate("/app/org-admin/pricing")}
-        className="flex h-10 w-full items-center gap-2.5 rounded-md px-2.5 text-[12px] text-amber-200/70 transition-colors hover:bg-amber-300/10 hover:text-amber-100 lg:h-8"
-        title="Edit credit costs for AI models"
-      >
-        <Coins className="h-3.5 w-3.5" />
-        Pricing
       </button>
       <button
         type="button"
