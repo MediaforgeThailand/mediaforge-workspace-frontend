@@ -40,6 +40,8 @@ const SEEDANCE_MODELS = [
   "seedance-1-0-pro-250528",
   "seedance-1-0-pro-fast-251015",
   "seedance-1-5-pro-251215",
+  "seedance-2-0-lite",
+  "seedance-2-0-pro",
 ] as const;
 const BANANA_MODELS = ["nano-banana-2", "nano-banana-pro"] as const;
 /** Backend dispatches anything starting with "gpt-image" to OpenAI's
@@ -175,30 +177,36 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           // Square
           "1024x1024",
           "2048x2048",
+          "2880x2880",
           // Landscape
           "1536x1024",
           "1280x1024",
           "2048x1152",
+          "2816x1584",
           "3840x2160",
           // Portrait / vertical
           "1024x1536",
           "1024x1280",
           "1152x1536",
           "1152x2048",
+          "1584x2816",
           "2160x3840",
           "auto",
         ],
         optionLabels: {
           "1024x1024": "1024×1024 · 1:1 Square",
           "2048x2048": "2048×2048 · 1:1 · 2K Square",
+          "2880x2880": "2880×2880 · 1:1 · 3K Square",
           "1536x1024": "1536×1024 · 3:2 Landscape",
           "1280x1024": "1280×1024 · 5:4 Landscape",
           "2048x1152": "2048×1152 · 16:9 · 2K",
+          "2816x1584": "2816×1584 · 16:9 · 3K",
           "3840x2160": "3840×2160 · 16:9 · 4K",
           "1024x1536": "1024×1536 · 2:3 Portrait",
           "1024x1280": "1024×1280 · 4:5 Portrait (IG)",
           "1152x1536": "1152×1536 · 3:4 Portrait",
           "1152x2048": "1152×2048 · 9:16 · 2K Vertical",
+          "1584x2816": "1584×2816 · 9:16 · 3K Vertical",
           "2160x3840": "2160×3840 · 9:16 · 4K Vertical",
           auto: "Auto Size",
         },
@@ -409,6 +417,8 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           "seedance-1-0-pro-250528": "SeedDance 1.0 Pro",
           "seedance-1-0-pro-fast-251015": "SeedDance 1.0 Pro Fast (3x)",
           "seedance-1-5-pro-251215": "SeedDance 1.5 Pro (Latest)",
+          "seedance-2-0-lite": "SeedDance 2.0 Fast",
+          "seedance-2-0-pro": "SeedDance 2.0 Pro",
         },
         default: "kling-v2-6-pro",
         required: true,
@@ -1013,16 +1023,19 @@ export const GPT_IMAGE_2_SIZE_MATRIX: Array<{
   // Square
   { size: "1024x1024", aspectRatio: "1:1", resolution: "1K" },
   { size: "2048x2048", aspectRatio: "1:1", resolution: "2K" },
+  { size: "2880x2880", aspectRatio: "1:1", resolution: "3K" },
   // Landscape
   { size: "1536x1024", aspectRatio: "3:2", resolution: "1K" },
   { size: "1280x1024", aspectRatio: "5:4", resolution: "1K" },
   { size: "2048x1152", aspectRatio: "16:9", resolution: "2K" },
+  { size: "2816x1584", aspectRatio: "16:9", resolution: "3K" },
   { size: "3840x2160", aspectRatio: "16:9", resolution: "4K" },
   // Portrait / vertical
   { size: "1024x1536", aspectRatio: "2:3", resolution: "1K" },
   { size: "1024x1280", aspectRatio: "4:5", resolution: "1K" },
   { size: "1152x1536", aspectRatio: "3:4", resolution: "1K" },
   { size: "1152x2048", aspectRatio: "9:16", resolution: "2K" },
+  { size: "1584x2816", aspectRatio: "9:16", resolution: "3K" },
   { size: "2160x3840", aspectRatio: "9:16", resolution: "4K" },
   // Auto — represented as a single "Auto" pair.
   { size: "auto", aspectRatio: "Auto", resolution: "Auto" },
