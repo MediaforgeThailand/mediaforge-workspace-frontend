@@ -49,6 +49,20 @@ import PageLoadingAnim from "./components/ui/PageLoadingAnim";
 /**
  * Wrap lazy imports so a stale-chunk 404 after deployment
  * automatically reloads the page once (instead of crashing).
+ *
+ * Failure modes:
+ *   1. First miss   → set sentinel, full-reload the page. The reload
+ *                     fetches the freshest index.html which references
+ *                     the new chunk hashes — the import succeeds.
+ *   2. Second miss  → reload didn't fix it (CDN propagation lag,
+ *                     network down, ad-blocker eating the chunk, etc.).
+ *                     Throwing here would bubble through Suspense with
+ *                     no error boundary above it and give the user a
+ *                     black screen. Instead, hard-redirect them to the
+ *                     dashboard root — that path's chunk usually IS
+ *                     loaded already in this session, and even if it
+ *                     isn't, the browser does a full page-load so the
+ *                     user lands on a real page rather than nothing.
  */
 function lazyWithRetry(factory: () => Promise<{ default: React.ComponentType<any> }>) {
   return lazy(() =>
@@ -60,7 +74,13 @@ function lazyWithRetry(factory: () => Promise<{ default: React.ComponentType<any
         return new Promise(() => {}); // never resolves — page is reloading
       }
       sessionStorage.removeItem(key);
-      throw err;
+      // Second failure — bail out to the dashboard via a hard nav so
+      // the user never sees a blank/black void from an unhandled
+      // Suspense throw. Log so we can still see the original error.
+      // eslint-disable-next-line no-console
+      console.error("[lazyWithRetry] chunk load failed twice, redirecting:", err);
+      window.location.href = "/app/workspace";
+      return new Promise(() => {}); // never resolves — page is navigating
     })
   );
 }
