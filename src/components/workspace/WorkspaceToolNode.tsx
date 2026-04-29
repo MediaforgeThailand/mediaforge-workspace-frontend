@@ -1578,6 +1578,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                     objectFit: "contain",
                     background: "hsl(0 0% 6%)",
                     display: "block",
+                    // Blur the previous output while a new run is in
+                    // progress so users can tell the node is busy
+                    // even when the prior image is still on screen.
+                    filter: isRunning ? "blur(10px) brightness(0.85)" : undefined,
+                    transition: "filter 200ms ease",
                   }}
                 />
               ) : (
@@ -1601,6 +1606,13 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                 const img = e.target as HTMLImageElement;
                 setImgDims({ w: img.naturalWidth, h: img.naturalHeight });
               }}
+              style={{
+                // Blur the prior image during a re-run so the running
+                // state is unmistakable. The RunTimer + spinner stay
+                // sharp because they live outside this <img>.
+                filter: isRunning ? "blur(10px) brightness(0.85)" : undefined,
+                transition: "filter 200ms ease",
+              }}
             />
           )}
           {currentGen?.type === "video" && currentGen.url && (
@@ -1615,6 +1627,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                 const v = e.target as HTMLVideoElement;
                 v.pause();
                 v.currentTime = 0;
+              }}
+              style={{
+                // Same blur-on-rerun treatment as the image branch.
+                filter: isRunning ? "blur(10px) brightness(0.85)" : undefined,
+                transition: "filter 200ms ease",
               }}
             />
           )}
