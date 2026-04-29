@@ -62,6 +62,7 @@ import NodePreviewLightbox, {
   type PreviewPayload,
 } from "./NodePreviewLightbox";
 import { getWorkspaceSchema, portTypeFromHandleId } from "./workspaceSchema";
+import { inheritParamsFromSource } from "./inheritParams";
 import CanvasNodePicker, {
   type CanvasNodePickerState,
   type PickerOption,
@@ -1473,7 +1474,20 @@ const Inner = () => {
   const onPickerPick = useCallback(
     (option: PickerOption) => {
       if (!picker) return;
-      const newId = addSchemaNode(option.nodeType, option.defaultLabel, picker.flow);
+      // Inherit compatible params from the source node so the user
+      // doesn't have to re-pick model + ratio + resolution + quality
+      // every time they extend a workflow downstream. When the picker
+      // was opened without a source (keyboard / +-button), the helper
+      // falls through to bare schema defaults — unchanged behaviour.
+      const targetSchema = getWorkspaceSchema(option.nodeType);
+      const inheritedParams = inheritParamsFromSource(
+        picker.fromNode,
+        targetSchema,
+        option.nodeType,
+      );
+      const newId = addSchemaNode(option.nodeType, option.defaultLabel, picker.flow, {
+        params: inheritedParams,
+      });
       // No source (keyboard `N` shortcut) → just spawn the node, no
       // edge to create. Drag-from-port path → wire the new node back
       // to the source on the matching handle.
