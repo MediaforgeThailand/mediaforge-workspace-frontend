@@ -44,13 +44,11 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-// PSC demo access: keep this account local so the college demo still works
-// even when the real Supabase user/SSO setup is unavailable. The demo user
-// uses UUID-shaped IDs because workspace persistence code expects UUIDs.
-const DEMO_EMAIL = "dmd@psc.com";
-const DEMO_PASSWORD = "123456";
+// Demo bypass disabled: dmd@psc.com is a real Supabase user with credits,
+// so it must receive a real session/JWT for autosave and generation.
+const DEMO_EMAIL = "__demo_disabled__";
+const DEMO_PASSWORD = "__demo_disabled__";
 const DEMO_SESSION_KEY = "mf_psc_demo_session";
-const DEMO_USER_ID = "5f2f9a52-76a5-45d7-9f95-7f3b31466b50";
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -142,19 +140,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     );
 
     supabase.auth.getSession().then(({ data: { session }, error }) => {
-      // Restore the local PSC demo session across refreshes.
+      // Clear any old local demo flag so it cannot resurrect a fake user
+      // without a Supabase JWT.
       try {
-        if (localStorage.getItem(DEMO_SESSION_KEY) === "1") {
-          const demoUser = createDemoUser();
-          setSession(null);
-          setUser(demoUser);
-          setProfile(createDemoProfile());
-          setLoading(false);
-          return;
-        }
+        localStorage.removeItem(DEMO_SESSION_KEY);
       } catch {
-        // localStorage may be blocked; signIn still creates an in-memory
-        // demo session for the current page.
+        // ignore
       }
 
       // Handle expired/revoked refresh tokens gracefully
@@ -275,7 +266,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
 function createDemoUser(): User {
   return {
-    id: DEMO_USER_ID,
+    id: "psc-dmd-demo-user",
     app_metadata: { provider: "email", providers: ["email"] },
     user_metadata: { full_name: "DMD PSC Demo" },
     aud: "authenticated",
@@ -288,10 +279,10 @@ function createDemoUser(): User {
 function createDemoProfile(): Profile {
   const now = new Date().toISOString();
   return {
-    id: "6ff8e935-ff1b-4ffd-b0fb-04e5bf8b64c0",
-    user_id: DEMO_USER_ID,
+    id: "psc-dmd-demo-profile",
+    user_id: "psc-dmd-demo-user",
     display_name: "DMD PSC Demo",
-    avatar_url: "/dmd-digital-media-logo.png",
+    avatar_url: "/dmd-logo-placeholder.svg",
     company: "PSC College",
     role: "college_admin",
     subscription_status: "professional",
