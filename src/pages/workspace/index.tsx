@@ -6,24 +6,23 @@
  *   Top — primary surfaces:
  *     Home       → aggregator (this design's centrepiece)
  *     Spaces     → grid of all spaces (the old workspace dashboard)
- *     Community  → mockup placeholder
- *     Projects   → mockup placeholder
+ *     Community  → placeholder
+ *     Projects   → placeholder
  *
  *   Bottom — utilities:
- *     All tools  → mockup placeholder (catalog of node types)
- *     Stock      → mockup placeholder (curated stock library)
+ *     All tools  → placeholder (catalog of node types)
+ *     Stock      → placeholder (curated stock library)
  *
  * Home aggregates the user's recent activity in a single scroll:
  *   • Top row: 3 cards
- *       Projects   — list of mock project memberships
+ *       Projects   — real project list from workspace_projects
  *       Spaces     — horizontal carousel of recent spaces with the
  *                     real per-space minimap thumbnail (same engine
  *                     as the Spaces grid below)
- *       Tools      — pinnable list of node families
+ *       Tools      — real standalone generation tools
  *   • "My work →" link → jumps to Spaces view
- *   • Tabs: What's new / Templates / Academy
- *       Backed by a static deck of showcase cards for now —
- *       intentionally a mockup until product owns the editorial side.
+ *   • Academy videos
+ *       Real video assets, lazy-loaded when the user presses play.
  *
  * The Spaces view (full grid with month buckets) is preserved as-is
  * for the Spaces tab — already battle-tested for cross-device sync.
@@ -56,11 +55,6 @@ import {
   ChevronDown,
   ChevronRight,
   List,
-  Image as ImageIcon,
-  Video,
-  Mic2,
-  Wand2,
-  Pin,
   SlidersHorizontal,
   UserCircle2,
   X,
@@ -68,7 +62,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import { useWorkspaceStore, type ProjectMeta } from "@/store/useWorkspaceStore";
 import { UserMenu } from "@/components/workspace/UserMenu";
 import WorkspaceSidebar, {
   type SectionKey,
@@ -78,6 +72,7 @@ import StandaloneGenerator, {
 } from "@/components/workspace/StandaloneGenerator";
 import {
   STANDALONE_TOOLS,
+  STANDALONE_TOOL_ORDER,
   type StandaloneToolKey,
 } from "@/components/workspace/standaloneGenerationCatalog";
 
@@ -410,7 +405,13 @@ const WorkspaceDashboardInner = () => {
       )}
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {section === "home" && (
-          <HomeView onSection={setSection} activeProjectId={activeProjectId} />
+          <HomeView
+            onSection={setSection}
+            projects={projects}
+            activeProjectId={activeProjectId}
+            onSelectProject={setActiveProject}
+            onCreateProject={handleCreateProject}
+          />
         )}
         {section === "spaces" && <SpacesView activeProjectId={activeProjectId} />}
         {isStandaloneSection(section) && (
@@ -465,56 +466,65 @@ export default WorkspaceDashboard;
  * Home view — Magnific-style aggregator
  * ════════════════════════════════════════════════════════════ */
 
-interface MockProject {
-  id: string;
-  name: string;
-  /** Tone for the leading colour swatch. */
+interface ProjectCardItem extends ProjectMeta {
   color: string;
   icon: LucideIcon;
-  /** Lock = personal; Users = team. Drives the trailing icon. */
-  visibility: "personal" | "team";
+  spaceCount: number;
 }
 
-const MOCK_PROJECTS: MockProject[] = [
-  { id: "personal", name: "Personal", color: "hsl(35 90% 55%)", icon: Lock, visibility: "personal" },
-  { id: "team", name: "Team project", color: "hsl(210 90% 60%)", icon: Users, visibility: "team" },
-  { id: "godprame", name: "God•Prame", color: "hsl(210 90% 60%)", icon: Layers, visibility: "team" },
-  { id: "boss", name: "BOSS", color: "hsl(210 90% 60%)", icon: Layers, visibility: "team" },
-  { id: "inwgun", name: "InwGun", color: "hsl(35 90% 55%)", icon: Layers, visibility: "personal" },
+const PROJECT_COLOR_SWATCHES = [
+  "hsl(35 90% 55%)",
+  "hsl(210 90% 60%)",
+  "hsl(258 86% 64%)",
+  "hsl(156 72% 42%)",
+  "hsl(38 92% 56%)",
 ];
 
-interface MockTool {
-  id: string;
+interface HomeTool {
+  id: StandaloneToolKey;
   label: string;
   icon: LucideIcon;
-  /** Pinned items show a filled pin icon to the right. */
-  pinned?: boolean;
+  subtitle: string;
+  accent: string;
 }
 
-const MOCK_TOOLS: MockTool[] = [
-  { id: "image-gen", label: "Image Generator", icon: ImageIcon, pinned: true },
-  { id: "image-upscale", label: "Image Upscaler", icon: Wand2 },
-  { id: "image-edit", label: "Image Editor", icon: Pencil },
-  { id: "video-gen", label: "Video Generator", icon: Video, pinned: true },
-  { id: "voice-gen", label: "Voice Generator", icon: Mic2 },
-];
+const HOME_TOOLS: HomeTool[] = STANDALONE_TOOL_ORDER.map((key) => {
+  const tool = STANDALONE_TOOLS[key];
+  return {
+    id: key,
+    label: tool.title,
+    icon: tool.icon,
+    subtitle: tool.subtitle,
+    accent: tool.accent,
+  };
+});
 
-interface NewsCard {
+interface AcademyVideo {
   id: string;
   title: string;
-  /** Tailwind gradient classes for the cover — image-less placeholder. */
-  cover: string;
+  description: string;
+  duration: string;
+  src: string;
+  poster: string;
 }
 
-const MOCK_NEWS: NewsCard[] = [
-  { id: "n1", title: "Workspace V2 — chain tools on a canvas", cover: "from-fuchsia-500 via-violet-600 to-indigo-700" },
-  { id: "n2", title: "Native 4K image upscaler is here", cover: "from-emerald-400 via-teal-500 to-cyan-600" },
-  { id: "n3", title: "Photorealism down to the last pixel", cover: "from-amber-400 via-orange-500 to-rose-600" },
-  { id: "n4", title: "The Chronicles of Bone — story mode", cover: "from-zinc-700 via-zinc-800 to-zinc-900" },
-  { id: "n5", title: "PixVerse V6: sharper, longer, louder", cover: "from-sky-400 via-blue-500 to-indigo-600" },
-  { id: "n6", title: "Seedance 2.0 — 1080p, live now", cover: "from-rose-400 via-fuchsia-500 to-purple-600" },
-  { id: "n7", title: "Wan 2.7 — image-guided video", cover: "from-pink-500 via-rose-500 to-red-500" },
-  { id: "n8", title: "Multi-reference video control", cover: "from-orange-500 via-red-600 to-rose-700" },
+const ACADEMY_VIDEOS: AcademyVideo[] = [
+  {
+    id: "scene-monitor-fn",
+    title: "Scene Monitor FN tutorial",
+    description: "Workflow tutorial for building a complete scene.",
+    duration: "1:21",
+    src: "/videos/academy/scene-monitor-fn.mp4",
+    poster: "/videos/academy/scene-monitor-fn-poster.jpg",
+  },
+  {
+    id: "full-screen",
+    title: "Full Screen workflow",
+    description: "Step-by-step full-screen workspace walkthrough.",
+    duration: "1:05",
+    src: "/videos/academy/full-screen.mp4",
+    poster: "/videos/academy/full-screen-poster.jpg",
+  },
 ];
 
 const HomeView = ({
@@ -586,6 +596,25 @@ const HomeView = ({
     };
   }, [user?.id, authLoading, mergeServerWorkspaces]);
 
+  const projectCards = useMemo<ProjectCardItem[]>(() => {
+    const spaceCountByProject = new Map<string, number>();
+    for (const workspace of workspaces) {
+      if (!workspace.projectId) continue;
+      spaceCountByProject.set(
+        workspace.projectId,
+        (spaceCountByProject.get(workspace.projectId) ?? 0) + 1,
+      );
+    }
+    return [...projects]
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .map((project, index) => ({
+        ...project,
+        color: PROJECT_COLOR_SWATCHES[index % PROJECT_COLOR_SWATCHES.length],
+        icon: index === 0 ? Lock : Layers,
+        spaceCount: spaceCountByProject.get(project.id) ?? 0,
+      }));
+  }, [projects, workspaces]);
+
   /* Recent spaces — top 6 by updatedAt with rendered minimaps so the
    * Home carousel previews are real (not placeholders). */
   const recentSpaces = useMemo(() => {
@@ -629,14 +658,19 @@ const HomeView = ({
         <div className="mx-auto w-full max-w-[1400px] px-4 pb-16 pt-5 md:px-6 lg:px-8 lg:pt-6">
           {/* ── Top trio: Projects · Spaces · Tools ───────────── */}
           <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.4fr_1fr]">
-            <ProjectsCard projects={MOCK_PROJECTS} />
+            <ProjectsCard
+              projects={projectCards}
+              activeProjectId={activeProjectId}
+              onSelect={onSelectProject}
+              onCreate={onCreateProject}
+            />
             <SpacesShowcaseCard
               spaces={recentSpaces}
               onOpen={(id) => navigate(`/app/workspace/${id}`)}
               onNew={handleNew}
               onSeeAll={() => onSection("spaces")}
             />
-            <ToolsCard tools={MOCK_TOOLS} />
+            <ToolsCard tools={HOME_TOOLS} onOpen={(tool) => onSection(tool)} />
           </section>
 
           {/* ── My work jump-link ─────────────────────────────── */}
@@ -651,83 +685,96 @@ const HomeView = ({
             </button>
           </div>
 
-          {/* ── Editorial tabs ────────────────────────────────── */}
-          <div className="mt-6 flex items-center justify-center gap-3 overflow-x-auto border-b border-white/[0.06] sm:gap-6">
-            <TabBtn
-              label="What's new"
-              active={newsTab === "news"}
-              onClick={() => setNewsTab("news")}
-            />
-            <TabBtn
-              label="Templates"
-              active={newsTab === "templates"}
-              onClick={() => setNewsTab("templates")}
-            />
-            <TabBtn
-              label="Academy"
-              active={newsTab === "academy"}
-              onClick={() => setNewsTab("academy")}
-            />
-          </div>
+          <section className="mt-6">
+            <div className="flex items-center justify-center border-b border-white/[0.06]">
+              <div className="relative h-11 px-3 text-[12.5px] font-medium text-zinc-50 lg:h-9">
+                Academy
+                <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-t-sm bg-zinc-100" />
+              </div>
+            </div>
 
-          <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {MOCK_NEWS.map((card) => (
-              <NewsTile key={card.id} card={card} />
-            ))}
-          </ul>
+            <ul className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {ACADEMY_VIDEOS.map((video) => (
+                <AcademyVideoTile key={video.id} video={video} />
+              ))}
+            </ul>
+          </section>
         </div>
       </div>
     </>
   );
 };
 
-const ProjectsCard = ({ projects }: { projects: MockProject[] }) => (
+const ProjectsCard = ({
+  projects,
+  activeProjectId,
+  onSelect,
+  onCreate,
+}: {
+  projects: ProjectCardItem[];
+  activeProjectId: string | null;
+  onSelect: (id: string | null) => void;
+  onCreate: () => void;
+}) => (
   <div className="rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
     <div className="mb-3 flex items-center justify-between">
-      <button
-        type="button"
-        className="flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-300 transition-colors hover:text-white"
-      >
+      <div className="flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-300">
         Projects
         <ChevronRight className="h-3 w-3 text-zinc-500" />
-      </button>
+      </div>
       <button
         type="button"
-        title="New project (mockup)"
+        onClick={onCreate}
+        title="New project"
         className="rounded-md p-1 text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white"
       >
         <Plus className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
       </button>
     </div>
 
-    <ul className="flex flex-col gap-0.5">
-      {projects.map((p) => (
-        <li key={p.id}>
-          <button
-            type="button"
-            className="flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 text-[12.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white lg:min-h-9"
-          >
-            <span
-              className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px]"
-              style={{ background: p.color }}
+    {projects.length === 0 ? (
+      <button
+        type="button"
+        onClick={onCreate}
+        className="flex min-h-[132px] w-full items-center justify-center rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] px-4 text-[12px] text-zinc-500 transition-colors hover:border-white/[0.20] hover:bg-white/[0.04] hover:text-zinc-200"
+      >
+        + Create your first project
+      </button>
+    ) : (
+      <ul className="flex flex-col gap-0.5">
+        {projects.map((p) => (
+          <li key={p.id}>
+            <button
+              type="button"
+              onClick={() => onSelect(p.id)}
+              className={cn(
+                "flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 text-[12.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white lg:min-h-9",
+                activeProjectId === p.id &&
+                  "bg-white/[0.07] text-white ring-1 ring-inset ring-white/[0.08]",
+              )}
             >
-              <p.icon className="h-2.5 w-2.5 text-zinc-950" />
-            </span>
-            <span className="flex-1 truncate text-left">{p.name}</span>
-            {p.id === "team" && (
-              <span className="rounded bg-fuchsia-500/15 px-1.5 py-px text-[8.5px] font-bold uppercase tracking-wide text-fuchsia-300 ring-1 ring-inset ring-fuchsia-500/30">
-                Upgrade
+              <span
+                className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px]"
+                style={{ background: p.color }}
+              >
+                <p.icon className="h-2.5 w-2.5 text-zinc-950" />
               </span>
-            )}
-            {p.visibility === "personal" ? (
-              <Lock className="h-3 w-3 text-zinc-600" />
-            ) : (
-              <Users className="h-3 w-3 text-zinc-600" />
-            )}
-          </button>
-        </li>
-      ))}
-    </ul>
+              <span className="flex-1 truncate text-left">{p.name}</span>
+              <span className="rounded bg-white/[0.05] px-1.5 py-px text-[9px] font-semibold text-zinc-400 ring-1 ring-inset ring-white/[0.06]">
+                {p.spaceCount}
+              </span>
+              {activeProjectId === p.id ? (
+                <span className="rounded bg-emerald-500/15 px-1.5 py-px text-[8.5px] font-bold uppercase tracking-wide text-emerald-300 ring-1 ring-inset ring-emerald-500/30">
+                  Active
+                </span>
+              ) : (
+                <Lock className="h-3 w-3 text-zinc-600" />
+              )}
+            </button>
+          </li>
+        ))}
+      </ul>
+    )}
   </div>
 );
 
@@ -806,11 +853,18 @@ const SpacesShowcaseCard = ({
   </div>
 );
 
-const ToolsCard = ({ tools }: { tools: MockTool[] }) => (
+const ToolsCard = ({
+  tools,
+  onOpen,
+}: {
+  tools: HomeTool[];
+  onOpen: (tool: StandaloneToolKey) => void;
+}) => (
   <div className="rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
     <div className="mb-3 flex items-center justify-between">
       <button
         type="button"
+        onClick={() => onOpen(tools[0]?.id ?? "image_gen")}
         className="flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-300 transition-colors hover:text-white"
       >
         Tools
@@ -823,20 +877,22 @@ const ToolsCard = ({ tools }: { tools: MockTool[] }) => (
         <li key={t.id}>
           <button
             type="button"
+            onClick={() => onOpen(t.id)}
             className="group/tool flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 text-[12.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white lg:min-h-9"
           >
-            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/[0.05] ring-1 ring-inset ring-white/[0.08]">
-              <t.icon className="h-3 w-3 text-zinc-300" />
+            <span
+              className="flex h-5 w-5 items-center justify-center rounded-md ring-1 ring-inset ring-white/[0.08]"
+              style={{ background: t.accent }}
+            >
+              <t.icon className="h-3 w-3 text-zinc-950" />
             </span>
-            <span className="flex-1 truncate text-left">{t.label}</span>
-            <Pin
-              className={cn(
-                "h-3 w-3 transition-colors",
-                t.pinned
-                  ? "fill-zinc-300 text-zinc-300"
-                  : "text-zinc-700 opacity-0 group-hover/tool:opacity-100",
-              )}
-            />
+            <span className="min-w-0 flex-1 text-left">
+              <span className="block truncate">{t.label}</span>
+              <span className="block truncate text-[10px] text-zinc-600 group-hover/tool:text-zinc-400">
+                {t.subtitle}
+              </span>
+            </span>
+            <ChevronRight className="h-3 w-3 text-zinc-700 transition-colors group-hover/tool:text-zinc-300" />
           </button>
         </li>
       ))}
@@ -844,42 +900,30 @@ const ToolsCard = ({ tools }: { tools: MockTool[] }) => (
   </div>
 );
 
-const TabBtn = ({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={cn(
-      "relative h-11 shrink-0 px-3 text-[12.5px] transition-colors lg:h-9 lg:px-1",
-      active ? "text-zinc-50" : "text-zinc-500 hover:text-zinc-200",
-    )}
-  >
-    {label}
-    {active && (
-      <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-t-sm bg-zinc-100" />
-    )}
-  </button>
-);
-
-const NewsTile = ({ card }: { card: NewsCard }) => (
-  <li className="cursor-pointer">
-    <div
-      className={cn(
-        "relative aspect-[16/10] overflow-hidden rounded-xl bg-gradient-to-br ring-1 ring-inset ring-white/[0.06] transition-all hover:ring-white/[0.16]",
-        card.cover,
-      )}
+const AcademyVideoTile = ({ video }: { video: AcademyVideo }) => (
+  <li className="overflow-hidden rounded-2xl bg-[hsl(0_0%_7%)] ring-1 ring-inset ring-white/[0.06]">
+    <video
+      className="aspect-video w-full bg-black object-cover"
+      controls
+      playsInline
+      preload="none"
+      poster={video.poster}
+      aria-label={video.title}
     >
-      <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_30%_20%,hsl(0_0%_100%/0.15),transparent)]" />
-    </div>
-    <div className="mt-2 truncate px-0.5 text-[12.5px] font-medium text-zinc-200">
-      {card.title}
+      <source src={video.src} type="video/mp4" />
+    </video>
+    <div className="flex items-start justify-between gap-4 p-4">
+      <div className="min-w-0">
+        <h3 className="truncate text-[13px] font-semibold text-zinc-100">
+          {video.title}
+        </h3>
+        <p className="mt-1 line-clamp-2 text-[11.5px] leading-5 text-zinc-500">
+          {video.description}
+        </p>
+      </div>
+      <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-1 text-[10px] font-semibold text-zinc-400 ring-1 ring-inset ring-white/[0.08]">
+        {video.duration}
+      </span>
     </div>
   </li>
 );
@@ -1524,7 +1568,7 @@ const Placeholder = ({ section }: { section: Section }) => (
     <div className="flex flex-1 items-center justify-center p-12">
       <EmptyState
         title="Coming soon"
-        hint="This section is part of the workspace mockup — wire-up lands in the next wave."
+        hint="This section is not connected yet."
       />
     </div>
   </>
