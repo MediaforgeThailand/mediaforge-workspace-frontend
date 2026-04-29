@@ -36,6 +36,11 @@ import {
   MiniSlider,
   isBinarySelect,
 } from "./CompactParamWidgets";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useDebugLogStore } from "@/store/useDebugLogStore";
 import {
@@ -1671,37 +1676,54 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
            *  inherit the prompt's dynamic-lift behaviour. */}
           {!isMultiShot && (
             <div className="ws-compact-run-anchor">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void runNode();
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-                onPointerDown={(e) => e.stopPropagation()}
-                disabled={isRunning || isViewer}
-                className={cn(
-                  "ws-compact-run nodrag",
-                  runStatus === "error" && "is-error",
-                )}
-                title={
-                  isViewer
-                    ? "View only — runs disabled"
-                    : isRunning
-                      ? "Running…"
-                      : runStatus === "error"
-                        ? "Retry"
-                        : "Run (Ctrl+Enter)"
-                }
-              >
-                {isRunning ? (
-                  <Loader2 className="animate-spin" />
-                ) : runStatus === "error" ? (
-                  <RotateCw />
-                ) : (
-                  <Play className="fill-current" />
-                )}
-              </button>
+              <Tooltip delayDuration={150}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void runNode();
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    disabled={isRunning || isViewer}
+                    className={cn(
+                      "ws-compact-run nodrag",
+                      runStatus === "error" && "is-error",
+                    )}
+                  >
+                    {isRunning ? (
+                      <Loader2 className="animate-spin" />
+                    ) : runStatus === "error" ? (
+                      <RotateCw />
+                    ) : (
+                      <Play className="fill-current" />
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" align="end">
+                  <div className="flex flex-col gap-0.5 text-xs">
+                    <span>
+                      {isViewer
+                        ? "View only — runs disabled"
+                        : isRunning
+                          ? "Running…"
+                          : runStatus === "error"
+                            ? "Retry"
+                            : "Run (Ctrl+Enter)"}
+                    </span>
+                    {!isViewer && (
+                      <span className="text-muted-foreground">
+                        {creditCostsLoading
+                          ? "Loading cost…"
+                          : nodeCost != null
+                            ? `Cost: ${nodeCost}${costSuffix ?? ""} credits`
+                            : "Pricing unavailable"}
+                      </span>
+                    )}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
               {isRunning && (
                 <RunTimer
                   startedAt={(d.runStartedAt as number | null | undefined) ?? null}
