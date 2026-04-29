@@ -28,6 +28,10 @@ import {
   type CanvasGraph,
 } from "@/store/useWorkspaceStore";
 import {
+  selectCanPersist,
+  useWorkspaceShareRole,
+} from "@/store/useWorkspaceShareRole";
+import {
   flushSaveOnUnload,
   saveCanvasToServer,
 } from "./canvasPersistence";
@@ -38,7 +42,9 @@ export type SaveState =
   | "saved"
   | "error"
   | "guest"
-  | "tableMissing";
+  | "tableMissing"
+  | "viewer"
+  | "editor-readonly";
 
 const DEBOUNCE_MS = 600;
 const SAVED_FLASH_MS = 1500;
@@ -59,6 +65,12 @@ function fingerprint(g: CanvasGraph): string {
 export function useCanvasAutosave(): SaveState {
   const current = useWorkspaceStore((s) => s.current);
   const { user } = useAuth();
+  // Reads the share role; only "owner" mode persists to server.
+  // Viewers and editors run with a local-only canvas — their edits
+  // do NOT write back to the owner's row. (See useWorkspaceShareRole
+  // for the rationale on the stricter editor policy.)
+  const canPersist = useWorkspaceShareRole(selectCanPersist);
+  const role = useWorkspaceShareRole((s) => s.role);
   const [state, setState] = useState<SaveState>("idle");
 
   // Last successfully-saved fingerprint per canvas. Stops us from
@@ -74,6 +86,14 @@ export function useCanvasAutosave(): SaveState {
     if (!current?.id) return;
     if (!user?.id) {
       setState("guest");
+      return;
+    }
+    // Share-mode short-circuit. Viewers can't mutate so their
+    // canvas never differs from the loaded server state; editors
+    // can mutate but those mutations stay local. Either way we
+    // skip the network entirely.
+    if (!canPersist) {
+      setState(role === "viewer" ? "viewer" : "editor-readonly");
       return;
     }
     const fp = fingerprint(current);
@@ -107,7 +127,7 @@ export function useCanvasAutosave(): SaveState {
     // We intentionally re-run on EVERY `current` change. The store
     // emits a new `current` reference whenever any node/edge mutation
     // lands, which is exactly what we want to watch.
-  }, [current, user?.id]);
+  }, [current, user?.id, canPersist, role]);
 
   /* ── beforeunload / pagehide flush ──────────────────────
    * If the user closes the tab mid-edit, the debounced save above
@@ -115,6 +135,7 @@ export function useCanvasAutosave(): SaveState {
    * flushSaveOnUnload) to send the final state on the way out. */
   useEffect(() => {
     if (!user?.id) return;
+    if (!canPersist) return; // viewer / editor — no server flushes
     const onUnload = () => {
       const c = useWorkspaceStore.getState().current;
       if (!c?.id) return;
@@ -128,11 +149,12 @@ export function useCanvasAutosave(): SaveState {
       window.removeEventListener("beforeunload", onUnload);
       window.removeEventListener("pagehide", onUnload);
     };
-  }, [user?.id]);
+  }, [user?.id, canPersist]);
 
   /* ── Visibility flush — tab blur saves immediately ──── */
   useEffect(() => {
     if (!user?.id) return;
+    if (!canPersist) return; // viewer / editor — no server flushes
     const onVisibility = () => {
       if (document.visibilityState !== "hidden") return;
       const c = useWorkspaceStore.getState().current;
@@ -145,7 +167,7 @@ export function useCanvasAutosave(): SaveState {
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [user?.id]);
+  }, [user?.id, canPersist]);
 
   return state;
 }

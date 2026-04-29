@@ -58,6 +58,9 @@ import {
   loadCanvasFromServer,
   loadCanvasesByWorkspaceFromServer,
 } from "@/components/workspace/canvasPersistence";
+import { useShareTokenResolution } from "@/components/workspace/useShareTokenResolution";
+import ShareModeBanner from "@/components/workspace/ShareModeBanner";
+import ShareLinkInvalidScreen from "@/components/workspace/ShareLinkInvalidScreen";
 
 const WorkspaceCanvasPage = () => {
   // Route param is now `workspaceId` (was `canvasId`). React Router
@@ -74,6 +77,13 @@ const WorkspaceCanvasPage = () => {
   const { user, loading: authLoading } = useAuth();
   const [hydrated, setHydrated] = useState(false);
   const [bounced, setBounced] = useState(false);
+
+  // Resolve any `?share=<token>` BEFORE the canvas hydration kicks
+  // in. The hook reads the URL, calls the workspace_share_resolve
+  // edge function when needed, and pushes the resulting role into
+  // the global useWorkspaceShareRole store. Components downstream
+  // (autosave, run buttons, banner) read that store.
+  const shareStatus = useShareTokenResolution();
 
   // Resolve `:routeId` → most-recent canvas in that workspace. If
   // the workspace has no canvases yet, return null so we can
@@ -282,9 +292,27 @@ const WorkspaceCanvasPage = () => {
           black void with no escape but F5. */}
       <WorkspaceErrorBoundary>
         <CanvasHeader />
+        <ShareModeBanner />
         <div className="flex flex-1 overflow-hidden">
           <main className="flex-1">
-            {hydrated ? (
+            {/* Share-token resolution gates the canvas when the URL
+             *  carries a `?share=` param. error → invalid screen;
+             *  resolving / redirecting → loading state; ok / no-token
+             *  → normal hydration path below. */}
+            {shareStatus.phase === "error" ? (
+              <ShareLinkInvalidScreen reason={shareStatus.reason} />
+            ) : shareStatus.phase === "resolving" ||
+              shareStatus.phase === "redirecting" ? (
+              <CanvasHydrationStatus
+                authLoading={authLoading}
+                hasUser={!!user?.id}
+                customStatus={
+                  shareStatus.phase === "redirecting"
+                    ? "Redirecting to sign in…"
+                    : "Verifying share link…"
+                }
+              />
+            ) : hydrated ? (
               <WorkspaceCanvas />
             ) : (
               <CanvasHydrationStatus
@@ -323,15 +351,19 @@ export default WorkspaceCanvasPage;
 function CanvasHydrationStatus({
   authLoading,
   hasUser,
+  customStatus,
 }: {
   authLoading: boolean;
   hasUser: boolean;
+  customStatus?: string;
 }) {
-  const status = authLoading
-    ? "Checking sign-in…"
-    : hasUser
-      ? "Loading canvas from server…"
-      : "Looking up canvas…";
+  const status =
+    customStatus ??
+    (authLoading
+      ? "Checking sign-in…"
+      : hasUser
+        ? "Loading canvas from server…"
+        : "Looking up canvas…");
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 text-zinc-300">
       <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-700 border-t-zinc-200" />

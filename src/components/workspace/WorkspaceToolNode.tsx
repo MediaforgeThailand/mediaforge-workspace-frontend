@@ -38,6 +38,10 @@ import {
 } from "./CompactParamWidgets";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useDebugLogStore } from "@/store/useDebugLogStore";
+import {
+  selectIsViewer,
+  useWorkspaceShareRole,
+} from "@/store/useWorkspaceShareRole";
 import NodeResultDialog from "./NodeResultDialog";
 import { RunTimer } from "./RunTimer";
 import type { Generation } from "./NodeResultBar";
@@ -519,9 +523,19 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const isMultiShot = String(params.multi_shot) === "true";
   const runStatus = d.status ?? "idle";
   const isRunning = runStatus === "processing";
+  // Viewer-mode read-only — runs require a credit deduction
+  // and a writable workspace, neither of which a viewer can
+  // perform. The Run button below is disabled in this state;
+  // we ALSO bail inside runNode as a defence-in-depth so a stale
+  // hotkey binding can't bypass the UI.
+  const isViewer = useWorkspaceShareRole(selectIsViewer);
 
   const runNode = useCallback(async () => {
     if (isRunning) return;
+    if (isViewer) {
+      toast.info("View-only mode — runs are disabled.");
+      return;
+    }
     const storeState = useWorkspaceStore.getState();
     const log = useDebugLogStore.getState().push;
     const nodeLabelForLog =
@@ -1024,7 +1038,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       });
       toast.error(String(e?.message ?? e));
     }
-  }, [id, isRunning, params, schemaKey, setNodes, selectedModel, schema, d.params?.nodeName]);
+  }, [id, isRunning, isViewer, params, schemaKey, setNodes, selectedModel, schema, d.params?.nodeName]);
 
   /* ── Listen for Ctrl+Enter / Ctrl+Shift+Enter shortcut ────
    * useWorkspaceShortcuts dispatches a `workspace-run-shortcut`
@@ -1665,17 +1679,19 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
-                disabled={isRunning}
+                disabled={isRunning || isViewer}
                 className={cn(
                   "ws-compact-run nodrag",
                   runStatus === "error" && "is-error",
                 )}
                 title={
-                  isRunning
-                    ? "Running…"
-                    : runStatus === "error"
-                      ? "Retry"
-                      : "Run (Ctrl+Enter)"
+                  isViewer
+                    ? "View only — runs disabled"
+                    : isRunning
+                      ? "Running…"
+                      : runStatus === "error"
+                        ? "Retry"
+                        : "Run (Ctrl+Enter)"
                 }
               >
                 {isRunning ? (

@@ -47,6 +47,10 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import {
+  selectIsViewer,
+  useWorkspaceShareRole,
+} from "@/store/useWorkspaceShareRole";
 
 import WorkspaceToolNode from "./WorkspaceToolNode";
 import AssetNode from "./AssetNode";
@@ -447,6 +451,14 @@ const Inner = () => {
     getEdges,
   } = useReactFlow();
   const { user } = useAuth();
+  // Viewer-mode flag — when true, the canvas renders read-only:
+  // no node drags, no new connections, no marquee selection (still
+  // selectable so the lightbox/preview affordances work, just no
+  // mutating actions). The ShareModeBanner up top tells the user
+  // they're in this state. Editor mode is NOT read-only — editors
+  // can mutate the local graph and run nodes; their changes just
+  // don't persist (see useCanvasAutosave for the bail-out).
+  const isViewer = useWorkspaceShareRole(selectIsViewer);
   // RE-ENABLED after the React #185 refactor: dropped the unstable
   // `getNode` dep in favour of a DOM-only data-port-type read, so
   // the effect now only re-runs when the connection target changes
@@ -832,6 +844,11 @@ const Inner = () => {
   const onPaneContextMenu = useCallback(
     (e: React.MouseEvent | MouseEvent) => {
       e.preventDefault();
+      // Viewer mode is read-only — the pane/tool-palette menu offers
+      // node creation + deletion, both of which are mutations. Bail
+      // out with the browser's default suppressed so right-click is
+      // a no-op rather than surfacing actions the visitor can't take.
+      if (isViewer) return;
       // Active multi-selection? Route to node menu, not tool palette.
       const allNodes =
         useWorkspaceStore.getState().current?.nodes ?? [];
@@ -850,7 +867,7 @@ const Inner = () => {
         flow,
       });
     },
-    [screenToFlowPosition],
+    [screenToFlowPosition, isViewer],
   );
 
   /** Right-click on a SINGLE node → small action menu (Download /
@@ -866,6 +883,9 @@ const Inner = () => {
       // tool palette — both would steal focus from our menu.
       e.preventDefault();
       e.stopPropagation();
+      // Viewer mode → no node-action menu (delete, duplicate, etc.
+      // are all mutations). Right-click becomes a silent no-op.
+      if (isViewer) return;
       // Always close the tool palette first (defensive — multiple
       // right-click variants in flight create stacked overlays).
       setContextMenu(null);
@@ -882,7 +902,7 @@ const Inner = () => {
         targetNodes,
       });
     },
-    [],
+    [isViewer],
   );
 
   /** Right-click on the multi-selection bounding box (React Flow's
@@ -2015,7 +2035,16 @@ const Inner = () => {
         onSelectionContextMenu={onSelectionContextMenu}
         onEdgeClick={onEdgeClick}
         isValidConnection={isValidConnection}
-        deleteKeyCode={DELETE_KEYS}
+        // Viewer mode locks the graph: nodes can't be dragged, new
+        // edges can't be drawn, the delete key is disabled. The
+        // canvas still PANS / ZOOMS (via the parent panOnDrag flag
+        // below) so the visitor can navigate around — they just
+        // can't change anything. Edges/nodes remain selectable so
+        // the click-to-open-lightbox affordance keeps working.
+        nodesDraggable={!isViewer}
+        nodesConnectable={!isViewer}
+        edgesUpdatable={!isViewer}
+        deleteKeyCode={isViewer ? null : DELETE_KEYS}
         fitView
         proOptions={PRO_OPTIONS}
         minZoom={0.25}
