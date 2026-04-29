@@ -30,6 +30,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useAuth } from "@/contexts/AuthContext";
 import WorkspaceTabBar from "@/components/workspace/WorkspaceTabBar";
+import CanvasHeader from "@/components/workspace/CanvasHeader";
 // Tool palette is replaced by the in-canvas floating sidebar (see
 // CanvasFloatingSidebar) + the right-click context menu (see
 // CanvasContextMenu). Both live inside WorkspaceCanvas and don't
@@ -280,6 +281,7 @@ const WorkspaceCanvasPage = () => {
           unmounting the React tree and leaving the user staring at a
           black void with no escape but F5. */}
       <WorkspaceErrorBoundary>
+        <CanvasHeader />
         <WorkspaceTabBar />
         <div className="flex flex-1 overflow-hidden">
           <main className="flex-1">

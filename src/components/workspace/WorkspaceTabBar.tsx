@@ -21,8 +21,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
-import { ChevronLeft, Plus, X, Check, CloudOff, Loader2 } from "lucide-react";
+import { Plus, X, Check, CloudOff, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import type { SaveState } from "./useCanvasAutosave";
@@ -177,22 +176,15 @@ const WorkspaceTabBar = () => {
     // the only visible separator is a hairline at the bottom. Tabs
     // are softer pills that don't try to look like document tabs
     // (the old "skeuomorphic" rounded-t-md card stack felt dated).
+    // Solid bg matches CanvasHeader above it so the two rows read
+    // as one continuous header — no glass/backdrop-blur, no
+    // hairline between them. The Back link moved to the new
+    // CanvasHeader; this row only holds tabs + the new-tab button
+    // + the autosave indicator.
     <div
-      className="flex h-11 shrink-0 items-center gap-1 bg-zinc-950/70 pl-2 pr-2 backdrop-blur-sm"
+      className="flex h-10 shrink-0 items-center gap-1 border-b border-white/[0.04] bg-[hsl(0_0%_4%)] pl-2 pr-2"
       style={{ fontFamily: "'Prompt', system-ui, sans-serif" }}
     >
-      {/* Back to dashboard — minimal pill rather than a chrome-style
-       *  link. */}
-      <Link
-        to="/app/workspace"
-        className="flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[11.5px] text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-100"
-        title="Back to workspaces"
-      >
-        <ChevronLeft className="h-3.5 w-3.5" />
-        Back
-      </Link>
-
-      <div className="mx-1 h-4 w-px bg-white/10" />
 
       <div
         ref={tabsScrollRef}
