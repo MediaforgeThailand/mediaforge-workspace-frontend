@@ -10,7 +10,7 @@
  * the chosen node at the drop position and immediately wires it up.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as Lucide from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -224,6 +224,47 @@ export function getPickerOptions(state: CanvasNodePickerState): PickerOption[] {
 }
 
 /* ────────────────────────────────────────────────────────────── */
+/* Grouping                                                        */
+/*                                                                 */
+/* Multiple compatible ports on the same target node type read as  */
+/* visual noise (three "Video Gen" rows differing only by hint).   */
+/* Roll those into a single parent row with a hover flyout listing */
+/* the ports.                                                      */
+/* ────────────────────────────────────────────────────────────── */
+
+interface PickerGroup {
+  key: string;
+  label: string;
+  icon: string;
+  children: PickerOption[];
+}
+
+/**
+ * Group picker options by `nodeType`, preserving first-seen order.
+ * Single-child groups stay collapsed (rendered as a flat leaf row);
+ * multi-child groups produce a parent row with a flyout submenu.
+ */
+function groupPickerOptions(opts: PickerOption[]): PickerGroup[] {
+  const order: string[] = [];
+  const map = new Map<string, PickerGroup>();
+  for (const opt of opts) {
+    let g = map.get(opt.nodeType);
+    if (!g) {
+      g = {
+        key: opt.nodeType,
+        label: opt.label,
+        icon: opt.icon,
+        children: [],
+      };
+      map.set(opt.nodeType, g);
+      order.push(opt.nodeType);
+    }
+    g.children.push(opt);
+  }
+  return order.map((k) => map.get(k)!);
+}
+
+/* ────────────────────────────────────────────────────────────── */
 /* UI                                                              */
 /* ────────────────────────────────────────────────────────────── */
 
@@ -236,34 +277,133 @@ interface Props {
 const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
+  // Which group key is currently expanded (showing flyout). null = none.
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
+  // Highlighted child index inside the open flyout (for keyboard nav).
+  const [childHighlight, setChildHighlight] = useState(0);
+  const rowRefs = useRef<Array<HTMLLIElement | null>>([]);
 
   const allOpts = useMemo(() => getPickerOptions(state), [state]);
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return allOpts;
+
+  const trimmedQuery = query.trim().toLowerCase();
+  const isSearching = trimmedQuery.length > 0;
+
+  // When searching: show a flat filtered list (no submenus) so users
+  // see every match inline. Otherwise: group by nodeType.
+  const filteredFlat = useMemo(() => {
+    if (!isSearching) return allOpts;
     return allOpts.filter(
       (o) =>
-        o.label.toLowerCase().includes(q) ||
-        o.portHint.toLowerCase().includes(q),
+        o.label.toLowerCase().includes(trimmedQuery) ||
+        o.portHint.toLowerCase().includes(trimmedQuery),
     );
-  }, [allOpts, query]);
+  }, [allOpts, trimmedQuery, isSearching]);
+
+  const groups = useMemo(() => groupPickerOptions(allOpts), [allOpts]);
+
+  // The visible rows in their current shape — flat options (when
+  // searching) or groups (when not). Used by keyboard nav to compute
+  // the highlight target.
+  const visibleRowCount = isSearching ? filteredFlat.length : groups.length;
+
+  // Reset highlight + close any open flyout when the visible list
+  // changes shape (e.g. user starts typing).
+  useEffect(() => {
+    setHighlight(0);
+    setOpenGroup(null);
+    setChildHighlight(0);
+  }, [isSearching]);
+
+  // Clamp highlight if the visible list shrinks underneath it.
+  useEffect(() => {
+    if (highlight >= visibleRowCount && visibleRowCount > 0) {
+      setHighlight(visibleRowCount - 1);
+    }
+  }, [visibleRowCount, highlight]);
+
+  const commit = (opt: PickerOption) => onPick(opt);
 
   const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setHighlight((i) => Math.min(filtered.length - 1, i + 1));
+      if (!isSearching && openGroup) {
+        const g = groups.find((x) => x.key === openGroup);
+        if (g) {
+          setChildHighlight((i) => Math.min(g.children.length - 1, i + 1));
+          return;
+        }
+      }
+      setHighlight((i) => Math.min(visibleRowCount - 1, i + 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
+      if (!isSearching && openGroup) {
+        setChildHighlight((i) => Math.max(0, i - 1));
+        return;
+      }
       setHighlight((i) => Math.max(0, i - 1));
+    } else if (e.key === "ArrowRight") {
+      if (isSearching) return;
+      const g = groups[highlight];
+      if (g && g.children.length > 1) {
+        e.preventDefault();
+        setOpenGroup(g.key);
+        setChildHighlight(0);
+      }
+    } else if (e.key === "ArrowLeft") {
+      if (openGroup) {
+        e.preventDefault();
+        setOpenGroup(null);
+        setChildHighlight(0);
+      }
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const opt = filtered[highlight];
-      if (opt) onPick(opt);
+      if (isSearching) {
+        const opt = filteredFlat[highlight];
+        if (opt) commit(opt);
+        return;
+      }
+      // Grouped mode: enter on parent → first child; enter on focused
+      // child (when flyout is open) → that child.
+      const g = groups[highlight];
+      if (!g) return;
+      if (openGroup === g.key && g.children[childHighlight]) {
+        commit(g.children[childHighlight]);
+      } else {
+        commit(g.children[0]);
+      }
     } else if (e.key === "Escape") {
       e.preventDefault();
-      onClose();
+      if (openGroup) {
+        setOpenGroup(null);
+        setChildHighlight(0);
+      } else {
+        onClose();
+      }
     }
   };
+
+  // Track the open group's parent row so the flyout can anchor its top
+  // edge to it. We measure on every render (cheap; offsetTop is sync).
+  // `useState` here so a row mounting after the flyout opens triggers
+  // a re-render with the correct offset.
+  const [flyoutAnchor, setFlyoutAnchor] = useState<{ top: number } | null>(null);
+  useEffect(() => {
+    if (!openGroup || isSearching) {
+      setFlyoutAnchor(null);
+      return;
+    }
+    const idx = groups.findIndex((g) => g.key === openGroup);
+    const el = rowRefs.current[idx];
+    if (!el) {
+      setFlyoutAnchor(null);
+      return;
+    }
+    // offsetTop is relative to the offsetParent — the <ul>. The picker
+    // root is positioned, so we add the <ul>'s own offsetTop too.
+    const ul = el.offsetParent as HTMLElement | null;
+    const ulTop = ul ? ul.offsetTop : 0;
+    setFlyoutAnchor({ top: ulTop + el.offsetTop });
+  }, [openGroup, isSearching, groups, query]);
 
   // Render through a portal to <body> so the picker positions in
   // viewport space, NOT inside the canvas DOM tree. The picker uses
@@ -292,6 +432,7 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
           transform: "translate(-12px, 6px)",
         }}
         onClick={(e) => e.stopPropagation()}
+        onMouseLeave={() => setOpenGroup(null)}
       >
         <div className="border-b border-zinc-800 px-2 py-1.5">
           <input
@@ -303,19 +444,20 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
             className="nodrag w-full rounded bg-transparent px-1.5 py-1 text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
           />
         </div>
-        <ul className="max-h-72 overflow-y-auto p-1">
-          {filtered.length === 0 ? (
+        <ul className="relative max-h-72 overflow-y-auto p-1">
+          {visibleRowCount === 0 ? (
             <li className="px-3 py-4 text-center text-xs italic text-zinc-500">
               No compatible node
             </li>
-          ) : (
-            filtered.map((opt, i) => {
+          ) : isSearching ? (
+            // Flat search-results list — no submenus, all matches inline.
+            filteredFlat.map((opt, i) => {
               const Icon = (Lucide as any)[opt.icon] ?? Lucide.Box;
               return (
                 <li key={`${opt.nodeType}-${opt.newNodeHandle}-${i}`}>
                   <button
                     type="button"
-                    onClick={() => onPick(opt)}
+                    onClick={() => commit(opt)}
                     onMouseEnter={() => setHighlight(i)}
                     className={cn(
                       "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs",
@@ -333,12 +475,111 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
                 </li>
               );
             })
+          ) : (
+            // Grouped list — parent rows, with optional hover flyout
+            // for groups that have 2+ ports.
+            groups.map((g, i) => {
+              const Icon = (Lucide as any)[g.icon] ?? Lucide.Box;
+              const hasChildren = g.children.length > 1;
+              const onlyChild = g.children[0];
+              return (
+                <li
+                  key={g.key}
+                  ref={(el) => {
+                    rowRefs.current[i] = el;
+                  }}
+                  onMouseEnter={() => {
+                    setHighlight(i);
+                    if (hasChildren) {
+                      setOpenGroup(g.key);
+                      setChildHighlight(0);
+                    } else {
+                      setOpenGroup(null);
+                    }
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => commit(g.children[0])}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs",
+                      i === highlight
+                        ? "bg-zinc-800 text-zinc-100"
+                        : "text-zinc-300 hover:bg-zinc-800/60",
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                    <span className="flex-1 truncate">{g.label}</span>
+                    {hasChildren ? (
+                      <Lucide.ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                    ) : (
+                      <span className="font-mono text-[10px] text-zinc-500">
+                        {onlyChild.portHint}
+                      </span>
+                    )}
+                  </button>
+                </li>
+              );
+            })
           )}
         </ul>
+
+        {/* Flyout panel — anchored to the right of the parent picker.
+            Rendered as a sibling so the open/close transition can be
+            scoped without re-laying out the parent list. */}
+        {!isSearching && openGroup
+          ? (() => {
+              const g = groups.find((x) => x.key === openGroup);
+              if (!g || g.children.length <= 1) return null;
+              return (
+                <div
+                  className="absolute left-full ml-2 w-52 rounded-lg border border-zinc-700 bg-zinc-950 shadow-xl"
+                  style={{
+                    top: flyoutAnchor ? flyoutAnchor.top : 0,
+                    animation: "canvas-picker-flyout-in 100ms ease-out",
+                  }}
+                  onMouseEnter={() => setOpenGroup(g.key)}
+                >
+                  <ul className="max-h-72 overflow-y-auto p-1">
+                    {g.children.map((opt, j) => {
+                      const ChildIcon = (Lucide as any)[opt.icon] ?? Lucide.Box;
+                      return (
+                        <li key={`${opt.nodeType}-${opt.newNodeHandle}-${j}`}>
+                          <button
+                            type="button"
+                            onClick={() => commit(opt)}
+                            onMouseEnter={() => setChildHighlight(j)}
+                            className={cn(
+                              "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs",
+                              j === childHighlight
+                                ? "bg-zinc-800 text-zinc-100"
+                                : "text-zinc-300 hover:bg-zinc-800/60",
+                            )}
+                          >
+                            <ChildIcon className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                            <span className="flex-1 truncate">
+                              {opt.portHint.replace(/^→\s*/, "")}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              );
+            })()
+          : null}
+
         <div className="border-t border-zinc-800 px-2 py-1 text-[10px] text-zinc-500">
-          ↑↓ to navigate · ⏎ to add · esc to cancel
+          ↑↓ to navigate · → to expand · ⏎ to add · esc to cancel
         </div>
       </div>
+      <style>{`
+        @keyframes canvas-picker-flyout-in {
+          from { opacity: 0; transform: translateX(4px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+      `}</style>
     </>,
     document.body,
   );
