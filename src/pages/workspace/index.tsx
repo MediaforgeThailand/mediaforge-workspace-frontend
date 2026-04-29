@@ -265,7 +265,7 @@ const WorkspaceDashboardInner = () => {
       style={{ fontFamily: "'Prompt', system-ui, sans-serif" }}
     >
       <WorkspaceSidebar active={section} onNavigate={setSection} />
-      <main className="flex flex-1 flex-col overflow-hidden">
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {section === "home" && <HomeView onSection={setSection} />}
         {section === "spaces" && <SpacesView />}
         {section !== "home" && section !== "spaces" && (
@@ -453,9 +453,9 @@ const HomeView = ({ onSection }: { onSection: (s: Section) => void }) => {
       <PageHeader title="Home" rightSlot={<UserMenu />} />
 
       <div className="ws-scroll-hide flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1400px] px-8 pb-16 pt-6">
+        <div className="mx-auto w-full max-w-[1400px] px-4 pb-16 pt-5 md:px-6 lg:px-8 lg:pt-6">
           {/* ── Top trio: Projects · Spaces · Tools ───────────── */}
-          <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.4fr_1fr]">
+          <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.4fr_1fr]">
             <ProjectsCard projects={MOCK_PROJECTS} />
             <SpacesShowcaseCard
               spaces={recentSpaces}
@@ -471,7 +471,7 @@ const HomeView = ({ onSection }: { onSection: (s: Section) => void }) => {
             <button
               type="button"
               onClick={() => onSection("spaces")}
-              className="flex items-center gap-1.5 text-[13px] font-medium text-zinc-300 transition-colors hover:text-white"
+              className="flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-zinc-300 transition-colors hover:text-white lg:min-h-0"
             >
               My work
               <ChevronRight className="h-3.5 w-3.5 text-zinc-500" />
@@ -479,7 +479,7 @@ const HomeView = ({ onSection }: { onSection: (s: Section) => void }) => {
           </div>
 
           {/* ── Editorial tabs ────────────────────────────────── */}
-          <div className="mt-6 flex items-center justify-center gap-6 border-b border-white/[0.06]">
+          <div className="mt-6 flex items-center justify-center gap-3 overflow-x-auto border-b border-white/[0.06] sm:gap-6">
             <TabBtn
               label="What's new"
               active={newsTab === "news"}
@@ -523,7 +523,7 @@ const ProjectsCard = ({ projects }: { projects: MockProject[] }) => (
         title="New project (mockup)"
         className="rounded-md p-1 text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white"
       >
-        <Plus className="h-3.5 w-3.5" />
+        <Plus className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
       </button>
     </div>
 
@@ -532,7 +532,7 @@ const ProjectsCard = ({ projects }: { projects: MockProject[] }) => (
         <li key={p.id}>
           <button
             type="button"
-            className="flex h-9 w-full items-center gap-2.5 rounded-md px-2 text-[12.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white"
+            className="flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 text-[12.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white lg:min-h-9"
           >
             <span
               className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px]"
@@ -592,7 +592,7 @@ const SpacesShowcaseCard = ({
         type="button"
         onClick={onNew}
         title="New space"
-        className="rounded-md p-1 text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white"
+        className="flex h-10 w-10 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white lg:h-8 lg:w-8"
       >
         <Plus className="h-3.5 w-3.5" />
       </button>
@@ -602,7 +602,7 @@ const SpacesShowcaseCard = ({
       <button
         type="button"
         onClick={onNew}
-        className="flex h-[150px] w-full items-center justify-center rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] text-[12px] text-zinc-500 transition-colors hover:border-white/[0.20] hover:bg-white/[0.04] hover:text-zinc-200"
+        className="flex min-h-[150px] w-full items-center justify-center rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] px-4 text-[12px] text-zinc-500 transition-colors hover:border-white/[0.20] hover:bg-white/[0.04] hover:text-zinc-200"
       >
         + Create your first space
       </button>
@@ -613,7 +613,7 @@ const SpacesShowcaseCard = ({
             key={ws.id}
             type="button"
             onClick={() => onOpen(ws.id)}
-            className="group/space flex w-[180px] shrink-0 flex-col gap-2 rounded-xl bg-[hsl(0_0%_4%)] p-1.5 ring-1 ring-inset ring-white/[0.05] transition-all hover:ring-white/[0.14]"
+            className="group/space flex w-[200px] shrink-0 flex-col gap-2 rounded-xl bg-[hsl(0_0%_4%)] p-1.5 ring-1 ring-inset ring-white/[0.05] transition-all hover:ring-white/[0.14] lg:w-[180px]"
           >
             <div className="aspect-[4/3] overflow-hidden rounded-lg bg-[hsl(0_0%_2%)]">
               <CanvasMinimap nodes={ws.nodes} edges={ws.edges} />
@@ -650,7 +650,7 @@ const ToolsCard = ({ tools }: { tools: MockTool[] }) => (
         <li key={t.id}>
           <button
             type="button"
-            className="group/tool flex h-9 w-full items-center gap-2.5 rounded-md px-2 text-[12.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white"
+            className="group/tool flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 text-[12.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white lg:min-h-9"
           >
             <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/[0.05] ring-1 ring-inset ring-white/[0.08]">
               <t.icon className="h-3 w-3 text-zinc-300" />
@@ -684,7 +684,7 @@ const TabBtn = ({
     type="button"
     onClick={onClick}
     className={cn(
-      "relative h-9 px-1 text-[12.5px] transition-colors",
+      "relative h-11 shrink-0 px-3 text-[12.5px] transition-colors lg:h-9 lg:px-1",
       active ? "text-zinc-50" : "text-zinc-500 hover:text-zinc-200",
     )}
   >
@@ -999,10 +999,10 @@ const SpacesView = () => {
       />
 
       <div className="ws-scroll-hide flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1400px] px-8 pb-16 pt-10">
+        <div className="mx-auto max-w-[1400px] px-4 pb-16 pt-6 md:px-6 lg:px-8 lg:pt-10">
           {/* ── Hero header — big title + subtitle ─────────────── */}
           <header className="mb-8">
-            <h1 className="text-[44px] md:text-[56px] font-bold leading-none tracking-tight text-zinc-50">
+            <h1 className="text-[40px] font-bold leading-none tracking-tight text-zinc-50 md:text-[48px] lg:text-[56px]">
               Spaces
             </h1>
             <p className="mt-3 text-[14px] text-zinc-400">
@@ -1020,7 +1020,7 @@ const SpacesView = () => {
               <button
                 type="button"
                 onClick={handleNew}
-                className="flex h-9 items-center gap-1.5 rounded-lg bg-white/[0.06] px-3.5 text-[13px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.12]"
+                className="flex h-11 items-center gap-1.5 rounded-lg bg-white/[0.06] px-3.5 text-[13px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.12] lg:h-9"
               >
                 <Plus className="h-3.5 w-3.5" /> New space
               </button>
@@ -1101,7 +1101,7 @@ const SpacesTabs = ({
             type="button"
             onClick={() => onChange(it.key)}
             className={cn(
-              "flex h-8 items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-medium transition-colors",
+              "flex h-11 items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-medium transition-colors lg:h-8",
               active
                 ? "bg-white/[0.08] text-zinc-50 ring-1 ring-inset ring-white/[0.06]"
                 : "text-zinc-400 hover:text-zinc-200",
@@ -1129,7 +1129,7 @@ const SpacesIconBtn = ({
     type="button"
     title={title}
     aria-label={title}
-    className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.03] text-zinc-400 ring-1 ring-inset ring-white/[0.05] transition-colors hover:bg-white/[0.08] hover:text-zinc-100"
+    className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/[0.03] text-zinc-400 ring-1 ring-inset ring-white/[0.05] transition-colors hover:bg-white/[0.08] hover:text-zinc-100 lg:h-9 lg:w-9"
   >
     <Icon className="h-3.5 w-3.5" />
   </button>
@@ -1191,7 +1191,7 @@ const SpaceCard = ({
       </div>
     </button>
 
-    <div className="pointer-events-none absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+    <div className="pointer-events-auto absolute right-2 top-2 flex gap-1 opacity-100 transition-opacity lg:pointer-events-none lg:opacity-0 lg:group-hover:pointer-events-auto lg:group-hover:opacity-100">
       <ActionButton title="Rename" onClick={(e) => { e.stopPropagation(); onRename(); }} icon={Pencil} />
       <ActionButton title="Duplicate" onClick={(e) => { e.stopPropagation(); onDuplicate(); }} icon={Copy} />
       <ActionButton title="Delete" danger onClick={(e) => { e.stopPropagation(); onDelete(); }} icon={Trash2} />
@@ -1215,7 +1215,7 @@ const ActionButton = ({
     onClick={onClick}
     title={title}
     className={cn(
-      "rounded-md bg-black/65 p-1.5 text-zinc-300 backdrop-blur transition-colors hover:bg-black/85 hover:text-white",
+      "flex h-10 w-10 items-center justify-center rounded-md bg-black/65 text-zinc-300 backdrop-blur transition-colors hover:bg-black/85 hover:text-white lg:h-auto lg:w-auto lg:p-1.5",
       danger && "hover:text-red-400",
     )}
   >
@@ -1234,7 +1234,7 @@ const PageHeader = ({
   title: string;
   rightSlot?: React.ReactNode;
 }) => (
-  <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/5 px-8">
+  <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/5 px-4 md:px-6 lg:h-12 lg:px-8">
     <h1 className="text-[14px] font-medium tracking-tight text-zinc-300">
       {title}
     </h1>
@@ -1302,14 +1302,14 @@ const EmptyState = ({
   hint: string;
   cta?: { label: string; onClick: () => void };
 }) => (
-  <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-10 py-20 text-center">
+  <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-5 py-14 text-center md:px-10 md:py-20">
     <div className="text-[15px] font-semibold text-zinc-200">{title}</div>
     <p className="mt-2 text-[12.5px] text-zinc-500">{hint}</p>
     {cta && (
       <button
         type="button"
         onClick={cta.onClick}
-        className="mt-5 inline-flex items-center gap-1.5 rounded-md bg-white/[0.08] px-3 py-1.5 text-[12px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.10] transition-colors hover:bg-white/[0.12]"
+        className="mt-5 inline-flex min-h-11 items-center gap-1.5 rounded-md bg-white/[0.08] px-4 text-[12px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.10] transition-colors hover:bg-white/[0.12] lg:min-h-0 lg:py-1.5"
       >
         <Plus className="h-3.5 w-3.5" />
         {cta.label}

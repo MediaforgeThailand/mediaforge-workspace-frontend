@@ -55,14 +55,14 @@ const CanvasHeader = () => {
 
   return (
     <div
-      className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-white/[0.04] bg-[hsl(0_0%_4%)] px-3"
+      className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-white/[0.04] bg-[hsl(0_0%_4%)] px-3 lg:h-12"
       style={{ fontFamily: "'Prompt', system-ui, sans-serif" }}
     >
       {/* Left — back arrow + breadcrumb */}
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <Link
           to="/app/workspace"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-100"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-100 lg:h-8 lg:w-8"
           title="Back to dashboard"
           aria-label="Back to dashboard"
         >
@@ -72,7 +72,7 @@ const CanvasHeader = () => {
         {/* Project chip — coloured square + label */}
         <button
           type="button"
-          className="flex h-8 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-[12.5px] text-zinc-200 transition-colors hover:bg-white/[0.04]"
+          className="flex h-10 shrink-0 items-center gap-1.5 rounded-md px-2 text-[12.5px] text-zinc-200 transition-colors hover:bg-white/[0.04] lg:h-8 lg:px-1.5"
           title={`Project: ${projectLabel} (mockup)`}
         >
           <span
@@ -99,7 +99,7 @@ const CanvasHeader = () => {
           <button
             type="button"
             onClick={() => setShareOpen(true)}
-            className="flex h-8 items-center gap-1.5 rounded-md bg-white px-3 text-[12px] font-medium text-zinc-900 transition-colors hover:bg-zinc-200"
+            className="flex h-10 items-center gap-1.5 rounded-md bg-white px-3 text-[12px] font-medium text-zinc-900 transition-colors hover:bg-zinc-200 lg:h-8"
             title="Share workspace"
           >
             <Users className="h-3.5 w-3.5" />

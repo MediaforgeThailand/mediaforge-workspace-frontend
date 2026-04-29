@@ -303,7 +303,7 @@ const WorkspaceCanvasPage = () => {
         <CanvasHeader />
         <ShareModeBanner />
         <div className="flex flex-1 overflow-hidden">
-          <main className="flex-1">
+          <main className="min-w-0 flex-1">
             {/* Share-token resolution gates the canvas when the URL
              *  carries a `?share=` param. error → invalid screen;
              *  resolving / redirecting → loading state; ok / no-token

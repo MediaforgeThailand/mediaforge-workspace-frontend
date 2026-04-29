@@ -133,13 +133,13 @@ export default function WorkspaceSidebar({
   };
 
   return (
-    <aside className="flex h-full w-[228px] shrink-0 flex-col border-r border-white/5 bg-[hsl(0_0%_4%)]">
+    <aside className="ws-scroll-hide flex h-full w-[212px] shrink-0 flex-col overflow-y-auto border-r border-white/5 bg-[hsl(0_0%_4%)] lg:w-[228px]">
       {/* ── Brand row — PSC : Digital Media ──────────────────────
        *  Logo lives at /public/psc-logo.png. Save the orange
        *  Digital Media wordmark there; the full lockup is wide
        *  so we use object-contain to fit the 34px square slot
        *  without distorting the trefoil + wordmark proportions. */}
-      <div className="flex h-14 shrink-0 items-center px-4">
+      <div className="flex h-14 shrink-0 items-center px-3 lg:px-4">
         <button
           type="button"
           onClick={() => navigate("/app/workspace")}
@@ -166,7 +166,7 @@ export default function WorkspaceSidebar({
           type="button"
           onClick={handleCreate}
           className={cn(
-            "flex h-9 w-full items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-white",
+            "flex h-11 w-full items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-white lg:h-9",
             "bg-gradient-to-b from-[#ff3d8e] to-[#e8327f] shadow-[0_2px_8px_-2px_rgba(255,61,142,0.45)]",
             "transition-[transform,box-shadow] hover:from-[#ff4da0] hover:to-[#ef3a8c] hover:shadow-[0_4px_12px_-2px_rgba(255,61,142,0.55)]",
             "active:scale-[0.98]",
@@ -232,7 +232,7 @@ export default function WorkspaceSidebar({
           <button
             type="button"
             onClick={() => navigate("/app/university")}
-            className="flex h-9 w-full items-center gap-2.5 rounded-md border border-fuchsia-400/25 bg-fuchsia-500/10 px-2.5 text-[12.5px] font-semibold text-fuchsia-100 transition-colors hover:bg-fuchsia-500/18 hover:text-white"
+            className="flex h-11 w-full items-center gap-2.5 rounded-md border border-fuchsia-400/25 bg-fuchsia-500/10 px-2.5 text-[12.5px] font-semibold text-fuchsia-100 transition-colors hover:bg-fuchsia-500/18 hover:text-white lg:h-9"
             title="PSC college demo"
           >
             <School className="h-3.5 w-3.5" />
@@ -271,7 +271,7 @@ const OrgAdminLink = () => {
       <button
         type="button"
         onClick={() => navigate("/app/org-admin")}
-        className="flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-[12.5px] text-amber-200/90 hover:bg-amber-300/10 hover:text-amber-100 transition-colors"
+        className="flex h-11 w-full items-center gap-2.5 rounded-md px-2.5 text-[12.5px] text-amber-200/90 transition-colors hover:bg-amber-300/10 hover:text-amber-100 lg:h-9"
         title="Manage organisation members and credits"
       >
         <Crown className="h-3.5 w-3.5" />
@@ -280,7 +280,7 @@ const OrgAdminLink = () => {
       <button
         type="button"
         onClick={() => navigate("/app/org-admin/pricing")}
-        className="flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 text-[12px] text-amber-200/70 hover:bg-amber-300/10 hover:text-amber-100 transition-colors"
+        className="flex h-10 w-full items-center gap-2.5 rounded-md px-2.5 text-[12px] text-amber-200/70 transition-colors hover:bg-amber-300/10 hover:text-amber-100 lg:h-8"
         title="Edit credit costs for AI models"
       >
         <Coins className="h-3.5 w-3.5" />
@@ -289,7 +289,7 @@ const OrgAdminLink = () => {
       <button
         type="button"
         onClick={() => navigate("/app/org-admin/branding")}
-        className="flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-[12.5px] text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100 transition-colors"
+        className="flex h-11 w-full items-center gap-2.5 rounded-md px-2.5 text-[12.5px] text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-100 lg:h-9"
         title="Logo, short name, and subdomains"
       >
         <Palette className="h-3.5 w-3.5" />
@@ -314,7 +314,7 @@ const NavLink = ({
     type="button"
     onClick={onClick}
     className={cn(
-      "flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-colors",
+      "flex h-10 items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-colors lg:h-9",
       active
         ? "bg-white/[0.07] text-zinc-50 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.05)]"
         : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100",
@@ -347,7 +347,7 @@ const UtilityBtn = ({
     title={title}
     aria-label={title}
     onClick={onClick}
-    className="relative flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-100"
+    className="relative flex h-10 w-10 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-100 lg:h-8 lg:w-8"
   >
     <Icon className="h-4 w-4" />
     {badge && (

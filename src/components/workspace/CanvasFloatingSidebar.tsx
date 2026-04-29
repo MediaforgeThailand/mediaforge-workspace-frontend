@@ -164,14 +164,8 @@ const CanvasFloatingSidebar = ({ onAddNode, onOpenSettings }: Props) => {
     // pointer events. Lets right-click pass through to the canvas
     // when the user aims at the gap above/below the pill.
     //
-    // `zoom: 0.8` shrinks just THIS rail to ~80% of its native size
-    // so the floating chrome reads as light scaffolding next to the
-    // canvas content. Buttons stay clickable — `zoom` keeps
-    // hit-testing in sync with the rendered geometry, unlike CSS
-    // `transform` which would offset click coordinates.
     <div
-      className="pointer-events-none fixed left-3 top-1/2 z-40 -translate-y-1/2"
-      style={{ zoom: 0.8 }}
+      className="pointer-events-none fixed left-4 top-1/2 z-40 -translate-y-1/2 lg:left-3"
     >
       <div className="pointer-events-auto flex flex-col items-center gap-1 rounded-full border border-zinc-800 bg-zinc-950/85 p-1 shadow-xl shadow-black/40 backdrop-blur">
         {BUTTONS.map((b, i) => (
@@ -216,7 +210,7 @@ function SidebarButton({
         aria-label={button.label}
         aria-pressed={button.isMode ? isActive : undefined}
         className={cn(
-          "flex h-9 w-9 items-center justify-center rounded-full transition-colors",
+          "flex h-11 w-11 items-center justify-center rounded-full transition-colors lg:h-9 lg:w-9",
           isActive
             ? "bg-zinc-200 text-zinc-900"
             : "text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100",

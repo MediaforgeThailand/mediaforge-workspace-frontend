@@ -56,10 +56,10 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="flex h-8 w-8 items-center justify-center rounded-full ring-1 ring-inset ring-white/[0.08] transition-all hover:ring-white/[0.18] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40"
+        className="flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-inset ring-white/[0.08] transition-all hover:ring-white/[0.18] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40 lg:h-8 lg:w-8"
         aria-label="Account menu"
       >
-        <Avatar className="h-8 w-8">
+        <Avatar className="h-10 w-10 lg:h-8 lg:w-8">
           <AvatarImage src={profile?.avatar_url ?? undefined} alt="" />
           <AvatarFallback className="bg-gradient-to-br from-fuchsia-500/40 to-violet-600/40 text-[11px] font-semibold text-white">
             {initial}
@@ -99,7 +99,7 @@ export function UserMenu() {
           <button
             type="button"
             onClick={() => navigate("/app/pricing")}
-            className="flex w-full items-center justify-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[12.5px] font-medium text-white shadow-sm transition-colors hover:bg-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/60"
+            className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-md bg-violet-600 px-3 text-[12.5px] font-medium text-white shadow-sm transition-colors hover:bg-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/60 lg:min-h-0 lg:py-1.5"
           >
             <Sparkles className="h-3.5 w-3.5" />
             Upgrade
@@ -113,7 +113,7 @@ export function UserMenu() {
          *  reference layout (loud CTA + quiet row). */}
         <DropdownMenuItem
           onSelect={() => navigate("/app/settings")}
-          className="cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50"
+          className="min-h-11 cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50 lg:min-h-0"
         >
           <SettingsIcon className="h-3.5 w-3.5 text-zinc-400" />
           Settings
@@ -121,7 +121,7 @@ export function UserMenu() {
 
         <DropdownMenuItem
           onSelect={() => navigate("/app/pricing")}
-          className="cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50"
+          className="min-h-11 cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50 lg:min-h-0"
         >
           <CreditCard className="h-3.5 w-3.5 text-zinc-400" />
           Plan &amp; billing
@@ -140,7 +140,7 @@ export function UserMenu() {
             e.preventDefault();
             setTheme(theme === "dark" ? "light" : "dark");
           }}
-          className="cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50"
+          className="min-h-11 cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50 lg:min-h-0"
         >
           {theme === "dark" ? (
             <Sun className="h-3.5 w-3.5 text-zinc-400" />
@@ -154,7 +154,7 @@ export function UserMenu() {
 
         <DropdownMenuItem
           onSelect={handleSignOut}
-          className="cursor-pointer gap-2 text-[12.5px] text-red-300 focus:bg-red-500/10 focus:text-red-200"
+          className="min-h-11 cursor-pointer gap-2 text-[12.5px] text-red-300 focus:bg-red-500/10 focus:text-red-200 lg:min-h-0"
         >
           <LogOut className="h-3.5 w-3.5" />
           Sign out
