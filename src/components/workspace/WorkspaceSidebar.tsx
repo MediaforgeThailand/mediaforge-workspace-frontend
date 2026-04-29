@@ -1,26 +1,48 @@
 /**
- * Workspace sidebar — shared chrome for the dashboard, account pages,
- * and any other surface that wants the workspace shell.
+ * Workspace sidebar — Magnific-style. Two stacked nav groups + a
+ * bottom utility row, all on a deep-black surface that matches the
+ * canvas chrome.
  *
- * Behaviour:
- *  • If `onNavigate` is provided, clicks call it with the section key.
- *    The dashboard uses this to drive its own internal section state
- *    without round-tripping through the URL.
- *  • If `onNavigate` is omitted, clicks router-navigate to
- *    `/app/workspace?section=<id>`. The dashboard reads that param on
- *    mount, so jumping in from /app/settings (or /app/pricing) lands
- *    on the correct section.
+ * Layout:
+ *   1. Brand row — workspace mascot + wordmark
+ *   2. "Create" button (primary action, pink/magenta solid pill)
+ *   3. Top nav group — Home, Search, Stock, Community, Projects
+ *   4. Section divider with "ALL TOOLS" label
+ *   5. Tools nav group — Spaces, Image / Video / Voice gen, Assistant
+ *   6. Bottom utility cluster — Settings, Notifications, Theme, More
  *
- * The sidebar is intentionally dumb about routing — it doesn't know
- * which page it's on. Pass `active` to highlight a section.
+ * Behaviour notes:
+ *   • If `onNavigate` is provided, clicks drive parent state without
+ *     a router round-trip (the dashboard uses this).
+ *   • Otherwise clicks navigate to /app/workspace?section=<id> so
+ *     deep-linking from /app/settings still lands on the right tab.
+ *   • The sidebar is intentionally dumb about routing: pass `active`
+ *     to highlight the current section.
+ *
+ * Design tokens (kept in this file so the chrome can drift slightly
+ * from the rest of the app without touching shared CSS):
+ *   • Surface           hsl(0 0% 4%)         — deep black
+ *   • Active pill       white/[0.07] + ring  — soft white on hover
+ *   • Hover pill        white/[0.04]
+ *   • Section header    zinc-500, 11px, uppercase, 4px letter-spacing
+ *   • Create button     #FF3D8E → #FF4DA0 gradient (workspace pink)
  */
 import {
   Home as HomeIcon,
-  Workflow,
+  Search,
+  Library,
   Globe,
   FolderKanban,
-  Boxes,
-  Library,
+  Workflow,
+  Image as ImageIcon,
+  Video,
+  Mic2,
+  MessageSquare,
+  Plus,
+  Settings as SettingsIcon,
+  Bell,
+  Sun,
+  MoreHorizontal,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -28,22 +50,31 @@ import { cn } from "@/lib/utils";
 
 export type SectionKey =
   | "home"
-  | "spaces"
+  | "search"
+  | "stock"
   | "community"
   | "projects"
-  | "tools"
-  | "stock";
+  | "spaces"
+  | "image_gen"
+  | "video_gen"
+  | "voice_gen"
+  | "assistant"
+  | "tools"; // legacy "All tools" placeholder — still accepted
 
 const NAV_TOP: Array<{ id: SectionKey; label: string; icon: LucideIcon }> = [
-  { id: "home", label: "Home", icon: HomeIcon },
-  { id: "spaces", label: "Spaces", icon: Workflow },
-  { id: "community", label: "Community", icon: Globe },
-  { id: "projects", label: "Projects", icon: FolderKanban },
+  { id: "home",       label: "Home",       icon: HomeIcon },
+  { id: "search",     label: "Search",     icon: Search },
+  { id: "stock",      label: "Stock",      icon: Library },
+  { id: "community",  label: "Community",  icon: Globe },
+  { id: "projects",   label: "Projects",   icon: FolderKanban },
 ];
 
-const NAV_BOTTOM: Array<{ id: SectionKey; label: string; icon: LucideIcon }> = [
-  { id: "tools", label: "All tools", icon: Boxes },
-  { id: "stock", label: "Stock", icon: Library },
+const NAV_TOOLS: Array<{ id: SectionKey; label: string; icon: LucideIcon }> = [
+  { id: "spaces",     label: "Spaces",          icon: Workflow },
+  { id: "image_gen",  label: "Image Generator", icon: ImageIcon },
+  { id: "video_gen",  label: "Video Generator", icon: Video },
+  { id: "voice_gen",  label: "Voice Generator", icon: Mic2 },
+  { id: "assistant",  label: "Assistant",       icon: MessageSquare },
 ];
 
 export interface WorkspaceSidebarProps {
@@ -53,55 +84,72 @@ export interface WorkspaceSidebarProps {
   /** When provided, sidebar clicks call this instead of router-
    *  navigating. The dashboard uses this to drive internal state. */
   onNavigate?: (s: SectionKey) => void;
+  /** Click handler for the prominent "Create" button at the top of
+   *  the sidebar. Defaults to opening a new space when omitted. */
+  onCreate?: () => void;
 }
 
 export default function WorkspaceSidebar({
   active,
   onNavigate,
+  onCreate,
 }: WorkspaceSidebarProps) {
   const navigate = useNavigate();
 
   const handleClick = (s: SectionKey) => {
-    if (onNavigate) {
-      onNavigate(s);
-    } else {
-      navigate(`/app/workspace?section=${s}`);
-    }
+    if (onNavigate) onNavigate(s);
+    else navigate(`/app/workspace?section=${s}`);
+  };
+
+  const handleCreate = () => {
+    if (onCreate) onCreate();
+    // Default — jump to spaces and let the user kick off "+ New space"
+    // there. The dashboard SpacesView's New-space button is the
+    // canonical create action; this just gets them in front of it.
+    else handleClick("spaces");
   };
 
   return (
     <aside className="flex h-full w-[228px] shrink-0 flex-col border-r border-white/5 bg-[hsl(0_0%_4%)]">
-      {/* Brand row — clicking the wordmark always returns to the
-       *  dashboard regardless of `onNavigate`. Account/Pricing pages
-       *  expect this; the dashboard already highlights Home so the
-       *  side-effect of clicking it from there is harmless. */}
-      <div className="flex h-12 items-center justify-between px-4">
+      {/* ── Brand row — PSC : Digital Media ──────────────────────
+       *  Logo lives at /public/psc-logo.png. Save the orange
+       *  Digital Media wordmark there; the full lockup is wide
+       *  so we use object-contain to fit the 34px square slot
+       *  without distorting the trefoil + wordmark proportions. */}
+      <div className="flex h-14 shrink-0 items-center px-4">
         <button
           type="button"
           onClick={() => navigate("/app/workspace")}
-          className="flex items-center gap-2 text-[13.5px] font-semibold tracking-tight text-zinc-50 transition-colors hover:text-white"
+          className="flex items-center gap-2 text-[13px] font-semibold tracking-tight text-zinc-50 transition-colors hover:text-white"
         >
-          {/* Mascot logo replaces the older gradient "M" tile. The
-           *  cat face was supplied by design; sits in /public so
-           *  Vite serves it at /mascot-logo.png without bundling.
-           *  Slightly larger (h-7 w-7) than the old square because
-           *  the rendered cat reads small at 24 px. */}
-          {/* Logo size bumped 20% (h-7 → h-[34px]) per design ask. The
-           *  brand chip needs to read at a glance against the sidebar
-           *  text; 28 px felt undersized once the cat PNG replaced
-           *  the gradient "M" tile. */}
           <img
-            src="/mascot-logo.png"
-            alt=""
-            className="h-[34px] w-[34px] shrink-0 select-none"
+            src="/psc-logo.png"
+            alt="PSC Digital Media"
+            className="h-[34px] w-[34px] shrink-0 select-none object-contain"
             draggable={false}
           />
-          Workspace
+          <span className="leading-tight">PSC : Digital Media</span>
         </button>
       </div>
 
-      {/* Top group — primary surfaces */}
-      <nav className="flex flex-col gap-0.5 px-3 pt-2 pb-1">
+      {/* ── Create button (primary action) ─────────────────────── */}
+      <div className="px-3 pb-2 pt-1">
+        <button
+          type="button"
+          onClick={handleCreate}
+          className={cn(
+            "flex h-9 w-full items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-white",
+            "bg-gradient-to-b from-[#ff3d8e] to-[#e8327f] shadow-[0_2px_8px_-2px_rgba(255,61,142,0.45)]",
+            "transition-[transform,box-shadow] hover:from-[#ff4da0] hover:to-[#ef3a8c] hover:shadow-[0_4px_12px_-2px_rgba(255,61,142,0.55)]",
+            "active:scale-[0.98]",
+          )}
+        >
+          <Plus className="h-3.5 w-3.5" /> Create
+        </button>
+      </div>
+
+      {/* ── Top nav group ──────────────────────────────────────── */}
+      <nav className="flex flex-col gap-0.5 px-3 pb-2 pt-1">
         {NAV_TOP.map((it) => (
           <NavLink
             key={it.id}
@@ -113,11 +161,16 @@ export default function WorkspaceSidebar({
         ))}
       </nav>
 
-      <div className="mx-4 my-3 h-px bg-white/[0.06]" />
+      {/* ── Section divider with label ─────────────────────────── */}
+      <div className="px-5 pb-1.5 pt-3">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+          All tools
+        </div>
+      </div>
 
-      {/* Bottom group — utility surfaces */}
+      {/* ── Tools nav group ────────────────────────────────────── */}
       <nav className="flex flex-col gap-0.5 px-3">
-        {NAV_BOTTOM.map((it) => (
+        {NAV_TOOLS.map((it) => (
           <NavLink
             key={it.id}
             label={it.label}
@@ -128,8 +181,12 @@ export default function WorkspaceSidebar({
         ))}
       </nav>
 
-      <div className="mt-auto px-4 py-3 text-[10.5px] text-zinc-600">
-        v1.5 · workspace
+      {/* ── Bottom utility row ─────────────────────────────────── */}
+      <div className="mt-auto flex items-center gap-1 px-3 pb-3 pt-4">
+        <UtilityBtn icon={SettingsIcon} title="Settings" onClick={() => navigate("/app/settings")} />
+        <UtilityBtn icon={Bell} title="Notifications" badge />
+        <UtilityBtn icon={Sun} title="Theme" />
+        <UtilityBtn icon={MoreHorizontal} title="More" />
       </div>
     </aside>
   );
@@ -150,13 +207,44 @@ const NavLink = ({
     type="button"
     onClick={onClick}
     className={cn(
-      "flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[12.5px] transition-colors",
+      "flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-colors",
       active
         ? "bg-white/[0.07] text-zinc-50 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.05)]"
         : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100",
     )}
   >
-    <Icon className="h-3.5 w-3.5" />
+    <Icon className="h-4 w-4 shrink-0" />
     {label}
+  </button>
+);
+
+/**
+ * Bottom-row utility button. Square, 32px, monochrome — the row sits
+ * at the bottom of the sidebar where Magnific puts settings/bell/
+ * theme. The optional `badge` shows a tiny dot at the top-right
+ * (used for the notifications bell).
+ */
+const UtilityBtn = ({
+  icon: Icon,
+  title,
+  onClick,
+  badge,
+}: {
+  icon: LucideIcon;
+  title: string;
+  onClick?: () => void;
+  badge?: boolean;
+}) => (
+  <button
+    type="button"
+    title={title}
+    aria-label={title}
+    onClick={onClick}
+    className="relative flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-100"
+  >
+    <Icon className="h-4 w-4" />
+    {badge && (
+      <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-rose-400 ring-2 ring-[hsl(0_0%_4%)]" />
+    )}
   </button>
 );
