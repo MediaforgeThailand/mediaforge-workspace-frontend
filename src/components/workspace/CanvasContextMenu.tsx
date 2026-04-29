@@ -269,6 +269,14 @@ interface Props {
 
 const PANEL_WIDTH = 360;
 const PANEL_MAX_HEIGHT = 540;
+/* Visual scale applied via CSS `transform: scale()` with the
+ * top-left as the origin. Keeps the design tokens (paddings, gaps,
+ * radii, font-sizes) untouched so the proportions still match the
+ * Figma spec, while making the whole panel land smaller on screen.
+ * 0.8 = 20 % smaller — what the team asked for. */
+const PANEL_SCALE = 0.8;
+const PANEL_VISUAL_WIDTH = PANEL_WIDTH * PANEL_SCALE;
+const PANEL_VISUAL_MAX_HEIGHT = PANEL_MAX_HEIGHT * PANEL_SCALE;
 
 const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
   const [query, setQuery] = useState("");
@@ -296,13 +304,15 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
     setHighlight(0);
   }, [query, active]);
 
+  // Clamp using the VISUAL (post-scale) footprint so the right /
+  // bottom edge guard accounts for the actual rendered size.
   const left = Math.min(
     state.screen.x,
-    Math.max(8, window.innerWidth - PANEL_WIDTH - 8),
+    Math.max(8, window.innerWidth - PANEL_VISUAL_WIDTH - 8),
   );
   const top = Math.min(
     state.screen.y,
-    Math.max(8, window.innerHeight - PANEL_MAX_HEIGHT - 8),
+    Math.max(8, window.innerHeight - PANEL_VISUAL_MAX_HEIGHT - 8),
   );
 
   const fire = (it: ToolItem) => {
@@ -372,6 +382,14 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
           width: PANEL_WIDTH,
           maxHeight: PANEL_MAX_HEIGHT,
           fontFamily: "'Prompt', system-ui, sans-serif",
+          // CSS `transform: scale` shrinks the entire panel uniformly.
+          // `transform-origin: top left` keeps the click point pinned
+          // to the panel's visible top-left, so the existing
+          // (left, top) coordinates still correspond to where the
+          // user right-clicked. The visual-size constants above are
+          // what the edge-clamp uses.
+          transform: `scale(${PANEL_SCALE})`,
+          transformOrigin: "top left",
         }}
         onClick={(e) => e.stopPropagation()}
         onContextMenu={(e) => e.preventDefault()}
