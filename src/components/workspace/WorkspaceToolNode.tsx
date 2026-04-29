@@ -15,7 +15,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type NodeProps, useEdges, useReactFlow } from "@xyflow/react";
 import {
   Film, Loader2, Play, RotateCw, Sparkles, Scissors, Combine, FileVideo,
-  Maximize2, Box,
+  Maximize2, Box, Image as ImageIcon, Music,
   type LucideIcon,
 } from "lucide-react";
 import { PortIcon } from "./PortIcon";
@@ -414,9 +414,21 @@ function resolveInputs(nodeId: string): {
   return { inputs: out, textMentioned };
 }
 
+/**
+ * Title-bar icon per tool-node schema. Mirrors the OUTPUT MEDIA TYPE
+ * the node produces — image gens get an image glyph, video gens a
+ * film glyph, audio gens a music note — so the icon family alone
+ * tells the user what flows out without reading the label.
+ *
+ * History: image-gen nodes used to render `Sparkles` (a generic
+ * "AI magic" star), which read identically to every other generative
+ * tool on the canvas. Switched to `ImageIcon` to match the AssetNode
+ * pattern — both kinds of "image source" now share the same glyph.
+ */
 const ICONS: Record<string, LucideIcon> = {
-  imageGenNode: Sparkles,
+  imageGenNode: ImageIcon,
   videoGenNode: Film,
+  audioGenNode: Music,
   removeBackgroundNode: Scissors,
   mergeAudioNode: Combine,
   videoToPromptNode: FileVideo,
@@ -1422,11 +1434,13 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         style={{ width: d.compactWidth ?? 437 }}
       >
         {/* ── Floating title — sits ABOVE the body, no border. ── */}
+        {/* Title icon stays neutral grey across every node type. The
+         *  schema's `accentColor` still drives the port handle / wire
+         *  colour for visual graph topology, but the title chrome
+         *  itself reads as quiet greyscale to keep a busy canvas
+         *  scannable. */}
         <div className="ws-clean-title">
-          <Icon
-            className="ws-clean-title-icon"
-            style={{ color: colorOf(schema.accentColor) }}
-          />
+          <Icon className="ws-clean-title-icon text-zinc-400" />
           <input
             value={(d.params?.nodeName as string) ?? schema.displayName}
             onChange={(e) =>

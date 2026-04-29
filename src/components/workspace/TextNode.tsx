@@ -67,7 +67,9 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
       {/* Floating title — icon + editable name, NO background, NO
        *  border, sits above the body (matches the design reference). */}
       <div className="ws-clean-title">
-        <Type className="ws-clean-title-icon" style={{ color: TEXT_COLOR }} />
+        {/* Title icon is neutral grey across every node type — TEXT_COLOR
+         *  still drives the output port + wire colour below. */}
+        <Type className="ws-clean-title-icon text-zinc-400" />
         <input
           value={d.label ?? ""}
           onChange={(e) => updateField("label", e.target.value)}

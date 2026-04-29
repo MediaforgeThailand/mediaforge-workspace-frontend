@@ -165,7 +165,7 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
     >
       {/* Floating title — icon + name (+ saved-badge). */}
       <div className="ws-clean-title">
-        <Users className="ws-clean-title-icon" style={{ color: "hsl(328 86% 70%)" }} />
+        <Users className="ws-clean-title-icon text-zinc-400" />
         <input
           value={d.label ?? ""}
           onChange={(e) => updateField({ label: e.target.value })}

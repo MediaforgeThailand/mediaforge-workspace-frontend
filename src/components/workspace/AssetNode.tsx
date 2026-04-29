@@ -148,12 +148,11 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
     : d.fieldType === "audio" ? Music
     : d.fieldType === "model3d" ? Box
     : ImageIcon;
-  // Tint the title icon to match the port colour for the field
-  // type. The bare-monochrome version was reported as
-  // hard-to-read at a glance — image / video / audio nodes all
-  // looked the same in a busy canvas. Colour signals the type
-  // without the user having to inspect the glyph.
-  const iconColor = PORT_COLOR[d.fieldType];
+  // Title icon stays neutral grey across every node type — team
+  // feedback was that a multi-coloured canvas was too noisy. The
+  // glyph alone (Image vs Film vs Music vs Box) is what now signals
+  // the field type. PORT_COLOR is still exported below for the
+  // actual port handle / wire colour, which DOES stay tinted.
 
   return (
     <div
@@ -170,8 +169,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
       {/* Floating title — icon + editable name. */}
       <div className="ws-clean-title">
         <Icon
-          className="ws-clean-title-icon"
-          style={{ color: iconColor }}
+          className="ws-clean-title-icon text-zinc-400"
           strokeWidth={2.25}
         />
         <input

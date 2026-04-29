@@ -98,8 +98,17 @@ export function PortIcon({
   const side = dir === "target" ? "left" : "right";
   const position = dir === "target" ? Position.Left : Position.Right;
   const offset = PORT_INSET_PX + index * PORT_GAP_PX;
+  // Neutral chrome for every port — both the chip border and the
+  // glyph share one grey across the whole canvas. The per-type
+  // `color` prop is still accepted (callers + wires still rely on
+  // it for compatibility / future use) but intentionally ignored
+  // for visual styling here. React Flow edge lines stay grey via
+  // workspace.css, so the canvas chrome reads as quiet greyscale
+  // overall.
+  void color; // keep prop signature; not applied to chip styling
+  const NEUTRAL_HANDLE_COLOR = "hsl(0 0% 60%)"; // = text-zinc-400 tone
   const style: CSSProperties = {
-    ["--handle-color" as never]: color,
+    ["--handle-color" as never]: NEUTRAL_HANDLE_COLOR,
   };
   if (side === "left") {
     // Anchor at bottom-left corner; stack upward.
