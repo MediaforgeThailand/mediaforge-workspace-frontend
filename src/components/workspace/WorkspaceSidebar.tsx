@@ -86,10 +86,14 @@ export default function WorkspaceSidebar({
            *  Vite serves it at /mascot-logo.png without bundling.
            *  Slightly larger (h-7 w-7) than the old square because
            *  the rendered cat reads small at 24 px. */}
+          {/* Logo size bumped 20% (h-7 → h-[34px]) per design ask. The
+           *  brand chip needs to read at a glance against the sidebar
+           *  text; 28 px felt undersized once the cat PNG replaced
+           *  the gradient "M" tile. */}
           <img
             src="/mascot-logo.png"
             alt=""
-            className="h-7 w-7 shrink-0 select-none"
+            className="h-[34px] w-[34px] shrink-0 select-none"
             draggable={false}
           />
           Workspace
