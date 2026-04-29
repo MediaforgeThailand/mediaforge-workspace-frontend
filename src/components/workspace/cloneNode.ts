@@ -68,13 +68,26 @@ function resetRunBadge(
   rawData: Record<string, unknown>,
 ): Record<string, unknown> {
   const data: Record<string, unknown> = { ...rawData };
-  // "idle" | "processing" | "done" | "error" — drop the live badge so
-  // a copy of an in-flight node doesn't pretend to be processing.
+  // ── Clear EVERY transient run-state field ──
+  // The dispatcher correlates a node's "is this run still alive?"
+  // by its `taskId` / `runId`. If we leave the parent's already-
+  // completed task id on the clone, the clone immediately reads
+  // as "done" against a stale id and never fires its own request
+  // when the user hits Run. Clear ALL keys that could carry the
+  // parent's identity over to the clone.
+  //
+  // `generations[]` + `selectedGenIndex` are deliberately kept
+  // (handled outside this function) so the clone shows the same
+  // image — the user's whole point in duplicating.
   data.status = "idle";
-  // Defensive: if a downstream node ever introduces an `isRunning`
-  // boolean alongside status, clear it too. Currently unused in
-  // schema but cheap insurance against future drift.
-  if ("isRunning" in data) data.isRunning = false;
+  data.runStatus = "idle";
+  data.isRunning = false;
+  data.runId = null;
+  data.taskId = null;
+  data.pollAt = null;
+  data.progress = null;
+  data.runStartedAt = null;
+  data.runError = null;
   return data;
 }
 

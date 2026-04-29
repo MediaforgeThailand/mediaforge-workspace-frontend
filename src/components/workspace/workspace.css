@@ -1634,3 +1634,20 @@ body.ws-lightbox-open .react-flow__node .ws-clean-title {
   pointer-events: none !important;
   visibility: hidden !important;
 }
+
+/* ─────────────────────────────────────────────────────────── */
+/* Run-timer pill — sits next to the spinner on a generating  */
+/* node. Tiny monospace badge with a translucent black        */
+/* background so it reads against any preview underneath.     */
+/* ─────────────────────────────────────────────────────────── */
+.ws-run-timer {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: hsl(0 0% 70%);
+  background: hsl(0 0% 0% / 0.5);
+  padding: 1px 6px;
+  border-radius: 999px;
+  margin-left: 6px;
+  pointer-events: none;
+  white-space: nowrap;
+}
