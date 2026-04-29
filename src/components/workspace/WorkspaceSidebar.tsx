@@ -45,13 +45,20 @@ import {
   MoreHorizontal,
   Crown,
   Coins,
+  Palette,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useIsOrgAdmin } from "@/hooks/useIsOrgUser";
+import { useOrgBranding } from "@/hooks/useOrgBranding";
 import OrgCreditBadge from "@/components/OrgCreditBadge";
 import ActiveClassPicker from "@/components/ActiveClassPicker";
+
+// Default brand (no tenant subdomain match). Centralised so the
+// org-admin branding preview can re-use the exact same fallback.
+export const DEFAULT_BRAND_LOGO = "/mascot-logo.png";
+export const DEFAULT_BRAND_NAME = "Workspace";
 
 export type SectionKey =
   | "home"
@@ -100,6 +107,13 @@ export default function WorkspaceSidebar({
   onCreate,
 }: WorkspaceSidebarProps) {
   const navigate = useNavigate();
+  // Tenant branding override (e.g. dmd.mediaforge.co → DMD logo +
+  // "DMD" short name). Returns null on the bare workspace.mediaforge.co
+  // host or while the lookup is in flight; we render the default
+  // mascot brand in that case so the chrome doesn't flicker empty.
+  const branding = useOrgBranding();
+  const brandLogo = branding?.logoUrl ?? DEFAULT_BRAND_LOGO;
+  const brandName = branding?.shortName ?? DEFAULT_BRAND_NAME;
 
   const handleClick = (s: SectionKey) => {
     if (onNavigate) onNavigate(s);
@@ -127,13 +141,18 @@ export default function WorkspaceSidebar({
           onClick={() => navigate("/app/workspace")}
           className="flex items-center gap-2 text-[13px] font-semibold tracking-tight text-zinc-50 transition-colors hover:text-white"
         >
+          {/* Brand logo — defaults to the workspace mascot, swapped
+           *  to the tenant org logo when the user is on a claimed
+           *  subdomain (e.g. dmd.mediaforge.co → DMD logo). The
+           *  square slot uses object-contain so wide wordmark logos
+           *  don't get squashed. */}
           <img
-            src="/psc-logo.png"
-            alt="PSC Digital Media"
+            src={brandLogo}
+            alt={brandName}
             className="h-[34px] w-[34px] shrink-0 select-none object-contain"
             draggable={false}
           />
-          <span className="leading-tight">PSC : Digital Media</span>
+          <span className="leading-tight">{brandName}</span>
         </button>
       </div>
 
@@ -218,16 +237,19 @@ export default function WorkspaceSidebar({
   );
 }
 
-/** "Manage Org" cluster — visible only to teachers + org_admins.
- *  Top button routes to /app/org-admin (the Teacher Command Center).
- *  "Pricing" sub-link routes to /app/org-admin/pricing (ERP credit-cost
- *  manager) — same gate, same auth surface. */
+/** "Manage Org" + "Pricing" + "Branding" buttons — visible only to
+ *  teachers + org_admins. Manage Org → Teacher Command Center;
+ *  Pricing → credit_costs CRUD; Branding → logo / short name /
+ *  subdomain admin. Branding is also reachable by host-resolved org
+ *  admins (no class memberships) via direct URL — useful for the
+ *  DMD demo where the admin user hasn't been enrolled into any
+ *  class yet. */
 const OrgAdminLink = () => {
   const isOrgAdmin = useIsOrgAdmin();
   const navigate = useNavigate();
   if (!isOrgAdmin) return null;
   return (
-    <div className="px-3 pt-3 pb-2 border-t border-white/5 mt-3 space-y-0.5">
+    <div className="px-3 pt-3 pb-2 border-t border-white/5 mt-3 space-y-1">
       <button
         type="button"
         onClick={() => navigate("/app/org-admin")}
@@ -245,6 +267,15 @@ const OrgAdminLink = () => {
       >
         <Coins className="h-3.5 w-3.5" />
         Pricing
+      </button>
+      <button
+        type="button"
+        onClick={() => navigate("/app/org-admin/branding")}
+        className="flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-[12.5px] text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100 transition-colors"
+        title="Logo, short name, and subdomains"
+      >
+        <Palette className="h-3.5 w-3.5" />
+        Branding
       </button>
     </div>
   );
