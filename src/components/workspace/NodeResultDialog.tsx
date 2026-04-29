@@ -61,6 +61,19 @@ const NodeResultDialog = memo(
                 {current.text}
               </div>
             )}
+            {current.type === "audio" && current.url && (
+              <div className="flex flex-col items-center justify-center gap-3 p-8">
+                <div className="text-[11px] uppercase tracking-wide text-zinc-500">
+                  Audio output
+                </div>
+                <audio
+                  src={current.url}
+                  controls
+                  autoPlay={false}
+                  className="w-[420px] max-w-[80vw]"
+                />
+              </div>
+            )}
           </div>
 
           {/* Meta row */}
@@ -101,6 +114,14 @@ const NodeResultDialog = memo(
                     {gen.type === "text" && (
                       <div className="p-1 text-left text-[8px] leading-tight text-white/60">
                         {gen.text?.slice(0, 60)}
+                      </div>
+                    )}
+                    {gen.type === "audio" && (
+                      // Thumbnail for audio gens — a stylised
+                      // speaker glyph + the gen index. Filmstrip
+                      // tile is too small to render a real player.
+                      <div className="flex h-full w-full items-center justify-center bg-zinc-800 text-[20px] text-white/60">
+                        ♪
                       </div>
                     )}
                     {i === 0 && (

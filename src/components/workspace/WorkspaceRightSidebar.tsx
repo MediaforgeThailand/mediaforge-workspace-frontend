@@ -23,11 +23,12 @@
  *     on text-heavy areas.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Layers, Sparkles, ChevronRight, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import WorkspaceAssetPanel from "./WorkspaceAssetPanel";
 import WorkspaceAIAssistantPanel from "./WorkspaceAIAssistantPanel";
+import AllAssetsDialog from "./AllAssetsDialog";
 
 type SidebarTab = "assets" | "ai";
 
@@ -37,8 +38,56 @@ const WorkspaceRightSidebar = () => {
   // also switches to that tab) or by clicking the toggle.
   const [collapsed, setCollapsed] = useState(false);
 
+  // ─────────────────────────────────────────────────────────────
+  // Always-mounted bridges for `workspace-open-all-assets` and
+  // `workspace-trigger-upload` (right-click → Assets / Upload from
+  // CanvasContextMenu). Hosted here — not inside WorkspaceAssetPanel
+  // — so they keep working when the user collapses the sidebar (in
+  // which case the panel unmounts entirely).
+  // ─────────────────────────────────────────────────────────────
+  const [allOpen, setAllOpen] = useState(false);
+  const triggerUploadRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const onOpen = () => setAllOpen(true);
+    const onTrigger = () => triggerUploadRef.current?.click();
+    window.addEventListener("workspace-open-all-assets", onOpen);
+    window.addEventListener("workspace-trigger-upload", onTrigger);
+    return () => {
+      window.removeEventListener("workspace-open-all-assets", onOpen);
+      window.removeEventListener("workspace-trigger-upload", onTrigger);
+    };
+  }, []);
+
+  // Bridges + dialog + hidden upload input — always rendered, regardless
+  // of the collapsed/expanded branch below.
+  const bridges = (
+    <>
+      <AllAssetsDialog open={allOpen} onClose={() => setAllOpen(false)} />
+      <input
+        ref={triggerUploadRef}
+        type="file"
+        multiple
+        accept="image/*,video/*,audio/*,.glb,.gltf,.usdz,.obj,.fbx"
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files?.length) {
+            window.dispatchEvent(
+              new CustomEvent("workspace-upload-files", {
+                detail: { files: Array.from(e.target.files) },
+              }),
+            );
+          }
+          e.target.value = "";
+        }}
+      />
+    </>
+  );
+
   if (collapsed) {
     return (
+      <>
+      {bridges}
       <aside
         className={cn(
           "pointer-events-auto fixed right-3 top-1/2 z-30 -translate-y-1/2",
@@ -75,10 +124,13 @@ const WorkspaceRightSidebar = () => {
           icon={ChevronLeft}
         />
       </aside>
+      </>
     );
   }
 
   return (
+    <>
+    {bridges}
     <aside
       className={cn(
         // Floating geometry — fixed right + a top offset that clears
@@ -174,6 +226,7 @@ const WorkspaceRightSidebar = () => {
         </div>
       </div>
     </aside>
+    </>
   );
 };
 

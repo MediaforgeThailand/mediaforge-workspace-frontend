@@ -6,8 +6,9 @@ import { useCredits } from "@/hooks/useCredits";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import TopupSection from "@/components/pricing/TopupSection";
 import { cn } from "@/lib/utils";
+// TopupSection import removed — workspace doesn't sell standalone
+// credit top-ups (the consumer product does, this surface doesn't).
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Workspace pricing — 4 tiers (Starter / Creator / Pro / Team).
@@ -144,16 +145,10 @@ const FEATURE_ROWS: { en: string; th: string; plans: Record<string, boolean> }[]
   },
 ];
 
-// Models surfaced in the GET UNLIMITED section. Maps model name to per-plan inclusion.
-const MODEL_ROWS: { name: string; plans: Record<string, boolean> }[] = [
-  { name: "Nano Banana 2",       plans: { Starter: false, Creator: true,  Pro: true,  Team: true  } },
-  { name: "Flux 2 Pro",          plans: { Starter: false, Creator: true,  Pro: true,  Team: true  } },
-  { name: "Seedream 4.5",        plans: { Starter: false, Creator: false, Pro: true,  Team: true  } },
-  { name: "Kling 2.5",           plans: { Starter: false, Creator: false, Pro: true,  Team: true  } },
-  { name: "Nano Banana Pro",     plans: { Starter: false, Creator: false, Pro: true,  Team: true  } },
-  { name: "Flux 2 Max",          plans: { Starter: false, Creator: false, Pro: false, Team: true  } },
-  { name: "GPT Image 1.5",       plans: { Starter: false, Creator: false, Pro: false, Team: true  } },
-];
+// MODEL_ROWS / GET UNLIMITED section removed — workspace pricing
+// doesn't advertise per-model "unlimited free" entries because we
+// don't actually offer free image generation. Plans bill credits;
+// per-model availability lives in the runtime gate, not the card.
 
 // Annual = 20% off.
 const ANNUAL_DISCOUNT = 0.2;
@@ -407,17 +402,10 @@ const Pricing = () => {
           </div>
         )}
 
-        {/* Top-up section */}
-        {!loading && topupPackages.length > 0 && (
-          <div className="mt-16">
-            <TopupSection
-              topupPackages={topupPackages}
-              language={language}
-              onTopup={handleTopup}
-              currentBalance={credits?.balance ?? 0}
-            />
-          </div>
-        )}
+        {/* Top-up section removed — workspace pricing doesn't sell
+            standalone credit top-ups. The package list / handler
+            stay populated upstream so other surfaces (admin, etc.)
+            can still read them, they just don't render here. */}
       </div>
     </div>
   );
@@ -634,33 +622,8 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
         })}
       </ul>
 
-      {/* GET UNLIMITED — model rows */}
-      <div className="mt-2 pt-3 border-t border-white/5">
-        <div className="text-[10px] font-bold tracking-widest uppercase text-neutral-500 mb-2">
-          {language === "th" ? "ใช้งานไม่จำกัด" : "GET UNLIMITED"}
-        </div>
-        <ul className="flex flex-col gap-1.5">
-          {MODEL_ROWS.map((row) => {
-            const has = row.plans[plan.name] ?? false;
-            return (
-              <li
-                key={row.name}
-                className={cn(
-                  "flex items-center gap-2 text-xs",
-                  has ? "text-neutral-200" : "text-neutral-600"
-                )}
-              >
-                {has ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-                ) : (
-                  <X className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                )}
-                <span>{row.name}</span>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+      {/* GET UNLIMITED model checklist removed — see MODEL_ROWS note
+          at the top of the file for the rationale. */}
 
       {/* 250M+ Premium assets — only Creator/Pro/Team (Starter excluded) */}
       {plan.name !== "Starter" && (

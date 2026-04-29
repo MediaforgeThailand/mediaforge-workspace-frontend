@@ -10,6 +10,23 @@ interface CreditBalance {
   total_purchased: number;
   /** Lifetime total credits ever used */
   total_used: number;
+  /** True when this user is billed through a domain-level shared pool. */
+  is_shared_pool?: boolean;
+  pool_domain?: string | null;
+  pool_user_id?: string | null;
+}
+
+function unwrapCreditBalance(payload: unknown): CreditBalance | null {
+  const row = ((payload as { data?: unknown } | null)?.data ?? payload) as CreditBalance | null;
+  if (!row) return null;
+  return {
+    balance: Number(row.balance ?? 0),
+    total_purchased: Number(row.total_purchased ?? 0),
+    total_used: Number(row.total_used ?? 0),
+    is_shared_pool: Boolean(row.is_shared_pool),
+    pool_domain: row.pool_domain ?? null,
+    pool_user_id: row.pool_user_id ?? null,
+  };
 }
 
 /**
@@ -32,6 +49,14 @@ export const useCredits = () => {
     enabled: !!user,
     queryFn: async () => {
       if (!user) return null;
+      const { data: functionData, error: functionError } = await supabase.functions.invoke(
+        "admin_workspace_pricing",
+        { body: { action: "get_workspace_credit_balance" } },
+      );
+      if (!functionError) {
+        return unwrapCreditBalance(functionData);
+      }
+
       const { data } = await supabase
         .from("user_credits")
         .select("balance, total_purchased, total_used")
@@ -43,6 +68,7 @@ export const useCredits = () => {
     staleTime: 30_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
+    refetchInterval: (query) => query.state.data?.is_shared_pool ? 15_000 : false,
     placeholderData: (prev) => prev,
   });
 

@@ -114,6 +114,7 @@ const Pricing = lazyWithRetry(() => import("./pages/dashboard/Pricing"));
 // scanning a teacher's QR. Page handles its own guest → /auth bounce.
 const TeacherCenter = lazyWithRetry(() => import("./pages/teacher-center"));
 const ClassEnroll = lazyWithRetry(() => import("./pages/ClassEnroll"));
+const OrgBranding = lazyWithRetry(() => import("./pages/org-admin/branding"));
 const UniversityMockup = lazyWithRetry(() => import("./pages/university"));
 
 const queryClient = new QueryClient();
@@ -168,6 +169,15 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <TeacherCenter />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/app/org-admin/branding"
+                    element={
+                      <ProtectedRoute>
+                        <OrgBranding />
                       </ProtectedRoute>
                     }
                   />

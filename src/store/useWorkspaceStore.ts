@@ -147,6 +147,19 @@ interface WorkspaceState {
   /** Deletes a workspace and CASCADES — every canvas owned by this
    *  workspace is removed too. */
   deleteWorkspace: (id: string) => void;
+  /** Clones a workspace and EVERY canvas inside it. The clone gets a
+   *  fresh workspace id, the source's name with a "(copy)" suffix,
+   *  and updated timestamps. Each canvas is deep-cloned (structuredClone
+   *  on every node's `data`) with a fresh canvas id; edges get fresh
+   *  ids too. Transient run-state on each node (`status`, `runId`,
+   *  `taskId`, etc.) is reset to idle so the duplicate doesn't inherit
+   *  in-flight badges or polling tokens.
+   *
+   *  Returns the new workspace id so the caller can navigate to it /
+   *  push it to the server. If the source workspace is missing
+   *  (already deleted in another tab), returns the source id unchanged
+   *  so the caller can no-op cleanly. */
+  duplicateWorkspace: (sourceWorkspaceId: string) => { workspaceId: string };
 
   // canvas-level (= tabs within a workspace)
   /** Creates a tab/canvas inside the given workspace. If no
@@ -517,6 +530,121 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             },
           };
         }),
+
+      duplicateWorkspace: (sourceWorkspaceId) => {
+        const state = get();
+        const source = state.workspaces.find(
+          (w) => w.id === sourceWorkspaceId,
+        );
+        // Source vanished (deleted on another tab between click and
+        // dispatch) — return the same id so the caller treats it as a
+        // no-op without crashing.
+        if (!source) return { workspaceId: sourceWorkspaceId };
+
+        const ts = now();
+        const newWorkspaceId = uid();
+        const newWorkspace: WorkspaceMeta = {
+          id: newWorkspaceId,
+          name: `${source.name} (copy)`,
+          updatedAt: ts,
+        };
+
+        // Snapshot the canvases that belong to the source. We build a
+        // source-canvas-id → new-canvas-id map first so any cross-canvas
+        // references inside the graph (none today, but cheap to be
+        // future-proof) could be remapped — also lets us pair the new
+        // canvas meta to its cloned graph below.
+        const sourceCanvases = state.canvases.filter(
+          (c) => c.workspaceId === sourceWorkspaceId,
+        );
+        const idMap: Record<string, string> = {};
+        const newCanvases: CanvasMeta[] = sourceCanvases.map((c) => {
+          const newId = uid();
+          idMap[c.id] = newId;
+          return {
+            id: newId,
+            workspaceId: newWorkspaceId,
+            // Keep the page name verbatim — users named these for a
+            // reason and a "(copy)" suffix per page would be noise.
+            name: c.name,
+            updatedAt: ts,
+          };
+        });
+
+        // Deep-clone each graph. structuredClone on `data` so we don't
+        // accidentally share references to nested arrays (generations,
+        // exposed maps, etc.) between the source and the copy. Reset
+        // every transient run-state field — same set the rehydrate
+        // sweep clears, kept in sync so the duplicate UX matches a
+        // post-reload "everything is idle" state.
+        const newGraphs: Record<string, CanvasGraph> = { ...state.graphs };
+        const cloneStruct = (v: unknown): unknown =>
+          typeof structuredClone === "function"
+            ? structuredClone(v)
+            : JSON.parse(JSON.stringify(v ?? null));
+        for (const sc of sourceCanvases) {
+          const sourceGraph = state.graphs[sc.id];
+          if (!sourceGraph) continue;
+          const targetCanvasId = idMap[sc.id];
+
+          const clonedNodes: WorkspaceNode[] = (sourceGraph.nodes ?? []).map(
+            (n) => {
+              const clonedData = cloneStruct(n.data ?? {}) as Record<
+                string,
+                unknown
+              >;
+              // Reset transient run state so the duplicate starts clean.
+              clonedData.status = "idle";
+              clonedData.runStatus = "idle";
+              clonedData.isRunning = false;
+              clonedData.runId = null;
+              clonedData.taskId = null;
+              clonedData.pollAt = null;
+              clonedData.progress = null;
+              clonedData.runStartedAt = null;
+              clonedData.runError = null;
+              return {
+                ...n,
+                // Keep the node id stable inside this canvas — node ids
+                // only need to be unique per canvas and they already
+                // are in the source. Edges reference these ids so
+                // rewriting them would also require rewriting every
+                // edge endpoint; not worth the churn.
+                data: clonedData as WorkspaceNodeData,
+                // Drop any "selected" flag so the duplicate doesn't
+                // open with a phantom selection from the source.
+                selected: false,
+              } as WorkspaceNode;
+            },
+          );
+
+          const clonedEdges: WorkspaceEdge[] = (sourceGraph.edges ?? []).map(
+            (e) => ({
+              ...e,
+              id: `e_${uid()}`,
+              selected: false,
+            }),
+          );
+
+          newGraphs[targetCanvasId] = {
+            ...sourceGraph,
+            id: targetCanvasId,
+            workspaceId: newWorkspaceId,
+            name: sourceGraph.name,
+            nodes: clonedNodes,
+            edges: clonedEdges,
+            updatedAt: ts,
+          };
+        }
+
+        set({
+          workspaces: [newWorkspace, ...state.workspaces],
+          canvases: [...newCanvases, ...state.canvases],
+          graphs: newGraphs,
+        });
+
+        return { workspaceId: newWorkspaceId };
+      },
 
       /* ── Canvas-level actions (= tabs within a workspace) ── */
 
