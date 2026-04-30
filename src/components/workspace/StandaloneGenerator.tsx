@@ -2138,6 +2138,10 @@ function CreationRow({ job }: { job: StandaloneJobRow }) {
   const duration = String(params.duration ?? "");
   const ratio = String(params.ratio ?? params.aspect_ratio ?? params.size ?? "");
   const modelName = String(params.model_name ?? job.model ?? "model");
+  const failureMessage =
+    job.status === "failed" || job.status === "permanent_failed"
+      ? (job.error ?? job.last_error)
+      : null;
   return (
     <article className="rounded-xl bg-[#222222] px-3 py-3 ring-1 ring-inset ring-white/[0.02]">
       <div className="mb-2 flex items-start justify-between gap-3">
@@ -2223,9 +2227,9 @@ function CreationRow({ job }: { job: StandaloneJobRow }) {
             {formatDate(job.created_at)}
             {job.attempts ? ` · attempt ${job.attempts}` : ""}
           </div>
-          {(job.error || job.last_error) && (
+          {failureMessage && (
             <div className="mt-3 rounded-xl bg-red-500/10 px-3 py-2 text-[12px] text-red-200">
-              {job.error ?? job.last_error}
+              {failureMessage}
             </div>
           )}
         </div>

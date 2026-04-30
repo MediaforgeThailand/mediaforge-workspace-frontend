@@ -560,6 +560,31 @@ export async function upsertProjectToServer(
 
 export async function deleteProjectFromServer(projectId: string): Promise<void> {
   try {
+    const deleteProjectRows = async (table: string): Promise<boolean> => {
+      const { error } = await (supabase as any)
+        .from(table)
+        .delete()
+        .eq("project_id", projectId);
+      if (!error) return true;
+      if (error.code === "42P01" || error.code === "42703") return true;
+      console.warn(
+        `[canvasPersistence] cascade project delete failed for ${table}:`,
+        error.message,
+      );
+      return false;
+    };
+
+    for (const table of [
+      "workspace_generation_events",
+      "workspace_generation_jobs",
+      "user_assets",
+      "workspace_canvases",
+      "workspaces",
+    ]) {
+      const ok = await deleteProjectRows(table);
+      if (!ok) return;
+    }
+
     const { error } = await supabase
       .from("workspace_projects")
       .delete()
