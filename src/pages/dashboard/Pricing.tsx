@@ -294,21 +294,21 @@ const Pricing = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
+    <div className="min-h-screen bg-[#0a0a0a] text-white">
       {/* Hero */}
-      <section className="w-full pt-12 md:pt-16 pb-6 text-center relative">
+      <section className="relative w-full px-4 pb-4 pt-16 text-center sm:pb-6 md:pt-16">
         <button
           onClick={() => navigate("/app/workspace")}
-          className="absolute top-4 left-4 md:left-8 w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
+          className="absolute left-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/5 transition-colors hover:bg-white/10 md:left-8"
           aria-label="Back to workspace"
         >
-          <ArrowLeft className="w-5 h-5 text-neutral-400" />
+          <ArrowLeft className="h-5 w-5 text-neutral-300" />
         </button>
 
-        <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tight text-white">
+        <h1 className="mx-auto max-w-[22rem] text-2xl font-black uppercase leading-tight tracking-tight text-white sm:max-w-2xl sm:text-3xl md:text-5xl">
           {language === "th" ? "ปลดล็อกพลังของ MEDIAFORGE" : "Unlock the power of MediaForge"}
         </h1>
-        <p className="text-neutral-400 mt-4 text-base md:text-lg max-w-2xl mx-auto px-4">
+        <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-neutral-400 sm:max-w-2xl md:mt-4 md:text-lg">
           {language === "th"
             ? "เลือกแพ็กเกจที่เหมาะกับคุณ คิดราคาตามจำนวนเครดิตที่ใช้จริง"
             : "Pick the plan that matches your output. Pricing is strictly credit-based."}
@@ -316,7 +316,7 @@ const Pricing = () => {
 
         {/* Credit balance widget */}
         {credits && (
-          <div className="mt-6 inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 text-xs text-neutral-300">
+          <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-neutral-300 md:mt-6">
             <Sparkles className="w-3.5 h-3.5 text-purple-400" />
             <span>
               {credits.balance.toLocaleString()}{" "}
@@ -344,12 +344,12 @@ const Pricing = () => {
         )}
 
         {/* Monthly / Annual toggle */}
-        <div className="mt-8 flex justify-center px-4">
-          <div className="inline-flex bg-white/10 rounded-full p-1">
+        <div className="mt-6 flex justify-center md:mt-8">
+          <div className="inline-flex w-full max-w-sm rounded-full bg-white/10 p-1">
             <button
               onClick={() => setCycle("monthly")}
               className={cn(
-                "px-5 py-2 rounded-full text-sm font-medium transition-all",
+                "flex-1 rounded-full px-4 py-2.5 text-sm font-medium transition-all",
                 cycle === "monthly"
                   ? "bg-white/15 text-white"
                   : "text-neutral-400 hover:text-neutral-200"
@@ -360,14 +360,14 @@ const Pricing = () => {
             <button
               onClick={() => setCycle("annual")}
               className={cn(
-                "px-5 py-2 rounded-full text-sm font-medium transition-all inline-flex items-center gap-2",
+                "inline-flex flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-medium transition-all sm:gap-2",
                 cycle === "annual"
                   ? "bg-white/15 text-white"
                   : "text-neutral-400 hover:text-neutral-200"
               )}
             >
               {language === "th" ? "รายปี" : "Annual"}
-              <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-400/30 rounded-full px-2 py-0.5">
+              <span className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300 sm:px-2 sm:text-[10px]">
                 −20%
               </span>
             </button>
@@ -376,7 +376,7 @@ const Pricing = () => {
       </section>
 
       {/* Cards */}
-      <div className="max-w-[1400px] mx-auto px-4 pt-6 pb-16">
+      <div className="mx-auto max-w-[1400px] px-4 pb-14 pt-3 sm:px-5 sm:pt-6 md:pb-16">
         {loading ? (
           <div className="flex justify-center py-16">
             <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
@@ -386,7 +386,7 @@ const Pricing = () => {
             {language === "th" ? "ไม่มีแพ็กเกจ" : "No plans available"}
           </p>
         ) : (
-          <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 pt-6">
+          <div className="grid grid-cols-1 gap-4 pt-4 sm:grid-cols-2 sm:gap-5 sm:pt-6 lg:grid-cols-4">
             {orderedPlans.map((plan) => (
               <PlanCard
                 key={plan.id}
@@ -464,32 +464,34 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
   return (
     <div
       className={cn(
-        "relative bg-[#171717] rounded-3xl px-5 pt-7 pb-5 flex flex-col gap-4 transition-all",
+        "relative flex flex-col gap-3 rounded-2xl bg-[#171717] px-4 pb-4 pt-6 transition-all sm:gap-4 sm:rounded-3xl sm:px-5 sm:pb-5 sm:pt-7",
         borderClass
       )}
     >
       {/* Ribbon */}
       {isPro ? (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1 rounded-full whitespace-nowrap z-10">
+        <div className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-blue-500 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white">
           {language === "th" ? "คุ้มที่สุด" : "BEST VALUE"}
         </div>
       ) : isTeam ? (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-purple-500 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1 rounded-full whitespace-nowrap z-10">
+        <div className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-purple-500 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white">
           {language === "th" ? "ตัวเลือกผู้เชี่ยวชาญ" : "EXPERT CHOICE"}
         </div>
       ) : null}
 
       {/* Plan name */}
-      <h3 className="text-3xl font-black text-white">{plan.name}</h3>
+      <h3 className="text-2xl font-black text-white sm:text-3xl">{plan.name}</h3>
 
       {/* Subtitle */}
-      <p className="text-neutral-400 text-sm leading-snug min-h-[44px]">{subtitle}</p>
+      <p className="min-h-0 text-sm leading-6 text-neutral-400 sm:min-h-[44px] sm:leading-snug">
+        {subtitle}
+      </p>
 
       {/* Price block */}
       <div className="flex flex-col gap-0.5">
         {isTeam ? (
           <>
-            <span className="text-white text-3xl font-semibold">
+            <span className="text-2xl font-semibold text-white sm:text-3xl">
               {language === "th" ? "ตามการใช้งาน" : "Pay as you go"}
             </span>
             <p className="text-neutral-500 text-xs">
@@ -500,11 +502,11 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
           </>
         ) : showAnnual ? (
           <>
-            <div className="flex items-baseline gap-2">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <span className="text-neutral-500 text-base line-through">
                 ฿{monthlyPrice.toLocaleString()}
               </span>
-              <span className="text-white text-4xl font-bold">
+              <span className="text-3xl font-bold text-white sm:text-4xl">
                 ฿{annualPerMonth.toLocaleString()}
               </span>
               <span className="text-neutral-400 text-sm">
@@ -517,8 +519,8 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
           </>
         ) : (
           <>
-            <div className="flex items-baseline gap-2">
-              <span className="text-white text-4xl font-bold">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <span className="text-3xl font-bold text-white sm:text-4xl">
                 ฿{monthlyPrice.toLocaleString()}
               </span>
               <span className="text-neutral-400 text-sm">
@@ -537,7 +539,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
         onClick={onSubscribe}
         disabled={isCurrent || submitting}
         className={cn(
-          "w-full py-3 rounded-xl font-medium text-white transition-colors inline-flex items-center justify-center gap-2",
+          "inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl py-3 font-semibold text-white transition-colors",
           ctaClass
         )}
       >
@@ -553,8 +555,8 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
 
       {/* Credits pill */}
       {!isTeam && (
-        <div className="rounded-xl py-2.5 px-3 text-center bg-neutral-800/80 border border-neutral-700/60">
-          <span className="font-semibold text-white text-sm">
+        <div className="rounded-xl border border-neutral-700/60 bg-neutral-800/80 px-3 py-3 text-center">
+          <span className="text-sm font-semibold text-white sm:text-base">
             {credits.toLocaleString()}{" "}
             <span className="text-neutral-400 font-normal">
               {cycle === "annual"
@@ -570,9 +572,9 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
       )}
 
       {/* NEW AVAILABLE highlight */}
-      <div className="rounded-lg bg-blue-500/10 border border-blue-400/30 px-3 py-2 flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 rounded-lg border border-blue-400/30 bg-blue-500/10 px-3 py-2">
         <span className="text-blue-200 text-xs font-medium">Seedance 2.0</span>
-        <span className="text-[10px] font-bold tracking-wider uppercase text-blue-300 bg-blue-500/20 rounded px-2 py-0.5">
+        <span className="rounded bg-blue-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-300">
           {language === "th" ? "พร้อมใช้แล้ว" : "NOW AVAILABLE"}
         </span>
       </div>
@@ -600,15 +602,15 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
       )}
 
       {/* Feature list */}
-      <ul className="flex flex-col gap-2 mt-1">
+      <ul className="mt-1 flex flex-col gap-2">
         {FEATURE_ROWS.map((row) => {
           const has = row.plans[plan.name] ?? false;
           return (
             <li
               key={row.en}
               className={cn(
-                "flex items-start gap-2 text-xs",
-                has ? "text-neutral-200" : "text-neutral-600"
+                "items-start gap-2 text-xs leading-5",
+                has ? "flex text-neutral-200" : "hidden text-neutral-600 sm:flex"
               )}
             >
               {has ? (

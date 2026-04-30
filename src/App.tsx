@@ -45,6 +45,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import OrgUserBlockGate from "./components/OrgUserBlockGate";
 import AccountShell from "./components/workspace/AccountShell";
 import WorkspacePageShell from "./components/workspace/WorkspacePageShell";
+import MobileSpaceBlockGate from "./components/workspace/MobileSpaceBlockGate";
 import PageLoadingAnim from "./components/ui/PageLoadingAnim";
 
 /**
@@ -222,7 +223,7 @@ const App = () => (
                     path="/app/pricing"
                     element={
                       <ProtectedRoute>
-                        <WorkspacePageShell>
+                        <WorkspacePageShell hideSidebarBelowLg>
                           <Pricing />
                         </WorkspacePageShell>
                       </ProtectedRoute>
@@ -234,9 +235,11 @@ const App = () => (
                   <Route
                     path="/app/workspace/:workspaceId"
                     element={
-                      <ProtectedRoute>
-                        <WorkspaceCanvasPage />
-                      </ProtectedRoute>
+                      <MobileSpaceBlockGate>
+                        <ProtectedRoute>
+                          <WorkspaceCanvasPage />
+                        </ProtectedRoute>
+                      </MobileSpaceBlockGate>
                     }
                   />
 
