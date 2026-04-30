@@ -468,7 +468,7 @@ export function buildVideoParams(args: {
     return {
       model_name: args.model,
       prompt: args.prompt.trim(),
-      ratio: args.ratio,
+      ratio: args.ratio === "Auto" ? "16:9" : args.ratio,
       resolution: args.resolution,
       duration: args.duration,
       generate_audio: String(args.withAudio),
@@ -478,7 +478,7 @@ export function buildVideoParams(args: {
   return {
     model_name: args.model,
     prompt: args.prompt.trim(),
-    aspect_ratio: args.ratio === "Auto" ? "16:9" : args.ratio,
+    aspect_ratio: args.ratio || "Auto",
     duration: String(args.duration <= 5 ? 5 : 10),
     has_audio: String(args.withAudio),
   };

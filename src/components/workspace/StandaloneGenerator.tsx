@@ -162,7 +162,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     outputFormat: "png",
     background: "auto",
     imageRefs: [],
-    videoRatio: "16:9",
+    videoRatio: "Auto",
     videoResolution: "720p",
     videoDuration: 5,
     videoWithAudio: false,
@@ -328,6 +328,15 @@ export default function StandaloneGenerator({
         form.aspectRatio === "Auto" ? "1:1" : form.aspectRatio;
       nextPatch.imageResolution =
         model === "nano-banana-pro" ? "2K" : "1K";
+    }
+    if (activeTool === "video_gen") {
+      const isSeedance = model.startsWith("seedance");
+      if (isSeedance && form.videoRatio === "Auto") {
+        nextPatch.videoRatio = "16:9";
+      }
+      if (!isSeedance && !["Auto", "16:9", "9:16", "1:1"].includes(form.videoRatio)) {
+        nextPatch.videoRatio = "Auto";
+      }
     }
     updateForm(nextPatch);
   };
@@ -1031,7 +1040,7 @@ function VideoControls({
         <SelectField
           label="Aspect"
           value={form.videoRatio}
-          options={isSeedance ? ["16:9", "9:16", "1:1", "4:3"] : ["16:9", "9:16", "1:1"]}
+          options={isSeedance ? ["16:9", "9:16", "1:1", "4:3"] : ["Auto", "16:9", "9:16", "1:1"]}
           onChange={(videoRatio) => onChange({ videoRatio })}
         />
         <SelectField
