@@ -19,12 +19,13 @@
  *    so downstream Video Gen Omni nodes work the same in either mode.
  */
 
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   type NodeProps,
   useEdges,
   useNodes,
   useReactFlow,
+  useUpdateNodeInternals,
 } from "@xyflow/react";
 import { Users, Plus, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
@@ -66,6 +67,16 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
 
   const [creating, setCreating] = useState(false);
   const isSaved = !!d.brand_element_id;
+
+  /* React Flow caches handle layout on mount. When `isSaved` flips
+   * (Create succeeds → ref_1..4 + frontal handles vanish), we have
+   * to notify React Flow or its connection-validation system keeps
+   * trying to land wires on now-invisible handles. See the matching
+   * comment in WorkspaceToolNode for the full story. */
+  const updateNodeInternals = useUpdateNodeInternals();
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [id, isSaved, updateNodeInternals]);
 
   const updateField = useCallback(
     (patch: Partial<ElementNodeData>) => {

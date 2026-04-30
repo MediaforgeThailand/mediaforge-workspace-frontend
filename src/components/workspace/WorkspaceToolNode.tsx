@@ -12,7 +12,13 @@
  */
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type Node, type NodeProps, useEdges, useReactFlow } from "@xyflow/react";
+import {
+  type Node,
+  type NodeProps,
+  useEdges,
+  useReactFlow,
+  useUpdateNodeInternals,
+} from "@xyflow/react";
 import {
   ChevronLeft, ChevronRight, Film, Loader2, Play, RotateCw, Sparkles, Scissors, Combine, FileVideo,
   Maximize2, Box, Image as ImageIcon, Music,
@@ -1653,6 +1659,34 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       (o) => !o.supportedModels || o.supportedModels.includes(selectedModel),
     );
   }, [schema, selectedModel]);
+
+  /* React Flow caches handle positions and IDs in its internal store
+   * the first time a node mounts. When `visibleInputs` / `visibleOutputs`
+   * change because the user picked a different model (e.g. switching
+   * Kling Pro → Kling Motion Pro swaps `start_frame`/`end_frame` for
+   * `ref_image`/`ref_video`), the new handles render in the DOM but
+   * React Flow's cached layout still points at the OLD handle ids.
+   *
+   * Result: dragging a wire onto the new handle silently fails — the
+   * connection-validation system can't find a registered handle at
+   * that DOM position, so the drop is rejected with no toast. This is
+   * the canonical bug the React Flow docs warn about for nodes whose
+   * handle set is dynamic:
+   *   https://reactflow.dev/api-reference/hooks/use-update-node-internals
+   *
+   * We fingerprint the visible handle ids (in render order) and call
+   * `updateNodeInternals(id)` whenever that fingerprint changes.
+   * Bandwidth: only fires on actual handle-set churn (model swap,
+   * schema reload), not every render. */
+  const updateNodeInternals = useUpdateNodeInternals();
+  const handleFingerprint = useMemo(() => {
+    const ins = visibleInputs.map((i) => i.id).join("|");
+    const outs = visibleOutputs.map((o) => o.id).join("|");
+    return `${ins}>>${outs}`;
+  }, [visibleInputs, visibleOutputs]);
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [id, handleFingerprint, updateNodeInternals]);
 
   const updateParam = useCallback(
     (key: string, value: unknown) => {

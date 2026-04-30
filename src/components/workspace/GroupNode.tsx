@@ -17,12 +17,13 @@
  *   - one shared output that downstream nodes consume as multi-ref
  */
 
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useEffect, useMemo } from "react";
 import {
   NodeResizer,
   useNodes,
   type NodeProps,
   useReactFlow,
+  useUpdateNodeInternals,
 } from "@xyflow/react";
 import { Group as GroupIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -93,6 +94,17 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
     // Stable order — image / video / audio top-to-bottom.
     return (["image", "video", "audio"] as const).filter((t) => types.has(t));
   }, [allNodes, id]);
+
+  /* When the group's set of output ports changes (a child finishes
+   * generating, a child is added/removed, etc.), nudge React Flow
+   * to re-measure handles. Without this, downstream wires can't
+   * land on the freshly-appeared port — same gotcha as in
+   * WorkspaceToolNode and ElementNode. */
+  const updateNodeInternals = useUpdateNodeInternals();
+  const outputFingerprint = outputTypes.join("|");
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [id, outputFingerprint, updateNodeInternals]);
 
   const updateLabel = useCallback(
     (newLabel: string) => {
