@@ -16,12 +16,12 @@ import { supabase } from "@/integrations/supabase/client";
  */
 export function useIsOrgUser(): boolean {
   const { profile } = useAuth();
-  return !!profile?.org_id;
+  return !!((profile as any)?.organization_id ?? profile?.org_id);
 }
 
 export function useOrgId(): string | null {
   const { profile } = useAuth();
-  return profile?.org_id ?? null;
+  return ((profile as any)?.organization_id ?? profile?.org_id ?? null) as string | null;
 }
 
 export interface ClassMembershipInfo {

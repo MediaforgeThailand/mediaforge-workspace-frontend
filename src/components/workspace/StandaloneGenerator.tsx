@@ -22,6 +22,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { friendlyError } from "@/lib/friendlyError";
 import { UserMenu } from "@/components/workspace/UserMenu";
 import InsufficientCreditsDialog from "@/components/InsufficientCreditsDialog";
 import { calculateNodeCost } from "@/lib/nodeCostCalculator";
@@ -311,6 +313,7 @@ export default function StandaloneGenerator({
   onDeleteProject?: (projectId: string) => void;
 }) {
   const { user } = useAuth();
+  const { language } = useLanguage();
   const queryClient = useQueryClient();
   const { credits } = useCredits();
   const { data: creditCosts = [], isLoading: creditCostsLoading } =
@@ -597,7 +600,11 @@ export default function StandaloneGenerator({
         setInsufficientRequiredCredits(estimatedCost ?? undefined);
         setInsufficientOpen(true);
       } else {
-        toast.error(message);
+        // Audit fix: jargon errors (PROVIDER_BILLING_ERROR, OpenAI
+        // 401, raw SQL function names) used to leak verbatim. Run
+        // through friendlyError so the user sees a clean Thai/EN
+        // message and the team gets the raw text in console.error.
+        toast.error(friendlyError(err, language === "th" ? "th" : "en"));
       }
     } finally {
       setRunning(false);
@@ -2159,12 +2166,42 @@ function CreationFeed({
 }
 
 function CreationRow({ job }: { job: StandaloneJobRow }) {
+  const [cancelling, setCancelling] = useState(false);
   const result = job.result;
   const params = job.request?.params ?? {};
   const prompt = String(params.prompt ?? "");
   const title =
     prompt.trim().slice(0, 90) ||
     String(params.nodeName ?? params.model_name ?? job.model ?? "Generation");
+
+  /* User-initiated cancel for an in-flight standalone gen.
+   *
+   * The audit flagged this gap explicitly: the canvas had cancel
+   * but the standalone tool didn't, so a user who started a 5-min
+   * Kling Motion Pro and changed their mind had to wait it out
+   * (or close the tab and lose visibility on the credits).
+   *
+   * Same RPC the canvas uses (`cancel_workspace_job`) — marks the
+   * row failed, refunds unused credits, the polling loop in the
+   * parent will pick up the new status on the next tick. */
+  const handleCancel = async () => {
+    if (!job.id || cancelling) return;
+    setCancelling(true);
+    try {
+      const { error } = await supabase.rpc("cancel_workspace_job", { p_job_id: job.id });
+      if (error) {
+        toast.error(`ยกเลิกไม่สำเร็จ / Cancel failed: ${error.message}`);
+        return;
+      }
+      toast.success("ยกเลิกแล้ว — คืนเครดิตให้แล้ว / Cancelled — credits refunded");
+    } catch (err) {
+      toast.error(
+        `ยกเลิกไม่สำเร็จ / Cancel failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      setCancelling(false);
+    }
+  };
   const statusTone =
     job.status === "completed"
       ? "text-emerald-300"
@@ -2287,6 +2324,26 @@ function CreationRow({ job }: { job: StandaloneJobRow }) {
         </div>
 
         <div className="flex shrink-0 gap-2 md:flex-col">
+          {/* Cancel button — visible only when the job is in-flight.
+           *  Confirmation is implicit (one tap = real cancel) because
+           *  the in-flight state is short-lived and credits are
+           *  auto-refunded; no destructive ambiguity. */}
+          {isActive && (
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={cancelling}
+              className="grid h-9 w-9 place-items-center rounded-lg bg-red-500/15 text-red-300 ring-1 ring-inset ring-red-500/30 transition-colors hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label="Cancel generation"
+              title="ยกเลิก / Cancel"
+            >
+              {cancelling ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <X className="h-4 w-4" />
+              )}
+            </button>
+          )}
           {url && (
             <>
               <button

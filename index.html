@@ -3,11 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- TODO: Set the document title to the name of your application -->
     <title>MediaForge</title>
-    <meta name="description" content="MediaForge คือทางลัดสู่การสร้างสื่อการตลาดด้วย AI สำหรับธุรกิจยุคใหม่
-ช่วยลดต้นทุน เร่งความเร็วในการผลิต และยกระดับคุณภาพงานให้พร้อมใช้งานจริง
-จากภาพสินค้า ภาพต">
+    <meta name="description" content="MediaForge Workspace — แพลตฟอร์มสร้างภาพ วิดีโอ เสียง และโมเดล 3D ด้วย AI สำหรับครีเอเตอร์และธุรกิจไทย รวมเครื่องมือ AI ชั้นนำในที่เดียว" />
     <meta name="author" content="MediaForge" />
 
     <!-- Favicon — uses the workspace mascot (the white-cat illustration
@@ -20,38 +17,31 @@
     <link rel="shortcut icon" href="/favicon.png" />
 
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/Ly2A6NDv03O8I3ifep0NJdmU6mu2/social-images/social-1776281119587-Artboard_1_copy_2.webp">
+    <meta property="og:image" content="https://workspace.mediaforge.co/mascot-logo.png" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@Lovable" />
-    <meta name="twitter:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/Ly2A6NDv03O8I3ifep0NJdmU6mu2/social-images/social-1776281119587-Artboard_1_copy_2.webp">
-  <link rel="preload" as="image" href="/loading.gif">
+    <meta name="twitter:image" content="https://workspace.mediaforge.co/mascot-logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  
-  
-  
-  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+
+
+
   <meta property="og:title" content="MediaForge">
   <meta name="twitter:title" content="MediaForge">
-  <meta property="og:description" content="MediaForge คือทางลัดสู่การสร้างสื่อการตลาดด้วย AI สำหรับธุรกิจยุคใหม่
-ช่วยลดต้นทุน เร่งความเร็วในการผลิต และยกระดับคุณภาพงานให้พร้อมใช้งานจริง
-จากภาพสินค้า ภาพต">
-  <meta name="twitter:description" content="MediaForge คือทางลัดสู่การสร้างสื่อการตลาดด้วย AI สำหรับธุรกิจยุคใหม่
-ช่วยลดต้นทุน เร่งความเร็วในการผลิต และยกระดับคุณภาพงานให้พร้อมใช้งานจริง
-จากภาพสินค้า ภาพต">
+  <meta property="og:description" content="MediaForge Workspace — แพลตฟอร์มสร้างภาพ วิดีโอ เสียง และโมเดล 3D ด้วย AI สำหรับครีเอเตอร์และธุรกิจไทย รวมเครื่องมือ AI ชั้นนำในที่เดียว">
+  <meta name="twitter:description" content="MediaForge Workspace — แพลตฟอร์มสร้างภาพ วิดีโอ เสียง และโมเดล 3D ด้วย AI สำหรับครีเอเตอร์และธุรกิจไทย รวมเครื่องมือ AI ชั้นนำในที่เดียว">
 </head>
 
   <body>
     <div id="root"></div>
-    <!-- <model-viewer> custom element — loaded directly from Google's
-         CDN per the official guide at https://modelviewer.dev/. The
-         Vite bundle path was unreliable: ESM tree-shaking sometimes
-         dropped the side-effect that calls `customElements.define`,
-         so the tag rendered as an inert <div> showing the poster
-         image only. The CDN bundle ALWAYS registers the element. -->
-    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+    <!-- model-viewer is now lazy-loaded from src/lib/loadModelViewer.ts
+         the first time a 3D preview is opened. Removed the eager CDN
+         <script type="module"> tag that used to live here so the 280 KB
+         module-viewer bundle no longer blocks first paint on every
+         page. The dynamic loader still imports the same Google CDN
+         build for the customElements.define side-effect. -->
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {

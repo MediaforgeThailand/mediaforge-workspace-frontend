@@ -31,6 +31,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import useDocumentTitle from "@/hooks/useDocumentTitle";
 import WorkspaceErrorBoundary from "@/components/workspace/WorkspaceErrorBoundary";
 import {
   loadProjectsFromServer,
@@ -53,6 +55,8 @@ import {
   Copy,
   Lock,
   Users,
+  GraduationCap,
+  WalletCards,
   ChevronDown,
   ChevronRight,
   List,
@@ -85,6 +89,13 @@ import {
   STANDALONE_TOOL_ORDER,
   type StandaloneToolKey,
 } from "@/components/workspace/standaloneGenerationCatalog";
+import { useEducationPresence } from "@/hooks/useEducationPresence";
+import {
+  useActiveClass,
+  useUserClassMemberships,
+  type ClassMembershipInfo,
+} from "@/hooks/useIsOrgUser";
+import ActiveClassPicker from "@/components/ActiveClassPicker";
 
 /* ════════════════════════════════════════════════════════════
  * Types + helpers
@@ -241,6 +252,8 @@ function isStandaloneSection(section: SectionKey): section is StandaloneToolKey 
 const STALE_BODY_CLASSES = ["ws-lightbox-open", "ws-resizing"];
 
 const WorkspaceDashboardInner = () => {
+  const { t } = useLanguage();
+  useDocumentTitle("Workspace — MediaForge");
   // Force-clear any canvas-only body classes that might have leaked
   // from the previous route. Runs once on mount — the cleanup return
   // is intentionally absent because we do NOT want to re-add them
@@ -275,6 +288,15 @@ const WorkspaceDashboardInner = () => {
   const mergeServerWorkspaces = useWorkspaceStore(
     (s) => s.mergeServerWorkspaces,
   );
+
+  useEducationPresence({
+    enabled: !authLoading && Boolean(user?.id),
+    userId: user?.id ?? null,
+    projectId: activeProjectId ?? null,
+    workspaceId: null,
+    canvasId: null,
+    activity: `Workspace ${section}`,
+  });
 
   const standaloneProjects = useMemo<StandaloneProjectOption[]>(
     () =>
@@ -365,28 +387,29 @@ const WorkspaceDashboardInner = () => {
   }, [activeProjectId, setActiveProject, standaloneProjects]);
 
   const handleCreateProject = () => {
-    const nextName = prompt("Project name:", "Untitled project");
+    const fallbackName = t("workspace.home.untitled_project_default");
+    const nextName = prompt(t("workspace.home.untitled_project_prompt"), fallbackName);
     if (nextName === null) return;
-    const projectName = nextName.trim() || "Untitled project";
+    const projectName = nextName.trim() || fallbackName;
     const projectId = createProject(projectName);
     if (user?.id) {
       const meta = useWorkspaceStore.getState().projects.find((p) => p.id === projectId);
       if (meta) void upsertProjectToServer(meta, user.id);
     }
-    toast.success(`Project "${projectName}" created`);
+    toast.success(t("workspace.toast.project_created", { name: projectName }));
   };
 
   const handleDeleteProject = (projectId: string) => {
     const state = useWorkspaceStore.getState();
     if (state.projects.length <= 1) {
-      toast.error("Keep at least one project.");
+      toast.error(t("workspace.toast.keep_one_project"));
       return;
     }
     const project = state.projects.find((item) => item.id === projectId);
     if (!project) return;
     deleteProject(projectId);
     if (user?.id) void deleteProjectFromServer(projectId);
-    toast.success(`Project "${project.name}" deleted`);
+    toast.success(t("workspace.toast.project_deleted", { name: project.name }));
   };
 
   // Two-way bind URL ↔ state. When the user clicks a sidebar item we
@@ -439,7 +462,7 @@ const WorkspaceDashboardInner = () => {
         <div className="fixed inset-0 z-50 flex md:hidden">
           <button
             type="button"
-            aria-label="Close sidebar"
+            aria-label={t("workspace.spaces.close_sidebar")}
             className="absolute inset-0 bg-black/65"
             onClick={() => setMobileSidebarOpen(false)}
           />
@@ -454,7 +477,7 @@ const WorkspaceDashboardInner = () => {
             />
             <button
               type="button"
-              aria-label="Close sidebar"
+              aria-label={t("workspace.spaces.close_sidebar")}
               onClick={() => setMobileSidebarOpen(false)}
               className="absolute -right-12 top-3 grid h-10 w-10 place-items-center rounded-full bg-white/[0.08] text-zinc-100 ring-1 ring-inset ring-white/10"
             >
@@ -623,6 +646,7 @@ const HomeView = ({
   onOpenSidebar?: () => void;
 }) => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { user, loading: authLoading } = useAuth();
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const canvases = useWorkspaceStore((s) => s.canvases);
@@ -754,10 +778,15 @@ const HomeView = ({
   const [newsTab, setNewsTab] = useState<"news" | "templates" | "academy">(
     "news",
   );
+  const activeClass = useActiveClass();
+  const { data: classMemberships } = useUserClassMemberships();
+  const studentClasses = (classMemberships ?? []).filter(
+    (membership) => membership.role === "member" && membership.status === "active",
+  );
 
   return (
     <>
-      <PageHeader title="Home" rightSlot={<UserMenu />} onOpenSidebar={onOpenSidebar} />
+      <PageHeader title={t("workspace.home.title")} rightSlot={<UserMenu />} onOpenSidebar={onOpenSidebar} />
 
       <div className="ws-scroll-hide flex-1 overflow-y-auto overflow-x-hidden">
         <div className="mx-auto min-w-0 w-full max-w-[1400px] px-4 pb-16 pt-5 md:px-6 lg:px-8 lg:pt-6">
@@ -779,6 +808,14 @@ const HomeView = ({
             <ToolsCard tools={HOME_TOOLS} onOpen={(tool) => onSection(tool)} />
           </section>
 
+          {activeClass && (
+            <EducationClassDashboard
+              active={activeClass}
+              classes={studentClasses}
+              onOpenSpaces={() => onSection("spaces")}
+            />
+          )}
+
           {/* ── My work jump-link ─────────────────────────────── */}
           <div className="mt-10 flex items-center justify-center">
             <button
@@ -786,7 +823,7 @@ const HomeView = ({
               onClick={() => onSection("spaces")}
               className="flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-zinc-300 transition-colors hover:text-white lg:min-h-0"
             >
-              My work
+              {t("workspace.home.my_work")}
               <ChevronRight className="h-3.5 w-3.5 text-zinc-500" />
             </button>
           </div>
@@ -794,7 +831,7 @@ const HomeView = ({
           <section className="mt-6">
             <div className="flex items-center justify-center border-b border-white/[0.06]">
               <div className="relative h-11 px-3 text-[12.5px] font-medium text-zinc-50 lg:h-9">
-                Academy
+                {t("workspace.home.academy")}
                 <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-t-sm bg-zinc-100" />
               </div>
             </div>
@@ -808,6 +845,83 @@ const HomeView = ({
         </div>
       </div>
     </>
+  );
+};
+
+const EducationClassDashboard = ({
+  active,
+  classes,
+  onOpenSpaces,
+}: {
+  active: ClassMembershipInfo;
+  classes: ClassMembershipInfo[];
+  onOpenSpaces: () => void;
+}) => {
+  const pctUsed = active.credits_lifetime_received > 0
+    ? Math.min(100, Math.round((active.credits_lifetime_used / active.credits_lifetime_received) * 100))
+    : 0;
+
+  return (
+    <section className="mt-4 rounded-2xl border border-emerald-400/20 bg-[linear-gradient(135deg,hsl(158_64%_16%/0.92),hsl(220_17%_9%/0.98)_55%,hsl(41_84%_18%/0.8))] p-4 shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-[12px] font-semibold text-emerald-100">
+            <GraduationCap className="h-3.5 w-3.5" />
+            Education workspace
+          </div>
+          <h2 className="truncate text-2xl font-semibold tracking-normal text-white">
+            {active.class_name}
+          </h2>
+          <p className="mt-1 text-sm text-emerald-50/70">
+            {active.class_code} · {classes.length} active class{classes.length === 1 ? "" : "es"} · student wallet
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <ActiveClassPicker variant="compact" className="border-white/10 bg-white/10 text-white hover:bg-white/15" />
+          <button
+            type="button"
+            onClick={onOpenSpaces}
+            className="inline-flex h-9 items-center gap-2 rounded-lg bg-white px-3 text-sm font-semibold text-zinc-950 transition-colors hover:bg-emerald-50"
+          >
+            Open class spaces
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="rounded-xl border border-white/10 bg-white/[0.08] p-3">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.14em] text-emerald-100/70">
+            <WalletCards className="h-3.5 w-3.5" />
+            Balance
+          </div>
+          <p className="mt-2 text-2xl font-semibold text-white">
+            {active.credits_balance.toLocaleString()}
+          </p>
+          <p className="mt-1 text-xs text-emerald-50/55">credits available for this class</p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-white/[0.08] p-3">
+          <div className="text-xs uppercase tracking-[0.14em] text-emerald-100/70">Received</div>
+          <p className="mt-2 text-2xl font-semibold text-white">
+            {active.credits_lifetime_received.toLocaleString()}
+          </p>
+          <p className="mt-1 text-xs text-emerald-50/55">teacher and class grants</p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-white/[0.08] p-3">
+          <div className="mb-2 flex justify-between text-xs uppercase tracking-[0.14em] text-emerald-100/70">
+            <span>Used</span>
+            <span>{pctUsed}%</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full rounded-full bg-amber-300" style={{ width: `${pctUsed}%` }} />
+          </div>
+          <p className="mt-3 text-lg font-semibold text-white">
+            {active.credits_lifetime_used.toLocaleString()}
+          </p>
+        </div>
+      </div>
+    </section>
   );
 };
 
@@ -837,6 +951,7 @@ const ProjectsCard = ({
   onCreate: () => void;
   onDelete: (id: string) => void;
 }) => {
+  const { t } = useLanguage();
   /* Type-to-confirm dialog state. We model the in-flight delete as
    * an optional pointer to the candidate project; the input field
    * lives alongside in `confirmText`. Both reset on close. The old
@@ -877,13 +992,13 @@ const ProjectsCard = ({
       <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-300">
-            Projects
+            {t("workspace.home.projects")}
             <ChevronRight className="h-3 w-3 text-zinc-500" />
           </div>
           <button
             type="button"
             onClick={onCreate}
-            title="New project"
+            title={t("workspace.home.new_project_tooltip")}
             className="rounded-md p-1 text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white"
           >
             <Plus className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
@@ -896,7 +1011,7 @@ const ProjectsCard = ({
             onClick={onCreate}
             className="flex min-h-[132px] w-full items-center justify-center rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] px-4 text-[12px] text-zinc-500 transition-colors hover:border-white/[0.20] hover:bg-white/[0.04] hover:text-zinc-200"
           >
-            + Create your first project
+            {t("workspace.home.create_first_project")}
           </button>
         ) : (
           <ul className="flex flex-col gap-0.5">
@@ -934,7 +1049,7 @@ const ProjectsCard = ({
                           !isProtected && "group-hover/proj:opacity-0",
                         )}
                       >
-                        Active
+                        {t("workspace.home.active")}
                       </span>
                     ) : (
                       <Lock
@@ -960,8 +1075,8 @@ const ProjectsCard = ({
                       type="button"
                       onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => requestDelete(e, p)}
-                      title={`Delete "${p.name}"`}
-                      aria-label={`Delete project ${p.name}`}
+                      title={t("workspace.home.delete_project_tooltip", { name: p.name })}
+                      aria-label={t("workspace.home.delete_project_aria", { name: p.name })}
                       className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-500 opacity-0 transition-all group-hover/proj:opacity-100 hover:bg-red-500/15 hover:text-red-300"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -988,16 +1103,18 @@ const ProjectsCard = ({
         <DialogContent className="border-white/10 bg-[hsl(0_0%_8%)] text-zinc-100 sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-base text-zinc-100">
-              ลบโปรเจค "{pendingDelete?.name}"?
+              {t("workspace.home.delete_dialog_title", { name: pendingDelete?.name ?? "" })}
             </DialogTitle>
             <DialogDescription className="text-[13px] leading-relaxed text-zinc-400">
-              การลบจะเอา <span className="font-semibold text-zinc-200">spaces, canvases และผลงานทั้งหมด</span> ในโปรเจคนี้ออกถาวร — กู้คืนไม่ได้
+              {t("workspace.home.delete_dialog_desc_pre")}
+              <span className="font-semibold text-zinc-200">{t("workspace.home.delete_dialog_desc_target")}</span>
+              {t("workspace.home.delete_dialog_desc_post")}
               <br />
-              พิมพ์{" "}
+              {t("workspace.home.delete_dialog_type")}
               <span className="rounded bg-red-500/15 px-1.5 py-0.5 font-mono text-[12px] font-semibold text-red-300 ring-1 ring-inset ring-red-500/30">
                 ยืนยัน
-              </span>{" "}
-              เพื่อลบ
+              </span>
+              {t("workspace.home.delete_dialog_to_confirm")}
             </DialogDescription>
           </DialogHeader>
 
@@ -1012,7 +1129,7 @@ const ProjectsCard = ({
               }
             }}
             autoFocus
-            placeholder="พิมพ์ ยืนยัน"
+            placeholder={t("workspace.home.delete_dialog_placeholder")}
             spellCheck={false}
             autoComplete="off"
             className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-red-500/40 focus:ring-1 focus:ring-red-500/20"
@@ -1024,7 +1141,7 @@ const ProjectsCard = ({
               onClick={closeDialog}
               className="inline-flex h-9 items-center justify-center rounded-md bg-white/[0.06] px-4 text-[13px] font-medium text-zinc-200 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.09] hover:text-white"
             >
-              ยกเลิก
+              {t("workspace.home.delete_dialog_cancel")}
             </button>
             <button
               type="button"
@@ -1038,7 +1155,7 @@ const ProjectsCard = ({
               )}
             >
               <Trash2 className="h-3.5 w-3.5" />
-              ลบโปรเจค
+              {t("workspace.home.delete_dialog_confirm")}
             </button>
           </DialogFooter>
         </DialogContent>
@@ -1066,61 +1183,64 @@ const SpacesShowcaseCard = ({
   onOpen: (id: string) => void;
   onNew: () => void;
   onSeeAll: () => void;
-}) => (
-  <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
-    <div className="mb-3 flex items-center justify-between">
-      <button
-        type="button"
-        onClick={onSeeAll}
-        className="flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-300 transition-colors hover:text-white"
-      >
-        Spaces
-        <ChevronRight className="h-3 w-3 text-zinc-500" />
-      </button>
-      <button
-        type="button"
-        onClick={onNew}
-        title="New space"
-        className="flex h-10 w-10 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white lg:h-8 lg:w-8"
-      >
-        <Plus className="h-3.5 w-3.5" />
-      </button>
-    </div>
-
-    {spaces.length === 0 ? (
-      <button
-        type="button"
-        onClick={onNew}
-        className="flex min-h-[150px] w-full items-center justify-center rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] px-4 text-[12px] text-zinc-500 transition-colors hover:border-white/[0.20] hover:bg-white/[0.04] hover:text-zinc-200"
-      >
-        + Create your first space
-      </button>
-    ) : (
-      <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
-        {spaces.map((ws) => (
-          <button
-            key={ws.id}
-            type="button"
-            onClick={() => onOpen(ws.id)}
-            className="group/space flex min-w-0 flex-col gap-2 rounded-xl bg-[hsl(0_0%_4%)] p-1.5 ring-1 ring-inset ring-white/[0.05] transition-all hover:ring-white/[0.14]"
-          >
-            <div className="aspect-[4/3] overflow-hidden rounded-lg bg-[hsl(0_0%_2%)]">
-              <CanvasMinimap nodes={ws.nodes} edges={ws.edges} />
-            </div>
-            <div className="px-1 pb-0.5 text-left">
-              <div className="truncate text-[11.5px] font-medium text-zinc-100">
-                {ws.name}
-              </div>
-              <div className="text-[10px] text-zinc-500">
-                {timeAgo(ws.updatedAt)}
-              </div>
-            </div>
-          </button>
-        ))}
+}) => {
+  const { t } = useLanguage();
+  return (
+    <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
+      <div className="mb-3 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={onSeeAll}
+          className="flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-300 transition-colors hover:text-white"
+        >
+          {t("workspace.home.spaces")}
+          <ChevronRight className="h-3 w-3 text-zinc-500" />
+        </button>
+        <button
+          type="button"
+          onClick={onNew}
+          title={t("workspace.home.new_space_tooltip")}
+          className="flex h-10 w-10 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white lg:h-8 lg:w-8"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
       </div>
-    )}
-  </div>
-);
+
+      {spaces.length === 0 ? (
+        <button
+          type="button"
+          onClick={onNew}
+          className="flex min-h-[150px] w-full items-center justify-center rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] px-4 text-[12px] text-zinc-500 transition-colors hover:border-white/[0.20] hover:bg-white/[0.04] hover:text-zinc-200"
+        >
+          {t("workspace.home.create_first_space")}
+        </button>
+      ) : (
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
+          {spaces.map((ws) => (
+            <button
+              key={ws.id}
+              type="button"
+              onClick={() => onOpen(ws.id)}
+              className="group/space flex min-w-0 flex-col gap-2 rounded-xl bg-[hsl(0_0%_4%)] p-1.5 ring-1 ring-inset ring-white/[0.05] transition-all hover:ring-white/[0.14]"
+            >
+              <div className="aspect-[4/3] overflow-hidden rounded-lg bg-[hsl(0_0%_2%)]">
+                <CanvasMinimap nodes={ws.nodes} edges={ws.edges} />
+              </div>
+              <div className="px-1 pb-0.5 text-left">
+                <div className="truncate text-[11.5px] font-medium text-zinc-100">
+                  {ws.name}
+                </div>
+                <div className="text-[10px] text-zinc-500">
+                  {timeAgo(ws.updatedAt)}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ToolsCard = ({
   tools,
@@ -1128,46 +1248,49 @@ const ToolsCard = ({
 }: {
   tools: HomeTool[];
   onOpen: (tool: StandaloneToolKey) => void;
-}) => (
-  <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
-    <div className="mb-3 flex items-center justify-between">
-      <button
-        type="button"
-        onClick={() => onOpen(tools[0]?.id ?? "image_gen")}
-        className="flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-300 transition-colors hover:text-white"
-      >
-        Tools
-        <ChevronRight className="h-3 w-3 text-zinc-500" />
-      </button>
-    </div>
+}) => {
+  const { t } = useLanguage();
+  return (
+    <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
+      <div className="mb-3 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => onOpen(tools[0]?.id ?? "image_gen")}
+          className="flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-300 transition-colors hover:text-white"
+        >
+          {t("workspace.home.tools")}
+          <ChevronRight className="h-3 w-3 text-zinc-500" />
+        </button>
+      </div>
 
-    <ul className="flex flex-col gap-0.5">
-      {tools.map((t) => (
-        <li key={t.id}>
-          <button
-            type="button"
-            onClick={() => onOpen(t.id)}
-            className="group/tool flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 text-[12.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white lg:min-h-9"
-          >
-            <span
-              className="flex h-5 w-5 items-center justify-center rounded-md ring-1 ring-inset ring-white/[0.08]"
-              style={{ background: t.accent }}
+      <ul className="flex flex-col gap-0.5">
+        {tools.map((tool) => (
+          <li key={tool.id}>
+            <button
+              type="button"
+              onClick={() => onOpen(tool.id)}
+              className="group/tool flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 text-[12.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white lg:min-h-9"
             >
-              <t.icon className="h-3 w-3 text-zinc-950" />
-            </span>
-            <span className="min-w-0 flex-1 text-left">
-              <span className="block truncate">{t.label}</span>
-              <span className="block truncate text-[10px] text-zinc-600 group-hover/tool:text-zinc-400">
-                {t.subtitle}
+              <span
+                className="flex h-5 w-5 items-center justify-center rounded-md ring-1 ring-inset ring-white/[0.08]"
+                style={{ background: tool.accent }}
+              >
+                <tool.icon className="h-3 w-3 text-zinc-950" />
               </span>
-            </span>
-            <ChevronRight className="h-3 w-3 text-zinc-700 transition-colors group-hover/tool:text-zinc-300" />
-          </button>
-        </li>
-      ))}
-    </ul>
-  </div>
-);
+              <span className="min-w-0 flex-1 text-left">
+                <span className="block truncate">{tool.label}</span>
+                <span className="block truncate text-[10px] text-zinc-600 group-hover/tool:text-zinc-400">
+                  {tool.subtitle}
+                </span>
+              </span>
+              <ChevronRight className="h-3 w-3 text-zinc-700 transition-colors group-hover/tool:text-zinc-300" />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
 
 const AcademyVideoTile = ({ video }: { video: AcademyVideo }) => (
   <li className="overflow-hidden rounded-2xl bg-[hsl(0_0%_7%)] ring-1 ring-inset ring-white/[0.06]">
@@ -1290,6 +1413,7 @@ const SpacesView = ({
   onOpenSidebar?: () => void;
 }) => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { user, loading: authLoading } = useAuth();
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const canvases = useWorkspaceStore((s) => s.canvases);
@@ -1361,7 +1485,7 @@ const SpacesView = ({
   }, [user?.id, authLoading, mergeServerWorkspaces]);
 
   const handleNew = () => {
-    const { workspaceId } = createWorkspace("Untitled space", activeProjectId);
+    const { workspaceId } = createWorkspace(t("workspace.spaces.untitled_space"), activeProjectId);
     if (user?.id) {
       const state = useWorkspaceStore.getState();
       const meta = state.workspaces.find((w) => w.id === workspaceId);
@@ -1395,7 +1519,7 @@ const SpacesView = ({
   }, [activeProjectId, workspaces, canvases, graphs]);
 
   const handleRename = (id: string, currentName: string) => {
-    const next = prompt("Rename space:", currentName);
+    const next = prompt(t("workspace.spaces.rename_prompt"), currentName);
     if (next?.trim() && next.trim() !== currentName) {
       renameWorkspace(id, next.trim());
       if (user?.id) {
@@ -1407,7 +1531,7 @@ const SpacesView = ({
     }
   };
   const handleDelete = (id: string, displayName: string) => {
-    if (!confirm(`Delete “${displayName}”? This can't be undone.`)) return;
+    if (!confirm(t("workspace.spaces.delete_confirm", { name: displayName }))) return;
     deleteWorkspace(id);
     if (user?.id) void deleteWorkspaceFromServer(id);
   };
@@ -1419,27 +1543,27 @@ const SpacesView = ({
    *  for it and ordering doesn't matter to the UX (the toast lands
    *  whenever the slowest write finishes). */
   const handleDuplicate = (id: string) => {
-    const toastId = toast.loading("Duplicating…");
+    const toastId = toast.loading(t("workspace.toast.duplicating"));
     let newWorkspaceId: string;
     try {
       const res = duplicateWorkspace(id);
       newWorkspaceId = res.workspaceId;
     } catch (err) {
       console.error("[workspace] duplicate failed:", err);
-      toast.error("Couldn't duplicate this space.", { id: toastId });
+      toast.error(t("workspace.toast.couldnt_duplicate"), { id: toastId });
       return;
     }
     // Source vanished — duplicateWorkspace returns the source id
     // unchanged in that case, so bail with an error toast.
     if (newWorkspaceId === id) {
-      toast.error("Couldn't duplicate this space.", { id: toastId });
+      toast.error(t("workspace.toast.couldnt_duplicate"), { id: toastId });
       return;
     }
 
     const newMeta = useWorkspaceStore
       .getState()
       .workspaces.find((w) => w.id === newWorkspaceId);
-    const newName = newMeta?.name ?? "Duplicated space";
+    const newName = newMeta?.name ?? t("workspace.toast.duplicated_space_fallback");
 
     if (user?.id) {
       void (async () => {
@@ -1456,10 +1580,10 @@ const SpacesView = ({
                 : Promise.resolve(),
             ),
           );
-          toast.success(`Duplicated as “${newName}”`, {
+          toast.success(t("workspace.toast.duplicated_as", { name: newName }), {
             id: toastId,
             action: {
-              label: "Open",
+              label: t("workspace.toast.open"),
               onClick: () => navigate(`/app/workspace/${newWorkspaceId}`),
             },
           });
@@ -1468,11 +1592,11 @@ const SpacesView = ({
           // Local copy is already there — surface a soft warning, not
           // a hard error. The user can still open the duplicate; the
           // canvas's own autosave will retry the server push.
-          toast.warning(`Duplicated as “${newName}” (offline)`, {
+          toast.warning(t("workspace.toast.duplicated_offline", { name: newName }), {
             id: toastId,
-            description: "Server sync failed — try again from the canvas.",
+            description: t("workspace.toast.duplicate_offline_desc"),
             action: {
-              label: "Open",
+              label: t("workspace.toast.open"),
               onClick: () => navigate(`/app/workspace/${newWorkspaceId}`),
             },
           });
@@ -1480,10 +1604,10 @@ const SpacesView = ({
       })();
     } else {
       // Guest — no server push, resolve the toast right away.
-      toast.success(`Duplicated as “${newName}”`, {
+      toast.success(t("workspace.toast.duplicated_as", { name: newName }), {
         id: toastId,
         action: {
-          label: "Open",
+          label: t("workspace.toast.open"),
           onClick: () => navigate(`/app/workspace/${newWorkspaceId}`),
         },
       });

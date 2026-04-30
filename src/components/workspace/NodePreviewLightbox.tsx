@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import type { Node } from "@xyflow/react";
 import { useMirroredTripoUrl } from "./useMirroredTripoUrl";
 import { downloadFromUrl } from "./downloadAsset";
+import { loadModelViewer } from "@/lib/loadModelViewer";
 
 export interface PreviewPayload {
   type: "image" | "video" | "audio" | "text" | "grid" | "model3d";
@@ -77,6 +78,15 @@ const NodePreviewLightbox = ({ preview, onClose }: Props) => {
     // 3D and opens another, the loader has to come back.
     setModelLoaded(false);
     if (preview.type !== "model3d") return;
+    // Kick off the lazy-load of the <model-viewer> custom element.
+    // Idempotent — the loader caches its promise, so opening multiple
+    // 3D previews issues at most one network request per session.
+    // We don't await here because the <model-viewer> element below is
+    // already mounted; once the script registers the custom element
+    // tag definition, the existing tags upgrade in-place.
+    void loadModelViewer().catch((err) => {
+      console.warn("[NodePreviewLightbox] failed to load model-viewer:", err);
+    });
     const el = modelViewerRef.current;
     if (!el) return;
     const onLoad = () => setModelLoaded(true);

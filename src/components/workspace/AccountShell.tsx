@@ -24,13 +24,14 @@
  */
 
 import { type ReactNode } from "react";
-import { useNavigate, useLocation, Outlet } from "react-router-dom";
+import { Link, useNavigate, useLocation, Outlet } from "react-router-dom";
 import {
   ChevronLeft,
   Settings as SettingsIcon,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { UserMenu } from "@/components/workspace/UserMenu";
 import WorkspaceSidebar from "@/components/workspace/WorkspaceSidebar";
 
@@ -40,10 +41,12 @@ import WorkspaceSidebar from "@/components/workspace/WorkspaceSidebar";
  * aren't promoted in the chrome. */
 const ACCOUNT_TABS: Array<{
   path: string;
-  label: string;
+  /** Translation key resolved inside the component via t(). Kept as
+   *  a key (not a string) so EN/TH switches re-render the chrome. */
+  labelKey: "workspace.account.settings";
   icon: LucideIcon;
 }> = [
-  { path: "/app/settings", label: "Settings", icon: SettingsIcon },
+  { path: "/app/settings", labelKey: "workspace.account.settings", icon: SettingsIcon },
 ];
 
 /**
@@ -54,6 +57,7 @@ const ACCOUNT_TABS: Array<{
 export default function AccountShell({ children }: { children?: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useLanguage();
   const isSettingsRoute = location.pathname.startsWith("/app/settings");
 
   return (
@@ -73,12 +77,12 @@ export default function AccountShell({ children }: { children?: ReactNode }) {
             type="button"
             onClick={() => navigate("/app/workspace")}
             className="flex h-10 w-10 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-100 lg:h-7 lg:w-7"
-            title="Back to workspace"
-            aria-label="Back to workspace"
+            title={t("workspace.account.back")}
+            aria-label={t("workspace.account.back")}
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="text-[13px] font-medium text-zinc-300">Account</span>
+          <span className="text-[13px] font-medium text-zinc-300">{t("workspace.account.title")}</span>
           <span className="text-zinc-600">/</span>
           <nav className="flex min-w-0 items-center gap-0.5 overflow-x-auto">
             {ACCOUNT_TABS.map((tab) => {
@@ -96,7 +100,7 @@ export default function AccountShell({ children }: { children?: ReactNode }) {
                   )}
                 >
                   <tab.icon className="h-3.5 w-3.5" />
-                  {tab.label}
+                  {t(tab.labelKey)}
                 </button>
               );
             })}
@@ -122,8 +126,59 @@ export default function AccountShell({ children }: { children?: ReactNode }) {
           >
             {children ?? <Outlet />}
           </div>
+
+          {/* ── Slim legal footer ─────────────────────────────────
+           *  Lives inside the scrolling area so it doesn't clip
+           *  short pages (Settings is min-h-full → footer pushes
+           *  to the natural end of the content). Skipped on
+           *  full-screen surfaces (canvas, pricing) because those
+           *  use WorkspacePageShell, not AccountShell. */}
+          <AccountFooter />
         </div>
       </main>
     </div>
+  );
+}
+
+function AccountFooter() {
+  const { t } = useLanguage();
+  const sep = (
+    <span className="select-none text-zinc-700" aria-hidden>
+      {t("footerSeparator" as any)}
+    </span>
+  );
+  const linkClass =
+    "text-zinc-500 transition-colors hover:text-zinc-200 underline-offset-4 hover:underline";
+  return (
+    <footer className="border-t border-white/5 px-4 py-4 md:px-6">
+      <nav
+        className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-3 gap-y-2 text-[11px] text-zinc-500"
+        aria-label="Legal"
+      >
+        <Link to="/privacy" className={linkClass}>
+          {t("footerPrivacy" as any)}
+        </Link>
+        {sep}
+        <Link to="/terms" className={linkClass}>
+          {t("footerTerms" as any)}
+        </Link>
+        {sep}
+        <Link to="/refund" className={linkClass}>
+          {t("footerRefund" as any)}
+        </Link>
+        {sep}
+        <Link to="/aup" className={linkClass}>
+          {t("footerAup" as any)}
+        </Link>
+        {sep}
+        <Link to="/cookies" className={linkClass}>
+          {t("footerCookies" as any)}
+        </Link>
+        {sep}
+        <a href="mailto:support@mediaforge.co" className={linkClass}>
+          {t("footerContact" as any)}
+        </a>
+      </nav>
+    </footer>
   );
 }

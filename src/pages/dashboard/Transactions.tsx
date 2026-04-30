@@ -6,11 +6,13 @@ import { ArrowUpRight, ArrowDownLeft, Loader2, Receipt, Coins } from "lucide-rea
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import useDocumentTitle from "@/hooks/useDocumentTitle";
 
 interface CreditTx { id: string; amount: number; type: string; description: string | null; feature: string | null; balance_after: number; created_at: string; }
 interface PaymentTx { id: string; amount_thb: number; credits_added: number; status: string; payment_method: string | null; created_at: string; }
 
 const Transactions = () => {
+  useDocumentTitle("Usage — MediaForge");
   const { user } = useAuth();
   const { t } = useLanguage();
   const [creditTxs, setCreditTxs] = useState<CreditTx[]>([]);

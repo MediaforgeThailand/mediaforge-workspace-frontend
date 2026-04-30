@@ -14,6 +14,9 @@ interface CreditBalance {
   is_shared_pool?: boolean;
   pool_domain?: string | null;
   pool_user_id?: string | null;
+  organization_id?: string | null;
+  organization_name?: string | null;
+  organization_type?: string | null;
 }
 
 function unwrapCreditBalance(payload: unknown): CreditBalance | null {
@@ -26,6 +29,9 @@ function unwrapCreditBalance(payload: unknown): CreditBalance | null {
     is_shared_pool: Boolean(row.is_shared_pool),
     pool_domain: row.pool_domain ?? null,
     pool_user_id: row.pool_user_id ?? null,
+    organization_id: row.organization_id ?? null,
+    organization_name: row.organization_name ?? null,
+    organization_type: row.organization_type ?? null,
   };
 }
 

@@ -27,6 +27,8 @@ import { cn } from "@/lib/utils";
 import SettingsLayout, { type SettingsSectionKey } from "@/components/settings/SettingsLayout";
 import ComingSoon from "@/components/settings/ComingSoon";
 import PlanBilling from "@/components/settings/PlanBilling";
+import { DeleteAccountDialog } from "@/components/settings/DeleteAccountDialog";
+import useDocumentTitle from "@/hooks/useDocumentTitle";
 
 /**
  * Settings — multi-section surface backed by an in-page state-driven
@@ -46,6 +48,7 @@ import PlanBilling from "@/components/settings/PlanBilling";
  */
 
 const Settings = () => {
+  useDocumentTitle("Settings — MediaForge");
   const { profile, user, refreshProfile } = useAuth();
   const { t, language, setLanguage } = useLanguage();
   const { toast } = useToast();
@@ -68,6 +71,7 @@ const Settings = () => {
   const [company, setCompany] = useState(profile?.company || "");
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || "");
   const [uploading, setUploading] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const handleSave = async () => {
     if (!user) return;
@@ -213,12 +217,36 @@ const Settings = () => {
         {saving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
         {t("saveChanges")}
       </Button>
+
+      {/* ── Danger Zone ─────────────────────────────────────────
+       * PDPA right-of-erasure surface. The audit found we promise
+       * "request deletion of your data" in Privacy Policy but had
+       * no actual UI — non-compliance the moment any user files
+       * a request. This block is the user-facing entry point. */}
+      <Separator className="bg-white/5" />
+      <div className="rounded-xl border border-red-500/20 bg-red-500/[0.04] p-5">
+        <h3 className="text-[14px] font-semibold text-red-200">
+          {language === "th" ? "พื้นที่อันตราย" : "Danger zone"}
+        </h3>
+        <p className="mt-1 text-[12px] text-zinc-400">
+          {language === "th"
+            ? "การลบบัญชีจะเอาข้อมูล โปรเจค ผลงาน เครดิต และประวัติการชำระทั้งหมดออกถาวร — กู้คืนไม่ได้"
+            : "Deleting your account permanently removes all data, projects, generations, credits, and billing history — this cannot be undone."}
+        </p>
+        <button
+          type="button"
+          onClick={() => setDeleteDialogOpen(true)}
+          className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-3 text-[12.5px] font-medium text-red-200 transition-colors hover:bg-red-500/20"
+        >
+          {language === "th" ? "ลบบัญชีถาวร" : "Delete account"}
+        </button>
+      </div>
     </div>
   );
 
   const renderPreferences = () => (
     <div className="max-w-2xl space-y-6">
-      <h2 className="text-xl font-semibold text-zinc-50">Preferences</h2>
+      <h2 className="text-xl font-semibold text-zinc-50">{t("workspace.settings.preferences")}</h2>
       <div className="space-y-1 max-w-lg">
         <div className="flex items-center justify-between py-3">
           <span className="text-sm text-zinc-300 flex items-center gap-2.5">
@@ -244,48 +272,48 @@ const Settings = () => {
         return (
           <ComingSoon
             icon={Download}
-            title="Stock downloads"
-            description="Your downloaded stock assets will appear here once the stock library ships."
+            title={t("workspace.settings.stock_downloads")}
+            description={t("workspace.settings.stock_downloads_desc")}
           />
         );
       case "account.stock-collections":
         return (
           <ComingSoon
             icon={Bookmark}
-            title="Stock collections"
-            description="Save and organise stock assets into shared collections in the next wave."
+            title={t("workspace.settings.stock_collections")}
+            description={t("workspace.settings.stock_collections_desc")}
           />
         );
       case "account.following":
         return (
           <ComingSoon
             icon={UserPlus}
-            title="Following"
-            description="Follow creators and saved searches — coming with the community release."
+            title={t("workspace.settings.following")}
+            description={t("workspace.settings.following_desc")}
           />
         );
       case "organization.my-team":
         return (
           <ComingSoon
             icon={Users}
-            title="My Team"
-            description="Manage shared workspaces and team members — ships with the team rollout."
+            title={t("workspace.settings.my_team")}
+            description={t("workspace.settings.my_team_desc")}
           />
         );
       case "organization.people":
         return (
           <ComingSoon
             icon={Users}
-            title="People"
-            description="Invite collaborators and manage permissions — ships with the team rollout."
+            title={t("workspace.settings.people")}
+            description={t("workspace.settings.people_desc")}
           />
         );
       case "organization.security-sso":
         return (
           <ComingSoon
             icon={KeyRound}
-            title="Security SSO"
-            description="SSO and enterprise security controls — coming with the team rollout."
+            title={t("workspace.settings.security_sso")}
+            description={t("workspace.settings.security_sso_desc")}
           />
         );
       case "organization.preferences":
@@ -298,9 +326,18 @@ const Settings = () => {
   };
 
   return (
-    <SettingsLayout activeKey={activeKey} onChange={setActiveKey}>
-      {renderActiveSection()}
-    </SettingsLayout>
+    <>
+      <SettingsLayout activeKey={activeKey} onChange={setActiveKey}>
+        {renderActiveSection()}
+      </SettingsLayout>
+      {/* Mounted at the page level so Profile section's button can
+       *  trigger it; keeps the dialog DOM out of the section render
+       *  function which gets recreated on every state change. */}
+      <DeleteAccountDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+      />
+    </>
   );
 };
 

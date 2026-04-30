@@ -45,4 +45,51 @@ export default defineConfig(({ mode }) => ({
     __APP_VERSION__: JSON.stringify(APP_VERSION),
     __APP_COMMIT__: JSON.stringify(APP_COMMIT),
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split heavy vendors into their own chunks so they can be
+        // cached independently and so the main app chunk doesn't
+        // balloon to ~1.1 MB. xyflow / three / drei / framer-motion
+        // are all large and only needed on the canvas page; keeping
+        // them in separate chunks lets Rollup tree-share them across
+        // routes that import them dynamically.
+        manualChunks: {
+          "vendor-react": ["react", "react-dom", "react-router-dom"],
+          "vendor-radix": [
+            "@radix-ui/react-accordion",
+            "@radix-ui/react-alert-dialog",
+            "@radix-ui/react-aspect-ratio",
+            "@radix-ui/react-avatar",
+            "@radix-ui/react-checkbox",
+            "@radix-ui/react-collapsible",
+            "@radix-ui/react-context-menu",
+            "@radix-ui/react-dialog",
+            "@radix-ui/react-dropdown-menu",
+            "@radix-ui/react-hover-card",
+            "@radix-ui/react-label",
+            "@radix-ui/react-menubar",
+            "@radix-ui/react-navigation-menu",
+            "@radix-ui/react-popover",
+            "@radix-ui/react-progress",
+            "@radix-ui/react-radio-group",
+            "@radix-ui/react-scroll-area",
+            "@radix-ui/react-select",
+            "@radix-ui/react-separator",
+            "@radix-ui/react-slider",
+            "@radix-ui/react-slot",
+            "@radix-ui/react-switch",
+            "@radix-ui/react-tabs",
+            "@radix-ui/react-toast",
+            "@radix-ui/react-toggle",
+            "@radix-ui/react-toggle-group",
+            "@radix-ui/react-tooltip",
+          ],
+          "vendor-xyflow": ["@xyflow/react"],
+          "vendor-three": ["three", "@react-three/drei", "@react-three/fiber"],
+          "vendor-framer": ["framer-motion"],
+        },
+      },
+    },
+  },
 }));

@@ -53,6 +53,10 @@ const CookieConsent = () => {
                 <Link to="/privacy" className="underline hover:text-foreground">
                   {t("landingFooterPrivacy")}
                 </Link>
+                {" · "}
+                <Link to="/cookies" className="underline hover:text-foreground">
+                  {t("cookieManageLink" as any)}
+                </Link>
               </p>
               <div className="mt-3 flex gap-2">
                 <Button variant="gradient" size="sm" onClick={accept}>

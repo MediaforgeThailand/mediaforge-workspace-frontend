@@ -2,8 +2,10 @@ import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import logo from "@/assets/logo-white.png";
 import { useLanguage } from "@/contexts/LanguageContext";
+import useDocumentTitle from "@/hooks/useDocumentTitle";
 
 const Terms = () => {
+  useDocumentTitle("Terms of Service — MediaForge");
   const { language, t } = useLanguage();
 
   return (

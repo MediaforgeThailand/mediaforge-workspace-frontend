@@ -1,8 +1,10 @@
 import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import useDocumentTitle from "@/hooks/useDocumentTitle";
 
 const NotFound = () => {
+  useDocumentTitle("Page not found — MediaForge");
   const location = useLocation();
   const { t } = useLanguage();
 

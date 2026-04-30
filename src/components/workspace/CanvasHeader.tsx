@@ -31,10 +31,12 @@ import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Users, Layers } from "lucide-react";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useWorkspaceShareRole } from "@/store/useWorkspaceShareRole";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { UserMenu } from "@/components/workspace/UserMenu";
 import ShareDialog from "@/components/workspace/ShareDialog";
 
 const CanvasHeader = () => {
+  const { t } = useLanguage();
   const currentWorkspaceId = useWorkspaceStore(
     (s) => s.current?.workspaceId ?? null,
   );
@@ -47,10 +49,19 @@ const CanvasHeader = () => {
   // viewer/editor token shouldn't see the Share button — they
   // can't (and shouldn't be able to) re-share someone else's space.
   const shareRole = useWorkspaceShareRole((s) => s.role);
-  const canShare = shareRole === "owner" && !!currentWorkspaceId;
+  // Hidden until the back-end ships. The audit found that Share
+  // calls `workspace_share_create` / `workspace_share_list` edge
+  // functions that don't exist in the backend repo — so clicking
+  // Share returned an error toast and made the product look
+  // half-built. Hide until the workspace_shares migration + edge
+  // functions land. Re-enable by setting SHARE_FEATURE_ENABLED=true
+  // (or flipping this constant) once the backend is in place.
+  const SHARE_FEATURE_ENABLED = false;
+  const canShare =
+    SHARE_FEATURE_ENABLED && shareRole === "owner" && !!currentWorkspaceId;
   const [shareOpen, setShareOpen] = useState(false);
 
-  const projectLabel = "Personal";
+  const projectLabel = t("workspace.canvas.personal");
   const projectAccent = "hsl(35 90% 55%)"; // matches the Personal colour swatch on the dashboard
 
   return (
@@ -63,8 +74,8 @@ const CanvasHeader = () => {
         <Link
           to="/app/workspace"
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-100 lg:h-8 lg:w-8"
-          title="Back to dashboard"
-          aria-label="Back to dashboard"
+          title={t("workspace.canvas.back_dashboard")}
+          aria-label={t("workspace.canvas.back_dashboard")}
         >
           <ChevronLeft className="h-4 w-4" />
         </Link>
@@ -73,7 +84,7 @@ const CanvasHeader = () => {
         <button
           type="button"
           className="flex h-10 shrink-0 items-center gap-1.5 rounded-md px-2 text-[12.5px] text-zinc-200 transition-colors hover:bg-white/[0.04] lg:h-8 lg:px-1.5"
-          title={`Project: ${projectLabel} (mockup)`}
+          title={t("workspace.canvas.project_tooltip", { name: projectLabel })}
         >
           <span
             className="flex h-5 w-5 items-center justify-center rounded-[5px]"
@@ -89,7 +100,7 @@ const CanvasHeader = () => {
         {/* Workspace name — slightly italic + soft glyph to read as
          *  "the document title", consistent with Figma/Notion patterns. */}
         <span className="min-w-0 truncate text-[12.5px] italic text-zinc-300">
-          {workspace?.name || "Untitled space"}
+          {workspace?.name || t("workspace.canvas.untitled_space")}
         </span>
       </div>
 
@@ -100,10 +111,10 @@ const CanvasHeader = () => {
             type="button"
             onClick={() => setShareOpen(true)}
             className="flex h-10 items-center gap-1.5 rounded-md bg-white px-3 text-[12px] font-medium text-zinc-900 transition-colors hover:bg-zinc-200 lg:h-8"
-            title="Share workspace"
+            title={t("workspace.canvas.share_workspace")}
           >
             <Users className="h-3.5 w-3.5" />
-            Share
+            {t("workspace.canvas.share")}
           </button>
         )}
         <UserMenu />

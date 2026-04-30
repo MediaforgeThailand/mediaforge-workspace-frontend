@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
+import useDocumentTitle from "@/hooks/useDocumentTitle";
 // TopupSection import removed — workspace doesn't sell standalone
 // credit top-ups (the consumer product does, this surface doesn't).
 
@@ -155,6 +156,7 @@ const FEATURE_ROWS: { en: string; th: string; plans: Record<string, boolean> }[]
 const ANNUAL_DISCOUNT = 0.2;
 
 const Pricing = () => {
+  useDocumentTitle("Pricing — MediaForge");
   const navigate = useNavigate();
   const { language, t } = useLanguage();
   const { credits, refetch } = useCredits();
@@ -352,6 +354,21 @@ const Pricing = () => {
               </span>
             </button>
           </div>
+        </div>
+
+        {/* One-time-purchase disclosure — keeps the user honest about
+         *  how the plan works on Thai PromptPay. The audit found that
+         *  Stripe Checkout creates `mode: "payment"` (one-off) rather
+         *  than `mode: "subscription"`, so plans DON'T auto-renew.
+         *  Without this banner, users assume "Pro Monthly" auto-charges
+         *  next month and feel cheated when nothing happens.  */}
+        <div className="mx-auto mt-4 flex max-w-2xl items-start justify-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/[0.07] px-4 py-3 text-center text-xs text-amber-200 md:mt-5 md:text-sm">
+          <span className="text-base leading-none">ⓘ</span>
+          <span>
+            {language === "th"
+              ? "แพ็กเครดิตจ่ายครั้งเดียว — ไม่หักบัตรอัตโนมัติ ครบกำหนดต้องเติมใหม่เอง รองรับ PromptPay QR (แนะนำ) และบัตรเครดิต"
+              : "One-time credit pack — no auto-renew. Top up manually each cycle. Pay with PromptPay QR (recommended) or credit card."}
+          </span>
         </div>
       </section>
 

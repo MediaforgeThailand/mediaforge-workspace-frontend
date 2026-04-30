@@ -29,6 +29,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import InsufficientCreditsDialog from "@/components/InsufficientCreditsDialog";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { friendlyError } from "@/lib/friendlyError";
 
 import { type ParamDef } from "@/components/flow/nodes/nodeApiSchema";
 import { useNodeCreditCosts as useCreatorCreditCosts } from "@/hooks/useNodeCreditCosts";
@@ -368,6 +370,20 @@ function resolveInputs(nodeId: string): {
       pushAt(key, cleanText);
       textMentioned.push(...mentioned);
     } else if (src.type === "assetNode") {
+      // Block enqueue if an upstream asset is still uploading. The
+      // local preview URL at this point is a `blob:` URL that won't
+      // resolve from the provider's side — they'd see "Failed to
+      // download image" and we'd waste credits. The audit caught
+      // this exact path: user drags a 50 MB video, clicks Run on a
+      // wired Kling node 200 ms later, the bucket upload is still
+      // in flight, the request goes out with the blob URL, and
+      // refund happens 5 minutes later via the sweep cron.
+      if (srcData?.uploading === true) {
+        throw new Error(
+          "ไฟล์อ้างอิงยังอัปโหลดไม่เสร็จ — รอสักครู่แล้วกด Run อีกครั้ง / " +
+            "Reference asset is still uploading — wait a moment and click Run again",
+        );
+      }
       pushAt(key, srcData?.previewUrl ?? srcData?.storagePath ?? null);
     } else if (src.type === "elementNode") {
       // Both saved (cached refs) + creator (walk edges) modes share the
@@ -507,6 +523,9 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const edges = useEdges();
   const prevHasRefVideo = useRef<boolean | undefined>(undefined);
   const [insufficientOpen, setInsufficientOpen] = useState(false);
+  // Used by friendlyError() to localize jargon errors before they
+  // reach the user. Raw text still lands in console.error.
+  const { language } = useLanguage();
 
   // Refs + ResizeObserver for the dynamic prompt-lift logic. The
   // prompt overlay sits above the settings toolbar and used to lift
@@ -1425,9 +1444,15 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         title: `✗ ${nodeLabelForLog} · ${String(e?.message ?? e)}`,
       });
       if (insufficientCredits) setInsufficientOpen(true);
-      if (shouldToast && !insufficientCredits) toast.error(errorMessage);
+      if (shouldToast && !insufficientCredits) {
+        // Translate jargon errors (`PROVIDER_BILLING_ERROR`,
+        // `function consume_credits_for(…) does not exist`,
+        // OpenAI 401 …) to friendly Thai/EN copy. Raw error
+        // stays in console.error for the team.
+        toast.error(friendlyError(errorMessage, language === "th" ? "th" : "en"));
+      }
     }
-  }, [getNodes, id, isRunning, isViewer, params, schemaKey, setNodes, selectedModel, schema, d.params?.nodeName]);
+  }, [getNodes, id, isRunning, isViewer, params, schemaKey, setNodes, selectedModel, schema, d.params?.nodeName, language]);
 
   useEffect(() => {
     if (!isRunning) return;

@@ -39,12 +39,14 @@ import {
   Coins,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "next-themes";
 import { useCredits } from "@/hooks/useCredits";
 
 export function UserMenu() {
   const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
+  const { t } = useLanguage();
   const { theme, setTheme } = useTheme();
   const { credits, loading: creditsLoading } = useCredits();
 
@@ -52,7 +54,7 @@ export function UserMenu() {
     (profile?.display_name?.[0] ?? user?.email?.[0] ?? "U").toUpperCase();
   const formattedCredits =
     creditsLoading && !credits
-      ? "Loading..."
+      ? t("workspace.usermenu.loading")
       : new Intl.NumberFormat("en-US").format(credits?.balance ?? 0);
 
   const handleSignOut = async () => {
@@ -64,7 +66,7 @@ export function UserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger
         className="flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-inset ring-white/[0.08] transition-all hover:ring-white/[0.18] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40 lg:h-8 lg:w-8"
-        aria-label="Account menu"
+        aria-label={t("workspace.usermenu.account")}
       >
         <Avatar className="h-10 w-10 lg:h-8 lg:w-8">
           <AvatarImage src={profile?.avatar_url ?? undefined} alt="" />
@@ -88,7 +90,7 @@ export function UserMenu() {
           </Avatar>
           <div className="min-w-0 flex-1">
             <div className="truncate text-[12.5px] font-medium text-zinc-100">
-              {profile?.display_name || "Member"}
+              {profile?.display_name || t("workspace.usermenu.member_fallback")}
             </div>
             <div className="truncate text-[11px] text-zinc-500">
               {user?.email}
@@ -110,12 +112,12 @@ export function UserMenu() {
               </span>
               <div className="min-w-0">
                 <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-violet-200/80">
-                  Credits
+                  {t("workspace.usermenu.credits")}
                 </div>
                 <div className="truncate text-[11px] text-zinc-500">
-                  {credits?.is_shared_pool && credits.pool_domain
-                    ? `Shared pool · ${credits.pool_domain}`
-                    : "Available balance"}
+                  {credits?.is_shared_pool
+                    ? `${t("workspace.usermenu.shared_pool")} · ${credits.organization_name ?? credits.pool_domain}`
+                    : t("workspace.usermenu.available_balance")}
                 </div>
               </div>
             </div>
@@ -132,7 +134,7 @@ export function UserMenu() {
             className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-md bg-violet-600 px-3 text-[12.5px] font-medium text-white shadow-sm transition-colors hover:bg-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/60 lg:min-h-0 lg:py-1.5"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            Upgrade
+            {t("workspace.usermenu.upgrade")}
           </button>
         </div>
 
@@ -146,7 +148,7 @@ export function UserMenu() {
           className="min-h-11 cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50 lg:min-h-0"
         >
           <SettingsIcon className="h-3.5 w-3.5 text-zinc-400" />
-          Settings
+          {t("workspace.usermenu.settings")}
         </DropdownMenuItem>
 
         <DropdownMenuItem
@@ -154,7 +156,7 @@ export function UserMenu() {
           className="min-h-11 cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50 lg:min-h-0"
         >
           <CreditCard className="h-3.5 w-3.5 text-zinc-400" />
-          Plan &amp; billing
+          {t("workspace.usermenu.plan_billing")}
         </DropdownMenuItem>
 
         <DropdownMenuSeparator className="bg-white/[0.06]" />
@@ -177,7 +179,7 @@ export function UserMenu() {
           ) : (
             <Moon className="h-3.5 w-3.5 text-zinc-400" />
           )}
-          Switch to {theme === "dark" ? "light" : "dark"}
+          {theme === "dark" ? t("workspace.usermenu.theme_to_light") : t("workspace.usermenu.theme_to_dark")}
         </DropdownMenuItem>
 
         <DropdownMenuSeparator className="bg-white/[0.06]" />
@@ -187,7 +189,7 @@ export function UserMenu() {
           className="min-h-11 cursor-pointer gap-2 text-[12.5px] text-red-300 focus:bg-red-500/10 focus:text-red-200 lg:min-h-0"
         >
           <LogOut className="h-3.5 w-3.5" />
-          Sign out
+          {t("workspace.usermenu.sign_out")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

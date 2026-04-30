@@ -2,8 +2,10 @@ import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import logo from "@/assets/logo-white.png";
 import { useLanguage } from "@/contexts/LanguageContext";
+import useDocumentTitle from "@/hooks/useDocumentTitle";
 
 const Privacy = () => {
+  useDocumentTitle("Privacy Policy — MediaForge");
   const { language, t } = useLanguage();
 
   return (
@@ -79,6 +81,103 @@ const EnglishPrivacy = () => (
       <li><strong>Legal Requirements:</strong> When required by law or to protect our rights.</li>
     </ul>
 
+    <h2>4a. Named Sub-processors</h2>
+    <p>
+      The vendors below process your data on MediaForge's behalf. We maintain Data Processing Agreements (DPAs) with each
+      named processor. Cross-border transfers are covered under <strong>Thai PDPA Section 28</strong> (adequate-protection
+      equivalent contractual clauses).
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Vendor</th>
+          <th>Region</th>
+          <th>Purpose</th>
+          <th>Data sent</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Supabase</td>
+          <td>Singapore (ap-southeast-1)</td>
+          <td>Database, auth, storage, edge functions</td>
+          <td>All user data</td>
+        </tr>
+        <tr>
+          <td>Stripe Inc.</td>
+          <td>USA + Thailand</td>
+          <td>Payment processing</td>
+          <td>Email, billing address, payment metadata</td>
+        </tr>
+        <tr>
+          <td>PostHog Inc.</td>
+          <td>USA</td>
+          <td>Product analytics (opt-in)</td>
+          <td>Pseudonymised event stream</td>
+        </tr>
+        <tr>
+          <td>SendGrid (Twilio)</td>
+          <td>USA</td>
+          <td>Transactional email</td>
+          <td>Email + name</td>
+        </tr>
+        <tr>
+          <td>OpenAI LLC</td>
+          <td>USA</td>
+          <td>GPT-Image generation</td>
+          <td>User prompt + reference images</td>
+        </tr>
+        <tr>
+          <td>Google LLC (Gemini, Cloud TTS)</td>
+          <td>USA</td>
+          <td>Banana / Gemini TTS / Google TTS</td>
+          <td>User prompt + reference images</td>
+        </tr>
+        <tr>
+          <td>ElevenLabs Inc.</td>
+          <td>USA</td>
+          <td>Voice generation</td>
+          <td>Text scripts</td>
+        </tr>
+        <tr>
+          <td>BytePlus / Volcengine</td>
+          <td>Singapore</td>
+          <td>Seedance / Seedream / Hyper3D — video, image, 3D generation</td>
+          <td>User prompt + reference images</td>
+        </tr>
+        <tr>
+          <td>Replicate Inc.</td>
+          <td>USA</td>
+          <td>Misc model hosting</td>
+          <td>User prompt + reference images</td>
+        </tr>
+        <tr>
+          <td>Anthropic PBC</td>
+          <td>USA</td>
+          <td>Claude (workspace chat)</td>
+          <td>User chat messages</td>
+        </tr>
+        <tr>
+          <td>Tripo3D</td>
+          <td>USA</td>
+          <td>3D model generation</td>
+          <td>User prompt + reference images</td>
+        </tr>
+        <tr>
+          <td>Vercel Inc.</td>
+          <td>USA</td>
+          <td>Frontend hosting (CDN, Edge Network)</td>
+          <td>Page-load HTTP logs</td>
+        </tr>
+        <tr>
+          <td>Cloudflare Inc.</td>
+          <td>Global</td>
+          <td>DNS + DDoS protection</td>
+          <td>HTTP request metadata</td>
+        </tr>
+      </tbody>
+    </table>
+
     <h2>5. Data Security</h2>
     <p>We implement industry-standard security measures including encryption in transit (TLS), row-level security policies, and secure authentication. However, no system is 100% secure.</p>
 
@@ -152,6 +251,104 @@ const ThaiPrivacy = () => (
       <li><strong>ผู้ประมวลผลการชำระเงิน:</strong> Stripe ประมวลผลธุรกรรมการชำระเงิน</li>
       <li><strong>ข้อกำหนดทางกฎหมาย:</strong> เมื่อกฎหมายกำหนดหรือเพื่อปกป้องสิทธิ์ของเรา</li>
     </ul>
+
+    <h2>4ก. รายชื่อผู้ประมวลผลย่อย (Sub-processors)</h2>
+    <p>
+      ผู้ให้บริการด้านล่างประมวลผลข้อมูลของคุณในนามของ MediaForge เรามีสัญญา Data Processing Agreement (DPA)
+      กับผู้ประมวลผลแต่ละราย การโอนข้อมูลข้ามประเทศได้รับการคุ้มครองภายใต้
+      <strong>พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล (PDPA) มาตรา 28</strong>
+      (สัญญาที่มีมาตรการคุ้มครองเทียบเท่า)
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>ผู้ให้บริการ</th>
+          <th>ภูมิภาค</th>
+          <th>วัตถุประสงค์</th>
+          <th>ข้อมูลที่ส่ง</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Supabase</td>
+          <td>สิงคโปร์ (ap-southeast-1)</td>
+          <td>Database, Auth, Storage, Edge Functions</td>
+          <td>ข้อมูลผู้ใช้ทั้งหมด</td>
+        </tr>
+        <tr>
+          <td>Stripe Inc.</td>
+          <td>สหรัฐอเมริกา + ไทย</td>
+          <td>ประมวลผลการชำระเงิน</td>
+          <td>อีเมล ที่อยู่เรียกเก็บ ข้อมูล metadata การชำระเงิน</td>
+        </tr>
+        <tr>
+          <td>PostHog Inc.</td>
+          <td>สหรัฐอเมริกา</td>
+          <td>Product Analytics (Opt-in)</td>
+          <td>Event stream แบบ pseudonymised</td>
+        </tr>
+        <tr>
+          <td>SendGrid (Twilio)</td>
+          <td>สหรัฐอเมริกา</td>
+          <td>อีเมลธุรกรรม</td>
+          <td>อีเมล + ชื่อ</td>
+        </tr>
+        <tr>
+          <td>OpenAI LLC</td>
+          <td>สหรัฐอเมริกา</td>
+          <td>การสร้างภาพด้วย GPT-Image</td>
+          <td>Prompt + รูปอ้างอิง</td>
+        </tr>
+        <tr>
+          <td>Google LLC (Gemini, Cloud TTS)</td>
+          <td>สหรัฐอเมริกา</td>
+          <td>Banana / Gemini TTS / Google TTS</td>
+          <td>Prompt + รูปอ้างอิง</td>
+        </tr>
+        <tr>
+          <td>ElevenLabs Inc.</td>
+          <td>สหรัฐอเมริกา</td>
+          <td>การสร้างเสียง</td>
+          <td>Script ข้อความ</td>
+        </tr>
+        <tr>
+          <td>BytePlus / Volcengine</td>
+          <td>สิงคโปร์</td>
+          <td>Seedance / Seedream / Hyper3D — สร้างวิดีโอ ภาพ และ 3D</td>
+          <td>Prompt + รูปอ้างอิง</td>
+        </tr>
+        <tr>
+          <td>Replicate Inc.</td>
+          <td>สหรัฐอเมริกา</td>
+          <td>Hosting โมเดลอื่นๆ</td>
+          <td>Prompt + รูปอ้างอิง</td>
+        </tr>
+        <tr>
+          <td>Anthropic PBC</td>
+          <td>สหรัฐอเมริกา</td>
+          <td>Claude (Workspace Chat)</td>
+          <td>ข้อความแชทของผู้ใช้</td>
+        </tr>
+        <tr>
+          <td>Tripo3D</td>
+          <td>สหรัฐอเมริกา</td>
+          <td>การสร้างโมเดล 3D</td>
+          <td>Prompt + รูปอ้างอิง</td>
+        </tr>
+        <tr>
+          <td>Vercel Inc.</td>
+          <td>สหรัฐอเมริกา</td>
+          <td>Hosting Frontend (CDN, Edge Network)</td>
+          <td>HTTP log การโหลดหน้า</td>
+        </tr>
+        <tr>
+          <td>Cloudflare Inc.</td>
+          <td>ทั่วโลก</td>
+          <td>DNS + การป้องกัน DDoS</td>
+          <td>Metadata ของ HTTP request</td>
+        </tr>
+      </tbody>
+    </table>
 
     <h2>5. ความปลอดภัยของข้อมูล</h2>
     <p>เราใช้มาตรการความปลอดภัยมาตรฐานอุตสาหกรรม รวมถึงการเข้ารหัสระหว่างการส่ง (TLS), นโยบาย Row-Level Security และการยืนยันตัวตนที่ปลอดภัย อย่างไรก็ตามไม่มีระบบใดที่ปลอดภัย 100%</p>

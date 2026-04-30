@@ -40,6 +40,9 @@ import { lazy, Suspense } from "react";
 import NotFound from "./pages/NotFound";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
+import Refund from "./pages/Refund";
+import AUP from "./pages/AUP";
+import Cookies from "./pages/Cookies";
 import CookieConsent from "./components/CookieConsent";
 import ProtectedRoute from "./components/ProtectedRoute";
 import OrgUserBlockGate from "./components/OrgUserBlockGate";
@@ -116,7 +119,6 @@ const Pricing = lazyWithRetry(() => import("./pages/dashboard/Pricing"));
 const TeacherCenter = lazyWithRetry(() => import("./pages/teacher-center"));
 const ClassEnroll = lazyWithRetry(() => import("./pages/ClassEnroll"));
 const OrgBranding = lazyWithRetry(() => import("./pages/org-admin/branding"));
-const UniversityMockup = lazyWithRetry(() => import("./pages/university"));
 
 const queryClient = new QueryClient();
 const PageLoader = () => <PageLoadingAnim />;
@@ -146,6 +148,9 @@ const App = () => (
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/terms" element={<Terms />} />
+                  <Route path="/refund" element={<Refund />} />
+                  <Route path="/aup" element={<AUP />} />
+                  <Route path="/cookies" element={<Cookies />} />
 
                   {/* Workspace dashboard owns its own sidebar (Home /
                    *  Spaces / Community / Projects / All tools / Stock),
@@ -185,13 +190,7 @@ const App = () => (
 
                   <Route
                     path="/app/university"
-                    element={
-                      <ProtectedRoute>
-                        <WorkspacePageShell hideSidebarBelowLg>
-                          <UniversityMockup />
-                        </WorkspacePageShell>
-                      </ProtectedRoute>
-                    }
+                    element={<Navigate to="/app/workspace" replace />}
                   />
 
                   {/* Account pages — same workspace sidebar as the

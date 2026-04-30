@@ -45,6 +45,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useIsOrgAdmin } from "@/hooks/useIsOrgUser";
 import { useOrgBranding } from "@/hooks/useOrgBranding";
 import OrgCreditBadge from "@/components/OrgCreditBadge";
@@ -71,21 +72,38 @@ export type SectionKey =
   | "assistant"
   | "tools"; // legacy "All tools" placeholder — still accepted
 
-const NAV_TOP: Array<{ id: SectionKey; label: string; icon: LucideIcon }> = [
-  { id: "home",   label: "Home",       icon: HomeIcon },
+/** Translation key for sidebar nav labels — resolved inside the
+ *  component via `useLanguage().t(...)` so EN/TH switches re-render
+ *  the rail. The id stays the same English-stable section key. */
+type NavItem = {
+  id: SectionKey;
+  /** Translation key for the label. Resolved at render time. */
+  labelKey:
+    | "workspace.sidebar.home"
+    | "workspace.sidebar.all_assets"
+    | "workspace.sidebar.spaces"
+    | "workspace.sidebar.image_gen"
+    | "workspace.sidebar.video_gen"
+    | "workspace.sidebar.voice_gen"
+    | "workspace.sidebar.threed_gen";
+  icon: LucideIcon;
+};
+
+const NAV_TOP: NavItem[] = [
+  { id: "home",   labelKey: "workspace.sidebar.home",       icon: HomeIcon },
   // Sidebar entry points to AssetsView (the Magnific-style asset
   // library that replaced the old HistoryView). The legacy
   // `?section=history` URL still resolves to this view because the
   // dashboard router treats both keys the same.
-  { id: "assets", label: "All assets", icon: HistoryIcon },
+  { id: "assets", labelKey: "workspace.sidebar.all_assets", icon: HistoryIcon },
 ];
 
-const NAV_TOOLS: Array<{ id: SectionKey; label: string; icon: LucideIcon }> = [
-  { id: "spaces",     label: "Spaces",          icon: Workflow },
-  { id: "image_gen",  label: "Image Generator", icon: ImageIcon },
-  { id: "video_gen",  label: "Video Generator", icon: Video },
-  { id: "voice_gen",  label: "Voice Generator", icon: Mic2 },
-  { id: "image_to_3d", label: "3D Generator",    icon: Box },
+const NAV_TOOLS: NavItem[] = [
+  { id: "spaces",     labelKey: "workspace.sidebar.spaces",      icon: Workflow },
+  { id: "image_gen",  labelKey: "workspace.sidebar.image_gen",   icon: ImageIcon },
+  { id: "video_gen",  labelKey: "workspace.sidebar.video_gen",   icon: Video },
+  { id: "voice_gen",  labelKey: "workspace.sidebar.voice_gen",   icon: Mic2 },
+  { id: "image_to_3d", labelKey: "workspace.sidebar.threed_gen", icon: Box },
 ];
 
 export interface WorkspaceSidebarProps {
@@ -107,6 +125,7 @@ export default function WorkspaceSidebar({
 }: WorkspaceSidebarProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const isPscDemoUser = user?.email?.toLowerCase() === "dmd@psc.com";
   // Tenant branding override (e.g. dmd.mediaforge.co → DMD logo +
   // "DMD" short name). Returns null on the bare workspace.mediaforge.co
@@ -169,7 +188,7 @@ export default function WorkspaceSidebar({
             "active:scale-[0.98]",
           )}
         >
-          <Plus className="h-3.5 w-3.5" /> Create
+          <Plus className="h-3.5 w-3.5" /> {t("workspace.sidebar.create")}
         </button>
       </div>
 
@@ -178,7 +197,7 @@ export default function WorkspaceSidebar({
         {NAV_TOP.map((it) => (
           <NavLink
             key={it.id}
-            label={it.label}
+            label={t(it.labelKey)}
             icon={it.icon}
             active={active === it.id}
             onClick={() => handleClick(it.id)}
@@ -189,7 +208,7 @@ export default function WorkspaceSidebar({
       {/* ── Section divider with label ─────────────────────────── */}
       <div className="px-5 pb-1.5 pt-3">
         <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
-          All tools
+          {t("workspace.sidebar.all_tools")}
         </div>
       </div>
 
@@ -198,7 +217,7 @@ export default function WorkspaceSidebar({
         {NAV_TOOLS.map((it) => (
           <NavLink
             key={it.id}
-            label={it.label}
+            label={t(it.labelKey)}
             icon={it.icon}
             active={active === it.id}
             onClick={() => handleClick(it.id)}
@@ -243,7 +262,7 @@ export default function WorkspaceSidebar({
 
       {/* ── Bottom utility row ─────────────────────────────────── */}
       <div className="flex items-center gap-1 px-3 pb-3 pt-4">
-        <UtilityBtn icon={SettingsIcon} title="Settings" onClick={() => navigate("/app/settings")} />
+        <UtilityBtn icon={SettingsIcon} title={t("workspace.sidebar.settings")} onClick={() => navigate("/app/settings")} />
       </div>
     </aside>
   );
@@ -259,6 +278,7 @@ export default function WorkspaceSidebar({
 const OrgAdminLink = () => {
   const isOrgAdmin = useIsOrgAdmin();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   if (!isOrgAdmin) return null;
   return (
     <div className="px-3 pt-3 pb-2 border-t border-white/5 mt-3 space-y-1">
@@ -269,7 +289,7 @@ const OrgAdminLink = () => {
         title="Manage organisation members and credits"
       >
         <Crown className="h-3.5 w-3.5" />
-        Manage Org
+        {t("workspace.sidebar.manage_org")}
       </button>
       <button
         type="button"
@@ -278,7 +298,7 @@ const OrgAdminLink = () => {
         title="Logo, short name, and subdomains"
       >
         <Palette className="h-3.5 w-3.5" />
-        Branding
+        {t("workspace.sidebar.branding")}
       </button>
     </div>
   );

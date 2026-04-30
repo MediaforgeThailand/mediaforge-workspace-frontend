@@ -520,6 +520,20 @@ const Inner = () => {
         toast.error("Please log in to upload files");
         return;
       }
+      // 200 MB cap — covers Thai-creator typical workflows (4k video
+      // clips, RAW DSLR photos, multi-page PSDs) without letting the
+      // bucket get blasted. The bucket also has a server-side
+      // file_size_limit migration of the same value as defence in
+      // depth; this client check just gives a friendly toast instead
+      // of waiting for the upload to fail mid-stream.
+      const MAX_BYTES = 200 * 1024 * 1024;
+      if (file.size > MAX_BYTES) {
+        const sizeMb = Math.round(file.size / (1024 * 1024));
+        toast.error(
+          `ไฟล์ใหญ่เกินไป (${sizeMb}MB) — สูงสุด 200MB / File too large (max 200 MB)`,
+        );
+        return;
+      }
       const isVideo = file.type.startsWith("video/");
       const isImage = file.type.startsWith("image/");
       const isAudio = file.type.startsWith("audio/");

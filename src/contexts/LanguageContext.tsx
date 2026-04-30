@@ -942,7 +942,7 @@ const translations = {
 
     // Terms Page
     termsPageTitle: "Terms of Service",
-    termsPageLastUpdated: "Last updated: February 17, 2026",
+    termsPageLastUpdated: "Last updated: April 30, 2026",
     termsBackToHome: "Back to Home",
 
     // Redeem Code Page
@@ -966,7 +966,7 @@ const translations = {
 
     // Privacy Page
     privacyPageTitle: "Privacy Policy",
-    privacyPageLastUpdated: "Last updated: February 17, 2026",
+    privacyPageLastUpdated: "Last updated: April 30, 2026",
     privacyBackToHome: "Back to Home",
 
     // Pricing
@@ -1726,6 +1726,178 @@ const translations = {
     adminDetCreditsAdjusted: "Credits adjusted",
     adminDetOfficialUpdated: "Official status updated",
 
+    // Refund Policy Page
+    refundPageTitle: "Refund Policy",
+    refundPageLastUpdated: "Last updated: April 30, 2026",
+    refundBackToHome: "Back to Home",
+
+    // Acceptable Use Policy Page
+    aupPageTitle: "Acceptable Use Policy",
+    aupPageLastUpdated: "Last updated: April 30, 2026",
+    aupBackToHome: "Back to Home",
+
+    // Cookie Policy Page
+    cookiesPageTitle: "Cookie Policy",
+    cookiesPageLastUpdated: "Last updated: April 30, 2026",
+    cookiesBackToHome: "Back to Home",
+    cookiesManagePreferences: "Manage your preferences",
+    cookiesManagePreferencesDesc: "You can change your cookie preferences at any time. Click the button below to reopen the cookie consent banner.",
+    cookiesReopenBanner: "Reopen cookie banner",
+
+    // Cookie consent extra
+    cookieManageLink: "Manage cookies",
+
+    // Footer (AccountShell + legal pages)
+    footerPrivacy: "Privacy",
+    footerTerms: "Terms",
+    footerRefund: "Refund",
+    footerAup: "Acceptable Use",
+    footerCookies: "Cookies",
+    footerContact: "Contact",
+    footerSeparator: "·",
+
+    // Auth - extra
+    authRefundPolicy: "Refund Policy",
+
+    // ─── Workspace shell (Wave 4 i18n) ────────────────────────
+    // Sidebar
+    "workspace.sidebar.home": "Home",
+    "workspace.sidebar.all_assets": "All assets",
+    "workspace.sidebar.spaces": "Spaces",
+    "workspace.sidebar.image_gen": "Image Generator",
+    "workspace.sidebar.video_gen": "Video Generator",
+    "workspace.sidebar.voice_gen": "Voice Generator",
+    "workspace.sidebar.threed_gen": "3D Generator",
+    "workspace.sidebar.create": "Create",
+    "workspace.sidebar.all_tools": "All tools",
+    "workspace.sidebar.settings": "Settings",
+    "workspace.sidebar.manage_org": "Manage Org",
+    "workspace.sidebar.branding": "Branding",
+    "workspace.sidebar.back_dashboard": "Back to dashboard",
+
+    // User menu
+    "workspace.usermenu.account": "Account menu",
+    "workspace.usermenu.member_fallback": "Member",
+    "workspace.usermenu.upgrade": "Upgrade",
+    "workspace.usermenu.settings": "Settings",
+    "workspace.usermenu.plan_billing": "Plan & billing",
+    "workspace.usermenu.sign_out": "Sign out",
+    "workspace.usermenu.theme_to_light": "Switch to light",
+    "workspace.usermenu.theme_to_dark": "Switch to dark",
+    "workspace.usermenu.credits": "Credits",
+    "workspace.usermenu.shared_pool": "Shared pool",
+    "workspace.usermenu.available_balance": "Available balance",
+    "workspace.usermenu.loading": "Loading...",
+
+    // Canvas header
+    "workspace.canvas.personal": "Personal",
+    "workspace.canvas.untitled_space": "Untitled space",
+    "workspace.canvas.share": "Share",
+    "workspace.canvas.share_workspace": "Share workspace",
+    "workspace.canvas.back_dashboard": "Back to dashboard",
+    "workspace.canvas.project_tooltip": "Project: {name} (mockup)",
+
+    // Account shell
+    "workspace.account.back": "Back to workspace",
+    "workspace.account.title": "Account",
+    "workspace.account.settings": "Settings",
+
+    // Settings sections
+    "workspace.settings.account": "Account",
+    "workspace.settings.organization": "Organization",
+    "workspace.settings.profile": "Profile",
+    "workspace.settings.stock_downloads": "Stock downloads",
+    "workspace.settings.stock_collections": "Stock collections",
+    "workspace.settings.following": "Following",
+    "workspace.settings.my_team": "My Team",
+    "workspace.settings.people": "People",
+    "workspace.settings.security_sso": "Security SSO",
+    "workspace.settings.preferences": "Preferences",
+    "workspace.settings.plan_billing": "Plan & billing",
+    "workspace.settings.coming_soon_pill": "Soon",
+    "workspace.settings.fallback_title": "Settings",
+    "workspace.settings.coming_soon_title": "Coming soon",
+    "workspace.settings.coming_soon_hint": "This surface is part of the team / org rollout and will arrive in the next wave.",
+    "workspace.settings.stock_downloads_desc": "Your downloaded stock assets will appear here once the stock library ships.",
+    "workspace.settings.stock_collections_desc": "Save and organise stock assets into shared collections in the next wave.",
+    "workspace.settings.following_desc": "Follow creators and saved searches — coming with the community release.",
+    "workspace.settings.my_team_desc": "Manage shared workspaces and team members — ships with the team rollout.",
+    "workspace.settings.people_desc": "Invite collaborators and manage permissions — ships with the team rollout.",
+    "workspace.settings.security_sso_desc": "SSO and enterprise security controls — coming with the team rollout.",
+
+    // Dashboard / workspace home
+    "workspace.home.title": "Home",
+    "workspace.home.projects": "Projects",
+    "workspace.home.spaces": "Spaces",
+    "workspace.home.tools": "Tools",
+    "workspace.home.my_work": "My work",
+    "workspace.home.academy": "Academy",
+    "workspace.home.new_project_tooltip": "New project",
+    "workspace.home.new_space_tooltip": "New space",
+    "workspace.home.create_first_project": "+ Create your first project",
+    "workspace.home.create_first_space": "+ Create your first space",
+    "workspace.home.active": "Active",
+    "workspace.home.delete_project_tooltip": "Delete \"{name}\"",
+    "workspace.home.delete_project_aria": "Delete project {name}",
+    "workspace.home.delete_dialog_title": "Delete project \"{name}\"?",
+    "workspace.home.delete_dialog_desc_pre": "This permanently removes ",
+    "workspace.home.delete_dialog_desc_target": "all spaces, canvases and generations",
+    "workspace.home.delete_dialog_desc_post": " in this project — it can't be undone.",
+    "workspace.home.delete_dialog_type": "Type ",
+    "workspace.home.delete_dialog_to_confirm": " to delete",
+    "workspace.home.delete_dialog_placeholder": "Type confirm",
+    "workspace.home.delete_dialog_cancel": "Cancel",
+    "workspace.home.delete_dialog_confirm": "Delete project",
+    "workspace.home.untitled_project_prompt": "Project name:",
+    "workspace.home.untitled_project_default": "Untitled project",
+
+    // Spaces view
+    "workspace.spaces.title": "Spaces",
+    "workspace.spaces.subtitle": "Build node-based generative workflows and bring your ideas to life.",
+    "workspace.spaces.tab_my": "My spaces",
+    "workspace.spaces.tab_shared": "Shared",
+    "workspace.spaces.tab_templates": "Templates",
+    "workspace.spaces.new_space": "New space",
+    "workspace.spaces.favorites": "Favorites",
+    "workspace.spaces.filter": "Filter",
+    "workspace.spaces.search": "Search",
+    "workspace.spaces.empty_no_spaces": "No spaces yet",
+    "workspace.spaces.empty_no_spaces_hint": "Create your first space to start chaining AI tools.",
+    "workspace.spaces.empty_no_shared": "No shared spaces yet",
+    "workspace.spaces.empty_no_shared_hint": "Spaces shared with you by teammates will show up here.",
+    "workspace.spaces.empty_no_templates": "No templates yet",
+    "workspace.spaces.empty_no_templates_hint": "Pre-built starting points for common workflows are coming soon.",
+    "workspace.spaces.rename_prompt": "Rename space:",
+    "workspace.spaces.delete_confirm": "Delete \"{name}\"? This can't be undone.",
+    "workspace.spaces.action_rename": "Rename",
+    "workspace.spaces.action_duplicate": "Duplicate",
+    "workspace.spaces.action_delete": "Delete",
+    "workspace.spaces.list_view": "List view",
+    "workspace.spaces.grid_view": "Grid view",
+    "workspace.spaces.untitled_space": "Untitled space",
+    "workspace.spaces.coming_soon": "Coming soon",
+    "workspace.spaces.coming_soon_hint": "This section is not connected yet.",
+    "workspace.spaces.section_search": "Search",
+    "workspace.spaces.section_community": "Community",
+    "workspace.spaces.section_projects": "Projects",
+    "workspace.spaces.section_all_tools": "All tools",
+    "workspace.spaces.section_stock": "Stock",
+    "workspace.spaces.section_assistant": "Assistant",
+    "workspace.spaces.open_menu": "Open menu",
+    "workspace.spaces.close_sidebar": "Close sidebar",
+
+    // Toasts
+    "workspace.toast.gen_queued": "Generation queued",
+    "workspace.toast.project_created": "Project \"{name}\" created",
+    "workspace.toast.project_deleted": "Project \"{name}\" deleted",
+    "workspace.toast.keep_one_project": "Keep at least one project.",
+    "workspace.toast.duplicating": "Duplicating…",
+    "workspace.toast.couldnt_duplicate": "Couldn't duplicate this space.",
+    "workspace.toast.duplicated_as": "Duplicated as \"{name}\"",
+    "workspace.toast.duplicated_offline": "Duplicated as \"{name}\" (offline)",
+    "workspace.toast.duplicate_offline_desc": "Server sync failed — try again from the canvas.",
+    "workspace.toast.open": "Open",
+    "workspace.toast.duplicated_space_fallback": "Duplicated space",
   },
   th: {
     createVideo: "สร้างวิดีโอ",
@@ -2654,7 +2826,7 @@ const translations = {
 
     // Terms Page
     termsPageTitle: "เงื่อนไขการใช้บริการ",
-    termsPageLastUpdated: "อัปเดตล่าสุด: 17 กุมภาพันธ์ 2026",
+    termsPageLastUpdated: "อัปเดตล่าสุด: 30 เมษายน 2026",
     termsBackToHome: "กลับหน้าหลัก",
 
     // Redeem Code Page
@@ -2678,7 +2850,7 @@ const translations = {
 
     // Privacy Page
     privacyPageTitle: "นโยบายความเป็นส่วนตัว",
-    privacyPageLastUpdated: "อัปเดตล่าสุด: 17 กุมภาพันธ์ 2026",
+    privacyPageLastUpdated: "อัปเดตล่าสุด: 30 เมษายน 2026",
     privacyBackToHome: "กลับหน้าหลัก",
 
     // Pricing
@@ -3438,6 +3610,178 @@ const translations = {
     adminDetCreditsAdjusted: "ปรับเครดิตแล้ว",
     adminDetOfficialUpdated: "อัปเดตสถานะทางการแล้ว",
 
+    // Refund Policy Page
+    refundPageTitle: "นโยบายการคืนเงิน",
+    refundPageLastUpdated: "อัปเดตล่าสุด: 30 เมษายน 2026",
+    refundBackToHome: "กลับหน้าหลัก",
+
+    // Acceptable Use Policy Page
+    aupPageTitle: "นโยบายการใช้งานที่ยอมรับได้",
+    aupPageLastUpdated: "อัปเดตล่าสุด: 30 เมษายน 2026",
+    aupBackToHome: "กลับหน้าหลัก",
+
+    // Cookie Policy Page
+    cookiesPageTitle: "นโยบาย Cookie",
+    cookiesPageLastUpdated: "อัปเดตล่าสุด: 30 เมษายน 2026",
+    cookiesBackToHome: "กลับหน้าหลัก",
+    cookiesManagePreferences: "จัดการการตั้งค่าของคุณ",
+    cookiesManagePreferencesDesc: "คุณสามารถเปลี่ยนการตั้งค่า Cookie ได้ทุกเมื่อ คลิกปุ่มด้านล่างเพื่อเปิด Banner ขอความยินยอมอีกครั้ง",
+    cookiesReopenBanner: "เปิด Banner Cookie อีกครั้ง",
+
+    // Cookie consent extra
+    cookieManageLink: "จัดการ Cookie",
+
+    // Footer (AccountShell + legal pages)
+    footerPrivacy: "ความเป็นส่วนตัว",
+    footerTerms: "ข้อกำหนด",
+    footerRefund: "การคืนเงิน",
+    footerAup: "การใช้งาน",
+    footerCookies: "Cookie",
+    footerContact: "ติดต่อ",
+    footerSeparator: "·",
+
+    // Auth - extra
+    authRefundPolicy: "นโยบายการคืนเงิน",
+
+    // ─── Workspace shell (Wave 4 i18n) ────────────────────────
+    // Sidebar
+    "workspace.sidebar.home": "หน้าหลัก",
+    "workspace.sidebar.all_assets": "ไฟล์ทั้งหมด",
+    "workspace.sidebar.spaces": "Spaces",
+    "workspace.sidebar.image_gen": "สร้างรูปภาพ",
+    "workspace.sidebar.video_gen": "สร้างวิดีโอ",
+    "workspace.sidebar.voice_gen": "สร้างเสียง",
+    "workspace.sidebar.threed_gen": "สร้าง 3D",
+    "workspace.sidebar.create": "สร้าง",
+    "workspace.sidebar.all_tools": "เครื่องมือทั้งหมด",
+    "workspace.sidebar.settings": "ตั้งค่า",
+    "workspace.sidebar.manage_org": "จัดการองค์กร",
+    "workspace.sidebar.branding": "แบรนด์",
+    "workspace.sidebar.back_dashboard": "กลับหน้าหลัก",
+
+    // User menu
+    "workspace.usermenu.account": "เมนูบัญชี",
+    "workspace.usermenu.member_fallback": "สมาชิก",
+    "workspace.usermenu.upgrade": "อัปเกรด",
+    "workspace.usermenu.settings": "ตั้งค่า",
+    "workspace.usermenu.plan_billing": "แผนและการชำระเงิน",
+    "workspace.usermenu.sign_out": "ออกจากระบบ",
+    "workspace.usermenu.theme_to_light": "เปลี่ยนเป็นโหมดสว่าง",
+    "workspace.usermenu.theme_to_dark": "เปลี่ยนเป็นโหมดมืด",
+    "workspace.usermenu.credits": "เครดิต",
+    "workspace.usermenu.shared_pool": "พูลรวม",
+    "workspace.usermenu.available_balance": "ยอดคงเหลือ",
+    "workspace.usermenu.loading": "กำลังโหลด...",
+
+    // Canvas header
+    "workspace.canvas.personal": "ส่วนตัว",
+    "workspace.canvas.untitled_space": "Space ไม่มีชื่อ",
+    "workspace.canvas.share": "แชร์",
+    "workspace.canvas.share_workspace": "แชร์ workspace",
+    "workspace.canvas.back_dashboard": "กลับหน้าหลัก",
+    "workspace.canvas.project_tooltip": "โปรเจค: {name} (mockup)",
+
+    // Account shell
+    "workspace.account.back": "กลับไป workspace",
+    "workspace.account.title": "บัญชี",
+    "workspace.account.settings": "ตั้งค่า",
+
+    // Settings sections
+    "workspace.settings.account": "บัญชี",
+    "workspace.settings.organization": "องค์กร",
+    "workspace.settings.profile": "โปรไฟล์",
+    "workspace.settings.stock_downloads": "Stock ที่ดาวน์โหลด",
+    "workspace.settings.stock_collections": "คอลเลกชัน Stock",
+    "workspace.settings.following": "กำลังติดตาม",
+    "workspace.settings.my_team": "ทีมของฉัน",
+    "workspace.settings.people": "สมาชิก",
+    "workspace.settings.security_sso": "ความปลอดภัย SSO",
+    "workspace.settings.preferences": "การตั้งค่า",
+    "workspace.settings.plan_billing": "แผนและการชำระเงิน",
+    "workspace.settings.coming_soon_pill": "เร็วๆ นี้",
+    "workspace.settings.fallback_title": "ตั้งค่า",
+    "workspace.settings.coming_soon_title": "เร็วๆ นี้",
+    "workspace.settings.coming_soon_hint": "ส่วนนี้เป็นส่วนหนึ่งของการเปิดตัวฟีเจอร์ทีม/องค์กร จะมาในเวฟถัดไป",
+    "workspace.settings.stock_downloads_desc": "ไฟล์ Stock ที่คุณดาวน์โหลดจะแสดงที่นี่ เมื่อคลัง Stock เปิดให้ใช้งาน",
+    "workspace.settings.stock_collections_desc": "บันทึกและจัดระเบียบไฟล์ Stock เป็นคอลเลกชันที่แชร์ได้ในเวฟถัดไป",
+    "workspace.settings.following_desc": "ติดตามครีเอเตอร์และการค้นหาที่บันทึกไว้ จะมาพร้อมกับ Community",
+    "workspace.settings.my_team_desc": "จัดการ workspace ที่แชร์และสมาชิกในทีม จะมากับการเปิดตัวฟีเจอร์ทีม",
+    "workspace.settings.people_desc": "เชิญผู้ร่วมงานและจัดการสิทธิ์ จะมากับการเปิดตัวฟีเจอร์ทีม",
+    "workspace.settings.security_sso_desc": "SSO และการควบคุมความปลอดภัยระดับองค์กร จะมากับการเปิดตัวฟีเจอร์ทีม",
+
+    // Dashboard / workspace home
+    "workspace.home.title": "หน้าหลัก",
+    "workspace.home.projects": "โปรเจค",
+    "workspace.home.spaces": "Spaces",
+    "workspace.home.tools": "เครื่องมือ",
+    "workspace.home.my_work": "งานของฉัน",
+    "workspace.home.academy": "Academy",
+    "workspace.home.new_project_tooltip": "โปรเจคใหม่",
+    "workspace.home.new_space_tooltip": "Space ใหม่",
+    "workspace.home.create_first_project": "+ สร้างโปรเจคแรกของคุณ",
+    "workspace.home.create_first_space": "+ สร้าง Space แรกของคุณ",
+    "workspace.home.active": "ใช้งานอยู่",
+    "workspace.home.delete_project_tooltip": "ลบ \"{name}\"",
+    "workspace.home.delete_project_aria": "ลบโปรเจค {name}",
+    "workspace.home.delete_dialog_title": "ลบโปรเจค \"{name}\"?",
+    "workspace.home.delete_dialog_desc_pre": "การลบจะเอา ",
+    "workspace.home.delete_dialog_desc_target": "spaces, canvases และผลงานทั้งหมด",
+    "workspace.home.delete_dialog_desc_post": " ในโปรเจคนี้ออกถาวร — กู้คืนไม่ได้",
+    "workspace.home.delete_dialog_type": "พิมพ์ ",
+    "workspace.home.delete_dialog_to_confirm": " เพื่อลบ",
+    "workspace.home.delete_dialog_placeholder": "พิมพ์ ยืนยัน",
+    "workspace.home.delete_dialog_cancel": "ยกเลิก",
+    "workspace.home.delete_dialog_confirm": "ลบโปรเจค",
+    "workspace.home.untitled_project_prompt": "ชื่อโปรเจค:",
+    "workspace.home.untitled_project_default": "โปรเจคไม่มีชื่อ",
+
+    // Spaces view
+    "workspace.spaces.title": "Spaces",
+    "workspace.spaces.subtitle": "สร้าง workflow แบบ node-based และนำไอเดียของคุณมาเป็นจริง",
+    "workspace.spaces.tab_my": "Spaces ของฉัน",
+    "workspace.spaces.tab_shared": "ที่แชร์",
+    "workspace.spaces.tab_templates": "เทมเพลต",
+    "workspace.spaces.new_space": "Space ใหม่",
+    "workspace.spaces.favorites": "รายการโปรด",
+    "workspace.spaces.filter": "กรอง",
+    "workspace.spaces.search": "ค้นหา",
+    "workspace.spaces.empty_no_spaces": "ยังไม่มี Space",
+    "workspace.spaces.empty_no_spaces_hint": "สร้าง Space แรกของคุณเพื่อเริ่มใช้เครื่องมือ AI",
+    "workspace.spaces.empty_no_shared": "ยังไม่มี Space ที่แชร์",
+    "workspace.spaces.empty_no_shared_hint": "Space ที่ทีมของคุณแชร์จะแสดงที่นี่",
+    "workspace.spaces.empty_no_templates": "ยังไม่มีเทมเพลต",
+    "workspace.spaces.empty_no_templates_hint": "เทมเพลตสำเร็จรูปสำหรับ workflow ทั่วไปจะมาเร็วๆ นี้",
+    "workspace.spaces.rename_prompt": "เปลี่ยนชื่อ Space:",
+    "workspace.spaces.delete_confirm": "ลบ \"{name}\"? กู้คืนไม่ได้",
+    "workspace.spaces.action_rename": "เปลี่ยนชื่อ",
+    "workspace.spaces.action_duplicate": "ทำสำเนา",
+    "workspace.spaces.action_delete": "ลบ",
+    "workspace.spaces.list_view": "มุมมองรายการ",
+    "workspace.spaces.grid_view": "มุมมองตาราง",
+    "workspace.spaces.untitled_space": "Space ไม่มีชื่อ",
+    "workspace.spaces.coming_soon": "เร็วๆ นี้",
+    "workspace.spaces.coming_soon_hint": "ส่วนนี้ยังไม่พร้อมใช้งาน",
+    "workspace.spaces.section_search": "ค้นหา",
+    "workspace.spaces.section_community": "Community",
+    "workspace.spaces.section_projects": "โปรเจค",
+    "workspace.spaces.section_all_tools": "เครื่องมือทั้งหมด",
+    "workspace.spaces.section_stock": "Stock",
+    "workspace.spaces.section_assistant": "ผู้ช่วย",
+    "workspace.spaces.open_menu": "เปิดเมนู",
+    "workspace.spaces.close_sidebar": "ปิดเมนู",
+
+    // Toasts
+    "workspace.toast.gen_queued": "ส่งคำสั่งสร้างแล้ว",
+    "workspace.toast.project_created": "สร้างโปรเจค \"{name}\" แล้ว",
+    "workspace.toast.project_deleted": "ลบโปรเจค \"{name}\" แล้ว",
+    "workspace.toast.keep_one_project": "ต้องเหลือโปรเจคอย่างน้อย 1 รายการ",
+    "workspace.toast.duplicating": "กำลังทำสำเนา…",
+    "workspace.toast.couldnt_duplicate": "ทำสำเนา Space นี้ไม่สำเร็จ",
+    "workspace.toast.duplicated_as": "ทำสำเนาเป็น \"{name}\" แล้ว",
+    "workspace.toast.duplicated_offline": "ทำสำเนาเป็น \"{name}\" (offline)",
+    "workspace.toast.duplicate_offline_desc": "ซิงก์กับเซิร์ฟเวอร์ไม่สำเร็จ ลองใหม่จากในแคนวาส",
+    "workspace.toast.open": "เปิด",
+    "workspace.toast.duplicated_space_fallback": "Space ที่ทำสำเนา",
   },
 } as const;
 
@@ -3478,6 +3822,15 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     localStorage.setItem("mf-lang", language);
+  }, [language]);
+
+  // Keep <html lang="…"> in sync with the active UI language so screen
+  // readers, SEO crawlers, and the browser's spell-checker pick the
+  // right locale. Runs on mount and on every language change.
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.lang = language === "th" ? "th" : "en";
+    }
   }, [language]);
 
   const t = (key: TranslationKey, params?: Record<string, string | number>): string => {

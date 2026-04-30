@@ -16,7 +16,6 @@ export default {
       fontFamily: {
         sans: ['Prompt', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
         prompt: ['Prompt', 'sans-serif'],
-        manrope: ['Manrope', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",

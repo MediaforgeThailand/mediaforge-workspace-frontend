@@ -8,8 +8,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Loader2, CheckCircle, KeyRound } from "lucide-react";
 import logo from "@/assets/logo-white.png";
+import useDocumentTitle from "@/hooks/useDocumentTitle";
 
 const ResetPassword = () => {
+  useDocumentTitle("Reset password — MediaForge");
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t } = useLanguage();

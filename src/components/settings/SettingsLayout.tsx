@@ -11,6 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 /**
  * Settings shell with a left-rail of grouped sections.
@@ -37,27 +38,42 @@ export type SettingsSectionKey =
   | "organization.preferences"
   | "organization.plan-billing";
 
+/** Translation keys for the rail labels. We carry the key (not the
+ *  string) through the section list so a Thai-mode switch re-renders
+ *  the rail without us threading t() into the static array. */
+export type SettingsSectionLabelKey =
+  | "workspace.settings.profile"
+  | "workspace.settings.stock_downloads"
+  | "workspace.settings.stock_collections"
+  | "workspace.settings.following"
+  | "workspace.settings.my_team"
+  | "workspace.settings.people"
+  | "workspace.settings.security_sso"
+  | "workspace.settings.preferences"
+  | "workspace.settings.plan_billing";
+
 export interface SettingsSection {
   key: SettingsSectionKey;
-  label: string;
+  /** Translation key for the visible label. */
+  labelKey: SettingsSectionLabelKey;
   icon: LucideIcon;
   /** When true, the rail item shows a "Soon" pill. */
   comingSoon?: boolean;
 }
 
 export const ACCOUNT_SECTIONS: SettingsSection[] = [
-  { key: "account.profile", label: "Profile", icon: User },
-  { key: "account.stock-downloads", label: "Stock downloads", icon: Download, comingSoon: true },
-  { key: "account.stock-collections", label: "Stock collections", icon: Bookmark, comingSoon: true },
-  { key: "account.following", label: "Following", icon: UserPlus, comingSoon: true },
+  { key: "account.profile", labelKey: "workspace.settings.profile", icon: User },
+  { key: "account.stock-downloads", labelKey: "workspace.settings.stock_downloads", icon: Download, comingSoon: true },
+  { key: "account.stock-collections", labelKey: "workspace.settings.stock_collections", icon: Bookmark, comingSoon: true },
+  { key: "account.following", labelKey: "workspace.settings.following", icon: UserPlus, comingSoon: true },
 ];
 
 export const ORG_SECTIONS: SettingsSection[] = [
-  { key: "organization.my-team", label: "My Team", icon: Users, comingSoon: true },
-  { key: "organization.people", label: "People", icon: Users, comingSoon: true },
-  { key: "organization.security-sso", label: "Security SSO", icon: KeyRound, comingSoon: true },
-  { key: "organization.preferences", label: "Preferences", icon: SettingsIcon },
-  { key: "organization.plan-billing", label: "Plan & billing", icon: CreditCard },
+  { key: "organization.my-team", labelKey: "workspace.settings.my_team", icon: Users, comingSoon: true },
+  { key: "organization.people", labelKey: "workspace.settings.people", icon: Users, comingSoon: true },
+  { key: "organization.security-sso", labelKey: "workspace.settings.security_sso", icon: KeyRound, comingSoon: true },
+  { key: "organization.preferences", labelKey: "workspace.settings.preferences", icon: SettingsIcon },
+  { key: "organization.plan-billing", labelKey: "workspace.settings.plan_billing", icon: CreditCard },
 ];
 
 interface SettingsLayoutProps {
@@ -67,6 +83,8 @@ interface SettingsLayoutProps {
 }
 
 const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) => {
+  const { t } = useLanguage();
+
   const renderGroup = (heading: string, items: SettingsSection[]) => (
     <div className="space-y-1">
       <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500 mb-2 px-3">
@@ -87,10 +105,10 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
             )}
           >
             <item.icon className="w-4 h-4 flex-shrink-0" />
-            <span className="flex-1 text-left">{item.label}</span>
+            <span className="flex-1 text-left">{t(item.labelKey)}</span>
             {item.comingSoon && (
               <span className="text-[9px] font-medium uppercase tracking-wider text-zinc-600 group-hover:text-zinc-500">
-                Soon
+                {t("workspace.settings.coming_soon_pill")}
               </span>
             )}
           </button>
@@ -101,7 +119,10 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
 
   // Find current item label for mobile breadcrumb header
   const allSections = [...ACCOUNT_SECTIONS, ...ORG_SECTIONS];
-  const currentLabel = allSections.find((s) => s.key === activeKey)?.label ?? "Settings";
+  const currentSection = allSections.find((s) => s.key === activeKey);
+  const currentLabel = currentSection
+    ? t(currentSection.labelKey)
+    : t("workspace.settings.fallback_title");
 
   return (
     <div className="min-h-full">
@@ -124,7 +145,7 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
                 )}
               >
                 <s.icon className="w-3.5 h-3.5" />
-                {s.label}
+                {t(s.labelKey)}
               </button>
             );
           })}
@@ -135,8 +156,8 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
         {/* Desktop left rail */}
         <aside className="hidden min-h-[calc(100vh-3rem)] w-56 shrink-0 border-r border-white/5 bg-[hsl(0_0%_4%)] px-3 py-6 md:block">
           <div className="space-y-6">
-          {renderGroup("Account", ACCOUNT_SECTIONS)}
-          {renderGroup("Organization", ORG_SECTIONS)}
+          {renderGroup(t("workspace.settings.account"), ACCOUNT_SECTIONS)}
+          {renderGroup(t("workspace.settings.organization"), ORG_SECTIONS)}
           </div>
         </aside>
 

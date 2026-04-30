@@ -107,12 +107,22 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const identifyUser = (u: User, p: Profile | null) => {
+    /* PDPA + GDPR-friendly identify: pseudonymise to user_id only.
+     *
+     * Background: PostHog is hosted in the US (us.i.posthog.com).
+     * Sending raw email + company + display_name across borders
+     * without an explicit DPA + consent banner is a Thai PDPA
+     * violation per Section 28 (cross-border transfer) — and once
+     * those PII fields land in PostHog they can't be cleanly
+     * deleted on user request.
+     *
+     * Strip every PII field. The opaque user_id (a uuid) is enough
+     * for funnel / cohort analytics; for support workflows the
+     * team can still resolve the uuid → email via the Supabase
+     * dashboard with an audit log behind it. */
     posthog.identify(u.id, {
-      email: u.email,
-      name: p?.display_name ?? u.user_metadata?.full_name,
       role: p?.role ?? "consumer",
       subscription_tier: p?.subscription_status ?? "free",
-      company: p?.company,
     });
   };
 
@@ -249,8 +259,40 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     posthog.capture("logout");
     posthog.reset();
     await supabase.auth.signOut();
+    /* Clear EVERY per-user persisted blob, not just the Supabase
+     * session token. The audit caught a real cross-user data leak
+     * here: zustand persists the workspace store at
+     * `mf-workspace-v1` (projects, workspaces, canvases, graphs,
+     * deletedWorkspaceIds) so user A's snapshot survived sign-out
+     * → user B signed in on the same device → for the few seconds
+     * before server merge they saw A's projects, AND any local
+     * edit they made would collide with A's tombstone list.
+     *
+     * Also nukes per-canvas viewport state (saved zoom/pan) and
+     * any other namespaced cache keys we add in the future. Belt-
+     * and-braces: try/catch each removal so a single failure
+     * doesn't abort the rest. */
+    const keysToClear = [
+      DEMO_SESSION_KEY,
+      "mf-workspace-v1",
+    ];
+    for (const k of keysToClear) {
+      try {
+        localStorage.removeItem(k);
+      } catch {
+        // ignore
+      }
+    }
+    // Sweep prefix-namespaced keys too (viewport snapshots, etc.).
     try {
-      localStorage.removeItem(DEMO_SESSION_KEY);
+      const PREFIX_PATTERNS = [/^workspace-viewport-/, /^mf-workspace-/];
+      const toDelete: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key) continue;
+        if (PREFIX_PATTERNS.some((p) => p.test(key))) toDelete.push(key);
+      }
+      for (const k of toDelete) localStorage.removeItem(k);
     } catch {
       // ignore
     }

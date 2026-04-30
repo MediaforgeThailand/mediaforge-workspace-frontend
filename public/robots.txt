@@ -1,8 +1,12 @@
 User-agent: Googlebot
 Allow: /
+Disallow: /app/
+Disallow: /reset-password
 
 User-agent: Bingbot
 Allow: /
+Disallow: /app/
+Disallow: /reset-password
 
 User-agent: Twitterbot
 Allow: /
@@ -12,3 +16,7 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /app/
+Disallow: /reset-password
+
+Sitemap: https://workspace.mediaforge.co/sitemap.xml

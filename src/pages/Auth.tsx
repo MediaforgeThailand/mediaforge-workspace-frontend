@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +16,7 @@ import PhoneOtpLogin from "@/components/auth/PhoneOtpLogin";
 import OrgLoginPanel from "@/components/auth/OrgLoginPanel";
 import { resolveOrgLogin, type OrgLoginResolution } from "@/lib/orgLoginResolver";
 import { useSearchParams } from "react-router-dom";
+import useDocumentTitle from "@/hooks/useDocumentTitle";
 
 const DEFAULT_POST_AUTH_PATH = "/app/workspace";
 
@@ -30,6 +31,7 @@ const normalizePostAuthPath = (path: string) => {
 };
 
 const Auth = () => {
+  useDocumentTitle("Sign in — MediaForge");
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -70,13 +72,14 @@ const Auth = () => {
 
   const checkOrgEmail = async (email: string) => {
     const trimmed = email.trim().toLowerCase();
-    if (!trimmed.includes("@") || !trimmed.includes(".")) return;
-    if (orgEmail === trimmed && orgResolution) return; // already resolved
+    if (!trimmed.includes("@") || !trimmed.includes(".")) return false;
+    if (orgEmail === trimmed && orgResolution) return orgResolution.is_org; // already resolved
     setIsResolvingOrg(true);
     try {
       const result = await resolveOrgLogin(trimmed);
       setOrgEmail(trimmed);
       setOrgResolution(result);
+      return result.is_org;
     } finally {
       setIsResolvingOrg(false);
     }
@@ -168,6 +171,8 @@ const Auth = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    const orgCheck = await checkOrgEmail(loginEmail);
+    if (orgCheck) return;
     setIsLoading(true);
     const {
       error
@@ -188,6 +193,11 @@ const Auth = () => {
   };
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    const orgCheck = await checkOrgEmail(signupEmail);
+    if (orgCheck) {
+      setActiveTab("login");
+      return;
+    }
     setIsLoading(true);
     const {
       error
@@ -330,7 +340,7 @@ const Auth = () => {
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="email-login">{t("authEmailLabel")}</Label>
-                      <Input id="email-login" type="email" placeholder="you@example.com" className="bg-input border-border" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required />
+                      <Input id="email-login" type="email" placeholder="you@example.com" className="bg-input border-border" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} onBlur={() => void checkOrgEmail(loginEmail)} required />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="password-login">{t("authPasswordLabel")}</Label>
@@ -392,7 +402,7 @@ const Auth = () => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="email-signup">{t("authEmailLabel")}</Label>
-                      <Input id="email-signup" type="email" placeholder="you@example.com" className="bg-input border-border" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} required />
+                      <Input id="email-signup" type="email" placeholder="you@example.com" className="bg-input border-border" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} onBlur={() => void checkOrgEmail(signupEmail)} required />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="password-signup">{t("authPasswordLabel")}</Label>
@@ -441,13 +451,17 @@ const Auth = () => {
 
           <p className="text-center text-sm text-muted-foreground">
             {t("authTermsText")}{" "}
-            <a href="#" className="text-primary hover:underline">
+            <Link to="/terms" className="text-primary hover:underline">
               {t("authTermsOfService")}
-            </a>{" "}
+            </Link>{" "}
             {t("authAnd")}{" "}
-            <a href="#" className="text-primary hover:underline">
+            <Link to="/privacy" className="text-primary hover:underline">
               {t("authPrivacyPolicy")}
-            </a>
+            </Link>{" "}
+            {t("authAnd")}{" "}
+            <Link to="/refund" className="text-primary hover:underline">
+              {t("authRefundPolicy" as any)}
+            </Link>
           </p>
           </>
           )}

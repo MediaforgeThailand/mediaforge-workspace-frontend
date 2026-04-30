@@ -218,8 +218,29 @@ const PlanBilling = () => {
   const billingEmail = billingAddress?.email ?? user?.email ?? "—";
 
   // ── Handlers ─────────────────────────────────────────────────
+  /* Audit fix: the toggle previously just wrote a boolean to
+   * `profiles.subscription_auto_refill` but NOTHING in the
+   * backend consumed that flag — no cron, no webhook, no edge
+   * function actually charged the saved card on low balance. So
+   * users would toggle it on, balance would still hit 0, and they
+   * felt cheated.
+   *
+   * Until the proper card-binding-with-OTP flow ships (separate
+   * SetupIntent → 3DS challenge → off-session payment cron), the
+   * toggle is hard-disabled and shows "Coming soon" copy. The
+   * profile column stays in the schema for the future flow.
+   */
+  const AUTO_REFILL_FEATURE_ENABLED = false;
   const handleAutoRefill = async (next: boolean) => {
     if (!user) return;
+    if (!AUTO_REFILL_FEATURE_ENABLED) {
+      toast({
+        title: "เร็ว ๆ นี้ / Coming soon",
+        description:
+          "ระบบเติมเครดิตอัตโนมัติกำลังพัฒนา — ตอนนี้กรุณาเติมผ่าน PromptPay QR หรือบัตรเองก่อน",
+      });
+      return;
+    }
     setAutoRefill(next); // optimistic
     const { error } = await supabase
       .from("profiles")
@@ -334,12 +355,18 @@ const PlanBilling = () => {
               Credits reset every {isAnnual ? "year" : "month"} on renewal.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-zinc-400">
-            <span>Auto-refill</span>
+          <div className="flex items-center gap-2 text-[11px] text-zinc-400" title="Auto-refill — coming soon">
+            <span className="flex items-center gap-1">
+              Auto-refill
+              <span className="rounded bg-amber-500/15 px-1 text-[8.5px] font-bold uppercase tracking-wide text-amber-300 ring-1 ring-inset ring-amber-500/30">
+                Soon
+              </span>
+            </span>
             <Switch
-              checked={autoRefill}
+              checked={false}
+              disabled
               onCheckedChange={handleAutoRefill}
-              aria-label="Auto-refill subscription credits"
+              aria-label="Auto-refill subscription credits (coming soon)"
             />
           </div>
         </div>

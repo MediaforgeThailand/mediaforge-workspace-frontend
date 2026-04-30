@@ -10,7 +10,6 @@ interface Props {
 const ALLOWED_FOR_ORG_USER: RegExp[] = [
   /^\/app\/workspace(\/|$)/,    // the only feature
   /^\/app\/org-admin(\/|$)/,    // org_admin panel (members + analytics)
-  /^\/app\/university(\/|$)/,   // PSC/DMD education demo mockup
   /^\/app\/settings(\/|$)/,     // logout / language / profile basics
   /^\/auth(\/|$)/,              // login / SSO callback
   /^\/enroll-class\//,          // QR scan landing

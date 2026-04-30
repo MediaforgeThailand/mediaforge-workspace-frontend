@@ -29,6 +29,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useAuth } from "@/contexts/AuthContext";
+import useDocumentTitle from "@/hooks/useDocumentTitle";
 import WorkspaceCanvasPagePill from "@/components/workspace/WorkspaceCanvasPagePill";
 import CanvasHeader from "@/components/workspace/CanvasHeader";
 // Tool palette is replaced by the in-canvas floating sidebar (see
@@ -62,8 +63,10 @@ import {
 import { useShareTokenResolution } from "@/components/workspace/useShareTokenResolution";
 import ShareModeBanner from "@/components/workspace/ShareModeBanner";
 import ShareLinkInvalidScreen from "@/components/workspace/ShareLinkInvalidScreen";
+import { useEducationPresence } from "@/hooks/useEducationPresence";
 
 const WorkspaceCanvasPage = () => {
+  useDocumentTitle("Canvas — MediaForge");
   // Route param is now `workspaceId` (was `canvasId`). React Router
   // doesn't care about the param name on its own — the route still
   // matches `/app/workspace/:workspaceId` either way — so existing
@@ -107,6 +110,15 @@ const WorkspaceCanvasPage = () => {
     if (state.canvases.some((c) => c.id === routeId)) return routeId;
     return null;
   }, [routeId]);
+
+  useEducationPresence({
+    enabled: !authLoading && Boolean(user?.id),
+    userId: user?.id ?? null,
+    projectId: null,
+    workspaceId: routeId ?? null,
+    canvasId: targetCanvasId,
+    activity: hydrated ? "Workspace canvas" : "Loading workspace canvas",
+  });
 
   useEffect(() => {
     if (!routeId) return;
