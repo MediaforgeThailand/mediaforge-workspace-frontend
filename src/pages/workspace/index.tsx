@@ -36,6 +36,7 @@ import {
   loadProjectsFromServer,
   loadWorkspacesFromServer,
   upsertProjectToServer,
+  deleteProjectFromServer,
   upsertWorkspaceToServer,
   deleteWorkspaceFromServer,
   listServerCanvasIds,
@@ -259,6 +260,7 @@ const WorkspaceDashboardInner = () => {
   const activeProjectId = useWorkspaceStore((s) => s.activeProjectId);
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const createProject = useWorkspaceStore((s) => s.createProject);
+  const deleteProject = useWorkspaceStore((s) => s.deleteProject);
   const createWorkspace = useWorkspaceStore((s) => s.createWorkspace);
   const setActiveProject = useWorkspaceStore((s) => s.setActiveProject);
   const mergeServerProjects = useWorkspaceStore((s) => s.mergeServerProjects);
@@ -366,6 +368,19 @@ const WorkspaceDashboardInner = () => {
     toast.success(`Project "${projectName}" created`);
   };
 
+  const handleDeleteProject = (projectId: string) => {
+    const state = useWorkspaceStore.getState();
+    if (state.projects.length <= 1) {
+      toast.error("Keep at least one project.");
+      return;
+    }
+    const project = state.projects.find((item) => item.id === projectId);
+    if (!project) return;
+    deleteProject(projectId);
+    if (user?.id) void deleteProjectFromServer(projectId);
+    toast.success(`Project "${project.name}" deleted`);
+  };
+
   // Two-way bind URL ↔ state. When the user clicks a sidebar item we
   // also update the URL so a refresh / shared link lands on the same
   // section. We use `replace` to avoid stacking history entries for
@@ -469,6 +484,7 @@ const WorkspaceDashboardInner = () => {
             activeProjectId={activeProjectId}
             onSelectProject={setActiveProject}
             onCreateProject={handleCreateProject}
+            onDeleteProject={handleDeleteProject}
           />
         )}
         {section !== "home" &&

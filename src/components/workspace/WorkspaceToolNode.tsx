@@ -862,6 +862,42 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               }
             }, 1_000);
 
+            let serverPollInFlight = false;
+            const serverPollInterval = setInterval(() => {
+              if (settled || serverPollInFlight) return;
+              serverPollInFlight = true;
+              void supabase.functions
+                .invoke(RUN_EDGE_FUNCTION, {
+                  body: { action: "poll_workspace_job", job_id: jobId },
+                })
+                .then(({ data, error }) => {
+                  if (settled) return;
+                  if (error) {
+                    log({
+                      level: "info",
+                      nodeId: id,
+                      title: `Job server-poll skipped: ${
+                        (error as { message?: string } | null)?.message ?? "unknown"
+                      }`,
+                    });
+                    return;
+                  }
+                  const job = (data as { job?: Record<string, unknown> } | null)?.job;
+                  if (job) handleJob(job);
+                })
+                .catch((err) => {
+                  if (settled) return;
+                  log({
+                    level: "info",
+                    nodeId: id,
+                    title: `Job server-poll threw: ${err instanceof Error ? err.message : String(err)}`,
+                  });
+                })
+                .finally(() => {
+                  serverPollInFlight = false;
+                });
+            }, 5_000);
+
             // Hard wall — sweep cron will already have marked the
             // row failed long before this fires (5-min threshold vs
             // 30-min wall here), but keep the timer as a safety net
@@ -879,6 +915,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
             const cleanup = () => {
               clearInterval(cancelInterval);
+              clearInterval(serverPollInterval);
               clearTimeout(timeoutId);
               try {
                 supabase.removeChannel(channel);

@@ -100,8 +100,11 @@ interface StandaloneResult {
   type?: "image" | "video" | "audio" | "text" | "model_3d";
   url?: string;
   text?: string;
+  task_id?: string;
+  outputs?: Record<string, string>;
   prompt_used?: string;
   provider_meta?: {
+    poll_endpoint?: string;
     model_url?: string;
     rendered_image?: string;
     provider?: string;
@@ -283,6 +286,7 @@ export default function StandaloneGenerator({
   activeProjectId,
   onSelectProject,
   onCreateProject,
+  onDeleteProject,
 }: {
   activeTool: StandaloneToolKey;
   onToolChange: (tool: StandaloneToolKey) => void;
@@ -291,6 +295,7 @@ export default function StandaloneGenerator({
   activeProjectId: string | null;
   onSelectProject: (projectId: string) => void;
   onCreateProject: () => void;
+  onDeleteProject?: (projectId: string) => void;
 }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -312,17 +317,26 @@ export default function StandaloneGenerator({
     null;
 
   const jobsQuery = useStandaloneJobs(user?.id, activeProject?.id);
+  const refetchJobs = jobsQuery.refetch;
   const hasActiveJobs = (jobsQuery.data ?? []).some((job) =>
     ["queued", "running"].includes(job.status),
   );
+  const activeJobs = useMemo(
+    () =>
+      (jobsQuery.data ?? []).filter((job) =>
+        ["queued", "running"].includes(job.status),
+      ),
+    [jobsQuery.data],
+  );
+  const activeJobIdsKey = activeJobs.map((job) => job.id).join("|");
 
   useEffect(() => {
     if (!hasActiveJobs) return;
     const timer = window.setInterval(() => {
-      void jobsQuery.refetch();
+      void refetchJobs();
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [hasActiveJobs, jobsQuery]);
+  }, [hasActiveJobs, refetchJobs]);
 
   useEffect(() => {
     if (!user?.id || !activeProject?.id) return;
@@ -347,6 +361,36 @@ export default function StandaloneGenerator({
       supabase.removeChannel(channel);
     };
   }, [activeProject?.id, queryClient, user?.id]);
+
+  useEffect(() => {
+    if (!activeJobIdsKey) return;
+    let cancelled = false;
+    let inFlight = false;
+
+    const pollActiveJobs = async () => {
+      if (cancelled || inFlight) return;
+      inFlight = true;
+      try {
+        await Promise.all(
+          activeJobs.map((job) =>
+            supabase.functions.invoke(RUN_EDGE_FUNCTION, {
+              body: { action: "poll_workspace_job", job_id: job.id },
+            }),
+          ),
+        );
+      } finally {
+        inFlight = false;
+        if (!cancelled) void refetchJobs();
+      }
+    };
+
+    void pollActiveJobs();
+    const timer = window.setInterval(() => void pollActiveJobs(), 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [activeJobIdsKey, activeJobs, refetchJobs]);
 
   const updateForm = (patch: Partial<StandaloneFormState>) => {
     setForms((prev) => ({
@@ -541,12 +585,14 @@ export default function StandaloneGenerator({
         activeProject={activeProject}
         onSelectProject={onSelectProject}
         onCreateProject={onCreateProject}
+        onDeleteProject={onDeleteProject}
       />
       <DesktopTopBar
         projects={projects}
         activeProject={activeProject}
         onSelectProject={onSelectProject}
         onCreateProject={onCreateProject}
+        onDeleteProject={onDeleteProject}
       />
 
       <div className="ws-scroll-hide flex min-h-0 flex-1 flex-col overflow-y-auto rounded-t-[22px] bg-[#191919] lg:flex-row lg:overflow-hidden lg:rounded-none">
@@ -707,6 +753,7 @@ function MobileHeader({
   activeProject,
   onSelectProject,
   onCreateProject,
+  onDeleteProject,
 }: {
   activeTool: StandaloneToolKey;
   onToolChange: (tool: StandaloneToolKey) => void;
@@ -715,6 +762,7 @@ function MobileHeader({
   activeProject: StandaloneProjectOption | null;
   onSelectProject: (projectId: string) => void;
   onCreateProject: () => void;
+  onDeleteProject?: (projectId: string) => void;
 }) {
   return (
     <header className="shrink-0 bg-[#0c0c0d] px-4 pb-0 pt-4 lg:hidden">
@@ -732,6 +780,7 @@ function MobileHeader({
           activeProject={activeProject}
           onSelectProject={onSelectProject}
           onCreateProject={onCreateProject}
+          onDeleteProject={onDeleteProject}
           compact
         />
         <UserMenu />
@@ -748,11 +797,13 @@ function DesktopTopBar({
   activeProject,
   onSelectProject,
   onCreateProject,
+  onDeleteProject,
 }: {
   projects: StandaloneProjectOption[];
   activeProject: StandaloneProjectOption | null;
   onSelectProject: (projectId: string) => void;
   onCreateProject: () => void;
+  onDeleteProject?: (projectId: string) => void;
 }) {
   return (
     <div className="hidden h-[66px] shrink-0 items-center justify-between bg-[#111111] px-5 lg:flex">
@@ -761,6 +812,7 @@ function DesktopTopBar({
         activeProject={activeProject}
         onSelectProject={onSelectProject}
         onCreateProject={onCreateProject}
+        onDeleteProject={onDeleteProject}
       />
       <UserMenu />
     </div>
@@ -772,12 +824,14 @@ function ProjectPicker({
   activeProject,
   onSelectProject,
   onCreateProject,
+  onDeleteProject,
   compact,
 }: {
   projects: StandaloneProjectOption[];
   activeProject: StandaloneProjectOption | null;
   onSelectProject: (projectId: string) => void;
   onCreateProject: () => void;
+  onDeleteProject?: (projectId: string) => void;
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -820,30 +874,51 @@ function ProjectPicker({
           <div className="max-h-[260px] space-y-1 overflow-y-auto">
             {projects.map((project) => {
               const active = project.id === activeProject?.id;
+              const canDelete = Boolean(onDeleteProject) && projects.length > 1;
               return (
-                <button
+                <div
                   key={project.id}
-                  type="button"
-                  onClick={() => {
-                    onSelectProject(project.id);
-                    setOpen(false);
-                  }}
                   className={cn(
-                    "flex h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-[12px] font-semibold transition",
+                    "flex h-10 w-full items-center gap-1 rounded-lg px-2 text-left text-[12px] font-semibold transition",
                     active
                       ? "bg-white/[0.09] text-white"
                       : "text-zinc-300 hover:bg-white/[0.05] hover:text-white",
                   )}
                   role="menuitem"
                 >
-                  <span className="h-2.5 w-2.5 shrink-0 rounded bg-amber-400" />
-                  <span className="min-w-0 flex-1 truncate">{project.name}</span>
-                  {active && (
-                    <span className="rounded bg-white/[0.08] px-1.5 py-0.5 text-[9px] uppercase text-zinc-400">
-                      Active
-                    </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSelectProject(project.id);
+                      setOpen(false);
+                    }}
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                  >
+                    <span className="h-2.5 w-2.5 shrink-0 rounded bg-amber-400" />
+                    <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                    {active && (
+                      <span className="rounded bg-white/[0.08] px-1.5 py-0.5 text-[9px] uppercase text-zinc-400">
+                        Active
+                      </span>
+                    )}
+                  </button>
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (!window.confirm(`Delete project "${project.name}"?`)) return;
+                        onDeleteProject?.(project.id);
+                        setOpen(false);
+                      }}
+                      className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-500 transition hover:bg-red-500/10 hover:text-red-300"
+                      aria-label={`Delete ${project.name}`}
+                      title="Delete project"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
@@ -2387,6 +2462,14 @@ function validateForm(
     (!form.videoRefImage || !form.videoRefVideo)
   ) {
     return "Motion video needs a reference image and a motion video.";
+  }
+  if (
+    tool === "video_gen" &&
+    videoSupportsStartEndFrames(form.model) &&
+    form.videoEnd &&
+    !form.videoStart
+  ) {
+    return "End image needs a start image too.";
   }
   if (
     tool === "video_gen" &&
