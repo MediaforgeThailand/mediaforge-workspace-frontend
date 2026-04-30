@@ -279,57 +279,38 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
     icon: Mic2,
     outputType: "audio",
     accent: "hsl(38 92% 56%)",
-    defaultModel: "google-tts-studio",
+    defaultModel: "elevenlabs-multilingual-v2",
     // Synced with the audioGenNode supportedModels in workspaceSchema.
-    // Backend dispatcher routes by model_name prefix:
-    //   google-tts-*   → Google Cloud TTS
-    //   elevenlabs-*   → ElevenLabs API
-    //   gemini-*       → Gemini TTS preview
+    // Production-quality models only — see schema audit comments for
+    // which lower-tier ones we dropped.
     models: [
-      // ── Google Cloud TTS ───────────────────────────────────
-      {
-        id: "google-tts-studio",
-        label: "Google Cloud TTS",
-        provider: "Google Cloud",
-        badge: "Studio",
-        description: "Studio / Neural2 / WaveNet voices in 30+ languages.",
-      },
-      // ── ElevenLabs ─────────────────────────────────────────
       {
         id: "elevenlabs-multilingual-v2",
-        label: "ElevenLabs Multilingual v2",
+        label: "ElevenLabs v2 — Multilingual",
         provider: "ElevenLabs",
         badge: "Best",
-        description: "Best-quality ElevenLabs model — multilingual, expressive.",
+        description: "Best-quality TTS — 32 languages, expressive prosody.",
       },
       {
         id: "elevenlabs-turbo-v2-5",
         label: "ElevenLabs Turbo v2.5",
         provider: "ElevenLabs",
         badge: "Fast",
-        description: "Faster ElevenLabs tier — good balance of speed and fidelity.",
-      },
-      {
-        id: "elevenlabs-flash-v2-5",
-        label: "ElevenLabs Flash v2.5",
-        provider: "ElevenLabs",
-        badge: "Fastest",
-        description: "Fastest ElevenLabs tier for real-time / cost-sensitive use.",
-      },
-      // ── Gemini ─────────────────────────────────────────────
-      {
-        id: "gemini-2.5-flash-preview-tts",
-        label: "Gemini 2.5 Flash TTS",
-        provider: "Google Gemini",
-        badge: "Flash",
-        description: "Fast Gemini TTS with star-name preset voices.",
+        description: "Half the latency of v2 with similar quality.",
       },
       {
         id: "gemini-2.5-pro-preview-tts",
         label: "Gemini 2.5 Pro TTS",
         provider: "Google Gemini",
         badge: "Pro",
-        description: "Higher quality Gemini TTS for narration.",
+        description: "Gemini Pro voices — 30 official preset speakers.",
+      },
+      {
+        id: "google-tts-studio",
+        label: "Google Cloud TTS — Studio",
+        provider: "Google Cloud",
+        badge: "Studio",
+        description: "Premium Studio + Neural2 voices for English & Thai.",
       },
     ],
   },
@@ -508,13 +489,37 @@ export function buildAudioParams(args: {
   script: string;
   voice: string;
   stylePrompt: string;
+  /** ElevenLabs / Gemini Voice Style preset — Expressive / Neutral /
+   *  Consistent. Backend maps this onto numeric voice_settings if no
+   *  explicit `stability` / `style` knobs are provided. */
+  voiceStylePreset?: "expressive" | "neutral" | "consistent";
+  /** ElevenLabs only — speech speed (0.7–1.2). */
+  voiceSpeed?: number;
+  /** ElevenLabs only — voice_settings.stability (0–1). */
+  voiceStability?: number;
+  /** ElevenLabs only — voice_settings.similarity_boost (0–1). */
+  voiceSimilarity?: number;
+  /** ElevenLabs only — voice_settings.style (0–1). */
+  voiceStyleAmount?: number;
 }): Record<string, unknown> {
-  return {
+  const isElevenLabs =
+    args.model.startsWith("elevenlabs-") || args.model.startsWith("eleven_");
+  const out: Record<string, unknown> = {
     model_name: args.model,
     prompt: args.script.trim(),
     voice: args.voice,
-    style_prompt: args.stylePrompt.trim(),
+    style_prompt: args.stylePrompt?.trim() ?? "",
   };
+  if (isElevenLabs) {
+    if (args.voiceStylePreset) out.voice_style = args.voiceStylePreset;
+    if (typeof args.voiceSpeed === "number") out.speed = args.voiceSpeed;
+    if (typeof args.voiceStability === "number") out.stability = args.voiceStability;
+    if (typeof args.voiceSimilarity === "number") {
+      out.similarity_boost = args.voiceSimilarity;
+    }
+    if (typeof args.voiceStyleAmount === "number") out.style = args.voiceStyleAmount;
+  }
+  return out;
 }
 
 export function build3dParams(args: {

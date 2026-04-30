@@ -130,6 +130,18 @@ interface StandaloneFormState {
   script: string;
   voice: string;
   voiceStyle: string;
+  /** ElevenLabs / Gemini "Voice Style" preset — Expressive / Neutral
+   *  / Consistent. Maps onto numeric voice_settings on the backend. */
+  voiceStylePreset: "expressive" | "neutral" | "consistent";
+  /** Speech speed (0.7–1.2). ElevenLabs only — Google has its own
+   *  speakingRate path, Gemini doesn't expose this. */
+  voiceSpeed: number;
+  /** ElevenLabs voice_settings.stability (0–1). */
+  voiceStability: number;
+  /** ElevenLabs voice_settings.similarity_boost (0–1). */
+  voiceSimilarity: number;
+  /** ElevenLabs voice_settings.style (0–1). */
+  voiceStyleAmount: number;
   modelImage: UploadedRef | null;
   texture: boolean;
   pbr: boolean;
@@ -140,6 +152,19 @@ export interface StandaloneProjectOption {
   name: string;
   updatedAt: number;
 }
+
+/** Per-tool default voice params shared across the four tools.
+ *  Picked to match Freepik's default voice studio panel: 1× speed,
+ *  Neutral preset, 20% similarity (their displayed default). */
+const DEFAULT_VOICE_PARAMS = {
+  voice: "",
+  voiceStyle: "",
+  voiceStylePreset: "neutral" as const,
+  voiceSpeed: 1.0,
+  voiceStability: 0.55,
+  voiceSimilarity: 0.20,
+  voiceStyleAmount: 0.30,
+};
 
 const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
   image_gen: {
@@ -159,8 +184,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     videoStart: null,
     videoEnd: null,
     script: "",
-    voice: DEFAULT_VOICE_ID,
-    voiceStyle: "Neutral, clear, natural pace",
+    ...DEFAULT_VOICE_PARAMS,
     modelImage: null,
     texture: true,
     pbr: true,
@@ -182,8 +206,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     videoStart: null,
     videoEnd: null,
     script: "",
-    voice: DEFAULT_VOICE_ID,
-    voiceStyle: "Neutral, clear, natural pace",
+    ...DEFAULT_VOICE_PARAMS,
     modelImage: null,
     texture: true,
     pbr: true,
@@ -205,8 +228,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     videoStart: null,
     videoEnd: null,
     script: "",
-    voice: DEFAULT_VOICE_ID,
-    voiceStyle: "Warm, confident, natural pace",
+    ...DEFAULT_VOICE_PARAMS,
     modelImage: null,
     texture: true,
     pbr: true,
@@ -228,8 +250,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     videoStart: null,
     videoEnd: null,
     script: "",
-    voice: DEFAULT_VOICE_ID,
-    voiceStyle: "Neutral",
+    ...DEFAULT_VOICE_PARAMS,
     modelImage: null,
     texture: true,
     pbr: true,
@@ -457,7 +478,7 @@ export default function StandaloneGenerator({
       />
 
       <div className="ws-scroll-hide flex min-h-0 flex-1 flex-col overflow-y-auto rounded-t-[22px] bg-[#191919] lg:flex-row lg:overflow-hidden lg:rounded-none">
-        <aside className="mx-auto min-h-[calc(100dvh-68px)] w-full max-w-[390px] shrink-0 overflow-visible bg-[#191919] px-4 pb-5 pt-4 lg:mx-0 lg:h-full lg:min-h-0 lg:w-[294px] lg:max-w-none lg:overflow-y-auto lg:border-r lg:border-white/[0.04] lg:bg-[#151515] lg:px-3 lg:pb-4 lg:pt-3">
+        <aside className="ws-scroll-hide mx-auto min-h-[calc(100dvh-68px)] w-full max-w-[390px] shrink-0 overflow-visible bg-[#191919] px-4 pb-5 pt-4 lg:mx-0 lg:h-full lg:min-h-0 lg:w-[294px] lg:max-w-none lg:overflow-y-auto lg:border-r lg:border-white/[0.04] lg:bg-[#151515] lg:px-3 lg:pb-4 lg:pt-3">
           <ToolTabs
             activeTool={activeTool}
             onToolChange={onToolChange}
@@ -546,7 +567,7 @@ export default function StandaloneGenerator({
           </button>
         </aside>
 
-        <main className="min-h-0 flex-1 overflow-visible bg-[#1c1c1c] lg:overflow-y-auto">
+        <main className="ws-scroll-hide min-h-0 flex-1 overflow-visible bg-[#1c1c1c] lg:overflow-y-auto">
           <div className="px-4 pb-20 pt-4 md:px-5 lg:px-4 lg:pb-10 lg:pt-3">
             <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <GenerationHistoryHeader onRefresh={() => void jobsQuery.refetch()} />
@@ -1054,35 +1075,81 @@ function VideoControls({
   );
 }
 
-/** Standalone tool voice grid — mirrors the canvas voice picker but
- *  in a smaller, side-panel-friendly layout. Three provider tabs
- *  (Google / Gemini / ElevenLabs) with a play button on each tile;
- *  preview audio is synthesised on demand by the same `voice-preview`
- *  edge function the canvas picker uses. */
-type StandaloneVoiceProvider = "google" | "gemini" | "elevenlabs";
-
-const STANDALONE_VOICE_TABS: Array<{ id: StandaloneVoiceProvider; label: string }> = [
-  { id: "google",     label: "Google" },
-  { id: "gemini",     label: "Gemini" },
-  { id: "elevenlabs", label: "ElevenLabs" },
-];
+/** Standalone tool voice panel — model-driven layout per Freepik /
+ *  ElevenLabs studio convention.
+ *
+ *  Voice list and parameter widgets follow the SELECTED MODEL above
+ *  (no separate provider tabs):
+ *
+ *    elevenlabs-multilingual-v2 / -turbo-v2-5
+ *      → Voices fetched live from `voice-list` edge fn (the user's
+ *        ElevenLabs account voices, real not sample)
+ *      → Params: Voice Style chip (Expressive / Neutral / Consistent),
+ *                Speed slider (0.7×–1.2×), Stability slider (0–100%),
+ *                Similarity slider (0–100%), Style amount slider
+ *
+ *    gemini-2.5-pro-preview-tts
+ *      → 30 official Gemini prebuilt voices (Achernar, Charon, …)
+ *      → Params: free-form Voice instructions textarea
+ *
+ *    google-tts-studio
+ *      → Google Cloud TTS Studio + Neural2 voices for English,
+ *        Standard / WaveNet for Thai (Google's actual catalog)
+ *      → Params: Voice instructions textarea (mapped to SSML
+ *                <prosody> on the backend)
+ */
+type VoiceProviderKind = "elevenlabs" | "gemini" | "google";
 
 interface VoiceTile {
   id: string;
   name: string;
   characteristic: string;
   tint: string;
+  /** Pre-existing CDN preview URL (ElevenLabs only). When present the
+   *  picker plays this directly without a synth round-trip. */
+  preview_url?: string | null;
 }
 
-function tilesFor(p: StandaloneVoiceProvider): VoiceTile[] {
-  if (p === "google") return GOOGLE_VOICES.map((v) => ({
-    id: v.id, name: v.name, characteristic: `${v.flag} ${v.characteristic}`, tint: v.tint,
-  }));
-  if (p === "gemini") return GEMINI_VOICES.map((v) => ({
-    id: v.id, name: v.name, characteristic: v.characteristic, tint: v.tint,
-  }));
-  return ELEVENLABS_VOICES.map((v) => ({
-    id: v.id, name: v.name, characteristic: `${v.flag} ${v.characteristic}`, tint: v.tint,
+function inferVoiceProvider(model: string): VoiceProviderKind {
+  if (model.startsWith("elevenlabs-") || model.startsWith("eleven_")) {
+    return "elevenlabs";
+  }
+  if (model.startsWith("gemini-")) return "gemini";
+  return "google";
+}
+
+/** Map our model slug to the ElevenLabs API model_id (the backend
+ *  uses the same map). Needed when previewing so the play button
+ *  uses the same model the user will eventually generate with. */
+function elevenApiModelId(model: string): string {
+  if (model === "elevenlabs-multilingual-v2") return "eleven_multilingual_v2";
+  if (model === "elevenlabs-turbo-v2-5") return "eleven_turbo_v2_5";
+  return model.startsWith("eleven") ? model : "eleven_multilingual_v2";
+}
+
+/** Curated Google Cloud TTS catalog — Studio + Neural2 only for
+ *  English (drop WaveNet / Standard for English; those tiers don't
+ *  pass production quality bar). Thai keeps Standard + WaveNet
+ *  because Google hasn't shipped Studio Thai yet (2026-04). */
+function googleVoicesForPicker(): VoiceTile[] {
+  return GOOGLE_VOICES
+    .filter((v) =>
+      v.languageCode === "th-TH" || v.family === "Studio" || v.family === "Neural2",
+    )
+    .map((v) => ({
+      id: v.id,
+      name: v.name,
+      characteristic: `${v.flag} ${v.characteristic}`,
+      tint: v.tint,
+    }));
+}
+
+function geminiVoicesForPicker(): VoiceTile[] {
+  return GEMINI_VOICES.map((v) => ({
+    id: v.id,
+    name: v.name,
+    characteristic: v.characteristic,
+    tint: v.tint,
   }));
 }
 
@@ -1093,46 +1160,151 @@ function VoiceControls({
   form: StandaloneFormState;
   onChange: (patch: Partial<StandaloneFormState>) => void;
 }) {
+  const provider = inferVoiceProvider(form.model);
   const selectedVoice = findAnyVoice(form.voice);
-  // Default tab follows the model picked above — if the user has
-  // an ElevenLabs model selected, open ElevenLabs voices first.
-  const initialTab: StandaloneVoiceProvider =
-    typeof form.model === "string" && form.model.startsWith("elevenlabs-")
-      ? "elevenlabs"
-      : typeof form.model === "string" && form.model.startsWith("gemini-")
-        ? "gemini"
-        : "google";
-  const [voiceProvider, setVoiceProvider] =
-    useState<StandaloneVoiceProvider>(initialTab);
+
+  // Voice catalog — switches with the selected model.
+  const [elevenVoices, setElevenVoices] = useState<VoiceTile[] | null>(null);
+  const [elevenLoading, setElevenLoading] = useState(false);
+  const [elevenError, setElevenError] = useState<string | null>(null);
+
+  // Pull ElevenLabs voices from the user's actual account when the
+  // user lands on an ElevenLabs model. Cached in state so switching
+  // away and back doesn't re-fetch.
+  useEffect(() => {
+    if (provider !== "elevenlabs") return;
+    if (elevenVoices !== null || elevenLoading) return;
+    let cancelled = false;
+    setElevenLoading(true);
+    setElevenError(null);
+    void (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("voice-list", {
+          body: { provider: "elevenlabs" },
+        });
+        if (cancelled) return;
+        const payload = data as
+          | { voices?: Array<{
+              id: string;
+              name: string;
+              description?: string;
+              preview_url?: string | null;
+              accent?: string | null;
+              category?: string;
+            }>; error?: string }
+          | null;
+        if (error || payload?.error || !payload?.voices) {
+          const msg =
+            payload?.error ??
+            (error as { message?: string } | null)?.message ??
+            "Couldn't load ElevenLabs voices";
+          setElevenError(msg);
+          setElevenVoices([]);
+          return;
+        }
+        const tiles: VoiceTile[] = payload.voices.map((v) => ({
+          id: v.id,
+          name: v.name,
+          characteristic:
+            (v.description || v.accent || v.category || "").slice(0, 90),
+          tint: pickTintFromName(v.name),
+          preview_url: v.preview_url ?? null,
+        }));
+        setElevenVoices(tiles);
+      } catch (err) {
+        if (cancelled) return;
+        const msg = err instanceof Error ? err.message : String(err);
+        setElevenError(msg);
+        setElevenVoices([]);
+      } finally {
+        if (!cancelled) setElevenLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [provider, elevenVoices, elevenLoading]);
+
+  const tiles: VoiceTile[] = useMemo(() => {
+    if (provider === "elevenlabs") return elevenVoices ?? [];
+    if (provider === "gemini") return geminiVoicesForPicker();
+    return googleVoicesForPicker();
+  }, [provider, elevenVoices]);
+
+  // When the user changes model, drop the current voice if it
+  // doesn't belong to the new provider's catalog. This stops a stale
+  // ElevenLabs voice id from being sent with a Gemini request (which
+  // 400s on the backend).
+  useEffect(() => {
+    if (!form.voice) return;
+    const valid = tiles.some((t) => t.id === form.voice);
+    if (!valid && (provider !== "elevenlabs" || elevenVoices !== null)) {
+      // Only blank-out once the catalog is loaded — otherwise we'd
+      // clear the user's voice the first render before the fetch
+      // completes.
+      onChange({ voice: tiles[0]?.id ?? "" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tiles, provider]);
+
   const [playing, setPlaying] = useState<string | null>(null);
   const [synthing, setSynthing] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  const tiles = useMemo(() => tilesFor(voiceProvider), [voiceProvider]);
 
   const stopAudio = () => {
     const a = audioRef.current;
     if (a) { a.pause(); a.currentTime = 0; }
   };
 
-  const handlePreview = async (
-    voiceId: string,
-    e: React.MouseEvent,
-  ) => {
+  const playUrl = (voiceId: string, url: string) => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+      audioRef.current.preload = "auto";
+    }
+    const a = audioRef.current;
+    a.src = url;
+    setPlaying(voiceId);
+    a.onended = () => setPlaying(null);
+    a.onerror = () => {
+      setPreviewError("Failed to play preview");
+      setPlaying(null);
+    };
+    a.play().catch((err) => {
+      setPreviewError(err?.message ?? "Playback blocked");
+      setPlaying(null);
+    });
+  };
+
+  const handlePreview = async (voice: VoiceTile, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (playing === voiceId) {
+    if (playing === voice.id) {
       stopAudio();
       setPlaying(null);
       return;
     }
     stopAudio();
     setPreviewError(null);
-    setSynthing(voiceId);
+
+    // Fast path — ElevenLabs ships pre-existing CDN samples for every
+    // voice in /v1/voices. Use those (instant, free) instead of
+    // calling our synth pipeline.
+    if (provider === "elevenlabs" && voice.preview_url) {
+      playUrl(voice.id, voice.preview_url);
+      return;
+    }
+
+    setSynthing(voice.id);
     try {
+      // Pass `model_id` so the preview is rendered with the EXACT
+      // model the user has selected (Multilingual v2 vs Turbo v2.5
+      // sound different — using a fixed fallback misrepresents one
+      // of them).
+      const modelId =
+        provider === "elevenlabs"
+          ? elevenApiModelId(form.model)
+          : form.model;
       const { data, error } = await supabase.functions.invoke(
         "voice-preview",
-        { body: { provider: voiceProvider, voice_id: voiceId } },
+        { body: { provider, voice_id: voice.id, model_id: modelId } },
       );
       const payload = data as { url?: string; error?: string } | null;
       if (error || payload?.error || !payload?.url) {
@@ -1145,22 +1317,7 @@ function VoiceControls({
         return;
       }
       setSynthing(null);
-      setPlaying(voiceId);
-      if (!audioRef.current) {
-        audioRef.current = new Audio();
-        audioRef.current.preload = "auto";
-      }
-      const a = audioRef.current;
-      a.src = payload.url;
-      a.onended = () => setPlaying(null);
-      a.onerror = () => {
-        setPreviewError("Failed to play preview");
-        setPlaying(null);
-      };
-      a.play().catch((err) => {
-        setPreviewError(err?.message ?? "Playback blocked");
-        setPlaying(null);
-      });
+      playUrl(voice.id, payload.url);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setPreviewError(msg);
@@ -1186,29 +1343,9 @@ function VoiceControls({
         minRows={7}
         maxLength={5000}
       />
+
       <div>
         <FieldLabel label="Voice" meta={selectedVoice.characteristic} />
-        {/* Provider tabs */}
-        <div className="mt-2 inline-flex w-fit items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[11px]">
-          {STANDALONE_VOICE_TABS.map((t) => {
-            const active = voiceProvider === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setVoiceProvider(t.id)}
-                className={cn(
-                  "rounded-md px-2.5 py-0.5 transition-colors",
-                  active
-                    ? "bg-white/[0.10] text-zinc-50"
-                    : "text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100",
-                )}
-              >
-                {t.label}
-              </button>
-            );
-          })}
-        </div>
 
         {previewError && (
           <div className="mt-2 flex items-start gap-1.5 rounded-md border border-amber-400/15 bg-amber-400/[0.06] px-2 py-1.5 text-[10.5px] text-amber-200">
@@ -1225,7 +1362,19 @@ function VoiceControls({
           </div>
         )}
 
-        <div className="mt-2 grid max-h-[270px] grid-cols-2 gap-2 overflow-y-auto pr-1">
+        {provider === "elevenlabs" && elevenLoading && (
+          <div className="mt-2 rounded-md border border-white/[0.06] bg-white/[0.02] px-2.5 py-2 text-[11px] text-zinc-500">
+            Loading ElevenLabs voices from your account…
+          </div>
+        )}
+
+        {provider === "elevenlabs" && elevenError && !elevenLoading && (
+          <div className="mt-2 rounded-md border border-red-400/20 bg-red-500/[0.06] px-2.5 py-2 text-[11px] text-red-300">
+            {elevenError}
+          </div>
+        )}
+
+        <div className="ws-scroll-hide mt-2 grid max-h-[270px] grid-cols-2 gap-2 overflow-y-auto pr-0.5">
           {tiles.map((voice) => {
             const active = voice.id === form.voice;
             const isPlaying = playing === voice.id;
@@ -1240,7 +1389,6 @@ function VoiceControls({
                     : "border-white/[0.12] bg-[#242424] hover:bg-[#2d2d2d]",
                 )}
               >
-                {/* Card body acts as the select target. */}
                 <button
                   type="button"
                   onClick={() => onChange({ voice: voice.id })}
@@ -1265,10 +1413,9 @@ function VoiceControls({
                     </span>
                   </span>
                 </button>
-                {/* Floating preview button — only top-right of the card. */}
                 <button
                   type="button"
-                  onClick={(e) => handlePreview(voice.id, e)}
+                  onClick={(e) => handlePreview(voice, e)}
                   disabled={isSynthing}
                   className={cn(
                     "absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full text-[11px] transition-colors",
@@ -1277,13 +1424,7 @@ function VoiceControls({
                     isPlaying && "bg-emerald-500/20 text-emerald-200 ring-emerald-400/30",
                     isSynthing && "animate-pulse",
                   )}
-                  title={
-                    isSynthing
-                      ? "Generating preview…"
-                      : isPlaying
-                        ? "Stop preview"
-                        : "Play preview"
-                  }
+                  title={isSynthing ? "Generating preview…" : isPlaying ? "Stop preview" : "Play preview"}
                   aria-label={isPlaying ? "Stop preview" : "Play preview"}
                 >
                   {isSynthing ? (
@@ -1299,13 +1440,153 @@ function VoiceControls({
           })}
         </div>
       </div>
-      <TextInputField
-        label="Voice instructions"
-        value={form.voiceStyle}
-        placeholder="e.g. Calm, confident, slightly slower pace"
-        onChange={(voiceStyle) => onChange({ voiceStyle })}
-      />
+
+      {/* ── Per-model parameter widgets ─────────────────────── */}
+      {provider === "elevenlabs" && (
+        <ElevenLabsVoiceParams form={form} onChange={onChange} />
+      )}
+      {provider !== "elevenlabs" && (
+        <TextInputField
+          label="Voice instructions"
+          value={form.voiceStyle}
+          placeholder={
+            provider === "gemini"
+              ? "e.g. Calmly, with a warm tone"
+              : "e.g. Calm, confident, slightly slower pace"
+          }
+          onChange={(voiceStyle) => onChange({ voiceStyle })}
+        />
+      )}
     </>
+  );
+}
+
+/** ElevenLabs param panel — Style preset chip + 4 numeric sliders.
+ *  Shape mirrors ElevenLabs' own studio UI so a Freepik / ElevenLabs
+ *  user feels at home. Each slider's range is the documented API
+ *  bound (0–1 for stability/similarity/style, 0.7–1.2 for speed). */
+function ElevenLabsVoiceParams({
+  form,
+  onChange,
+}: {
+  form: StandaloneFormState;
+  onChange: (patch: Partial<StandaloneFormState>) => void;
+}) {
+  const presets: Array<{ id: StandaloneFormState["voiceStylePreset"]; label: string }> = [
+    { id: "expressive", label: "Expressive" },
+    { id: "neutral",    label: "Neutral" },
+    { id: "consistent", label: "Consistent" },
+  ];
+
+  return (
+    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-3">
+      <div className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+        Voice style
+      </div>
+      <div className="mt-2 inline-flex w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[11px]">
+        {presets.map((p) => {
+          const active = form.voiceStylePreset === p.id;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => onChange({ voiceStylePreset: p.id })}
+              className={cn(
+                "flex-1 rounded-md px-2 py-1 text-center transition-colors",
+                active
+                  ? "bg-white/[0.10] text-zinc-50"
+                  : "text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100",
+              )}
+            >
+              {p.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <RangeSlider
+        label="Speed"
+        meta={`${form.voiceSpeed.toFixed(2)}×`}
+        min={0.7}
+        max={1.2}
+        step={0.05}
+        value={form.voiceSpeed}
+        onChange={(voiceSpeed) => onChange({ voiceSpeed })}
+      />
+      <RangeSlider
+        label="Stability"
+        meta={`${Math.round(form.voiceStability * 100)}%`}
+        min={0}
+        max={1}
+        step={0.05}
+        value={form.voiceStability}
+        onChange={(voiceStability) => onChange({ voiceStability })}
+      />
+      <RangeSlider
+        label="Similarity"
+        meta={`${Math.round(form.voiceSimilarity * 100)}%`}
+        min={0}
+        max={1}
+        step={0.05}
+        value={form.voiceSimilarity}
+        onChange={(voiceSimilarity) => onChange({ voiceSimilarity })}
+      />
+      <RangeSlider
+        label="Style amount"
+        meta={`${Math.round(form.voiceStyleAmount * 100)}%`}
+        min={0}
+        max={1}
+        step={0.05}
+        value={form.voiceStyleAmount}
+        onChange={(voiceStyleAmount) => onChange({ voiceStyleAmount })}
+      />
+    </div>
+  );
+}
+
+/** Pick a tint key from a voice name's first letter — keeps the
+ *  ElevenLabs avatar circle from being a uniform grey when the API
+ *  doesn't tell us anything about colour. Distribution is even
+ *  enough across the alphabet for most catalogs. */
+function pickTintFromName(name: string): string {
+  const tints = ["violet", "rose", "amber", "emerald", "sky", "zinc"];
+  const i = (name.charCodeAt(0) || 0) % tints.length;
+  return tints[i];
+}
+
+function RangeSlider({
+  label,
+  meta,
+  min,
+  max,
+  step,
+  value,
+  onChange,
+}: {
+  label: string;
+  meta?: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="mt-3">
+      <div className="flex items-center justify-between text-[10.5px] font-medium text-zinc-300">
+        <span>{label}</span>
+        {meta && <span className="text-zinc-500">{meta}</span>}
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="mt-1.5 h-1 w-full cursor-pointer appearance-none rounded-full bg-white/[0.08] accent-amber-300 outline-none"
+      />
+    </div>
   );
 }
 
@@ -2010,6 +2291,11 @@ function buildCurrentParams(
       script: form.script,
       voice: form.voice,
       stylePrompt: form.voiceStyle,
+      voiceStylePreset: form.voiceStylePreset,
+      voiceSpeed: form.voiceSpeed,
+      voiceStability: form.voiceStability,
+      voiceSimilarity: form.voiceSimilarity,
+      voiceStyleAmount: form.voiceStyleAmount,
     });
   }
   if (tool === "image_to_3d") {

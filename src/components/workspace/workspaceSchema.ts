@@ -743,22 +743,29 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     displayName: "Audio Generation",
     category: "AI PROCESS",
     accentColor: "amber",
-    // Three providers all behind one node. The dispatcher in
-    // workspace-run-node routes:
-    //   model_name starts with "gemini-"     → executeGeminiTts
-    //   model_name starts with "elevenlabs-" → executeElevenLabsTts
-    //   any en-US-/en-GB-/th-TH- voice id    → executeGoogleTts
-    // The voice picker swaps `voice` between catalogs when the user
-    // changes the provider tab; this node accepts any of them.
+    // Three providers behind one node, all top-tier only. The
+    // dispatcher in workspace-run-node routes:
+    //   model_name = elevenlabs-*    → executeElevenLabsTts
+    //   model_name = gemini-2.5-pro-* → executeGeminiTts
+    //   model_name = google-tts-studio → executeGoogleTts
+    //
+    // Model audit (2026-04):
+    //   • Dropped ElevenLabs Flash v2.5 — Turbo v2.5 covers the same
+    //     fast-tier use case at higher quality.
+    //   • Dropped Gemini 2.5 Flash TTS — Pro TTS supersedes it for
+    //     production-grade output; Flash was preview-tier scratch.
+    //   • Dropped Google Standard / WaveNet for English — Studio +
+    //     Neural2 are the only voices worth shipping. Thai is the
+    //     exception (Google hasn't released Studio Thai yet) so the
+    //     Thai catalog still includes Standard / WaveNet voices for
+    //     coverage.
     supportedModels: [
-      "gemini-2.5-flash-preview-tts",
-      "gemini-2.5-pro-preview-tts",
-      "google-tts-studio",
       "elevenlabs-multilingual-v2",
       "elevenlabs-turbo-v2-5",
-      "elevenlabs-flash-v2-5",
+      "gemini-2.5-pro-preview-tts",
+      "google-tts-studio",
     ],
-    defaultModel: "google-tts-studio",
+    defaultModel: "elevenlabs-multilingual-v2",
     inputs: [
       { id: "text", label: "text (script)", color: "sky" },
     ],
@@ -769,22 +776,18 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         label: "Model",
         type: "select",
         options: [
-          "google-tts-studio",
           "elevenlabs-multilingual-v2",
           "elevenlabs-turbo-v2-5",
-          "elevenlabs-flash-v2-5",
-          "gemini-2.5-flash-preview-tts",
           "gemini-2.5-pro-preview-tts",
+          "google-tts-studio",
         ],
         optionLabels: {
-          "google-tts-studio":           "Google Cloud TTS",
-          "elevenlabs-multilingual-v2":  "ElevenLabs Multilingual v2",
-          "elevenlabs-turbo-v2-5":       "ElevenLabs Turbo v2.5 (Fast)",
-          "elevenlabs-flash-v2-5":       "ElevenLabs Flash v2.5 (Fastest)",
-          "gemini-2.5-flash-preview-tts": "Gemini 2.5 Flash TTS",
-          "gemini-2.5-pro-preview-tts":   "Gemini 2.5 Pro TTS",
+          "elevenlabs-multilingual-v2": "ElevenLabs v2 — Multilingual (Best quality)",
+          "elevenlabs-turbo-v2-5":      "ElevenLabs Turbo v2.5 (Fast)",
+          "gemini-2.5-pro-preview-tts": "Gemini 2.5 Pro TTS",
+          "google-tts-studio":          "Google Cloud TTS — Studio",
         },
-        default: "google-tts-studio",
+        default: "elevenlabs-multilingual-v2",
         required: true,
       },
       {
