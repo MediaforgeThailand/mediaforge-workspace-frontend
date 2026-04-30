@@ -97,9 +97,12 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         label: "ref_image",
         color: "blue",
         supportedModels: [...SEEDREAM_MODELS],
-        // Backend currently forwards one SeedDream reference image.
-        // Keep the UI honest so extra refs are not silently ignored.
-        maxConnections: 1,
+        // BytePlus ModelArk SeedDream 4.5 + 5.0 accept up to 14
+        // reference images via the `image_urls` array (per BytePlus
+        // doc 1824121, verified 2026-04). The executor passes them
+        // through in canvas wire order so the prompt's "Image 1",
+        // "Image 2" indexing stays predictable.
+        maxConnections: 14,
       },
     ],
     outputs: [{ id: "image", label: "IMAGE", color: "emerald" }],
