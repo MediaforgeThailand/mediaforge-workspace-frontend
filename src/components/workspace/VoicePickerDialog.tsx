@@ -1,59 +1,12 @@
-/**
- * Voice picker — full-viewport dialog for choosing a Google Cloud
- * Text-to-Speech voice. Mirrors Krea / ElevenLabs / Freepik
- * conventions:
- *
- *   ┌──────────────────────────────────────────────────────────────┐
- *   │ Voices            [All genders ▾] [Last used ▾] [♡] [🔍] [×] │
- *   ├──────────────────────────────────────────────────────────────┤
- *   │ Use cases                                                    │
- *   │ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐              │
- *   │ │  Ad     │ │ Informa │ │ Narra   │ │ Social  │              │
- *   │ └─────────┘ └─────────┘ └─────────┘ └─────────┘              │
- *   │                                                              │
- *   │ All voices                                                   │
- *   │ ┌─────────────────┐ ┌─────────────────┐ …                    │
- *   │ │  ⊙  Achernar    │ │  ⊙  Achird      │                      │
- *   │ │     All langs   │ │     All langs   │                      │
- *   │ └─────────────────┘ └─────────────────┘                      │
- *   └──────────────────────────────────────────────────────────────┘
- *
- * Each voice row:
- *   - Avatar circle (initial letter on a tinted gradient — we don't
- *     have real photos for the API voices, so this stays minimal).
- *   - Name + language flag + family badge (Studio / Neural2 / WaveNet).
- *   - Hover reveals a play button. Click → fetches the pre-generated
- *     MP3 from Supabase Storage `voice-previews/google/<id>.mp3` and
- *     plays it via a real <audio> element. If the file is missing
- *     (e.g. before `scripts/generate-voice-previews.ts` has been
- *     run on a fresh project) the row falls back to a silent
- *     "preview unavailable" toast — picking still works.
- *   - Click the row body → selects + closes.
- *
- * Top filters:
- *   - Genders dropdown (male / female / all).
- *   - "Last used" dropdown (sort).
- *   - Favorite toggle (mock — no backing store yet).
- *   - Search opens an input that filters by name or characteristic.
- *
- * Use case cards filter the list to voices matching that case. Click
- * the same card again to clear the filter.
- */
-
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { createPortal } from "react-dom";
-import {
-  X,
-  Search,
-  Heart,
-  ChevronDown,
-  ArrowRight,
-} from "lucide-react";
+import { ArrowRight, ChevronDown, Search, X } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import {
   GOOGLE_VOICES,
-  GOOGLE_VOICE_USE_CASES,
   GOOGLE_VOICE_TINT_GRADIENT,
+  GOOGLE_VOICE_USE_CASES,
   type GoogleVoice,
   type GoogleVoiceLean,
   type GoogleVoiceUseCase,
@@ -65,56 +18,84 @@ import {
   type ElevenLabsVoice,
 } from "./elevenlabsVoices";
 
-/* Aliases — the rest of this file was written against the legacy
- * Gemini types. Keeping the local names stable means the JSX body
- * below doesn't need to change shape, only the underlying data
- * source. */
-type GeminiVoice = GoogleVoice;
+type ProviderTab = "google" | "gemini" | "elevenlabs";
+type VoiceRow = GoogleVoice;
 type VoiceLean = GoogleVoiceLean;
 type VoiceUseCase = GoogleVoiceUseCase;
-const VOICE_USE_CASES = GOOGLE_VOICE_USE_CASES;
-const VOICE_TINT_GRADIENT = GOOGLE_VOICE_TINT_GRADIENT;
 
-/** Provider tabs let the user switch between Google Cloud TTS,
- *  Gemini's prebuilt voice family, and ElevenLabs presets without
- *  juggling three different pickers. Each catalog is normalised to
- *  the same row shape (defined by `GoogleVoice` fields) so the JSX
- *  below renders all three identically. */
-type ProviderTab = "google" | "gemini" | "elevenlabs";
+type ElevenLabsApiVoice = {
+  id: string;
+  name: string;
+  category?: string;
+  description?: string;
+  preview_url?: string | null;
+  lean?: "male" | "female" | "neutral";
+  accent?: string | null;
+  use_case?: string | null;
+};
 
 const PROVIDER_TABS: Array<{ id: ProviderTab; label: string }> = [
-  { id: "google",     label: "Google TTS" },
-  { id: "gemini",     label: "Gemini" },
+  { id: "google", label: "Google TTS" },
+  { id: "gemini", label: "Gemini" },
   { id: "elevenlabs", label: "ElevenLabs" },
 ];
 
-/** Coerce a Gemini voice (no language / family / flag fields) to the
- *  GoogleVoice shape so the row renderer doesn't need a per-provider
- *  branch. Gemini voices are non-localised in the API; we display
- *  them as "All langs" and surface an "AI" tier badge. */
-function geminiToRow(v: GeminiTTSVoice): GoogleVoice {
+const VOICE_USE_CASES = GOOGLE_VOICE_USE_CASES;
+
+const ALL_TINT_GRADIENT: Record<GoogleVoice["tint"], string> = {
+  ...GOOGLE_VOICE_TINT_GRADIENT,
+  ...ELEVENLABS_VOICE_TINT_GRADIENT,
+};
+
+interface Props {
+  open: boolean;
+  value?: string;
+  modelName?: string;
+  onClose: () => void;
+  onSelect: (voiceId: string, modelName: string) => void;
+}
+
+function providerForModel(modelName?: string, voiceId?: string): ProviderTab {
+  const model = String(modelName ?? "");
+  if (model.startsWith("elevenlabs-") || model.startsWith("eleven_")) return "elevenlabs";
+  if (model.startsWith("gemini-")) return "gemini";
+  if (model.startsWith("google-")) return "google";
+  if (ELEVENLABS_VOICES.some((v) => v.id === voiceId)) return "elevenlabs";
+  if (GEMINI_TTS_VOICES.some((v) => v.id === voiceId)) return "gemini";
+  return "google";
+}
+
+function modelForProvider(provider: ProviderTab, currentModel?: string): string {
+  const model = String(currentModel ?? "");
+  if (provider === "elevenlabs") {
+    return model.startsWith("elevenlabs-") || model.startsWith("eleven_")
+      ? model
+      : "elevenlabs-multilingual-v2";
+  }
+  if (provider === "gemini") return "gemini-2.5-pro-preview-tts";
+  return "google-tts-studio";
+}
+
+function geminiToRow(v: GeminiTTSVoice): VoiceRow {
   return {
     id: v.id,
     name: v.name,
     characteristic: v.characteristic,
-    lean: v.lean === "neutral" ? "female" : v.lean,
-    languageCode: "en-US", // Gemini voices speak any language Gemini supports
-    family: "Standard",     // not really standard but the badge variant we want to render
-    flag: "🌐",
+    lean: v.lean,
+    languageCode: "en-US",
+    family: "Standard",
+    flag: "AI",
     useCases: v.useCases,
     tint: v.tint,
   };
 }
 
-/** Same coercion for ElevenLabs — accent maps to the flag chip and
- *  we surface the ElevenLabs name where the Google voice family
- *  would normally sit. */
-function elevenLabsToRow(v: ElevenLabsVoice): GoogleVoice {
+function elevenPresetToRow(v: ElevenLabsVoice): VoiceRow {
   return {
     id: v.id,
     name: v.name,
     characteristic: v.characteristic,
-    lean: v.lean === "neutral" ? "female" : v.lean,
+    lean: v.lean,
     languageCode: v.accent === "British" ? "en-GB" : "en-US",
     family: "Standard",
     flag: v.flag,
@@ -123,44 +104,59 @@ function elevenLabsToRow(v: ElevenLabsVoice): GoogleVoice {
   };
 }
 
-function catalogFor(p: ProviderTab): GoogleVoice[] {
-  if (p === "google") return GOOGLE_VOICES.slice();
-  if (p === "gemini") return GEMINI_TTS_VOICES.map(geminiToRow);
-  return ELEVENLABS_VOICES.map(elevenLabsToRow);
+function useCaseFromEleven(value?: string | null): VoiceUseCase[] {
+  const raw = String(value ?? "").toLowerCase();
+  if (raw.includes("advert")) return ["advertisement"];
+  if (raw.includes("educ") || raw.includes("inform")) return ["informative_educational"];
+  if (raw.includes("narr") || raw.includes("story") || raw.includes("audiobook")) return ["narrative_story"];
+  if (raw.includes("social")) return ["social_media"];
+  return ["advertisement", "informative_educational", "narrative_story", "social_media"];
 }
 
-/** Tint-gradient lookup that works for any provider's tint value
- *  (the palettes are kept identical across catalogs on purpose, but
- *  defensive merging means a future addition can't break the row). */
-const ALL_TINT_GRADIENT: Record<GoogleVoice["tint"], string> = {
-  ...GOOGLE_VOICE_TINT_GRADIENT,
-  ...ELEVENLABS_VOICE_TINT_GRADIENT,
-};
-
-interface Props {
-  open: boolean;
-  /** Currently selected voice id — highlighted in the grid. */
-  value?: string;
-  onClose: () => void;
-  onSelect: (voiceId: string) => void;
+function tintFromName(name: string): VoiceRow["tint"] {
+  const tints: VoiceRow["tint"][] = ["violet", "rose", "amber", "emerald", "sky", "zinc"];
+  const total = Array.from(name).reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+  return tints[total % tints.length];
 }
 
-const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
-  const [provider, setProvider] = useState<ProviderTab>("google");
+function elevenApiToRow(v: ElevenLabsApiVoice): VoiceRow {
+  const accent = String(v.accent ?? "").toLowerCase();
+  return {
+    id: v.id,
+    name: v.name,
+    characteristic: v.description || v.category || v.accent || "ElevenLabs voice",
+    lean: v.lean ?? "neutral",
+    languageCode: accent.includes("british") || accent.includes("uk") ? "en-GB" : "en-US",
+    family: "Standard",
+    flag: accent.includes("british") || accent.includes("uk") ? "GB" : "EL",
+    useCases: useCaseFromEleven(v.use_case),
+    tint: tintFromName(v.name),
+  };
+}
+
+function staticCatalogFor(provider: ProviderTab): VoiceRow[] {
+  if (provider === "google") return GOOGLE_VOICES.slice();
+  if (provider === "gemini") return GEMINI_TTS_VOICES.map(geminiToRow);
+  return ELEVENLABS_VOICES.map(elevenPresetToRow);
+}
+
+const VoicePickerDialog = ({ open, value, modelName, onClose, onSelect }: Props) => {
+  const [provider, setProvider] = useState<ProviderTab>(() => providerForModel(modelName, value));
   const [genderFilter, setGenderFilter] = useState<"all" | VoiceLean>("all");
   const [useCaseFilter, setUseCaseFilter] = useState<VoiceUseCase | null>(null);
-  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [genderOpen, setGenderOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
-  const [sort, setSort] = useState<"recent" | "alpha">("recent");
-  // Catalog list reactive to provider tab.
-  const GEMINI_VOICES: GeminiVoice[] = useMemo(() => catalogFor(provider), [provider]);
+  const [sort, setSort] = useState<"catalog" | "alpha">("catalog");
+  const [elevenVoices, setElevenVoices] = useState<VoiceRow[]>([]);
+  const [elevenLoading, setElevenLoading] = useState(false);
+  const [elevenError, setElevenError] = useState<string | null>(null);
 
-  // Mocked favorites — survives only the session; can be wired to
-  // user_settings or a `voice_favorites` table later.
-  const [favorites, setFavorites] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    if (!open) return;
+    setProvider(providerForModel(modelName, value));
+  }, [modelName, open, value]);
 
   useEffect(() => {
     if (!open) return;
@@ -174,46 +170,58 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [open, onClose]);
 
+  useEffect(() => {
+    if (!open || provider !== "elevenlabs") return;
+    let cancelled = false;
+    setElevenLoading(true);
+    setElevenError(null);
+    supabase.functions
+      .invoke<{ voices?: ElevenLabsApiVoice[]; error?: string }>("voice-list", {
+        body: { provider: "elevenlabs" },
+      })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error || data?.error) {
+          setElevenError(error?.message || data?.error || "Cannot load ElevenLabs voices");
+          setElevenVoices([]);
+          return;
+        }
+        setElevenVoices((data?.voices ?? []).map(elevenApiToRow));
+      })
+      .catch((err) => {
+        if (!cancelled) setElevenError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => {
+        if (!cancelled) setElevenLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, provider]);
+
+  const catalog = useMemo(() => {
+    if (provider !== "elevenlabs") return staticCatalogFor(provider);
+    return elevenVoices.length > 0 ? elevenVoices : staticCatalogFor("elevenlabs");
+  }, [elevenVoices, provider]);
+
   const filtered = useMemo(() => {
-    let list: GeminiVoice[] = GEMINI_VOICES.slice();
+    let list = catalog.slice();
     if (genderFilter !== "all") list = list.filter((v) => v.lean === genderFilter);
     if (useCaseFilter) list = list.filter((v) => v.useCases.includes(useCaseFilter));
-    if (favoritesOnly) list = list.filter((v) => favorites.has(v.id));
     const q = query.trim().toLowerCase();
     if (q) {
-      list = list.filter((v) =>
-        `${v.name} ${v.characteristic}`.toLowerCase().includes(q),
-      );
+      list = list.filter((v) => `${v.name} ${v.characteristic} ${v.id}`.toLowerCase().includes(q));
     }
-    if (sort === "alpha") {
-      list.sort((a, b) => a.name.localeCompare(b.name));
-    }
-    // "recent" defaults to the catalogue order, which is alphabetical
-    // by id in our source file — visually the same as "alpha". When
-    // we ship a real "last used" timestamp we'll swap this for a
-    // proper sort.
+    if (sort === "alpha") list.sort((a, b) => a.name.localeCompare(b.name));
     return list;
-  }, [genderFilter, useCaseFilter, favoritesOnly, query, sort, favorites]);
+  }, [catalog, genderFilter, query, sort, useCaseFilter]);
 
-  if (!open) return null;
-
-  // Voice preview is intentionally absent — see the comment near the
-  // voice card render below. The dialog is select-only.
-  };
-
-  const handleSelect = (v: GeminiVoice) => {
-    onSelect(v.id);
+  const handleSelect = (voice: VoiceRow) => {
+    onSelect(voice.id, modelForProvider(provider, modelName));
     onClose();
   };
 
-  const toggleFavorite = (id: string) => {
-    setFavorites((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  if (!open) return null;
 
   return createPortal(
     <div
@@ -231,26 +239,23 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Top sheen */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent"
         />
 
-        {/* ── Header ── */}
-        <div className="flex items-center gap-3 px-6 pt-5 pb-4">
-          <h2 className="text-[18px] font-semibold tracking-tight text-zinc-50">
-            Voices
-          </h2>
+        <div className="flex items-center gap-3 px-6 pb-4 pt-5">
+          <h2 className="text-[18px] font-semibold tracking-tight text-zinc-50">Voices</h2>
           <div className="ml-auto flex items-center gap-2">
-            {/* Gender dropdown */}
             <DropdownButton
               label={
                 genderFilter === "all"
                   ? "All genders"
                   : genderFilter === "male"
                     ? "Male"
-                    : "Female"
+                    : genderFilter === "female"
+                      ? "Female"
+                      : "Neutral"
               }
               open={genderOpen}
               onToggle={() => setGenderOpen((v) => !v)}
@@ -259,52 +264,31 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
                 { label: "All genders", value: "all" },
                 { label: "Female", value: "female" },
                 { label: "Male", value: "male" },
+                { label: "Neutral", value: "neutral" },
               ]}
-              onSelect={(v) =>
-                setGenderFilter(v as "all" | VoiceLean)
-              }
+              onSelect={(v) => setGenderFilter(v as "all" | VoiceLean)}
             />
-            {/* Sort dropdown */}
             <DropdownButton
-              label={sort === "recent" ? "Last used" : "A → Z"}
+              label={sort === "catalog" ? "Provider order" : "A to Z"}
               open={sortOpen}
               onToggle={() => setSortOpen((v) => !v)}
               onClose={() => setSortOpen(false)}
               items={[
-                { label: "Last used", value: "recent" },
-                { label: "A → Z", value: "alpha" },
+                { label: "Provider order", value: "catalog" },
+                { label: "A to Z", value: "alpha" },
               ]}
-              onSelect={(v) => setSort(v as "recent" | "alpha")}
+              onSelect={(v) => setSort(v as "catalog" | "alpha")}
             />
-            {/* Favorites toggle */}
-            <ChromeIconBtn
-              icon={Heart}
-              title="Show favorites only"
-              active={favoritesOnly}
-              onClick={() => setFavoritesOnly((v) => !v)}
-            />
-            {/* Search toggle */}
             <ChromeIconBtn
               icon={Search}
               title="Search voices"
               active={searchOpen}
               onClick={() => setSearchOpen((v) => !v)}
             />
-            <ChromeIconBtn
-              icon={X}
-              title="Close (Esc)"
-              onClick={onClose}
-            />
+            <ChromeIconBtn icon={X} title="Close (Esc)" onClick={onClose} />
           </div>
         </div>
 
-        {/* Preview-bucket-empty banner — shown after the first 404
-         *  so users know the picker still works (selection is fine,
-         *  preview MP3s just haven't been populated yet). */}
-        {/* Provider tabs — Google / Gemini / ElevenLabs. Switching
-         *  tabs swaps the entire grid; the selected voice id is
-         *  preserved in the dialog's `value` prop so a row stays
-         *  highlighted if the user comes back to its tab. */}
         <div className="mx-6 mb-3 inline-flex w-fit items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[12px]">
           {PROVIDER_TABS.map((t) => {
             const active = provider === t.id;
@@ -326,7 +310,21 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
           })}
         </div>
 
-        {/* Inline search field — slides in below the header when toggled */}
+        {provider === "elevenlabs" && (elevenLoading || elevenError) && (
+          <div
+            className={cn(
+              "mx-6 mb-3 rounded-xl border px-3 py-2 text-[12px]",
+              elevenError
+                ? "border-amber-400/20 bg-amber-400/10 text-amber-100"
+                : "border-white/10 bg-white/[0.04] text-zinc-300",
+            )}
+          >
+            {elevenError
+              ? `${elevenError}. Showing bundled ElevenLabs preset voices as a fallback.`
+              : "Loading ElevenLabs account voices..."}
+          </div>
+        )}
+
         {searchOpen && (
           <div className="px-6 pb-3">
             <div className="relative">
@@ -335,7 +333,7 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by name or characteristic…"
+                placeholder="Search by name, provider id, or characteristic..."
                 className="w-full rounded-xl border border-white/[0.06] bg-white/[0.04] py-2.5 pl-9 pr-3 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-white/10"
               />
             </div>
@@ -343,10 +341,7 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
         )}
 
         <div className="ws-scroll-hide flex-1 overflow-y-auto px-6 pb-8">
-          {/* ── Use-case cards ── */}
-          <div className="mb-2 text-[12.5px] font-medium text-zinc-300">
-            Use cases
-          </div>
+          <div className="mb-2 text-[12.5px] font-medium text-zinc-300">Use cases</div>
           <ul className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {VOICE_USE_CASES.map((uc) => {
               const active = useCaseFilter === uc.id;
@@ -355,9 +350,7 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
                   <button
                     type="button"
                     onClick={() =>
-                      setUseCaseFilter((current) =>
-                        current === uc.id ? null : uc.id,
-                      )
+                      setUseCaseFilter((current) => (current === uc.id ? null : uc.id))
                     }
                     className={cn(
                       "group relative h-[120px] w-full overflow-hidden rounded-2xl text-left transition-all",
@@ -367,8 +360,6 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
                     )}
                     style={{ background: uc.gradient }}
                   >
-                    {/* Subtle texture overlay so the cards don't read
-                     *  as flat colour blocks. */}
                     <div
                       aria-hidden
                       className="pointer-events-none absolute inset-0 opacity-30"
@@ -389,12 +380,7 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
                           uc.label
                         )}
                       </span>
-                      <span
-                        className={cn(
-                          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/95 text-zinc-900 transition-transform",
-                          "group-hover:translate-x-0.5",
-                        )}
-                      >
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/95 text-zinc-900 transition-transform group-hover:translate-x-0.5">
                         <ArrowRight className="h-3.5 w-3.5" />
                       </span>
                     </div>
@@ -404,7 +390,6 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
             })}
           </ul>
 
-          {/* ── All voices ── */}
           <div className="mb-3 flex items-baseline justify-between">
             <span className="text-[12.5px] font-medium text-zinc-300">
               {useCaseFilter
@@ -422,14 +407,13 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
             </div>
           ) : (
             <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filtered.map((v) => {
-                const isSelected = value === v.id;
-                const isFav = favorites.has(v.id);
+              {filtered.map((voice) => {
+                const isSelected = value === voice.id;
                 return (
-                  <li key={v.id}>
+                  <li key={voice.id}>
                     <button
                       type="button"
-                      onClick={() => handleSelect(v)}
+                      onClick={() => handleSelect(voice)}
                       className={cn(
                         "group flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition-colors",
                         "ring-1 ring-inset",
@@ -437,41 +421,19 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
                           ? "bg-white/[0.10] ring-white/[0.18]"
                           : "bg-white/[0.025] ring-white/[0.06] hover:bg-white/[0.05] hover:ring-white/[0.12]",
                       )}
-                      title={v.characteristic}
+                      title={`${voice.name} - ${voice.id}`}
                     >
-                      <VoiceAvatar voice={v} />
+                      <VoiceAvatar voice={voice} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 truncate text-[13px] font-semibold text-zinc-50">
-                          <span className="shrink-0">{v.flag}</span>
-                          <span className="truncate">{v.name}</span>
-                          <FamilyBadge family={v.family} />
+                          <span className="shrink-0 text-[10px]">{voice.flag}</span>
+                          <span className="truncate">{voice.name}</span>
+                          <FamilyBadge family={voice.family} />
                         </div>
                         <div className="truncate text-[11px] text-zinc-500">
-                          {v.characteristic} · {v.languageCode}
+                          {voice.characteristic} - {voice.id}
                         </div>
                       </div>
-                      {/* Favourite — only shows on hover OR when set.
-                       *  Voice preview play button removed per UX
-                       *  rework — the cards are select-only until we
-                       *  build a properly debounced preview pipeline. */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFavorite(v.id);
-                        }}
-                        className={cn(
-                          "shrink-0 rounded-md p-1.5 transition-colors",
-                          isFav
-                            ? "text-rose-300"
-                            : "text-zinc-500 opacity-0 group-hover:opacity-100 hover:text-rose-300",
-                        )}
-                        title={isFav ? "Unfavorite" : "Favorite"}
-                      >
-                        <Heart
-                          className={cn("h-3.5 w-3.5", isFav && "fill-rose-300")}
-                        />
-                      </button>
                     </button>
                   </li>
                 );
@@ -485,11 +447,7 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
   );
 };
 
-/* ── Atoms ──────────────────────────────────────────────────── */
-
-/** Initial-letter avatar — gradient background per voice tint, name
- *  initial in white. Cheap stand-in until we ship real avatars. */
-const VoiceAvatar = ({ voice }: { voice: GeminiVoice }) => (
+const VoiceAvatar = ({ voice }: { voice: VoiceRow }) => (
   <span
     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-white shadow-inner ring-1 ring-inset ring-white/15"
     style={{ background: ALL_TINT_GRADIENT[voice.tint] }}
@@ -498,18 +456,9 @@ const VoiceAvatar = ({ voice }: { voice: GeminiVoice }) => (
   </span>
 );
 
-/** Tiny pill that surfaces the Google TTS family — Studio is the
- *  premium tier (and most expensive), so it gets an amber accent so
- *  users notice when they're picking it. */
 const FamilyBadge = ({ family }: { family: GoogleVoice["family"] }) => {
   const label =
-    family === "Studio"
-      ? "Studio"
-      : family === "Neural2"
-        ? "N2"
-        : family === "WaveNet"
-          ? "Wav"
-          : "Std";
+    family === "Studio" ? "Studio" : family === "Neural2" ? "N2" : family === "WaveNet" ? "Wav" : "Std";
   const tone =
     family === "Studio"
       ? "bg-amber-400/15 text-amber-200 ring-amber-300/20"
@@ -535,7 +484,7 @@ const ChromeIconBtn = ({
   active,
   onClick,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   title: string;
   active?: boolean;
   onClick?: () => void;
@@ -597,18 +546,18 @@ const DropdownButton = ({
         <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />
       </button>
       {open && (
-        <ul className="absolute right-0 top-full z-10 mt-1 w-[160px] overflow-hidden rounded-md border border-white/10 bg-[hsl(220_10%_10%)] py-1 shadow-lg">
-          {items.map((it) => (
-            <li key={it.value}>
+        <ul className="absolute right-0 top-full z-10 mt-1 w-[170px] overflow-hidden rounded-md border border-white/10 bg-[hsl(220_10%_10%)] py-1 shadow-lg">
+          {items.map((item) => (
+            <li key={item.value}>
               <button
                 type="button"
                 onClick={() => {
-                  onSelect(it.value);
+                  onSelect(item.value);
                   onClose();
                 }}
                 className="flex w-full items-center px-3 py-1.5 text-left text-[12px] text-zinc-200 hover:bg-white/[0.06]"
               >
-                {it.label}
+                {item.label}
               </button>
             </li>
           ))}
@@ -617,15 +566,5 @@ const DropdownButton = ({
     </div>
   );
 };
-
-/* ── Preview playback removed ──────────────────────────────────
- *
- * The dialog used to ship a per-row play button that synthesised a
- * sample via the `voice-preview` edge fn and / or fell back to the
- * browser SpeechSynthesis API. It was the source of repeated user-
- * facing errors (Chrome's "play() interrupted by pause()" race when
- * users clicked between voices, plus 502s when provider keys were
- * missing). The picker is now select-only — pick a voice and the
- * generation step itself produces real audio. */
 
 export default VoicePickerDialog;

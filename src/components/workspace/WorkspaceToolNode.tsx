@@ -1846,7 +1846,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             onClick={() => {
               window.dispatchEvent(
                 new CustomEvent("workspace-open-voice-picker", {
-                  detail: { nodeId: id, voiceId: String(value) },
+                  detail: {
+                    nodeId: id,
+                    voiceId: String(value),
+                    modelName: String(params.model_name ?? selectedModel),
+                  },
                 }),
               );
             }}

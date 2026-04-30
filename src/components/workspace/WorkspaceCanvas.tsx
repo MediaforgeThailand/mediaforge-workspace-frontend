@@ -826,6 +826,7 @@ const Inner = () => {
   const [voicePicker, setVoicePicker] = useState<{
     nodeId: string;
     voiceId: string;
+    modelName: string;
   } | null>(null);
   // Tool mode (select / hand / cut / sticky). Read once at the top
   // so we can flip ReactFlow props (panOnDrag, selectionOnDrag) and
@@ -1406,12 +1407,13 @@ const Inner = () => {
   useEffect(() => {
     const onOpen = (evt: Event) => {
       const detail = (evt as CustomEvent).detail as
-        | { nodeId?: string; voiceId?: string }
+        | { nodeId?: string; voiceId?: string; modelName?: string }
         | undefined;
       if (!detail?.nodeId) return;
       setVoicePicker({
         nodeId: detail.nodeId,
         voiceId: detail.voiceId ?? "Charon",
+        modelName: detail.modelName ?? "google-tts-studio",
       });
     };
     window.addEventListener("workspace-open-voice-picker", onOpen);
@@ -1419,7 +1421,7 @@ const Inner = () => {
       window.removeEventListener("workspace-open-voice-picker", onOpen);
   }, []);
 
-  const onVoicePicked = useCallback((voiceId: string) => {
+  const onVoicePicked = useCallback((voiceId: string, modelName: string) => {
     if (!voicePicker) return;
     const nodeId = voicePicker.nodeId;
     setNodes((nds) =>
@@ -1431,6 +1433,7 @@ const Inner = () => {
                 ...n.data,
                 params: {
                   ...((n.data?.params as Record<string, unknown>) ?? {}),
+                  model_name: modelName,
                   voice: voiceId,
                 },
               },
@@ -2126,6 +2129,7 @@ const Inner = () => {
       <VoicePickerDialog
         open={!!voicePicker}
         value={voicePicker?.voiceId}
+        modelName={voicePicker?.modelName}
         onClose={() => setVoicePicker(null)}
         onSelect={onVoicePicked}
       />
