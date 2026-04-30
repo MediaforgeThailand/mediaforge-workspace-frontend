@@ -37,11 +37,10 @@ import {
   STANDALONE_TOOLS,
   type StandaloneToolKey,
 } from "./standaloneGenerationCatalog";
-import { GEMINI_VOICES } from "./geminiVoices";
+import { GEMINI_VOICES, DEFAULT_VOICE_ID as DEFAULT_GEMINI_VOICE_ID } from "./geminiVoices";
 import {
   GOOGLE_VOICES,
   GOOGLE_VOICE_TINT_GRADIENT,
-  DEFAULT_GOOGLE_VOICE_ID,
 } from "./googleTtsVoices";
 import {
   ELEVENLABS_VOICES,
@@ -49,13 +48,10 @@ import {
 } from "./elevenlabsVoices";
 import { findAnyVoice } from "./voiceCatalogs";
 
-/** Default voice for the standalone surface — matches what the
- *  canvas voice picker opens to (Aria / en-US-Studio-O). The
- *  legacy `DEFAULT_VOICE_ID` from geminiVoices was "Charon", which
- *  meant a fresh standalone form picked a Gemini voice but the
- *  default model was google-tts-studio — backend then errored out.
- *  Using the Google default keeps voice + model in sync. */
-const DEFAULT_VOICE_ID = DEFAULT_GOOGLE_VOICE_ID;
+/** Default voice for the standalone surface. Keep this paired with
+ *  STANDALONE_TOOLS.voice_gen.defaultModel so a fresh form never sends
+ *  a voice id from the wrong provider. */
+const DEFAULT_VOICE_ID = DEFAULT_GEMINI_VOICE_ID;
 
 /** Per-provider tint palette merge — lets a single VoiceTile render
  *  any of the 3 catalogs without per-provider branching. */
@@ -157,7 +153,7 @@ export interface StandaloneProjectOption {
  *  Picked to match Freepik's default voice studio panel: 1× speed,
  *  Neutral preset, 20% similarity (their displayed default). */
 const DEFAULT_VOICE_PARAMS = {
-  voice: "",
+  voice: DEFAULT_VOICE_ID,
   voiceStyle: "",
   voiceStylePreset: "neutral" as const,
   voiceSpeed: 1.0,
@@ -1220,7 +1216,10 @@ function VoiceControls({
   // ElevenLabs voice id from being sent with a Gemini request (which
   // 400s on the backend).
   useEffect(() => {
-    if (!form.voice) return;
+    if (!form.voice) {
+      if (tiles[0]?.id) onChange({ voice: tiles[0].id });
+      return;
+    }
     const valid = tiles.some((t) => t.id === form.voice);
     if (!valid && (provider !== "elevenlabs" || elevenVoices !== null)) {
       // Only blank-out once the catalog is loaded — otherwise we'd

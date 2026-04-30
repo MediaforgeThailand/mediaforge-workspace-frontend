@@ -279,7 +279,7 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
     icon: Mic2,
     outputType: "audio",
     accent: "hsl(38 92% 56%)",
-    defaultModel: "elevenlabs-multilingual-v2",
+    defaultModel: "gemini-2.5-pro-preview-tts",
     // Synced with the audioGenNode supportedModels in workspaceSchema.
     // Production-quality models only — see schema audit comments for
     // which lower-tier ones we dropped.

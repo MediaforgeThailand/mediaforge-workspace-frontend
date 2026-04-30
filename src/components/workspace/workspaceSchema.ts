@@ -770,7 +770,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
       ...GEMINI_TTS_MODELS,
       ...GOOGLE_TTS_MODELS,
     ],
-    defaultModel: "elevenlabs-multilingual-v2",
+    defaultModel: "gemini-2.5-pro-preview-tts",
     inputs: [
       { id: "text", label: "text (script)", color: "sky" },
     ],
@@ -791,7 +791,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           "gemini-2.5-pro-preview-tts": "Gemini 2.5 Pro TTS",
           "google-tts-studio":          "Google Cloud TTS — Studio",
         },
-        default: "elevenlabs-multilingual-v2",
+        default: "gemini-2.5-pro-preview-tts",
         required: true,
       },
       {
@@ -824,7 +824,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
             default: DEFAULT_ELEVENLABS_VOICE_ID,
           };
         },
-        default: DEFAULT_ELEVENLABS_VOICE_ID,
+        default: DEFAULT_GEMINI_VOICE_ID,
         required: true,
       },
       {
