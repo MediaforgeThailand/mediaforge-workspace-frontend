@@ -16,21 +16,24 @@
  * to a future LiveClassroom page).
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsOrgAdmin } from "@/hooks/useIsOrgUser";
 import {
   useManageableClasses,
   useClassMembers,
+  useClassMemberSummary,
   useClassModelUsage,
   useClassActivity,
   useClassDailyUsage,
+  useClassTopSpenders,
   useMemberModelBreakdown,
   type TeacherClass,
   type ClassMember,
+  type ClassMemberSummary,
 } from "./useTeacherData";
-import { getModelMeta, getCategoryColor } from "./modelMeta";
+import { getModelMeta, getCategoryColor, type ModelCategory } from "./modelMeta";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -215,20 +218,29 @@ function Sidebar(props: {
 
 function ClassDetail({ classId, classes }: { classId: string; classes: TeacherClass[] }) {
   const cls = classes.find((c) => c.id === classId);
-  const { data: members } = useClassMembers(classId);
+  const [membersPage, setMembersPage] = useState(1);
+  const membersPageSize = 25;
+  const { data: membersData } = useClassMembers(classId, membersPage, membersPageSize);
+  const { data: memberSummary } = useClassMemberSummary(classId);
+  const { data: topSpenders } = useClassTopSpenders(classId, 5);
   const { data: modelUsage } = useClassModelUsage(classId, 30);
   const { data: dailyUsage } = useClassDailyUsage(classId, 7);
   const { data: activity } = useClassActivity(classId, 30);
+
+  const members = membersData?.items ?? [];
+  const studentCount = memberSummary?.totalStudents ?? membersData?.total ?? 0;
 
   const totalCredits = cls ? cls.credit_pool : 0;
   const usedCredits = cls ? cls.credit_pool_consumed : 0;
   const remaining = Math.max(totalCredits - usedCredits, 0);
   const usedPercent = totalCredits > 0 ? Math.round((usedCredits / totalCredits) * 100) : 0;
-
-  const studentCount = (members ?? []).length;
   const usageThisMonth = (modelUsage ?? []).reduce((sum, m) => sum + m.total_credits, 0);
   const totalRuns = (modelUsage ?? []).reduce((sum, m) => sum + m.uses, 0);
   const distinctModels = (modelUsage ?? []).length;
+
+  useEffect(() => {
+    setMembersPage(1);
+  }, [classId]);
 
   if (!cls) {
     return <div className="p-10 text-muted-foreground">Class not found.</div>;
@@ -346,20 +358,28 @@ function ClassDetail({ classId, classes }: { classId: string; classes: TeacherCl
           {/* AI Models ranking + Top spenders side by side */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <ModelRankingCard models={modelUsage ?? []} />
-            <TopSpendersCard members={members ?? []} />
+            <TopSpendersCard members={topSpenders ?? []} />
           </div>
 
           {/* Insights */}
           <InsightsCard
             models={modelUsage ?? []}
-            members={members ?? []}
+            memberSummary={memberSummary}
             totalCredits={totalCredits}
             usedCredits={usedCredits}
           />
         </TabsContent>
 
         <TabsContent value="members" className="flex-1 m-0 p-7">
-          <MembersPanel members={members ?? []} classId={classId} />
+          <MembersPanel
+            members={members}
+            classId={classId}
+            currentPage={membersData?.page ?? membersPage}
+            pageSize={membersData?.pageSize ?? membersPageSize}
+            totalStudents={studentCount}
+            hasMore={membersData?.hasMore ?? false}
+            onPageChange={setMembersPage}
+          />
         </TabsContent>
 
         <TabsContent value="ai" className="flex-1 m-0 p-7">
@@ -617,7 +637,7 @@ function TopSpendersCard({ members }: { members: ClassMember[] }) {
 
 function InsightsCard(props: {
   models: import("./useTeacherData").ModelUsageRow[];
-  members: ClassMember[];
+  memberSummary?: ClassMemberSummary;
   totalCredits: number;
   usedCredits: number;
 }) {
@@ -634,13 +654,11 @@ function InsightsCard(props: {
   }
 
   // 2) Inactive students
-  const inactive = props.members.filter(
-    (m) => m.status === "active" && m.credits_lifetime_used === 0,
-  );
-  if (inactive.length > 0) {
+  const inactiveCount = props.memberSummary?.inactiveStudents ?? 0;
+  if (inactiveCount > 0) {
     insights.push({
       tone: "warn",
-      text: `🔔 มี ${inactive.length} คนที่ยังไม่เคยใช้เครดิต — ส่ง notification เตือน?`,
+      text: `🔔 มี ${inactiveCount} คนที่ยังไม่เคยใช้เครดิต — ส่ง notification เตือน?`,
     });
   }
 
@@ -793,7 +811,7 @@ function AIUsagePanel({
               <div className="flex items-center gap-2 mb-2">
                 <div
                   className="h-2 w-2 rounded-full"
-                  style={{ backgroundColor: getCategoryColor(cat as any) }}
+                  style={{ backgroundColor: getCategoryColor(cat as ModelCategory) }}
                 />
                 <span className="text-xs uppercase tracking-wider text-muted-foreground capitalize font-semibold">
                   {cat}
@@ -853,12 +871,25 @@ function AIUsagePanel({
 // ─────────────────────────────────────────────────────────────────────
 
 function MembersPanel({
-  members, classId,
+  members,
+  classId,
+  currentPage,
+  pageSize,
+  totalStudents,
+  hasMore,
+  onPageChange,
 }: {
   members: ClassMember[];
   classId: string;
+  currentPage: number;
+  pageSize: number;
+  totalStudents: number;
+  hasMore: boolean;
+  onPageChange: (page: number) => void;
 }) {
   const [selected, setSelected] = useState<ClassMember | null>(null);
+  const startRow = totalStudents === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endRow = totalStudents === 0 ? 0 : startRow + members.length - 1;
 
   return (
     <>
@@ -868,7 +899,7 @@ function MembersPanel({
             <CardTitle className="text-sm font-medium">
               Class roster
               <span className="ml-2 text-xs text-muted-foreground font-normal">
-                {members.length} students
+                {totalStudents} students
               </span>
             </CardTitle>
             <Button size="sm" variant="outline">
@@ -946,6 +977,31 @@ function MembersPanel({
             </tbody>
           </table>
         </CardContent>
+        <div className="flex items-center justify-between border-t border-border px-4 py-3 text-xs text-muted-foreground">
+          <span>
+            {totalStudents === 0
+              ? "No students"
+              : `Showing ${startRow}-${endRow} of ${totalStudents}`}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={currentPage <= 1}
+              onClick={() => onPageChange(currentPage - 1)}
+            >
+              Previous
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!hasMore}
+              onClick={() => onPageChange(currentPage + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       </Card>
 
       {/* Member detail drill-down */}
