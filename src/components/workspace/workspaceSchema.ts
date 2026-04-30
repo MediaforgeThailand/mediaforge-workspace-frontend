@@ -800,15 +800,25 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         default: "gemini-2.5-pro-preview-tts",
         required: true,
       },
-      // Voice param removed from the canvas tool node — the hardcoded
-      // preset lists (Gemini star names, Google Studio "Aria/Brian"
-      // labels, ElevenLabs default presets) are gone. Backend
-      // executors carry their own per-provider default so a request
-      // with no `voice` field still works:
-      //   gemini-*       → "Charon"
-      //   google-*       → "en-US-Studio-O"
-      //   elevenlabs-*   → first available account voice (picker is
-      //                    in the standalone /app voice gen tool only)
+      /* Voice — optional text input. Audit found a confusing drift
+       * between standalone (which had a voice picker) and canvas
+       * (which had no voice param at all) — running the same model
+       * in both surfaces produced different audio because the
+       * backend default kicked in on canvas. We restore parity here
+       * via a single optional voice-id text input. Empty string =
+       * use the backend's per-provider default
+       * (gemini→"Charon", google→"en-US-Studio-O", elevenlabs→first
+       * available account voice). The standalone tool keeps its
+       * richer ElevenLabs grid for users who want to browse — the
+       * canvas just exposes the override knob. */
+      {
+        key: "voice",
+        label: "Voice ID (optional)",
+        type: "text",
+        default: "",
+        placeholder:
+          "Leave blank for default (gemini→Charon · google→en-US-Studio-O · elevenlabs→account default)",
+      },
       {
         key: "prompt",
         label: "Script",

@@ -313,7 +313,7 @@ export default function StandaloneGenerator({
   onDeleteProject?: (projectId: string) => void;
 }) {
   const { user } = useAuth();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const queryClient = useQueryClient();
   const { credits } = useCredits();
   const { data: creditCosts = [], isLoading: creditCostsLoading } =
@@ -494,7 +494,7 @@ export default function StandaloneGenerator({
   const onFileSelected = async (file: File | undefined) => {
     if (!file) return;
     if (!activeProject?.id) {
-      toast.error("Create or select a project before uploading references.");
+      toast.error(t("workspace.toast.create_project_first_upload"));
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
@@ -504,7 +504,7 @@ export default function StandaloneGenerator({
       ? file.type.startsWith("video/")
       : file.type.startsWith("image/");
     if (!isValidType) {
-      toast.error(needsVideo ? "Upload a video reference." : "Upload an image reference.");
+      toast.error(needsVideo ? t("workspace.toast.upload_video_ref") : t("workspace.toast.upload_image_ref"));
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
@@ -527,7 +527,7 @@ export default function StandaloneGenerator({
       } else {
         updateForm({ modelImage: uploaded });
       }
-      toast.success("Reference uploaded");
+      toast.success(t("workspace.toast.reference_uploaded"));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
     } finally {
@@ -538,16 +538,16 @@ export default function StandaloneGenerator({
 
   const run = async () => {
     if (!user?.id) {
-      toast.error("Please sign in before generating.");
+      toast.error(t("workspace.toast.sign_in_first"));
       return;
     }
     if (!activeProject?.id) {
-      toast.error("Create or select a project before generating.");
+      toast.error(t("workspace.toast.create_project_first_gen"));
       return;
     }
     const params = buildCurrentParams(activeTool, form);
     if (!params) {
-      toast.error("This tool is not ready yet.");
+      toast.error(t("workspace.toast.tool_not_ready"));
       return;
     }
     const validation = validateForm(activeTool, form);
@@ -592,7 +592,7 @@ export default function StandaloneGenerator({
             "Failed to queue generation",
         );
       }
-      toast.success("Generation queued");
+      toast.success(t("workspace.toast.gen_queued"));
       void jobsQuery.refetch();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

@@ -1898,6 +1898,13 @@ const translations = {
     "workspace.toast.duplicate_offline_desc": "Server sync failed — try again from the canvas.",
     "workspace.toast.open": "Open",
     "workspace.toast.duplicated_space_fallback": "Duplicated space",
+    "workspace.toast.create_project_first_upload": "Create or select a project before uploading references.",
+    "workspace.toast.create_project_first_gen": "Create or select a project before generating.",
+    "workspace.toast.upload_video_ref": "Upload a video reference.",
+    "workspace.toast.upload_image_ref": "Upload an image reference.",
+    "workspace.toast.reference_uploaded": "Reference uploaded",
+    "workspace.toast.sign_in_first": "Please sign in before generating.",
+    "workspace.toast.tool_not_ready": "This tool is not ready yet.",
   },
   th: {
     createVideo: "สร้างวิดีโอ",
@@ -3782,6 +3789,13 @@ const translations = {
     "workspace.toast.duplicate_offline_desc": "ซิงก์กับเซิร์ฟเวอร์ไม่สำเร็จ ลองใหม่จากในแคนวาส",
     "workspace.toast.open": "เปิด",
     "workspace.toast.duplicated_space_fallback": "Space ที่ทำสำเนา",
+    "workspace.toast.create_project_first_upload": "สร้างหรือเลือกโปรเจคก่อนอัปโหลด reference",
+    "workspace.toast.create_project_first_gen": "สร้างหรือเลือกโปรเจคก่อนเริ่มสร้าง",
+    "workspace.toast.upload_video_ref": "อัปโหลดวิดีโอ reference",
+    "workspace.toast.upload_image_ref": "อัปโหลดรูปภาพ reference",
+    "workspace.toast.reference_uploaded": "อัปโหลด reference แล้ว",
+    "workspace.toast.sign_in_first": "กรุณาเข้าสู่ระบบก่อนสร้าง",
+    "workspace.toast.tool_not_ready": "เครื่องมือนี้ยังไม่พร้อมใช้งาน",
   },
 } as const;
 

@@ -755,7 +755,7 @@ const HomeView = ({
   }, [activeProjectId, workspaces, canvases, graphs]);
 
   const handleNew = () => {
-    const { workspaceId } = createWorkspace("Untitled space", activeProjectId);
+    const { workspaceId } = createWorkspace(t("workspace.spaces.untitled_space"), activeProjectId);
     if (user?.id) {
       const state = useWorkspaceStore.getState();
       const meta = state.workspaces.find((w) => w.id === workspaceId);
@@ -1642,10 +1642,10 @@ const SpacesView = ({
           {/* ── Hero header — big title + subtitle ─────────────── */}
           <header className="mb-8">
             <h1 className="text-[40px] font-bold leading-none tracking-tight text-zinc-50 md:text-[48px] lg:text-[56px]">
-              Spaces
+              {t("workspace.spaces.title")}
             </h1>
             <p className="mt-3 text-[14px] text-zinc-400">
-              Build node-based generative workflows and bring your ideas to life.
+              {t("workspace.spaces.subtitle")}
             </p>
           </header>
 
@@ -1661,11 +1661,11 @@ const SpacesView = ({
                 onClick={handleNew}
                 className="flex h-11 items-center gap-1.5 rounded-lg bg-white/[0.06] px-3.5 text-[13px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.12] lg:h-9"
               >
-                <Plus className="h-3.5 w-3.5" /> New space
+                <Plus className="h-3.5 w-3.5" /> {t("workspace.spaces.new_space")}
               </button>
-              <SpacesIconBtn icon={Heart} title="Favorites" />
-              <SpacesIconBtn icon={SlidersHorizontal} title="Filter" />
-              <SpacesIconBtn icon={Search} title="Search" />
+              <SpacesIconBtn icon={Heart} title={t("workspace.spaces.favorites")} />
+              <SpacesIconBtn icon={SlidersHorizontal} title={t("workspace.spaces.filter")} />
+              <SpacesIconBtn icon={Search} title={t("workspace.spaces.search")} />
             </div>
           </div>
 
@@ -1674,18 +1674,18 @@ const SpacesView = ({
               dead clicks. */}
           {tab !== "mine" ? (
             <EmptyState
-              title={tab === "shared" ? "No shared spaces yet" : "No templates yet"}
+              title={tab === "shared" ? t("workspace.spaces.empty_no_shared") : t("workspace.spaces.empty_no_templates")}
               hint={
                 tab === "shared"
-                  ? "Spaces shared with you by teammates will show up here."
-                  : "Pre-built starting points for common workflows are coming soon."
+                  ? t("workspace.spaces.empty_no_shared_hint")
+                  : t("workspace.spaces.empty_no_templates_hint")
               }
             />
           ) : buckets.length === 0 ? (
             <EmptyState
-              title="No spaces yet"
-              hint="Create your first space to start chaining AI tools."
-              cta={{ label: "New space", onClick: handleNew }}
+              title={t("workspace.spaces.empty_no_spaces")}
+              hint={t("workspace.spaces.empty_no_spaces_hint")}
+              cta={{ label: t("workspace.spaces.new_space"), onClick: handleNew }}
             />
           ) : (
             buckets.map((b) => (
@@ -1724,10 +1724,11 @@ const SpacesTabs = ({
   tab: "mine" | "shared" | "templates";
   onChange: (t: "mine" | "shared" | "templates") => void;
 }) => {
+  const { t } = useLanguage();
   const items: { key: "mine" | "shared" | "templates"; label: string; icon: LucideIcon }[] = [
-    { key: "mine", label: "My spaces", icon: UserCircle2 },
-    { key: "shared", label: "Shared", icon: Users },
-    { key: "templates", label: "Templates", icon: LayoutGrid },
+    { key: "mine", label: t("workspace.spaces.tab_my"), icon: UserCircle2 },
+    { key: "shared", label: t("workspace.spaces.tab_shared"), icon: Users },
+    { key: "templates", label: t("workspace.spaces.tab_templates"), icon: LayoutGrid },
   ];
   return (
     <div className="inline-flex rounded-xl bg-white/[0.03] p-1 ring-1 ring-inset ring-white/[0.05]">
@@ -1774,23 +1775,26 @@ const SpacesIconBtn = ({
   </button>
 );
 
-const SpaceToolbar = ({ onNew }: { onNew: () => void }) => (
-  <div className="flex items-center gap-2">
-    <button
-      type="button"
-      onClick={onNew}
-      className="flex items-center gap-1.5 rounded-md bg-white/[0.06] px-3 py-1.5 text-[12px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.1]"
-    >
-      <Plus className="h-3.5 w-3.5" /> New space
-    </button>
-    <SegmentDivider />
-    <ChromePill icon={ChevronDown} label="Project" />
-    <ChromeIconBtn icon={List} title="List view" />
-    <ChromeIconBtn icon={LayoutGrid} title="Grid view" active />
-    <ChromeIconBtn icon={Heart} title="Favorites" />
-    <ChromeIconBtn icon={Search} title="Search" />
-  </div>
-);
+const SpaceToolbar = ({ onNew }: { onNew: () => void }) => {
+  const { t } = useLanguage();
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={onNew}
+        className="flex items-center gap-1.5 rounded-md bg-white/[0.06] px-3 py-1.5 text-[12px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.1]"
+      >
+        <Plus className="h-3.5 w-3.5" /> {t("workspace.spaces.new_space")}
+      </button>
+      <SegmentDivider />
+      <ChromePill icon={ChevronDown} label={t("workspace.home.projects")} />
+      <ChromeIconBtn icon={List} title={t("workspace.spaces.list_view")} />
+      <ChromeIconBtn icon={LayoutGrid} title={t("workspace.spaces.grid_view")} active />
+      <ChromeIconBtn icon={Heart} title={t("workspace.spaces.favorites")} />
+      <ChromeIconBtn icon={Search} title={t("workspace.spaces.search")} />
+    </div>
+  );
+};
 
 const SpaceCard = ({
   ws,
@@ -1804,39 +1808,42 @@ const SpaceCard = ({
   onRename: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
-}) => (
-  <li
-    className={cn(
-      "group relative cursor-pointer overflow-hidden rounded-2xl bg-[hsl(0_0%_7%)] ring-1 ring-inset ring-white/[0.06]",
-      "transition-all hover:ring-white/[0.14] hover:shadow-[0_18px_40px_-20px_hsl(0_0%_0%/0.7)]",
-    )}
-  >
-    <button
-      type="button"
-      onClick={onOpen}
-      className="block w-full text-left"
+}) => {
+  const { t } = useLanguage();
+  return (
+    <li
+      className={cn(
+        "group relative cursor-pointer overflow-hidden rounded-2xl bg-[hsl(0_0%_7%)] ring-1 ring-inset ring-white/[0.06]",
+        "transition-all hover:ring-white/[0.14] hover:shadow-[0_18px_40px_-20px_hsl(0_0%_0%/0.7)]",
+      )}
     >
-      <div className="relative aspect-[16/10] overflow-hidden bg-[hsl(0_0%_4%)]">
-        <CanvasMinimap nodes={ws.nodes} edges={ws.edges} />
-      </div>
-
-      <div className="px-3.5 py-3">
-        <div className="truncate text-[13px] font-semibold leading-tight text-zinc-50">
-          {ws.name}
+      <button
+        type="button"
+        onClick={onOpen}
+        className="block w-full text-left"
+      >
+        <div className="relative aspect-[16/10] overflow-hidden bg-[hsl(0_0%_4%)]">
+          <CanvasMinimap nodes={ws.nodes} edges={ws.edges} />
         </div>
-        <div className="mt-1 text-[11px] text-zinc-500">
-          {timeAgo(ws.updatedAt)}
-        </div>
-      </div>
-    </button>
 
-    <div className="pointer-events-auto absolute right-2 top-2 flex gap-1 opacity-100 transition-opacity lg:pointer-events-none lg:opacity-0 lg:group-hover:pointer-events-auto lg:group-hover:opacity-100">
-      <ActionButton title="Rename" onClick={(e) => { e.stopPropagation(); onRename(); }} icon={Pencil} />
-      <ActionButton title="Duplicate" onClick={(e) => { e.stopPropagation(); onDuplicate(); }} icon={Copy} />
-      <ActionButton title="Delete" danger onClick={(e) => { e.stopPropagation(); onDelete(); }} icon={Trash2} />
-    </div>
-  </li>
-);
+        <div className="px-3.5 py-3">
+          <div className="truncate text-[13px] font-semibold leading-tight text-zinc-50">
+            {ws.name}
+          </div>
+          <div className="mt-1 text-[11px] text-zinc-500">
+            {timeAgo(ws.updatedAt)}
+          </div>
+        </div>
+      </button>
+
+      <div className="pointer-events-auto absolute right-2 top-2 flex gap-1 opacity-100 transition-opacity lg:pointer-events-none lg:opacity-0 lg:group-hover:pointer-events-auto lg:group-hover:opacity-100">
+        <ActionButton title={t("workspace.spaces.action_rename")} onClick={(e) => { e.stopPropagation(); onRename(); }} icon={Pencil} />
+        <ActionButton title={t("workspace.spaces.action_duplicate")} onClick={(e) => { e.stopPropagation(); onDuplicate(); }} icon={Copy} />
+        <ActionButton title={t("workspace.spaces.action_delete")} danger onClick={(e) => { e.stopPropagation(); onDelete(); }} icon={Trash2} />
+      </div>
+    </li>
+  );
+};
 
 const ActionButton = ({
   title,
@@ -1878,13 +1885,15 @@ const PageHeader = ({
    *  drawer. Pages that don't pass this (very few — pretty much only
    *  modals / nested screens) keep a plain header. */
   onOpenSidebar?: () => void;
-}) => (
+}) => {
+  const { t } = useLanguage();
+  return (
   <div className="flex h-14 shrink-0 items-center gap-3 border-b border-white/5 px-4 md:px-6 lg:h-12 lg:px-8">
     {onOpenSidebar && (
       <button
         type="button"
         onClick={onOpenSidebar}
-        aria-label="Open menu"
+        aria-label={t("workspace.spaces.open_menu")}
         className="-ml-1 flex h-9 w-9 items-center justify-center rounded-md text-zinc-300 hover:bg-white/[0.06] hover:text-white md:hidden"
       >
         {/* Inline SVG so we don't pull a new icon import for one button */}
@@ -1900,7 +1909,8 @@ const PageHeader = ({
     </h1>
     {rightSlot}
   </div>
-);
+  );
+};
 
 const MonthHeader = ({ label }: { label: string }) => (
   <div className="mb-3 flex items-center gap-2 text-[12.5px] text-zinc-400">
@@ -1978,42 +1988,63 @@ const EmptyState = ({
   </div>
 );
 
-const SECTION_LABELS: Record<Section, string> = {
-  home: "Home",
-  search: "Search",
-  spaces: "Spaces",
-  image_gen: STANDALONE_TOOLS.image_gen.title,
-  video_gen: STANDALONE_TOOLS.video_gen.title,
-  voice_gen: STANDALONE_TOOLS.voice_gen.title,
-  image_to_3d: STANDALONE_TOOLS.image_to_3d.title,
-  community: "Community",
-  projects: "Projects",
-  tools: "All tools",
-  stock: "Stock",
-  assistant: "Assistant",
-};
-
 const Placeholder = ({
   section,
   onOpenSidebar,
 }: {
   section: Section;
   onOpenSidebar?: () => void;
-}) => (
-  <>
-    <PageHeader
-      title={SECTION_LABELS[section]}
-      rightSlot={<UserMenu />}
-      onOpenSidebar={onOpenSidebar}
-    />
-    <div className="flex flex-1 items-center justify-center p-12">
-      <EmptyState
-        title="Coming soon"
-        hint="This section is not connected yet."
+}) => {
+  const { t } = useLanguage();
+  // Section title resolver — returns a localised label for the page
+  // header. Tool sections still pull from STANDALONE_TOOLS (these
+  // carry their own brand-stable names like "Image Generator").
+  const title = (() => {
+    switch (section) {
+      case "home":
+        return t("workspace.home.title");
+      case "search":
+        return t("workspace.spaces.section_search");
+      case "spaces":
+        return t("workspace.spaces.title");
+      case "image_gen":
+        return STANDALONE_TOOLS.image_gen.title;
+      case "video_gen":
+        return STANDALONE_TOOLS.video_gen.title;
+      case "voice_gen":
+        return STANDALONE_TOOLS.voice_gen.title;
+      case "image_to_3d":
+        return STANDALONE_TOOLS.image_to_3d.title;
+      case "community":
+        return t("workspace.spaces.section_community");
+      case "projects":
+        return t("workspace.spaces.section_projects");
+      case "tools":
+        return t("workspace.spaces.section_all_tools");
+      case "stock":
+        return t("workspace.spaces.section_stock");
+      case "assistant":
+        return t("workspace.spaces.section_assistant");
+      default:
+        return "";
+    }
+  })();
+  return (
+    <>
+      <PageHeader
+        title={title}
+        rightSlot={<UserMenu />}
+        onOpenSidebar={onOpenSidebar}
       />
-    </div>
-  </>
-);
+      <div className="flex flex-1 items-center justify-center p-12">
+        <EmptyState
+          title={t("workspace.spaces.coming_soon")}
+          hint={t("workspace.spaces.coming_soon_hint")}
+        />
+      </div>
+    </>
+  );
+};
 
 /* ════════════════════════════════════════════════════════════
  * Canvas minimap — SVG snapshot with real images at node positions
