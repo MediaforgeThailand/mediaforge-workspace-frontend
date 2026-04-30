@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -7,449 +7,444 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Minus, Plus, AlertCircle, CheckCircle2, CreditCard, X } from "lucide-react";
+import {
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+  QrCode,
+  X,
+  Clock,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 /**
- * Buy extra credits dialog.
+ * Buy extra credits — custom-amount-only, PromptPay QR checkout.
  *
- * Reads the live `topup_packages` table and renders one radio card
- * per active row, sorted by `sort_order`. The user can select a pack,
- * adjust quantity (1..N) for that pack, OR fall back to a "custom
- * amount" track that obeys the strict 1 THB = 25 credits ratio with
- * a 100 THB minimum. Both routes funnel through the existing
- * `create-topup` edge function (preset path) or `create-promptpay-
- * intent` (custom amount fallback when no preset matches).
+ * The previous version showed a stack of preset packs (12,250 / 6,250
+ * / … "extra credits / pack"). That's replaced with a single THB
+ * amount input. The user types how much they want to top up, sees a
+ * live "you'll get X credits" preview, and pays via PromptPay QR.
  *
- * Stripe checkout is launched as a hosted Checkout Session via
- * `create-topup` (returning a session URL) — keeping consistent with
- * Q's subscription flow. Custom amounts use PromptPay PaymentIntent
- * because the topup_packages table requires a preconfigured
- * stripe_price_id and we don't want to create a Stripe price per
- * arbitrary THB value.
+ *   1 THB = 25 credits  (matches the published rate)
+ *   minimum: 500 THB    (lifted from 100 because the smaller packs
+ *                        weren't worth the Stripe fee floor)
+ *   maximum: 100,000 THB
+ *
+ * Flow:
+ *   amount → POST `create-promptpay-intent` with `{ amountThb }`
+ *          → render the returned QR (image_url_svg / image_url_png)
+ *          → poll `payment_transactions` until `status = "completed"`
+ *            (the stripe-webhook flips it on payment_intent.succeeded
+ *            and grants credits via `grant_credits` RPC)
+ *          → success state, refetch balances, close.
  */
 
-const RATIO_THB_TO_CREDITS = 25; // 1 THB = 25 credits for custom amount
-const MIN_CUSTOM_THB = 100;
-const MAX_CUSTOM_THB = 100_000;
-
-interface TopupPackage {
-  id: string;
-  name: string;
-  credits: number;
-  price_thb: number;
-  sort_order: number;
-  is_promo: boolean;
-  badge_label: string | null;
-  one_time_per_user: boolean;
-}
+const RATIO_THB_TO_CREDITS = 25;
+const MIN_TOPUP_THB = 500;
+const MAX_TOPUP_THB = 100_000;
+const PROMPTPAY_TIMEOUT_SEC = 600; // Stripe expires the QR after ~10 min
 
 interface BuyCreditsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  defaultPaymentLabel?: string | null;
+  /** Optional callback fired right after a successful top-up — the
+   *  parent (settings page) uses it to refresh the credit balance
+   *  badge without a full route reload. */
+  onSuccess?: () => void;
 }
 
-type Selection =
-  | { kind: "pack"; packId: string; quantity: number }
-  | { kind: "custom"; thb: number };
+type Step = "form" | "qr" | "success" | "error";
 
-const BuyCreditsDialog = ({ open, onOpenChange, defaultPaymentLabel }: BuyCreditsDialogProps) => {
+interface PromptPayQr {
+  paymentIntentId: string;
+  clientSecret: string;
+  qrCodeSvgUrl: string | null;
+  qrCodePngUrl: string | null;
+  expiresAt: number | null;
+  amount: number;
+  credits: number;
+  packageName: string;
+}
+
+const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogProps) => {
   const { toast } = useToast();
-  const [packages, setPackages] = useState<TopupPackage[]>([]);
-  const [loadingPkgs, setLoadingPkgs] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  const [step, setStep] = useState<Step>("form");
+  const [amountInput, setAmountInput] = useState<string>(String(MIN_TOPUP_THB));
   const [submitting, setSubmitting] = useState(false);
-  const [selection, setSelection] = useState<Selection>({ kind: "custom", thb: MIN_CUSTOM_THB });
-  const [showPromo, setShowPromo] = useState(false);
-  const [promoCode, setPromoCode] = useState("");
-  const [customInput, setCustomInput] = useState(String(MIN_CUSTOM_THB));
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [qrData, setQrData] = useState<PromptPayQr | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState<number>(PROMPTPAY_TIMEOUT_SEC);
 
-  // ── Load packages on open ───────────────────────────────────
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    (async () => {
-      setLoadingPkgs(true);
-      setError(null);
-      const { data, error: err } = await supabase
-        .from("topup_packages")
-        .select("id, name, credits, price_thb, sort_order, is_promo, badge_label, one_time_per_user")
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true });
-      if (cancelled) return;
-      if (err) {
-        setError(err.message);
-      } else {
-        const rows = (data ?? []) as TopupPackage[];
-        setPackages(rows);
-        // Default-select the first non-promo pack if available
-        const firstReg = rows.find((r) => !r.is_promo) ?? rows[0];
-        if (firstReg) setSelection({ kind: "pack", packId: firstReg.id, quantity: 1 });
-      }
-      setLoadingPkgs(false);
-    })();
-    return () => { cancelled = true; };
-  }, [open]);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Reset state when closing
+  // ── Reset on close ─────────────────────────────────────────
   useEffect(() => {
     if (open) return;
-    // Slight delay so we don't visibly reset before the close animation
+    // Defer reset so the close animation isn't visibly disrupted.
     const t = setTimeout(() => {
-      setError(null);
+      setStep("form");
+      setAmountInput(String(MIN_TOPUP_THB));
       setSubmitting(false);
-      setShowPromo(false);
-      setPromoCode("");
+      setErrorMsg(null);
+      setQrData(null);
+      setSecondsLeft(PROMPTPAY_TIMEOUT_SEC);
+      if (pollRef.current) clearInterval(pollRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
+      pollRef.current = null;
+      timerRef.current = null;
     }, 250);
     return () => clearTimeout(t);
   }, [open]);
 
-  const selectedPack = useMemo(
-    () => (selection.kind === "pack" ? packages.find((p) => p.id === selection.packId) ?? null : null),
-    [selection, packages],
+  // ── Cleanup pollers on unmount ─────────────────────────────
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
+  // ── Derived values ─────────────────────────────────────────
+  const amountThb = useMemo(() => {
+    const n = Math.floor(Number(amountInput));
+    if (!Number.isFinite(n)) return 0;
+    return n;
+  }, [amountInput]);
+
+  const validatedAmount = useMemo(() => {
+    return Math.max(MIN_TOPUP_THB, Math.min(MAX_TOPUP_THB, amountThb || 0));
+  }, [amountThb]);
+
+  const previewCredits = useMemo(
+    () => validatedAmount * RATIO_THB_TO_CREDITS,
+    [validatedAmount],
   );
 
-  // ── Derived totals ───────────────────────────────────────────
-  const customCredits = useMemo(() => {
-    if (selection.kind !== "custom") return 0;
-    return selection.thb * RATIO_THB_TO_CREDITS;
-  }, [selection]);
+  const isAmountValid =
+    amountThb >= MIN_TOPUP_THB && amountThb <= MAX_TOPUP_THB;
 
-  const totalThb = useMemo(() => {
-    if (selection.kind === "pack" && selectedPack) {
-      return Number(selectedPack.price_thb) * selection.quantity;
-    }
-    if (selection.kind === "custom") return selection.thb;
-    return 0;
-  }, [selection, selectedPack]);
-
-  const totalCredits = useMemo(() => {
-    if (selection.kind === "pack" && selectedPack) {
-      return selectedPack.credits * selection.quantity;
-    }
-    if (selection.kind === "custom") return customCredits;
-    return 0;
-  }, [selection, selectedPack, customCredits]);
-
-  // ── Handlers ─────────────────────────────────────────────────
-  const handleSelectPack = (packId: string) => {
-    setSelection({ kind: "pack", packId, quantity: 1 });
-  };
-
-  const handleQty = (delta: number) => {
-    if (selection.kind !== "pack") return;
-    const next = Math.max(1, Math.min(20, selection.quantity + delta));
-    setSelection({ ...selection, quantity: next });
-  };
-
-  const handleCustomChange = (raw: string) => {
-    setCustomInput(raw);
-    const num = Math.floor(Number(raw));
-    if (!Number.isFinite(num)) return;
-    const clamped = Math.max(MIN_CUSTOM_THB, Math.min(MAX_CUSTOM_THB, num));
-    setSelection({ kind: "custom", thb: clamped });
-  };
-
-  const selectCustomTrack = () => {
-    const num = Math.floor(Number(customInput));
-    const valid = Number.isFinite(num) ? Math.max(MIN_CUSTOM_THB, Math.min(MAX_CUSTOM_THB, num)) : MIN_CUSTOM_THB;
-    setSelection({ kind: "custom", thb: valid });
-  };
-
+  // ── Submit ────────────────────────────────────────────────
   const handleSubmit = async () => {
+    if (!isAmountValid) {
+      setErrorMsg(`กรอกจำนวนเงินขั้นต่ำ ${MIN_TOPUP_THB.toLocaleString()} บาท`);
+      return;
+    }
     setSubmitting(true);
-    setError(null);
+    setErrorMsg(null);
     try {
-      if (selection.kind === "pack" && selectedPack) {
-        // Preset path → hosted Checkout Session via create-topup.
-        // We honour quantity via N back-to-back checkouts is awkward;
-        // simpler: send the same packageId once, and document that
-        // multi-pack purchases require multiple confirmations.
-        // Edge function accepts a single packageId today, so we ship
-        // qty=1 for now. If quantity>1, we still show the total in
-        // the UI but only checkout one pack at a time — the user can
-        // re-open the dialog for additional packs.
-        const { data, error: err } = await supabase.functions.invoke("create-topup", {
-          body: {
-            packageId: selectedPack.id,
-            embedded: false,
-            promo_code: promoCode || undefined,
-          },
-        });
-        if (err || data?.error) throw new Error(err?.message || data?.error || "Could not start checkout");
-        if (data?.url) {
-          window.location.href = data.url;
-          return;
+      const { data, error } = await supabase.functions.invoke(
+        "create-promptpay-intent",
+        { body: { amountThb } },
+      );
+      if (error || data?.error || !data?.paymentIntentId) {
+        throw new Error(
+          data?.error ||
+            (error as { message?: string } | null)?.message ||
+            "ไม่สามารถสร้างใบชำระเงินได้",
+        );
+      }
+      const qr = data as PromptPayQr;
+      setQrData(qr);
+      setStep("qr");
+
+      // Poll for payment completion via the webhook-driven row in
+      // payment_transactions. Stripe emits payment_intent.succeeded
+      // ~seconds after the user pays the QR; the webhook flips the
+      // row to "completed" and grants credits.
+      pollRef.current = setInterval(async () => {
+        const { data: tx } = await supabase
+          .from("payment_transactions")
+          .select("id, status")
+          .eq("stripe_payment_intent_id", qr.paymentIntentId)
+          .eq("status", "completed")
+          .maybeSingle();
+        if (tx) {
+          if (pollRef.current) clearInterval(pollRef.current);
+          if (timerRef.current) clearInterval(timerRef.current);
+          pollRef.current = null;
+          timerRef.current = null;
+          setStep("success");
+          onSuccess?.();
         }
-        throw new Error("Checkout did not return a URL");
-      }
-      if (selection.kind === "custom") {
-        // Custom THB amount — there's no preconfigured Stripe price
-        // for arbitrary values, so we skip the topup_packages lookup
-        // and tell the user to pick a preset. (A future enhancement
-        // could create an ad-hoc PaymentIntent via a new edge fn.)
-        toast({
-          title: "Custom amount coming soon",
-          description: `Custom top-ups will be available shortly. For now, please pick a preset pack — they're priced more competitively anyway.`,
-          variant: "default",
-        });
-        setSubmitting(false);
-        return;
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      }, 3000);
+
+      // Countdown — when this hits 0 the QR is dead and we kick the
+      // user back to the form so they can request a fresh one.
+      const expiresAtMs = qr.expiresAt
+        ? qr.expiresAt * 1000
+        : Date.now() + PROMPTPAY_TIMEOUT_SEC * 1000;
+      const tick = () => {
+        const remaining = Math.max(
+          0,
+          Math.floor((expiresAtMs - Date.now()) / 1000),
+        );
+        setSecondsLeft(remaining);
+        if (remaining <= 0 && timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+          if (pollRef.current) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+          }
+          setErrorMsg("QR หมดอายุแล้ว — กรุณาสร้างใบชำระใหม่");
+          setStep("error");
+        }
+      };
+      tick();
+      timerRef.current = setInterval(tick, 1000);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "เกิดข้อผิดพลาด";
+      setErrorMsg(msg);
+      setStep("error");
+    } finally {
       setSubmitting(false);
     }
   };
 
-  const formatThb = (n: number) => `THB ${n.toLocaleString()}`;
-  const formatCredits = (n: number) => n.toLocaleString();
+  const formatTime = (s: number) =>
+    `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
+
+  const fmtThb = (n: number) => `฿${n.toLocaleString()}`;
+  const fmtCredits = (n: number) => n.toLocaleString();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[460px] p-0 overflow-hidden bg-[#0c1020] border-white/[0.08] rounded-2xl gap-0">
-        <div className="px-6 pt-6 pb-3 relative">
+      <DialogContent className="max-w-[440px] gap-0 overflow-hidden rounded-2xl border-white/[0.08] bg-[#0c1020] p-0">
+        {/* ── Header ───────────────────────────────────────── */}
+        <div className="relative px-6 pt-6 pb-3">
           <DialogHeader className="space-y-1.5 pr-8">
             <DialogTitle className="text-base font-semibold text-zinc-50">
-              Buy extra credits
+              เติมเครดิต (Top-up)
             </DialogTitle>
-            <DialogDescription className="text-[11px] leading-relaxed text-zinc-400">
-              Extra credits expire after 3 years. They work with{" "}
-              <span className="text-zinc-200 font-medium">any active subscription</span>, and are used after your regular credits run out.
+            <DialogDescription className="text-[11.5px] leading-relaxed text-zinc-400">
+              ชำระผ่าน{" "}
+              <span className="font-medium text-zinc-200">PromptPay QR</span>{" "}
+              · 1 บาท = {RATIO_THB_TO_CREDITS} เครดิต · เครดิตหมดอายุ 1 ปี
+              หลังเติม
             </DialogDescription>
           </DialogHeader>
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="absolute right-4 top-4 text-zinc-500 hover:text-zinc-200 transition-colors"
+            className="absolute right-4 top-4 text-zinc-500 transition-colors hover:text-zinc-200"
             aria-label="Close"
           >
-            <X className="w-4 h-4" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="max-h-[70vh] overflow-y-auto px-6 pb-2 space-y-2">
-          {loadingPkgs && (
-            <div className="flex items-center gap-2 py-4 text-xs text-zinc-500">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Loading packages…
-            </div>
-          )}
-
-          {!loadingPkgs && packages.length > 0 && (
-            <RadioGroup
-              value={selection.kind === "pack" ? selection.packId : ""}
-              onValueChange={handleSelectPack}
-              className="space-y-2"
-            >
-              {packages.map((pkg) => {
-                const isSelected = selection.kind === "pack" && selection.packId === pkg.id;
-                return (
-                  <Label
-                    key={pkg.id}
-                    htmlFor={`topup-${pkg.id}`}
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-3 rounded-xl border cursor-pointer transition-colors",
-                      isSelected
-                        ? "border-violet-500/50 bg-violet-500/[0.07]"
-                        : "border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]",
-                    )}
-                  >
-                    <RadioGroupItem
-                      id={`topup-${pkg.id}`}
-                      value={pkg.id}
-                      className="mt-0 border-white/30 data-[state=checked]:border-violet-400 data-[state=checked]:bg-violet-500"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[13px] font-semibold text-zinc-100">
-                          {formatCredits(pkg.credits)} extra credits
-                        </span>
-                        {pkg.is_promo && pkg.badge_label && (
-                          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/20">
-                            {pkg.badge_label}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-zinc-500 mt-0.5">
-                        {formatThb(Number(pkg.price_thb))} / pack
-                      </p>
-                    </div>
-                    {isSelected && selection.kind === "pack" && (
-                      <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] p-0.5">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleQty(-1);
-                          }}
-                          disabled={selection.quantity <= 1}
-                          className="w-6 h-6 flex items-center justify-center rounded text-zinc-300 hover:bg-white/10 disabled:opacity-40"
-                          aria-label="Decrease quantity"
-                        >
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <span className="text-[12px] font-semibold text-zinc-100 w-5 text-center">
-                          {selection.quantity}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleQty(1);
-                          }}
-                          className="w-6 h-6 flex items-center justify-center rounded text-zinc-300 hover:bg-white/10"
-                          aria-label="Increase quantity"
-                        >
-                          <Plus className="w-3 h-3" />
-                        </button>
-                      </div>
-                    )}
-                  </Label>
-                );
-              })}
-            </RadioGroup>
-          )}
-
-          {/* Custom amount track */}
-          <div
-            onClick={selectCustomTrack}
-            className={cn(
-              "flex flex-col gap-2 px-3 py-3 rounded-xl border cursor-pointer transition-colors",
-              selection.kind === "custom"
-                ? "border-violet-500/50 bg-violet-500/[0.07]"
-                : "border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]",
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className={cn(
-                  "w-3.5 h-3.5 rounded-full border flex-shrink-0 transition-colors",
-                  selection.kind === "custom"
-                    ? "border-violet-400 bg-violet-500"
-                    : "border-white/30",
-                )}
-              />
-              <span className="text-[13px] font-semibold text-zinc-100">
-                Custom amount
-              </span>
-              <span className="ml-auto text-[10px] text-zinc-500">
-                1 THB = {RATIO_THB_TO_CREDITS} credits · min {MIN_CUSTOM_THB}
-              </span>
-            </div>
-            {selection.kind === "custom" && (
-              <div className="flex items-center gap-2 pl-6">
-                <span className="text-xs text-zinc-500">THB</span>
+        {/* ── Step: form (amount input) ────────────────────── */}
+        {step === "form" && (
+          <div className="space-y-4 px-6 pb-6 pt-2">
+            <div>
+              <Label
+                htmlFor="topup-amount"
+                className="text-[12px] font-medium text-zinc-300"
+              >
+                จำนวนเงินที่ต้องการเติม (บาท)
+              </Label>
+              <div className="mt-1.5 flex items-center gap-2">
+                <span className="text-[18px] font-medium text-zinc-500">฿</span>
                 <Input
+                  id="topup-amount"
                   type="number"
                   inputMode="numeric"
-                  min={MIN_CUSTOM_THB}
-                  max={MAX_CUSTOM_THB}
+                  min={MIN_TOPUP_THB}
+                  max={MAX_TOPUP_THB}
                   step={50}
-                  value={customInput}
-                  onChange={(e) => handleCustomChange(e.target.value)}
-                  className="h-8 w-28 bg-black/30 border-white/10 text-zinc-100 text-xs"
+                  value={amountInput}
+                  onChange={(e) => setAmountInput(e.target.value)}
+                  className="h-11 bg-[#16192c] text-[16px] font-semibold text-zinc-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  placeholder={String(MIN_TOPUP_THB)}
                 />
-                <span className="text-[11px] text-zinc-500">
-                  = {formatCredits(customCredits)} credits
+              </div>
+              <div className="mt-2 flex items-center justify-between text-[10.5px] text-zinc-500">
+                <span>
+                  ขั้นต่ำ ฿{MIN_TOPUP_THB.toLocaleString()} · สูงสุด ฿
+                  {MAX_TOPUP_THB.toLocaleString()}
                 </span>
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* Promo code link */}
-          <div className="pt-2">
-            {!showPromo ? (
-              <button
-                type="button"
-                onClick={() => setShowPromo(true)}
-                className="text-[11px] text-violet-300 hover:text-violet-200 transition-colors"
-              >
-                + Add a promo code
-              </button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Input
-                  placeholder="Promo code"
-                  value={promoCode}
-                  onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                  className="h-8 bg-black/30 border-white/10 text-zinc-100 text-xs"
-                />
+            {/* Quick-select chips */}
+            <div className="flex flex-wrap gap-1.5">
+              {[500, 1000, 2000, 5000, 10000].map((v) => (
                 <button
+                  key={v}
                   type="button"
-                  onClick={() => { setShowPromo(false); setPromoCode(""); }}
-                  className="text-[11px] text-zinc-500 hover:text-zinc-300"
+                  onClick={() => setAmountInput(String(v))}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-[11px] transition-colors ring-1 ring-inset",
+                    amountThb === v
+                      ? "bg-violet-500/20 text-violet-100 ring-violet-400/30"
+                      : "bg-white/[0.04] text-zinc-300 ring-white/[0.08] hover:bg-white/[0.08]",
+                  )}
                 >
-                  Cancel
+                  ฿{v.toLocaleString()}
                 </button>
+              ))}
+            </div>
+
+            {/* Live preview */}
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] px-4 py-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11.5px] text-zinc-400">
+                  เครดิตที่จะได้รับ
+                </span>
+                <span className="text-[20px] font-semibold text-emerald-300">
+                  +{fmtCredits(previewCredits)}
+                </span>
+              </div>
+              <div className="mt-1 flex items-center justify-between text-[10.5px] text-zinc-500">
+                <span>ที่อัตรา 1 บาท = {RATIO_THB_TO_CREDITS} เครดิต</span>
+                <span>ชำระ {fmtThb(validatedAmount)}</span>
+              </div>
+            </div>
+
+            {errorMsg && (
+              <div className="flex items-start gap-2 rounded-md border border-red-400/20 bg-red-500/[0.06] px-3 py-2 text-[11.5px] text-red-300">
+                <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
+                <span>{errorMsg}</span>
               </div>
             )}
+
+            <Button
+              onClick={handleSubmit}
+              disabled={submitting || !isAmountValid}
+              className="h-11 w-full bg-gradient-to-b from-violet-500 to-violet-700 text-[13.5px] font-semibold text-white hover:from-violet-400 hover:to-violet-600"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  กำลังสร้าง QR…
+                </>
+              ) : (
+                <>
+                  <QrCode className="mr-2 h-4 w-4" />
+                  สร้าง QR ชำระเงิน
+                </>
+              )}
+            </Button>
           </div>
-        </div>
+        )}
 
-        {/* Footer summary + CTA */}
-        <div className="border-t border-white/5 bg-black/20 px-6 py-5 space-y-3">
-          {selection.kind === "pack" && selectedPack && (
-            <div className="flex items-center justify-between text-[11px] text-zinc-400">
-              <span>
-                {selection.quantity} × {selectedPack.name}
-              </span>
-              <span>{formatThb(totalThb)}</span>
+        {/* ── Step: qr ────────────────────────────────────── */}
+        {step === "qr" && qrData && (
+          <div className="space-y-4 px-6 pb-6 pt-2">
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-4">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-zinc-400">ยอดชำระ</span>
+                <span className="font-semibold text-zinc-100">
+                  {fmtThb(qrData.amount)}
+                </span>
+              </div>
+              <div className="mt-1 flex items-center justify-between text-[11px]">
+                <span className="text-zinc-400">เครดิตที่จะได้รับ</span>
+                <span className="font-semibold text-emerald-300">
+                  +{fmtCredits(qrData.credits)}
+                </span>
+              </div>
             </div>
-          )}
 
-          <div className="flex items-baseline justify-between">
-            <span className="text-[13px] font-medium text-zinc-100">Charged today</span>
-            <div className="text-right">
-              <p className="text-base font-bold text-zinc-50">{formatThb(totalThb)}</p>
-              <p className="text-[10px] text-zinc-500">+ {formatCredits(totalCredits)} credits</p>
+            <div className="flex flex-col items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.025] p-5">
+              {qrData.qrCodeSvgUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={qrData.qrCodeSvgUrl}
+                  alt="PromptPay QR"
+                  className="h-56 w-56 rounded-lg bg-white p-3"
+                />
+              ) : qrData.qrCodePngUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={qrData.qrCodePngUrl}
+                  alt="PromptPay QR"
+                  className="h-56 w-56 rounded-lg bg-white p-3"
+                />
+              ) : (
+                <div className="flex h-56 w-56 items-center justify-center rounded-lg bg-white/10 text-zinc-500">
+                  ไม่พบ QR
+                </div>
+              )}
+              <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+                <Clock className="h-3 w-3" />
+                <span>หมดอายุใน {formatTime(secondsLeft)}</span>
+              </div>
+              <div className="text-center text-[10.5px] text-zinc-500">
+                สแกน QR ในแอปธนาคาร · เครดิตจะเข้าระบบทันทีหลังชำระสำเร็จ
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-[11px] text-zinc-400">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-400" />
+              กำลังรอการชำระเงิน…
             </div>
           </div>
+        )}
 
-          <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
-            <CreditCard className="w-3 h-3 flex-shrink-0" />
-            {defaultPaymentLabel ? (
-              <span>Pay with {defaultPaymentLabel}</span>
-            ) : (
-              <span className="text-amber-400/80">No payment method saved — add one in Billing information first.</span>
-            )}
-          </div>
-
-          {error && (
-            <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-2.5 text-[11px] text-red-300">
-              <AlertCircle className="mt-0.5 w-3.5 h-3.5 flex-shrink-0" />
-              <span>{error}</span>
+        {/* ── Step: success ───────────────────────────────── */}
+        {step === "success" && qrData && (
+          <div className="space-y-4 px-6 pb-6 pt-2">
+            <div className="flex flex-col items-center gap-3 rounded-xl border border-emerald-400/20 bg-emerald-500/[0.06] px-5 py-7">
+              <CheckCircle2 className="h-12 w-12 text-emerald-300" />
+              <div className="text-center">
+                <div className="text-[15px] font-semibold text-zinc-50">
+                  ชำระเงินสำเร็จ
+                </div>
+                <div className="mt-1 text-[12px] text-emerald-200">
+                  +{fmtCredits(qrData.credits)} เครดิตเข้าระบบแล้ว
+                </div>
+                <div className="mt-1 text-[10.5px] text-zinc-400">
+                  ยอดชำระ {fmtThb(qrData.amount)}
+                </div>
+              </div>
             </div>
-          )}
+            <Button
+              onClick={() => {
+                onOpenChange(false);
+                toast({
+                  title: "เติมเครดิตเรียบร้อย",
+                  description: `+${fmtCredits(qrData.credits)} เครดิตในบัญชี`,
+                });
+              }}
+              className="h-11 w-full bg-zinc-100 text-[13.5px] font-semibold text-zinc-900 hover:bg-zinc-200"
+            >
+              เสร็จสิ้น
+            </Button>
+          </div>
+        )}
 
-          <Button
-            onClick={handleSubmit}
-            disabled={submitting || totalThb <= 0}
-            className="w-full bg-gradient-to-r from-violet-600 to-purple-500 text-white font-semibold hover:opacity-95"
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                Starting checkout…
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-                Confirm and pay
-              </>
-            )}
-          </Button>
-
-          <p className="text-center text-[10px] text-zinc-600">
-            You can manage your preferences from Profile &gt; Subscription.
-          </p>
-        </div>
+        {/* ── Step: error ─────────────────────────────────── */}
+        {step === "error" && (
+          <div className="space-y-4 px-6 pb-6 pt-2">
+            <div className="flex flex-col items-center gap-3 rounded-xl border border-red-400/20 bg-red-500/[0.06] px-5 py-7">
+              <AlertCircle className="h-12 w-12 text-red-300" />
+              <div className="text-center">
+                <div className="text-[15px] font-semibold text-zinc-50">
+                  ชำระไม่สำเร็จ
+                </div>
+                <div className="mt-1 max-w-[300px] text-[11.5px] text-red-200">
+                  {errorMsg ?? "เกิดข้อผิดพลาด ลองใหม่อีกครั้ง"}
+                </div>
+              </div>
+            </div>
+            <Button
+              onClick={() => {
+                setStep("form");
+                setErrorMsg(null);
+              }}
+              className="h-11 w-full bg-violet-500 text-[13.5px] font-semibold text-white hover:bg-violet-400"
+            >
+              ลองใหม่
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
