@@ -689,8 +689,9 @@ const HomeView = ({
       }));
   }, [projects, workspaces]);
 
-  /* Recent spaces — top 6 by updatedAt with rendered minimaps so the
-   * Home carousel previews are real (not placeholders). */
+  /* Recent spaces — top 3 by updatedAt with rendered minimaps so the
+   * Home preview stays fixed-width and never pushes the Tools column
+   * off-screen when a project has many spaces. */
   const recentSpaces = useMemo(() => {
     return [...workspaces]
       .filter(
@@ -698,7 +699,7 @@ const HomeView = ({
           !activeProjectId || !ws.projectId || ws.projectId === activeProjectId,
       )
       .sort((a, b) => b.updatedAt - a.updatedAt)
-      .slice(0, 6)
+      .slice(0, 3)
       .map((ws) => buildSpaceCardData(ws, canvases, graphs));
   }, [activeProjectId, workspaces, canvases, graphs]);
 
@@ -731,10 +732,10 @@ const HomeView = ({
     <>
       <PageHeader title="Home" rightSlot={<UserMenu />} onOpenSidebar={onOpenSidebar} />
 
-      <div className="ws-scroll-hide flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1400px] px-4 pb-16 pt-5 md:px-6 lg:px-8 lg:pt-6">
+      <div className="ws-scroll-hide flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="mx-auto min-w-0 w-full max-w-[1400px] px-4 pb-16 pt-5 md:px-6 lg:px-8 lg:pt-6">
           {/* ── Top trio: Projects · Spaces · Tools ───────────── */}
-          <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.4fr_1fr]">
+          <section className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)]">
             <ProjectsCard
               projects={projectCards}
               activeProjectId={activeProjectId}
@@ -793,7 +794,7 @@ const ProjectsCard = ({
   onSelect: (id: string | null) => void;
   onCreate: () => void;
 }) => (
-  <div className="rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
+  <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
     <div className="mb-3 flex items-center justify-between">
       <div className="flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-300">
         Projects
@@ -875,7 +876,7 @@ const SpacesShowcaseCard = ({
   onNew: () => void;
   onSeeAll: () => void;
 }) => (
-  <div className="rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
+  <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
     <div className="mb-3 flex items-center justify-between">
       <button
         type="button"
@@ -904,13 +905,13 @@ const SpacesShowcaseCard = ({
         + Create your first space
       </button>
     ) : (
-      <div className="ws-scroll-hide -mx-4 flex gap-3 overflow-x-auto px-4 pb-1">
+      <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
         {spaces.map((ws) => (
           <button
             key={ws.id}
             type="button"
             onClick={() => onOpen(ws.id)}
-            className="group/space flex w-[200px] shrink-0 flex-col gap-2 rounded-xl bg-[hsl(0_0%_4%)] p-1.5 ring-1 ring-inset ring-white/[0.05] transition-all hover:ring-white/[0.14] lg:w-[180px]"
+            className="group/space flex min-w-0 flex-col gap-2 rounded-xl bg-[hsl(0_0%_4%)] p-1.5 ring-1 ring-inset ring-white/[0.05] transition-all hover:ring-white/[0.14]"
           >
             <div className="aspect-[4/3] overflow-hidden rounded-lg bg-[hsl(0_0%_2%)]">
               <CanvasMinimap nodes={ws.nodes} edges={ws.edges} />
@@ -937,7 +938,7 @@ const ToolsCard = ({
   tools: HomeTool[];
   onOpen: (tool: StandaloneToolKey) => void;
 }) => (
-  <div className="rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
+  <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
     <div className="mb-3 flex items-center justify-between">
       <button
         type="button"
