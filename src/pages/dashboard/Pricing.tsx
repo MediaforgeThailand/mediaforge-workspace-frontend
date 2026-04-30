@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 // TopupSection import removed — workspace doesn't sell standalone
 // credit top-ups (the consumer product does, this surface doesn't).
 
@@ -167,6 +168,7 @@ const Pricing = () => {
   const [cycle, setCycle] = useState<CycleTab>("monthly");
   const [submittingPlanId, setSubmittingPlanId] = useState<string | null>(null);
   const [openingPortal, setOpeningPortal] = useState(false);
+  const [checkoutPlan, setCheckoutPlan] = useState<SubscriptionPlan | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -203,7 +205,7 @@ const Pricing = () => {
     [plans]
   );
 
-  const handleSubscribe = async (plan: SubscriptionPlan) => {
+  const handleSubscribe = (plan: SubscriptionPlan) => {
     // Team is contact-sales / metered.
     if (plan.target === "team") {
       window.location.href = "mailto:sales@mediaforge.co?subject=Team plan inquiry";
@@ -223,30 +225,8 @@ const Pricing = () => {
       });
       return;
     }
-
-    try {
-      setSubmittingPlanId(plan.id);
-      const { data, error } = await supabase.functions.invoke("create-checkout", {
-        body: {
-          packageId: plan.id,
-          billingInterval: cycle,
-          embedded: false,
-        },
-      });
-      if (error) throw error;
-      const url = (data as { url?: string })?.url;
-      if (!url) throw new Error("No checkout URL returned");
-      window.location.href = url;
-    } catch (e) {
-      console.error("[Pricing] checkout error:", e);
-      toast({
-        title: language === "th" ? "เริ่มชำระเงินไม่ได้" : "Could not start checkout",
-        description: e instanceof Error ? e.message : String(e),
-        variant: "destructive",
-      });
-    } finally {
-      setSubmittingPlanId(null);
-    }
+    setSubmittingPlanId(plan.id);
+    setCheckoutPlan(plan);
   };
 
   const handleManageSubscription = async () => {
@@ -407,6 +387,23 @@ const Pricing = () => {
             stay populated upstream so other surfaces (admin, etc.)
             can still read them, they just don't render here. */}
       </div>
+      <EmbeddedCheckoutModal
+        open={!!checkoutPlan}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCheckoutPlan(null);
+            setSubmittingPlanId(null);
+          }
+        }}
+        mode="subscription"
+        packageId={checkoutPlan?.id ?? ""}
+        billingInterval={cycle}
+        onSuccess={() => {
+          void refetch();
+          void refreshProfile();
+          setSubmittingPlanId(null);
+        }}
+      />
     </div>
   );
 };

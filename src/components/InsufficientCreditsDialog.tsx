@@ -1,30 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Coins, Plus, ArrowUpCircle, Loader2 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { ArrowUpCircle, Coins, Zap } from "lucide-react";
 import { useCredits } from "@/hooks/useCredits";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { supabase } from "@/integrations/supabase/client";
-import EmbeddedCheckoutModal from "./EmbeddedCheckoutModal";
-
-interface TopupPackage {
-  id: string;
-  name: string;
-  credits: number;
-  price_thb: number;
-  stripe_price_id: string | null;
-  is_active: boolean;
-  sort_order: number;
-}
+import BuyCreditsDialog from "@/components/settings/BuyCreditsDialog";
 
 interface InsufficientCreditsDialogProps {
   open: boolean;
@@ -38,124 +25,80 @@ const InsufficientCreditsDialog = ({
   requiredCredits,
 }: InsufficientCreditsDialogProps) => {
   const navigate = useNavigate();
-  const { profile } = useAuth();
-  const { credits } = useCredits();
-  const { language, t } = useLanguage();
-  const isSubscribed = profile?.subscription_status !== "free";
+  const { credits, refetch } = useCredits();
+  const { language } = useLanguage();
+  const [topupOpen, setTopupOpen] = useState(false);
 
-  const [topupPackages, setTopupPackages] = useState<TopupPackage[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [selectedPkgId, setSelectedPkgId] = useState("");
-  const [checkoutMode, setCheckoutMode] = useState<"subscription" | "topup">("topup");
-
-  useEffect(() => {
-    if (open && isSubscribed) {
-      supabase
-        .from("topup_packages" as any)
-        .select("*")
-        .eq("is_active", true)
-        .order("sort_order")
-        .then(({ data }) => {
-          if (data) setTopupPackages(data as any);
-        });
-    }
-  }, [open, isSubscribed]);
-
-  const handleTopup = (pkg: TopupPackage) => {
-    setSelectedPkgId(pkg.id);
-    setCheckoutMode("topup");
-    setCheckoutOpen(true);
-  };
+  const balance = credits?.balance ?? 0;
+  const shortage = requiredCredits ? Math.max(0, requiredCredits - balance) : 0;
 
   const handleGoToPricing = () => {
     onOpenChange(false);
     navigate("/app/pricing");
   };
 
-  const balance = credits?.balance ?? 0;
-  const shortage = requiredCredits ? requiredCredits - balance : 0;
-
   return (
     <>
-      <Dialog open={open && !checkoutOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-md bg-popover border-border">
+      <Dialog open={open && !topupOpen} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md border-white/10 bg-[#111827] text-white">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-foreground">
-              <Coins className="w-5 h-5 text-destructive" />
-              {t("insuffCreditsTitle")}
+            <DialogTitle className="flex items-center gap-2 text-white">
+              <Coins className="h-5 w-5 text-sky-400" />
+              {language === "th" ? "เครดิตไม่เพียงพอ" : "Not enough credits"}
             </DialogTitle>
-            <DialogDescription>
-              {requiredCredits ? t("insuffCreditsNeed", { balance: balance.toLocaleString(), required: requiredCredits.toLocaleString() }) : t("insuffCreditsHave", { balance: balance.toLocaleString() })}
+            <DialogDescription className="text-zinc-300">
+              {requiredCredits
+                ? language === "th"
+                  ? `ต้องใช้ ${requiredCredits.toLocaleString()} credits แต่ตอนนี้มี ${balance.toLocaleString()} credits`
+                  : `This action needs ${requiredCredits.toLocaleString()} credits. Current balance: ${balance.toLocaleString()} credits.`
+                : language === "th"
+                  ? `ยอดคงเหลือปัจจุบัน ${balance.toLocaleString()} credits`
+                  : `Current balance: ${balance.toLocaleString()} credits.`}
             </DialogDescription>
           </DialogHeader>
 
-          {isSubscribed ? (
-            <div className="space-y-4 mt-2">
-              {/* Top-up options for subscribers */}
-              <p className="text-sm text-muted-foreground">
-                {t("insuffTopupDesc")}
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {topupPackages.slice(0, 4).map((pkg) => (
-                  <button
-                    key={pkg.id}
-                    onClick={() => handleTopup(pkg)}
-                    className="flex flex-col items-center p-3 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-colors"
-                  >
-                    <span className="text-lg font-bold text-foreground">
-                      {pkg.credits.toLocaleString()}
-                    </span>
-                    <span className="text-xs text-muted-foreground">credits</span>
-                    <span className="text-sm font-semibold text-foreground mt-1">
-                      ฿{Number(pkg.price_thb).toLocaleString()}
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="h-px flex-1 bg-border" />
-                <span className="text-xs text-muted-foreground">
-                  {t("insuffOr")}
-                </span>
-                <div className="h-px flex-1 bg-border" />
-              </div>
-
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={handleGoToPricing}
-              >
-                <ArrowUpCircle className="w-4 h-4 mr-2" />
-                {t("insuffUpgrade")}
-              </Button>
+          <div className="mt-2 space-y-3">
+            <div className="rounded-xl border border-sky-400/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
+              {shortage > 0
+                ? language === "th"
+                  ? `ขาดอีก ${shortage.toLocaleString()} credits`
+                  : `Short by ${shortage.toLocaleString()} credits.`
+                : language === "th"
+                  ? "เติมเครดิตหรือเลือกแพ็กเกจใหม่เพื่อใช้งานต่อ"
+                  : "Top up credits or choose a plan to continue."}
             </div>
-          ) : (
-            <div className="space-y-4 mt-2">
-              <p className="text-sm text-muted-foreground">
-                {t("insuffSubscribeDesc")}
-              </p>
-              <Button
-                className="w-full gradient-primary text-primary-foreground"
-                onClick={handleGoToPricing}
-              >
-                <ArrowUpCircle className="w-4 h-4 mr-2" />
-                {t("insuffViewPlans")}
-              </Button>
-            </div>
-          )}
+
+            <Button
+              className="h-11 w-full bg-sky-500 font-semibold text-white hover:bg-sky-400"
+              onClick={() => setTopupOpen(true)}
+            >
+              <Zap className="mr-2 h-4 w-4" />
+              {language === "th"
+                ? "Top-up ด่วนด้วย PromptPay QR"
+                : "Quick top-up with PromptPay QR"}
+            </Button>
+
+            <Button
+              variant="outline"
+              className="h-11 w-full border-white/15 bg-white/5 text-white hover:bg-white/10"
+              onClick={handleGoToPricing}
+            >
+              <ArrowUpCircle className="mr-2 h-4 w-4" />
+              {language === "th" ? "ไปหน้า Plan & Pricing" : "Go to plans and pricing"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
-      <EmbeddedCheckoutModal
-        open={checkoutOpen}
-        onOpenChange={(v) => {
-          setCheckoutOpen(v);
-          if (!v) onOpenChange(false);
+      <BuyCreditsDialog
+        open={topupOpen}
+        onOpenChange={(nextOpen) => {
+          setTopupOpen(nextOpen);
+          if (!nextOpen) onOpenChange(false);
         }}
-        mode={checkoutMode}
-        packageId={selectedPkgId}
+        onSuccess={() => {
+          void refetch();
+        }}
       />
     </>
   );

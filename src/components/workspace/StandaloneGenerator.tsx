@@ -23,8 +23,10 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserMenu } from "@/components/workspace/UserMenu";
+import InsufficientCreditsDialog from "@/components/InsufficientCreditsDialog";
 import { calculateNodeCost } from "@/lib/nodeCostCalculator";
 import { useNodeCreditCosts } from "@/hooks/useNodeCreditCosts";
+import { useCredits } from "@/hooks/useCredits";
 import { downloadFromUrl } from "./downloadAsset";
 import {
   build3dParams,
@@ -63,6 +65,10 @@ const STORAGE_BUCKET = "ai-media";
 const SIGNED_URL_TTL_SEC = 60 * 60 * 24 * 365;
 const STANDALONE_JOB_SELECT =
   "id,node_type,provider,model,request,status,attempts,result,error,last_error,created_at,completed_at,run_after,deadline_at,locked_by,lock_expires_at,credits_charged,credits_refunded";
+
+const isInsufficientCreditsError = (message: string) =>
+  /insufficient|not enough|credit/i.test(message) &&
+  !/api credit|provider credit/i.test(message);
 
 type UploadSlot =
   | "image-ref"
@@ -306,6 +312,7 @@ export default function StandaloneGenerator({
 }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { credits } = useCredits();
   const { data: creditCosts = [], isLoading: creditCostsLoading } =
     useNodeCreditCosts();
   const [forms, setForms] =
@@ -313,6 +320,9 @@ export default function StandaloneGenerator({
   const [running, setRunning] = useState(false);
   const [uploading, setUploading] = useState<UploadSlot | null>(null);
   const [uploadAccept, setUploadAccept] = useState("image/*");
+  const [insufficientOpen, setInsufficientOpen] = useState(false);
+  const [insufficientRequiredCredits, setInsufficientRequiredCredits] =
+    useState<number | undefined>();
 
   const activeDef = STANDALONE_TOOLS[activeTool];
   const form = forms[activeTool];
@@ -542,6 +552,15 @@ export default function StandaloneGenerator({
       toast.error(validation);
       return;
     }
+    if (
+      estimatedCost != null &&
+      credits &&
+      Number(credits.balance ?? 0) < estimatedCost
+    ) {
+      setInsufficientRequiredCredits(estimatedCost);
+      setInsufficientOpen(true);
+      return;
+    }
 
     const inputs = buildCurrentInputs(activeTool, form);
     setRunning(true);
@@ -573,7 +592,13 @@ export default function StandaloneGenerator({
       toast.success("Generation queued");
       void jobsQuery.refetch();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      if (isInsufficientCreditsError(message)) {
+        setInsufficientRequiredCredits(estimatedCost ?? undefined);
+        setInsufficientOpen(true);
+      } else {
+        toast.error(message);
+      }
     } finally {
       setRunning(false);
     }
@@ -685,7 +710,7 @@ export default function StandaloneGenerator({
             type="button"
             onClick={() => void run()}
             disabled={running || !!uploading}
-            className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#3a3a3a] text-[13px] font-semibold text-zinc-200 transition hover:bg-[#474747] disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-sky-500 text-[13px] font-semibold text-white shadow-[0_10px_24px_rgba(14,165,233,0.25)] transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-300 disabled:shadow-none disabled:opacity-70"
           >
             {running ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -714,6 +739,11 @@ export default function StandaloneGenerator({
           </div>
         </main>
       </div>
+      <InsufficientCreditsDialog
+        open={insufficientOpen}
+        onOpenChange={setInsufficientOpen}
+        requiredCredits={insufficientRequiredCredits}
+      />
     </div>
   );
 }

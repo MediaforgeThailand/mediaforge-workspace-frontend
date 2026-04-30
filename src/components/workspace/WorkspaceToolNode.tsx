@@ -28,6 +28,7 @@ import { PortIcon } from "./PortIcon";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import InsufficientCreditsDialog from "@/components/InsufficientCreditsDialog";
 
 import { type ParamDef } from "@/components/flow/nodes/nodeApiSchema";
 import { useNodeCreditCosts as useCreatorCreditCosts } from "@/hooks/useNodeCreditCosts";
@@ -92,6 +93,10 @@ const MULTI_GEN_NODE_TYPES = new Set([
 const NEW_ID = (): string =>
   globalThis.crypto?.randomUUID?.() ??
   `n_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+const isInsufficientCreditsError = (message: string) =>
+  /insufficient|not enough|credit/i.test(message) &&
+  !/api credit|provider credit/i.test(message);
 
 /** Trim a long URL down to "host…/last_segment" for one-line debug rows. */
 function shortUrl(u: string | undefined): string {
@@ -501,6 +506,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const { getEdges, getNodes, setNodes, setEdges } = useReactFlow();
   const edges = useEdges();
   const prevHasRefVideo = useRef<boolean | undefined>(undefined);
+  const [insufficientOpen, setInsufficientOpen] = useState(false);
 
   // Refs + ResizeObserver for the dynamic prompt-lift logic. The
   // prompt overlay sits above the settings toolbar and used to lift
@@ -1396,6 +1402,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     } catch (e: any) {
       const errorMessage = String(e?.message ?? e);
       const shouldToast = runStillActive();
+      const insufficientCredits = isInsufficientCreditsError(errorMessage);
       setNodes((ns) =>
         ns.map((n) =>
           n.id === id && ((n.data as NodeData | undefined)?.activeRunId ?? null) === runId
@@ -1417,7 +1424,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         nodeId: id,
         title: `✗ ${nodeLabelForLog} · ${String(e?.message ?? e)}`,
       });
-      if (shouldToast) toast.error(errorMessage);
+      if (insufficientCredits) setInsufficientOpen(true);
+      if (shouldToast && !insufficientCredits) toast.error(errorMessage);
     }
   }, [getNodes, id, isRunning, isViewer, params, schemaKey, setNodes, selectedModel, schema, d.params?.nodeName]);
 
@@ -2443,6 +2451,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           index={i}
         />
       ))}
+      <InsufficientCreditsDialog
+        open={insufficientOpen}
+        onOpenChange={setInsufficientOpen}
+        requiredCredits={nodeCost ?? undefined}
+      />
     </>
   );
 });
