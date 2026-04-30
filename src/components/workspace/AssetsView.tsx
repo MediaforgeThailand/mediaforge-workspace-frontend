@@ -125,7 +125,15 @@ const SIDE_NAV: Array<{ key: SectionKind; label: string; icon: LucideIcon }> = [
   { key: "trash",     label: "Trash",      icon: Trash2 },
 ];
 
-export default function AssetsView() {
+export default function AssetsView({
+  onOpenSidebar,
+}: {
+  /** Optional — when provided, renders a hamburger button in the
+   *  header that opens the workspace dashboard's main sidebar
+   *  drawer. Only the dashboard route passes this; standalone uses
+   *  of AssetsView (none today) skip it. */
+  onOpenSidebar?: () => void;
+} = {}) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const projects = useWorkspaceStore((s) => s.projects);
@@ -431,17 +439,39 @@ export default function AssetsView() {
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Header */}
         <div className="flex flex-wrap items-center gap-2 border-b border-white/5 px-4 py-3 sm:px-6">
-          {/* Mobile drawer toggle */}
+          {/* Workspace sidebar toggle (mobile) — only shown when the
+           *  dashboard wired in `onOpenSidebar`. Different button from
+           *  the filters drawer below; this opens the OUTER sidebar
+           *  (Home / All assets nav) while the filters drawer below
+           *  opens the INNER sub-nav (sections + projects). */}
+          {onOpenSidebar && (
+            <button
+              type="button"
+              onClick={onOpenSidebar}
+              aria-label="Open menu"
+              className="-ml-1 flex h-9 w-9 items-center justify-center rounded-md text-zinc-300 hover:bg-white/[0.06] hover:text-white md:hidden"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+          )}
+          {/* Filters drawer toggle (mobile) — opens the inner sub-nav
+           *  drawer (sections / projects). Sits to the right of the
+           *  hamburger above so they don't collide. */}
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
             className="rounded-md border border-white/10 bg-white/[0.04] p-1.5 text-zinc-300 hover:bg-white/[0.08] md:hidden"
             aria-label="Open filters"
+            title="Filters"
           >
             <SlidersHorizontal className="h-4 w-4" />
           </button>
-          <div className="flex flex-col">
-            <h1 className="text-base font-semibold leading-snug text-zinc-100 sm:text-lg">
+          <div className="flex min-w-0 flex-col">
+            <h1 className="truncate text-base font-semibold leading-snug text-zinc-100 sm:text-lg">
               {sectionTitle(section, projects, activeProject)}
             </h1>
             <span className="text-[11px] text-zinc-500">

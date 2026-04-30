@@ -396,15 +396,24 @@ const WorkspaceDashboardInner = () => {
       className="flex h-screen w-screen overflow-hidden bg-[hsl(0_0%_5%)] text-zinc-100"
       style={{ fontFamily: "'Prompt', system-ui, sans-serif" }}
     >
-      <div className={isStandaloneSection(section) ? "hidden h-full lg:block" : "h-full"}>
+      {/* Persistent sidebar — shown only on tablet+ (md / 768px+). On
+       *  mobile the same component renders inside the drawer below
+       *  (triggered by the hamburger button in each page's header). */}
+      <div className="hidden h-full md:block">
         <WorkspaceSidebar
           active={section}
           onNavigate={setSection}
           onCreate={handleCreateProject}
         />
       </div>
-      {isStandaloneSection(section) && mobileSidebarOpen && (
-        <div className="fixed inset-0 z-50 flex lg:hidden">
+
+      {/* Mobile drawer — works for every section (Home, All assets,
+       *  Spaces, the standalone tools, etc.). The previous version
+       *  only opened on standalone-tool sections, which left Home /
+       *  All assets users with the sidebar permanently eating ~50%
+       *  of the viewport on a phone. */}
+      {mobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden">
           <button
             type="button"
             aria-label="Close sidebar"
@@ -439,10 +448,18 @@ const WorkspaceDashboardInner = () => {
             activeProjectId={activeProjectId}
             onSelectProject={setActiveProject}
             onCreateProject={handleCreateProject}
+            onOpenSidebar={() => setMobileSidebarOpen(true)}
           />
         )}
-        {section === "spaces" && <SpacesView activeProjectId={activeProjectId} />}
-        {(section === "history" || section === "assets") && <AssetsView />}
+        {section === "spaces" && (
+          <SpacesView
+            activeProjectId={activeProjectId}
+            onOpenSidebar={() => setMobileSidebarOpen(true)}
+          />
+        )}
+        {(section === "history" || section === "assets") && (
+          <AssetsView onOpenSidebar={() => setMobileSidebarOpen(true)} />
+        )}
         {isStandaloneSection(section) && (
           <StandaloneGenerator
             activeTool={section}
@@ -459,7 +476,10 @@ const WorkspaceDashboardInner = () => {
           section !== "history" &&
           section !== "assets" &&
           !isStandaloneSection(section) && (
-            <Placeholder section={section} />
+            <Placeholder
+              section={section}
+              onOpenSidebar={() => setMobileSidebarOpen(true)}
+            />
           )}
       </main>
     </div>
@@ -566,12 +586,14 @@ const HomeView = ({
   activeProjectId,
   onSelectProject,
   onCreateProject,
+  onOpenSidebar,
 }: {
   onSection: (s: Section) => void;
   projects: ProjectMeta[];
   activeProjectId: string | null;
   onSelectProject: (id: string | null) => void;
   onCreateProject: () => void;
+  onOpenSidebar?: () => void;
 }) => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
@@ -707,7 +729,7 @@ const HomeView = ({
 
   return (
     <>
-      <PageHeader title="Home" rightSlot={<UserMenu />} />
+      <PageHeader title="Home" rightSlot={<UserMenu />} onOpenSidebar={onOpenSidebar} />
 
       <div className="ws-scroll-hide flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[1400px] px-4 pb-16 pt-5 md:px-6 lg:px-8 lg:pt-6">
@@ -1068,7 +1090,13 @@ function buildSpaceCardData(
   };
 }
 
-const SpacesView = ({ activeProjectId }: { activeProjectId: string | null }) => {
+const SpacesView = ({
+  activeProjectId,
+  onOpenSidebar,
+}: {
+  activeProjectId: string | null;
+  onOpenSidebar?: () => void;
+}) => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const workspaces = useWorkspaceStore((s) => s.workspaces);
@@ -1285,6 +1313,7 @@ const SpacesView = ({ activeProjectId }: { activeProjectId: string | null }) => 
           Magnific-style layout. */}
       <PageHeader
         title=""
+        onOpenSidebar={onOpenSidebar}
         rightSlot={
           <div className="flex items-center gap-3">
             <UserMenu />
@@ -1524,12 +1553,33 @@ const ActionButton = ({
 const PageHeader = ({
   title,
   rightSlot,
+  onOpenSidebar,
 }: {
   title: string;
   rightSlot?: React.ReactNode;
+  /** When provided, renders a hamburger button on mobile (`md:hidden`)
+   *  that calls back into the dashboard to open the WorkspaceSidebar
+   *  drawer. Pages that don't pass this (very few — pretty much only
+   *  modals / nested screens) keep a plain header. */
+  onOpenSidebar?: () => void;
 }) => (
-  <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/5 px-4 md:px-6 lg:h-12 lg:px-8">
-    <h1 className="text-[14px] font-medium tracking-tight text-zinc-300">
+  <div className="flex h-14 shrink-0 items-center gap-3 border-b border-white/5 px-4 md:px-6 lg:h-12 lg:px-8">
+    {onOpenSidebar && (
+      <button
+        type="button"
+        onClick={onOpenSidebar}
+        aria-label="Open menu"
+        className="-ml-1 flex h-9 w-9 items-center justify-center rounded-md text-zinc-300 hover:bg-white/[0.06] hover:text-white md:hidden"
+      >
+        {/* Inline SVG so we don't pull a new icon import for one button */}
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
+    )}
+    <h1 className="flex-1 truncate text-[14px] font-medium tracking-tight text-zinc-300">
       {title}
     </h1>
     {rightSlot}
@@ -1627,9 +1677,19 @@ const SECTION_LABELS: Record<Section, string> = {
   assistant: "Assistant",
 };
 
-const Placeholder = ({ section }: { section: Section }) => (
+const Placeholder = ({
+  section,
+  onOpenSidebar,
+}: {
+  section: Section;
+  onOpenSidebar?: () => void;
+}) => (
   <>
-    <PageHeader title={SECTION_LABELS[section]} rightSlot={<UserMenu />} />
+    <PageHeader
+      title={SECTION_LABELS[section]}
+      rightSlot={<UserMenu />}
+      onOpenSidebar={onOpenSidebar}
+    />
     <div className="flex flex-1 items-center justify-center p-12">
       <EmptyState
         title="Coming soon"
