@@ -50,7 +50,9 @@ import {
 import NodeResultDialog from "./NodeResultDialog";
 import { RunTimer } from "./RunTimer";
 import type { Generation } from "./NodeResultBar";
-import { findAnyVoice, voiceTintGradient } from "./voiceCatalogs";
+// Voice catalog imports were removed when the hardcoded preset
+// lists were deleted. Audio gen nodes no longer surface a voice
+// picker on the canvas — backend uses its own per-provider default.
 import { cloneNodeFresh } from "./cloneNode";
 // Workspace-local schema + helpers — kept out of the shared file so
 // the main flow editor stays untouched.
@@ -1833,30 +1835,10 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       const effectiveLabels = resolved?.optionLabels ?? param.optionLabels;
       const value = params[param.key] ?? resolved?.default ?? param.default;
 
-      // Audio-gen Voice picker — replace the default MiniSelect with a
-      // bespoke button that fires the rich picker dialog (avatar grid
-      // + use-case cards + preview play). The select-style fallback
-      // would still work for keyboard users but the button gives the
-      // primary visual affordance.
-      if (param.key === "voice" && schemaKey === "audioGenNode") {
-        return (
-          <VoicePickerButton
-            key={param.key}
-            voiceId={String(value)}
-            onClick={() => {
-              window.dispatchEvent(
-                new CustomEvent("workspace-open-voice-picker", {
-                  detail: {
-                    nodeId: id,
-                    voiceId: String(value),
-                    modelName: String(params.model_name ?? selectedModel),
-                  },
-                }),
-              );
-            }}
-          />
-        );
-      }
+      // Voice picker for audio gen was removed — see audioGenNode in
+      // workspaceSchema.ts for context. Voice id falls back to the
+      // backend's per-provider default; users who need to override
+      // do it from the standalone /app voice gen tool.
 
       // GPT Image 2 — Aspect Ratio + Resolution split (UI-only).
       // The OpenAI gpt-image API takes a single `size` field, but
@@ -2446,42 +2428,7 @@ function MultiGenStepper({
   );
 }
 
-/* ── Voice picker pill (audioGenNode only) ──────────────────
- *
- * Renders the currently-selected Gemini voice as a small pill with
- * an avatar (initial letter on a tinted gradient) + the name. The
- * actual picker UI lives in `VoicePickerDialog`, opened via a window
- * event so the canvas owns the dialog state and the node body stays
- * pure. We don't render the dialog here — that would mount one per
- * audio node, which is wasteful AND would compete for keyboard /
- * Esc focus across multiple nodes.
- */
-function VoicePickerButton({
-  voiceId,
-  onClick,
-}: {
-  voiceId: string;
-  onClick: () => void;
-}) {
-  const voice = findAnyVoice(voiceId);
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      onMouseDown={(e) => e.stopPropagation()}
-      onPointerDown={(e) => e.stopPropagation()}
-      className="nodrag flex h-7 items-center gap-2 rounded-full bg-white/[0.05] px-1 pr-3 text-[11px] text-zinc-100 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.10]"
-      title={`Voice: ${voice.name} (${voice.characteristic}) — click to browse`}
-    >
-      <span
-        className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white ring-1 ring-inset ring-white/15"
-        style={{ background: voiceTintGradient(voice.tint) }}
-      >
-        {voice.name.charAt(0)}
-      </span>
-      <span className="font-medium">{voice.name}</span>
-      <span className="text-zinc-500">·</span>
-      <span className="text-zinc-400">{voice.characteristic}</span>
-    </button>
-  );
-}
+/* VoicePickerButton + VoicePickerDialog were removed when the
+ * hardcoded voice preset lists were deleted. Audio gen on the canvas
+ * is select-only at the model level; voice id is whatever the
+ * backend's per-provider default is. */

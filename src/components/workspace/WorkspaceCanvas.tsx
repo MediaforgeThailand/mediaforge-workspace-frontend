@@ -90,7 +90,9 @@ import { downloadFromUrl } from "./downloadAsset";
 import { bundleNodesAsZip, harvestAssetsFromNode } from "./bundleNodes";
 import CanvasFloatingSidebar from "./CanvasFloatingSidebar";
 import ShortcutsDialog from "./ShortcutsDialog";
-import VoicePickerDialog from "./VoicePickerDialog";
+// VoicePickerDialog was removed when the hardcoded preset voice
+// lists were deleted. The canvas no longer hosts a voice picker —
+// audio nodes use the backend's per-provider default voice.
 import { useCanvasToolStore } from "./useCanvasToolStore";
 import { useWorkspaceShortcuts } from "./useWorkspaceShortcuts";
 import { useCanvasAutosave } from "./useCanvasAutosave";
@@ -820,14 +822,11 @@ const Inner = () => {
     targetNodes: Node[];
   } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  // Voice picker — single instance owned by the canvas, opened via
-  // a window event from any audioGenNode that wants to swap voices.
-  // Stores the requesting node id so we know who to write back to.
-  const [voicePicker, setVoicePicker] = useState<{
-    nodeId: string;
-    voiceId: string;
-    modelName: string;
-  } | null>(null);
+  // Voice picker state was removed when the hardcoded preset voice
+  // lists were deleted. Audio gen nodes use the backend's
+  // per-provider default voice; users override only in the
+  // standalone /app voice gen tool.
+
   // Tool mode (select / hand / cut / sticky). Read once at the top
   // so we can flip ReactFlow props (panOnDrag, selectionOnDrag) and
   // handle pane / edge clicks based on the active tool.
@@ -1396,53 +1395,11 @@ const Inner = () => {
     return () => window.removeEventListener("workspace-spawn-assets", onSpawn);
   }, [addAssetNode, screenToFlowPosition, reparentSpawned]);
 
-  /* Voice picker → audioGenNode bridge.
-   *
-   * Any audio node renders a "Voice" pill that dispatches
-   * `workspace-open-voice-picker` with its node id + current voice.
-   * We open the dialog here (one instance per canvas), and on
-   * select write the new voice id back into the node's
-   * `data.params.voice`. The dialog handles its own preview play +
-   * use-case filtering — we just listen for select / close. */
-  useEffect(() => {
-    const onOpen = (evt: Event) => {
-      const detail = (evt as CustomEvent).detail as
-        | { nodeId?: string; voiceId?: string; modelName?: string }
-        | undefined;
-      if (!detail?.nodeId) return;
-      setVoicePicker({
-        nodeId: detail.nodeId,
-        voiceId: detail.voiceId ?? "Charon",
-        modelName: detail.modelName ?? "google-tts-studio",
-      });
-    };
-    window.addEventListener("workspace-open-voice-picker", onOpen);
-    return () =>
-      window.removeEventListener("workspace-open-voice-picker", onOpen);
-  }, []);
-
-  const onVoicePicked = useCallback((voiceId: string, modelName: string) => {
-    if (!voicePicker) return;
-    const nodeId = voicePicker.nodeId;
-    setNodes((nds) =>
-      nds.map((n) =>
-        n.id === nodeId
-          ? {
-              ...n,
-              data: {
-                ...n.data,
-                params: {
-                  ...((n.data?.params as Record<string, unknown>) ?? {}),
-                  model_name: modelName,
-                  voice: voiceId,
-                },
-              },
-            }
-          : n,
-      ),
-    );
-    setVoicePicker(null);
-  }, [voicePicker, setNodes]);
+  /* Voice picker bridge was removed alongside the preset catalog
+   * cleanup. The canvas no longer hosts a voice dialog; audio gen
+   * nodes use whatever default voice the backend executor picks for
+   * their model. Users who need a specific voice swap models from
+   * the standalone /app voice gen tool. */
 
   /* All-assets dialog → upload bridge.
    *
@@ -2126,13 +2083,8 @@ const Inner = () => {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
       />
-      <VoicePickerDialog
-        open={!!voicePicker}
-        value={voicePicker?.voiceId}
-        modelName={voicePicker?.modelName}
-        onClose={() => setVoicePicker(null)}
-        onSelect={onVoicePicked}
-      />
+      {/* VoicePickerDialog render removed — the dialog and its
+       *  hardcoded preset catalog are gone. */}
     </div>
   );
 };

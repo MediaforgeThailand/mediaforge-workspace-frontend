@@ -37,28 +37,17 @@ import {
   STANDALONE_TOOLS,
   type StandaloneToolKey,
 } from "./standaloneGenerationCatalog";
-import { GEMINI_VOICES, DEFAULT_VOICE_ID as DEFAULT_GEMINI_VOICE_ID } from "./geminiVoices";
-import {
-  GOOGLE_VOICES,
-  GOOGLE_VOICE_TINT_GRADIENT,
-} from "./googleTtsVoices";
-import {
-  ELEVENLABS_VOICES,
-  ELEVENLABS_VOICE_TINT_GRADIENT,
-} from "./elevenlabsVoices";
-import { findAnyVoice } from "./voiceCatalogs";
+// Hardcoded voice catalogs (Gemini star names, Google Studio
+// labels, ElevenLabs default presets) were deleted in the
+// preset-purge cleanup. ElevenLabs voices come from a live
+// /v1/voices fetch (account-bound, real); Gemini and Google use
+// a single text input where the user types the voice id directly.
 
-/** Default voice for the standalone surface. Keep this paired with
- *  STANDALONE_TOOLS.voice_gen.defaultModel so a fresh form never sends
- *  a voice id from the wrong provider. */
-const DEFAULT_VOICE_ID = DEFAULT_GEMINI_VOICE_ID;
-
-/** Per-provider tint palette merge — lets a single VoiceTile render
- *  any of the 3 catalogs without per-provider branching. */
-const ALL_VOICE_TINT_GRADIENT: Record<string, string> = {
-  ...GOOGLE_VOICE_TINT_GRADIENT,
-  ...ELEVENLABS_VOICE_TINT_GRADIENT,
-};
+/** Empty default voice — backend executors carry their own
+ *  per-provider fallback (`Charon` for Gemini, `en-US-Studio-O`
+ *  for Google, first account voice for ElevenLabs) so an empty
+ *  string is fine. */
+const DEFAULT_VOICE_ID = "";
 
 const RUN_EDGE_FUNCTION = "workspace-run-node";
 const STANDALONE_CANVAS_ID = "standalone";
@@ -1111,31 +1100,18 @@ function inferVoiceProvider(model: string): VoiceProviderKind {
   return "google";
 }
 
-/** Curated Google Cloud TTS catalog — Studio + Neural2 only for
- *  English (drop WaveNet / Standard for English; those tiers don't
- *  pass production quality bar). Thai keeps Standard + WaveNet
- *  because Google hasn't shipped Studio Thai yet (2026-04). */
-function googleVoicesForPicker(): VoiceTile[] {
-  return GOOGLE_VOICES
-    .filter((v) =>
-      v.languageCode === "th-TH" || v.family === "Studio" || v.family === "Neural2",
-    )
-    .map((v) => ({
-      id: v.id,
-      name: v.name,
-      characteristic: `${v.flag} ${v.characteristic}`,
-      tint: v.tint,
-    }));
-}
-
-function geminiVoicesForPicker(): VoiceTile[] {
-  return GEMINI_VOICES.map((v) => ({
-    id: v.id,
-    name: v.name,
-    characteristic: v.characteristic,
-    tint: v.tint,
-  }));
-}
+/** Tints for the dynamic-fetch ElevenLabs grid. The hardcoded
+ *  catalog files are gone; we generate a colour from the voice name
+ *  hash so each tile still gets a stable colour without needing to
+ *  ship a static tint table. */
+const TINT_PALETTE: Record<string, string> = {
+  violet: "linear-gradient(135deg, hsl(258 75% 45%), hsl(258 65% 28%))",
+  rose:   "linear-gradient(135deg, hsl(345 75% 50%), hsl(345 65% 32%))",
+  amber:  "linear-gradient(135deg, hsl(35 80% 50%), hsl(35 70% 32%))",
+  emerald:"linear-gradient(135deg, hsl(160 65% 38%), hsl(160 60% 22%))",
+  sky:    "linear-gradient(135deg, hsl(205 75% 45%), hsl(205 65% 28%))",
+  zinc:   "linear-gradient(135deg, hsl(0 0% 35%), hsl(0 0% 22%))",
+};
 
 function VoiceControls({
   form,
@@ -1145,16 +1121,13 @@ function VoiceControls({
   onChange: (patch: Partial<StandaloneFormState>) => void;
 }) {
   const provider = inferVoiceProvider(form.model);
-  const selectedVoice = findAnyVoice(form.voice);
 
-  // Voice catalog — switches with the selected model.
+  // ElevenLabs voice catalog — pulled live from the user's account
+  // via the voice-list edge fn (no hardcoded preset list).
   const [elevenVoices, setElevenVoices] = useState<VoiceTile[] | null>(null);
   const [elevenLoading, setElevenLoading] = useState(false);
   const [elevenError, setElevenError] = useState<string | null>(null);
 
-  // Pull ElevenLabs voices from the user's actual account when the
-  // user lands on an ElevenLabs model. Cached in state so switching
-  // away and back doesn't re-fetch.
   useEffect(() => {
     if (provider !== "elevenlabs") return;
     if (elevenVoices !== null || elevenLoading) return;
@@ -1205,40 +1178,12 @@ function VoiceControls({
     return () => { cancelled = true; };
   }, [provider, elevenVoices, elevenLoading]);
 
-  const tiles: VoiceTile[] = useMemo(() => {
-    if (provider === "elevenlabs") return elevenVoices ?? [];
-    if (provider === "gemini") return geminiVoicesForPicker();
-    return googleVoicesForPicker();
-  }, [provider, elevenVoices]);
-
-  // When the user changes model, drop the current voice if it
-  // doesn't belong to the new provider's catalog. This stops a stale
-  // ElevenLabs voice id from being sent with a Gemini request (which
-  // 400s on the backend).
+  // Reset voice id when switching providers — a Gemini text-input
+  // value can't satisfy the ElevenLabs UUID contract and vice versa.
   useEffect(() => {
-    if (!form.voice) {
-      if (tiles[0]?.id) onChange({ voice: tiles[0].id });
-      return;
-    }
-    const valid = tiles.some((t) => t.id === form.voice);
-    if (!valid && (provider !== "elevenlabs" || elevenVoices !== null)) {
-      // Only blank-out once the catalog is loaded — otherwise we'd
-      // clear the user's voice the first render before the fetch
-      // completes.
-      onChange({ voice: tiles[0]?.id ?? "" });
-    }
+    onChange({ voice: "" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tiles, provider]);
-
-  // ── Preview removed per user request ─────────────────────────
-  // The play button on each voice card and the on-demand preview
-  // synthesis used to live here. The user generation flow itself
-  // works fine — picking a voice + clicking Generate produces audio
-  // — but the inline preview kept hitting Chrome's "play()
-  // interrupted by pause()" race when users clicked between voices,
-  // and the resulting error chip was more noise than signal. Until
-  // we have a properly debounced preview pipeline, the cards are
-  // select-only.
+  }, [provider]);
 
   return (
     <>
@@ -1251,59 +1196,90 @@ function VoiceControls({
         maxLength={5000}
       />
 
-      <div>
-        <FieldLabel label="Voice" meta={selectedVoice.characteristic} />
-
-        {provider === "elevenlabs" && elevenLoading && (
-          <div className="mt-2 rounded-md border border-white/[0.06] bg-white/[0.02] px-2.5 py-2 text-[11px] text-zinc-500">
-            Loading ElevenLabs voices from your account…
-          </div>
-        )}
-
-        {provider === "elevenlabs" && elevenError && !elevenLoading && (
-          <div className="mt-2 rounded-md border border-red-400/20 bg-red-500/[0.06] px-2.5 py-2 text-[11px] text-red-300">
-            {elevenError}
-          </div>
-        )}
-
-        <div className="ws-scroll-hide mt-2 grid max-h-[270px] grid-cols-2 gap-2 overflow-y-auto pr-0.5">
-          {tiles.map((voice) => {
-            const active = voice.id === form.voice;
-            return (
-              <button
-                key={voice.id}
-                type="button"
-                onClick={() => onChange({ voice: voice.id })}
-                className={cn(
-                  "flex min-h-[72px] flex-col items-start justify-between rounded-lg border border-dashed px-3 py-3 text-left transition",
-                  active
-                    ? "border-amber-300/50 bg-amber-300/10"
-                    : "border-white/[0.12] bg-[#242424] hover:bg-[#2d2d2d]",
-                )}
-              >
-                <span
-                  className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"
-                  style={{
-                    background:
-                      ALL_VOICE_TINT_GRADIENT[voice.tint] ??
-                      "linear-gradient(135deg, hsl(0 0% 35%), hsl(0 0% 22%))",
-                  }}
-                >
-                  {voice.name.charAt(0)}
-                </span>
-                <span className="min-w-0 w-full">
-                  <span className="block truncate text-[11px] font-bold text-white">
-                    {voice.name}
-                  </span>
-                  <span className="block truncate text-[10px] text-zinc-500">
-                    {voice.characteristic}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
+      {provider === "elevenlabs" ? (
+        // ElevenLabs: live grid of the user's account voices. No
+        // hardcoded preset catalog — what's in the API is what we show.
+        <div>
+          <FieldLabel
+            label="Voice"
+            meta={
+              elevenLoading
+                ? "Loading…"
+                : elevenVoices?.length
+                  ? `${elevenVoices.length} from your account`
+                  : "ElevenLabs"
+            }
+          />
+          {elevenError && (
+            <div className="mt-2 rounded-md border border-red-400/20 bg-red-500/[0.06] px-2.5 py-2 text-[11px] text-red-300">
+              {elevenError}
+            </div>
+          )}
+          {elevenLoading && (
+            <div className="mt-2 rounded-md border border-white/[0.06] bg-white/[0.02] px-2.5 py-2 text-[11px] text-zinc-500">
+              Loading ElevenLabs voices from your account…
+            </div>
+          )}
+          {!elevenLoading && elevenVoices && elevenVoices.length === 0 && !elevenError && (
+            <div className="mt-2 rounded-md border border-white/[0.06] bg-white/[0.02] px-2.5 py-2 text-[11px] text-zinc-500">
+              No voices in this ElevenLabs account.
+            </div>
+          )}
+          {elevenVoices && elevenVoices.length > 0 && (
+            <div className="ws-scroll-hide mt-2 grid max-h-[270px] grid-cols-2 gap-2 overflow-y-auto pr-0.5">
+              {elevenVoices.map((voice) => {
+                const active = voice.id === form.voice;
+                return (
+                  <button
+                    key={voice.id}
+                    type="button"
+                    onClick={() => onChange({ voice: voice.id })}
+                    className={cn(
+                      "flex min-h-[72px] flex-col items-start justify-between rounded-lg border border-dashed px-3 py-3 text-left transition",
+                      active
+                        ? "border-amber-300/50 bg-amber-300/10"
+                        : "border-white/[0.12] bg-[#242424] hover:bg-[#2d2d2d]",
+                    )}
+                  >
+                    <span
+                      className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"
+                      style={{
+                        background:
+                          TINT_PALETTE[voice.tint] ?? TINT_PALETTE.zinc,
+                      }}
+                    >
+                      {voice.name.charAt(0)}
+                    </span>
+                    <span className="min-w-0 w-full">
+                      <span className="block truncate text-[11px] font-bold text-white">
+                        {voice.name}
+                      </span>
+                      <span className="block truncate text-[10px] text-zinc-500">
+                        {voice.characteristic}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
-      </div>
+      ) : (
+        // Gemini / Google: no preset catalog — let the user paste a
+        // voice id directly. Empty string is fine; the backend
+        // executor falls back to its provider default
+        // (`Charon` for Gemini, `en-US-Studio-O` for Google).
+        <TextInputField
+          label="Voice ID"
+          value={form.voice}
+          placeholder={
+            provider === "gemini"
+              ? "Optional · e.g. Charon, Aoede (defaults to Charon)"
+              : "Optional · e.g. en-US-Studio-O (defaults to Studio-O)"
+          }
+          onChange={(voice) => onChange({ voice })}
+        />
+      )}
 
       {/* ── Per-model parameter widgets ─────────────────────── */}
       {provider === "elevenlabs" && (

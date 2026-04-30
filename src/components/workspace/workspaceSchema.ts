@@ -24,9 +24,12 @@ import {
   type NodeIOHandle,
   type ParamDef,
 } from "@/components/flow/nodes/nodeApiSchema";
-import { ELEVENLABS_VOICES, DEFAULT_ELEVENLABS_VOICE_ID } from "./elevenlabsVoices";
-import { GEMINI_VOICES, DEFAULT_VOICE_ID as DEFAULT_GEMINI_VOICE_ID } from "./geminiVoices";
-import { GOOGLE_VOICES, DEFAULT_GOOGLE_VOICE_ID } from "./googleTtsVoices";
+// Voice catalog imports were removed when the hardcoded "preset"
+// voice lists were deleted. Audio gen now relies on backend defaults
+// for the voice id (Gemini → "Charon", Google → "en-US-Studio-O",
+// ElevenLabs → an account-specific voice picked by the standalone
+// tool's live /v1/voices fetch). The canvas audio node no longer
+// surfaces a voice picker.
 
 /** Kling model value → display label. Rebuilt locally so we never need
  *  a new export from the shared schema file. */
@@ -794,39 +797,15 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         default: "gemini-2.5-pro-preview-tts",
         required: true,
       },
-      {
-        key: "voice",
-        label: "Voice",
-        type: "select",
-        options: ELEVENLABS_VOICES.map((v) => v.id),
-        optionLabels: Object.fromEntries(ELEVENLABS_VOICES.map((v) => [v.id, v.name])),
-        dynamicType: (model) => {
-          if (model.startsWith("gemini-")) {
-            return {
-              type: "select",
-              options: GEMINI_VOICES.map((v) => v.id),
-              optionLabels: Object.fromEntries(GEMINI_VOICES.map((v) => [v.id, v.name])),
-              default: DEFAULT_GEMINI_VOICE_ID,
-            };
-          }
-          if (model.startsWith("google-")) {
-            return {
-              type: "select",
-              options: GOOGLE_VOICES.map((v) => v.id),
-              optionLabels: Object.fromEntries(GOOGLE_VOICES.map((v) => [v.id, v.name])),
-              default: DEFAULT_GOOGLE_VOICE_ID,
-            };
-          }
-          return {
-            type: "select",
-            options: ELEVENLABS_VOICES.map((v) => v.id),
-            optionLabels: Object.fromEntries(ELEVENLABS_VOICES.map((v) => [v.id, v.name])),
-            default: DEFAULT_ELEVENLABS_VOICE_ID,
-          };
-        },
-        default: DEFAULT_GEMINI_VOICE_ID,
-        required: true,
-      },
+      // Voice param removed from the canvas tool node — the hardcoded
+      // preset lists (Gemini star names, Google Studio "Aria/Brian"
+      // labels, ElevenLabs default presets) are gone. Backend
+      // executors carry their own per-provider default so a request
+      // with no `voice` field still works:
+      //   gemini-*       → "Charon"
+      //   google-*       → "en-US-Studio-O"
+      //   elevenlabs-*   → first available account voice (picker is
+      //                    in the standalone /app voice gen tool only)
       {
         key: "prompt",
         label: "Script",
