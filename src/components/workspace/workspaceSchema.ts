@@ -24,6 +24,9 @@ import {
   type NodeIOHandle,
   type ParamDef,
 } from "@/components/flow/nodes/nodeApiSchema";
+import { ELEVENLABS_VOICES, DEFAULT_ELEVENLABS_VOICE_ID } from "./elevenlabsVoices";
+import { GEMINI_VOICES, DEFAULT_VOICE_ID as DEFAULT_GEMINI_VOICE_ID } from "./geminiVoices";
+import { GOOGLE_VOICES, DEFAULT_GOOGLE_VOICE_ID } from "./googleTtsVoices";
 
 /** Kling model value → display label. Rebuilt locally so we never need
  *  a new export from the shared schema file. */
@@ -51,6 +54,9 @@ const BANANA_MODELS = ["nano-banana-2", "nano-banana-pro"] as const;
 /** Backend dispatches anything starting with "gpt-image" to OpenAI's
  *  /v1/images/edits or /v1/images/generations endpoint. */
 const OPENAI_IMAGE_MODELS = ["gpt-image-2"] as const;
+const ELEVENLABS_TTS_MODELS = ["elevenlabs-multilingual-v2", "elevenlabs-turbo-v2-5"] as const;
+const GEMINI_TTS_MODELS = ["gemini-2.5-pro-preview-tts"] as const;
+const GOOGLE_TTS_MODELS = ["google-tts-studio"] as const;
 
 export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
   /**
@@ -760,10 +766,9 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     //     Thai catalog still includes Standard / WaveNet voices for
     //     coverage.
     supportedModels: [
-      "elevenlabs-multilingual-v2",
-      "elevenlabs-turbo-v2-5",
-      "gemini-2.5-pro-preview-tts",
-      "google-tts-studio",
+      ...ELEVENLABS_TTS_MODELS,
+      ...GEMINI_TTS_MODELS,
+      ...GOOGLE_TTS_MODELS,
     ],
     defaultModel: "elevenlabs-multilingual-v2",
     inputs: [
@@ -776,10 +781,9 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         label: "Model",
         type: "select",
         options: [
-          "elevenlabs-multilingual-v2",
-          "elevenlabs-turbo-v2-5",
-          "gemini-2.5-pro-preview-tts",
-          "google-tts-studio",
+          ...ELEVENLABS_TTS_MODELS,
+          ...GEMINI_TTS_MODELS,
+          ...GOOGLE_TTS_MODELS,
         ],
         optionLabels: {
           "elevenlabs-multilingual-v2": "ElevenLabs v2 — Multilingual (Best quality)",
@@ -794,18 +798,33 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         key: "voice",
         label: "Voice",
         type: "select",
-        // The full 30-voice catalogue; the in-canvas widget is a
-        // dropdown, but the floating "Browse voices…" button on the
-        // node opens the rich VoicePickerDialog (with use-case
-        // cards, search, preview play, etc.).
-        options: [
-          "Achernar","Achird","Algenib","Algieba","Alnilam","Aoede",
-          "Autonoe","Callirrhoe","Charon","Despina","Enceladus","Erinome",
-          "Fenrir","Gacrux","Iapetus","Kore","Laomedeia","Leda","Orus",
-          "Puck","Pulcherrima","Rasalgethi","Sadachbia","Sadaltager",
-          "Schedar","Sulafat","Umbriel","Vindemiatrix","Zephyr","Zubenelgenubi",
-        ],
-        default: "Charon",
+        options: ELEVENLABS_VOICES.map((v) => v.id),
+        optionLabels: Object.fromEntries(ELEVENLABS_VOICES.map((v) => [v.id, v.name])),
+        dynamicType: (model) => {
+          if (model.startsWith("gemini-")) {
+            return {
+              type: "select",
+              options: GEMINI_VOICES.map((v) => v.id),
+              optionLabels: Object.fromEntries(GEMINI_VOICES.map((v) => [v.id, v.name])),
+              default: DEFAULT_GEMINI_VOICE_ID,
+            };
+          }
+          if (model.startsWith("google-")) {
+            return {
+              type: "select",
+              options: GOOGLE_VOICES.map((v) => v.id),
+              optionLabels: Object.fromEntries(GOOGLE_VOICES.map((v) => [v.id, v.name])),
+              default: DEFAULT_GOOGLE_VOICE_ID,
+            };
+          }
+          return {
+            type: "select",
+            options: ELEVENLABS_VOICES.map((v) => v.id),
+            optionLabels: Object.fromEntries(ELEVENLABS_VOICES.map((v) => [v.id, v.name])),
+            default: DEFAULT_ELEVENLABS_VOICE_ID,
+          };
+        },
+        default: DEFAULT_ELEVENLABS_VOICE_ID,
         required: true,
       },
       {
@@ -823,6 +842,98 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         default: "",
         placeholder:
           "e.g. Read this in a calm, reassuring tone, slowing down on the technical terms.",
+      },
+      {
+        key: "voice_style",
+        label: "Style",
+        type: "select",
+        options: ["expressive", "neutral", "consistent"],
+        optionLabels: {
+          expressive: "Expressive",
+          neutral: "Neutral",
+          consistent: "Consistent",
+        },
+        default: "neutral",
+        supportedModels: [...ELEVENLABS_TTS_MODELS],
+      },
+      {
+        key: "speed",
+        label: "Speed",
+        type: "slider",
+        min: 0.7,
+        max: 1.2,
+        step: 0.05,
+        default: 1,
+        supportedModels: [...ELEVENLABS_TTS_MODELS],
+      },
+      {
+        key: "stability",
+        label: "Stability",
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.55,
+        supportedModels: [...ELEVENLABS_TTS_MODELS],
+      },
+      {
+        key: "similarity_boost",
+        label: "Similarity",
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.75,
+        supportedModels: [...ELEVENLABS_TTS_MODELS],
+      },
+      {
+        key: "style",
+        label: "Style amount",
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.3,
+        supportedModels: [...ELEVENLABS_TTS_MODELS],
+      },
+      {
+        key: "use_speaker_boost",
+        label: "Boost",
+        type: "select",
+        options: ["false", "true"],
+        optionLabels: { false: "Off", true: "On" },
+        default: "true",
+        supportedModels: [...ELEVENLABS_TTS_MODELS],
+      },
+      {
+        key: "speaking_rate",
+        label: "Rate",
+        type: "slider",
+        min: 0.25,
+        max: 2,
+        step: 0.05,
+        default: 1,
+        supportedModels: [...GOOGLE_TTS_MODELS],
+      },
+      {
+        key: "pitch",
+        label: "Pitch",
+        type: "slider",
+        min: -20,
+        max: 20,
+        step: 1,
+        default: 0,
+        supportedModels: [...GOOGLE_TTS_MODELS],
+      },
+      {
+        key: "volume_gain_db",
+        label: "Volume",
+        type: "slider",
+        min: -96,
+        max: 16,
+        step: 1,
+        default: 0,
+        supportedModels: [...GOOGLE_TTS_MODELS],
       },
     ],
   },
@@ -1113,12 +1224,20 @@ export function cleanWsParamsOnModelChange(
   for (const p of schema.params) {
     if (p.key === "model_name") continue;
     if (!matchesModel(p, newModel)) continue;
-    if (prev[p.key] === undefined) continue;
+    const concrete = resolveParam(p, newModel);
+    if (prev[p.key] === undefined) {
+      if (concrete.default !== undefined) valid[p.key] = concrete.default;
+      continue;
+    }
     const carried = prev[p.key];
     // For finite-option params, drop the carried value if it isn't a
     // legal option under the new param def (cross-provider collision).
-    if (p.type === "select" && Array.isArray(p.options) && !p.options.includes(String(carried))) {
-      valid[p.key] = p.default;
+    if (
+      concrete.type === "select" &&
+      Array.isArray(concrete.options) &&
+      !concrete.options.includes(String(carried))
+    ) {
+      valid[p.key] = concrete.default;
     } else {
       valid[p.key] = carried;
     }

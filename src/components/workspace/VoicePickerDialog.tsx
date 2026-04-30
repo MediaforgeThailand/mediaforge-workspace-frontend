@@ -47,12 +47,9 @@ import {
   Search,
   Heart,
   ChevronDown,
-  Play,
-  Pause,
   ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
 import {
   GOOGLE_VOICES,
   GOOGLE_VOICE_USE_CASES,
@@ -148,14 +145,6 @@ interface Props {
   onSelect: (voiceId: string) => void;
 }
 
-/* Sample text the preview button speaks. (Used by the offline
- * fallback only — the real preview is a pre-generated MP3 served
- * from Supabase Storage.) Kept short so first-byte latency is low
- * and the user gets a feel for the voice without waiting for a
- * paragraph to play out. */
-const PREVIEW_TEXT =
-  "Hi, I'm a sample voice from Google Cloud. Try me out for your next project.";
-
 const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
   const [provider, setProvider] = useState<ProviderTab>("google");
   const [genderFilter, setGenderFilter] = useState<"all" | VoiceLean>("all");
@@ -166,22 +155,8 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
   const [genderOpen, setGenderOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [sort, setSort] = useState<"recent" | "alpha">("recent");
-  const [playing, setPlaying] = useState<string | null>(null);
-  /** Set when the on-demand voice-preview endpoint failed for a given
-   *  voice — surfaces a per-row warning chip without spamming the
-   *  global banner. Cleared on next successful play. */
-  const [previewError, setPreviewError] = useState<string | null>(null);
-  /** Showing a spinner on the play button while we wait for synth.
-   *  First click on a fresh voice can take 1-3s while ElevenLabs /
-   *  Google produces the sample, so the user needs visual feedback. */
-  const [synthing, setSynthing] = useState<string | null>(null);
   // Catalog list reactive to provider tab.
   const GEMINI_VOICES: GeminiVoice[] = useMemo(() => catalogFor(provider), [provider]);
-
-  // One <audio> element per dialog instance — re-target by setting
-  // .src when a new voice is picked. Keeping a single element means
-  // a fresh play implicitly stops the previous one.
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Mocked favorites — survives only the session; can be wired to
   // user_settings or a `voice_favorites` table later.
@@ -198,16 +173,6 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [open, onClose]);
-
-  // Cancel any running preview when the dialog closes — leaving a
-  // half-played MP3 in the background is unsettling.
-  useEffect(() => {
-    if (!open) {
-      stopPreview();
-      stopAudio(audioRef.current);
-      setPlaying(null);
-    }
-  }, [open]);
 
   const filtered = useMemo(() => {
     let list: GeminiVoice[] = GEMINI_VOICES.slice();
@@ -232,71 +197,8 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
 
   if (!open) return null;
 
-  /** Resolve a playable URL for the given voice — this is where the
-   *  "preview button stays silent" bug used to live. The new flow:
-   *
-   *  1. POST `/functions/v1/voice-preview` with `{ provider, voice_id }`.
-   *     The edge fn checks the `voice-previews` bucket cache first
-   *     (sub-second response) and on cache miss synthesises the
-   *     sample via the right provider, uploads to bucket, returns
-   *     the public URL. Either way the client sees a single API call
-   *     and gets back a URL to feed into <audio>.
-   *  2. If the endpoint itself errors (auth / rate limit / provider
-   *     keys missing) we surface that on the row instead of a global
-   *     "previews not generated" banner — the message is more useful.
-   *
-   *  Catching previewError per-row also means a working Google preview
-   *  doesn't get blamed for a broken ElevenLabs preview if the API
-   *  key isn't configured for both. */
-  const handlePreview = async (v: GeminiVoice, e: React.MouseEvent) => {
-    e.stopPropagation();
-    // Re-click the playing voice → stop.
-    if (playing === v.id) {
-      stopAudio(audioRef.current);
-      setPlaying(null);
-      return;
-    }
-    // Stop any currently-playing audio before kicking off a new one.
-    stopAudio(audioRef.current);
-    setPreviewError(null);
-    setSynthing(v.id);
-    try {
-      const { data, error } = await supabase.functions.invoke(
-        "voice-preview",
-        { body: { provider, voice_id: v.id } },
-      );
-      const payload = data as { url?: string; error?: string } | null;
-      if (error || payload?.error || !payload?.url) {
-        const msg =
-          payload?.error ??
-          (error as { message?: string } | null)?.message ??
-          "Preview unavailable";
-        setPreviewError(`${v.id}: ${msg}`);
-        setSynthing(null);
-        return;
-      }
-      setSynthing(null);
-      setPlaying(v.id);
-      if (!audioRef.current) {
-        audioRef.current = new Audio();
-        audioRef.current.preload = "auto";
-      }
-      const a = audioRef.current;
-      a.src = payload.url;
-      a.onended = () => setPlaying(null);
-      a.onerror = () => {
-        setPreviewError(`${v.id}: failed to play`);
-        setPlaying(null);
-      };
-      a.play().catch((err) => {
-        setPreviewError(`${v.id}: ${err?.message ?? "blocked"}`);
-        setPlaying(null);
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setPreviewError(`${v.id}: ${msg}`);
-      setSynthing(null);
-    }
+  // Voice preview is intentionally absent — see the comment near the
+  // voice card render below. The dialog is select-only.
   };
 
   const handleSelect = (v: GeminiVoice) => {
@@ -424,26 +326,6 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
           })}
         </div>
 
-        {/* Per-row preview-error chip — replaces the old "scripts not
-         *  run" banner. Only shows when the most recent preview attempt
-         *  failed; we keep it small and dismissible so a single broken
-         *  voice doesn't crowd the rest of the picker. */}
-        {previewError && (
-          <div className="mx-6 mb-3 flex items-center gap-2 rounded-lg border border-amber-400/15 bg-amber-400/[0.06] px-3 py-2 text-[11.5px] text-amber-200">
-            <span aria-hidden>⚠</span>
-            <span className="flex-1 truncate">
-              Preview failed — {previewError}
-            </span>
-            <button
-              type="button"
-              onClick={() => setPreviewError(null)}
-              className="rounded p-1 text-amber-200/70 hover:bg-white/[0.05] hover:text-amber-100"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </div>
-        )}
-
         {/* Inline search field — slides in below the header when toggled */}
         {searchOpen && (
           <div className="px-6 pb-3">
@@ -543,7 +425,6 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
               {filtered.map((v) => {
                 const isSelected = value === v.id;
                 const isFav = favorites.has(v.id);
-                const isPlaying = playing === v.id;
                 return (
                   <li key={v.id}>
                     <button
@@ -569,7 +450,10 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
                           {v.characteristic} · {v.languageCode}
                         </div>
                       </div>
-                      {/* Favourite — only shows on hover OR when set */}
+                      {/* Favourite — only shows on hover OR when set.
+                       *  Voice preview play button removed per UX
+                       *  rework — the cards are select-only until we
+                       *  build a properly debounced preview pipeline. */}
                       <button
                         type="button"
                         onClick={(e) => {
@@ -587,33 +471,6 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
                         <Heart
                           className={cn("h-3.5 w-3.5", isFav && "fill-rose-300")}
                         />
-                      </button>
-                      {/* Preview play */}
-                      <button
-                        type="button"
-                        onClick={(e) => handlePreview(v, e)}
-                        disabled={synthing === v.id}
-                        className={cn(
-                          "shrink-0 rounded-full bg-white/[0.08] p-1.5 text-zinc-200 ring-1 ring-inset ring-white/[0.08] transition-all",
-                          "hover:bg-white/[0.16] hover:text-white",
-                          isPlaying && "bg-emerald-500/20 text-emerald-300 ring-emerald-400/30",
-                          synthing === v.id && "animate-pulse",
-                        )}
-                        title={
-                          synthing === v.id
-                            ? "Generating preview…"
-                            : isPlaying
-                              ? "Stop preview"
-                              : "Play preview"
-                        }
-                      >
-                        {synthing === v.id ? (
-                          <span className="block h-3.5 w-3.5 rounded-full border-2 border-zinc-400 border-t-transparent animate-spin" />
-                        ) : isPlaying ? (
-                          <Pause className="h-3.5 w-3.5" />
-                        ) : (
-                          <Play className="h-3.5 w-3.5" />
-                        )}
                       </button>
                     </button>
                   </li>
@@ -761,96 +618,14 @@ const DropdownButton = ({
   );
 };
 
-/* ── Preview playback ──────────────────────────────────────────
+/* ── Preview playback removed ──────────────────────────────────
  *
- * Primary path: a real <audio> element fetches the pre-generated
- * MP3 from `voice-previews/google/<voice-id>.mp3` (Supabase Storage
- * public bucket). Each voice gets one short clip (~5s) generated
- * by `scripts/generate-voice-previews.ts`. The dialog's per-row
- * play handler points the audio element at the URL and calls
- * `.play()`.
- *
- * Fallback (kept for offline / no-Supabase-URL local dev): the
- * browser's `SpeechSynthesis` API speaks a sample line. The actual
- * Google voice timbre obviously isn't reproduced — the browser
- * uses its OS voices — but the user gets at least *some* signal.
- * We DON'T auto-fall-through to this from the primary path on a
- * 404; instead we surface a "preview unavailable" banner so the
- * user knows the bucket needs populating. The `speakPreview`
- * helper stays exported only for ad-hoc reuse.
- */
-
-/** Stop a possibly-playing <audio> element. Safe on null/undefined. */
-function stopAudio(a: HTMLAudioElement | null) {
-  if (!a) return;
-  try {
-    a.pause();
-    a.removeAttribute("src");
-    a.load();
-  } catch {
-    /* fine — element may already be torn down */
-  }
-}
-
-let currentUtterance: SpeechSynthesisUtterance | null = null;
-
-function stopPreview() {
-  if (typeof window === "undefined") return;
-  if (currentUtterance) {
-    currentUtterance.onend = null;
-    currentUtterance = null;
-  }
-  if ("speechSynthesis" in window) {
-    window.speechSynthesis.cancel();
-  }
-}
-
-function speakPreview(v: GeminiVoice, onEnd: () => void) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-    onEnd();
-    return;
-  }
-  const utt = new SpeechSynthesisUtterance(PREVIEW_TEXT);
-  // Pick a local voice that loosely matches the Gemini voice's
-  // perceptual lean. The browser's SpeechSynthesis API exposes
-  // voices that have a name + lang; on most platforms only a
-  // handful are male/female-tagged in the name, so we fall back to
-  // index-based selection deterministic per Gemini name (so clicking
-  // the same voice always sounds the same on a given machine).
-  const voices = window.speechSynthesis.getVoices();
-  const enVoices = voices.filter((vv) => /^en[-_]/i.test(vv.lang));
-  const pool = enVoices.length > 0 ? enVoices : voices;
-  if (pool.length > 0) {
-    // Hash voice id → pool index. Same name always → same index, so
-    // playing "Achernar" twice picks the same browser voice.
-    let h = 0;
-    for (let i = 0; i < v.id.length; i++) h = (h * 31 + v.id.charCodeAt(i)) | 0;
-    utt.voice = pool[Math.abs(h) % pool.length];
-  }
-  // Soft tweaks based on characteristic — nudges pitch / rate so the
-  // preview gives at least *some* variety beyond "the default OS
-  // voice for everyone". Numbers are conservative so it doesn't
-  // sound cartoonish.
-  const c = v.characteristic.toLowerCase();
-  if (c.includes("bright") || c.includes("upbeat") || c.includes("lively"))
-    utt.rate = 1.1, utt.pitch = 1.15;
-  else if (c.includes("mature") || c.includes("warm") || c.includes("smooth"))
-    utt.rate = 0.95, utt.pitch = 0.9;
-  else if (c.includes("breezy") || c.includes("youthful"))
-    utt.rate = 1.05, utt.pitch = 1.1;
-  else if (c.includes("firm") || c.includes("informative"))
-    utt.rate = 1.0, utt.pitch = 0.95;
-
-  utt.onend = () => {
-    currentUtterance = null;
-    onEnd();
-  };
-  utt.onerror = () => {
-    currentUtterance = null;
-    onEnd();
-  };
-  currentUtterance = utt;
-  window.speechSynthesis.speak(utt);
-}
+ * The dialog used to ship a per-row play button that synthesised a
+ * sample via the `voice-preview` edge fn and / or fell back to the
+ * browser SpeechSynthesis API. It was the source of repeated user-
+ * facing errors (Chrome's "play() interrupted by pause()" race when
+ * users clicked between voices, plus 502s when provider keys were
+ * missing). The picker is now select-only — pick a voice and the
+ * generation step itself produces real audio. */
 
 export default VoicePickerDialog;

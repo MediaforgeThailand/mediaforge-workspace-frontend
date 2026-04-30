@@ -1105,9 +1105,6 @@ interface VoiceTile {
   name: string;
   characteristic: string;
   tint: string;
-  /** Pre-existing CDN preview URL (ElevenLabs only). When present the
-   *  picker plays this directly without a synth round-trip. */
-  preview_url?: string | null;
 }
 
 function inferVoiceProvider(model: string): VoiceProviderKind {
@@ -1116,15 +1113,6 @@ function inferVoiceProvider(model: string): VoiceProviderKind {
   }
   if (model.startsWith("gemini-")) return "gemini";
   return "google";
-}
-
-/** Map our model slug to the ElevenLabs API model_id (the backend
- *  uses the same map). Needed when previewing so the play button
- *  uses the same model the user will eventually generate with. */
-function elevenApiModelId(model: string): string {
-  if (model === "elevenlabs-multilingual-v2") return "eleven_multilingual_v2";
-  if (model === "elevenlabs-turbo-v2-5") return "eleven_turbo_v2_5";
-  return model.startsWith("eleven") ? model : "eleven_multilingual_v2";
 }
 
 /** Curated Google Cloud TTS catalog — Studio + Neural2 only for
@@ -1188,7 +1176,6 @@ function VoiceControls({
               id: string;
               name: string;
               description?: string;
-              preview_url?: string | null;
               accent?: string | null;
               category?: string;
             }>; error?: string }
@@ -1208,7 +1195,6 @@ function VoiceControls({
           characteristic:
             (v.description || v.accent || v.category || "").slice(0, 90),
           tint: pickTintFromName(v.name),
-          preview_url: v.preview_url ?? null,
         }));
         setElevenVoices(tiles);
       } catch (err) {
@@ -1245,93 +1231,15 @@ function VoiceControls({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tiles, provider]);
 
-  const [playing, setPlaying] = useState<string | null>(null);
-  const [synthing, setSynthing] = useState<string | null>(null);
-  const [previewError, setPreviewError] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  const stopAudio = () => {
-    const a = audioRef.current;
-    if (a) { a.pause(); a.currentTime = 0; }
-  };
-
-  const playUrl = (voiceId: string, url: string) => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-      audioRef.current.preload = "auto";
-    }
-    const a = audioRef.current;
-    a.src = url;
-    setPlaying(voiceId);
-    a.onended = () => setPlaying(null);
-    a.onerror = () => {
-      setPreviewError("Failed to play preview");
-      setPlaying(null);
-    };
-    a.play().catch((err) => {
-      setPreviewError(err?.message ?? "Playback blocked");
-      setPlaying(null);
-    });
-  };
-
-  const handlePreview = async (voice: VoiceTile, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (playing === voice.id) {
-      stopAudio();
-      setPlaying(null);
-      return;
-    }
-    stopAudio();
-    setPreviewError(null);
-
-    // Fast path — ElevenLabs ships pre-existing CDN samples for every
-    // voice in /v1/voices. Use those (instant, free) instead of
-    // calling our synth pipeline.
-    if (provider === "elevenlabs" && voice.preview_url) {
-      playUrl(voice.id, voice.preview_url);
-      return;
-    }
-
-    setSynthing(voice.id);
-    try {
-      // Pass `model_id` so the preview is rendered with the EXACT
-      // model the user has selected (Multilingual v2 vs Turbo v2.5
-      // sound different — using a fixed fallback misrepresents one
-      // of them).
-      const modelId =
-        provider === "elevenlabs"
-          ? elevenApiModelId(form.model)
-          : form.model;
-      const { data, error } = await supabase.functions.invoke(
-        "voice-preview",
-        { body: { provider, voice_id: voice.id, model_id: modelId } },
-      );
-      const payload = data as { url?: string; error?: string } | null;
-      if (error || payload?.error || !payload?.url) {
-        const msg =
-          payload?.error ??
-          (error as { message?: string } | null)?.message ??
-          "Preview unavailable";
-        setPreviewError(msg);
-        setSynthing(null);
-        return;
-      }
-      setSynthing(null);
-      playUrl(voice.id, payload.url);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setPreviewError(msg);
-      setSynthing(null);
-    }
-  };
-
-  // Stop any running audio when the panel unmounts.
-  useEffect(() => {
-    return () => {
-      const a = audioRef.current;
-      if (a) { a.pause(); a.src = ""; }
-    };
-  }, []);
+  // ── Preview removed per user request ─────────────────────────
+  // The play button on each voice card and the on-demand preview
+  // synthesis used to live here. The user generation flow itself
+  // works fine — picking a voice + clicking Generate produces audio
+  // — but the inline preview kept hitting Chrome's "play()
+  // interrupted by pause()" race when users clicked between voices,
+  // and the resulting error chip was more noise than signal. Until
+  // we have a properly debounced preview pipeline, the cards are
+  // select-only.
 
   return (
     <>
@@ -1346,21 +1254,6 @@ function VoiceControls({
 
       <div>
         <FieldLabel label="Voice" meta={selectedVoice.characteristic} />
-
-        {previewError && (
-          <div className="mt-2 flex items-start gap-1.5 rounded-md border border-amber-400/15 bg-amber-400/[0.06] px-2 py-1.5 text-[10.5px] text-amber-200">
-            <span aria-hidden>⚠</span>
-            <span className="flex-1">Preview failed — {previewError}</span>
-            <button
-              type="button"
-              onClick={() => setPreviewError(null)}
-              className="text-amber-200/70 hover:text-amber-100"
-              aria-label="Dismiss"
-            >
-              ×
-            </button>
-          </div>
-        )}
 
         {provider === "elevenlabs" && elevenLoading && (
           <div className="mt-2 rounded-md border border-white/[0.06] bg-white/[0.02] px-2.5 py-2 text-[11px] text-zinc-500">
@@ -1377,65 +1270,37 @@ function VoiceControls({
         <div className="ws-scroll-hide mt-2 grid max-h-[270px] grid-cols-2 gap-2 overflow-y-auto pr-0.5">
           {tiles.map((voice) => {
             const active = voice.id === form.voice;
-            const isPlaying = playing === voice.id;
-            const isSynthing = synthing === voice.id;
             return (
-              <div
+              <button
                 key={voice.id}
+                type="button"
+                onClick={() => onChange({ voice: voice.id })}
                 className={cn(
-                  "group relative flex min-h-[72px] flex-col items-start justify-between rounded-lg border border-dashed px-3 py-3 text-left transition",
+                  "flex min-h-[72px] flex-col items-start justify-between rounded-lg border border-dashed px-3 py-3 text-left transition",
                   active
                     ? "border-amber-300/50 bg-amber-300/10"
                     : "border-white/[0.12] bg-[#242424] hover:bg-[#2d2d2d]",
                 )}
               >
-                <button
-                  type="button"
-                  onClick={() => onChange({ voice: voice.id })}
-                  className="flex w-full flex-col items-start gap-1 text-left"
+                <span
+                  className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"
+                  style={{
+                    background:
+                      ALL_VOICE_TINT_GRADIENT[voice.tint] ??
+                      "linear-gradient(135deg, hsl(0 0% 35%), hsl(0 0% 22%))",
+                  }}
                 >
-                  <span
-                    className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"
-                    style={{
-                      background:
-                        ALL_VOICE_TINT_GRADIENT[voice.tint] ??
-                        "linear-gradient(135deg, hsl(0 0% 35%), hsl(0 0% 22%))",
-                    }}
-                  >
-                    {voice.name.charAt(0)}
+                  {voice.name.charAt(0)}
+                </span>
+                <span className="min-w-0 w-full">
+                  <span className="block truncate text-[11px] font-bold text-white">
+                    {voice.name}
                   </span>
-                  <span className="min-w-0 w-full">
-                    <span className="block truncate text-[11px] font-bold text-white">
-                      {voice.name}
-                    </span>
-                    <span className="block truncate text-[10px] text-zinc-500">
-                      {voice.characteristic}
-                    </span>
+                  <span className="block truncate text-[10px] text-zinc-500">
+                    {voice.characteristic}
                   </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => handlePreview(voice, e)}
-                  disabled={isSynthing}
-                  className={cn(
-                    "absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full text-[11px] transition-colors",
-                    "bg-black/40 text-zinc-200 ring-1 ring-inset ring-white/10",
-                    "hover:bg-black/60 hover:text-white",
-                    isPlaying && "bg-emerald-500/20 text-emerald-200 ring-emerald-400/30",
-                    isSynthing && "animate-pulse",
-                  )}
-                  title={isSynthing ? "Generating preview…" : isPlaying ? "Stop preview" : "Play preview"}
-                  aria-label={isPlaying ? "Stop preview" : "Play preview"}
-                >
-                  {isSynthing ? (
-                    <span className="block h-3 w-3 rounded-full border-2 border-zinc-400 border-t-transparent animate-spin" />
-                  ) : isPlaying ? (
-                    "■"
-                  ) : (
-                    "▶"
-                  )}
-                </button>
-              </div>
+                </span>
+              </button>
             );
           })}
         </div>
