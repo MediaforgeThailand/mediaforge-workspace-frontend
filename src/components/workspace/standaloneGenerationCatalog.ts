@@ -18,7 +18,7 @@ export type StandaloneToolKey =
   | "voice_gen"
   | "image_to_3d";
 
-export type GenerationOutputType = "image" | "video" | "audio" | "text";
+export type GenerationOutputType = "image" | "video" | "audio" | "text" | "model_3d";
 
 export interface StandaloneModelOption {
   id: string;
@@ -321,7 +321,7 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
     navLabel: "3D",
     nodeType: "imageTo3dNode",
     icon: Box,
-    outputType: "image",
+    outputType: "model_3d",
     accent: "hsl(48 87% 50%)",
     defaultModel: "tripo3d-v3.1",
     // Sync with `imageTo3dNode.supportedModels` in workspaceSchema.ts.
@@ -404,6 +404,66 @@ export function gptImageResolutionsFor(aspectRatio: string): string[] {
   return gptImage2ResolutionsFor(aspectRatio);
 }
 
+export function isSeedreamImageModel(model: string): boolean {
+  return model.startsWith("seedream");
+}
+
+export function isSeedanceVideoModel(model: string): boolean {
+  return model.startsWith("seedance") || model.startsWith("dreamina-seedance");
+}
+
+export function isKlingMotionVideoModel(model: string): boolean {
+  return model === "kling-v2-6-motion-pro" || model === "kling-v3-motion-pro";
+}
+
+export function videoSupportsStartEndFrames(model: string): boolean {
+  return (
+    model === "kling-v2-6-pro" ||
+    model === "kling-v3-pro" ||
+    model === "kling-v3-omni" ||
+    isSeedanceVideoModel(model)
+  );
+}
+
+export function videoSupportsReferenceImage(model: string): boolean {
+  return isKlingMotionVideoModel(model) || model === "kling-v3-omni";
+}
+
+export function videoSupportsReferenceVideo(model: string): boolean {
+  return (
+    isKlingMotionVideoModel(model) ||
+    model === "kling-v3-omni" ||
+    model === "seedance-2-0-lite" ||
+    model === "seedance-2-0-pro"
+  );
+}
+
+export function videoDurationsForModel(model: string): number[] {
+  if (model === "kling-v3-omni" || model === "kling-v3-pro") {
+    return [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+  }
+  if (
+    model.startsWith("seedance-2-0") ||
+    model.startsWith("dreamina-seedance")
+  ) {
+    return [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+  }
+  if (model.startsWith("seedance-1-5")) {
+    return [4, 5, 6, 7, 8, 9, 10, 11, 12];
+  }
+  if (model.startsWith("seedance-1-0-lite")) {
+    return [5, 10];
+  }
+  if (
+    model.startsWith("seedance-1-0-pro") ||
+    model.startsWith("seedance-1-0-fast") ||
+    isSeedanceVideoModel(model)
+  ) {
+    return [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  }
+  return [5, 10];
+}
+
 export function composeStandaloneImagePrompt(
   prompt: string,
   styleId: string,
@@ -438,6 +498,16 @@ export function buildImageParams(args: {
       moderation: "auto",
     };
   }
+  if (isSeedreamImageModel(args.model)) {
+    return {
+      model_name: args.model,
+      prompt: styledPrompt,
+      size: args.resolution === "3K" ? "3K" : "2K",
+      sequential_image_generation: "disabled",
+      optimize_prompt: "off",
+      watermark: "false",
+    };
+  }
   const bananaSize =
     args.model === "nano-banana-pro"
       ? args.resolution === "4K"
@@ -463,8 +533,12 @@ export function buildVideoParams(args: {
   resolution: string;
   duration: number;
   withAudio: boolean;
+  characterOrientation?: string;
+  keepOriginalSound?: boolean;
+  hasReferenceVideo?: boolean;
 }): Record<string, unknown> {
-  if (args.model.startsWith("seedance")) {
+  const hasReferenceVideo = !!args.hasReferenceVideo;
+  if (isSeedanceVideoModel(args.model)) {
     return {
       model_name: args.model,
       prompt: args.prompt.trim(),
@@ -473,15 +547,30 @@ export function buildVideoParams(args: {
       duration: args.duration,
       generate_audio: String(args.withAudio),
       return_last_frame: "true",
+      _has_ref_video: hasReferenceVideo,
     };
   }
-  return {
+  if (isKlingMotionVideoModel(args.model)) {
+    return {
+      model_name: args.model,
+      prompt: args.prompt.trim(),
+      character_orientation: args.characterOrientation ?? "image",
+      keep_original_sound: args.keepOriginalSound ? "yes" : "no",
+      _has_ref_video: hasReferenceVideo,
+    };
+  }
+  const klingParams: Record<string, unknown> = {
     model_name: args.model,
     prompt: args.prompt.trim(),
     aspect_ratio: args.ratio || "Auto",
-    duration: String(args.duration <= 5 ? 5 : 10),
+    duration: String(args.duration),
     has_audio: String(args.withAudio),
+    _has_ref_video: hasReferenceVideo,
   };
+  if (args.model === "kling-v3-omni") {
+    klingParams.keep_original_sound = args.keepOriginalSound ? "yes" : "no";
+  }
+  return klingParams;
 }
 
 export function buildAudioParams(args: {

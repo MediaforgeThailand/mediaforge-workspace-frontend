@@ -33,9 +33,16 @@ import {
   gptImageResolutionsFor,
   GPT_IMAGE_ASPECT_RATIOS,
   IMAGE_STYLE_PRESETS,
+  isKlingMotionVideoModel,
+  isSeedanceVideoModel,
+  isSeedreamImageModel,
   STANDALONE_TOOL_ORDER,
   STANDALONE_TOOLS,
   type StandaloneToolKey,
+  videoDurationsForModel,
+  videoSupportsReferenceImage,
+  videoSupportsReferenceVideo,
+  videoSupportsStartEndFrames,
 } from "./standaloneGenerationCatalog";
 // Hardcoded voice catalogs (Gemini star names, Google Studio
 // labels, ElevenLabs default presets) were deleted in the
@@ -54,7 +61,13 @@ const STANDALONE_CANVAS_ID = "standalone";
 const STORAGE_BUCKET = "ai-media";
 const SIGNED_URL_TTL_SEC = 60 * 60 * 24 * 365;
 
-type UploadSlot = "image-ref" | "video-start" | "video-end" | "model-image";
+type UploadSlot =
+  | "image-ref"
+  | "video-start"
+  | "video-end"
+  | "video-ref-image"
+  | "video-ref-video"
+  | "model-image";
 
 interface UploadedRef {
   id: string;
@@ -84,7 +97,7 @@ interface StandaloneJobRow {
 }
 
 interface StandaloneResult {
-  type?: "image" | "video" | "audio" | "text";
+  type?: "image" | "video" | "audio" | "text" | "model_3d";
   url?: string;
   text?: string;
   prompt_used?: string;
@@ -112,6 +125,10 @@ interface StandaloneFormState {
   videoWithAudio: boolean;
   videoStart: UploadedRef | null;
   videoEnd: UploadedRef | null;
+  videoRefImage: UploadedRef | null;
+  videoRefVideo: UploadedRef | null;
+  videoCharacterOrientation: "image" | "video";
+  videoKeepOriginalSound: boolean;
   script: string;
   voice: string;
   voiceStyle: string;
@@ -156,7 +173,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     model: STANDALONE_TOOLS.image_gen.defaultModel,
     prompt: "",
     styleId: "none",
-    aspectRatio: "1:1",
+    aspectRatio: "Auto",
     imageResolution: "1K",
     quality: "medium",
     outputFormat: "png",
@@ -168,6 +185,10 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     videoWithAudio: false,
     videoStart: null,
     videoEnd: null,
+    videoRefImage: null,
+    videoRefVideo: null,
+    videoCharacterOrientation: "image",
+    videoKeepOriginalSound: false,
     script: "",
     ...DEFAULT_VOICE_PARAMS,
     modelImage: null,
@@ -184,12 +205,16 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     outputFormat: "png",
     background: "auto",
     imageRefs: [],
-    videoRatio: "16:9",
+    videoRatio: "Auto",
     videoResolution: "720p",
     videoDuration: 5,
     videoWithAudio: false,
     videoStart: null,
     videoEnd: null,
+    videoRefImage: null,
+    videoRefVideo: null,
+    videoCharacterOrientation: "image",
+    videoKeepOriginalSound: false,
     script: "",
     ...DEFAULT_VOICE_PARAMS,
     modelImage: null,
@@ -212,6 +237,10 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     videoWithAudio: false,
     videoStart: null,
     videoEnd: null,
+    videoRefImage: null,
+    videoRefVideo: null,
+    videoCharacterOrientation: "image",
+    videoKeepOriginalSound: false,
     script: "",
     ...DEFAULT_VOICE_PARAMS,
     modelImage: null,
@@ -234,6 +263,10 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     videoWithAudio: false,
     videoStart: null,
     videoEnd: null,
+    videoRefImage: null,
+    videoRefVideo: null,
+    videoCharacterOrientation: "image",
+    videoKeepOriginalSound: false,
     script: "",
     ...DEFAULT_VOICE_PARAMS,
     modelImage: null,
@@ -267,6 +300,7 @@ export default function StandaloneGenerator({
     useState<Record<StandaloneToolKey, StandaloneFormState>>(INITIAL_FORMS);
   const [running, setRunning] = useState(false);
   const [uploading, setUploading] = useState<UploadSlot | null>(null);
+  const [uploadAccept, setUploadAccept] = useState("image/*");
 
   const activeDef = STANDALONE_TOOLS[activeTool];
   const form = forms[activeTool];
@@ -323,20 +357,48 @@ export default function StandaloneGenerator({
 
   const setToolModel = (model: string) => {
     const nextPatch: Partial<StandaloneFormState> = { model };
-    if (activeTool === "image_gen" && model !== "gpt-image-2") {
-      nextPatch.aspectRatio =
-        form.aspectRatio === "Auto" ? "1:1" : form.aspectRatio;
-      nextPatch.imageResolution =
-        model === "nano-banana-pro" ? "2K" : "1K";
+    if (activeTool === "image_gen") {
+      if (model === "gpt-image-2") {
+        nextPatch.aspectRatio = GPT_IMAGE_ASPECT_RATIOS.includes(form.aspectRatio)
+          ? form.aspectRatio
+          : "1:1";
+        const resolutions = gptImageResolutionsFor(
+          String(nextPatch.aspectRatio ?? form.aspectRatio),
+        );
+        nextPatch.imageResolution = resolutions.includes(form.imageResolution)
+          ? form.imageResolution
+          : (resolutions[0] ?? "1K");
+      } else if (isSeedreamImageModel(model)) {
+        nextPatch.imageResolution = ["2K", "3K"].includes(form.imageResolution)
+          ? form.imageResolution
+          : "2K";
+      } else {
+        nextPatch.aspectRatio = form.aspectRatio || "Auto";
+        nextPatch.imageResolution =
+          model === "nano-banana-pro" ? "2K" : "1K";
+      }
+      nextPatch.imageRefs = form.imageRefs.slice(0, maxImageRefsForModel(model));
     }
     if (activeTool === "video_gen") {
-      const isSeedance = model.startsWith("seedance");
+      const isSeedance = isSeedanceVideoModel(model);
       if (isSeedance && form.videoRatio === "Auto") {
         nextPatch.videoRatio = "16:9";
       }
       if (!isSeedance && !["Auto", "16:9", "9:16", "1:1"].includes(form.videoRatio)) {
         nextPatch.videoRatio = "Auto";
       }
+      const durations = videoDurationsForModel(model);
+      if (!durations.includes(form.videoDuration)) {
+        nextPatch.videoDuration = durations.includes(5)
+          ? 5
+          : (durations[0] ?? 5);
+      }
+      if (!videoSupportsStartEndFrames(model)) {
+        nextPatch.videoStart = null;
+        nextPatch.videoEnd = null;
+      }
+      if (!videoSupportsReferenceImage(model)) nextPatch.videoRefImage = null;
+      if (!videoSupportsReferenceVideo(model)) nextPatch.videoRefVideo = null;
     }
     updateForm(nextPatch);
   };
@@ -354,6 +416,9 @@ export default function StandaloneGenerator({
 
   const openUpload = (slot: UploadSlot) => {
     pendingSlotRef.current = slot;
+    const accept = uploadAcceptForSlot(slot);
+    setUploadAccept(accept);
+    if (fileInputRef.current) fileInputRef.current.accept = accept;
     fileInputRef.current?.click();
   };
 
@@ -365,6 +430,15 @@ export default function StandaloneGenerator({
       return;
     }
     const slot = pendingSlotRef.current;
+    const needsVideo = slot === "video-ref-video";
+    const isValidType = needsVideo
+      ? file.type.startsWith("video/")
+      : file.type.startsWith("image/");
+    if (!isValidType) {
+      toast.error(needsVideo ? "Upload a video reference." : "Upload an image reference.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
     setUploading(slot);
     try {
       const uploaded = await uploadReference(file, user?.id, activeProject.id);
@@ -377,6 +451,10 @@ export default function StandaloneGenerator({
         updateForm({ videoStart: uploaded });
       } else if (slot === "video-end") {
         updateForm({ videoEnd: uploaded });
+      } else if (slot === "video-ref-image") {
+        updateForm({ videoRefImage: uploaded });
+      } else if (slot === "video-ref-video") {
+        updateForm({ videoRefVideo: uploaded });
       } else {
         updateForm({ modelImage: uploaded });
       }
@@ -451,7 +529,7 @@ export default function StandaloneGenerator({
         ref={fileInputRef}
         type="file"
         className="hidden"
-        accept="image/*"
+        accept={uploadAccept}
         onChange={(event) => void onFileSelected(event.target.files?.[0])}
       />
 
@@ -524,8 +602,12 @@ export default function StandaloneGenerator({
                 onChange={updateForm}
                 uploadingStart={uploading === "video-start"}
                 uploadingEnd={uploading === "video-end"}
+                uploadingRefImage={uploading === "video-ref-image"}
+                uploadingRefVideo={uploading === "video-ref-video"}
                 onUploadStart={() => openUpload("video-start")}
                 onUploadEnd={() => openUpload("video-end")}
+                onUploadRefImage={() => openUpload("video-ref-image")}
+                onUploadRefVideo={() => openUpload("video-ref-video")}
               />
             )}
             {activeTool === "voice_gen" && (
@@ -894,11 +976,14 @@ function ImageControls({
   onUpload: () => void;
 }) {
   const isGpt = form.model === "gpt-image-2";
+  const isSeedream = isSeedreamImageModel(form.model);
   const resolutionOptions = isGpt
     ? gptImageResolutionsFor(form.aspectRatio)
-    : form.model === "nano-banana-pro"
-      ? ["1K", "2K", "4K"]
-      : ["1K", "2K"];
+    : isSeedream
+      ? ["2K", "3K"]
+      : form.model === "nano-banana-pro"
+        ? ["1K", "2K", "4K"]
+        : ["1K", "2K"];
   const maxRefs = maxImageRefsForModel(form.model);
 
   useEffect(() => {
@@ -928,13 +1013,15 @@ function ImageControls({
         onChange={(prompt) => onChange({ prompt })}
       />
 
-      <div className="grid grid-cols-2 gap-2">
-        <SelectField
-          label="Aspect"
-          value={form.aspectRatio}
-          options={isGpt ? GPT_IMAGE_ASPECT_RATIOS : ["1:1", "16:9", "9:16", "4:3", "3:4", "Auto"]}
-          onChange={(aspectRatio) => onChange({ aspectRatio })}
-        />
+      <div className={cn("grid gap-2", isSeedream ? "grid-cols-1" : "grid-cols-2")}>
+        {!isSeedream && (
+          <SelectField
+            label="Aspect"
+            value={form.aspectRatio}
+            options={isGpt ? GPT_IMAGE_ASPECT_RATIOS : ["Auto", "1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"]}
+            onChange={(aspectRatio) => onChange({ aspectRatio })}
+          />
+        )}
         <SelectField
           label="Resolution"
           value={form.imageResolution}
@@ -976,95 +1063,165 @@ function VideoControls({
   onChange,
   uploadingStart,
   uploadingEnd,
+  uploadingRefImage,
+  uploadingRefVideo,
   onUploadStart,
   onUploadEnd,
+  onUploadRefImage,
+  onUploadRefVideo,
 }: {
   form: StandaloneFormState;
   onChange: (patch: Partial<StandaloneFormState>) => void;
   uploadingStart: boolean;
   uploadingEnd: boolean;
+  uploadingRefImage: boolean;
+  uploadingRefVideo: boolean;
   onUploadStart: () => void;
   onUploadEnd: () => void;
+  onUploadRefImage: () => void;
+  onUploadRefVideo: () => void;
 }) {
-  const isSeedance = form.model.startsWith("seedance");
-  // Per-model valid duration windows. BytePlus / upstream rejects
-  // anything outside these with HTTP 400 InvalidParameter, so we
-  // only ever surface options the API will accept.
-  //
-  //   Seedance 1.0 Lite           → [5, 10]          (Lite is 5s or 10s)
-  //   Seedance 1.0 Pro / Pro Fast → 2..12            (slider-style)
-  //   Seedance 1.5 Pro            → [4..12]          (discrete)
-  //   Seedance 2.0 Lite / Pro     → 4..15            (slider-style)
-  //
-  // Order matters — more specific prefixes have to come first or
-  // the broader `seedance-` fallback would swallow them.
-  const isSeedanceV2 =
-    form.model.startsWith("seedance-2-0") ||
-    form.model.startsWith("dreamina-seedance");
-  const isSeedance15 = form.model.startsWith("seedance-1-5");
-  const isSeedance10Lite = form.model.startsWith("seedance-1-0-lite");
-  const durations = isSeedanceV2
-    ? [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-    : isSeedance15
-      ? [4, 5, 6, 7, 8, 9, 10, 11, 12]
-      : isSeedance10Lite
-        ? [5, 10]
-        : isSeedance
-          ? [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-          : [5, 10];
+  const isSeedance = isSeedanceVideoModel(form.model);
+  const isMotion = isKlingMotionVideoModel(form.model);
+  const supportsStartEnd = videoSupportsStartEndFrames(form.model);
+  const supportsRefImage = videoSupportsReferenceImage(form.model);
+  const supportsRefVideo = videoSupportsReferenceVideo(form.model);
+  const durations = videoDurationsForModel(form.model);
+
+  useEffect(() => {
+    if (!durations.includes(form.videoDuration)) {
+      onChange({
+        videoDuration: durations.includes(5) ? 5 : (durations[0] ?? 5),
+      });
+    }
+  }, [durations, form.videoDuration, onChange]);
+
+  const referenceSlots: Array<{
+    key: string;
+    label: string;
+    refItem: UploadedRef | null;
+    uploading: boolean;
+    onUpload: () => void;
+    onRemove: () => void;
+  }> = [];
+  if (supportsStartEnd) {
+    referenceSlots.push(
+      {
+        key: "start",
+        label: "Start image",
+        refItem: form.videoStart,
+        uploading: uploadingStart,
+        onUpload: onUploadStart,
+        onRemove: () => onChange({ videoStart: null }),
+      },
+      {
+        key: "end",
+        label: "End image",
+        refItem: form.videoEnd,
+        uploading: uploadingEnd,
+        onUpload: onUploadEnd,
+        onRemove: () => onChange({ videoEnd: null }),
+      },
+    );
+  }
+  if (supportsRefImage) {
+    referenceSlots.push({
+      key: "ref-image",
+      label: isMotion ? "Reference image" : "Ref image",
+      refItem: form.videoRefImage,
+      uploading: uploadingRefImage,
+      onUpload: onUploadRefImage,
+      onRemove: () => onChange({ videoRefImage: null }),
+    });
+  }
+  if (supportsRefVideo) {
+    referenceSlots.push({
+      key: "ref-video",
+      label: isMotion ? "Motion video" : "Ref video",
+      refItem: form.videoRefVideo,
+      uploading: uploadingRefVideo,
+      onUpload: onUploadRefVideo,
+      onRemove: () => onChange({ videoRefVideo: null }),
+    });
+  }
   return (
     <>
-      <div className="grid grid-cols-2 gap-2">
-        <SingleReferenceButton
-          label="Start image"
-          refItem={form.videoStart}
-          uploading={uploadingStart}
-          onUpload={onUploadStart}
-          onRemove={() => onChange({ videoStart: null })}
-        />
-        <SingleReferenceButton
-          label="End image"
-          refItem={form.videoEnd}
-          uploading={uploadingEnd}
-          onUpload={onUploadEnd}
-          onRemove={() => onChange({ videoEnd: null })}
-        />
-      </div>
+      {referenceSlots.length > 0 && (
+        <div className="grid grid-cols-2 gap-2">
+          {referenceSlots.map((slot) => (
+            <SingleReferenceButton
+              key={slot.key}
+              label={slot.label}
+              refItem={slot.refItem}
+              uploading={slot.uploading}
+              onUpload={slot.onUpload}
+              onRemove={slot.onRemove}
+            />
+          ))}
+        </div>
+      )}
       <PromptBox
         label="Prompt"
         placeholder="Describe camera movement, subject, scene, and mood"
         value={form.prompt}
         onChange={(prompt) => onChange({ prompt })}
       />
-      <div className="grid grid-cols-2 gap-2">
-        <SelectField
-          label="Aspect"
-          value={form.videoRatio}
-          options={isSeedance ? ["16:9", "9:16", "1:1", "4:3"] : ["Auto", "16:9", "9:16", "1:1"]}
-          onChange={(videoRatio) => onChange({ videoRatio })}
+      {!isMotion ? (
+        <div className="grid grid-cols-2 gap-2">
+          <SelectField
+            label="Aspect"
+            value={form.videoRatio}
+            options={isSeedance ? ["16:9", "9:16", "1:1", "4:3"] : ["Auto", "16:9", "9:16", "1:1"]}
+            onChange={(videoRatio) => onChange({ videoRatio })}
+          />
+          <SelectField
+            label="Duration"
+            value={String(form.videoDuration)}
+            options={durations.map(String)}
+            onChange={(videoDuration) =>
+              onChange({ videoDuration: Number(videoDuration) || 5 })
+            }
+          />
+          {isSeedance && (
+            <SelectField
+              label="Resolution"
+              value={form.videoResolution}
+              options={["480p", "720p", "1080p"]}
+              onChange={(videoResolution) => onChange({ videoResolution })}
+            />
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          <SelectField
+            label="Orientation"
+            value={form.videoCharacterOrientation}
+            options={["image", "video"]}
+            onChange={(videoCharacterOrientation) =>
+              onChange({
+                videoCharacterOrientation:
+                  videoCharacterOrientation === "video" ? "video" : "image",
+              })
+            }
+          />
+        </div>
+      )}
+      {!isMotion && (
+        <ToggleRow
+          label="Generate audio"
+          checked={form.videoWithAudio}
+          onChange={(videoWithAudio) => onChange({ videoWithAudio })}
         />
-        <SelectField
-          label="Duration"
-          value={String(form.videoDuration)}
-          options={durations.map(String)}
-          onChange={(videoDuration) =>
-            onChange({ videoDuration: Number(videoDuration) || 5 })
+      )}
+      {(isMotion || form.model === "kling-v3-omni") && supportsRefVideo && (
+        <ToggleRow
+          label="Keep original sound"
+          checked={form.videoKeepOriginalSound}
+          onChange={(videoKeepOriginalSound) =>
+            onChange({ videoKeepOriginalSound })
           }
         />
-        {isSeedance && (
-          <SelectField
-            label="Resolution"
-            value={form.videoResolution}
-            options={["480p", "720p", "1080p"]}
-            onChange={(videoResolution) => onChange({ videoResolution })}
-          />
-        )}
-      </div>
-      <ToggleRow
-        label="Generate audio"
-        checked={form.videoWithAudio}
-        onChange={(videoWithAudio) => onChange({ videoWithAudio })}
-      />
+      )}
     </>
   );
 }
@@ -1789,6 +1946,8 @@ function SingleReferenceButton({
   onRemove: () => void;
   tall?: boolean;
 }) {
+  const isVideo = refItem?.mime.startsWith("video/");
+
   return (
     <div>
       <FieldLabel label={label} />
@@ -1800,11 +1959,21 @@ function SingleReferenceButton({
       >
         {refItem ? (
           <div className="relative h-full w-full">
-            <img
-              src={refItem.url}
-              alt=""
-              className="h-full w-full object-cover"
-            />
+            {isVideo ? (
+              <video
+                src={refItem.url}
+                muted
+                playsInline
+                preload="metadata"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <img
+                src={refItem.url}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            )}
             <button
               type="button"
               onClick={onRemove}
@@ -1887,6 +2056,10 @@ function CreationRow({ job }: { job: StandaloneJobRow }) {
         : "text-amber-300";
   const url = result?.url;
   const modelUrl = result?.provider_meta?.model_url;
+  const isModel3d = result?.type === "model_3d" || !!modelUrl;
+  const previewUrl = isModel3d
+    ? (result?.provider_meta?.rendered_image ?? url)
+    : url;
   const duration = String(params.duration ?? "");
   const ratio = String(params.ratio ?? params.aspect_ratio ?? params.size ?? "");
   const modelName = String(params.model_name ?? job.model ?? "model");
@@ -1917,8 +2090,8 @@ function CreationRow({ job }: { job: StandaloneJobRow }) {
               </div>
             </div>
           )}
-          {result?.type === "image" && url && (
-            <img src={url} alt="" className="h-full w-full object-cover" />
+          {(result?.type === "image" || result?.type === "model_3d") && previewUrl && (
+            <img src={previewUrl} alt="" className="h-full w-full object-cover" />
           )}
           {result?.type === "video" && url && (
             <video
@@ -1943,7 +2116,9 @@ function CreationRow({ job }: { job: StandaloneJobRow }) {
               ? "audio"
               : result?.type === "video"
                 ? "0:06"
-                : "image"}
+                : isModel3d
+                  ? "3d"
+                  : "image"}
           </div>
         </div>
 
@@ -2042,6 +2217,10 @@ function standaloneCanvasId(projectId: string): string {
   return `${STANDALONE_CANVAS_ID}:${projectId}`;
 }
 
+function uploadAcceptForSlot(slot: UploadSlot): string {
+  return slot === "video-ref-video" ? "video/*" : "image/*";
+}
+
 function useStandaloneJobs(
   userId: string | undefined,
   projectId: string | undefined,
@@ -2074,8 +2253,8 @@ async function uploadReference(
 ): Promise<UploadedRef> {
   if (!userId) throw new Error("Please sign in before uploading references.");
   if (!projectId) throw new Error("Create or select a project before uploading references.");
-  if (!file.type.startsWith("image/")) {
-    throw new Error("Only image references are supported on this surface.");
+  if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+    throw new Error("Only image or video references are supported on this surface.");
   }
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 80);
   // Storage RLS on `ai-media` requires the FIRST folder segment to
@@ -2132,6 +2311,9 @@ function buildCurrentParams(
       resolution: form.videoResolution,
       duration: form.videoDuration,
       withAudio: form.videoWithAudio,
+      characterOrientation: form.videoCharacterOrientation,
+      keepOriginalSound: form.videoKeepOriginalSound,
+      hasReferenceVideo: !!form.videoRefVideo,
     });
   }
   if (tool === "voice_gen") {
@@ -2171,9 +2353,19 @@ function buildCurrentInputs(
     };
   }
   if (tool === "video_gen") {
+    const inputs: Record<string, unknown> = {};
+    if (videoSupportsStartEndFrames(form.model)) {
+      if (form.videoStart) inputs.start_frame = form.videoStart.url;
+      if (form.videoEnd) inputs.end_frame = form.videoEnd.url;
+    }
+    if (videoSupportsReferenceImage(form.model) && form.videoRefImage) {
+      inputs.ref_image = form.videoRefImage.url;
+    }
+    if (videoSupportsReferenceVideo(form.model) && form.videoRefVideo) {
+      inputs.ref_video = form.videoRefVideo.url;
+    }
     return {
-      ...(form.videoStart ? { start_frame: form.videoStart.url } : {}),
-      ...(form.videoEnd ? { end_frame: form.videoEnd.url } : {}),
+      ...inputs,
     };
   }
   if (tool === "image_to_3d") {
@@ -2189,7 +2381,20 @@ function validateForm(
   if (tool === "image_gen" && !form.prompt.trim()) {
     return "Image generation needs a prompt.";
   }
-  if (tool === "video_gen" && !form.prompt.trim() && !form.videoStart) {
+  if (
+    tool === "video_gen" &&
+    isKlingMotionVideoModel(form.model) &&
+    (!form.videoRefImage || !form.videoRefVideo)
+  ) {
+    return "Motion video needs a reference image and a motion video.";
+  }
+  if (
+    tool === "video_gen" &&
+    !form.prompt.trim() &&
+    !form.videoStart &&
+    !form.videoRefImage &&
+    !form.videoRefVideo
+  ) {
     return "Video generation needs a prompt or start image.";
   }
   if (tool === "voice_gen" && !form.script.trim()) {
@@ -2205,6 +2410,7 @@ function validateForm(
 }
 
 function maxImageRefsForModel(model: string): number {
+  if (isSeedreamImageModel(model)) return 1;
   if (model === "gpt-image-2") return 16;
   return 14;
 }
