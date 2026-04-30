@@ -63,6 +63,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { useWorkspaceStore, type ProjectMeta } from "@/store/useWorkspaceStore";
 import { UserMenu } from "@/components/workspace/UserMenu";
 import WorkspaceSidebar, {
@@ -803,6 +811,19 @@ const HomeView = ({
   );
 };
 
+/** Name of the auto-seeded fallback project (server migration
+ *  20260430090000 inserts this row for every legacy user who didn't
+ *  yet have a project). It's the safety net the workspace store
+ *  needs — we never want the user to delete their last home, and
+ *  the server-side seed guarantees this one always exists. */
+const PROTECTED_PROJECT_NAME = "Default project";
+
+/** Phrase the user must type into the delete dialog. Match is
+ *  case-insensitive + trimmed so "ยืนยัน" / "ยืนยัน " / "Confirm"
+ *  all unlock the destructive button. */
+const DELETE_CONFIRM_PHRASE = "ยืนยัน";
+const DELETE_CONFIRM_PHRASE_FALLBACK = "confirm";
+
 const ProjectsCard = ({
   projects,
   activeProjectId,
@@ -816,108 +837,213 @@ const ProjectsCard = ({
   onCreate: () => void;
   onDelete: (id: string) => void;
 }) => {
-  /* Delete handler — confirm first so a stray click can't nuke a
-   * project. Stop the click event so the row's own onClick (which
-   * SELECTS the project) doesn't also fire and stomp on the active-
-   * project state during the delete dance. The "keep at least one
-   * project" rule is enforced by the parent's handleDeleteProject —
-   * we don't duplicate that guard here. */
-  const handleDelete = (e: React.MouseEvent, p: ProjectCardItem) => {
+  /* Type-to-confirm dialog state. We model the in-flight delete as
+   * an optional pointer to the candidate project; the input field
+   * lives alongside in `confirmText`. Both reset on close. The old
+   * window.confirm path was too low-friction for a multi-cascade
+   * delete (project → all spaces → all canvases → all generations),
+   * so the user asked for an explicit "type ยืนยัน to delete"
+   * speed bump. */
+  const [pendingDelete, setPendingDelete] = useState<ProjectCardItem | null>(
+    null,
+  );
+  const [confirmText, setConfirmText] = useState("");
+
+  const requestDelete = (e: React.MouseEvent, p: ProjectCardItem) => {
     e.stopPropagation();
     e.preventDefault();
-    if (!window.confirm(`Delete project "${p.name}"? This can't be undone.`)) return;
-    onDelete(p.id);
+    setConfirmText("");
+    setPendingDelete(p);
+  };
+
+  const closeDialog = () => {
+    setPendingDelete(null);
+    setConfirmText("");
+  };
+
+  const normalised = confirmText.trim().toLowerCase();
+  const canConfirm =
+    normalised === DELETE_CONFIRM_PHRASE ||
+    normalised === DELETE_CONFIRM_PHRASE_FALLBACK;
+
+  const confirmDelete = () => {
+    if (!pendingDelete || !canConfirm) return;
+    onDelete(pendingDelete.id);
+    closeDialog();
   };
 
   return (
-    <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-300">
-          Projects
-          <ChevronRight className="h-3 w-3 text-zinc-500" />
+    <>
+      <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-300">
+            Projects
+            <ChevronRight className="h-3 w-3 text-zinc-500" />
+          </div>
+          <button
+            type="button"
+            onClick={onCreate}
+            title="New project"
+            className="rounded-md p-1 text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white"
+          >
+            <Plus className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onCreate}
-          title="New project"
-          className="rounded-md p-1 text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white"
-        >
-          <Plus className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
-        </button>
+
+        {projects.length === 0 ? (
+          <button
+            type="button"
+            onClick={onCreate}
+            className="flex min-h-[132px] w-full items-center justify-center rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] px-4 text-[12px] text-zinc-500 transition-colors hover:border-white/[0.20] hover:bg-white/[0.04] hover:text-zinc-200"
+          >
+            + Create your first project
+          </button>
+        ) : (
+          <ul className="flex flex-col gap-0.5">
+            {projects.map((p) => {
+              const isProtected = p.name === PROTECTED_PROJECT_NAME;
+              return (
+                <li key={p.id} className="group/proj relative">
+                  <button
+                    type="button"
+                    onClick={() => onSelect(p.id)}
+                    className={cn(
+                      "flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 text-[12.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white lg:min-h-9",
+                      activeProjectId === p.id &&
+                        "bg-white/[0.07] text-white ring-1 ring-inset ring-white/[0.08]",
+                    )}
+                  >
+                    <span
+                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px]"
+                      style={{ background: p.color }}
+                    >
+                      <p.icon className="h-2.5 w-2.5 text-zinc-950" />
+                    </span>
+                    <span className="flex-1 truncate text-left">{p.name}</span>
+                    <span className="rounded bg-white/[0.05] px-1.5 py-px text-[9px] font-semibold text-zinc-400 ring-1 ring-inset ring-white/[0.06]">
+                      {p.spaceCount}
+                    </span>
+                    {activeProjectId === p.id ? (
+                      <span
+                        className={cn(
+                          "rounded bg-emerald-500/15 px-1.5 py-px text-[8.5px] font-bold uppercase tracking-wide text-emerald-300 ring-1 ring-inset ring-emerald-500/30 transition-opacity",
+                          /* Fade the badge so the trash button can
+                           * take its slot — but only when this row is
+                           * actually deletable. The protected project
+                           * keeps its badge full-strength on hover. */
+                          !isProtected && "group-hover/proj:opacity-0",
+                        )}
+                      >
+                        Active
+                      </span>
+                    ) : (
+                      <Lock
+                        className={cn(
+                          "h-3 w-3 text-zinc-600 transition-opacity",
+                          !isProtected && "group-hover/proj:opacity-0",
+                        )}
+                      />
+                    )}
+                  </button>
+                  {/* Delete affordance — absolutely positioned over
+                   * the Lock / Active slot so it's only visible on
+                   * hover. Sits OUTSIDE the row <button> because
+                   * <button> can't legally nest another <button>;
+                   * onPointerDown stopPropagation keeps the underlying
+                   * row click from firing first.
+                   *
+                   * Hidden entirely on the protected "Default project"
+                   * row — that's the server-side fallback every user
+                   * gets, and we never want it deleted. */}
+                  {!isProtected && (
+                    <button
+                      type="button"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => requestDelete(e, p)}
+                      title={`Delete "${p.name}"`}
+                      aria-label={`Delete project ${p.name}`}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-500 opacity-0 transition-all group-hover/proj:opacity-100 hover:bg-red-500/15 hover:text-red-300"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
 
-      {projects.length === 0 ? (
-        <button
-          type="button"
-          onClick={onCreate}
-          className="flex min-h-[132px] w-full items-center justify-center rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] px-4 text-[12px] text-zinc-500 transition-colors hover:border-white/[0.20] hover:bg-white/[0.04] hover:text-zinc-200"
-        >
-          + Create your first project
-        </button>
-      ) : (
-        <ul className="flex flex-col gap-0.5">
-          {projects.map((p) => (
-            <li key={p.id} className="group/proj relative">
-              <button
-                type="button"
-                onClick={() => onSelect(p.id)}
-                className={cn(
-                  "flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 text-[12.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white lg:min-h-9",
-                  activeProjectId === p.id &&
-                    "bg-white/[0.07] text-white ring-1 ring-inset ring-white/[0.08]",
-                )}
-              >
-                <span
-                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px]"
-                  style={{ background: p.color }}
-                >
-                  <p.icon className="h-2.5 w-2.5 text-zinc-950" />
-                </span>
-                <span className="flex-1 truncate text-left">{p.name}</span>
-                <span className="rounded bg-white/[0.05] px-1.5 py-px text-[9px] font-semibold text-zinc-400 ring-1 ring-inset ring-white/[0.06]">
-                  {p.spaceCount}
-                </span>
-                {activeProjectId === p.id ? (
-                  /* Active badge fades out on hover so the trash
-                   * button below can take its slot — same coordinated
-                   * swap the Lock variant uses for non-active rows. */
-                  <span className="rounded bg-emerald-500/15 px-1.5 py-px text-[8.5px] font-bold uppercase tracking-wide text-emerald-300 ring-1 ring-inset ring-emerald-500/30 transition-opacity group-hover/proj:opacity-0">
-                    Active
-                  </span>
-                ) : (
-                  /* Lock icon parks here when idle. On hover the
-                   * trash button below fades in over it (same slot)
-                   * so the row layout never shifts. */
-                  <Lock className="h-3 w-3 text-zinc-600 transition-opacity group-hover/proj:opacity-0" />
-                )}
-              </button>
-              {/* Delete affordance — absolutely positioned over the
-               * Lock slot so it's only visible on hover. Sits OUTSIDE
-               * the row <button> because <button> can't legally nest
-               * another <button>; onPointerDown stopPropagation keeps
-               * the underlying row click from firing first.
-               *
-               * Always shown (even on the active row) — user reported
-               * "ที มันเยอะและไม่มีให้ลบเลย" (so many projects, no way
-               * to delete). The store's deleteProject already
-               * auto-switches activeProjectId to the next remaining
-               * project, so killing the active one is safe. The
-               * window.confirm guard catches stray clicks. */}
-              <button
-                type="button"
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => handleDelete(e, p)}
-                title={`Delete "${p.name}"`}
-                aria-label={`Delete project ${p.name}`}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-500 opacity-0 transition-all group-hover/proj:opacity-100 hover:bg-red-500/15 hover:text-red-300"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+      {/* Type-to-confirm delete dialog. The destructive button stays
+       * disabled until the user types `ยืนยัน` (or English `confirm`)
+       * — same gesture GitHub uses for repo deletion, scaled down to
+       * a single short phrase. Enter on the input also fires confirm
+       * once the phrase matches so the user can keyboard through. */}
+      <Dialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) closeDialog();
+        }}
+      >
+        <DialogContent className="border-white/10 bg-[hsl(0_0%_8%)] text-zinc-100 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base text-zinc-100">
+              ลบโปรเจค "{pendingDelete?.name}"?
+            </DialogTitle>
+            <DialogDescription className="text-[13px] leading-relaxed text-zinc-400">
+              การลบจะเอา <span className="font-semibold text-zinc-200">spaces, canvases และผลงานทั้งหมด</span> ในโปรเจคนี้ออกถาวร — กู้คืนไม่ได้
+              <br />
+              พิมพ์{" "}
+              <span className="rounded bg-red-500/15 px-1.5 py-0.5 font-mono text-[12px] font-semibold text-red-300 ring-1 ring-inset ring-red-500/30">
+                ยืนยัน
+              </span>{" "}
+              เพื่อลบ
+            </DialogDescription>
+          </DialogHeader>
+
+          <input
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && canConfirm) {
+                e.preventDefault();
+                confirmDelete();
+              }
+            }}
+            autoFocus
+            placeholder="พิมพ์ ยืนยัน"
+            spellCheck={false}
+            autoComplete="off"
+            className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-red-500/40 focus:ring-1 focus:ring-red-500/20"
+          />
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <button
+              type="button"
+              onClick={closeDialog}
+              className="inline-flex h-9 items-center justify-center rounded-md bg-white/[0.06] px-4 text-[13px] font-medium text-zinc-200 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.09] hover:text-white"
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="button"
+              onClick={confirmDelete}
+              disabled={!canConfirm}
+              className={cn(
+                "inline-flex h-9 items-center justify-center gap-1.5 rounded-md px-4 text-[13px] font-semibold transition-colors",
+                canConfirm
+                  ? "bg-red-500/90 text-white hover:bg-red-500"
+                  : "cursor-not-allowed bg-red-500/20 text-red-300/50",
+              )}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              ลบโปรเจค
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
