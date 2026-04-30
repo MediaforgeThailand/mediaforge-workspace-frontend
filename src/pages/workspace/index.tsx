@@ -463,6 +463,7 @@ const WorkspaceDashboardInner = () => {
             activeProjectId={activeProjectId}
             onSelectProject={setActiveProject}
             onCreateProject={handleCreateProject}
+            onDeleteProject={handleDeleteProject}
             onOpenSidebar={() => setMobileSidebarOpen(true)}
           />
         )}
@@ -602,6 +603,7 @@ const HomeView = ({
   activeProjectId,
   onSelectProject,
   onCreateProject,
+  onDeleteProject,
   onOpenSidebar,
 }: {
   onSection: (s: Section) => void;
@@ -609,6 +611,7 @@ const HomeView = ({
   activeProjectId: string | null;
   onSelectProject: (id: string | null) => void;
   onCreateProject: () => void;
+  onDeleteProject: (id: string) => void;
   onOpenSidebar?: () => void;
 }) => {
   const navigate = useNavigate();
@@ -757,6 +760,7 @@ const HomeView = ({
               activeProjectId={activeProjectId}
               onSelect={onSelectProject}
               onCreate={onCreateProject}
+              onDelete={onDeleteProject}
             />
             <SpacesShowcaseCard
               spaces={recentSpaces}
@@ -804,73 +808,118 @@ const ProjectsCard = ({
   activeProjectId,
   onSelect,
   onCreate,
+  onDelete,
 }: {
   projects: ProjectCardItem[];
   activeProjectId: string | null;
   onSelect: (id: string | null) => void;
   onCreate: () => void;
-}) => (
-  <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
-    <div className="mb-3 flex items-center justify-between">
-      <div className="flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-300">
-        Projects
-        <ChevronRight className="h-3 w-3 text-zinc-500" />
-      </div>
-      <button
-        type="button"
-        onClick={onCreate}
-        title="New project"
-        className="rounded-md p-1 text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white"
-      >
-        <Plus className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
-      </button>
-    </div>
+  onDelete: (id: string) => void;
+}) => {
+  /* Delete handler — confirm first so a stray click can't nuke a
+   * project. Stop the click event so the row's own onClick (which
+   * SELECTS the project) doesn't also fire and stomp on the active-
+   * project state during the delete dance. The "keep at least one
+   * project" rule is enforced by the parent's handleDeleteProject —
+   * we don't duplicate that guard here. */
+  const handleDelete = (e: React.MouseEvent, p: ProjectCardItem) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!window.confirm(`Delete project "${p.name}"? This can't be undone.`)) return;
+    onDelete(p.id);
+  };
 
-    {projects.length === 0 ? (
-      <button
-        type="button"
-        onClick={onCreate}
-        className="flex min-h-[132px] w-full items-center justify-center rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] px-4 text-[12px] text-zinc-500 transition-colors hover:border-white/[0.20] hover:bg-white/[0.04] hover:text-zinc-200"
-      >
-        + Create your first project
-      </button>
-    ) : (
-      <ul className="flex flex-col gap-0.5">
-        {projects.map((p) => (
-          <li key={p.id}>
-            <button
-              type="button"
-              onClick={() => onSelect(p.id)}
-              className={cn(
-                "flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 text-[12.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white lg:min-h-9",
-                activeProjectId === p.id &&
-                  "bg-white/[0.07] text-white ring-1 ring-inset ring-white/[0.08]",
-              )}
-            >
-              <span
-                className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px]"
-                style={{ background: p.color }}
+  return (
+    <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-300">
+          Projects
+          <ChevronRight className="h-3 w-3 text-zinc-500" />
+        </div>
+        <button
+          type="button"
+          onClick={onCreate}
+          title="New project"
+          className="rounded-md p-1 text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white"
+        >
+          <Plus className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
+        </button>
+      </div>
+
+      {projects.length === 0 ? (
+        <button
+          type="button"
+          onClick={onCreate}
+          className="flex min-h-[132px] w-full items-center justify-center rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] px-4 text-[12px] text-zinc-500 transition-colors hover:border-white/[0.20] hover:bg-white/[0.04] hover:text-zinc-200"
+        >
+          + Create your first project
+        </button>
+      ) : (
+        <ul className="flex flex-col gap-0.5">
+          {projects.map((p) => (
+            <li key={p.id} className="group/proj relative">
+              <button
+                type="button"
+                onClick={() => onSelect(p.id)}
+                className={cn(
+                  "flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 text-[12.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white lg:min-h-9",
+                  activeProjectId === p.id &&
+                    "bg-white/[0.07] text-white ring-1 ring-inset ring-white/[0.08]",
+                )}
               >
-                <p.icon className="h-2.5 w-2.5 text-zinc-950" />
-              </span>
-              <span className="flex-1 truncate text-left">{p.name}</span>
-              <span className="rounded bg-white/[0.05] px-1.5 py-px text-[9px] font-semibold text-zinc-400 ring-1 ring-inset ring-white/[0.06]">
-                {p.spaceCount}
-              </span>
-              {activeProjectId === p.id ? (
-                <span className="rounded bg-emerald-500/15 px-1.5 py-px text-[8.5px] font-bold uppercase tracking-wide text-emerald-300 ring-1 ring-inset ring-emerald-500/30">
-                  Active
+                <span
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px]"
+                  style={{ background: p.color }}
+                >
+                  <p.icon className="h-2.5 w-2.5 text-zinc-950" />
                 </span>
-              ) : (
-                <Lock className="h-3 w-3 text-zinc-600" />
-              )}
-            </button>
-          </li>
-        ))}
-      </ul>
-    )}
-  </div>
-);
+                <span className="flex-1 truncate text-left">{p.name}</span>
+                <span className="rounded bg-white/[0.05] px-1.5 py-px text-[9px] font-semibold text-zinc-400 ring-1 ring-inset ring-white/[0.06]">
+                  {p.spaceCount}
+                </span>
+                {activeProjectId === p.id ? (
+                  /* Active badge fades out on hover so the trash
+                   * button below can take its slot — same coordinated
+                   * swap the Lock variant uses for non-active rows. */
+                  <span className="rounded bg-emerald-500/15 px-1.5 py-px text-[8.5px] font-bold uppercase tracking-wide text-emerald-300 ring-1 ring-inset ring-emerald-500/30 transition-opacity group-hover/proj:opacity-0">
+                    Active
+                  </span>
+                ) : (
+                  /* Lock icon parks here when idle. On hover the
+                   * trash button below fades in over it (same slot)
+                   * so the row layout never shifts. */
+                  <Lock className="h-3 w-3 text-zinc-600 transition-opacity group-hover/proj:opacity-0" />
+                )}
+              </button>
+              {/* Delete affordance — absolutely positioned over the
+               * Lock slot so it's only visible on hover. Sits OUTSIDE
+               * the row <button> because <button> can't legally nest
+               * another <button>; onPointerDown stopPropagation keeps
+               * the underlying row click from firing first.
+               *
+               * Always shown (even on the active row) — user reported
+               * "ที มันเยอะและไม่มีให้ลบเลย" (so many projects, no way
+               * to delete). The store's deleteProject already
+               * auto-switches activeProjectId to the next remaining
+               * project, so killing the active one is safe. The
+               * window.confirm guard catches stray clicks. */}
+              <button
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => handleDelete(e, p)}
+                title={`Delete "${p.name}"`}
+                aria-label={`Delete project ${p.name}`}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-500 opacity-0 transition-all group-hover/proj:opacity-100 hover:bg-red-500/15 hover:text-red-300"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
 
 interface SpaceCardData {
   id: string;
