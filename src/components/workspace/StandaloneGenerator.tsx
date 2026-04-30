@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AlertCircle,
   Box,
   ChevronDown,
   Download,
@@ -60,6 +61,8 @@ const RUN_EDGE_FUNCTION = "workspace-run-node";
 const STANDALONE_CANVAS_ID = "standalone";
 const STORAGE_BUCKET = "ai-media";
 const SIGNED_URL_TTL_SEC = 60 * 60 * 24 * 365;
+const STANDALONE_JOB_SELECT =
+  "id,node_type,provider,model,request,status,attempts,result,error,last_error,created_at,completed_at,run_after,deadline_at,locked_by,lock_expires_at,credits_charged,credits_refunded";
 
 type UploadSlot =
   | "image-ref"
@@ -92,6 +95,10 @@ interface StandaloneJobRow {
   last_error: string | null;
   created_at: string;
   completed_at: string | null;
+  run_after?: string | null;
+  deadline_at?: string | null;
+  locked_by?: string | null;
+  lock_expires_at?: string | null;
   credits_charged?: number | null;
   credits_refunded?: number | null;
 }
@@ -377,6 +384,11 @@ export default function StandaloneGenerator({
               body: { action: "poll_workspace_job", job_id: job.id },
             }),
           ),
+        );
+      } catch (err) {
+        console.info(
+          "[standalone-generation] background poll skipped",
+          err instanceof Error ? err.message : String(err),
         );
       } finally {
         inFlight = false;
@@ -2142,6 +2154,8 @@ function CreationRow({ job }: { job: StandaloneJobRow }) {
     job.status === "failed" || job.status === "permanent_failed"
       ? (job.error ?? job.last_error)
       : null;
+  const isActive = job.status === "queued" || job.status === "running";
+  const isFailed = job.status === "failed" || job.status === "permanent_failed";
   return (
     <article className="rounded-xl bg-[#222222] px-3 py-3 ring-1 ring-inset ring-white/[0.02]">
       <div className="mb-2 flex items-start justify-between gap-3">
@@ -2161,11 +2175,19 @@ function CreationRow({ job }: { job: StandaloneJobRow }) {
       </div>
       <div className="flex flex-col gap-3 md:flex-row md:items-start">
         <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black md:w-[265px]">
-          {job.status !== "completed" && (
+          {isActive && (
             <div className="absolute inset-0 grid place-items-center">
               <div className="flex items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 text-[12px] text-zinc-300">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 {job.status}
+              </div>
+            </div>
+          )}
+          {isFailed && (
+            <div className="absolute inset-0 grid place-items-center">
+              <div className="flex items-center gap-2 rounded-full bg-red-950/70 px-3 py-1.5 text-[12px] text-red-100">
+                <AlertCircle className="h-3.5 w-3.5" />
+                failed
               </div>
             </div>
           )}
@@ -2310,17 +2332,38 @@ function useStandaloneJobs(
     refetchInterval: false,
     queryFn: async () => {
       if (!projectId) return [];
-      const { data, error } = await (supabase as any)
+      const base = (supabase as any)
         .from("workspace_generation_jobs")
-        .select(
-          "id,node_type,provider,model,request,status,attempts,result,error,last_error,created_at,completed_at,credits_charged,credits_refunded",
-        )
+        .select(STANDALONE_JOB_SELECT)
         .eq("project_id", projectId)
-        .eq("canvas_id", standaloneCanvasId(projectId))
-        .order("created_at", { ascending: false })
-        .limit(50);
-      if (error) throw new Error(error.message);
-      return (data ?? []) as StandaloneJobRow[];
+        .eq("canvas_id", standaloneCanvasId(projectId));
+
+      const [activeRes, recentRes] = await Promise.all([
+        base
+          .in("status", ["queued", "running"])
+          .order("created_at", { ascending: false })
+          .limit(100),
+        (supabase as any)
+          .from("workspace_generation_jobs")
+          .select(STANDALONE_JOB_SELECT)
+          .eq("project_id", projectId)
+          .eq("canvas_id", standaloneCanvasId(projectId))
+          .in("status", ["completed", "failed", "permanent_failed"])
+          .order("created_at", { ascending: false })
+          .limit(50),
+      ]);
+
+      if (activeRes.error) throw new Error(activeRes.error.message);
+      if (recentRes.error) throw new Error(recentRes.error.message);
+
+      const byId = new Map<string, StandaloneJobRow>();
+      for (const row of [...(activeRes.data ?? []), ...(recentRes.data ?? [])]) {
+        byId.set(String(row.id), row as StandaloneJobRow);
+      }
+      return Array.from(byId.values()).sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
     },
   });
 }
