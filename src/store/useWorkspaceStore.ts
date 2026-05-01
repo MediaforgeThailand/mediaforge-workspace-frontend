@@ -359,11 +359,13 @@ function withCurrent(
   };
 }
 
+const initialDefaultProject = createDefaultProjectMeta();
+
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
     (set, get) => ({
-      projects: [createDefaultProjectMeta()],
-      activeProjectId: null,
+      projects: [initialDefaultProject],
+      activeProjectId: initialDefaultProject.id,
       workspaces: [],
       canvases: [],
       graphs: {},
