@@ -291,14 +291,8 @@ interface Props {
   onAction: (item: ToolItem) => void;
 }
 
-const PANEL_WIDTH = 360;
-const PANEL_MAX_HEIGHT = 540;
-/* Visual scale applied via CSS `transform: scale()` with the
- * top-left as the origin. Keeps the design tokens (paddings, gaps,
- * radii, font-sizes) untouched so the proportions still match the
- * Figma spec, while making the whole panel land smaller on screen.
- * 0.8 = 20 % smaller — what the team asked for. */
-const DESKTOP_PANEL_SCALE = 0.8;
+const PANEL_WIDTH = 300;
+const PANEL_MAX_HEIGHT = 440;
 
 const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
   const { t } = useLanguage();
@@ -306,14 +300,6 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
   const [active, setActive] = useState<ToolCategory>("all");
   const [highlight, setHighlight] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const panelScale =
-    typeof window !== "undefined" &&
-    window.matchMedia("(pointer: coarse)").matches
-      ? 1
-      : DESKTOP_PANEL_SCALE;
-  const visualWidth = PANEL_WIDTH * panelScale;
-  const visualMaxHeight = PANEL_MAX_HEIGHT * panelScale;
-
   useEffect(() => {
     const t = window.setTimeout(() => inputRef.current?.focus(), 0);
     return () => window.clearTimeout(t);
@@ -340,15 +326,15 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
     setHighlight(0);
   }, [query, active]);
 
-  // Clamp using the VISUAL (post-scale) footprint so the right /
-  // bottom edge guard accounts for the actual rendered size.
+  // Clamp against the real panel footprint so it never opens beyond
+  // the viewport edge.
   const left = Math.min(
     state.screen.x,
-    Math.max(8, window.innerWidth - visualWidth - 8),
+    Math.max(8, window.innerWidth - PANEL_WIDTH - 8),
   );
   const top = Math.min(
     state.screen.y,
-    Math.max(8, window.innerHeight - visualMaxHeight - 8),
+    Math.max(8, window.innerHeight - PANEL_MAX_HEIGHT - 8),
   );
 
   const fire = (it: ToolItem) => {
@@ -402,7 +388,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
         aria-modal="true"
         className={cn(
           "fixed z-[1310] flex flex-col overflow-hidden",
-          "rounded-2xl border border-white/10",
+          "rounded-xl border border-white/10",
           // Stacked surface treatment:
           //  1. very-dark zinc base for legibility
           //  2. a faint top-light gradient overlay (drawn via the
@@ -418,14 +404,6 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
           width: PANEL_WIDTH,
           maxHeight: PANEL_MAX_HEIGHT,
           fontFamily: "var(--font-sans)",
-          // CSS `transform: scale` shrinks the entire panel uniformly.
-          // `transform-origin: top left` keeps the click point pinned
-          // to the panel's visible top-left, so the existing
-          // (left, top) coordinates still correspond to where the
-          // user right-clicked. The visual-size constants above are
-          // what the edge-clamp uses.
-          transform: `scale(${panelScale})`,
-          transformOrigin: "top left",
         }}
         onClick={(e) => e.stopPropagation()}
         onContextMenu={(e) => e.preventDefault()}
@@ -438,9 +416,9 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
         />
 
         {/* ── Search ── */}
-        <div className="px-3 pt-3 pb-2">
+        <div className="px-3 pb-2 pt-3">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-zinc-300" />
             <input
               ref={inputRef}
               value={query}
@@ -448,8 +426,8 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
               onKeyDown={onKey}
               placeholder={t("workspace.picker.search")}
               className={cn(
-                "nodrag w-full rounded-xl border border-white/[0.06] bg-white/[0.04] py-3 pl-9 pr-3 lg:py-2.5",
-                "text-[13px] text-zinc-100 outline-none placeholder:text-zinc-500",
+                "nodrag w-full rounded-lg border border-white/[0.08] bg-white/[0.05] py-2.5 pl-9 pr-3",
+                "text-[15px] font-medium leading-5 text-zinc-50 outline-none placeholder:text-zinc-400",
                 "transition-colors focus:border-white/10 focus:bg-white/[0.06]",
               )}
             />
@@ -469,13 +447,13 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
                 title={t(cat.labelKey)}
                 aria-pressed={isActive}
                 className={cn(
-                  "flex h-11 flex-1 items-center justify-center rounded-lg transition-all lg:h-9",
+                  "flex h-9 flex-1 items-center justify-center rounded-lg transition-all",
                   isActive
                     ? "bg-white/[0.08] text-zinc-50 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.06)]"
                     : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200",
                 )}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-[18px] w-[18px]" />
               </button>
             );
           })}
@@ -487,7 +465,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
         {/* ── List ── */}
         <div className="ws-scroll-hide flex-1 overflow-y-auto px-2 py-2">
           {filtered.length === 0 ? (
-            <div className="px-3 py-10 text-center text-[12px] italic text-zinc-500">
+            <div className="px-3 py-8 text-center text-[14px] italic text-zinc-300">
               {t("workspace.picker.no_match", { query })}
             </div>
           ) : (
@@ -507,7 +485,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
                       disabled={it.comingSoon}
                       title={it.description}
                       className={cn(
-                        "group flex min-h-12 w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-colors lg:min-h-0",
+                        "group flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors",
                         isHighlight
                           ? "bg-white/[0.06]"
                           : "hover:bg-white/[0.04]",
@@ -519,16 +497,16 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
                         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset ring-white/[0.06]"
                         style={{ background: tint.bg, color: tint.fg }}
                       >
-                        <Icon className="h-4 w-4" />
+                        <Icon className="h-[18px] w-[18px]" />
                       </span>
 
                       {/* Title + subtitle */}
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13px] font-medium text-zinc-100">
+                        <span className="block truncate text-[15.5px] font-semibold leading-5 text-white">
                           {it.label}
                         </span>
                         {it.subtitle && (
-                          <span className="block truncate text-[11px] text-zinc-500">
+                          <span className="block truncate text-[13px] leading-4 text-zinc-300">
                             {it.subtitle}
                           </span>
                         )}
@@ -546,7 +524,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
         </div>
 
         {/* ── Footer ── */}
-        <div className="flex items-center gap-4 border-t border-white/5 bg-black/20 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+        <div className="flex items-center gap-3 border-t border-white/5 bg-black/20 px-3 py-2 text-[12.5px] font-semibold text-zinc-300">
           <span className="flex items-center gap-1.5">
             <Kbd>N</Kbd> {t("workspace.picker.hint_open")}
           </span>
@@ -575,7 +553,7 @@ function Chip({
   return (
     <span
       className={cn(
-        "shrink-0 rounded-full px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide",
+        "shrink-0 rounded-full px-2 py-0.5 text-[12px] font-semibold uppercase",
         kind === "new"
           ? "bg-white/10 text-zinc-100 ring-1 ring-inset ring-white/10"
           : "bg-white/[0.04] text-zinc-500 ring-1 ring-inset ring-white/[0.06]",
@@ -588,7 +566,7 @@ function Chip({
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="inline-flex min-w-[1.1rem] items-center justify-center rounded border border-white/10 bg-white/[0.04] px-1 py-px text-[9px] font-bold text-zinc-300">
+    <kbd className="inline-flex min-w-[1.25rem] items-center justify-center rounded border border-white/10 bg-white/[0.06] px-1 py-px text-[11px] font-bold text-zinc-100">
       {children}
     </kbd>
   );

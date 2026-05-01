@@ -36,7 +36,7 @@ import type { Node as RFNode } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
 
-const PANEL_WIDTH = 232;
+const PANEL_WIDTH = 220;
 /** Floor of the rendered height for the bottom-edge clamp — the actual
  *  height varies with how many rows are visible (4–6 typically), this
  *  is the worst case at 6 rows incl. separators. */
@@ -172,7 +172,7 @@ const NodeContextMenu = ({ position, items, onClose }: Props) => {
               onClick={() => fire(item)}
               title={item.label}
               className={cn(
-                "flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[12.5px] transition-colors",
+                "flex w-full items-center gap-2.5 px-3 py-2 text-left text-[14.5px] font-semibold leading-5 transition-colors",
                 item.disabled
                   ? "cursor-not-allowed text-zinc-600"
                   : item.danger
@@ -180,7 +180,7 @@ const NodeContextMenu = ({ position, items, onClose }: Props) => {
                     : "text-zinc-200 hover:bg-white/[0.06] hover:text-zinc-50",
               )}
             >
-              <Icon className="h-3.5 w-3.5 shrink-0 opacity-80" />
+              <Icon className="h-4 w-4 shrink-0 opacity-90" />
               <span className="truncate">{item.label}</span>
             </button>
           </div>

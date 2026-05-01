@@ -141,15 +141,15 @@ function PaletteIcon({ item }: { item: PaletteItem }) {
        *  overflows the 52px palette without affecting layout. */}
       <div
         role="tooltip"
-        className="ws-tool-tooltip pointer-events-none absolute left-full top-1/2 z-[80] ml-2 w-[240px] -translate-y-1/2 rounded-md border border-zinc-700/80 bg-zinc-900/95 px-3 py-2 opacity-0 shadow-xl shadow-black/40 transition-opacity duration-150 group-hover:opacity-100 backdrop-blur"
+        className="ws-tool-tooltip pointer-events-none absolute left-full top-1/2 z-[80] ml-2 w-[260px] -translate-y-1/2 rounded-lg border border-zinc-700/80 bg-zinc-900/95 px-3.5 py-3 opacity-0 shadow-xl shadow-black/40 transition-opacity duration-150 group-hover:opacity-100 backdrop-blur"
       >
-        <div className="text-[12px] font-semibold leading-tight text-zinc-100">
+        <div className="text-[15px] font-semibold leading-5 text-white">
           {item.label}
         </div>
-        <div className="mt-0.5 text-[9.5px] uppercase tracking-wide text-zinc-500">
+        <div className="mt-0.5 text-[12.5px] font-semibold uppercase text-zinc-300">
           {item.category}
         </div>
-        <div className="mt-1.5 text-[11px] leading-relaxed text-zinc-400">
+        <div className="mt-1.5 text-[13.5px] leading-5 text-zinc-300">
           {item.description}
         </div>
       </div>

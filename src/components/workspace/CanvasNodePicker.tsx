@@ -452,7 +452,7 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
         onContextMenu={(e) => e.preventDefault()}
       />
       <div
-        className="fixed z-50 w-80 max-w-[calc(100vw-1rem)] rounded-lg border border-zinc-700 bg-zinc-950 shadow-xl lg:w-72"
+        className="fixed z-50 w-[280px] max-w-[calc(100vw-1rem)] rounded-xl border border-zinc-700 bg-zinc-950 shadow-xl"
         style={{
           left: state.screen.x,
           top: state.screen.y,
@@ -461,19 +461,19 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
         onClick={(e) => e.stopPropagation()}
         onMouseLeave={() => setOpenGroup(null)}
       >
-        <div className="border-b border-zinc-800 px-2 py-2 lg:py-1.5">
+        <div className="border-b border-zinc-800 px-2.5 py-2">
           <input
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKey}
             placeholder={t("workspace.picker.add_node")}
-            className="nodrag w-full rounded bg-transparent px-2 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 lg:px-1.5 lg:py-1"
+            className="nodrag w-full rounded-md bg-white/[0.04] px-2.5 py-2 text-[15px] font-medium leading-5 text-zinc-50 outline-none placeholder:text-zinc-400"
           />
         </div>
-        <ul className="relative max-h-[min(22rem,calc(100vh-10rem))] overflow-y-auto p-1 lg:max-h-72">
+        <ul className="relative max-h-[min(20rem,calc(100vh-10rem))] overflow-y-auto p-1.5">
           {visibleRowCount === 0 ? (
-            <li className="px-3 py-4 text-center text-xs italic text-zinc-500">
+            <li className="px-3 py-4 text-center text-[14px] italic text-zinc-300">
               {t("workspace.picker.no_compatible")}
             </li>
           ) : isSearching ? (
@@ -487,15 +487,15 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
                     onClick={() => commit(opt)}
                     onMouseEnter={() => setHighlight(i)}
                     className={cn(
-                      "flex min-h-11 w-full items-center gap-2 rounded px-2 text-left text-xs lg:min-h-0 lg:py-1.5",
+                      "flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[14.5px] font-semibold leading-5",
                       i === highlight
                         ? "bg-zinc-800 text-zinc-100"
                         : "text-zinc-300 hover:bg-zinc-800/60",
                     )}
                   >
-                    <Icon className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                    <Icon className="h-4 w-4 shrink-0 text-zinc-200" />
                     <span className="flex-1 truncate">{opt.label}</span>
-                    <span className="font-mono text-[10px] text-zinc-500">
+                    <span className="text-[12.5px] font-medium text-zinc-300">
                       {opt.portHint}
                     </span>
                   </button>
@@ -536,18 +536,18 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
                       commit(g.children[0]);
                     }}
                     className={cn(
-                      "flex min-h-11 w-full items-center gap-2 rounded px-2 text-left text-xs lg:min-h-0 lg:py-1.5",
+                      "flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[14.5px] font-semibold leading-5",
                       i === highlight
                         ? "bg-zinc-800 text-zinc-100"
                         : "text-zinc-300 hover:bg-zinc-800/60",
                     )}
                   >
-                    <Icon className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                    <Icon className="h-4 w-4 shrink-0 text-zinc-200" />
                     <span className="flex-1 truncate">{g.label}</span>
                     {hasChildren ? (
-                      <Lucide.ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                      <Lucide.ChevronRight className="h-4 w-4 shrink-0 text-zinc-300" />
                     ) : (
-                      <span className="font-mono text-[10px] text-zinc-500">
+                      <span className="text-[12.5px] font-medium text-zinc-300">
                         {onlyChild.portHint}
                       </span>
                     )}
@@ -567,14 +567,14 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
               if (!g || g.children.length <= 1) return null;
               return (
                 <div
-                  className="absolute left-full ml-2 w-56 rounded-lg border border-zinc-700 bg-zinc-950 shadow-xl lg:w-52"
+                  className="absolute left-full ml-2 w-52 rounded-xl border border-zinc-700 bg-zinc-950 shadow-xl"
                   style={{
                     top: flyoutAnchor ? flyoutAnchor.top : 0,
                     animation: "canvas-picker-flyout-in 100ms ease-out",
                   }}
                   onMouseEnter={() => setOpenGroup(g.key)}
                 >
-                  <ul className="max-h-[min(18rem,calc(100vh-12rem))] overflow-y-auto p-1 lg:max-h-72">
+                  <ul className="max-h-[min(18rem,calc(100vh-12rem))] overflow-y-auto p-1.5">
                     {g.children.map((opt, j) => {
                       const ChildIcon = (Lucide as any)[opt.icon] ?? Lucide.Box;
                       return (
@@ -584,13 +584,13 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
                             onClick={() => commit(opt)}
                             onMouseEnter={() => setChildHighlight(j)}
                             className={cn(
-                              "flex min-h-11 w-full items-center gap-2 rounded px-2 text-left text-xs lg:min-h-0 lg:py-1.5",
+                              "flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[14.5px] font-semibold leading-5",
                               j === childHighlight
                                 ? "bg-zinc-800 text-zinc-100"
                                 : "text-zinc-300 hover:bg-zinc-800/60",
                             )}
                           >
-                            <ChildIcon className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                            <ChildIcon className="h-4 w-4 shrink-0 text-zinc-200" />
                             <span className="flex-1 truncate">
                               {opt.portHint.replace(/^→\s*/, "")}
                             </span>
@@ -604,7 +604,7 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
             })()
           : null}
 
-        <div className="border-t border-zinc-800 px-2 py-1 text-[10px] text-zinc-500">
+        <div className="border-t border-zinc-800 px-3 py-2 text-[12.5px] font-medium text-zinc-300">
           {t("workspace.picker.hint_row")}
         </div>
       </div>

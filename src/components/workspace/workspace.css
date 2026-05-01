@@ -465,19 +465,19 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   /* Reserve space above the body for the floating title — keeps
    * adjacent nodes from overlapping the label region when nodes
    * are placed close together. */
-  padding-top: 22px;
+  padding-top: 30px;
 }
 
 .ws-clean-title {
   position: absolute;
-  top: 0;
+  top: 2px;
   left: 4px;
   right: 4px;
-  height: 20px;
+  height: 24px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 4px;
+  gap: 8px;
+  padding: 0 5px;
   pointer-events: none; /* re-enabled on the input below */
 }
 .ws-clean-title-icon {
@@ -485,10 +485,12 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
    * (Film vs Image vs Music vs Box) reads at canvas zoom. The
    * tint comes from inline `style.color` on the icon element so
    * each AssetNode broadcasts its fieldType in the title. */
-  width: 15px;
-  height: 15px;
+  width: 17px;
+  height: 17px;
   flex-shrink: 0;
   opacity: 1;
+  color: hsl(0 0% 92%) !important;
+  filter: drop-shadow(0 1px 2px hsl(0 0% 0% / 0.65));
 }
 .ws-clean-title-input {
   flex: 1;
@@ -496,16 +498,18 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   background: transparent;
   border: none;
   outline: none;
-  font-size: 12px;
-  font-weight: 600;
-  color: hsl(0 0% 92%);
+  font-size: 15.5px;
+  line-height: 20px;
+  font-weight: 700;
+  color: hsl(0 0% 100%);
   text-overflow: ellipsis;
   white-space: nowrap;
   overflow: hidden;
   pointer-events: auto; /* override the wrapper's pointer-events: none */
+  text-shadow: 0 1px 2px hsl(0 0% 0% / 0.85);
 }
 .ws-clean-title-input::placeholder {
-  color: hsl(0 0% 35%);
+  color: hsl(0 0% 72%);
 }
 
 /* Body — one rounded card. No inner section borders. */
@@ -580,15 +584,14 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
 
 /* Tiny credit-cost badge that sits inside the floating title row. */
 .ws-compact-header-badge {
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
   color: hsl(258 90% 78%);
   background: hsl(258 90% 50% / 0.15);
   border: 1px solid hsl(258 90% 50% / 0.3);
-  border-radius: 4px;
-  padding: 2px 5px;
+  border-radius: 999px;
+  padding: 1px 7px;
   flex-shrink: 0;
 }
 
