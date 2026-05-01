@@ -123,6 +123,28 @@
   --port-cx: 50%;
 }
 
+/* Invisible bridge between the node body and the floated port.
+ * Without this, the port reveals on node:hover, but moving across
+ * the tiny empty gap toward the connector drops node:hover before
+ * the cursor reaches the Handle. The pseudo-element belongs to the
+ * Handle, so that gap keeps the Handle hovered and prevents the
+ * connector from snapping closed under the user's cursor. */
+.react-flow__handle.workspace-handle::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  bottom: -8px;
+  width: 24px;
+  background: transparent;
+  pointer-events: auto;
+}
+.react-flow__handle.workspace-handle[data-port-anchor="left"]::before {
+  right: -16px;
+}
+.react-flow__handle.workspace-handle[data-port-anchor="right"]::before {
+  left: -16px;
+}
+
 /* Glyph (Lucide icon) sits inside the Handle — pointer-events off
  * so the hit area belongs to the Handle div, not the SVG. */
 .workspace-handle .ws-port-glyph {
