@@ -574,10 +574,17 @@ const WorkspaceDashboardInner = () => {
       {/* Create-project dialog — replaces native prompt(). Mounted
        *  at the page level so any of the dashboard's "+ New project"
        *  triggers (sidebar, ProjectsCard, empty state) all open the
-       *  same controlled dialog. */}
+       *  same controlled dialog. The default color rotates by
+       *  current project count so each new project lands on a
+       *  different palette slot without the user picking. */}
       <CreateProjectDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
+        defaultColor={
+          PROJECT_COLOR_SWATCHES[
+            projects.length % PROJECT_COLOR_SWATCHES.length
+          ]
+        }
         onCreate={handleConfirmCreateProject}
       />
     </div>
