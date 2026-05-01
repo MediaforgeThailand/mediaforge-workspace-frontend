@@ -64,6 +64,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { cn } from "@/lib/utils";
+import NodePreviewLightbox, { type PreviewPayload } from "./NodePreviewLightbox";
 
 type AssetKind = "image" | "video" | "audio" | "3d";
 
@@ -76,6 +77,7 @@ type GenerationAsset = {
   modelLabel?: string;
   prompt?: string;
   projectId: string | null;
+  workspaceId: string | null;
   canvasId: string | null;
   nodeId: string | null;
   createdAt: string;        // ISO
@@ -145,6 +147,7 @@ export default function AssetsView({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [preview, setPreview] = useState<PreviewPayload | null>(null);
 
   // Generation assets — live-paged from workspace_generation_jobs.
   const [genAssets, setGenAssets] = useState<GenerationAsset[]>([]);
@@ -164,7 +167,7 @@ export default function AssetsView({
       const { data, error } = await supabase
         .from("workspace_generation_jobs")
         .select(
-          "id, status, node_type, provider, model, request, result, created_at, project_id, canvas_id, node_id",
+          "id, status, node_type, provider, model, request, result, created_at, project_id, workspace_id, canvas_id, node_id",
         )
         .eq("user_id", user.id)
         .eq("status", "completed")
@@ -214,6 +217,7 @@ export default function AssetsView({
             modelLabel: (row.model as string | null) ?? (row.node_type as string),
             prompt: promptText,
             projectId: (row.project_id as string | null) ?? null,
+            workspaceId: (row.workspace_id as string | null) ?? null,
             canvasId: (row.canvas_id as string | null) ?? null,
             nodeId: (row.node_id as string | null) ?? null,
             createdAt: row.created_at as string,
@@ -375,6 +379,35 @@ export default function AssetsView({
     }
     return out;
   }, [filteredAssets]);
+
+  const openAssetPreview = useCallback((asset: Asset) => {
+    const label =
+      asset.source === "generation"
+        ? asset.prompt || asset.modelLabel || "Generation"
+        : asset.name;
+    const caption =
+      asset.source === "generation"
+        ? [asset.modelLabel, formatRelative(asset.createdAt)].filter(Boolean).join(" · ")
+        : formatRelative(asset.createdAt);
+
+    if (asset.kind === "3d") {
+      setPreview({
+        type: "model3d",
+        model_url: asset.url,
+        poster: asset.source === "generation" ? asset.thumbnailUrl : undefined,
+        label,
+        caption,
+      });
+      return;
+    }
+
+    setPreview({
+      type: asset.kind,
+      url: asset.url,
+      label,
+      caption,
+    });
+  }, []);
 
   return (
     <div className="flex h-full min-h-0 w-full overflow-hidden text-zinc-100">
@@ -603,10 +636,17 @@ export default function AssetsView({
                       <AssetCard
                         key={`${a.source}-${a.id}`}
                         asset={a}
-                        onOpenCanvas={(canvasId, nodeId) => {
-                          const qp = new URLSearchParams({ canvas: canvasId });
-                          if (nodeId) qp.set("node", nodeId);
-                          navigate(`/app/workspace?${qp.toString()}`);
+                        onPreview={openAssetPreview}
+                        onOpenCanvas={(asset) => {
+                          const qp = new URLSearchParams();
+                          if (asset.canvasId) qp.set("canvas", asset.canvasId);
+                          if (asset.nodeId) qp.set("node", asset.nodeId);
+                          const query = qp.toString();
+                          if (asset.workspaceId) {
+                            navigate(`/app/workspace/${asset.workspaceId}${query ? `?${query}` : ""}`);
+                            return;
+                          }
+                          navigate(`/app/workspace${query ? `?${query}` : ""}`);
                         }}
                       />
                     ))}
@@ -628,6 +668,12 @@ export default function AssetsView({
           )}
         </div>
       </main>
+      {preview && (
+        <NodePreviewLightbox
+          preview={preview}
+          onClose={() => setPreview(null)}
+        />
+      )}
     </div>
   );
 }
@@ -710,10 +756,12 @@ function SubNav({
 
 function AssetCard({
   asset,
+  onPreview,
   onOpenCanvas,
 }: {
   asset: Asset;
-  onOpenCanvas: (canvasId: string, nodeId: string | null) => void;
+  onPreview: (asset: Asset) => void;
+  onOpenCanvas: (asset: GenerationAsset) => void;
 }) {
   const Icon = KIND_ICON[asset.kind];
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -749,12 +797,24 @@ function AssetCard({
       onMouseLeave={() => setHovered(false)}
       onTouchStart={() => setHovered(true)}
     >
-      <div className="relative aspect-video w-full overflow-hidden bg-black/40">
+      <div
+        className="relative aspect-video w-full cursor-zoom-in overflow-hidden bg-black/40"
+        role="button"
+        tabIndex={0}
+        title="Open preview"
+        onClick={() => onPreview(asset)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onPreview(asset);
+          }
+        }}
+      >
         {asset.kind === "video" ? (
           <video
             ref={videoRef}
             src={asset.url}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover pointer-events-none"
             muted
             loop
             playsInline
@@ -769,7 +829,7 @@ function AssetCard({
             <img
               src={asset.thumbnailUrl}
               alt=""
-              className="h-full w-full object-cover"
+              className="h-full w-full object-cover pointer-events-none"
               loading="lazy"
             />
           ) : (
@@ -781,7 +841,7 @@ function AssetCard({
           <img
             src={asset.url}
             alt=""
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover pointer-events-none"
             loading="lazy"
           />
         )}
@@ -799,15 +859,19 @@ function AssetCard({
             href={asset.url}
             target="_blank"
             rel="noreferrer"
+            onClick={(event) => event.stopPropagation()}
             className="rounded-md bg-black/60 p-1.5 text-zinc-200 hover:bg-black/80 hover:text-white"
             title="Open / download"
           >
             <Download className="h-3 w-3" />
           </a>
-          {asset.source === "generation" && asset.canvasId && (
+          {asset.source === "generation" && (asset.workspaceId || asset.canvasId) && (
             <button
               type="button"
-              onClick={() => onOpenCanvas(asset.canvasId!, asset.nodeId)}
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenCanvas(asset);
+              }}
               className="rounded-md bg-black/60 p-1.5 text-zinc-200 hover:bg-black/80 hover:text-white"
               title="Open in space"
             >
