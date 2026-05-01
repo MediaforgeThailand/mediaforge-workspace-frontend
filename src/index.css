@@ -1024,3 +1024,15 @@
   to   { opacity: 1; transform: translateX(0); }
 }
 .anim-slideInR { animation: mf-slide-in-right .45s cubic-bezier(.22,1,.36,1) both; }
+
+/* Global scrollbar policy: keep scrolling usable, never show native scrollbars. */
+* {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+*::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
