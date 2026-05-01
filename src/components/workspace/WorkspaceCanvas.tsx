@@ -96,6 +96,7 @@ import ShortcutsDialog from "./ShortcutsDialog";
 import { useCanvasToolStore } from "./useCanvasToolStore";
 import { useWorkspaceShortcuts } from "./useWorkspaceShortcuts";
 import { useCanvasAutosave } from "./useCanvasAutosave";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const VIEWPORT_KEY = (canvasId: string) => `workspace-viewport-${canvasId}`;
 const STORAGE_BUCKET = "ai-media";
@@ -453,6 +454,7 @@ const Inner = () => {
     getEdges,
   } = useReactFlow();
   const { user } = useAuth();
+  const { t } = useLanguage();
   // Viewer-mode flag — when true, the canvas renders read-only:
   // no node drags, no new connections, no marquee selection (still
   // selectable so the lightbox/preview affordances work, just no
@@ -517,7 +519,7 @@ const Inner = () => {
   const uploadAsset = useCallback(
     async (file: File, position: XYPosition) => {
       if (!user) {
-        toast.error("Please log in to upload files");
+        toast.error(t("workspace.toast.login_to_upload"));
         return;
       }
       // 200 MB cap — covers Thai-creator typical workflows (4k video
@@ -543,9 +545,7 @@ const Inner = () => {
       // route them straight into a 3d-typed AssetNode.
       const isModel3d = /\.(glb|gltf|usdz|obj|fbx)$/i.test(file.name);
       if (!isImage && !isVideo && !isAudio && !isModel3d) {
-        toast.error(
-          "Supported files: image, video, audio, 3D model (.glb / .gltf / .usdz / .obj / .fbx)",
-        );
+        toast.error(t("workspace.toast.supported_files"));
         return;
       }
 
@@ -602,7 +602,7 @@ const Inner = () => {
         .upload(storagePath, file, { contentType: file.type, upsert: true });
 
       if (upErr) {
-        toast.error(`Upload failed: ${file.name}`);
+        toast.error(t("workspace.toast.upload_failed", { name: file.name }));
         updateNodeData(nodeId, { uploading: false });
         URL.revokeObjectURL(localPreview);
         return;
@@ -947,16 +947,16 @@ const Inner = () => {
   const onCtxDownloadSingle = useCallback((node: Node) => {
     const downloadable = getNodeDownloadable(node);
     if (!downloadable) {
-      toast.error("Nothing to download — node has no output yet");
+      toast.error(t("workspace.toast.nothing_dl_no_output"));
       return;
     }
     void downloadFromUrl(downloadable.url, downloadable.label);
-  }, []);
+  }, [t]);
 
   const onCtxDownloadAllGenerations = useCallback(async (node: Node) => {
     const refs = harvestAssetsFromNode(node);
     if (refs.length === 0) {
-      toast.error("Nothing to download — node has no generations yet");
+      toast.error(t("workspace.toast.nothing_dl_no_gens"));
       return;
     }
     if (refs.length === 1) {
@@ -965,28 +965,28 @@ const Inner = () => {
       void downloadFromUrl(refs[0].url, refs[0].filename);
       return;
     }
-    const id = toast.loading(`Bundling ${refs.length} assets...`);
+    const id = toast.loading(t("workspace.toast.bundling", { count: refs.length }));
     try {
       const res = await bundleNodesAsZip([node]);
       if (res.succeeded === 0) {
         toast.error(
-          `Bundle failed${res.firstError ? `: ${res.firstError}` : ""}`,
+          res.firstError ? t("workspace.toast.bundle_failed_reason", { reason: res.firstError }) : t("workspace.toast.bundle_failed"),
           { id },
         );
         return;
       }
       const partial =
         res.failed > 0
-          ? ` (${res.failed} failed: ${res.firstError ?? "unknown"})`
+          ? t("workspace.toast.partial_suffix", { failed: res.failed, reason: res.firstError ?? "unknown" })
           : "";
-      toast.success(`Downloaded ${res.bundleName}${partial}`, { id });
+      toast.success(t("workspace.toast.downloaded", { name: res.bundleName, partial }), { id });
     } catch (err) {
       toast.error(
-        `Bundle failed: ${err instanceof Error ? err.message : String(err)}`,
+        t("workspace.toast.bundle_failed_reason", { reason: err instanceof Error ? err.message : String(err) }),
         { id },
       );
     }
-  }, []);
+  }, [t]);
 
   const onCtxDownloadZip = useCallback(async (nodes: Node[]) => {
     // Aggregate harvest count up front so we can show an accurate
@@ -995,31 +995,31 @@ const Inner = () => {
     // files to the ZIP).
     const refs = nodes.flatMap((n) => harvestAssetsFromNode(n));
     if (refs.length === 0) {
-      toast.error("Nothing to download — selection has no output yet");
+      toast.error(t("workspace.toast.nothing_dl_selection"));
       return;
     }
-    const id = toast.loading(`Bundling ${refs.length} assets...`);
+    const id = toast.loading(t("workspace.toast.bundling", { count: refs.length }));
     try {
       const res = await bundleNodesAsZip(nodes);
       if (res.succeeded === 0) {
         toast.error(
-          `Bundle failed${res.firstError ? `: ${res.firstError}` : ""}`,
+          res.firstError ? t("workspace.toast.bundle_failed_reason", { reason: res.firstError }) : t("workspace.toast.bundle_failed"),
           { id },
         );
         return;
       }
       const partial =
         res.failed > 0
-          ? ` (${res.failed} failed: ${res.firstError ?? "unknown"})`
+          ? t("workspace.toast.partial_suffix", { failed: res.failed, reason: res.firstError ?? "unknown" })
           : "";
-      toast.success(`Downloaded ${res.bundleName}${partial}`, { id });
+      toast.success(t("workspace.toast.downloaded", { name: res.bundleName, partial }), { id });
     } catch (err) {
       toast.error(
-        `Bundle failed: ${err instanceof Error ? err.message : String(err)}`,
+        t("workspace.toast.bundle_failed_reason", { reason: err instanceof Error ? err.message : String(err) }),
         { id },
       );
     }
-  }, []);
+  }, [t]);
 
   const onCtxDuplicate = useCallback(
     (nodes: Node[]) => {
@@ -1086,7 +1086,7 @@ const Inner = () => {
       const items: NodeContextMenuItem[] = [
         {
           key: "download",
-          label: "Download",
+          label: t("workspace.nodemenu.download"),
           icon: CtxDownloadIcon,
           disabled: !downloadable,
           onSelect: () => onCtxDownloadSingle(node),
@@ -1095,7 +1095,7 @@ const Inner = () => {
       if (gens.length > 1) {
         items.push({
           key: "download-all-gens",
-          label: `Download all generations (${gens.length})`,
+          label: t("workspace.nodemenu.download_all_gens", { count: gens.length }),
           icon: CtxFilesIcon,
           onSelect: () => void onCtxDownloadAllGenerations(node),
         });
@@ -1103,14 +1103,14 @@ const Inner = () => {
       items.push(
         {
           key: "duplicate",
-          label: "Duplicate",
+          label: t("workspace.nodemenu.duplicate"),
           icon: CtxCopyIcon,
           separatorBefore: true,
           onSelect: () => onCtxDuplicate([node]),
         },
         {
           key: "delete",
-          label: "Delete",
+          label: t("workspace.nodemenu.delete"),
           icon: CtxTrash2Icon,
           danger: true,
           onSelect: () => onCtxDelete([node]),
@@ -1127,21 +1127,21 @@ const Inner = () => {
     return [
       {
         key: "download-zip",
-        label: `Download all (${targets.length} items) as ZIP`,
+        label: t("workspace.nodemenu.download_zip", { count: targets.length }),
         icon: CtxFileArchiveIcon,
         disabled: downloadable === 0,
         onSelect: () => void onCtxDownloadZip(targets),
       },
       {
         key: "duplicate-all",
-        label: `Duplicate all (${targets.length})`,
+        label: t("workspace.nodemenu.duplicate_all", { count: targets.length }),
         icon: CtxCopyIcon,
         separatorBefore: true,
         onSelect: () => onCtxDuplicate(targets),
       },
       {
         key: "delete-all",
-        label: `Delete all (${targets.length})`,
+        label: t("workspace.nodemenu.delete_all", { count: targets.length }),
         icon: CtxTrash2Icon,
         danger: true,
         onSelect: () => onCtxDelete(targets),
@@ -1154,6 +1154,7 @@ const Inner = () => {
     onCtxDownloadZip,
     onCtxDuplicate,
     onCtxDelete,
+    t,
   ]);
 
   /** Picking a tool from the right-click menu spawns it at the
@@ -1212,7 +1213,7 @@ const Inner = () => {
         // files go through the existing uploadAsset flow.
         window.dispatchEvent(new CustomEvent("workspace-trigger-upload"));
       } else if (item.action === "stock") {
-        toast.info("Stock library coming soon");
+        toast.info(t("workspace.toast.stock_soon"));
       }
       setContextMenu(null);
     },
@@ -2106,7 +2107,7 @@ const Inner = () => {
               y: window.innerHeight / 2,
             });
             await uploadAsset(file, centre);
-            toast.success("Cropped image added to canvas");
+            toast.success(t("workspace.crop.toast_added_canvas"));
           }}
         />
       )}

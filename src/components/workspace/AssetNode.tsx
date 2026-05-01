@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { useFreshSignedUrl } from "./useFreshSignedUrl";
 import { PortIcon } from "./PortIcon";
 import { MiniSelect } from "./CompactParamWidgets";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export interface AssetNodeData {
   /** Editable label — this is what @-mentions reference. */
@@ -54,13 +55,21 @@ export type ReferenceRole =
   | "object"
   | "pose";
 
-const REFERENCE_ROLE_OPTIONS: Array<{ value: ReferenceRole; label: string }> = [
-  { value: "general", label: "General" },
-  { value: "subject", label: "Subject (face / identity)" },
-  { value: "scene", label: "Scene / background" },
-  { value: "style", label: "Style / palette" },
-  { value: "object", label: "Object / product" },
-  { value: "pose", label: "Pose / composition" },
+type RoleLabelKey =
+  | "workspace.node.role_general"
+  | "workspace.node.role_subject"
+  | "workspace.node.role_scene"
+  | "workspace.node.role_style"
+  | "workspace.node.role_object"
+  | "workspace.node.role_pose";
+
+const REFERENCE_ROLE_OPTIONS: Array<{ value: ReferenceRole; labelKey: RoleLabelKey }> = [
+  { value: "general", labelKey: "workspace.node.role_general" },
+  { value: "subject", labelKey: "workspace.node.role_subject" },
+  { value: "scene", labelKey: "workspace.node.role_scene" },
+  { value: "style", labelKey: "workspace.node.role_style" },
+  { value: "object", labelKey: "workspace.node.role_object" },
+  { value: "pose", labelKey: "workspace.node.role_pose" },
 ];
 
 const PORT_COLOR: Record<AssetNodeData["fieldType"], string> = {
@@ -73,6 +82,7 @@ const PORT_COLOR: Record<AssetNodeData["fieldType"], string> = {
 const AssetNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as unknown as AssetNodeData;
   const { setNodes } = useReactFlow();
+  const { t } = useLanguage();
   // Re-sign the previewUrl on mount in case it was generated under
   // the old 24h TTL and has since expired. Falls back to the raw
   // URL untouched for blob:/data: URLs and non-Supabase sources.
@@ -179,7 +189,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
           className="ws-clean-title-input nodrag"
-          placeholder="Name…"
+          placeholder={t("workspace.node.asset_name_placeholder")}
         />
       </div>
 
@@ -231,7 +241,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
                 value={d.referenceType ?? "general"}
                 options={REFERENCE_ROLE_OPTIONS.map((o) => o.value)}
                 optionLabels={Object.fromEntries(
-                  REFERENCE_ROLE_OPTIONS.map((o) => [o.value, o.label]),
+                  REFERENCE_ROLE_OPTIONS.map((o) => [o.value, t(o.labelKey)]),
                 )}
                 onChange={(v) => onRoleChange(v as ReferenceRole)}
                 truncateAt={28}
@@ -351,8 +361,8 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
         className="ws-compact-resize-handle nodrag"
         onPointerDown={onResizeStart}
         onMouseDown={(e) => e.stopPropagation()}
-        title="Drag to resize"
-        aria-label="Resize asset card"
+        title={t("workspace.node.asset_drag_resize")}
+        aria-label={t("workspace.node.asset_resize")}
       />
     </div>
   );

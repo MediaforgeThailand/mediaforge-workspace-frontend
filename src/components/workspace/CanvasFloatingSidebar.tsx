@@ -27,11 +27,13 @@ import {
   Undo2,
   Redo2,
   Settings,
+  Languages,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCanvasToolStore, type CanvasTool } from "./useCanvasToolStore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Props {
   /** Open the categorised tool picker. Receives the screen position
@@ -44,9 +46,19 @@ interface Props {
   onOpenSettings: () => void;
 }
 
+type ToolBtnLabelKey =
+  | "workspace.tools.add_node"
+  | "workspace.tools.select"
+  | "workspace.tools.hand"
+  | "workspace.tools.cut_connector"
+  | "workspace.tools.sticky_note"
+  | "workspace.tools.undo"
+  | "workspace.tools.redo"
+  | "workspace.tools.settings_shortcuts";
+
 interface ToolButton {
   id: CanvasTool | "add" | "undo" | "redo" | "settings";
-  label: string;
+  labelKey: ToolBtnLabelKey;
   shortcut?: string;
   icon: LucideIcon;
   /** Style flag — solid divider above this button. Used to break the
@@ -58,14 +70,14 @@ interface ToolButton {
 }
 
 const BUTTONS: ToolButton[] = [
-  { id: "add", label: "Add node", shortcut: "N", icon: Plus },
-  { id: "select", label: "Select", shortcut: "V", icon: MousePointer2, isMode: true, divider: true },
-  { id: "hand", label: "Hand (hold Space)", shortcut: "H", icon: Hand, isMode: true },
-  { id: "cut", label: "Cut connector", shortcut: "C", icon: Scissors, isMode: true },
-  { id: "sticky", label: "Sticky note", shortcut: "S", icon: StickyNote, isMode: true },
-  { id: "undo", label: "Undo", shortcut: "Ctrl+Z", icon: Undo2, divider: true },
-  { id: "redo", label: "Redo", shortcut: "Ctrl+Shift+Z", icon: Redo2 },
-  { id: "settings", label: "Settings & shortcuts", icon: Settings, divider: true },
+  { id: "add", labelKey: "workspace.tools.add_node", shortcut: "N", icon: Plus },
+  { id: "select", labelKey: "workspace.tools.select", shortcut: "V", icon: MousePointer2, isMode: true, divider: true },
+  { id: "hand", labelKey: "workspace.tools.hand", shortcut: "H", icon: Hand, isMode: true },
+  { id: "cut", labelKey: "workspace.tools.cut_connector", shortcut: "C", icon: Scissors, isMode: true },
+  { id: "sticky", labelKey: "workspace.tools.sticky_note", shortcut: "S", icon: StickyNote, isMode: true },
+  { id: "undo", labelKey: "workspace.tools.undo", shortcut: "Ctrl+Z", icon: Undo2, divider: true },
+  { id: "redo", labelKey: "workspace.tools.redo", shortcut: "Ctrl+Shift+Z", icon: Redo2 },
+  { id: "settings", labelKey: "workspace.tools.settings_shortcuts", icon: Settings, divider: true },
 ];
 
 const CanvasFloatingSidebar = ({ onAddNode, onOpenSettings }: Props) => {
@@ -73,6 +85,7 @@ const CanvasFloatingSidebar = ({ onAddNode, onOpenSettings }: Props) => {
   const setTool = useCanvasToolStore((s) => s.setTool);
   const undo = useWorkspaceStore((s) => s.undo);
   const redo = useWorkspaceStore((s) => s.redo);
+  const { language, setLanguage } = useLanguage();
 
   /* Spacebar = momentary hand tool.
    *
@@ -177,6 +190,15 @@ const CanvasFloatingSidebar = ({ onAddNode, onOpenSettings }: Props) => {
             onClick={(e) => onClick(b, e)}
           />
         ))}
+        {/* Language toggle — sits next to Settings (no divider so the
+         *  two icons read as a paired "preferences" cluster). Label
+         *  shows the TARGET language in its own script, mirroring how
+         *  OS-level language switchers read ("English" while you're
+         *  in Thai → tap to go English). */}
+        <LanguageToggleButton
+          language={language}
+          onToggle={() => setLanguage(language === "th" ? "en" : "th")}
+        />
       </div>
     </div>
   );
@@ -196,7 +218,9 @@ function SidebarButton({
   onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   const [showTip, setShowTip] = useState(false);
+  const { t } = useLanguage();
   const Icon = button.icon;
+  const label = t(button.labelKey);
   return (
     <div className="group relative">
       {button.divider && !isFirst && (
@@ -207,7 +231,7 @@ function SidebarButton({
         onClick={(e) => onClick(e)}
         onMouseEnter={() => setShowTip(true)}
         onMouseLeave={() => setShowTip(false)}
-        aria-label={button.label}
+        aria-label={label}
         aria-pressed={button.isMode ? isActive : undefined}
         className={cn(
           "flex h-11 w-11 items-center justify-center rounded-full transition-colors lg:h-9 lg:w-9",
@@ -220,12 +244,50 @@ function SidebarButton({
       </button>
       {showTip && (
         <div className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded border border-zinc-700 bg-zinc-900/95 px-2 py-1 text-[11px] text-zinc-200 shadow-lg backdrop-blur">
-          <span>{button.label}</span>
+          <span>{label}</span>
           {button.shortcut && (
             <span className="ml-2 font-mono text-[9.5px] text-zinc-500">
               {button.shortcut}
             </span>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * LanguageToggleButton — flips between English and Thai.
+ *
+ * Mirrors the SidebarButton visual but renders a literal target-language
+ * label in the tooltip ("English" / "ภาษาไทย") instead of going through
+ * t(). That way the user sees the destination language in its own script,
+ * which is the universal convention for language switchers.
+ */
+function LanguageToggleButton({
+  language,
+  onToggle,
+}: {
+  language: "en" | "th";
+  onToggle: () => void;
+}) {
+  const [showTip, setShowTip] = useState(false);
+  const targetLabel = language === "th" ? "English" : "ภาษาไทย";
+  return (
+    <div className="group relative">
+      <button
+        type="button"
+        onClick={onToggle}
+        onMouseEnter={() => setShowTip(true)}
+        onMouseLeave={() => setShowTip(false)}
+        aria-label={targetLabel}
+        className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100 lg:h-9 lg:w-9"
+      >
+        <Languages className="h-4 w-4" />
+      </button>
+      {showTip && (
+        <div className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded border border-zinc-700 bg-zinc-900/95 px-2 py-1 text-[11px] text-zinc-200 shadow-lg backdrop-blur">
+          <span>{targetLabel}</span>
         </div>
       )}
     </div>

@@ -55,6 +55,7 @@ import { getNodeDownloadable } from "./NodePreviewLightbox";
 import { downloadFromUrl } from "./downloadAsset";
 import { bundleNodesAsZip, harvestAssetsFromNode } from "./bundleNodes";
 import { cloneNodeFresh } from "./cloneNode";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const TOOL_NODE_TYPES = new Set([
   "imageGenNode",
@@ -108,6 +109,7 @@ const NodeQuickToolbar = memo(() => {
     setNodes,
     setEdges,
   } = useReactFlow();
+  const { t } = useLanguage();
   const viewport = useViewport(); // re-render on pan/zoom
   const groupSelectedNodes = useWorkspaceStore((s) => s.groupSelectedNodes);
   const ungroupNode = useWorkspaceStore((s) => s.ungroupNode);
@@ -448,9 +450,9 @@ const NodeQuickToolbar = memo(() => {
         }),
       );
 
-      toast.success(`Generating ${n} variations in parallel`);
+      toast.success(t("workspace.quicktoolbar.variations_toast", { count: n }));
     },
-    [single, getEdges, setNodes, setEdges, pushHistory],
+    [single, getEdges, setNodes, setEdges, pushHistory, t],
   );
 
   // Single-node download — only surfaces when the selected node has a
@@ -478,31 +480,31 @@ const NodeQuickToolbar = memo(() => {
     if (selected.length === 0) return;
     const refCount = multiDownloadable;
     if (refCount === 0) {
-      toast.error("Nothing to download — selection has no output yet");
+      toast.error(t("workspace.toast.nothing_dl_selection"));
       return;
     }
-    const id = toast.loading(`Bundling ${refCount} assets...`);
+    const id = toast.loading(t("workspace.toast.bundling", { count: refCount }));
     try {
       const res = await bundleNodesAsZip(selected);
       if (res.succeeded === 0) {
         toast.error(
-          `Bundle failed${res.firstError ? `: ${res.firstError}` : ""}`,
+          res.firstError ? t("workspace.toast.bundle_failed_reason", { reason: res.firstError }) : t("workspace.toast.bundle_failed"),
           { id },
         );
         return;
       }
       const partial =
         res.failed > 0
-          ? ` (${res.failed} failed: ${res.firstError ?? "unknown"})`
+          ? t("workspace.toast.partial_suffix", { failed: res.failed, reason: res.firstError ?? "unknown" })
           : "";
-      toast.success(`Downloaded ${res.bundleName}${partial}`, { id });
+      toast.success(t("workspace.toast.downloaded", { name: res.bundleName, partial }), { id });
     } catch (err) {
       toast.error(
-        `Bundle failed: ${err instanceof Error ? err.message : String(err)}`,
+        t("workspace.toast.bundle_failed_reason", { reason: err instanceof Error ? err.message : String(err) }),
         { id },
       );
     }
-  }, [selected, multiDownloadable]);
+  }, [selected, multiDownloadable, t]);
 
   if (!screenPos || selected.length === 0) return null;
 
@@ -522,12 +524,12 @@ const NodeQuickToolbar = memo(() => {
         <>
           <ToolbarBtn
             icon={GroupIcon}
-            label="Group selection"
+            label={t("workspace.quicktoolbar.group_selection")}
             onClick={onGroup}
           />
           <ToolbarBtn
             icon={LayoutGrid}
-            label="Arrange as grid"
+            label={t("workspace.quicktoolbar.arrange_grid")}
             onClick={onArrange}
           />
           {/* Download all as ZIP — same handler as the right-click
@@ -537,7 +539,7 @@ const NodeQuickToolbar = memo(() => {
            *  next to Copy / Delete" requirement. */}
           <ToolbarBtn
             icon={Download}
-            label={`Download all (${selected.length}) as ZIP`}
+            label={t("workspace.quicktoolbar.download_zip", { count: selected.length })}
             onClick={() => void onDownloadMulti()}
           />
           <Separator />
@@ -548,7 +550,7 @@ const NodeQuickToolbar = memo(() => {
         <>
           <ToolbarBtn
             icon={Ungroup}
-            label="Ungroup"
+            label={t("workspace.quicktoolbar.ungroup")}
             onClick={onUngroup}
           />
           <Separator />
@@ -559,7 +561,7 @@ const NodeQuickToolbar = memo(() => {
         <>
           <ToolbarBtn
             icon={Play}
-            label="Run (Ctrl+Enter)"
+            label={t("workspace.quicktoolbar.run_ctrl_enter")}
             onClick={onRunSingle}
           />
           {/* Multi-gen — Freepik-style x1/x2/x3 selector. Only
@@ -574,19 +576,19 @@ const NodeQuickToolbar = memo(() => {
       {!multi && downloadable && (
         <ToolbarBtn
           icon={Download}
-          label="Download"
+          label={t("workspace.quicktoolbar.download")}
           onClick={onDownload}
         />
       )}
 
       <ToolbarBtn
         icon={Copy}
-        label="Duplicate (Ctrl+D)"
+        label={t("workspace.quicktoolbar.duplicate")}
         onClick={onDuplicate}
       />
       <ToolbarBtn
         icon={Trash2}
-        label="Delete (Del)"
+        label={t("workspace.quicktoolbar.delete")}
         onClick={onDelete}
         danger
       />
@@ -658,6 +660,7 @@ function MultiGenButton({
   onOpenChange: (v: boolean) => void;
   onPick: (count: number) => void;
 }) {
+  const { t } = useLanguage();
   if (!open) {
     return (
       <button
@@ -666,10 +669,10 @@ function MultiGenButton({
         disabled={disabled}
         title={
           disabled
-            ? "Wait for the current run to finish before queuing a multi-gen"
-            : "Multi-generate (x2 / x3 parallel runs)"
+            ? t("workspace.quicktoolbar.multi_gen_wait")
+            : t("workspace.quicktoolbar.multi_gen_tip")
         }
-        aria-label="Multi-generate"
+        aria-label={t("workspace.quicktoolbar.multi_gen_aria")}
         className={cn(
           "flex h-7 items-center gap-1 rounded px-1.5 transition-colors",
           disabled
@@ -692,8 +695,8 @@ function MultiGenButton({
           onClick={() => onPick(c)}
           title={
             c === 1
-              ? "Single run (same as Run button)"
-              : `Generate ${c} variations in parallel`
+              ? t("workspace.quicktoolbar.single_run")
+              : t("workspace.quicktoolbar.variations", { count: c })
           }
           aria-label={`x${c}`}
           className={cn(

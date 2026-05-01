@@ -25,6 +25,7 @@ import { useMirroredTripoUrl } from "./useMirroredTripoUrl";
 import { downloadFromUrl } from "./downloadAsset";
 import { loadModelViewer } from "@/lib/loadModelViewer";
 import { ImageCropTool } from "./ImageCropTool";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export interface PreviewPayload {
   type: "image" | "video" | "audio" | "text" | "grid" | "model3d";
@@ -56,6 +57,7 @@ interface Props {
 }
 
 const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
+  const { t } = useLanguage();
   // Crop-tool toggle. When true the lightbox renders the
   // ImageCropTool overlay on top of the preview. Esc / Cancel
   // bubbles back here to close the tool without closing the
@@ -184,7 +186,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="min-w-0 flex-1 truncate">
-          <span className="font-medium">{preview.label ?? "Preview"}</span>
+          <span className="font-medium">{preview.label ?? t("workspace.lightbox.preview_fallback")}</span>
           {preview.caption && (
             <span className="ml-2 text-[11px] text-zinc-500">
               {preview.caption}
@@ -199,12 +201,12 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
             <button
               type="button"
               onClick={() => setCropOpen(true)}
-              title="Crop image"
-              aria-label="Crop image"
+              title={t("workspace.lightbox.crop_image")}
+              aria-label={t("workspace.lightbox.crop_image")}
               className="flex items-center gap-1.5 rounded px-2 py-1 text-[11.5px] text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
             >
               <CropIcon className="h-3.5 w-3.5" />
-              Crop
+              {t("workspace.lightbox.crop")}
             </button>
           )}
           {(preview.type === "image" ||
@@ -216,18 +218,18 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
                 onClick={() =>
                   void downloadFromUrl(preview.url!, preview.label)
                 }
-                title="Download"
-                aria-label="Download"
+                title={t("workspace.lightbox.download")}
+                aria-label={t("workspace.lightbox.download")}
                 className="flex items-center gap-1.5 rounded px-2 py-1 text-[11.5px] text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
               >
                 <Download className="h-3.5 w-3.5" />
-                Download
+                {t("workspace.lightbox.download")}
               </button>
             )}
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close preview"
+            aria-label={t("workspace.lightbox.close_preview")}
             className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
           >
             <X className="h-4 w-4" />
@@ -246,7 +248,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
         {preview.type === "image" && preview.url && (
           <img
             src={preview.url}
-            alt={preview.label ?? "preview"}
+            alt={preview.label ?? t("workspace.lightbox.alt_preview")}
             className="max-h-[86vh] max-w-[90vw] rounded-md object-contain shadow-2xl shadow-black"
             draggable={false}
           />
@@ -290,7 +292,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
                 modelViewerRef.current = el as HTMLElement | null;
               }}
               src={mirroredModelUrl ?? preview.model_url}
-              alt={preview.label ?? "3D model"}
+              alt={preview.label ?? t("workspace.lightbox.alt_3d_model")}
               auto-rotate
               camera-controls
               shadow-intensity="1.2"

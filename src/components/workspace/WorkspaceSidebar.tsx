@@ -37,6 +37,7 @@ import {
   Mic2,
   Plus,
   Settings as SettingsIcon,
+  Languages,
   Crown,
   Palette,
   School,
@@ -128,7 +129,7 @@ export default function WorkspaceSidebar({
 }: WorkspaceSidebarProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, language, setLanguage } = useLanguage();
   const isPscDemoUser = user?.email?.toLowerCase() === "dmd@psc.com";
   // Tenant branding override (e.g. dmd.mediaforge.co → DMD logo +
   // "DMD" short name). Returns null on the bare workspace.mediaforge.co
@@ -252,7 +253,7 @@ export default function WorkspaceSidebar({
             type="button"
             onClick={() => navigate("/app/university")}
             className="flex h-11 w-full items-center gap-2.5 rounded-md border border-fuchsia-400/25 bg-fuchsia-500/10 px-2.5 text-[12.5px] font-semibold text-fuchsia-100 transition-colors hover:bg-fuchsia-500/18 hover:text-white lg:h-9"
-            title="PSC college demo"
+            title={t("workspace.sidebar.psc_demo_tip")}
           >
             <School className="h-3.5 w-3.5" />
             PSC
@@ -264,8 +265,18 @@ export default function WorkspaceSidebar({
       <OrgAdminLink />
 
       {/* ── Bottom utility row ─────────────────────────────────── */}
+      {/* Settings + language toggle sit as a paired "preferences"
+       *  cluster at the bottom of the rail. The language icon is a
+       *  parallel UtilityBtn — same visual weight, no special
+       *  treatment beyond label rendering the TARGET language in its
+       *  own script (universal language-switcher convention). */}
       <div className="flex items-center gap-1 px-3 pb-3 pt-4">
         <UtilityBtn icon={SettingsIcon} title={t("workspace.sidebar.settings")} onClick={() => navigate("/app/settings")} />
+        <UtilityBtn
+          icon={Languages}
+          title={language === "th" ? "English" : "ภาษาไทย"}
+          onClick={() => setLanguage(language === "th" ? "en" : "th")}
+        />
       </div>
     </aside>
   );
@@ -289,7 +300,7 @@ const OrgAdminLink = () => {
         type="button"
         onClick={() => navigate("/app/org-admin")}
         className="flex h-11 w-full items-center gap-2.5 rounded-md px-2.5 text-[12.5px] text-amber-200/90 transition-colors hover:bg-amber-300/10 hover:text-amber-100 lg:h-9"
-        title="Manage organisation members and credits"
+        title={t("workspace.sidebar.manage_org_tip")}
       >
         <Crown className="h-3.5 w-3.5" />
         {t("workspace.sidebar.manage_org")}
@@ -298,7 +309,7 @@ const OrgAdminLink = () => {
         type="button"
         onClick={() => navigate("/app/org-admin/branding")}
         className="flex h-11 w-full items-center gap-2.5 rounded-md px-2.5 text-[12.5px] text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-100 lg:h-9"
-        title="Logo, short name, and subdomains"
+        title={t("workspace.sidebar.branding_tip")}
       >
         <Palette className="h-3.5 w-3.5" />
         {t("workspace.sidebar.branding")}

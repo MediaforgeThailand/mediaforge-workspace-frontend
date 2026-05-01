@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface FreepikResource {
   id: number | string;
@@ -65,25 +66,30 @@ interface FreepikDownloadResponse {
   error?: string;
 }
 
-const STOCK_TYPES = [
-  { value: "all", label: "All" },
-  { value: "photo", label: "Photos" },
-  { value: "vector", label: "Vectors" },
-  { value: "psd", label: "PSD" },
-  { value: "ai", label: "AI" },
+type OptLabelKey =
+  | "workspace.stock.type_all" | "workspace.stock.type_photo" | "workspace.stock.type_vector" | "workspace.stock.type_psd" | "workspace.stock.type_ai"
+  | "workspace.stock.orient_any" | "workspace.stock.orient_horizontal" | "workspace.stock.orient_vertical" | "workspace.stock.orient_square" | "workspace.stock.orient_panoramic"
+  | "workspace.stock.order_relevance" | "workspace.stock.order_recent";
+
+const STOCK_TYPES: Array<{ value: string; labelKey: OptLabelKey }> = [
+  { value: "all", labelKey: "workspace.stock.type_all" },
+  { value: "photo", labelKey: "workspace.stock.type_photo" },
+  { value: "vector", labelKey: "workspace.stock.type_vector" },
+  { value: "psd", labelKey: "workspace.stock.type_psd" },
+  { value: "ai", labelKey: "workspace.stock.type_ai" },
 ];
 
-const ORIENTATIONS = [
-  { value: "all", label: "Any orientation" },
-  { value: "horizontal", label: "Horizontal" },
-  { value: "vertical", label: "Vertical" },
-  { value: "square", label: "Square" },
-  { value: "panoramic", label: "Panoramic" },
+const ORIENTATIONS: Array<{ value: string; labelKey: OptLabelKey }> = [
+  { value: "all", labelKey: "workspace.stock.orient_any" },
+  { value: "horizontal", labelKey: "workspace.stock.orient_horizontal" },
+  { value: "vertical", labelKey: "workspace.stock.orient_vertical" },
+  { value: "square", labelKey: "workspace.stock.orient_square" },
+  { value: "panoramic", labelKey: "workspace.stock.orient_panoramic" },
 ];
 
-const ORDERS = [
-  { value: "relevance", label: "Relevant" },
-  { value: "recent", label: "Recent" },
+const ORDERS: Array<{ value: string; labelKey: OptLabelKey }> = [
+  { value: "relevance", labelKey: "workspace.stock.order_relevance" },
+  { value: "recent", labelKey: "workspace.stock.order_recent" },
 ];
 
 const QUICK_TERMS = [
@@ -110,6 +116,7 @@ function pickLicense(item: FreepikResource): string {
 }
 
 export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
+  const { t } = useLanguage();
   const [query, setQuery] = useState("education classroom");
   const [submittedQuery, setSubmittedQuery] = useState("education classroom");
   const [contentType, setContentType] = useState("all");
@@ -124,8 +131,8 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
 
   const totalLabel = useMemo(() => {
     const total = Number(meta?.total ?? 0);
-    return total ? `${total.toLocaleString()} assets` : "Freepik stock assets";
-  }, [meta?.total]);
+    return total ? t("workspace.stock.assets_count", { count: total.toLocaleString() }) : t("workspace.stock.total_fallback");
+  }, [meta?.total, t]);
 
   const runSearch = async (nextPage = 1) => {
     const term = submittedQuery.trim() || query.trim();
@@ -152,7 +159,7 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
       setMeta(data?.meta ?? null);
       setPage(nextPage);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Search failed";
+      const message = err instanceof Error ? err.message : t("workspace.stock.search_failed");
       setError(message);
       toast.error(message);
     } finally {
@@ -188,11 +195,11 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
       if (invokeError) throw new Error(invokeError.message);
       if (data?.error) throw new Error(data.error);
       const url = data?.data?.signed_url ?? data?.data?.url;
-      if (!url) throw new Error("Freepik did not return a download URL");
+      if (!url) throw new Error(t("workspace.stock.no_url"));
       window.open(url, "_blank", "noopener,noreferrer");
-      toast.success("Download link opened");
+      toast.success(t("workspace.stock.download_opened"));
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Download failed";
+      const message = err instanceof Error ? err.message : t("workspace.stock.download_failed");
       toast.error(message);
     } finally {
       setDownloadingId(null);
@@ -207,14 +214,14 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
             type="button"
             onClick={onOpenSidebar}
             className="grid h-10 w-10 place-items-center rounded-full bg-white/[0.06] text-zinc-100 ring-1 ring-inset ring-white/10 md:hidden"
-            aria-label="Open sidebar"
+            aria-label={t("workspace.stock.open_sidebar")}
           >
             <Menu className="h-4 w-4" />
           </button>
         )}
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">Stock</p>
-          <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Freepik stock search</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">{t("workspace.stock.eyebrow")}</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{t("workspace.stock.heading")}</h1>
           <p className="mt-1 text-sm text-zinc-400">{totalLabel}</p>
         </div>
       </header>
@@ -226,7 +233,7 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search Freepik photos, vectors, PSDs..."
+              placeholder={t("workspace.stock.search_placeholder")}
               className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.05] pl-11 pr-4 text-sm text-white outline-none transition focus:border-sky-400/60 focus:bg-white/[0.07]"
             />
           </label>
@@ -236,7 +243,7 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
             className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-sky-500 px-5 text-sm font-semibold text-white transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            Search
+            {t("workspace.stock.search_button")}
           </button>
         </form>
 
@@ -257,9 +264,9 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
             ))}
           </div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <StockSelect label="Type" value={contentType} onChange={setContentType} options={STOCK_TYPES} />
-            <StockSelect label="Orientation" value={orientation} onChange={setOrientation} options={ORIENTATIONS} />
-            <StockSelect label="Sort" value={order} onChange={setOrder} options={ORDERS} />
+            <StockSelect label={t("workspace.stock.filter_type")} value={contentType} onChange={setContentType} options={STOCK_TYPES} />
+            <StockSelect label={t("workspace.stock.filter_orientation")} value={orientation} onChange={setOrientation} options={ORIENTATIONS} />
+            <StockSelect label={t("workspace.stock.filter_sort")} value={order} onChange={setOrder} options={ORDERS} />
           </div>
         </div>
       </section>
@@ -275,15 +282,15 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
           <div className="grid min-h-[360px] place-items-center rounded-3xl border border-white/10 bg-white/[0.03]">
             <div className="flex items-center gap-3 text-sm text-zinc-300">
               <Loader2 className="h-5 w-5 animate-spin text-sky-300" />
-              Searching Freepik...
+              {t("workspace.stock.searching")}
             </div>
           </div>
         ) : items.length === 0 ? (
           <div className="grid min-h-[360px] place-items-center rounded-3xl border border-dashed border-white/15 bg-white/[0.03] text-center">
             <div>
               <ImageIcon className="mx-auto h-8 w-8 text-zinc-500" />
-              <h2 className="mt-4 text-lg font-semibold text-white">No stock assets found</h2>
-              <p className="mt-1 text-sm text-zinc-400">Try a broader keyword or remove filters.</p>
+              <h2 className="mt-4 text-lg font-semibold text-white">{t("workspace.stock.empty_title")}</h2>
+              <p className="mt-1 text-sm text-zinc-400">{t("workspace.stock.empty_hint")}</p>
             </div>
           </div>
         ) : (
@@ -298,7 +305,7 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
                     {item.image?.source?.url ? (
                       <img
                         src={item.image.source.url}
-                        alt={item.title ?? item.filename ?? "Freepik stock asset"}
+                        alt={item.title ?? item.filename ?? t("workspace.stock.asset_alt")}
                         className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
                         loading="lazy"
                       />
@@ -319,10 +326,10 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
                   <div className="space-y-3 p-4">
                     <div className="min-h-[68px]">
                       <h3 className="line-clamp-2 text-sm font-semibold leading-5 text-white">
-                        {item.title ?? item.filename ?? `Freepik asset ${item.id}`}
+                        {item.title ?? item.filename ?? t("workspace.stock.asset_id_fallback", { id: String(item.id) })}
                       </h3>
                       <p className="mt-1 truncate text-xs text-zinc-500">
-                        {item.author?.name ? `by ${item.author.name}` : "Freepik"}
+                        {item.author?.name ? t("workspace.stock.author_prefix", { name: item.author.name }) : t("workspace.stock.author_fallback")}
                         {item.image?.orientation ? ` · ${item.image.orientation}` : ""}
                       </p>
                     </div>
@@ -335,7 +342,7 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
                     </div>
                     <div className="flex items-center justify-between gap-2">
                       <div className="text-[11px] text-zinc-500">
-                        {formatCount(item.stats?.downloads)} downloads
+                        {t("workspace.stock.downloads_count", { count: formatCount(item.stats?.downloads) })}
                       </div>
                       <div className="flex items-center gap-1.5">
                         {item.url && (
@@ -344,7 +351,7 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
                             target="_blank"
                             rel="noreferrer"
                             className="grid h-9 w-9 place-items-center rounded-xl bg-white/[0.06] text-zinc-200 transition hover:bg-white/[0.12] hover:text-white"
-                            title="Open on Freepik"
+                            title={t("workspace.stock.open_freepik")}
                           >
                             <ExternalLink className="h-4 w-4" />
                           </a>
@@ -360,7 +367,7 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
                           ) : (
                             <Download className="h-3.5 w-3.5" />
                           )}
-                          Download
+                          {t("workspace.stock.download")}
                         </button>
                       </div>
                     </div>
@@ -371,7 +378,7 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
 
             <div className="mt-6 flex flex-col items-center justify-between gap-3 border-t border-white/8 pt-5 sm:flex-row">
               <p className="text-xs text-zinc-500">
-                Page {meta?.current_page ?? page} of {meta?.last_page ?? "?"}
+                {t("workspace.stock.page_of", { current: meta?.current_page ?? page, total: meta?.last_page ?? "?" })}
               </p>
               <div className="flex items-center gap-2">
                 <button
@@ -380,7 +387,7 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
                   onClick={() => void runSearch(page - 1)}
                   className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-zinc-200 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Previous
+                  {t("workspace.stock.previous")}
                 </button>
                 <button
                   type="button"
@@ -388,7 +395,7 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
                   onClick={() => void runSearch(page + 1)}
                   className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Next
+                  {t("workspace.stock.next")}
                 </button>
               </div>
             </div>
@@ -408,8 +415,9 @@ function StockSelect({
   label: string;
   value: string;
   onChange: (value: string) => void;
-  options: Array<{ value: string; label: string }>;
+  options: Array<{ value: string; labelKey: OptLabelKey }>;
 }) {
+  const { t } = useLanguage();
   return (
     <label className="flex min-w-[150px] items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
       <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-500" />
@@ -424,7 +432,7 @@ function StockSelect({
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
-            {option.label}
+            {t(option.labelKey)}
           </option>
         ))}
       </select>

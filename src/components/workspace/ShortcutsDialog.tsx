@@ -16,59 +16,97 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, Keyboard } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
+
+type ScLabelKey =
+  | "workspace.shortcuts.select"
+  | "workspace.shortcuts.hand_momentary"
+  | "workspace.shortcuts.cut_connector"
+  | "workspace.shortcuts.sticky"
+  | "workspace.shortcuts.add_node_picker"
+  | "workspace.shortcuts.right_click_menu"
+  | "workspace.shortcuts.multi_select"
+  | "workspace.shortcuts.add_to_selection"
+  | "workspace.shortcuts.pan"
+  | "workspace.shortcuts.zoom"
+  | "workspace.shortcuts.undo"
+  | "workspace.shortcuts.redo"
+  | "workspace.shortcuts.copy"
+  | "workspace.shortcuts.cut"
+  | "workspace.shortcuts.paste"
+  | "workspace.shortcuts.duplicate"
+  | "workspace.shortcuts.delete"
+  | "workspace.shortcuts.select_all"
+  | "workspace.shortcuts.run_node"
+  | "workspace.shortcuts.open_lightbox"
+  | "workspace.shortcuts.flip_gen"
+  | "workspace.shortcuts.close_dialog";
+
+type ScKeyKey =
+  | "workspace.shortcuts.key_hold_space"
+  | "workspace.shortcuts.key_right_click"
+  | "workspace.shortcuts.key_drag"
+  | "workspace.shortcuts.key_click"
+  | "workspace.shortcuts.key_wheel";
+
+/** Each "key" entry is either a literal string (rendered as-is) or a
+ *  translation key — we discriminate at render time. */
+type Key = string | { tk: ScKeyKey };
 
 interface ShortcutSpec {
-  /** Human-readable description. */
-  label: string;
-  /** Keys, in display order. Use "+" to combine. */
-  keys: string[];
+  labelKey: ScLabelKey;
+  keys: Key[];
 }
 interface ShortcutGroup {
-  title: string;
+  titleKey:
+    | "workspace.shortcuts.group_tools"
+    | "workspace.shortcuts.group_canvas"
+    | "workspace.shortcuts.group_edit"
+    | "workspace.shortcuts.group_run_inspect";
   items: ShortcutSpec[];
 }
 
 const GROUPS: ShortcutGroup[] = [
   {
-    title: "Tools",
+    titleKey: "workspace.shortcuts.group_tools",
     items: [
-      { label: "Select / cursor", keys: ["V"] },
-      { label: "Hand (pan canvas) — momentary", keys: ["Hold Space"] },
-      { label: "Cut connector", keys: ["C"] },
-      { label: "Sticky note", keys: ["S"] },
-      { label: "Add node picker", keys: ["N"] },
+      { labelKey: "workspace.shortcuts.select", keys: ["V"] },
+      { labelKey: "workspace.shortcuts.hand_momentary", keys: [{ tk: "workspace.shortcuts.key_hold_space" }] },
+      { labelKey: "workspace.shortcuts.cut_connector", keys: ["C"] },
+      { labelKey: "workspace.shortcuts.sticky", keys: ["S"] },
+      { labelKey: "workspace.shortcuts.add_node_picker", keys: ["N"] },
     ],
   },
   {
-    title: "Canvas",
+    titleKey: "workspace.shortcuts.group_canvas",
     items: [
-      { label: "Open right-click tool menu", keys: ["Right-click"] },
-      { label: "Multi-select with box drag", keys: ["Drag"] },
-      { label: "Add to selection", keys: ["Shift", "Click"] },
-      { label: "Pan with middle / right mouse drag", keys: ["Drag"] },
-      { label: "Zoom", keys: ["Ctrl", "Wheel"] },
+      { labelKey: "workspace.shortcuts.right_click_menu", keys: [{ tk: "workspace.shortcuts.key_right_click" }] },
+      { labelKey: "workspace.shortcuts.multi_select", keys: [{ tk: "workspace.shortcuts.key_drag" }] },
+      { labelKey: "workspace.shortcuts.add_to_selection", keys: ["Shift", { tk: "workspace.shortcuts.key_click" }] },
+      { labelKey: "workspace.shortcuts.pan", keys: [{ tk: "workspace.shortcuts.key_drag" }] },
+      { labelKey: "workspace.shortcuts.zoom", keys: ["Ctrl", { tk: "workspace.shortcuts.key_wheel" }] },
     ],
   },
   {
-    title: "Edit",
+    titleKey: "workspace.shortcuts.group_edit",
     items: [
-      { label: "Undo", keys: ["Ctrl", "Z"] },
-      { label: "Redo", keys: ["Ctrl", "Shift", "Z"] },
-      { label: "Copy", keys: ["Ctrl", "C"] },
-      { label: "Cut", keys: ["Ctrl", "X"] },
-      { label: "Paste", keys: ["Ctrl", "V"] },
-      { label: "Duplicate", keys: ["Ctrl", "D"] },
-      { label: "Delete selected", keys: ["Del"] },
-      { label: "Select all", keys: ["Ctrl", "A"] },
+      { labelKey: "workspace.shortcuts.undo", keys: ["Ctrl", "Z"] },
+      { labelKey: "workspace.shortcuts.redo", keys: ["Ctrl", "Shift", "Z"] },
+      { labelKey: "workspace.shortcuts.copy", keys: ["Ctrl", "C"] },
+      { labelKey: "workspace.shortcuts.cut", keys: ["Ctrl", "X"] },
+      { labelKey: "workspace.shortcuts.paste", keys: ["Ctrl", "V"] },
+      { labelKey: "workspace.shortcuts.duplicate", keys: ["Ctrl", "D"] },
+      { labelKey: "workspace.shortcuts.delete", keys: ["Del"] },
+      { labelKey: "workspace.shortcuts.select_all", keys: ["Ctrl", "A"] },
     ],
   },
   {
-    title: "Run & inspect",
+    titleKey: "workspace.shortcuts.group_run_inspect",
     items: [
-      { label: "Run selected node", keys: ["Ctrl", "Enter"] },
-      { label: "Open preview lightbox", keys: ["A"] },
-      { label: "Flip to next / previous generation", keys: ["←", "→"] },
-      { label: "Close dialog / cancel", keys: ["Esc"] },
+      { labelKey: "workspace.shortcuts.run_node", keys: ["Ctrl", "Enter"] },
+      { labelKey: "workspace.shortcuts.open_lightbox", keys: ["A"] },
+      { labelKey: "workspace.shortcuts.flip_gen", keys: ["←", "→"] },
+      { labelKey: "workspace.shortcuts.close_dialog", keys: ["Esc"] },
     ],
   },
 ];
@@ -79,6 +117,7 @@ interface Props {
 }
 
 const ShortcutsDialog = ({ open, onClose }: Props) => {
+  const { t } = useLanguage();
   // Esc closes (capture so the canvas's own Esc binding doesn't
   // race us).
   useEffect(() => {
@@ -110,13 +149,13 @@ const ShortcutsDialog = ({ open, onClose }: Props) => {
         <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
           <Keyboard className="h-4 w-4 text-zinc-400" />
           <h2 className="text-sm font-semibold text-zinc-100">
-            Settings · Keyboard shortcuts
+            {t("workspace.shortcuts.heading")}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="ml-auto rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
-            title="Close (Esc)"
+            title={t("workspace.assets_dialog.close_esc")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -125,26 +164,29 @@ const ShortcutsDialog = ({ open, onClose }: Props) => {
         {/* Body — two-column grid on wide, stacks on narrow. */}
         <div className="grid flex-1 grid-cols-1 gap-x-6 gap-y-4 overflow-y-auto p-5 sm:grid-cols-2">
           {GROUPS.map((g) => (
-            <section key={g.title}>
+            <section key={g.titleKey}>
               <h3 className="mb-2 text-[10.5px] font-semibold uppercase tracking-wide text-zinc-500">
-                {g.title}
+                {t(g.titleKey)}
               </h3>
               <ul className="space-y-1.5">
                 {g.items.map((it) => (
                   <li
-                    key={it.label}
+                    key={it.labelKey}
                     className="flex items-center justify-between gap-3 rounded px-2 py-1.5 text-[12.5px] text-zinc-200 odd:bg-zinc-900/40"
                   >
-                    <span className="truncate">{it.label}</span>
+                    <span className="truncate">{t(it.labelKey)}</span>
                     <span className="flex shrink-0 items-center gap-1">
-                      {it.keys.map((k, i) => (
-                        <span key={i} className="flex items-center gap-1">
-                          <Kbd k={k} />
-                          {i < it.keys.length - 1 && (
-                            <span className="text-zinc-600">+</span>
-                          )}
-                        </span>
-                      ))}
+                      {it.keys.map((k, i) => {
+                        const display = typeof k === "string" ? k : t(k.tk);
+                        return (
+                          <span key={i} className="flex items-center gap-1">
+                            <Kbd k={display} />
+                            {i < it.keys.length - 1 && (
+                              <span className="text-zinc-600">+</span>
+                            )}
+                          </span>
+                        );
+                      })}
                     </span>
                   </li>
                 ))}
@@ -154,9 +196,7 @@ const ShortcutsDialog = ({ open, onClose }: Props) => {
         </div>
 
         <div className="border-t border-zinc-800 px-4 py-2 text-[11px] text-zinc-500">
-          Tip: shortcuts only fire while the canvas has focus — clicks
-          on a text input release the bindings until you click back on
-          the canvas.
+          {t("workspace.shortcuts.tip")}
         </div>
       </div>
     </div>,

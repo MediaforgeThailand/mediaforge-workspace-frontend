@@ -62,6 +62,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { cn } from "@/lib/utils";
 import NodePreviewLightbox, { type PreviewPayload } from "./NodePreviewLightbox";
@@ -111,20 +112,33 @@ const KIND_ICON: Record<AssetKind, LucideIcon> = {
   "3d":  Box,
 };
 
-const FILTER_BUTTONS: Array<{ key: FilterKind; label: string; icon: LucideIcon }> = [
-  { key: "all",   label: "All",   icon: LayoutGrid },
-  { key: "image", label: "Image", icon: ImageIcon },
-  { key: "video", label: "Video", icon: Film },
-  { key: "audio", label: "Audio", icon: Music },
-  { key: "3d",    label: "3D",    icon: Box },
+type FilterLabelKey =
+  | "workspace.assets.filter_all"
+  | "workspace.assets.filter_image"
+  | "workspace.assets.filter_video"
+  | "workspace.assets.filter_audio"
+  | "workspace.assets.filter_3d";
+type SideLabelKey =
+  | "workspace.assets.all_assets"
+  | "workspace.assets.spaces"
+  | "workspace.assets.favorites"
+  | "workspace.assets.uploads"
+  | "workspace.assets.trash";
+
+const FILTER_BUTTONS: Array<{ key: FilterKind; labelKey: FilterLabelKey; icon: LucideIcon }> = [
+  { key: "all",   labelKey: "workspace.assets.filter_all",   icon: LayoutGrid },
+  { key: "image", labelKey: "workspace.assets.filter_image", icon: ImageIcon },
+  { key: "video", labelKey: "workspace.assets.filter_video", icon: Film },
+  { key: "audio", labelKey: "workspace.assets.filter_audio", icon: Music },
+  { key: "3d",    labelKey: "workspace.assets.filter_3d",    icon: Box },
 ];
 
-const SIDE_NAV: Array<{ key: SectionKind; label: string; icon: LucideIcon }> = [
-  { key: "all",       label: "All assets", icon: LayoutGrid },
-  { key: "spaces",    label: "All spaces", icon: Folder },
-  { key: "favorites", label: "Favorites",  icon: Star },
-  { key: "uploads",   label: "Uploads",    icon: UploadCloud },
-  { key: "trash",     label: "Trash",      icon: Trash2 },
+const SIDE_NAV: Array<{ key: SectionKind; labelKey: SideLabelKey; icon: LucideIcon }> = [
+  { key: "all",       labelKey: "workspace.assets.all_assets", icon: LayoutGrid },
+  { key: "spaces",    labelKey: "workspace.assets.spaces",     icon: Folder },
+  { key: "favorites", labelKey: "workspace.assets.favorites",  icon: Star },
+  { key: "uploads",   labelKey: "workspace.assets.uploads",    icon: UploadCloud },
+  { key: "trash",     labelKey: "workspace.assets.trash",      icon: Trash2 },
 ];
 
 export default function AssetsView({
@@ -137,6 +151,7 @@ export default function AssetsView({
   onOpenSidebar?: () => void;
 } = {}) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const projects = useWorkspaceStore((s) => s.projects);
 
@@ -175,7 +190,7 @@ export default function AssetsView({
         .range(offset, offset + PAGE - 1);
 
       if (error) {
-        toast.error(`Asset load failed: ${error.message}`);
+        toast.error(t("workspace.assets.load_failed", { error: error.message }));
         return;
       }
       const next: GenerationAsset[] = (data ?? [])
@@ -323,7 +338,7 @@ export default function AssetsView({
         setUploadAssets(items);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        toast.error(`Upload list failed: ${msg}`);
+        toast.error(t("workspace.assets.upload_list_failed", { error: msg }));
       } finally {
         setUploadLoading(false);
       }
@@ -383,12 +398,12 @@ export default function AssetsView({
   const openAssetPreview = useCallback((asset: Asset) => {
     const label =
       asset.source === "generation"
-        ? asset.prompt || asset.modelLabel || "Generation"
+        ? asset.prompt || asset.modelLabel || t("workspace.assets.gen_fallback")
         : asset.name;
     const caption =
       asset.source === "generation"
-        ? [asset.modelLabel, formatRelative(asset.createdAt)].filter(Boolean).join(" · ")
-        : formatRelative(asset.createdAt);
+        ? [asset.modelLabel, formatRelative(asset.createdAt, t)].filter(Boolean).join(" · ")
+        : formatRelative(asset.createdAt, t);
 
     if (asset.kind === "3d") {
       setPreview({
@@ -433,18 +448,18 @@ export default function AssetsView({
         <div className="fixed inset-0 z-50 flex md:hidden">
           <button
             type="button"
-            aria-label="Close filters"
+            aria-label={t("workspace.assets.close_filters")}
             className="absolute inset-0 bg-black/65"
             onClick={() => setDrawerOpen(false)}
           />
           <aside className="relative z-10 h-full w-[268px] max-w-[84vw] overflow-y-auto border-r border-white/5 bg-[hsl(0_0%_5%)]">
             <div className="flex items-center justify-between px-4 py-3">
-              <span className="text-[13px] font-semibold text-zinc-100">Browse</span>
+              <span className="text-[13px] font-semibold text-zinc-100">{t("workspace.assets.browse")}</span>
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
                 className="rounded-md p-1 text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-100"
-                aria-label="Close"
+                aria-label={t("workspace.assets.close")}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -481,7 +496,7 @@ export default function AssetsView({
             <button
               type="button"
               onClick={onOpenSidebar}
-              aria-label="Open menu"
+              aria-label={t("workspace.assets.open_menu")}
               className="-ml-1 flex h-9 w-9 items-center justify-center rounded-md text-zinc-300 hover:bg-white/[0.06] hover:text-white md:hidden"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -498,17 +513,17 @@ export default function AssetsView({
             type="button"
             onClick={() => setDrawerOpen(true)}
             className="rounded-md border border-white/10 bg-white/[0.04] p-1.5 text-zinc-300 hover:bg-white/[0.08] md:hidden"
-            aria-label="Open filters"
-            title="Filters"
+            aria-label={t("workspace.assets.open_filters")}
+            title={t("workspace.assets.filters")}
           >
             <SlidersHorizontal className="h-4 w-4" />
           </button>
           <div className="flex min-w-0 flex-col">
             <h1 className="truncate text-base font-semibold leading-snug text-zinc-100 sm:text-lg">
-              {sectionTitle(section, projects, activeProject)}
+              {sectionTitle(section, projects, activeProject, t)}
             </h1>
             <span className="text-[11px] text-zinc-500">
-              {filteredAssets.length} item{filteredAssets.length === 1 ? "" : "s"}
+              {filteredAssets.length} {filteredAssets.length === 1 ? t("workspace.assets.item_singular") : t("workspace.assets.item_plural")}
             </span>
           </div>
           <div className="ml-auto flex items-center gap-1.5">
@@ -529,7 +544,7 @@ export default function AssetsView({
                         : "text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100",
                     )}
                   >
-                    <Icon className="h-3 w-3" /> {b.label}
+                    <Icon className="h-3 w-3" /> {t(b.labelKey)}
                   </button>
                 );
               })}
@@ -542,7 +557,7 @@ export default function AssetsView({
             >
               {FILTER_BUTTONS.map((b) => (
                 <option key={b.key} value={b.key} className="bg-zinc-900">
-                  {b.label}
+                  {t(b.labelKey)}
                 </option>
               ))}
             </select>
@@ -554,7 +569,7 @@ export default function AssetsView({
                 "rounded-md p-1.5 text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-100",
                 searchOpen && "bg-white/[0.06] text-zinc-100",
               )}
-              aria-label="Search"
+              aria-label={t("workspace.assets.search")}
             >
               <SearchIcon className="h-3.5 w-3.5" />
             </button>
@@ -574,7 +589,7 @@ export default function AssetsView({
                 }
               }}
               className="rounded-md p-1.5 text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-100"
-              aria-label="Refresh"
+              aria-label={t("workspace.assets.refresh")}
             >
               <RefreshCcw className="h-3.5 w-3.5" />
             </button>
@@ -589,7 +604,7 @@ export default function AssetsView({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search prompt, model, or file name…"
+                placeholder={t("workspace.assets.search_placeholder")}
                 autoFocus
                 className="w-full bg-transparent text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600"
               />
@@ -598,7 +613,7 @@ export default function AssetsView({
                   type="button"
                   onClick={() => setSearchQuery("")}
                   className="rounded-md p-1 text-zinc-400 hover:bg-white/[0.05]"
-                  aria-label="Clear search"
+                  aria-label={t("workspace.assets.clear_search")}
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -660,7 +675,7 @@ export default function AssetsView({
                     onClick={() => void fetchGenPage(genAssets.length)}
                     className="rounded-md border border-white/10 bg-white/[0.04] px-4 py-2 text-xs text-zinc-300 hover:bg-white/[0.08] hover:text-zinc-100"
                   >
-                    Load more
+                    {t("workspace.assets.load_more")}
                   </button>
                 </div>
               )}
@@ -679,7 +694,7 @@ export default function AssetsView({
            * `${user.id}/...` is enforced. */
           onCropConfirmed={async (blob, filename) => {
             if (!user) {
-              toast.error("Sign in required to save crop");
+              toast.error(t("workspace.crop.toast_signin_required"));
               return;
             }
             const ext = filename.match(/\.([^.]+)$/)?.[1] ?? "png";
@@ -691,10 +706,10 @@ export default function AssetsView({
                 upsert: false,
               });
             if (upErr) {
-              toast.error(`Crop save failed: ${upErr.message}`);
+              toast.error(t("workspace.crop.toast_save_failed", { error: upErr.message }));
               throw upErr;
             }
-            toast.success("Cropped image saved to your library");
+            toast.success(t("workspace.crop.toast_saved_library"));
             // Re-trigger the uploads listing so the new file shows
             // up. Cheapest signal: flip and restore the section.
             if (section === "uploads") {
@@ -723,10 +738,11 @@ function SubNav({
   setActiveProject: (id: string | null) => void;
   projects: Array<{ id: string; name: string }>;
 }) {
+  const { t } = useLanguage();
   return (
     <div className="flex flex-col">
       <div className="px-3 py-3 text-[11px] font-medium uppercase tracking-[0.16em] text-zinc-500">
-        Browse
+        {t("workspace.assets.browse")}
       </div>
       <nav className="flex flex-col gap-0.5 px-2 pb-2">
         {SIDE_NAV.map((it) => {
@@ -744,7 +760,7 @@ function SubNav({
                   : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100",
               )}
             >
-              <Icon className="h-3.5 w-3.5" /> {it.label}
+              <Icon className="h-3.5 w-3.5" /> {t(it.labelKey)}
             </button>
           );
         })}
@@ -753,7 +769,7 @@ function SubNav({
         <div className="border-t border-white/5 pt-2">
           <div className="flex items-center justify-between px-3 pb-1">
             <span className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
-              Projects
+              {t("workspace.assets.projects_heading")}
             </span>
           </div>
           <div className="flex flex-col gap-0.5 px-2 pb-4">
@@ -793,6 +809,7 @@ function AssetCard({
   onPreview: (asset: Asset) => void;
   onOpenCanvas: (asset: GenerationAsset) => void;
 }) {
+  const { t } = useLanguage();
   const Icon = KIND_ICON[asset.kind];
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [hovered, setHovered] = useState(false);
@@ -813,11 +830,11 @@ function AssetCard({
     asset.kind === "video"
       ? asset.source === "generation" && asset.durationSec
         ? `${Math.round(asset.durationSec)}s`
-        : "Video"
+        : t("workspace.assets.kind_video")
       : asset.kind === "audio"
-        ? "Audio"
+        ? t("workspace.assets.kind_audio")
         : asset.kind === "3d"
-          ? "3D"
+          ? t("workspace.assets.kind_3d")
           : null;
 
   return (
@@ -831,7 +848,7 @@ function AssetCard({
         className="relative aspect-video w-full cursor-zoom-in overflow-hidden bg-black/40"
         role="button"
         tabIndex={0}
-        title="Open preview"
+        title={t("workspace.assets.open_download")}
         onClick={() => onPreview(asset)}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -891,7 +908,7 @@ function AssetCard({
             rel="noreferrer"
             onClick={(event) => event.stopPropagation()}
             className="rounded-md bg-black/60 p-1.5 text-zinc-200 hover:bg-black/80 hover:text-white"
-            title="Open / download"
+            title={t("workspace.assets.open_download")}
           >
             <Download className="h-3 w-3" />
           </a>
@@ -903,7 +920,7 @@ function AssetCard({
                 onOpenCanvas(asset);
               }}
               className="rounded-md bg-black/60 p-1.5 text-zinc-200 hover:bg-black/80 hover:text-white"
-              title="Open in space"
+              title={t("workspace.assets.open_in_space")}
             >
               <ExternalLink className="h-3 w-3" />
             </button>
@@ -918,7 +935,7 @@ function AssetCard({
           title={asset.source === "generation" ? asset.prompt : asset.name}
         >
           {asset.source === "generation"
-            ? asset.prompt || asset.modelLabel || "Generation"
+            ? asset.prompt || asset.modelLabel || t("workspace.assets.gen_fallback")
             : asset.name}
         </div>
         <div className="flex items-center gap-1 text-[10px] text-zinc-500">
@@ -926,7 +943,7 @@ function AssetCard({
             <span className="truncate">{asset.modelLabel}</span>
           )}
           <span className="ml-auto whitespace-nowrap">
-            {formatRelative(asset.createdAt)}
+            {formatRelative(asset.createdAt, t)}
           </span>
         </div>
       </div>
@@ -935,9 +952,10 @@ function AssetCard({
 }
 
 function CenterLoader() {
+  const { t } = useLanguage();
   return (
     <div className="flex h-full items-center justify-center text-zinc-500">
-      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
+      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("workspace.assets.loading")}
     </div>
   );
 }
@@ -949,15 +967,16 @@ function EmptyState({
   section: SectionKind;
   hasFilter: boolean;
 }) {
+  const { t } = useLanguage();
   const msg = hasFilter
-    ? "No assets match your filter — try a different type or clear the search."
+    ? t("workspace.assets.no_filter_match")
     : section === "uploads"
-      ? "Nothing uploaded here yet — drop a file in any tool's reference slot to populate this list."
-      : "No generations yet — run any image, video, or 3D node and it'll show up here.";
+      ? t("workspace.assets.no_uploads")
+      : t("workspace.assets.no_generations");
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-zinc-500">
       <ImageIcon className="h-8 w-8 text-zinc-600" />
-      <div className="text-sm">No assets</div>
+      <div className="text-sm">{t("workspace.assets.no_assets")}</div>
       <div className="max-w-xs text-xs text-zinc-600">{msg}</div>
     </div>
   );
@@ -970,27 +989,27 @@ function PlaceholderTab({
   section: SectionKind;
   onGoTo: () => void;
 }) {
+  const { t } = useLanguage();
   const titles: Record<SectionKind, string> = {
-    all: "All assets",
-    spaces: "All spaces",
-    favorites: "Favorites",
-    uploads: "Uploads",
-    trash: "Trash",
+    all: t("workspace.assets.all_assets"),
+    spaces: t("workspace.assets.spaces"),
+    favorites: t("workspace.assets.favorites"),
+    uploads: t("workspace.assets.uploads"),
+    trash: t("workspace.assets.trash"),
   };
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-zinc-500">
       <SlidersHorizontal className="h-8 w-8 text-zinc-600" />
       <div className="text-sm font-medium text-zinc-300">{titles[section]}</div>
       <div className="max-w-xs text-xs text-zinc-600">
-        Coming soon — this view will let you star and recover assets across
-        spaces. For now, head to All assets.
+        {t("workspace.assets.placeholder_hint")}
       </div>
       <button
         type="button"
         onClick={onGoTo}
         className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-zinc-200 hover:bg-white/[0.08]"
       >
-        Go to All assets
+        {t("workspace.assets.go_to_all")}
       </button>
     </div>
   );
@@ -1000,27 +1019,31 @@ function sectionTitle(
   section: SectionKind,
   projects: Array<{ id: string; name: string }>,
   activeProject: string | null,
+  t: (key: string, params?: Record<string, string | number>) => string,
 ): string {
   if (activeProject) {
-    return projects.find((p) => p.id === activeProject)?.name ?? "Project";
+    return projects.find((p) => p.id === activeProject)?.name ?? t("workspace.assets.project_fallback");
   }
   switch (section) {
-    case "all":       return "All assets";
-    case "spaces":    return "All spaces";
-    case "favorites": return "Favorites";
-    case "uploads":   return "Uploads";
-    case "trash":     return "Trash";
+    case "all":       return t("workspace.assets.all_assets");
+    case "spaces":    return t("workspace.assets.spaces");
+    case "favorites": return t("workspace.assets.favorites");
+    case "uploads":   return t("workspace.assets.uploads");
+    case "trash":     return t("workspace.assets.trash");
   }
 }
 
-function formatRelative(iso: string): string {
+function formatRelative(
+  iso: string,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): string {
   const d = new Date(iso);
   const diffMin = Math.floor((Date.now() - d.getTime()) / 60_000);
-  if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffMin < 1) return t("workspace.assets.relative_just_now");
+  if (diffMin < 60) return t("workspace.assets.relative_minutes", { n: diffMin });
   const h = Math.floor(diffMin / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return t("workspace.assets.relative_hours", { n: h });
   const days = Math.floor(h / 24);
-  if (days < 7) return `${days}d ago`;
+  if (days < 7) return t("workspace.assets.relative_days", { n: days });
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }

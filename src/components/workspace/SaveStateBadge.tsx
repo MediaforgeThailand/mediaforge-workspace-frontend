@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import { Check, CloudOff, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SaveState } from "./useCanvasAutosave";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type Variant = "inline" | "block";
 
@@ -27,6 +28,7 @@ interface Props {
 
 const SaveStateBadge = ({ variant = "block", className }: Props) => {
   const [state, setState] = useState<SaveState>("idle");
+  const { t } = useLanguage();
   useEffect(() => {
     const onState = (e: Event) => {
       const detail = (e as CustomEvent<{ state: SaveState }>).detail;
@@ -56,22 +58,22 @@ const SaveStateBadge = ({ variant = "block", className }: Props) => {
     viewer: null,
     "editor-readonly": null,
     saving: {
-      label: "Saving…",
+      label: t("workspace.save.saving"),
       icon: Loader2,
       color: "text-amber-300",
     },
     saved: {
-      label: "Saved",
+      label: t("workspace.save.saved"),
       icon: Check,
       color: "text-emerald-300",
     },
     error: {
-      label: "Save failed — retry on next change",
+      label: t("workspace.save.error_msg"),
       icon: CloudOff,
       color: "text-rose-300",
     },
     tableMissing: {
-      label: "Local-only (apply migration to enable cloud autosave)",
+      label: t("workspace.save.table_missing"),
       icon: CloudOff,
       color: "text-amber-300/80",
     },
@@ -100,7 +102,7 @@ const SaveStateBadge = ({ variant = "block", className }: Props) => {
         {/* Compact label — only show short status words inline.
          *  Long error strings stay as the tooltip. */}
         <span className="truncate">
-          {state === "saving" ? "Saving" : state === "saved" ? "Saved" : "Offline"}
+          {state === "saving" ? t("workspace.save.saving_short") : state === "saved" ? t("workspace.save.saved") : t("workspace.save.offline")}
         </span>
       </span>
     );

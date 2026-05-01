@@ -33,6 +33,7 @@ import {
   Settings as SettingsIcon,
   Sun,
   Moon,
+  Languages,
   LogOut,
   CreditCard,
   Sparkles,
@@ -46,7 +47,7 @@ import { useCredits } from "@/hooks/useCredits";
 export function UserMenu() {
   const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
-  const { t } = useLanguage();
+  const { t, language, setLanguage } = useLanguage();
   const { theme, setTheme } = useTheme();
   const { credits, loading: creditsLoading } = useCredits();
 
@@ -180,6 +181,23 @@ export function UserMenu() {
             <Moon className="h-3.5 w-3.5 text-zinc-400" />
           )}
           {theme === "dark" ? t("workspace.usermenu.theme_to_light") : t("workspace.usermenu.theme_to_dark")}
+        </DropdownMenuItem>
+
+        {/* Language toggle — flips between English / Thai. Same
+         *  preventDefault trick as the theme toggle so the menu stays
+         *  open and the user can read the new label immediately. The
+         *  visible label is rendered in the TARGET language (the one
+         *  you'd switch to), mirroring how OS-level language switchers
+         *  read ("English" while you're in Thai → tap to go English). */}
+        <DropdownMenuItem
+          onSelect={(e) => {
+            e.preventDefault();
+            setLanguage(language === "th" ? "en" : "th");
+          }}
+          className="min-h-11 cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50 lg:min-h-0"
+        >
+          <Languages className="h-3.5 w-3.5 text-zinc-400" />
+          {language === "th" ? "English" : "ภาษาไทย"}
         </DropdownMenuItem>
 
         <DropdownMenuSeparator className="bg-white/[0.06]" />

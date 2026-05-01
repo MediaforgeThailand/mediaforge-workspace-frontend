@@ -28,6 +28,7 @@ import {
 import { Group as GroupIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PortIcon } from "./PortIcon";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type OutputType = "image" | "video" | "audio";
 
@@ -45,6 +46,7 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
   const d = (data ?? {}) as GroupNodeData;
   const { setNodes } = useReactFlow();
   const allNodes = useNodes();
+  const { t } = useLanguage();
 
   /* ── Compute which output ports to render ──────────────────
    * Walk every child (parentId === this group) and collect the
@@ -151,13 +153,13 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
       <div className="absolute -top-7 left-2 flex items-center gap-1.5 rounded-md bg-zinc-900/90 px-2 py-0.5 text-[11px] font-medium text-zinc-200 shadow-sm backdrop-blur">
         <GroupIcon className="h-3 w-3 shrink-0 text-zinc-500" />
         <input
-          value={d.label ?? "New group"}
+          value={d.label ?? t("workspace.node.group_new_group")}
           onChange={(e) => updateLabel(e.target.value)}
           onMouseDown={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
           className="nodrag w-32 truncate bg-transparent text-zinc-200 outline-none"
-          placeholder="New group"
+          placeholder={t("workspace.node.group_new_group")}
         />
       </div>
 
@@ -171,14 +173,14 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
        *  edge.sourceHandle so the right media flows down. Icons
        *  cluster at the top-right of the group frame so they read
        *  the same as every other workspace node. */}
-      {outputTypes.map((t, i) => (
+      {outputTypes.map((kind, i) => (
         <PortIcon
-          key={t}
+          key={kind}
           dir="source"
-          handleId={t}
-          label={`Group ${t} output`}
-          portType={t}
-          color={PORT_COLOR[t]}
+          handleId={kind}
+          label={t("workspace.node.group_output_label", { kind })}
+          portType={kind}
+          color={PORT_COLOR[kind]}
           index={i}
         />
       ))}
