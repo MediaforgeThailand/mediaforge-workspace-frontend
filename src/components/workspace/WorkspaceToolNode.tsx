@@ -971,6 +971,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
         storeState.addGeneration(id, {
           id: (globalThis.crypto?.randomUUID?.() ?? String(Date.now())),
+          job_id: jobId,
           type: r.type,
           url: r.url,
           text: r.text,
@@ -1628,6 +1629,143 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     },
     [getEdges, getNodes, id, isRunning, isViewer, runNode, setEdges, setNodes],
   );
+
+  useEffect(() => {
+    const knownJobId = d.backgroundJobId ?? null;
+    const canRecoverByNode =
+      !knownJobId && (runStatus === "processing" || runStatus === "error");
+    if ((!knownJobId && !canRecoverByNode) || d.jobStatus === "completed") return;
+
+    let cancelled = false;
+    let pollTimer: number | null = null;
+
+    const applyCompletedJob = (job: Record<string, unknown>) => {
+      const resolvedJobId = String(job.id ?? knownJobId ?? "");
+      const result = job.result as {
+        type?: "image" | "video" | "text" | "audio";
+        url?: string;
+        text?: string;
+        prompt_used?: string;
+        prompt_source?: string;
+        provider_meta?: { model_url?: string };
+      } | null;
+      if (!result) return;
+
+      const node = getNodes().find((n) => n.id === id);
+      const nodeData = node?.data as NodeData | undefined;
+      const generations = Array.isArray(nodeData?.generations)
+        ? (nodeData.generations as Array<Record<string, unknown>>)
+        : [];
+      const alreadyApplied = generations.some((gen) =>
+        (!!resolvedJobId && gen.job_id === resolvedJobId) ||
+        (!!result.url && gen.url === result.url) ||
+        (!!result.text && gen.text === result.text)
+      );
+
+      if (!alreadyApplied) {
+        useWorkspaceStore.getState().addGeneration(id, {
+          id: (globalThis.crypto?.randomUUID?.() ?? String(Date.now())),
+          job_id: resolvedJobId || undefined,
+          type: result.type ?? "image",
+          url: result.url,
+          text: result.text,
+          model_url: result.provider_meta?.model_url,
+          prompt_used: result.prompt_used,
+          prompt_source: result.prompt_source,
+          createdAt: Date.now(),
+        } as Record<string, unknown>);
+      }
+
+      setNodes((ns) =>
+        ns.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  status: "done",
+                  runStartedAt: null,
+                  activeRunId: null,
+                  backgroundJobId: resolvedJobId || knownJobId,
+                  jobStatus: "completed",
+                  lastRunError: null,
+                },
+              }
+            : n,
+        ),
+      );
+    };
+
+    const checkJob = async () => {
+      let query = supabase
+        .from("workspace_generation_jobs")
+        .select("*");
+
+      if (knownJobId) {
+        query = query.eq("id", knownJobId);
+      } else {
+        const current = useWorkspaceStore.getState().current;
+        query = query.eq("node_id", id).order("created_at", { ascending: false }).limit(1);
+        if (current?.id) query = query.eq("canvas_id", current.id);
+        if (current?.workspaceId) query = query.eq("workspace_id", current.workspaceId);
+      }
+
+      const { data: job, error } = await query.maybeSingle();
+      if (cancelled || error || !job) return;
+
+      const status = String(job.status ?? "");
+      const attempts = Number(job.attempts ?? 0);
+      if (status === "completed") {
+        applyCompletedJob(job as Record<string, unknown>);
+        if (pollTimer != null) window.clearInterval(pollTimer);
+        return;
+      }
+      if (status === "failed" || status === "permanent_failed") {
+        setNodes((ns) =>
+          ns.map((n) =>
+            n.id === id && (n.data as NodeData | undefined)?.status !== "done"
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    status: "error",
+                    runStartedAt: null,
+                    activeRunId: null,
+                    jobStatus: status,
+                    jobAttempts: attempts,
+                    lastRunError: String(job.error ?? job.last_error ?? "Generation failed"),
+                  },
+                }
+              : n,
+          ),
+        );
+        if (pollTimer != null) window.clearInterval(pollTimer);
+        return;
+      }
+
+      setNodes((ns) =>
+        ns.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  jobStatus: status || (n.data as NodeData | undefined)?.jobStatus,
+                  jobAttempts: attempts,
+                },
+              }
+            : n,
+        ),
+      );
+    };
+
+    void checkJob();
+    pollTimer = window.setInterval(() => void checkJob(), 5_000);
+    return () => {
+      cancelled = true;
+      if (pollTimer != null) window.clearInterval(pollTimer);
+    };
+  }, [d.backgroundJobId, d.jobStatus, getNodes, id, runStatus, setNodes]);
 
   /* ── Listen for Ctrl+Enter / Ctrl+Shift+Enter shortcut ────
    * useWorkspaceShortcuts dispatches a `workspace-run-shortcut`
