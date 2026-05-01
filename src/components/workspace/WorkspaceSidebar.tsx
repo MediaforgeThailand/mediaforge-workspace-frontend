@@ -32,6 +32,7 @@ import {
   History as HistoryIcon,
   Workflow,
   Image as ImageIcon,
+  Images,
   Video,
   Mic2,
   Plus,
@@ -81,6 +82,7 @@ type NavItem = {
   labelKey:
     | "workspace.sidebar.home"
     | "workspace.sidebar.all_assets"
+    | "workspace.sidebar.stock"
     | "workspace.sidebar.spaces"
     | "workspace.sidebar.image_gen"
     | "workspace.sidebar.video_gen"
@@ -100,6 +102,7 @@ const NAV_TOP: NavItem[] = [
 
 const NAV_TOOLS: NavItem[] = [
   { id: "spaces",     labelKey: "workspace.sidebar.spaces",      icon: Workflow },
+  { id: "stock",      labelKey: "workspace.sidebar.stock",       icon: Images },
   { id: "image_gen",  labelKey: "workspace.sidebar.image_gen",   icon: ImageIcon },
   { id: "video_gen",  labelKey: "workspace.sidebar.video_gen",   icon: Video },
   { id: "voice_gen",  labelKey: "workspace.sidebar.voice_gen",   icon: Mic2 },
