@@ -41,6 +41,7 @@ import { useToast } from "@/hooks/use-toast";
 import BuyCreditsDialog from "./BuyCreditsDialog";
 import BillingHistoryDialog from "./BillingHistoryDialog";
 import BillingInfoDialog from "./BillingInfoDialog";
+import { AutoRefillSetupDialog } from "./AutoRefillSetupDialog";
 import UpdatePaymentDialog from "./UpdatePaymentDialog";
 import { cn } from "@/lib/utils";
 
@@ -218,40 +219,54 @@ const PlanBilling = () => {
   const billingEmail = billingAddress?.email ?? user?.email ?? "—";
 
   // ── Handlers ─────────────────────────────────────────────────
-  /* Audit fix: the toggle previously just wrote a boolean to
-   * `profiles.subscription_auto_refill` but NOTHING in the
-   * backend consumed that flag — no cron, no webhook, no edge
-   * function actually charged the saved card on low balance. So
-   * users would toggle it on, balance would still hit 0, and they
-   * felt cheated.
+  /* Auto-refill toggle.
    *
-   * Until the proper card-binding-with-OTP flow ships (separate
-   * SetupIntent → 3DS challenge → off-session payment cron), the
-   * toggle is hard-disabled and shows "Coming soon" copy. The
-   * profile column stays in the schema for the future flow.
-   */
-  const AUTO_REFILL_FEATURE_ENABLED = false;
+   * ON: open the AutoRefillSetupDialog → user binds a card via
+   *     Stripe Elements (3DS / OTP fires per bank policy) →
+   *     server does a ฿20 verify charge + immediate refund to
+   *     prove the card actually charges → only then is the toggle
+   *     persisted as `true` and `auto_refill_payment_method_id`
+   *     saved.
+   *
+   * OFF: clear the saved card + flip the boolean. No dialog needed —
+   *     turning off shouldn't gate anything.
+   *
+   * Pre-fix: the toggle just wrote a boolean to profiles with no
+   * downstream effect. Audit caught this as a phantom feature. */
+  const [autoRefillSetupOpen, setAutoRefillSetupOpen] = useState(false);
   const handleAutoRefill = async (next: boolean) => {
     if (!user) return;
-    if (!AUTO_REFILL_FEATURE_ENABLED) {
-      toast({
-        title: "เร็ว ๆ นี้ / Coming soon",
-        description:
-          "ระบบเติมเครดิตอัตโนมัติกำลังพัฒนา — ตอนนี้กรุณาเติมผ่าน PromptPay QR หรือบัตรเองก่อน",
-      });
+    if (next) {
+      // Don't optimistically flip — wait until the dialog finishes
+      // and `onEnabled` fires. Until then the toggle stays off.
+      setAutoRefillSetupOpen(true);
       return;
     }
-    setAutoRefill(next); // optimistic
-    const { error } = await supabase
-      .from("profiles")
-      .update({ subscription_auto_refill: next as unknown as never })
-      .eq("user_id", user.id);
-    if (error) {
-      setAutoRefill(!next);
-      toast({ title: "Could not save", description: error.message, variant: "destructive" });
-    } else {
+    // Disable path: call the edge function to wipe the saved PM
+    // server-side, then refresh the local toggle state.
+    setAutoRefill(false);
+    try {
+      const { error } = await supabase.functions.invoke("setup-autorefill", {
+        body: { action: "disable" },
+      });
+      if (error) throw error;
       await refreshProfile();
+      toast({
+        title: "ปิดใช้งานแล้ว / Auto-refill disabled",
+        description: "บัตรที่ผูกไว้ถูกถอนออก / Saved card detached",
+      });
+    } catch (err) {
+      // Best effort: server fail keeps the local toggle off; the
+      // next refresh will sync.
+      const msg = err instanceof Error ? err.message : String(err);
+      toast({ title: "Could not save", description: msg, variant: "destructive" });
     }
+  };
+
+  // Called by the dialog after verify_and_enable succeeds.
+  const handleAutoRefillEnabled = async () => {
+    setAutoRefill(true);
+    await refreshProfile();
   };
 
   const handleCancelSubscription = async () => {
@@ -355,18 +370,12 @@ const PlanBilling = () => {
               Credits reset every {isAnnual ? "year" : "month"} on renewal.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-zinc-400" title="Auto-refill — coming soon">
-            <span className="flex items-center gap-1">
-              Auto-refill
-              <span className="rounded bg-amber-500/15 px-1 text-[8.5px] font-bold uppercase tracking-wide text-amber-300 ring-1 ring-inset ring-amber-500/30">
-                Soon
-              </span>
-            </span>
+          <div className="flex items-center gap-2 text-[11px] text-zinc-400" title="Auto-refill — top up automatically when balance is low">
+            <span>Auto-refill</span>
             <Switch
-              checked={false}
-              disabled
+              checked={autoRefill}
               onCheckedChange={handleAutoRefill}
-              aria-label="Auto-refill subscription credits (coming soon)"
+              aria-label="Auto-refill credits"
             />
           </div>
         </div>
@@ -606,6 +615,11 @@ const PlanBilling = () => {
         open={showUpdatePayment}
         onOpenChange={setShowUpdatePayment}
         onSaved={() => { void refreshPaymentMethods(); }}
+      />
+      <AutoRefillSetupDialog
+        open={autoRefillSetupOpen}
+        onOpenChange={setAutoRefillSetupOpen}
+        onEnabled={handleAutoRefillEnabled}
       />
 
       {/* Team placeholder — keeps the CTA functional without shipping a real flow yet. */}
