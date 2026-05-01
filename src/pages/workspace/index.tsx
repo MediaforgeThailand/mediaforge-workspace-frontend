@@ -878,7 +878,7 @@ const HomeView = ({
             <button
               type="button"
               onClick={() => onSection("spaces")}
-              className="flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-zinc-300 transition-colors hover:text-white lg:min-h-0"
+              className="flex min-h-11 items-center gap-1.5 text-[14.5px] font-medium text-zinc-300 transition-colors hover:text-white lg:min-h-0"
             >
               {t("workspace.home.my_work")}
               <ChevronRight className="h-3.5 w-3.5 text-zinc-500" />
@@ -887,7 +887,7 @@ const HomeView = ({
 
           <section className="mt-6">
             <div className="flex items-center justify-center border-b border-white/[0.06]">
-              <div className="relative h-11 px-3 text-[12.5px] font-medium text-zinc-50 lg:h-9">
+              <div className="relative h-11 px-3 text-[15.5px] font-medium text-zinc-50 lg:h-9">
                 {t("workspace.home.academy")}
                 <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-t-sm bg-zinc-100" />
               </div>
@@ -922,7 +922,7 @@ const EducationClassDashboard = ({
     <section className="mt-4 rounded-2xl border border-emerald-400/20 bg-[linear-gradient(135deg,hsl(158_64%_16%/0.92),hsl(220_17%_9%/0.98)_55%,hsl(41_84%_18%/0.8))] p-4 shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-[12px] font-semibold text-emerald-100">
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-[13.5px] font-semibold text-emerald-100">
             <GraduationCap className="h-3.5 w-3.5" />
             Education workspace
           </div>
@@ -1041,7 +1041,7 @@ const ProjectsCard = ({
     <>
       <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
         <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-300">
+          <div className="flex items-center gap-1 text-[13.5px] font-semibold uppercase tracking-[0.14em] text-zinc-300">
             {t("workspace.home.projects")}
             <ChevronRight className="h-3 w-3 text-zinc-500" />
           </div>
@@ -1059,7 +1059,7 @@ const ProjectsCard = ({
           <button
             type="button"
             onClick={onCreate}
-            className="flex min-h-[132px] w-full items-center justify-center rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] px-4 text-[12px] text-zinc-500 transition-colors hover:border-white/[0.20] hover:bg-white/[0.04] hover:text-zinc-200"
+            className="flex min-h-[132px] w-full items-center justify-center rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] px-4 text-[13.5px] text-zinc-500 transition-colors hover:border-white/[0.20] hover:bg-white/[0.04] hover:text-zinc-200"
           >
             {t("workspace.home.create_first_project")}
           </button>
@@ -1073,7 +1073,7 @@ const ProjectsCard = ({
                     type="button"
                     onClick={() => onSelect(p.id)}
                     className={cn(
-                      "flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 text-[12.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white lg:min-h-9",
+                      "flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 text-[15.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white lg:min-h-9",
                       activeProjectId === p.id &&
                         "bg-white/[0.07] text-white ring-1 ring-inset ring-white/[0.08]",
                     )}
@@ -1085,13 +1085,13 @@ const ProjectsCard = ({
                       <p.icon className="h-2.5 w-2.5 text-zinc-950" />
                     </span>
                     <span className="flex-1 truncate text-left">{p.name}</span>
-                    <span className="rounded bg-white/[0.05] px-1.5 py-px text-[9px] font-semibold text-zinc-400 ring-1 ring-inset ring-white/[0.06]">
+                    <span className="rounded bg-white/[0.05] px-1.5 py-px text-[10.5px] font-semibold text-zinc-400 ring-1 ring-inset ring-white/[0.06]">
                       {p.spaceCount}
                     </span>
                     {activeProjectId === p.id ? (
                       <span
                         className={cn(
-                          "rounded bg-emerald-500/15 px-1.5 py-px text-[8.5px] font-bold uppercase tracking-wide text-emerald-300 ring-1 ring-inset ring-emerald-500/30 transition-opacity",
+                          "rounded bg-emerald-500/15 px-1.5 py-px text-[13.5px] font-bold uppercase tracking-wide text-emerald-300 ring-1 ring-inset ring-emerald-500/30 transition-opacity",
                           /* Fade the badge so the trash button can
                            * take its slot — but only when this row is
                            * actually deletable. The protected project
@@ -1155,13 +1155,13 @@ const ProjectsCard = ({
             <DialogTitle className="text-base text-zinc-100">
               {t("workspace.home.delete_dialog_title", { name: pendingDelete?.name ?? "" })}
             </DialogTitle>
-            <DialogDescription className="text-[13px] leading-relaxed text-zinc-400">
+            <DialogDescription className="text-[14.5px] leading-relaxed text-zinc-400">
               {t("workspace.home.delete_dialog_desc_pre")}
               <span className="font-semibold text-zinc-200">{t("workspace.home.delete_dialog_desc_target")}</span>
               {t("workspace.home.delete_dialog_desc_post")}
               <br />
               {t("workspace.home.delete_dialog_type")}
-              <span className="rounded bg-red-500/15 px-1.5 py-0.5 font-mono text-[12px] font-semibold text-red-300 ring-1 ring-inset ring-red-500/30">
+              <span className="rounded bg-red-500/15 px-1.5 py-0.5 font-mono text-[13.5px] font-semibold text-red-300 ring-1 ring-inset ring-red-500/30">
                 ยืนยัน
               </span>
               {t("workspace.home.delete_dialog_to_confirm")}
@@ -1182,14 +1182,14 @@ const ProjectsCard = ({
             placeholder={t("workspace.home.delete_dialog_placeholder")}
             spellCheck={false}
             autoComplete="off"
-            className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-red-500/40 focus:ring-1 focus:ring-red-500/20"
+            className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-[14.5px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-red-500/40 focus:ring-1 focus:ring-red-500/20"
           />
 
           <DialogFooter className="gap-2 sm:gap-2">
             <button
               type="button"
               onClick={closeDialog}
-              className="inline-flex h-9 items-center justify-center rounded-md bg-white/[0.06] px-4 text-[13px] font-medium text-zinc-200 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.09] hover:text-white"
+              className="inline-flex h-9 items-center justify-center rounded-md bg-white/[0.06] px-4 text-[14.5px] font-medium text-zinc-200 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.09] hover:text-white"
             >
               {t("workspace.home.delete_dialog_cancel")}
             </button>
@@ -1198,7 +1198,7 @@ const ProjectsCard = ({
               onClick={confirmDelete}
               disabled={!canConfirm}
               className={cn(
-                "inline-flex h-9 items-center justify-center gap-1.5 rounded-md px-4 text-[13px] font-semibold transition-colors",
+                "inline-flex h-9 items-center justify-center gap-1.5 rounded-md px-4 text-[14.5px] font-semibold transition-colors",
                 canConfirm
                   ? "bg-red-500/90 text-white hover:bg-red-500"
                   : "cursor-not-allowed bg-red-500/20 text-red-300/50",
@@ -1241,7 +1241,7 @@ const SpacesShowcaseCard = ({
         <button
           type="button"
           onClick={onSeeAll}
-          className="flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-300 transition-colors hover:text-white"
+          className="flex items-center gap-1 text-[13.5px] font-semibold uppercase tracking-[0.14em] text-zinc-300 transition-colors hover:text-white"
         >
           {t("workspace.home.spaces")}
           <ChevronRight className="h-3 w-3 text-zinc-500" />
@@ -1260,7 +1260,7 @@ const SpacesShowcaseCard = ({
         <button
           type="button"
           onClick={onNew}
-          className="flex min-h-[150px] w-full items-center justify-center rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] px-4 text-[12px] text-zinc-500 transition-colors hover:border-white/[0.20] hover:bg-white/[0.04] hover:text-zinc-200"
+          className="flex min-h-[150px] w-full items-center justify-center rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] px-4 text-[13.5px] text-zinc-500 transition-colors hover:border-white/[0.20] hover:bg-white/[0.04] hover:text-zinc-200"
         >
           {t("workspace.home.create_first_space")}
         </button>
@@ -1277,10 +1277,10 @@ const SpacesShowcaseCard = ({
                 <CanvasMinimap nodes={ws.nodes} edges={ws.edges} />
               </div>
               <div className="px-1 pb-0.5 text-left">
-                <div className="truncate text-[11.5px] font-medium text-zinc-100">
+                <div className="truncate text-[14.5px] font-medium text-zinc-100">
                   {ws.name}
                 </div>
-                <div className="text-[10px] text-zinc-500">
+                <div className="text-[13.5px] text-zinc-500">
                   {timeAgo(ws.updatedAt)}
                 </div>
               </div>
@@ -1306,7 +1306,7 @@ const ToolsCard = ({
         <button
           type="button"
           onClick={() => onOpen(tools[0]?.id ?? "image_gen")}
-          className="flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-300 transition-colors hover:text-white"
+          className="flex items-center gap-1 text-[13.5px] font-semibold uppercase tracking-[0.14em] text-zinc-300 transition-colors hover:text-white"
         >
           {t("workspace.home.tools")}
           <ChevronRight className="h-3 w-3 text-zinc-500" />
@@ -1319,7 +1319,7 @@ const ToolsCard = ({
             <button
               type="button"
               onClick={() => onOpen(tool.id)}
-              className="group/tool flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 text-[12.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white lg:min-h-9"
+              className="group/tool flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 text-[15.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white lg:min-h-9"
             >
               <span
                 className="flex h-5 w-5 items-center justify-center rounded-md ring-1 ring-inset ring-white/[0.08]"
@@ -1329,7 +1329,7 @@ const ToolsCard = ({
               </span>
               <span className="min-w-0 flex-1 text-left">
                 <span className="block truncate">{tool.label}</span>
-                <span className="block truncate text-[10px] text-zinc-600 group-hover/tool:text-zinc-400">
+                <span className="block truncate text-[13.5px] text-zinc-600 group-hover/tool:text-zinc-400">
                   {tool.subtitle}
                 </span>
               </span>
@@ -1356,14 +1356,14 @@ const AcademyVideoTile = ({ video }: { video: AcademyVideo }) => (
     </video>
     <div className="flex items-start justify-between gap-4 p-4">
       <div className="min-w-0">
-        <h3 className="truncate text-[13px] font-semibold text-zinc-100">
+        <h3 className="truncate text-[14.5px] font-semibold text-zinc-100">
           {video.title}
         </h3>
-        <p className="mt-1 line-clamp-2 text-[11.5px] leading-5 text-zinc-500">
+        <p className="mt-1 line-clamp-2 text-[14.5px] leading-5 text-zinc-500">
           {video.description}
         </p>
       </div>
-      <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-1 text-[10px] font-semibold text-zinc-400 ring-1 ring-inset ring-white/[0.08]">
+      <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-1 text-[13.5px] font-semibold text-zinc-400 ring-1 ring-inset ring-white/[0.08]">
         {video.duration}
       </span>
     </div>
@@ -1694,7 +1694,7 @@ const SpacesView = ({
             <h1 className="text-[40px] font-bold leading-none tracking-tight text-zinc-50 md:text-[48px] lg:text-[56px]">
               {t("workspace.spaces.title")}
             </h1>
-            <p className="mt-3 text-[14px] text-zinc-400">
+            <p className="mt-3 text-[15.5px] text-zinc-400">
               {t("workspace.spaces.subtitle")}
             </p>
           </header>
@@ -1709,7 +1709,7 @@ const SpacesView = ({
               <button
                 type="button"
                 onClick={handleNew}
-                className="flex h-11 items-center gap-1.5 rounded-lg bg-white/[0.06] px-3.5 text-[13px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.12] lg:h-9"
+                className="flex h-11 items-center gap-1.5 rounded-lg bg-white/[0.06] px-3.5 text-[14.5px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.12] lg:h-9"
               >
                 <Plus className="h-3.5 w-3.5" /> {t("workspace.spaces.new_space")}
               </button>
@@ -1791,7 +1791,7 @@ const SpacesTabs = ({
             type="button"
             onClick={() => onChange(it.key)}
             className={cn(
-              "flex h-11 items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-medium transition-colors lg:h-8",
+              "flex h-11 items-center gap-1.5 rounded-lg px-3 text-[15.5px] font-medium transition-colors lg:h-8",
               active
                 ? "bg-white/[0.08] text-zinc-50 ring-1 ring-inset ring-white/[0.06]"
                 : "text-zinc-400 hover:text-zinc-200",
@@ -1832,7 +1832,7 @@ const SpaceToolbar = ({ onNew }: { onNew: () => void }) => {
       <button
         type="button"
         onClick={onNew}
-        className="flex items-center gap-1.5 rounded-md bg-white/[0.06] px-3 py-1.5 text-[12px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.1]"
+        className="flex items-center gap-1.5 rounded-md bg-white/[0.06] px-3 py-1.5 text-[13.5px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.1]"
       >
         <Plus className="h-3.5 w-3.5" /> {t("workspace.spaces.new_space")}
       </button>
@@ -1877,10 +1877,10 @@ const SpaceCard = ({
         </div>
 
         <div className="px-3.5 py-3">
-          <div className="truncate text-[13px] font-semibold leading-tight text-zinc-50">
+          <div className="truncate text-[14.5px] font-semibold leading-tight text-zinc-50">
             {ws.name}
           </div>
-          <div className="mt-1 text-[11px] text-zinc-500">
+          <div className="mt-1 text-[15.5px] text-zinc-500">
             {timeAgo(ws.updatedAt)}
           </div>
         </div>
@@ -1954,7 +1954,7 @@ const PageHeader = ({
         </svg>
       </button>
     )}
-    <h1 className="flex-1 truncate text-[14px] font-medium tracking-tight text-zinc-300">
+    <h1 className="flex-1 truncate text-[15.5px] font-medium tracking-tight text-zinc-300">
       {title}
     </h1>
     {rightSlot}
@@ -1963,7 +1963,7 @@ const PageHeader = ({
 };
 
 const MonthHeader = ({ label }: { label: string }) => (
-  <div className="mb-3 flex items-center gap-2 text-[12.5px] text-zinc-400">
+  <div className="mb-3 flex items-center gap-2 text-[15.5px] text-zinc-400">
     <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full ring-1 ring-inset ring-white/15">
       <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
     </span>
@@ -1980,7 +1980,7 @@ const ChromePill = ({
 }) => (
   <button
     type="button"
-    className="flex h-8 items-center gap-1.5 rounded-md bg-white/[0.04] px-2.5 text-[11.5px] text-zinc-300 ring-1 ring-inset ring-white/[0.06] transition-colors hover:bg-white/[0.08] hover:text-zinc-100"
+    className="flex h-8 items-center gap-1.5 rounded-md bg-white/[0.04] px-2.5 text-[14.5px] text-zinc-300 ring-1 ring-inset ring-white/[0.06] transition-colors hover:bg-white/[0.08] hover:text-zinc-100"
   >
     <span>{label}</span>
     {Icon && <Icon className="h-3.5 w-3.5 text-zinc-500" />}
@@ -2023,13 +2023,13 @@ const EmptyState = ({
   cta?: { label: string; onClick: () => void };
 }) => (
   <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-5 py-14 text-center md:px-10 md:py-20">
-    <div className="text-[15px] font-semibold text-zinc-200">{title}</div>
-    <p className="mt-2 text-[12.5px] text-zinc-500">{hint}</p>
+    <div className="text-[16.5px] font-semibold text-zinc-200">{title}</div>
+    <p className="mt-2 text-[15.5px] text-zinc-500">{hint}</p>
     {cta && (
       <button
         type="button"
         onClick={cta.onClick}
-        className="mt-5 inline-flex min-h-11 items-center gap-1.5 rounded-md bg-white/[0.08] px-4 text-[12px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.10] transition-colors hover:bg-white/[0.12] lg:min-h-0 lg:py-1.5"
+        className="mt-5 inline-flex min-h-11 items-center gap-1.5 rounded-md bg-white/[0.08] px-4 text-[13.5px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.10] transition-colors hover:bg-white/[0.12] lg:min-h-0 lg:py-1.5"
       >
         <Plus className="h-3.5 w-3.5" />
         {cta.label}
