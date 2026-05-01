@@ -28,7 +28,7 @@
  * for the Spaces tab — already battle-tested for cross-device sync.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -42,6 +42,7 @@ import {
   upsertWorkspaceToServer,
   deleteWorkspaceFromServer,
   listServerCanvasIds,
+  loadLatestCanvasPreviewsByWorkspaceIds,
   saveCanvasToServer,
 } from "@/components/workspace/canvasPersistence";
 import {
@@ -141,15 +142,25 @@ const FALLBACK_H = 320;
 function pickPreviewCanvasId(
   workspaceId: string,
   canvases: ReadonlyArray<{ id: string; workspaceId: string; updatedAt: number }>,
+  graphs?: Record<string, { nodes?: unknown[]; edges?: unknown[] } | undefined>,
 ): string | null {
-  let best: { id: string; updatedAt: number } | null = null;
-  for (const c of canvases) {
-    if (c.workspaceId !== workspaceId) continue;
-    if (!best || c.updatedAt > best.updatedAt) {
-      best = { id: c.id, updatedAt: c.updatedAt };
-    }
-  }
-  return best?.id ?? null;
+  const matches = canvases
+    .filter((c) => c.workspaceId === workspaceId)
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+  if (matches.length === 0) return null;
+  if (!graphs) return matches[0].id;
+
+  const withContent = matches.find((c) => {
+    const graph = graphs[c.id];
+    return (graph?.nodes?.length ?? 0) > 0;
+  });
+  return withContent?.id ?? matches[0].id;
+}
+
+function graphHasPreviewContent(
+  graph: { nodes?: unknown[]; edges?: unknown[] } | undefined,
+): boolean {
+  return (graph?.nodes?.length ?? 0) > 0;
 }
 
 /** "5 minutes ago" / "yesterday" / "Apr 12". */
@@ -685,6 +696,60 @@ const ACADEMY_VIDEOS: AcademyVideo[] = [
   },
 ];
 
+function useHydrateSpacePreviewGraphs(
+  workspaceIds: string[],
+  userId: string | undefined,
+  authLoading: boolean,
+) {
+  const replaceCanvasGraph = useWorkspaceStore((s) => s.replaceCanvasGraph);
+  const requestedRef = useRef<Set<string>>(new Set());
+  const signature = workspaceIds.join("|");
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!userId) {
+      requestedRef.current.clear();
+      return;
+    }
+
+    const state = useWorkspaceStore.getState();
+    const missing = workspaceIds.filter((workspaceId) => {
+      if (requestedRef.current.has(workspaceId)) return false;
+      const previewCanvasId = pickPreviewCanvasId(
+        workspaceId,
+        state.canvases,
+        state.graphs,
+      );
+      const previewGraph = previewCanvasId
+        ? state.graphs[previewCanvasId]
+        : undefined;
+      return !graphHasPreviewContent(previewGraph);
+    });
+
+    if (missing.length === 0) return;
+    for (const workspaceId of missing) requestedRef.current.add(workspaceId);
+
+    let cancelled = false;
+    loadLatestCanvasPreviewsByWorkspaceIds(missing).then((graphs) => {
+      if (cancelled) return;
+      if (!graphs) {
+        for (const workspaceId of missing) requestedRef.current.delete(workspaceId);
+        return;
+      }
+      for (const graph of graphs) {
+        replaceCanvasGraph(graph);
+      }
+    }).catch((err) => {
+      for (const workspaceId of missing) requestedRef.current.delete(workspaceId);
+      console.warn("[workspace-dashboard] preview hydration failed:", err);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, replaceCanvasGraph, signature, userId, workspaceIds]);
+}
+
 const HomeView = ({
   onSection,
   projects,
@@ -800,7 +865,7 @@ const HomeView = ({
   /* Recent spaces — top 3 by updatedAt with rendered minimaps so the
    * Home preview stays fixed-width and never pushes the Tools column
    * off-screen when a project has many spaces. */
-  const recentSpaces = useMemo(() => {
+  const recentWorkspaceIds = useMemo(() => {
     return [...workspaces]
       .filter(
         (ws) =>
@@ -808,8 +873,18 @@ const HomeView = ({
       )
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, 3)
+      .map((ws) => ws.id);
+  }, [activeProjectId, workspaces]);
+
+  useHydrateSpacePreviewGraphs(recentWorkspaceIds, user?.id, authLoading);
+
+  const recentSpaces = useMemo(() => {
+    const recentIds = new Set(recentWorkspaceIds);
+    return [...workspaces]
+      .filter((ws) => recentIds.has(ws.id))
+      .sort((a, b) => b.updatedAt - a.updatedAt)
       .map((ws) => buildSpaceCardData(ws, canvases, graphs));
-  }, [activeProjectId, workspaces, canvases, graphs]);
+  }, [recentWorkspaceIds, workspaces, canvases, graphs]);
 
   const handleNew = () => {
     const { workspaceId } = createWorkspace(t("workspace.spaces.untitled_space"), activeProjectId);
@@ -1382,22 +1457,52 @@ function buildSpaceCardData(
   graphs: Record<string, { nodes?: unknown[]; edges?: unknown[] } | undefined>,
 ): SpaceCardData {
   const wsCanvases = canvases.filter((c) => c.workspaceId === ws.id);
-  const previewCanvasId = pickPreviewCanvasId(ws.id, canvases);
+  const previewCanvasId = pickPreviewCanvasId(ws.id, canvases, graphs);
   const graph = previewCanvasId ? graphs[previewCanvasId] : null;
 
   const rawNodes = (graph?.nodes ?? []) as Array<Record<string, unknown>>;
+  const rawById = new Map(rawNodes.map((n) => [String(n.id), n] as const));
+  const absolutePositionOf = (node: Record<string, unknown>) => {
+    let x = ((node.position as { x?: number } | undefined)?.x ?? 0);
+    let y = ((node.position as { y?: number } | undefined)?.y ?? 0);
+    let parentId =
+      typeof node.parentId === "string"
+        ? node.parentId
+        : typeof node.parentNode === "string"
+          ? node.parentNode
+          : null;
+    const seen = new Set<string>();
+    while (parentId && !seen.has(parentId)) {
+      seen.add(parentId);
+      const parent = rawById.get(parentId);
+      if (!parent) break;
+      x += (parent.position as { x?: number } | undefined)?.x ?? 0;
+      y += (parent.position as { y?: number } | undefined)?.y ?? 0;
+      parentId =
+        typeof parent.parentId === "string"
+          ? parent.parentId
+          : typeof parent.parentNode === "string"
+            ? parent.parentNode
+            : null;
+    }
+    return { x, y };
+  };
   const nodes: MiniNode[] = rawNodes.map((n) => {
     const d = (n.data ?? {}) as Record<string, unknown>;
     let imageUrl: string | undefined;
     const nType = n.type as string | undefined;
-    if (nType === "assetNode") {
-      const ft = d.fieldType as string | undefined;
-      if (ft === "image" && typeof d.previewUrl === "string") {
-        imageUrl = d.previewUrl;
-      } else if (typeof d.posterUrl === "string") {
+    const fieldType = d.fieldType as string | undefined;
+    if (typeof d.posterUrl === "string") {
+      imageUrl = d.posterUrl;
+    } else if (
+      typeof d.previewUrl === "string" &&
+      (fieldType === "image" || fieldType === "model3d")
+    ) {
+      imageUrl = d.previewUrl;
+    } else {
+      if (nType === "assetNode" && typeof d.posterUrl === "string") {
         imageUrl = d.posterUrl;
       }
-    } else {
       const gens = Array.isArray(d.generations)
         ? (d.generations as Array<Record<string, unknown>>)
         : [];
@@ -1419,14 +1524,12 @@ function buildSpaceCardData(
     const style = (n.style ?? null) as
       | { width?: number; height?: number }
       | null;
-    const position = (n.position ?? null) as
-      | { x?: number; y?: number }
-      | null;
+    const position = absolutePositionOf(n);
     return {
       id: String(n.id),
       type: nType,
-      x: position?.x ?? 0,
-      y: position?.y ?? 0,
+      x: position.x,
+      y: position.y,
       w:
         measured?.width ??
         (n.width as number | undefined) ??
@@ -1554,6 +1657,19 @@ const SpacesView = ({
     }
     navigate(`/app/workspace/${workspaceId}`);
   };
+
+  const visibleWorkspaceIds = useMemo(() => {
+    return [...workspaces]
+      .filter(
+        (ws) =>
+          !activeProjectId ||
+          !ws.projectId ||
+          ws.projectId === activeProjectId,
+      )
+      .map((ws) => ws.id);
+  }, [activeProjectId, workspaces]);
+
+  useHydrateSpacePreviewGraphs(visibleWorkspaceIds, user?.id, authLoading);
 
   const buckets = useMemo(() => {
     return groupByMonth(
@@ -2113,6 +2229,9 @@ const CanvasMinimap = ({
   nodes: MiniNode[];
   edges: MiniEdge[];
 }) => {
+  const svgUid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+  const dotsId = `mm-dots-${svgUid}`;
+
   if (nodes.length === 0) {
     return (
       <div className="flex h-full w-full items-center justify-center text-zinc-700">
@@ -2148,7 +2267,7 @@ const CanvasMinimap = ({
     >
       <defs>
         <pattern
-          id="mm-dots"
+          id={dotsId}
           width={Math.max(span * 0.025, 8)}
           height={Math.max(span * 0.025, 8)}
           patternUnits="userSpaceOnUse"
@@ -2161,7 +2280,7 @@ const CanvasMinimap = ({
           />
         </pattern>
       </defs>
-      <rect x={vbX} y={vbY} width={vbW} height={vbH} fill="url(#mm-dots)" />
+      <rect x={vbX} y={vbY} width={vbW} height={vbH} fill={`url(#${dotsId})`} />
 
       <g stroke="hsl(258 60% 65%)" strokeOpacity={0.55} strokeWidth={strokeW} fill="none">
         {edges.map((e, i) => {
@@ -2187,7 +2306,7 @@ const CanvasMinimap = ({
           const fill = NODE_FILL[n.type ?? ""] ?? TOOL_FILL;
 
           if (n.imageUrl) {
-            const clipId = `mm-clip-${n.id}`;
+            const clipId = `mm-clip-${svgUid}-${n.id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
             return (
               <g key={n.id}>
                 <defs>
@@ -2202,6 +2321,18 @@ const CanvasMinimap = ({
                     />
                   </clipPath>
                 </defs>
+                <rect
+                  x={n.x}
+                  y={n.y}
+                  width={n.w}
+                  height={n.h}
+                  rx={cornerR}
+                  ry={cornerR}
+                  fill={fill}
+                  stroke={isGroup ? "hsl(0 0% 100% / 0.18)" : "hsl(0 0% 100% / 0.10)"}
+                  strokeDasharray={isGroup ? `${strokeW * 3} ${strokeW * 2}` : undefined}
+                  strokeWidth={nodeStroke}
+                />
                 <image
                   href={n.imageUrl}
                   x={n.x}

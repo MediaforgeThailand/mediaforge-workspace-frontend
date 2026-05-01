@@ -41,6 +41,23 @@ interface ServerCanvasRow {
   updated_at: string;
 }
 
+function rowToCanvasGraph(row: ServerCanvasRow): CanvasGraph {
+  return {
+    id: row.id,
+    projectId: row.project_id ?? null,
+    workspaceId: row.workspace_id,
+    name: row.name,
+    nodes: Array.isArray(row.nodes) ? (row.nodes as CanvasGraph["nodes"]) : [],
+    edges: Array.isArray(row.edges) ? (row.edges as CanvasGraph["edges"]) : [],
+    viewport: row.viewport as CanvasGraph["viewport"],
+    updatedAt: new Date(row.updated_at).getTime(),
+  };
+}
+
+function rowHasContent(row: ServerCanvasRow): boolean {
+  return Array.isArray(row.nodes) && row.nodes.length > 0;
+}
+
 /** Fetch a canvas by id for the current user. Returns null if not
  *  found, the table doesn't exist yet, or the user isn't allowed
  *  by RLS — every "no data available" branch is the same to the
@@ -69,17 +86,7 @@ export async function loadCanvasFromServer(
     }
     if (!data) return null;
 
-    const row = data as ServerCanvasRow;
-    return {
-      id: row.id,
-      projectId: row.project_id ?? null,
-      workspaceId: row.workspace_id,
-      name: row.name,
-      nodes: Array.isArray(row.nodes) ? (row.nodes as CanvasGraph["nodes"]) : [],
-      edges: Array.isArray(row.edges) ? (row.edges as CanvasGraph["edges"]) : [],
-      viewport: row.viewport as CanvasGraph["viewport"],
-      updatedAt: new Date(row.updated_at).getTime(),
-    };
+    return rowToCanvasGraph(data as ServerCanvasRow);
   } catch (err) {
     console.warn("[canvasPersistence] load threw:", err);
     return null;
@@ -149,19 +156,70 @@ export async function loadCanvasesByWorkspaceFromServer(
     }
     if (!Array.isArray(data)) return [];
 
-    return (data as ServerCanvasRow[]).map((row) => ({
-      id: row.id,
-      projectId: row.project_id ?? null,
-      workspaceId: row.workspace_id,
-      name: row.name,
-      nodes: Array.isArray(row.nodes) ? (row.nodes as CanvasGraph["nodes"]) : [],
-      edges: Array.isArray(row.edges) ? (row.edges as CanvasGraph["edges"]) : [],
-      viewport: row.viewport as CanvasGraph["viewport"],
-      updatedAt: new Date(row.updated_at).getTime(),
-    }));
+    return (data as ServerCanvasRow[]).map(rowToCanvasGraph);
   } catch (err) {
     console.warn(
       "[canvasPersistence] load canvases by workspace threw:",
+      err,
+    );
+    return null;
+  }
+}
+
+/** Fetch one lightweight preview graph per workspace. The dashboard
+ *  uses this to draw stable space thumbnails without opening every
+ *  canvas page. Prefer the newest canvas that has visible graph
+ *  content; if a workspace only has empty canvases, return the newest
+ *  empty one so the local canvas list still hydrates correctly. */
+export async function loadLatestCanvasPreviewsByWorkspaceIds(
+  workspaceIds: string[],
+): Promise<CanvasGraph[] | null> {
+  const uniqueIds = Array.from(new Set(workspaceIds.filter(Boolean)));
+  if (uniqueIds.length === 0) return [];
+
+  const chosen = new Map<string, ServerCanvasRow>();
+  const chunkSize = 50;
+
+  try {
+    for (let i = 0; i < uniqueIds.length; i += chunkSize) {
+      const batch = uniqueIds.slice(i, i + chunkSize);
+      const { data, error } = await supabase
+        .from("workspace_canvases")
+        .select(
+          "id, user_id, project_id, workspace_id, name, nodes, edges, viewport, created_at, updated_at",
+        )
+        .in("workspace_id", batch)
+        .order("updated_at", { ascending: false });
+
+      if (error) {
+        if (isMissingTableError(error)) {
+          warnOnceAboutMissingTable();
+          return null;
+        }
+        console.warn(
+          "[canvasPersistence] load canvas previews failed:",
+          error.message,
+        );
+        return null;
+      }
+      if (!Array.isArray(data)) continue;
+
+      for (const row of data as ServerCanvasRow[]) {
+        const existing = chosen.get(row.workspace_id);
+        if (!existing) {
+          chosen.set(row.workspace_id, row);
+          continue;
+        }
+        if (!rowHasContent(existing) && rowHasContent(row)) {
+          chosen.set(row.workspace_id, row);
+        }
+      }
+    }
+
+    return Array.from(chosen.values()).map(rowToCanvasGraph);
+  } catch (err) {
+    console.warn(
+      "[canvasPersistence] load canvas previews threw:",
       err,
     );
     return null;
