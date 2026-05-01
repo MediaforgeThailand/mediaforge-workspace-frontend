@@ -142,7 +142,7 @@ const WorkspaceCanvasPagePill = () => {
     <div
       className="fixed bottom-4 left-24 z-50 md:left-[220px]"
       style={{
-        fontFamily: "'Prompt', system-ui, sans-serif",
+        fontFamily: "var(--font-sans)",
       }}
     >
       <Popover open={open} onOpenChange={setOpen}>

@@ -184,7 +184,7 @@ const WorkspaceTabBar = () => {
     // + the autosave indicator.
     <div
       className="flex h-10 shrink-0 items-center gap-1 border-b border-white/[0.04] bg-[hsl(0_0%_4%)] pl-2 pr-2"
-      style={{ fontFamily: "'Prompt', system-ui, sans-serif" }}
+      style={{ fontFamily: "var(--font-sans)" }}
     >
 
       <div

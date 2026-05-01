@@ -349,7 +349,7 @@ const WorkspaceAssetPanel = () => {
     // alpha surfaces, no chrome borders).
     <div
       className="flex h-full flex-col text-zinc-200"
-      style={{ fontFamily: "'Prompt', system-ui, sans-serif" }}
+      style={{ fontFamily: "var(--font-sans)" }}
     >
       {/* Header — soft title strip with the live count + a maximise
        *  shortcut to the All-Assets dialog. No uppercase / mono

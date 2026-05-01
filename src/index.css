@@ -14,6 +14,7 @@
 
 @layer base {
   :root {
+    --font-sans: 'DB Adman X', 'Adman X', 'ADMAN X', 'Prompt', 'Noto Sans Thai', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --background: 150 50% 1%;
     --foreground: 0 0% 100%;
 
@@ -86,7 +87,7 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Prompt', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: var(--font-sans);
   }
 }
 
