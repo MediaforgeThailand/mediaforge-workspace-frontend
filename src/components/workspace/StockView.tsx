@@ -3,12 +3,12 @@ import {
   Box,
   Camera,
   Download,
-  ExternalLink,
   FileImage,
   Grid2X2,
   Image as ImageIcon,
   Layers3,
   Loader2,
+  Maximize2,
   Menu,
   Mic,
   Music2,
@@ -17,13 +17,14 @@ import {
   Shapes,
   Sparkles,
   Video,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
 
-interface FreepikResource {
+interface StockResource {
   id: number | string;
   title?: string;
   url?: string;
@@ -55,8 +56,8 @@ interface FreepikResource {
   };
 }
 
-interface FreepikSearchResponse {
-  data?: FreepikResource[];
+interface StockSearchResponse {
+  data?: StockResource[];
   meta?: {
     current_page?: number;
     last_page?: number;
@@ -67,7 +68,7 @@ interface FreepikSearchResponse {
   details?: unknown;
 }
 
-interface FreepikDownloadResponse {
+interface StockDownloadResponse {
   data?: {
     filename?: string;
     url?: string;
@@ -199,16 +200,35 @@ function formatCount(value?: number): string {
   return String(value);
 }
 
-function availableFormats(item: FreepikResource): string[] {
+function availableFormats(item: StockResource): string[] {
   return Object.keys(item.meta?.available_formats ?? {}).slice(0, 4);
 }
 
-function pickLicense(item: FreepikResource): string {
-  return item.products?.[0]?.type ?? item.licenses?.[0]?.type ?? "freepik";
+function pickAccessLabel(item: StockResource): string {
+  const values = [...(item.products ?? []), ...(item.licenses ?? [])]
+    .map((entry) => String(entry.type ?? "").toLowerCase())
+    .join(" ");
+  return values.includes("premium") ? "Premium" : "Included";
 }
 
 function isValidImageUrl(url: string | undefined): url is string {
   return Boolean(url && /^https?:\/\//i.test(url));
+}
+
+function userStockError(err: unknown, fallback: string): string {
+  console.error("Stock library request failed:", err);
+  return fallback;
+}
+
+function triggerDownload(url: string, filename: string) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.target = "_blank";
+  link.rel = "noreferrer";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 }
 
 export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
@@ -217,11 +237,12 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
   const [submittedQuery, setSubmittedQuery] = useState("creator stock content");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [page, setPage] = useState(1);
-  const [items, setItems] = useState<FreepikResource[]>([]);
-  const [meta, setMeta] = useState<FreepikSearchResponse["meta"] | null>(null);
+  const [items, setItems] = useState<StockResource[]>([]);
+  const [meta, setMeta] = useState<StockSearchResponse["meta"] | null>(null);
   const [loading, setLoading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [previewItem, setPreviewItem] = useState<StockResource | null>(null);
 
   const heroImages = useMemo(() => {
     const apiImages = items
@@ -246,7 +267,7 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
     setError(null);
     try {
       const { data, error: invokeError } =
-        await supabase.functions.invoke<FreepikSearchResponse>("freepik-stock", {
+        await supabase.functions.invoke<StockSearchResponse>("freepik-stock", {
           body: {
             action: "search-resources",
             query: term,
@@ -261,7 +282,7 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
       setMeta(data?.meta ?? null);
       setPage(nextPage);
     } catch (err) {
-      const message = err instanceof Error ? err.message : t("workspace.stock.search_failed");
+      const message = userStockError(err, t("workspace.stock.search_failed"));
       setError(message);
       toast.error(message);
     } finally {
@@ -287,16 +308,16 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
     setSubmittedQuery(category.query);
   };
 
-  const downloadResource = async (item: FreepikResource) => {
+  const downloadResource = async (item: StockResource) => {
     const resourceId = String(item.id);
     setDownloadingId(resourceId);
     try {
       const { data, error: invokeError } =
-        await supabase.functions.invoke<FreepikDownloadResponse>("freepik-stock", {
+        await supabase.functions.invoke<StockDownloadResponse>("freepik-stock", {
           body: {
             action: "download-resource",
             resourceId,
-            title: item.title ?? item.filename ?? `freepik-${resourceId}`,
+            title: item.title ?? item.filename ?? `mediaforge-stock-${resourceId}`,
             imageSize: item.image?.type === "photo" ? "large" : undefined,
           },
         });
@@ -304,10 +325,10 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
       if (data?.error) throw new Error(data.error);
       const url = data?.data?.signed_url ?? data?.data?.url;
       if (!url) throw new Error(t("workspace.stock.no_url"));
-      window.open(url, "_blank", "noopener,noreferrer");
-      toast.success(t("workspace.stock.download_opened"));
+      triggerDownload(url, data?.data?.filename ?? item.filename ?? `mediaforge-stock-${resourceId}`);
+      toast.success(t("workspace.stock.download_started"));
     } catch (err) {
-      const message = err instanceof Error ? err.message : t("workspace.stock.download_failed");
+      const message = userStockError(err, t("workspace.stock.download_failed"));
       toast.error(message);
     } finally {
       setDownloadingId(null);
@@ -467,12 +488,13 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
             </div>
           ) : (
             <>
-              <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
                 {items.map((item) => (
                   <StockAssetCard
                     key={String(item.id)}
                     item={item}
                     downloading={downloadingId === String(item.id)}
+                    onPreview={() => setPreviewItem(item)}
                     onDownload={() => void downloadResource(item)}
                   />
                 ))}
@@ -508,6 +530,15 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
           )}
         </section>
       </main>
+
+      {previewItem && (
+        <StockPreviewModal
+          item={previewItem}
+          downloading={downloadingId === String(previewItem.id)}
+          onClose={() => setPreviewItem(null)}
+          onDownload={() => void downloadResource(previewItem)}
+        />
+      )}
     </div>
   );
 }
@@ -546,17 +577,22 @@ function HeroMosaic({ images, side }: { images: string[]; side: "left" | "right"
 function StockAssetCard({
   item,
   downloading,
+  onPreview,
   onDownload,
 }: {
-  item: FreepikResource;
+  item: StockResource;
   downloading: boolean;
+  onPreview: () => void;
   onDownload: () => void;
 }) {
   const { t } = useLanguage();
   const imageUrl = item.image?.source?.url;
   return (
-    <article className="group overflow-hidden rounded-2xl bg-white/[0.04] ring-1 ring-inset ring-white/[0.05] transition hover:-translate-y-0.5 hover:bg-white/[0.06] hover:ring-white/[0.13]">
-      <div className="relative aspect-[4/3] overflow-hidden bg-zinc-950">
+    <article
+      onClick={onPreview}
+      className="group cursor-zoom-in overflow-hidden rounded-[24px] bg-white/[0.04] ring-1 ring-inset ring-white/[0.05] transition hover:-translate-y-0.5 hover:bg-white/[0.06] hover:ring-white/[0.13]"
+    >
+      <div className="relative aspect-[16/11] overflow-hidden bg-zinc-950 md:aspect-[4/3]">
         {isValidImageUrl(imageUrl) ? (
           <img
             src={imageUrl}
@@ -573,62 +609,144 @@ function StockAssetCard({
           <span className="rounded-full bg-black/65 px-2.5 py-1 text-[12px] font-semibold capitalize text-white backdrop-blur">
             {item.image?.type ?? "asset"}
           </span>
-          <span className="rounded-full bg-sky-500/90 px-2.5 py-1 text-[12px] font-semibold text-white">
-            {pickLicense(item)}
+          <span className="rounded-full bg-sky-500/90 px-2.5 py-1 text-[12px] font-semibold text-white shadow-lg shadow-sky-950/20">
+            {pickAccessLabel(item)}
           </span>
         </div>
-      </div>
-      <div className="space-y-3 p-4">
-        <div className="min-h-[72px]">
-          <h3 className="line-clamp-2 text-[15px] font-semibold leading-6 text-white">
+        <div className="absolute right-3 top-3 flex gap-2 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onPreview();
+            }}
+            className="grid h-10 w-10 place-items-center rounded-full bg-black/65 text-white backdrop-blur transition hover:bg-white hover:text-zinc-950"
+            title={t("workspace.stock.preview")}
+          >
+            <Maximize2 className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onDownload();
+            }}
+            disabled={downloading}
+            className="grid h-10 w-10 place-items-center rounded-full bg-sky-500 text-white shadow-lg shadow-sky-950/30 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+            title={t("workspace.stock.download")}
+          >
+            {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          </button>
+        </div>
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-4 pt-14">
+          <h3 className="line-clamp-2 text-[16px] font-semibold leading-6 text-white">
             {item.title ?? item.filename ?? t("workspace.stock.asset_id_fallback", { id: String(item.id) })}
           </h3>
-          <p className="mt-1 truncate text-[13px] text-zinc-500">
-            {item.author?.name
-              ? t("workspace.stock.author_prefix", { name: item.author.name })
-              : t("workspace.stock.author_fallback")}
-            {item.image?.orientation ? ` · ${item.image.orientation}` : ""}
+          <p className="mt-1 truncate text-[13px] text-zinc-300">
+            {item.image?.orientation ?? t("workspace.stock.asset_fallback_meta")}
+            {item.stats?.downloads ? ` · ${t("workspace.stock.downloads_count", { count: formatCount(item.stats.downloads) })}` : ""}
           </p>
-        </div>
-        <div className="flex min-h-7 flex-wrap gap-1.5">
-          {availableFormats(item).map((format) => (
-            <span key={format} className="rounded-md bg-white/[0.06] px-2 py-1 text-[12px] text-zinc-300">
-              {format.toUpperCase()}
-            </span>
-          ))}
-        </div>
-        <div className="flex items-center justify-between gap-2">
-          <div className="text-[12px] text-zinc-500">
-            {t("workspace.stock.downloads_count", { count: formatCount(item.stats?.downloads) })}
-          </div>
-          <div className="flex items-center gap-1.5">
-            {item.url && (
-              <a
-                href={item.url}
-                target="_blank"
-                rel="noreferrer"
-                className="grid h-10 w-10 place-items-center rounded-xl bg-white/[0.06] text-zinc-200 transition hover:bg-white/[0.12] hover:text-white"
-                title={t("workspace.stock.open_freepik")}
-              >
-                <ExternalLink className="h-4 w-4" />
-              </a>
-            )}
-            <button
-              type="button"
-              onClick={onDownload}
-              disabled={downloading}
-              className="inline-flex h-10 items-center gap-2 rounded-xl bg-sky-500 px-3.5 text-[13px] font-semibold text-white transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {downloading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-              {t("workspace.stock.download")}
-            </button>
-          </div>
         </div>
       </div>
     </article>
+  );
+}
+
+function StockPreviewModal({
+  item,
+  downloading,
+  onClose,
+  onDownload,
+}: {
+  item: StockResource;
+  downloading: boolean;
+  onClose: () => void;
+  onDownload: () => void;
+}) {
+  const { t } = useLanguage();
+  const imageUrl = item.image?.source?.url;
+  const formats = availableFormats(item);
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] grid place-items-center bg-black/85 p-3 backdrop-blur-md sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[92vh] w-full max-w-[1280px] flex-col overflow-hidden rounded-[28px] bg-zinc-950 ring-1 ring-white/10 lg:flex-row"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="grid min-h-[320px] flex-1 place-items-center bg-black lg:min-h-[720px]">
+          {isValidImageUrl(imageUrl) ? (
+            <img
+              src={imageUrl}
+              alt={item.title ?? item.filename ?? t("workspace.stock.asset_alt")}
+              className="max-h-[72vh] w-full object-contain"
+            />
+          ) : (
+            <ImageIcon className="h-14 w-14 text-zinc-700" />
+          )}
+        </div>
+        <aside className="w-full shrink-0 border-t border-white/10 p-5 lg:w-[340px] lg:border-l lg:border-t-0">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-[13px] font-semibold uppercase tracking-[0.18em] text-sky-300">
+                {t("workspace.stock.eyebrow")}
+              </div>
+              <h2 className="mt-3 text-[22px] font-semibold leading-8 text-white">
+                {item.title ?? item.filename ?? t("workspace.stock.asset_id_fallback", { id: String(item.id) })}
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/[0.06] text-zinc-200 transition hover:bg-white hover:text-zinc-950"
+              aria-label={t("workspace.stock.close_preview")}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            <span className="rounded-full bg-white/[0.08] px-3 py-1.5 text-[13px] font-semibold capitalize text-zinc-200">
+              {item.image?.type ?? "asset"}
+            </span>
+            <span className="rounded-full bg-sky-500/90 px-3 py-1.5 text-[13px] font-semibold text-white">
+              {pickAccessLabel(item)}
+            </span>
+            {item.image?.orientation && (
+              <span className="rounded-full bg-white/[0.08] px-3 py-1.5 text-[13px] font-semibold capitalize text-zinc-200">
+                {item.image.orientation}
+              </span>
+            )}
+          </div>
+
+          {formats.length > 0 && (
+            <div className="mt-5">
+              <div className="mb-2 text-[13px] font-semibold text-zinc-400">{t("workspace.stock.formats")}</div>
+              <div className="flex flex-wrap gap-2">
+                {formats.map((format) => (
+                  <span key={format} className="rounded-lg bg-white/[0.06] px-2.5 py-1.5 text-[12px] text-zinc-300">
+                    {format.toUpperCase()}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={onDownload}
+            disabled={downloading}
+            className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-sky-500 text-[15px] font-semibold text-white transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {t("workspace.stock.download")}
+          </button>
+        </aside>
+      </div>
+    </div>
   );
 }
