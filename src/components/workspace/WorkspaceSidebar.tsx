@@ -37,6 +37,7 @@ import {
   Mic2,
   Plus,
   Settings as SettingsIcon,
+  Languages,
   Crown,
   Palette,
   School,
@@ -128,7 +129,7 @@ export default function WorkspaceSidebar({
 }: WorkspaceSidebarProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, language, setLanguage } = useLanguage();
   const isPscDemoUser = user?.email?.toLowerCase() === "dmd@psc.com";
   // Tenant branding override (e.g. dmd.mediaforge.co → DMD logo +
   // "DMD" short name). Returns null on the bare workspace.mediaforge.co
@@ -264,8 +265,18 @@ export default function WorkspaceSidebar({
       <OrgAdminLink />
 
       {/* ── Bottom utility row ─────────────────────────────────── */}
+      {/* Settings + language toggle sit as a paired "preferences"
+       *  cluster at the bottom of the rail. The language icon is a
+       *  parallel UtilityBtn — same visual weight, no special
+       *  treatment beyond label rendering the TARGET language in its
+       *  own script (universal language-switcher convention). */}
       <div className="flex items-center gap-1 px-3 pb-3 pt-4">
         <UtilityBtn icon={SettingsIcon} title={t("workspace.sidebar.settings")} onClick={() => navigate("/app/settings")} />
+        <UtilityBtn
+          icon={Languages}
+          title={language === "th" ? "English" : "ภาษาไทย"}
+          onClick={() => setLanguage(language === "th" ? "en" : "th")}
+        />
       </div>
     </aside>
   );
