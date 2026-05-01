@@ -6,6 +6,7 @@
 import { ChevronLeft, Save, Play, FlaskConical } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 /** Tool node types that support the generation history feature. */
 const TOOL_NODE_TYPES = new Set([
@@ -25,6 +26,7 @@ const WorkspaceTopBar = () => {
   const current = useWorkspaceStore((s) => s.current);
   const renameCanvas = useWorkspaceStore((s) => s.renameCanvas);
   const addGeneration = useWorkspaceStore((s) => s.addGeneration);
+  const { t } = useLanguage();
 
   if (!current) return null;
 
@@ -56,7 +58,7 @@ const WorkspaceTopBar = () => {
         className="flex items-center gap-1 rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
       >
         <ChevronLeft className="h-4 w-4" />
-        Back
+        {t("workspace.topbar.back")}
       </Link>
 
       <div className="h-5 w-px bg-zinc-800" />
@@ -65,39 +67,39 @@ const WorkspaceTopBar = () => {
         value={current.name}
         onChange={(e) => renameCanvas(current.id, e.target.value)}
         className="min-w-0 flex-1 rounded bg-transparent px-2 py-1 text-sm font-medium outline-none focus:bg-zinc-900"
-        placeholder="Canvas name"
+        placeholder={t("workspace.topbar.canvas_name")}
       />
 
       <div className="text-[11px] text-zinc-500">
-        {current.nodes.length} node{current.nodes.length === 1 ? "" : "s"} ·{" "}
-        {current.edges.length} link{current.edges.length === 1 ? "" : "s"}
+        {current.nodes.length} {current.nodes.length === 1 ? t("workspace.topbar.node_singular") : t("workspace.topbar.node_plural")} ·{" "}
+        {current.edges.length} {current.edges.length === 1 ? t("workspace.topbar.link_singular") : t("workspace.topbar.link_plural")}
       </div>
 
       <button
         type="button"
         onClick={seedDemoResults}
         className="flex items-center gap-1 rounded border border-amber-900/60 bg-amber-950/40 px-2 py-1 text-xs text-amber-300 hover:bg-amber-950/70"
-        title="Dev: seed mock generations onto every tool node on this canvas"
+        title={t("workspace.topbar.seed_demo_tip")}
       >
-        <FlaskConical className="h-3.5 w-3.5" /> Seed demo
+        <FlaskConical className="h-3.5 w-3.5" /> {t("workspace.topbar.seed_demo")}
       </button>
 
       <button
         type="button"
         disabled
         className="flex items-center gap-1 rounded border border-zinc-800 px-2 py-1 text-xs text-zinc-500"
-        title="Save (not yet wired)"
+        title={t("workspace.topbar.save_not_wired")}
       >
-        <Save className="h-3.5 w-3.5" /> Save
+        <Save className="h-3.5 w-3.5" /> {t("workspace.topbar.save")}
       </button>
 
       <button
         type="button"
         disabled
         className="flex items-center gap-1 rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-300"
-        title="Run (not yet wired)"
+        title={t("workspace.topbar.run_not_wired")}
       >
-        <Play className="h-3.5 w-3.5" /> Run
+        <Play className="h-3.5 w-3.5" /> {t("workspace.topbar.run")}
       </button>
     </header>
   );

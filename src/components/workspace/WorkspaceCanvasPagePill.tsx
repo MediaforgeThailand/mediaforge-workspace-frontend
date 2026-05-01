@@ -37,8 +37,10 @@ import {
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { deleteCanvasFromServer } from "./canvasPersistence";
 import SaveStateBadge from "./SaveStateBadge";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const WorkspaceCanvasPagePill = () => {
+  const { t } = useLanguage();
   /* ── Store wiring (mirrors WorkspaceTabBar) ───────────────── */
   const allCanvases = useWorkspaceStore((s) => s.canvases);
   const currentWorkspaceId = useWorkspaceStore(
@@ -89,8 +91,10 @@ const WorkspaceCanvasPagePill = () => {
     const hasContent = (graph?.nodes?.length ?? 0) > 0;
     if (hasContent) {
       const ok = confirm(
-        `Close "${graph?.name ?? "page"}"? ` +
-          `It has ${graph?.nodes?.length} node(s) — they'll be deleted.`,
+        t("workspace.pill.close_prompt", {
+          name: graph?.name ?? t("workspace.pill.tab_fallback"),
+          count: graph?.nodes?.length ?? 0,
+        }),
       );
       if (!ok) return;
     }
@@ -135,7 +139,7 @@ const WorkspaceCanvasPagePill = () => {
   };
 
   /* ── Render ───────────────────────────────────────────────── */
-  const activeName = currentMeta?.name ?? "Untitled";
+  const activeName = currentMeta?.name ?? t("workspace.pill.untitled");
   const totalPages = canvases.length;
 
   return (
@@ -149,7 +153,7 @@ const WorkspaceCanvasPagePill = () => {
         <PopoverTrigger asChild>
           <button
             type="button"
-            aria-label={`Page: ${activeName}. Click to switch pages.`}
+            aria-label={t("workspace.pill.aria_switch", { name: activeName })}
             className={cn(
               "group flex h-11 items-center gap-2 rounded-full border border-white/[0.06] bg-zinc-900/85 px-4 text-[12px] text-zinc-100 shadow-lg shadow-black/40 backdrop-blur transition-all lg:h-9 lg:px-3",
               "hover:-translate-y-0.5 hover:bg-zinc-800/90 hover:shadow-xl",
@@ -167,7 +171,7 @@ const WorkspaceCanvasPagePill = () => {
                 className={cn(
                   "shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 font-mono text-[9px] tabular-nums text-zinc-300",
                 )}
-                aria-label={`${totalPages} pages in this workspace`}
+                aria-label={t("workspace.pill.aria_count", { count: totalPages })}
               >
                 {totalPages}
               </span>
@@ -197,7 +201,7 @@ const WorkspaceCanvasPagePill = () => {
           )}
         >
           <div className="px-2 pb-1 pt-1.5 text-[10px] uppercase tracking-wider text-zinc-500">
-            Pages in this workspace
+            {t("workspace.pill.pages_in_workspace")}
           </div>
 
           {/* Page list — scrolls if there are many pages. */}
@@ -222,7 +226,7 @@ const WorkspaceCanvasPagePill = () => {
                   title={
                     isEditing
                       ? undefined
-                      : `${c.name} · ${nodeCount} node(s) · double-click to rename`
+                      : t("workspace.pill.item_title", { name: c.name, count: nodeCount })
                   }
                 >
                   <FolderOpen
@@ -258,7 +262,7 @@ const WorkspaceCanvasPagePill = () => {
                         "shrink-0 font-mono text-[9px] tabular-nums",
                         isActive ? "text-zinc-400" : "text-zinc-600",
                       )}
-                      title={`${nodeCount} node(s)`}
+                      title={t("workspace.pill.node_count", { count: nodeCount })}
                     >
                       {nodeCount}
                     </span>
@@ -271,8 +275,8 @@ const WorkspaceCanvasPagePill = () => {
                         type="button"
                         onClick={(e) => startRename(c.id, c.name, e)}
                         className="flex h-9 w-9 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 lg:h-auto lg:w-auto lg:p-1"
-                        title="Rename page"
-                        aria-label="Rename page"
+                        title={t("workspace.pill.rename")}
+                        aria-label={t("workspace.pill.rename")}
                       >
                         <Pencil className="h-3 w-3" />
                       </button>
@@ -280,8 +284,8 @@ const WorkspaceCanvasPagePill = () => {
                         type="button"
                         onClick={(e) => closeTab(c.id, e)}
                         className="flex h-9 w-9 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-rose-300 lg:h-auto lg:w-auto lg:p-1"
-                        title="Delete page"
-                        aria-label="Delete page"
+                        title={t("workspace.pill.delete")}
+                        aria-label={t("workspace.pill.delete")}
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -300,7 +304,7 @@ const WorkspaceCanvasPagePill = () => {
               className="flex h-11 w-full items-center gap-1.5 rounded px-2 text-[12px] text-zinc-300 transition-colors hover:bg-white/5 hover:text-zinc-100 lg:h-8"
             >
               <Plus className="h-3.5 w-3.5" />
-              New page
+              {t("workspace.pill.new_page")}
             </button>
           </div>
         </PopoverContent>

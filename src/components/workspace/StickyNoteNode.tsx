@@ -19,6 +19,7 @@
 import { memo, useCallback } from "react";
 import { type NodeProps, useReactFlow } from "@xyflow/react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export interface StickyNoteData {
   text?: string;
@@ -27,6 +28,7 @@ export interface StickyNoteData {
 const StickyNoteNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as unknown as StickyNoteData;
   const { setNodes } = useReactFlow();
+  const { t } = useLanguage();
 
   const onChange = useCallback(
     (next: string) => {
@@ -68,7 +70,7 @@ const StickyNoteNode = memo(({ id, data, selected }: NodeProps) => {
         onMouseDown={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
-        placeholder="Type a note…"
+        placeholder={t("workspace.node.sticky_placeholder")}
         className={cn(
           "nodrag block h-full w-full resize-none bg-transparent text-[13px] leading-relaxed text-amber-950 outline-none placeholder:text-amber-900/40",
         )}

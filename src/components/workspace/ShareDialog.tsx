@@ -32,6 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Copy, Eye, Pencil, Trash2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type ShareRole = "viewer" | "editor";
 
@@ -52,18 +53,18 @@ interface Props {
   workspaceName: string;
 }
 
-/** Friendly relative time for the share list ("Created 2m ago"). */
-function timeAgo(iso: string): string {
-  const t = new Date(iso).getTime();
-  const diff = Date.now() - t;
-  if (diff < 60_000) return "just now";
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
-  return `${Math.floor(diff / 86_400_000)}d ago`;
-}
-
 const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) => {
   const { toast } = useToast();
+  const { t } = useLanguage();
+  /** Friendly relative time for the share list ("Created 2m ago"). */
+  const timeAgo = (iso: string): string => {
+    const ts = new Date(iso).getTime();
+    const diff = Date.now() - ts;
+    if (diff < 60_000) return t("workspace.share.relative_just_now");
+    if (diff < 3_600_000) return t("workspace.share.relative_minutes_ago", { n: Math.floor(diff / 60_000) });
+    if (diff < 86_400_000) return t("workspace.share.relative_hours_ago", { n: Math.floor(diff / 3_600_000) });
+    return t("workspace.share.relative_days_ago", { n: Math.floor(diff / 86_400_000) });
+  };
   const [role, setRole] = useState<ShareRole>("viewer");
   const [generating, setGenerating] = useState(false);
   const [latestUrl, setLatestUrl] = useState<string | null>(null);
@@ -85,14 +86,14 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
     } catch (err) {
       console.error("[ShareDialog] list failed:", err);
       toast({
-        title: "Couldn't load share links",
-        description: "Try again in a moment.",
+        title: t("workspace.share.couldnt_load"),
+        description: t("workspace.share.try_again"),
         variant: "destructive",
       });
     } finally {
       setLoadingList(false);
     }
-  }, [workspaceId, toast]);
+  }, [workspaceId, toast, t]);
 
   // Refresh whenever the dialog opens.
   useEffect(() => {
@@ -120,16 +121,18 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
       if (!data) throw new Error("Empty response");
       setLatestUrl(data.share_url);
       toast({
-        title: "Share link generated",
-        description: `${role === "viewer" ? "Viewer" : "Editor"} link is ready to copy.`,
+        title: t("workspace.share.link_generated"),
+        description: t("workspace.share.link_ready", {
+          role: role === "viewer" ? t("workspace.share.viewer") : t("workspace.share.editor"),
+        }),
       });
       // Refresh the list so the new row appears below.
       refreshList();
     } catch (err: any) {
       console.error("[ShareDialog] generate failed:", err);
       toast({
-        title: "Couldn't generate link",
-        description: err?.message ?? "Try again in a moment.",
+        title: t("workspace.share.couldnt_generate"),
+        description: err?.message ?? t("workspace.share.try_again"),
         variant: "destructive",
       });
     } finally {
@@ -140,11 +143,11 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
   const handleCopy = async (url: string) => {
     try {
       await navigator.clipboard.writeText(url);
-      toast({ title: "Link copied" });
+      toast({ title: t("workspace.share.link_copied") });
     } catch {
       toast({
-        title: "Copy failed",
-        description: "Select the URL and copy manually.",
+        title: t("workspace.share.copy_failed"),
+        description: t("workspace.share.copy_manually"),
         variant: "destructive",
       });
     }
@@ -157,15 +160,15 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
         body: { id },
       });
       if (error) throw error;
-      toast({ title: "Link revoked" });
+      toast({ title: t("workspace.share.link_revoked") });
       // Remove locally; refresh too in case anything else changed.
       setShares((s) => s.filter((r) => r.id !== id));
       refreshList();
     } catch (err: any) {
       console.error("[ShareDialog] revoke failed:", err);
       toast({
-        title: "Couldn't revoke link",
-        description: err?.message ?? "Try again in a moment.",
+        title: t("workspace.share.couldnt_revoke"),
+        description: err?.message ?? t("workspace.share.try_again"),
         variant: "destructive",
       });
     } finally {
@@ -175,16 +178,18 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
 
   const description =
     role === "viewer"
-      ? "Anyone with the link can view this workspace. Sign-in required. They can't edit or run nodes."
-      : "Anyone with the link can edit + run. Runs deduct from THEIR credit balance, not yours. Their layout changes don't save back to your workspace.";
+      ? t("workspace.share.viewer_desc")
+      : t("workspace.share.editor_desc");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
-          <DialogTitle>Share workspace</DialogTitle>
+          <DialogTitle>{t("workspace.share.title")}</DialogTitle>
           <DialogDescription className="text-xs">
-            Mint a link for "{workspaceName || "this workspace"}". Active links are listed below — revoke any time.
+            {t("workspace.share.description", {
+              name: workspaceName || t("workspace.share.this_workspace_fallback"),
+            })}
           </DialogDescription>
         </DialogHeader>
 
@@ -201,7 +206,7 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
             )}
           >
             <Eye className="h-3.5 w-3.5" />
-            Viewer
+            {t("workspace.share.viewer")}
           </button>
           <button
             type="button"
@@ -214,7 +219,7 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
             )}
           >
             <Pencil className="h-3.5 w-3.5" />
-            Editor
+            {t("workspace.share.editor")}
           </button>
         </div>
 
@@ -225,10 +230,10 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
           {generating ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Generating…
+              {t("workspace.share.generating")}
             </>
           ) : (
-            "Generate link"
+            t("workspace.share.generate")
           )}
         </Button>
 
@@ -248,7 +253,7 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
               onClick={() => handleCopy(latestUrl)}
             >
               <Copy className="mr-1 h-3.5 w-3.5" />
-              Copy
+              {t("workspace.share.copy")}
             </Button>
           </div>
         )}
@@ -259,7 +264,7 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-medium text-muted-foreground">
-              Active links
+              {t("workspace.share.active_links")}
             </h4>
             {loadingList && (
               <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
@@ -268,7 +273,7 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
 
           {!loadingList && shares.length === 0 && (
             <p className="text-xs text-muted-foreground italic">
-              No active links yet.
+              {t("workspace.share.no_active_links")}
             </p>
           )}
 
@@ -293,13 +298,13 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
                     {s.share_url}
                   </div>
                   <div className="text-[10.5px] text-muted-foreground/70">
-                    Created {timeAgo(s.created_at)}
+                    {t("workspace.share.created_relative", { time: timeAgo(s.created_at) })}
                   </div>
                 </div>
                 <button
                   type="button"
                   className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-                  title="Copy link"
+                  title={t("workspace.share.copy_link")}
                   onClick={() => handleCopy(s.share_url)}
                 >
                   <Copy className="h-3.5 w-3.5" />
@@ -307,7 +312,7 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
                 <button
                   type="button"
                   className="rounded p-1 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-400 disabled:opacity-50"
-                  title="Revoke link"
+                  title={t("workspace.share.revoke_link")}
                   disabled={revokingId === s.id}
                   onClick={() => handleRevoke(s.id)}
                 >

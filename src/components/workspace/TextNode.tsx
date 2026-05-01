@@ -23,6 +23,7 @@ import { Type, AtSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PromptMentionTextarea from "@/components/flow/nodes/PromptMentionTextarea";
 import { PortIcon } from "./PortIcon";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface TextNodeData {
   label: string;
@@ -34,6 +35,7 @@ const TEXT_COLOR = "hsl(217 91% 60%)"; // blue — text output
 const TextNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as unknown as TextNodeData;
   const { setNodes } = useReactFlow();
+  const { t } = useLanguage();
 
   const updateField = useCallback(
     (field: "label" | "content", value: string) => {
@@ -76,7 +78,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
           onMouseDown={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
           className="ws-clean-title-input nodrag"
-          placeholder="Text name…"
+          placeholder={t("workspace.node.text_name_placeholder")}
         />
       </div>
 
@@ -91,7 +93,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
         <PromptMentionTextarea
           value={d.content ?? ""}
           onChange={onContentChange}
-          placeholder='Try "Happy dog with sunglasses and floating ring"'
+          placeholder={t("workspace.node.text_body_placeholder")}
           excludeNodeId={id}
           // Workspace assets show up under `assetNode`. Include the
           // legacy `inputNode` so a flow imported from the main
@@ -103,7 +105,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
         {mentionCount > 0 && (
           <div className="mt-1 flex items-center gap-1 text-[9px] text-zinc-500">
             <AtSign className="h-2.5 w-2.5" />
-            {mentionCount} ref{mentionCount === 1 ? "" : "s"}
+            {mentionCount} {mentionCount === 1 ? t("workspace.node.text_ref_singular") : t("workspace.node.text_ref_plural")}
           </div>
         )}
       </div>
@@ -112,7 +114,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
       <PortIcon
         dir="source"
         handleId="default"
-        label="Text output"
+        label={t("workspace.node.text_output")}
         portType="text"
         color={TEXT_COLOR}
         index={0}
