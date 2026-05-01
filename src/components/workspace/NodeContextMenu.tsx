@@ -34,6 +34,7 @@ import { createPortal } from "react-dom";
 import { type LucideIcon } from "lucide-react";
 import type { Node as RFNode } from "@xyflow/react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const PANEL_WIDTH = 232;
 /** Floor of the rendered height for the bottom-edge clamp — the actual
@@ -70,6 +71,7 @@ interface Props {
 
 const NodeContextMenu = ({ position, items, onClose }: Props) => {
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const { t } = useLanguage();
 
   // Click-outside / Esc / native-context-menu suppression. We listen
   // via `mousedown` (capture) so a click on a panel button doesn't
@@ -129,7 +131,7 @@ const NodeContextMenu = ({ position, items, onClose }: Props) => {
     <div
       ref={panelRef}
       role="menu"
-      aria-label="Node context menu"
+      aria-label={t("workspace.nodemenu.aria")}
       className={cn(
         "fixed z-[1310] flex flex-col overflow-hidden",
         "rounded-xl border border-white/10",

@@ -51,6 +51,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type AssetSource = "generated" | "uploaded" | "element";
 type AssetType = "image" | "video" | "audio" | "model3d";
@@ -94,6 +95,7 @@ interface Props {
 
 const AllAssetsDialog = ({ open, onClose }: Props) => {
   const allGraphs = useWorkspaceStore((s) => s.graphs);
+  const { t } = useLanguage();
 
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<AssetType | "all">("all");
@@ -337,7 +339,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
           <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-sky-500/10 text-sky-200">
             <div className="flex flex-col items-center gap-2">
               <UploadCloud className="h-12 w-12" />
-              <div className="text-sm font-semibold">Drop files to upload</div>
+              <div className="text-sm font-semibold">{t("workspace.assets_dialog.drop_to_upload")}</div>
             </div>
           </div>
         )}
@@ -346,7 +348,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
         <div className="flex flex-1 flex-col">
           <div className="flex items-center gap-3 border-b border-zinc-800 px-4 py-3">
             <Layers className="h-4 w-4 text-zinc-400" />
-            <h2 className="text-sm font-semibold text-zinc-100">All assets</h2>
+            <h2 className="text-sm font-semibold text-zinc-100">{t("workspace.assets_dialog.title")}</h2>
             <span className="font-mono text-[10px] text-zinc-500">
               {filtered.length}/{counts.all}
             </span>
@@ -357,7 +359,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search…"
+                  placeholder={t("workspace.assets_dialog.search_placeholder")}
                   className="w-56 rounded border border-zinc-800 bg-zinc-900 py-1.5 pl-7 pr-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-zinc-600"
                 />
               </div>
@@ -365,7 +367,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
                 type="button"
                 onClick={onClose}
                 className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
-                title="Close (Esc)"
+                title={t("workspace.assets_dialog.close_esc")}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -377,54 +379,54 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
             <SegmentPill
               active={typeFilter === "all"}
               onClick={() => setTypeFilter("all")}
-              label="All"
+              label={t("workspace.assets_dialog.filter_all")}
               count={counts.all}
             />
             <SegmentPill
               active={typeFilter === "image"}
               onClick={() => setTypeFilter("image")}
               icon={ImageIcon}
-              label="Image"
+              label={t("workspace.assets_dialog.filter_image")}
               count={counts.image}
             />
             <SegmentPill
               active={typeFilter === "video"}
               onClick={() => setTypeFilter("video")}
               icon={Film}
-              label="Video"
+              label={t("workspace.assets_dialog.filter_video")}
               count={counts.video}
             />
             <SegmentPill
               active={typeFilter === "audio"}
               onClick={() => setTypeFilter("audio")}
               icon={Music}
-              label="Audio"
+              label={t("workspace.assets_dialog.filter_audio")}
               count={counts.audio}
             />
             <SegmentPill
               active={typeFilter === "model3d"}
               onClick={() => setTypeFilter("model3d")}
               icon={Box}
-              label="3D"
+              label={t("workspace.assets_dialog.filter_3d")}
               count={counts.model3d}
             />
             <div className="mx-2 h-4 w-px bg-zinc-800" />
             <SegmentPill
               active={sourceFilter === "all"}
               onClick={() => setSourceFilter("all")}
-              label="Any source"
+              label={t("workspace.assets_dialog.filter_any_source")}
             />
             <SegmentPill
               active={sourceFilter === "generated"}
               onClick={() => setSourceFilter("generated")}
               icon={Sparkles}
-              label="Generated"
+              label={t("workspace.assets_dialog.filter_generated")}
             />
             <SegmentPill
               active={sourceFilter === "uploaded"}
               onClick={() => setSourceFilter("uploaded")}
               icon={Upload}
-              label="Uploaded"
+              label={t("workspace.assets_dialog.filter_uploaded")}
             />
           </div>
 
@@ -433,8 +435,8 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
             {filtered.length === 0 ? (
               <div className="flex h-full items-center justify-center text-xs italic text-zinc-500">
                 {assets.length === 0
-                  ? "No assets yet — upload or generate something to get started."
-                  : "No assets match the current filter."}
+                  ? t("workspace.assets_dialog.no_assets_yet")
+                  : t("workspace.assets_dialog.no_match")}
               </div>
             ) : (
               <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
@@ -507,10 +509,10 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
                           )}
                         >
                           {a.source === "generated"
-                            ? "GEN"
+                            ? t("workspace.assets_dialog.badge_gen")
                             : a.source === "element"
-                              ? "EL"
-                              : "UP"}
+                              ? t("workspace.assets_dialog.badge_el")
+                              : t("workspace.assets_dialog.badge_upload")}
                         </span>
 
                         {/* Selected checkmark */}
@@ -533,14 +535,14 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
           </div>
 
           <div className="border-t border-zinc-800 px-4 py-2 text-[11px] leading-snug text-zinc-500">
-            Click to select · Drag onto canvas · Drop files here to upload
+            {t("workspace.assets_dialog.help")}
           </div>
         </div>
 
         {/* ── Right column: cart ── */}
         <div className="flex w-[320px] flex-col border-l border-zinc-800 bg-zinc-925">
           <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-            <span className="text-xs font-semibold text-zinc-200">Selected</span>
+            <span className="text-xs font-semibold text-zinc-200">{t("workspace.assets_dialog.selected")}</span>
             <span className="font-mono text-[11px] text-zinc-400">
               {selectedAssets.length}/{assets.length}
             </span>
@@ -585,7 +587,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
                         toggleSelect(a.id);
                       }}
                       className="absolute right-1 top-1 rounded bg-black/70 p-0.5 text-zinc-300 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
-                      title="Remove from selection"
+                      title={t("workspace.assets_dialog.remove_selection")}
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -601,11 +603,11 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-md border border-dashed border-zinc-700 bg-zinc-900 text-zinc-500 transition-colors hover:border-zinc-500 hover:text-zinc-300"
-                  title="Upload from your computer"
+                  title={t("workspace.assets_dialog.upload_from_computer")}
                 >
                   <UploadCloud className="h-6 w-6" />
                   <span className="text-[9px] font-mono uppercase tracking-wide">
-                    Upload
+                    {t("workspace.assets_dialog.upload_short")}
                   </span>
                 </button>
                 <input
@@ -626,7 +628,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
 
             {selectedAssets.length === 0 && (
               <div className="mt-6 px-2 text-center text-[11px] italic text-zinc-600">
-                Click any asset on the left to add it here.
+                {t("workspace.assets_dialog.click_hint")}
               </div>
             )}
           </div>
@@ -640,7 +642,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
               className="flex items-center gap-1.5 rounded border border-zinc-700 px-3 py-2 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800 disabled:opacity-40 disabled:hover:bg-transparent"
             >
               <Trash2 className="h-3.5 w-3.5" />
-              Clear all
+              {t("workspace.assets_dialog.clear_all")}
             </button>
             <button
               type="button"
@@ -649,7 +651,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
               className="flex flex-1 items-center justify-center gap-1.5 rounded bg-sky-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-sky-400 disabled:opacity-40 disabled:hover:bg-sky-500"
             >
               <Plus className="h-3.5 w-3.5" />
-              Add {selectedAssets.length > 0 ? `(${selectedAssets.length})` : ""}
+              {t("workspace.assets_dialog.add_btn")} {selectedAssets.length > 0 ? `(${selectedAssets.length})` : ""}
             </button>
           </div>
         </div>

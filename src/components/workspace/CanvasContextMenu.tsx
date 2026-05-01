@@ -39,6 +39,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 /* ── Categories ────────────────────────────────────────────── */
 
@@ -52,19 +53,29 @@ export type ToolCategory =
   | "text"
   | "addon";
 
+type CatLabelKey =
+  | "workspace.picker.cat_all"
+  | "workspace.picker.cat_media"
+  | "workspace.picker.cat_character"
+  | "workspace.picker.cat_image"
+  | "workspace.picker.cat_video"
+  | "workspace.picker.cat_audio"
+  | "workspace.picker.cat_text"
+  | "workspace.picker.cat_addon";
+
 const CATEGORY_TABS: Array<{
   id: ToolCategory;
-  label: string;
+  labelKey: CatLabelKey;
   icon: LucideIcon;
 }> = [
-  { id: "all", label: "All", icon: LayoutGrid },
-  { id: "media", label: "Media", icon: Layers },
-  { id: "character", label: "Character", icon: Sparkles },
-  { id: "image", label: "Image", icon: ImageIcon },
-  { id: "video", label: "Video", icon: Film },
-  { id: "audio", label: "Audio", icon: Music },
-  { id: "text", label: "Text", icon: Type },
-  { id: "addon", label: "Addon", icon: PenTool },
+  { id: "all", labelKey: "workspace.picker.cat_all", icon: LayoutGrid },
+  { id: "media", labelKey: "workspace.picker.cat_media", icon: Layers },
+  { id: "character", labelKey: "workspace.picker.cat_character", icon: Sparkles },
+  { id: "image", labelKey: "workspace.picker.cat_image", icon: ImageIcon },
+  { id: "video", labelKey: "workspace.picker.cat_video", icon: Film },
+  { id: "audio", labelKey: "workspace.picker.cat_audio", icon: Music },
+  { id: "text", labelKey: "workspace.picker.cat_text", icon: Type },
+  { id: "addon", labelKey: "workspace.picker.cat_addon", icon: PenTool },
 ];
 
 /* ── Catalog ────────────────────────────────────────────────
@@ -73,15 +84,30 @@ const CATEGORY_TABS: Array<{
  * variants under a parent (think "Auto · Image Generator"); leave
  * undefined for top-level tools. `comingSoon` greys the row out and
  * disables clicks so users can preview the roadmap. */
+type ToolLabelKey =
+  | "workspace.toolnames.text" | "workspace.toolnames.image_gen" | "workspace.toolnames.video_gen"
+  | "workspace.toolnames.audio_gen" | "workspace.toolnames.video_to_prompt" | "workspace.toolnames.upload"
+  | "workspace.toolnames.assets" | "workspace.toolnames.stock" | "workspace.toolnames.kling_element"
+  | "workspace.toolnames.remove_bg" | "workspace.toolnames.image_to_3d" | "workspace.toolnames.merge_av";
+type ToolDescKey =
+  | "workspace.toolnames.text_desc" | "workspace.toolnames.image_gen_desc" | "workspace.toolnames.video_gen_desc"
+  | "workspace.toolnames.audio_gen_desc" | "workspace.toolnames.video_to_prompt_desc" | "workspace.toolnames.upload_desc"
+  | "workspace.toolnames.assets_desc" | "workspace.toolnames.stock_desc" | "workspace.toolnames.kling_element_desc"
+  | "workspace.toolnames.remove_bg_desc" | "workspace.toolnames.image_to_3d_desc" | "workspace.toolnames.merge_av_desc";
+
 export interface ToolItem {
   nodeType: string;
   /** When set, fires a non-spawn action — Upload / Assets / Stock —
    *  routed back to the canvas via the menu's `onAction` callback. */
   action?: "upload" | "assets" | "stock";
-  label: string;
+  /** Translation key for the visible label in the picker. */
+  labelKey: ToolLabelKey;
   subtitle?: string;
+  /** Stable English label saved as `node.data.label` when spawned.
+   *  NOT translated — keeps node names language-agnostic. */
   defaultLabel: string;
-  description: string;
+  /** Translation key for the description / tooltip / search corpus. */
+  descriptionKey: ToolDescKey;
   category: ToolCategory;
   icon: LucideIcon;
   /** Tint colour family for the icon tile background. Pre-mapped
@@ -90,16 +116,20 @@ export interface ToolItem {
   isNew?: boolean;
   comingSoon?: boolean;
   keywords?: string[];
+  /** Convenience accessors — populated at render time so the consumer
+   *  callback (`onPick`) gets a plain `label` / `description` in the
+   *  user's current language without having to call useLanguage itself. */
+  label?: string;
+  description?: string;
 }
 
 const CATALOG: ToolItem[] = [
   // ── BASICS ────────────────────────────────────────────────
   {
     nodeType: "textNode",
-    label: "Text",
+    labelKey: "workspace.toolnames.text",
     defaultLabel: "Text",
-    description:
-      "Plain text node. @-mention any image / video asset to feed it as a reference.",
+    descriptionKey: "workspace.toolnames.text_desc",
     category: "text",
     icon: Lucide.Type,
     tint: "sky",
@@ -107,10 +137,9 @@ const CATALOG: ToolItem[] = [
   },
   {
     nodeType: "imageGenNode",
-    label: "Image Generator",
+    labelKey: "workspace.toolnames.image_gen",
     defaultLabel: "Image Generation",
-    description:
-      "Generate or edit images. Banana, SeedDream, GPT Image 2 supported.",
+    descriptionKey: "workspace.toolnames.image_gen_desc",
     category: "image",
     icon: Lucide.Sparkles,
     tint: "violet",
@@ -118,10 +147,9 @@ const CATALOG: ToolItem[] = [
   },
   {
     nodeType: "videoGenNode",
-    label: "Video Generator",
+    labelKey: "workspace.toolnames.video_gen",
     defaultLabel: "Video Generation",
-    description:
-      "Kling family + SeedDance. Omni v3 supports element refs.",
+    descriptionKey: "workspace.toolnames.video_gen_desc",
     category: "video",
     icon: Lucide.Film,
     tint: "rose",
@@ -129,10 +157,9 @@ const CATALOG: ToolItem[] = [
   },
   {
     nodeType: "audioGenNode",
-    label: "Audio Generator",
+    labelKey: "workspace.toolnames.audio_gen",
     defaultLabel: "Audio Generation",
-    description:
-      "Text-to-speech with Gemini TTS — 30 named voices, per-clip style direction.",
+    descriptionKey: "workspace.toolnames.audio_gen_desc",
     category: "audio",
     icon: Lucide.AudioLines,
     tint: "amber",
@@ -141,10 +168,9 @@ const CATALOG: ToolItem[] = [
   },
   {
     nodeType: "videoToPromptNode",
-    label: "Video to Prompt",
+    labelKey: "workspace.toolnames.video_to_prompt",
     defaultLabel: "Video to Prompt",
-    description:
-      "Read a video and write a scene-by-scene prompt breakdown.",
+    descriptionKey: "workspace.toolnames.video_to_prompt_desc",
     category: "addon",
     icon: Lucide.FileVideo,
     tint: "amber",
@@ -155,9 +181,9 @@ const CATALOG: ToolItem[] = [
   {
     nodeType: "__upload__",
     action: "upload",
-    label: "Upload",
+    labelKey: "workspace.toolnames.upload",
     defaultLabel: "Upload",
-    description: "Pick files from your computer to add as assets.",
+    descriptionKey: "workspace.toolnames.upload_desc",
     category: "media",
     icon: Lucide.Upload,
     tint: "sky",
@@ -166,9 +192,9 @@ const CATALOG: ToolItem[] = [
   {
     nodeType: "__assets__",
     action: "assets",
-    label: "Assets",
+    labelKey: "workspace.toolnames.assets",
     defaultLabel: "Assets",
-    description: "Browse every asset across your workspaces.",
+    descriptionKey: "workspace.toolnames.assets_desc",
     category: "media",
     icon: Lucide.Layers,
     tint: "emerald",
@@ -177,9 +203,9 @@ const CATALOG: ToolItem[] = [
   {
     nodeType: "__stock__",
     action: "stock",
-    label: "Stock",
+    labelKey: "workspace.toolnames.stock",
     defaultLabel: "Stock",
-    description: "Pull stock photos / videos from Freepik (coming soon).",
+    descriptionKey: "workspace.toolnames.stock_desc",
     category: "media",
     icon: Lucide.Globe,
     tint: "zinc",
@@ -190,10 +216,9 @@ const CATALOG: ToolItem[] = [
   // ── CHARACTER ─────────────────────────────────────────────
   {
     nodeType: "elementNode",
-    label: "Kling Element",
+    labelKey: "workspace.toolnames.kling_element",
     defaultLabel: "Kling Element",
-    description:
-      "Save a character or object as a reusable Kling Omni element. 4 ref + 1 frontal.",
+    descriptionKey: "workspace.toolnames.kling_element_desc",
     category: "character",
     icon: Lucide.Users,
     tint: "rose",
@@ -203,10 +228,9 @@ const CATALOG: ToolItem[] = [
   // ── IMAGE ─────────────────────────────────────────────────
   {
     nodeType: "removeBackgroundNode",
-    label: "Remove BG",
+    labelKey: "workspace.toolnames.remove_bg",
     defaultLabel: "Remove Background",
-    description:
-      "Strip the background from an image (BiRefNet via Replicate).",
+    descriptionKey: "workspace.toolnames.remove_bg_desc",
     category: "image",
     icon: Lucide.Scissors,
     tint: "emerald",
@@ -214,9 +238,9 @@ const CATALOG: ToolItem[] = [
   },
   {
     nodeType: "imageTo3dNode",
-    label: "Image to 3D",
+    labelKey: "workspace.toolnames.image_to_3d",
     defaultLabel: "Image to 3D",
-    description: "Turn a reference image into a GLB via Tripo3D.",
+    descriptionKey: "workspace.toolnames.image_to_3d_desc",
     category: "image",
     icon: Lucide.Box,
     tint: "violet",
@@ -227,9 +251,9 @@ const CATALOG: ToolItem[] = [
   // ── ADDON ─────────────────────────────────────────────────
   {
     nodeType: "mergeAudioNode",
-    label: "Merge Audio + Video",
+    labelKey: "workspace.toolnames.merge_av",
     defaultLabel: "Merge Audio + Video",
-    description: "Mux an audio track onto a video clip. Output is MP4.",
+    descriptionKey: "workspace.toolnames.merge_av_desc",
     category: "addon",
     icon: Lucide.Combine,
     tint: "amber",
@@ -277,6 +301,7 @@ const PANEL_MAX_HEIGHT = 540;
 const DESKTOP_PANEL_SCALE = 0.8;
 
 const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
+  const { t } = useLanguage();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState<ToolCategory>("all");
   const [highlight, setHighlight] = useState(0);
@@ -296,14 +321,20 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return CATALOG.filter((it) => {
-      if (active !== "all" && it.category !== active) return false;
-      if (!q) return true;
-      const hay =
-        `${it.label} ${it.subtitle ?? ""} ${it.description} ${(it.keywords ?? []).join(" ")}`.toLowerCase();
-      return hay.includes(q);
-    });
-  }, [query, active]);
+    return CATALOG
+      .map((it) => ({
+        ...it,
+        label: t(it.labelKey),
+        description: t(it.descriptionKey),
+      }))
+      .filter((it) => {
+        if (active !== "all" && it.category !== active) return false;
+        if (!q) return true;
+        const hay =
+          `${it.label} ${it.subtitle ?? ""} ${it.description} ${(it.keywords ?? []).join(" ")}`.toLowerCase();
+        return hay.includes(q);
+      });
+  }, [query, active, t]);
 
   useEffect(() => {
     setHighlight(0);
@@ -415,7 +446,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onKey}
-              placeholder="Search"
+              placeholder={t("workspace.picker.search")}
               className={cn(
                 "nodrag w-full rounded-xl border border-white/[0.06] bg-white/[0.04] py-3 pl-9 pr-3 lg:py-2.5",
                 "text-[13px] text-zinc-100 outline-none placeholder:text-zinc-500",
@@ -427,15 +458,15 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
 
         {/* ── Category tabs ── */}
         <div className="flex items-center gap-1 px-3 pb-2">
-          {CATEGORY_TABS.map((t) => {
-            const Icon = t.icon;
-            const isActive = active === t.id;
+          {CATEGORY_TABS.map((cat) => {
+            const Icon = cat.icon;
+            const isActive = active === cat.id;
             return (
               <button
-                key={t.id}
+                key={cat.id}
                 type="button"
-                onClick={() => setActive(t.id)}
-                title={t.label}
+                onClick={() => setActive(cat.id)}
+                title={t(cat.labelKey)}
                 aria-pressed={isActive}
                 className={cn(
                   "flex h-11 flex-1 items-center justify-center rounded-lg transition-all lg:h-9",
@@ -457,7 +488,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
         <div className="ws-scroll-hide flex-1 overflow-y-auto px-2 py-2">
           {filtered.length === 0 ? (
             <div className="px-3 py-10 text-center text-[12px] italic text-zinc-500">
-              Nothing matches “{query}”
+              {t("workspace.picker.no_match", { query })}
             </div>
           ) : (
             <ul className="flex flex-col gap-0.5">
@@ -504,8 +535,8 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
                       </span>
 
                       {/* Right-side chips */}
-                      {it.isNew && <Chip kind="new">New</Chip>}
-                      {it.comingSoon && <Chip kind="muted">Soon</Chip>}
+                      {it.isNew && <Chip kind="new">{t("workspace.picker.new")}</Chip>}
+                      {it.comingSoon && <Chip kind="muted">{t("workspace.picker.soon")}</Chip>}
                     </button>
                   </li>
                 );
@@ -517,13 +548,13 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
         {/* ── Footer ── */}
         <div className="flex items-center gap-4 border-t border-white/5 bg-black/20 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-500">
           <span className="flex items-center gap-1.5">
-            <Kbd>N</Kbd> Open
+            <Kbd>N</Kbd> {t("workspace.picker.hint_open")}
           </span>
           <span className="flex items-center gap-1.5">
-            <Kbd>↑↓</Kbd> Navigate
+            <Kbd>↑↓</Kbd> {t("workspace.picker.hint_navigate")}
           </span>
           <span className="flex items-center gap-1.5">
-            <Kbd>↵</Kbd> Insert
+            <Kbd>↵</Kbd> {t("workspace.picker.hint_insert")}
           </span>
         </div>
       </div>

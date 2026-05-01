@@ -16,6 +16,7 @@ import * as Lucide from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Node } from "@xyflow/react";
 import { getWorkspaceSchema } from "./workspaceSchema";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export type WirePortType = "text" | "image" | "video" | "audio" | "element";
 
@@ -300,6 +301,7 @@ interface Props {
 }
 
 const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
+  const { t } = useLanguage();
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
   // Which group key is currently expanded (showing flyout). null = none.
@@ -465,14 +467,14 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKey}
-            placeholder="Add node…"
+            placeholder={t("workspace.picker.add_node")}
             className="nodrag w-full rounded bg-transparent px-2 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 lg:px-1.5 lg:py-1"
           />
         </div>
         <ul className="relative max-h-[min(22rem,calc(100vh-10rem))] overflow-y-auto p-1 lg:max-h-72">
           {visibleRowCount === 0 ? (
             <li className="px-3 py-4 text-center text-xs italic text-zinc-500">
-              No compatible node
+              {t("workspace.picker.no_compatible")}
             </li>
           ) : isSearching ? (
             // Flat search-results list — no submenus, all matches inline.
@@ -603,7 +605,7 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
           : null}
 
         <div className="border-t border-zinc-800 px-2 py-1 text-[10px] text-zinc-500">
-          ↑↓ to navigate · → to expand · ⏎ to add · esc to cancel
+          {t("workspace.picker.hint_row")}
         </div>
       </div>
       <style>{`
