@@ -86,8 +86,8 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
   const { t } = useLanguage();
 
   const renderGroup = (heading: string, items: SettingsSection[]) => (
-    <div className="space-y-1">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500 mb-2 px-3">
+    <div className="space-y-1.5">
+      <p className="mb-2.5 px-3 text-[13px] font-semibold uppercase leading-5 text-zinc-300">
         {heading}
       </p>
       {items.map((item) => {
@@ -98,16 +98,16 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
             type="button"
             onClick={() => onChange(item.key)}
             className={cn(
-              "flex items-center gap-2.5 w-full px-3 py-1.5 rounded-md text-[13px] transition-colors group",
+              "group flex min-h-10 w-full items-center gap-3 rounded-md px-3 py-2 text-[15.5px] font-medium leading-5 transition-colors",
               active
                 ? "bg-white/[0.07] text-zinc-50"
                 : "text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.04]",
             )}
           >
-            <item.icon className="w-4 h-4 flex-shrink-0" />
+            <item.icon className="h-5 w-5 flex-shrink-0" />
             <span className="flex-1 text-left">{t(item.labelKey)}</span>
             {item.comingSoon && (
-              <span className="text-[9px] font-medium uppercase tracking-wider text-zinc-600 group-hover:text-zinc-500">
+              <span className="text-[12px] font-semibold uppercase leading-4 text-zinc-500 group-hover:text-zinc-400">
                 {t("workspace.settings.coming_soon_pill")}
               </span>
             )}
@@ -138,13 +138,13 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
                 type="button"
                 onClick={() => onChange(s.key)}
                 className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] whitespace-nowrap transition-colors flex-shrink-0",
+                  "flex min-h-9 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-[14px] transition-colors",
                   active
                     ? "bg-white/[0.08] text-zinc-50"
                     : "text-zinc-400 hover:text-zinc-100",
                 )}
               >
-                <s.icon className="w-3.5 h-3.5" />
+                <s.icon className="h-4 w-4" />
                 {t(s.labelKey)}
               </button>
             );
@@ -154,16 +154,16 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
 
       <div className="flex min-h-full">
         {/* Desktop left rail */}
-        <aside className="hidden min-h-[calc(100vh-3rem)] w-56 shrink-0 border-r border-white/5 bg-[hsl(0_0%_4%)] px-3 py-6 md:block">
-          <div className="space-y-6">
+        <aside className="hidden min-h-[calc(100vh-3rem)] w-[320px] shrink-0 border-r border-white/5 bg-[hsl(0_0%_4%)] px-4 py-7 md:block">
+          <div className="space-y-7">
           {renderGroup(t("workspace.settings.account"), ACCOUNT_SECTIONS)}
           {renderGroup(t("workspace.settings.organization"), ORG_SECTIONS)}
           </div>
         </aside>
 
         {/* Content */}
-        <div className="min-w-0 flex-1 px-6 py-8 md:px-10 md:py-10">
-          <div className="md:hidden text-xs text-zinc-500 mb-3">{currentLabel}</div>
+        <div className="min-w-0 flex-1 px-6 py-8 md:px-12 md:py-12">
+          <div className="mb-3 text-[14px] leading-5 text-zinc-400 md:hidden">{currentLabel}</div>
           {children}
         </div>
       </div>

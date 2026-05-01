@@ -135,13 +135,13 @@ const Settings = () => {
 
   // ── Section dispatch ────────────────────────────────────────
   const renderProfile = () => (
-    <div className="max-w-2xl space-y-8">
+    <div className="max-w-3xl space-y-8">
       <div>
-        <h2 className="text-xl font-semibold text-zinc-50">{t("profile")}</h2>
+        <h2 className="text-[28px] font-semibold leading-9 text-zinc-50">{t("profile")}</h2>
       </div>
 
       <div className="space-y-2">
-        <Label className="text-sm font-medium text-zinc-200">{t("Avatar")}</Label>
+        <Label className="text-[16px] font-medium leading-6 text-zinc-200">{t("Avatar")}</Label>
         <div className="relative group w-16 h-16">
           <Avatar className="w-16 h-16 border-2 border-white/10">
             <AvatarImage src={avatarUrl} />
@@ -157,41 +157,41 @@ const Settings = () => {
       </div>
 
       <div className="max-w-md space-y-1.5">
-        <Label htmlFor="displayName" className="text-sm font-medium text-zinc-200">{t("displayName")}</Label>
+        <Label htmlFor="displayName" className="text-[16px] font-medium leading-6 text-zinc-200">{t("displayName")}</Label>
         <Input
           id="displayName"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           placeholder={t("displayName")}
-          className="bg-black/30 border-white/10 text-zinc-100"
+          className="h-11 border-white/10 bg-black/30 text-[16px] text-zinc-100"
         />
       </div>
 
       <div className="max-w-md space-y-1.5">
-        <Label htmlFor="company" className="text-sm font-medium text-zinc-200">{t("company")}</Label>
+        <Label htmlFor="company" className="text-[16px] font-medium leading-6 text-zinc-200">{t("company")}</Label>
         <Input
           id="company"
           value={company}
           onChange={(e) => setCompany(e.target.value)}
           placeholder={t("companyPlaceholder")}
-          className="bg-black/30 border-white/10 text-zinc-100"
+          className="h-11 border-white/10 bg-black/30 text-[16px] text-zinc-100"
         />
       </div>
 
       <div className="space-y-1.5">
-        <Label className="text-sm font-medium text-zinc-200">{t("authEmailLabel")}</Label>
-        <p className="text-sm text-zinc-400">{user?.email}</p>
+        <Label className="text-[16px] font-medium leading-6 text-zinc-200">{t("authEmailLabel")}</Label>
+        <p className="text-[16px] leading-6 text-zinc-300">{user?.email}</p>
       </div>
 
       <Separator className="bg-white/5" />
 
       <div className="space-y-2">
         <div className="flex items-center gap-3">
-          <span className="text-sm text-zinc-300">{t("currentPlan")}</span>
+          <span className="text-[16px] leading-6 text-zinc-300">{t("currentPlan")}</span>
           {getPlanBadge()}
         </div>
         {profile?.current_period_end && profile?.subscription_status !== "free" && (
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex items-center gap-2 text-[15px] leading-6">
             <span className="text-zinc-500">{t("expires")}:</span>
             <span
               className={cn(
@@ -210,14 +210,14 @@ const Settings = () => {
                 day: "numeric",
               })}
               {new Date(profile.current_period_end) < new Date() && (
-                <span className="ml-1.5 text-xs">({t("expired")})</span>
+                <span className="ml-1.5 text-[13px]">({t("expired")})</span>
               )}
             </span>
           </div>
         )}
       </div>
 
-      <Button onClick={handleSave} disabled={saving} size="sm">
+      <Button onClick={handleSave} disabled={saving} className="h-10 px-4 text-[15px]">
         {saving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
         {t("saveChanges")}
       </Button>
@@ -229,10 +229,10 @@ const Settings = () => {
        * a request. This block is the user-facing entry point. */}
       <Separator className="bg-white/5" />
       <div className="rounded-xl border border-red-500/20 bg-red-500/[0.04] p-5">
-        <h3 className="text-[14px] font-semibold text-red-200">
+        <h3 className="text-[16px] font-semibold leading-6 text-red-200">
           {language === "th" ? "พื้นที่อันตราย" : "Danger zone"}
         </h3>
-        <p className="mt-1 text-[12px] text-zinc-400">
+        <p className="mt-2 text-[15px] leading-6 text-zinc-300">
           {language === "th"
             ? "การลบบัญชีจะเอาข้อมูล โปรเจค ผลงาน เครดิต และประวัติการชำระทั้งหมดออกถาวร — กู้คืนไม่ได้"
             : "Deleting your account permanently removes all data, projects, generations, credits, and billing history — this cannot be undone."}
@@ -240,7 +240,7 @@ const Settings = () => {
         <button
           type="button"
           onClick={() => setDeleteDialogOpen(true)}
-          className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-3 text-[12.5px] font-medium text-red-200 transition-colors hover:bg-red-500/20"
+          className="mt-4 inline-flex h-10 items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-3.5 text-[15px] font-medium text-red-200 transition-colors hover:bg-red-500/20"
         >
           {language === "th" ? "ลบบัญชีถาวร" : "Delete account"}
         </button>
@@ -250,16 +250,16 @@ const Settings = () => {
 
   const renderPreferences = () => (
     <div className="max-w-2xl space-y-6">
-      <h2 className="text-xl font-semibold text-zinc-50">{t("workspace.settings.preferences")}</h2>
+      <h2 className="text-[28px] font-semibold leading-9 text-zinc-50">{t("workspace.settings.preferences")}</h2>
       <div className="space-y-1 max-w-lg">
         <div className="flex items-center justify-between py-3">
-          <span className="text-sm text-zinc-300 flex items-center gap-2.5">
+          <span className="flex items-center gap-2.5 text-[16px] leading-6 text-zinc-200">
             <Globe className="w-4 h-4 text-zinc-500" />
             {t("language")}
           </span>
           <button
             onClick={toggleLanguage}
-            className="text-xs px-3 py-1.5 rounded-lg bg-white/[0.05] text-zinc-300 hover:text-zinc-100 font-medium transition-colors"
+            className="rounded-lg bg-white/[0.05] px-3.5 py-2 text-[15px] font-medium text-zinc-200 transition-colors hover:text-zinc-100"
           >
             {language === "en" ? "EN → TH" : "TH → EN"}
           </button>
@@ -503,39 +503,39 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
   }
 
   return (
-    <div className="max-w-3xl space-y-5">
+    <div className="max-w-5xl space-y-7">
       <div>
-        <h2 className="text-xl font-semibold text-zinc-50">Team</h2>
-        <p className="mt-1 text-sm text-zinc-400">
+        <h2 className="text-[28px] font-semibold leading-9 text-zinc-50">Team</h2>
+        <p className="mt-2 text-[18px] leading-7 text-zinc-200">
           Your account is connected to {active.organization?.display_name || active.organization?.name || "your organization"}.
         </p>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-          <div className="text-xs text-zinc-500">Shared credits</div>
-          <div className="mt-1 text-lg font-semibold text-zinc-50">
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+          <div className="text-[15px] font-medium leading-5 text-zinc-200">Shared credits</div>
+          <div className="mt-3 text-[26px] font-semibold leading-8 text-zinc-50">
             {formatCredits(active.organization?.credit_available ?? active.organization?.credit_pool ?? 0)}
           </div>
-          <div className="mt-0.5 text-[11px] text-zinc-500">Organization pool</div>
+          <div className="mt-2 text-[14px] leading-5 text-zinc-300">Organization pool</div>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-          <div className="text-xs text-zinc-500">Team</div>
-          <div className="mt-1 text-lg font-semibold text-zinc-50">
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+          <div className="text-[15px] font-medium leading-5 text-zinc-200">Team</div>
+          <div className="mt-3 text-[24px] font-semibold leading-8 text-zinc-50">
             {active.team?.name || "Company pool"}
           </div>
-          <div className="mt-0.5 text-[11px] text-zinc-500">
+          <div className="mt-2 text-[14px] leading-5 text-zinc-300">
             {active.team
               ? `${formatCredits(active.team.credit_available ?? 0)} credits`
               : "No sub-team assigned"}
           </div>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-          <div className="text-xs text-zinc-500">Access</div>
-          <div className="mt-1 text-lg font-semibold text-zinc-50">
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+          <div className="text-[15px] font-medium leading-5 text-zinc-200">Access</div>
+          <div className="mt-3 text-[24px] font-semibold leading-8 text-zinc-50">
             {active.role === "org_admin" ? "Admin" : "Member"}
           </div>
-          <div className="mt-0.5 text-[11px] text-zinc-500">{active.status} - $5 / seat</div>
+          <div className="mt-2 text-[14px] leading-5 text-zinc-300">{active.status} - $5 / seat</div>
         </div>
       </div>
 
@@ -549,7 +549,7 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
           Open Admin Console
         </Button>
       ) : (
-        <p className="text-sm text-zinc-500">
+        <p className="max-w-4xl text-[18px] leading-7 text-zinc-200">
           Member accounts can use the team workspace after approval. Admin Console access is available only to organization admins.
         </p>
       )}

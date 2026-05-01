@@ -108,7 +108,7 @@ function CreditAvatarRing({
         }}
       >
         <AvatarImage src={src ?? undefined} alt="" />
-        <AvatarFallback className="bg-emerald-600 text-[12px] font-semibold text-white">
+        <AvatarFallback className="bg-emerald-600 text-[13.5px] font-semibold text-white">
           {initial}
         </AvatarFallback>
       </Avatar>
@@ -132,7 +132,7 @@ function UsageRow({
   const pct = percentOf(used, total);
   return (
     <div className="space-y-1">
-      <div className="flex items-center justify-between gap-3 text-[11.5px] font-medium leading-4 text-white">
+      <div className="flex items-center justify-between gap-3 text-[14px] font-medium leading-5 text-white">
         <span className="truncate">{label}</span>
         <span className="shrink-0 tabular-nums text-white/[0.85]">
           {formatCompact(used)} / {formatCompact(total)}
@@ -141,7 +141,7 @@ function UsageRow({
       <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.12]">
         <div className={`h-full rounded-full ${colorClass}`} style={{ width: `${pct}%` }} />
       </div>
-      <div className="flex items-center justify-between gap-3 text-[10.5px] leading-3 text-white/[0.68]">
+      <div className="flex items-center justify-between gap-3 text-[12.5px] leading-4 text-white/[0.76]">
         <span>Spent {formatCompact(used)}</span>
         <span>Available {formatCompact(available)}</span>
       </div>
@@ -212,11 +212,11 @@ export function UserMenu() {
       <DropdownMenuContent
         align="end"
         sideOffset={6}
-        className="max-h-[calc(100vh-72px)] w-[292px] overflow-y-auto rounded-lg border-white/[0.10] bg-[#121212] p-0 text-white shadow-2xl"
+        className="mf-readable max-h-[calc(100vh-72px)] w-[326px] overflow-y-auto rounded-lg border-white/[0.10] bg-[#121212] p-0 text-white shadow-2xl"
       >
         <DropdownMenuLabel className="p-0 font-normal">
-          <div className="p-3 pb-2.5">
-            <div className="flex items-center gap-2.5">
+          <div className="p-4 pb-3">
+            <div className="flex items-center gap-3">
               <CreditAvatarRing
                 src={profile?.avatar_url}
                 initial={initial}
@@ -227,12 +227,12 @@ export function UserMenu() {
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <div className="truncate text-[12.5px] font-semibold leading-4 text-white">
+                  <div className="truncate text-[15px] font-semibold leading-5 text-white">
                     {profile?.display_name || t("workspace.usermenu.member_fallback")}
                   </div>
                   {hasTeamContext && <Crown className="h-3.5 w-3.5 shrink-0 fill-yellow-400 text-yellow-400" />}
                 </div>
-                <div className="mt-0.5 truncate text-[11px] leading-4 text-white/70">
+                <div className="mt-0.5 truncate text-[13px] leading-5 text-white/75">
                   {user?.email}
                 </div>
               </div>
@@ -242,7 +242,7 @@ export function UserMenu() {
               <button
                 type="button"
                 onClick={() => navigate("/app/pricing")}
-                className="flex h-8 w-full items-center justify-center gap-1.5 rounded-md bg-[#5367f5] px-3 text-[12px] font-semibold leading-4 text-white transition-colors hover:bg-[#6274ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70"
+                className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-[#5367f5] px-3 text-[14px] font-semibold leading-5 text-white transition-colors hover:bg-[#6274ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70"
               >
                 <Sparkles className="h-3.5 w-3.5" />
                 {t("workspace.usermenu.upgrade")}
@@ -256,7 +256,7 @@ export function UserMenu() {
                     navigate("/app/team-register");
                   }
                 }}
-                className="flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-white/[0.16] bg-transparent px-3 text-[12px] font-semibold leading-4 text-white transition-colors hover:bg-white/[0.06]"
+                className="flex h-9 w-full items-center justify-center gap-2 rounded-md border border-white/[0.16] bg-transparent px-3 text-[14px] font-semibold leading-5 text-white transition-colors hover:bg-white/[0.06]"
               >
                 {hasTeamContext ? <Building2 className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}
                 {hasTeamContext ? "Admin Console" : "Create your team"}
@@ -265,22 +265,22 @@ export function UserMenu() {
           </div>
         </DropdownMenuLabel>
 
-        <div className="border-t border-white/[0.08] px-3 py-3">
-          <div className="mb-2.5 flex items-center justify-between gap-3">
+        <div className="border-t border-white/[0.08] px-4 py-3.5">
+          <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <Gauge className="h-4 w-4 shrink-0 text-white" />
               <div className="min-w-0">
-                <div className="text-[12.5px] font-semibold leading-4 text-white">Credit usage</div>
-                <div className="truncate text-[10.5px] leading-3 text-white/[0.64]">{creditScopeLabel}</div>
+                <div className="text-[15px] font-semibold leading-5 text-white">Credit usage</div>
+                <div className="truncate text-[12.5px] leading-4 text-white/[0.72]">{creditScopeLabel}</div>
               </div>
             </div>
             <div className="shrink-0 text-right">
-              <div className="text-[14px] font-bold leading-4 tabular-nums text-white">{formattedCredits}</div>
-              <div className="text-[10px] leading-3 text-white/[0.64]">available</div>
+              <div className="text-[16px] font-bold leading-5 tabular-nums text-white">{formattedCredits}</div>
+              <div className="text-[12px] leading-4 text-white/[0.72]">available</div>
             </div>
           </div>
 
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             <UsageRow
               label="Personal"
               used={personalUsed}
@@ -304,18 +304,18 @@ export function UserMenu() {
 
         <DropdownMenuItem
           disabled
-          className="mx-2 my-0.5 h-8 gap-2.5 rounded-md px-3 text-[12px] font-medium leading-4 text-white/55 data-[disabled]:opacity-100"
+          className="mx-2 my-1 h-9 gap-3 rounded-md px-3 text-[14px] font-medium leading-5 text-white/55 data-[disabled]:opacity-100"
         >
           <CreditCard className="h-3.5 w-3.5 text-white/55" />
           <span className="flex-1">{t("workspace.usermenu.plan_billing")}</span>
-          <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-semibold text-white/55">
+          <span className="rounded bg-white/[0.06] px-2 py-0.5 text-[12px] font-semibold text-white/60">
             {t("workspace.settings.coming_soon_pill")}
           </span>
         </DropdownMenuItem>
 
         <DropdownMenuItem
           onSelect={() => navigate("/app/settings")}
-          className="mx-2 my-0.5 h-8 cursor-pointer gap-2.5 rounded-md px-3 text-[12px] font-medium leading-4 text-white focus:bg-white/[0.06] focus:text-white"
+          className="mx-2 my-1 h-9 cursor-pointer gap-3 rounded-md px-3 text-[14px] font-medium leading-5 text-white focus:bg-white/[0.06] focus:text-white"
         >
           <SettingsIcon className="h-3.5 w-3.5 text-white/[0.82]" />
           {t("workspace.usermenu.settings")}
@@ -326,11 +326,11 @@ export function UserMenu() {
             e.preventDefault();
             setLanguage(language === "th" ? "en" : "th");
           }}
-          className="mx-2 my-0.5 h-8 cursor-pointer gap-2.5 rounded-md px-3 text-[12px] font-medium leading-4 text-white focus:bg-white/[0.06] focus:text-white"
+          className="mx-2 my-1 h-9 cursor-pointer gap-3 rounded-md px-3 text-[14px] font-medium leading-5 text-white focus:bg-white/[0.06] focus:text-white"
         >
           <Languages className="h-3.5 w-3.5 text-white/[0.82]" />
           <span className="flex-1">Language</span>
-          <span className="rounded-md border border-white/[0.10] bg-white/[0.04] px-2 py-0.5 text-[10.5px] text-white">
+          <span className="rounded-md border border-white/[0.10] bg-white/[0.04] px-2 py-0.5 text-[12.5px] text-white">
             {language === "th" ? "English" : "Thai"}
           </span>
         </DropdownMenuItem>
@@ -339,7 +339,7 @@ export function UserMenu() {
 
         <DropdownMenuItem
           onSelect={handleSignOut}
-          className="mx-2 my-1.5 h-8 cursor-pointer gap-2.5 rounded-md px-3 text-[12px] font-medium leading-4 text-red-200 focus:bg-red-500/10 focus:text-red-100"
+          className="mx-2 my-1.5 h-9 cursor-pointer gap-3 rounded-md px-3 text-[14px] font-medium leading-5 text-red-200 focus:bg-red-500/10 focus:text-red-100"
         >
           <LogOut className="h-3.5 w-3.5" />
           {t("workspace.usermenu.sign_out")}

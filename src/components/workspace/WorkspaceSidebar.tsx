@@ -153,7 +153,7 @@ export default function WorkspaceSidebar({
   };
 
   return (
-    <aside className="ws-scroll-hide flex h-full w-[212px] shrink-0 flex-col overflow-y-auto border-r border-white/5 bg-[hsl(0_0%_4%)] lg:w-[228px]">
+    <aside className="mf-readable ws-scroll-hide flex h-full w-[212px] shrink-0 flex-col overflow-y-auto border-r border-white/5 bg-[hsl(0_0%_4%)] lg:w-[228px]">
       {/* ── Brand row — PSC : Digital Media ──────────────────────
        *  Logo lives at /public/psc-logo.png. Save the orange
        *  Digital Media wordmark there; the full lockup is wide
@@ -163,7 +163,7 @@ export default function WorkspaceSidebar({
         <button
           type="button"
           onClick={() => navigate("/app/workspace")}
-          className="flex items-center gap-2 text-[14.5px] font-semibold tracking-tight text-zinc-50 transition-colors hover:text-white"
+          className="flex items-center gap-2 text-[15.5px] font-semibold tracking-tight text-zinc-50 transition-colors hover:text-white"
         >
           {/* Brand logo — defaults to the workspace mascot, swapped
            *  to the tenant org logo when the user is on a claimed
@@ -186,7 +186,7 @@ export default function WorkspaceSidebar({
           type="button"
           onClick={handleCreate}
           className={cn(
-            "flex h-11 w-full items-center justify-center gap-1.5 rounded-lg px-3 text-[14.5px] font-semibold text-white lg:h-9",
+            "flex h-11 w-full items-center justify-center gap-1.5 rounded-lg px-3 text-[15.5px] font-semibold text-white lg:h-10",
             "bg-gradient-to-b from-[#ff3d8e] to-[#e8327f] shadow-[0_2px_8px_-2px_rgba(255,61,142,0.45)]",
             "transition-[transform,box-shadow] hover:from-[#ff4da0] hover:to-[#ef3a8c] hover:shadow-[0_4px_12px_-2px_rgba(255,61,142,0.55)]",
             "active:scale-[0.98]",
@@ -211,7 +211,7 @@ export default function WorkspaceSidebar({
 
       {/* ── Section divider with label ─────────────────────────── */}
       <div className="px-5 pb-1.5 pt-3">
-        <div className="text-[13.5px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+        <div className="text-[14px] font-semibold uppercase text-zinc-400">
           {t("workspace.sidebar.all_tools")}
         </div>
       </div>
@@ -252,7 +252,7 @@ export default function WorkspaceSidebar({
           <button
             type="button"
             onClick={() => navigate("/app/university")}
-            className="flex h-11 w-full items-center gap-2.5 rounded-md border border-fuchsia-400/25 bg-fuchsia-500/10 px-2.5 text-[15.5px] font-semibold text-fuchsia-100 transition-colors hover:bg-fuchsia-500/18 hover:text-white lg:h-9"
+            className="flex h-11 w-full items-center gap-2.5 rounded-md border border-fuchsia-400/25 bg-fuchsia-500/10 px-2.5 text-[16px] font-semibold text-fuchsia-100 transition-colors hover:bg-fuchsia-500/18 hover:text-white lg:h-10"
             title={t("workspace.sidebar.psc_demo_tip")}
           >
             <School className="h-3.5 w-3.5" />
@@ -299,7 +299,7 @@ const OrgAdminLink = () => {
       <button
         type="button"
         onClick={() => navigate("/app/org-admin")}
-        className="flex h-11 w-full items-center gap-2.5 rounded-md px-2.5 text-[15.5px] text-amber-200/90 transition-colors hover:bg-amber-300/10 hover:text-amber-100 lg:h-9"
+        className="flex h-11 w-full items-center gap-2.5 rounded-md px-2.5 text-[16px] text-amber-200/90 transition-colors hover:bg-amber-300/10 hover:text-amber-100 lg:h-10"
         title={t("workspace.sidebar.manage_org_tip")}
       >
         <Crown className="h-3.5 w-3.5" />
@@ -308,7 +308,7 @@ const OrgAdminLink = () => {
       <button
         type="button"
         onClick={() => navigate("/app/org-admin/branding")}
-        className="flex h-11 w-full items-center gap-2.5 rounded-md px-2.5 text-[15.5px] text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-100 lg:h-9"
+        className="flex h-11 w-full items-center gap-2.5 rounded-md px-2.5 text-[16px] text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-100 lg:h-10"
         title={t("workspace.sidebar.branding_tip")}
       >
         <Palette className="h-3.5 w-3.5" />
@@ -333,7 +333,7 @@ const NavLink = ({
     type="button"
     onClick={onClick}
     className={cn(
-      "flex h-10 items-center gap-2.5 rounded-lg px-2.5 text-[14.5px] transition-colors lg:h-9",
+      "flex h-10 items-center gap-2.5 rounded-lg px-2.5 text-[15.5px] font-medium transition-colors lg:h-10",
       active
         ? "bg-white/[0.07] text-zinc-50 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.05)]"
         : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100",

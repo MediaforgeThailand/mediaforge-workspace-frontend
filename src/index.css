@@ -1062,3 +1062,36 @@ body {
 :where(p, span, div, label, a, button, h1, h2, h3, h4, h5, h6, input, textarea, select).text-muted-foreground {
   color: rgba(244, 244, 245, 0.82) !important;
 }
+
+/* Readable chrome guard. Account/settings/sidebar/profile surfaces
+   must not regress to 9-13px labels; DB Adman renders small at those
+   sizes, especially for Thai. Scoped by `.mf-readable` so dense canvas
+   node internals can keep their compact technical labels. */
+.mf-readable :where([class*="text-[9px]"], [class*="text-[9.5px]"], [class*="text-[10px]"], [class*="text-[10.5px]"], [class*="text-[11px]"], [class*="text-[11.5px]"]) {
+  font-size: 14px !important;
+  line-height: 1.25rem !important;
+}
+
+.mf-readable :where([class*="text-[12px]"], [class*="text-[12.5px]"]) {
+  font-size: 14.5px !important;
+  line-height: 1.35rem !important;
+}
+
+.mf-readable :where([class*="text-[13px]"], [class*="text-[13.5px]"]) {
+  font-size: 15px !important;
+  line-height: 1.45rem !important;
+}
+
+.mf-readable :where(.text-xs) {
+  font-size: 14.5px !important;
+  line-height: 1.35rem !important;
+}
+
+.mf-readable :where(.text-sm) {
+  font-size: 16.5px !important;
+  line-height: 1.55rem !important;
+}
+
+.mf-readable :where([class*="tracking-"]) {
+  letter-spacing: 0 !important;
+}

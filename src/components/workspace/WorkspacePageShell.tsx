@@ -24,7 +24,7 @@ export default function WorkspacePageShell({
 }) {
   return (
     <div
-      className="flex h-screen w-screen overflow-hidden bg-[hsl(0_0%_5%)] text-zinc-100"
+      className="mf-readable flex h-screen w-screen overflow-hidden bg-[hsl(0_0%_5%)] text-zinc-100"
       style={{ fontFamily: "var(--font-sans)" }}
     >
       {/* No `active` — this shell is used for surfaces that aren't
