@@ -83,6 +83,7 @@ import WorkspaceSidebar, {
 import StandaloneGenerator, {
   type StandaloneProjectOption,
 } from "@/components/workspace/StandaloneGenerator";
+import StockView from "@/components/workspace/StockView";
 import AssetsView from "@/components/workspace/AssetsView";
 import {
   STANDALONE_TOOLS,
@@ -210,6 +211,7 @@ const VALID_SECTIONS: Section[] = [
   "home",
   "history",
   "assets",
+  "stock",
   "spaces",
   "image_gen",
   "video_gen",
@@ -507,6 +509,9 @@ const WorkspaceDashboardInner = () => {
         {(section === "history" || section === "assets") && (
           <AssetsView onOpenSidebar={() => setMobileSidebarOpen(true)} />
         )}
+        {section === "stock" && (
+          <StockView onOpenSidebar={() => setMobileSidebarOpen(true)} />
+        )}
         {isStandaloneSection(section) && (
           <StandaloneGenerator
             activeTool={section}
@@ -523,6 +528,7 @@ const WorkspaceDashboardInner = () => {
           section !== "spaces" &&
           section !== "history" &&
           section !== "assets" &&
+          section !== "stock" &&
           !isStandaloneSection(section) && (
             <Placeholder
               section={section}

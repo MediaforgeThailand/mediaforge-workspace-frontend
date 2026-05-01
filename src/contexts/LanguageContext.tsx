@@ -1763,6 +1763,7 @@ const translations = {
     // Sidebar
     "workspace.sidebar.home": "Home",
     "workspace.sidebar.all_assets": "All assets",
+    "workspace.sidebar.stock": "Stock",
     "workspace.sidebar.spaces": "Spaces",
     "workspace.sidebar.image_gen": "Image Generator",
     "workspace.sidebar.video_gen": "Video Generator",
@@ -3958,6 +3959,7 @@ const translations = {
     // Sidebar
     "workspace.sidebar.home": "หน้าหลัก",
     "workspace.sidebar.all_assets": "ไฟล์ทั้งหมด",
+    "workspace.sidebar.stock": "Stock",
     "workspace.sidebar.spaces": "Spaces",
     "workspace.sidebar.image_gen": "สร้างรูปภาพ",
     "workspace.sidebar.video_gen": "สร้างวิดีโอ",
