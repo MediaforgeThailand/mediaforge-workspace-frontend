@@ -694,7 +694,7 @@ export default function AssetsView({
            * `${user.id}/...` is enforced. */
           onCropConfirmed={async (blob, filename) => {
             if (!user) {
-              toast.error("Sign in required to save crop");
+              toast.error(t("workspace.crop.toast_signin_required"));
               return;
             }
             const ext = filename.match(/\.([^.]+)$/)?.[1] ?? "png";
@@ -706,10 +706,10 @@ export default function AssetsView({
                 upsert: false,
               });
             if (upErr) {
-              toast.error(`Crop save failed: ${upErr.message}`);
+              toast.error(t("workspace.crop.toast_save_failed", { error: upErr.message }));
               throw upErr;
             }
-            toast.success("Cropped image saved to your library");
+            toast.success(t("workspace.crop.toast_saved_library"));
             // Re-trigger the uploads listing so the new file shows
             // up. Cheapest signal: flip and restore the section.
             if (section === "uploads") {

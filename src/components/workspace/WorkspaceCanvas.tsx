@@ -2107,7 +2107,7 @@ const Inner = () => {
               y: window.innerHeight / 2,
             });
             await uploadAsset(file, centre);
-            toast.success("Cropped image added to canvas");
+            toast.success(t("workspace.crop.toast_added_canvas"));
           }}
         />
       )}

@@ -43,6 +43,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Check, X as XIcon, Crop as CropIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ImageCropToolProps {
   /** Source image URL — must be CORS-fetchable (signed URL or
@@ -89,6 +90,7 @@ export function ImageCropTool({
   onCropConfirmed,
   onCancel,
 }: ImageCropToolProps) {
+  const { t } = useLanguage();
   // The natural (source) image dimensions — known after the <img>
   // loads. We need these to convert screen-pixel drag deltas into
   // source-pixel crop coords.
@@ -259,7 +261,7 @@ export function ImageCropTool({
       const blob: Blob | null = await new Promise((resolve) => {
         canvas.toBlob((b) => resolve(b), outputMime, 0.95);
       });
-      if (!blob) throw new Error("Failed to encode cropped image");
+      if (!blob) throw new Error(t("workspace.crop.encode_failed"));
 
       // Compose the suggested filename — append "-cropped" before the
       // extension so the asset library doesn't collide with the
@@ -304,7 +306,7 @@ export function ImageCropTool({
       <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 border-b border-white/10 bg-zinc-950/90 px-4 py-2.5 text-sm text-zinc-100">
         <div className="flex items-center gap-2 font-medium">
           <CropIcon className="h-4 w-4" />
-          ครอปรูปภาพ / Crop image
+          {t("workspace.crop.heading")}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -314,7 +316,7 @@ export function ImageCropTool({
             className="inline-flex h-8 items-center gap-1.5 rounded-md bg-white/[0.06] px-3 text-[12px] font-medium text-zinc-200 transition-colors hover:bg-white/[0.10] disabled:opacity-50"
           >
             <XIcon className="h-3.5 w-3.5" />
-            ยกเลิก / Cancel
+            {t("workspace.crop.cancel")}
           </button>
           <button
             type="button"
@@ -330,12 +332,12 @@ export function ImageCropTool({
             {submitting ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                กำลังบันทึก…
+                {t("workspace.crop.saving")}
               </>
             ) : (
               <>
                 <Check className="h-3.5 w-3.5" />
-                บันทึกที่ครอป / Save crop
+                {t("workspace.crop.save")}
               </>
             )}
           </button>
@@ -352,7 +354,7 @@ export function ImageCropTool({
         <img
           ref={imgRef}
           src={src}
-          alt="crop source"
+          alt={t("workspace.crop.source_alt")}
           crossOrigin="anonymous"
           onLoad={handleImageLoad}
           draggable={false}
@@ -492,10 +494,10 @@ export function ImageCropTool({
               {Math.round(crop.width)} × {Math.round(crop.height)} px
             </span>
             <span className="text-zinc-600">·</span>
-            <span>ลากกรอบเพื่อย้าย / ลากมุมเพื่อปรับขนาด</span>
+            <span>{t("workspace.crop.hint")}</span>
           </>
         ) : (
-          <span>กำลังโหลดรูป…</span>
+          <span>{t("workspace.crop.loading")}</span>
         )}
       </div>
     </div>
