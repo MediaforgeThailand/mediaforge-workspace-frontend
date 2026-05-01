@@ -2087,7 +2087,28 @@ const Inner = () => {
         />
       )}
       {preview && (
-        <NodePreviewLightbox preview={preview} onClose={() => setPreview(null)} />
+        <NodePreviewLightbox
+          preview={preview}
+          onClose={() => setPreview(null)}
+          /* Crop confirm — turn the cropped Blob into a File and
+           * route it through the existing uploadAsset path. The new
+           * AssetNode spawns at the centre of the current viewport
+           * so it appears in view rather than offscreen. The
+           * lightbox itself closes after the upload completes. */
+          onCropConfirmed={async (blob, filename) => {
+            const file = new File([blob], filename, {
+              type: blob.type || "image/png",
+            });
+            // Spawn at the visible viewport centre so the user
+            // sees the cropped node land in front of them.
+            const centre = screenToFlowPosition({
+              x: window.innerWidth / 2,
+              y: window.innerHeight / 2,
+            });
+            await uploadAsset(file, centre);
+            toast.success("Cropped image added to canvas");
+          }}
+        />
       )}
       <CanvasFloatingSidebar
         onAddNode={openContextMenuAtAnchor}

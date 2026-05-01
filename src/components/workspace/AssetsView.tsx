@@ -672,6 +672,36 @@ export default function AssetsView({
         <NodePreviewLightbox
           preview={preview}
           onClose={() => setPreview(null)}
+          /* Crop confirm — uploads the cropped Blob into the user's
+           * own ai-media folder, then re-runs the uploads-listing
+           * effect by toggling the section state so the new file
+           * appears immediately. RLS guarantees the path-prefix
+           * `${user.id}/...` is enforced. */
+          onCropConfirmed={async (blob, filename) => {
+            if (!user) {
+              toast.error("Sign in required to save crop");
+              return;
+            }
+            const ext = filename.match(/\.([^.]+)$/)?.[1] ?? "png";
+            const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
+            const { error: upErr } = await supabase.storage
+              .from("ai-media")
+              .upload(path, blob, {
+                contentType: blob.type || "image/png",
+                upsert: false,
+              });
+            if (upErr) {
+              toast.error(`Crop save failed: ${upErr.message}`);
+              throw upErr;
+            }
+            toast.success("Cropped image saved to your library");
+            // Re-trigger the uploads listing so the new file shows
+            // up. Cheapest signal: flip and restore the section.
+            if (section === "uploads") {
+              setSection("all");
+              setTimeout(() => setSection("uploads"), 0);
+            }
+          }}
         />
       )}
     </div>
