@@ -80,7 +80,6 @@ type StockCategory = {
   id: string;
   label: string;
   query: string;
-  contentType?: string;
   Icon: typeof Shapes;
   swatch: string;
   preview: string;
@@ -91,7 +90,6 @@ const CATEGORIES: StockCategory[] = [
     id: "vectors",
     label: "Vectors",
     query: "modern vector illustration pack",
-    contentType: "vector",
     Icon: Shapes,
     swatch: "from-[#ff9f8f] via-[#f75f8f] to-[#461a6b]",
     preview: "https://img.freepik.com/free-vector/hand-drawn-flat-design-people-pattern_23-2149251292.jpg",
@@ -100,7 +98,6 @@ const CATEGORIES: StockCategory[] = [
     id: "photos",
     label: "Photos",
     query: "premium editorial lifestyle photo",
-    contentType: "photo",
     Icon: Camera,
     swatch: "from-[#c8fff1] via-[#8ad2ff] to-[#365d8d]",
     preview: "https://img.freepik.com/free-photo/beautiful-shot-sea-beach-sunrise_181624-3715.jpg",
@@ -109,7 +106,6 @@ const CATEGORIES: StockCategory[] = [
     id: "illustrations",
     label: "Illustrations",
     query: "surreal digital illustration portrait",
-    contentType: "vector",
     Icon: Palette,
     swatch: "from-[#d5ff82] via-[#ff85b8] to-[#6d46ff]",
     preview: "https://img.freepik.com/free-vector/gradient-abstract-colorful-background_23-2149131349.jpg",
@@ -126,7 +122,6 @@ const CATEGORIES: StockCategory[] = [
     id: "psds",
     label: "PSDs",
     query: "poster psd template",
-    contentType: "psd",
     Icon: FileImage,
     swatch: "from-[#16171d] via-[#42435a] to-[#f7d2ff]",
     preview: "https://img.freepik.com/free-psd/vertical-poster-template-fashion-sale_23-2149488890.jpg",
@@ -135,7 +130,6 @@ const CATEGORIES: StockCategory[] = [
     id: "mockups",
     label: "Mockups",
     query: "product packaging mockup",
-    contentType: "psd",
     Icon: Box,
     swatch: "from-[#f8f8f8] via-[#a4a9b5] to-[#18181b]",
     preview: "https://img.freepik.com/free-psd/isolated-business-card-mockup_125540-1382.jpg",
@@ -152,7 +146,6 @@ const CATEGORIES: StockCategory[] = [
     id: "icons",
     label: "Icons",
     query: "colorful icon set",
-    contentType: "vector",
     Icon: Grid2X2,
     swatch: "from-[#b8fff5] via-[#a78bfa] to-[#22c55e]",
     preview: "https://img.freepik.com/free-vector/social-media-icons-set_98292-4250.jpg",
@@ -177,7 +170,6 @@ const CATEGORIES: StockCategory[] = [
     id: "3d",
     label: "3D Models",
     query: "3d abstract object white studio",
-    contentType: "photo",
     Icon: Box,
     swatch: "from-[#ffffff] via-[#e4e4e7] to-[#9ca3af]",
     preview: "https://img.freepik.com/free-psd/3d-rendering-abstract-shape_23-2150901966.jpg",
@@ -186,7 +178,6 @@ const CATEGORIES: StockCategory[] = [
     id: "fonts",
     label: "Fonts",
     query: "typography font poster lettering",
-    contentType: "vector",
     Icon: Sparkles,
     swatch: "from-[#d9fbff] via-[#ffffff] to-[#7dd3fc]",
     preview: "https://img.freepik.com/free-vector/hand-drawn-lettering-quotes-collection_23-2149064656.jpg",
@@ -224,7 +215,6 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
   const { t } = useLanguage();
   const [query, setQuery] = useState("creator stock content");
   const [submittedQuery, setSubmittedQuery] = useState("creator stock content");
-  const [contentType, setContentType] = useState<string | undefined>();
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<FreepikResource[]>([]);
@@ -263,7 +253,6 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
             page: nextPage,
             limit: 36,
             order: "relevance",
-            contentType,
           },
         });
       if (invokeError) throw new Error(invokeError.message);
@@ -283,19 +272,17 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
   useEffect(() => {
     void runSearch(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submittedQuery, contentType]);
+  }, [submittedQuery]);
 
   const submit = (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
     const term = query.trim() || "creator stock content";
     setActiveCategory("all");
-    setContentType(undefined);
     setSubmittedQuery(term);
   };
 
   const searchCategory = (category: StockCategory) => {
     setActiveCategory(category.id);
-    setContentType(category.contentType);
     setQuery(category.query);
     setSubmittedQuery(category.query);
   };
@@ -446,7 +433,6 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
                   type="button"
                   onClick={() => {
                     setActiveCategory("all");
-                    setContentType(undefined);
                     setQuery(term);
                     setSubmittedQuery(term);
                   }}
