@@ -54,6 +54,19 @@ export interface ModelUsageRow {
   unique_users: number;
 }
 
+export interface PaginatedClassMembers {
+  items: ClassMember[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
+export interface ClassMemberSummary {
+  totalStudents: number;
+  inactiveStudents: number;
+}
+
 export interface ActivityEvent {
   id: string;
   user_id: string;
@@ -62,8 +75,73 @@ export interface ActivityEvent {
   model_id: string | null;
   credits_used: number;
   created_at: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
+
+interface RpcResultRow {
+  [key: string]: unknown;
+}
+
+interface SupabaseQueryResult<T> {
+  data: T[] | null;
+  count: number | null;
+  error: { message: string } | null;
+}
+
+interface SupabaseQueryBuilder<T> extends PromiseLike<SupabaseQueryResult<T>> {
+  select: (columns: string, options?: { count?: "exact"; head?: boolean }) => SupabaseQueryBuilder<T>;
+  eq: (column: string, value: unknown) => SupabaseQueryBuilder<T>;
+  is: (column: string, value: unknown) => SupabaseQueryBuilder<T>;
+  gte: (column: string, value: unknown) => SupabaseQueryBuilder<T>;
+  order: (column: string, options?: { ascending?: boolean }) => SupabaseQueryBuilder<T>;
+  limit: (count: number) => SupabaseQueryBuilder<T>;
+  range: (from: number, to: number) => SupabaseQueryBuilder<T>;
+}
+
+interface ClassMemberRow {
+  user_id: string;
+  status: string;
+  joined_at: string;
+  credits_balance: number | null;
+  credits_lifetime_received: number | null;
+  credits_lifetime_used: number | null;
+  profiles?: {
+    display_name?: string | null;
+    avatar_url?: string | null;
+  } | null;
+}
+
+interface TeacherClassJoinRow {
+  classes?: TeacherClass | null;
+}
+
+interface OrganizationMembershipRow {
+  role: string;
+}
+
+interface ActivityRow {
+  id: string;
+  user_id: string;
+  activity_type: string;
+  model_id: string | null;
+  credits_used: number | null;
+  created_at: string;
+  metadata: Record<string, unknown> | null;
+  profiles?: {
+    display_name?: string | null;
+  } | null;
+}
+
+type RpcCaller = (
+  fn: string,
+  args?: Record<string, unknown>
+) => Promise<{ data: unknown; error: { message: string } | null }>;
+
+const callRpc = supabase.rpc.bind(supabase) as RpcCaller;
+const fromTable = supabase.from.bind(supabase) as unknown as <T>(
+  table: string,
+) => SupabaseQueryBuilder<T>;
+const MAX_MANAGEABLE_CLASSES = 200;
 
 // ─────────────────────────────────────────────────────────────────────
 // Class list — different scope for teacher vs org_admin
@@ -77,7 +155,7 @@ export interface ActivityEvent {
  */
 export function useManageableClasses() {
   const { user, profile } = useAuth();
-  const orgId = (profile as any)?.organization_id ?? null;
+  const orgId = (profile as { organization_id?: string | null } | null)?.organization_id ?? null;
 
   return useQuery<TeacherClass[]>({
     queryKey: ["teacher-classes", user?.id, orgId],
@@ -86,8 +164,7 @@ export function useManageableClasses() {
       if (!user || !orgId) return [];
 
       // Try teacher-scoped first
-      const { data: teacherRows } = await supabase
-        .from("class_members" as any)
+      const { data: teacherRows } = await fromTable<TeacherClassJoinRow>("class_members")
         .select(`
           classes:class_id (
             id, name, code, status, credit_policy, credit_amount,
@@ -97,19 +174,20 @@ export function useManageableClasses() {
         `)
         .eq("user_id", user.id)
         .eq("role", "teacher")
-        .eq("status", "active");
+        .eq("status", "active")
+        .limit(MAX_MANAGEABLE_CLASSES);
 
-      const teacherClasses: TeacherClass[] = ((teacherRows ?? []) as unknown as any[])
+      const teacherClasses: TeacherClass[] = (teacherRows ?? [])
         .map((r) => r.classes)
         .filter(Boolean);
 
       // Plus classes where they are primary_instructor (legacy fallback)
-      const { data: primaryRows } = await supabase
-        .from("classes" as any)
+      const { data: primaryRows } = await fromTable<TeacherClass>("classes")
         .select("id, name, code, status, credit_policy, credit_amount, " +
                 "credit_pool, credit_pool_consumed, primary_instructor_id, organization_id, end_date")
         .eq("primary_instructor_id", user.id)
-        .is("deleted_at", null);
+        .is("deleted_at", null)
+        .limit(MAX_MANAGEABLE_CLASSES);
 
       // Merge + dedupe
       const byId = new Map<string, TeacherClass>();
@@ -122,20 +200,19 @@ export function useManageableClasses() {
       // fall back to all org classes (so org_admin without classes can still
       // navigate). We detect "is org admin" via a quick membership check.
       if (byId.size === 0) {
-        const { data: orgAdminRow } = await supabase
-          .from("organization_memberships" as any)
+        const { data: orgAdminRow } = await fromTable<OrganizationMembershipRow>("organization_memberships")
           .select("role")
           .eq("user_id", user.id)
           .eq("role", "org_admin")
           .eq("status", "active")
           .limit(1);
         if ((orgAdminRow ?? []).length > 0) {
-          const { data: allOrgClasses } = await supabase
-            .from("classes" as any)
+          const { data: allOrgClasses } = await fromTable<TeacherClass>("classes")
             .select("id, name, code, status, credit_policy, credit_amount, " +
                     "credit_pool, credit_pool_consumed, primary_instructor_id, organization_id, end_date")
             .eq("organization_id", orgId)
-            .is("deleted_at", null);
+            .is("deleted_at", null)
+            .limit(MAX_MANAGEABLE_CLASSES);
           ((allOrgClasses ?? []) as unknown as TeacherClass[]).forEach((c) => byId.set(c.id, c));
         }
       }
@@ -152,15 +229,103 @@ export function useManageableClasses() {
 // Class detail data (members, activity, model usage)
 // ─────────────────────────────────────────────────────────────────────
 
-export function useClassMembers(classId: string | null | undefined) {
+export function useClassMembers(
+  classId: string | null | undefined,
+  page = 1,
+  pageSize = 25,
+) {
+  return useQuery<PaginatedClassMembers>({
+    queryKey: ["class-members-detailed", classId, page, pageSize],
+    enabled: !!classId,
+    queryFn: async () => {
+      if (!classId) {
+        return {
+          items: [],
+          total: 0,
+          page,
+          pageSize,
+          hasMore: false,
+        };
+      }
+
+      const safePage = Math.max(1, page);
+      const safePageSize = Math.min(Math.max(1, pageSize), 100);
+      const start = (safePage - 1) * safePageSize;
+      const end = start + safePageSize - 1;
+
+      const { data: rows, count } = await fromTable<ClassMemberRow>("class_members")
+        .select(`
+          user_id, status, joined_at,
+          credits_balance, credits_lifetime_received, credits_lifetime_used,
+          profiles:user_id (display_name, avatar_url)
+        `, { count: "exact" })
+        .eq("class_id", classId)
+        .eq("role", "student")
+        .order("joined_at", { ascending: false })
+        .range(start, end);
+
+      const items = (rows ?? []).map((r) => ({
+        user_id: r.user_id,
+        display_name: r.profiles?.display_name ?? null,
+        avatar_url: r.profiles?.avatar_url ?? null,
+        email: null,
+        status: r.status,
+        joined_at: r.joined_at,
+        credits_balance: r.credits_balance ?? 0,
+        credits_lifetime_received: r.credits_lifetime_received ?? 0,
+        credits_lifetime_used: r.credits_lifetime_used ?? 0,
+      }));
+
+      return {
+        items,
+        total: count ?? 0,
+        page: safePage,
+        pageSize: safePageSize,
+        hasMore: start + items.length < (count ?? 0),
+      };
+    },
+    staleTime: 30_000,
+  });
+}
+
+export function useClassMemberSummary(classId: string | null | undefined) {
+  return useQuery<ClassMemberSummary>({
+    queryKey: ["class-member-summary", classId],
+    enabled: !!classId,
+    queryFn: async () => {
+      if (!classId) {
+        return { totalStudents: 0, inactiveStudents: 0 };
+      }
+
+      const [totalResult, inactiveResult] = await Promise.all([
+        fromTable<ClassMemberRow>("class_members")
+          .select("user_id", { count: "exact", head: true })
+          .eq("class_id", classId)
+          .eq("role", "student"),
+        fromTable<ClassMemberRow>("class_members")
+          .select("user_id", { count: "exact", head: true })
+          .eq("class_id", classId)
+          .eq("role", "student")
+          .eq("status", "active")
+          .eq("credits_lifetime_used", 0),
+      ]);
+
+      return {
+        totalStudents: totalResult.count ?? 0,
+        inactiveStudents: inactiveResult.count ?? 0,
+      };
+    },
+    staleTime: 30_000,
+  });
+}
+
+export function useClassTopSpenders(classId: string | null | undefined, limit = 5) {
   return useQuery<ClassMember[]>({
-    queryKey: ["class-members-detailed", classId],
+    queryKey: ["class-top-spenders", classId, limit],
     enabled: !!classId,
     queryFn: async () => {
       if (!classId) return [];
-      // Get class_members + join with profiles
-      const { data: rows } = await supabase
-        .from("class_members" as any)
+      const { data: rows } = await fromTable<ClassMemberRow>("class_members")
         .select(`
           user_id, status, joined_at,
           credits_balance, credits_lifetime_received, credits_lifetime_used,
@@ -168,11 +333,11 @@ export function useClassMembers(classId: string | null | undefined) {
         `)
         .eq("class_id", classId)
         .eq("role", "student")
-        .order("joined_at", { ascending: false });
+        .eq("status", "active")
+        .order("credits_lifetime_used", { ascending: false })
+        .limit(limit);
 
-      // Email comes from auth.users — we'd need an edge fn for that.
-      // For demo, leave email null and surface display_name only.
-      return ((rows ?? []) as any[]).map((r) => ({
+      return (rows ?? []).map((r) => ({
         user_id: r.user_id,
         display_name: r.profiles?.display_name ?? null,
         avatar_url: r.profiles?.avatar_url ?? null,
@@ -199,38 +364,18 @@ export function useClassModelUsage(classId: string | null | undefined, days = 30
     queryFn: async () => {
       if (!classId) return [];
       const since = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
-      const { data } = await supabase
-        .from("workspace_activity" as any)
-        .select("model_id, credits_used, user_id")
-        .eq("class_id", classId)
-        .eq("activity_type", "model_use")
-        .gte("created_at", since);
-
-      const byModel = new Map<string, ModelUsageRow>();
-      ((data ?? []) as any[]).forEach((r) => {
-        if (!r.model_id) return;
-        const cur = byModel.get(r.model_id) ?? {
-          model_id: r.model_id, uses: 0, total_credits: 0, unique_users: 0,
-        };
-        cur.uses += 1;
-        cur.total_credits += r.credits_used ?? 0;
-        byModel.set(r.model_id, cur);
+      const { data, error } = await callRpc("teacher_class_model_usage", {
+        p_class_id: classId,
+        p_since: since,
       });
+      if (error) throw error;
 
-      // Compute unique_users separately (Set per model)
-      const userSets = new Map<string, Set<string>>();
-      ((data ?? []) as any[]).forEach((r) => {
-        if (!r.model_id) return;
-        if (!userSets.has(r.model_id)) userSets.set(r.model_id, new Set());
-        userSets.get(r.model_id)!.add(r.user_id);
-      });
-      byModel.forEach((row, key) => {
-        row.unique_users = userSets.get(key)?.size ?? 0;
-      });
-
-      return Array.from(byModel.values()).sort(
-        (a, b) => b.total_credits - a.total_credits,
-      );
+      return ((data ?? []) as RpcResultRow[]).map((row) => ({
+        model_id: String(row.model_id ?? ""),
+        uses: Number(row.uses ?? 0),
+        total_credits: Number(row.total_credits ?? 0),
+        unique_users: Number(row.unique_users ?? 0),
+      }));
     },
     staleTime: 30_000,
   });
@@ -245,8 +390,7 @@ export function useClassActivity(classId: string | null | undefined, limit = 50)
     enabled: !!classId,
     queryFn: async () => {
       if (!classId) return [];
-      const { data } = await supabase
-        .from("workspace_activity" as any)
+      const { data } = await fromTable<ActivityRow>("workspace_activity")
         .select(`
           id, user_id, activity_type, model_id, credits_used, created_at, metadata,
           profiles:user_id (display_name)
@@ -254,7 +398,7 @@ export function useClassActivity(classId: string | null | undefined, limit = 50)
         .eq("class_id", classId)
         .order("created_at", { ascending: false })
         .limit(limit);
-      return ((data ?? []) as any[]).map((r) => ({
+      return (data ?? []).map((r) => ({
         id: r.id,
         user_id: r.user_id,
         user_display_name: r.profiles?.display_name ?? null,
@@ -279,29 +423,18 @@ export function useClassDailyUsage(classId: string | null | undefined, days = 7)
     queryFn: async () => {
       if (!classId) return [];
       const since = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
-      const { data } = await supabase
-        .from("workspace_activity" as any)
-        .select("credits_used, created_at")
-        .eq("class_id", classId)
-        .eq("activity_type", "model_use")
-        .gte("created_at", since);
-
-      // Bucket by day in local time
-      const buckets = new Map<string, number>();
-      ((data ?? []) as any[]).forEach((r) => {
-        const d = new Date(r.created_at);
-        const key = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,"0")}-${d.getDate().toString().padStart(2,"0")}`;
-        buckets.set(key, (buckets.get(key) ?? 0) + (r.credits_used ?? 0));
+      const until = new Date().toISOString();
+      const { data, error } = await callRpc("teacher_class_daily_usage", {
+        p_class_id: classId,
+        p_since: since,
+        p_until: until,
       });
+      if (error) throw error;
 
-      // Fill missing days with 0
-      const out: { day: string; credits: number }[] = [];
-      for (let i = days - 1; i >= 0; i--) {
-        const d = new Date(Date.now() - i * 24 * 3600 * 1000);
-        const key = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,"0")}-${d.getDate().toString().padStart(2,"0")}`;
-        out.push({ day: key.slice(5), credits: buckets.get(key) ?? 0 });
-      }
-      return out;
+      return ((data ?? []) as RpcResultRow[]).map((row) => ({
+        day: String(row.day ?? ""),
+        credits: Number(row.credits ?? 0),
+      }));
     },
     staleTime: 60_000,
   });
@@ -322,27 +455,19 @@ export function useMemberModelBreakdown(
     queryFn: async () => {
       if (!classId || !userId) return [];
       const since = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
-      const { data } = await supabase
-        .from("workspace_activity" as any)
-        .select("model_id, credits_used")
-        .eq("class_id", classId)
-        .eq("user_id", userId)
-        .eq("activity_type", "model_use")
-        .gte("created_at", since);
-
-      const byModel = new Map<string, ModelUsageRow>();
-      ((data ?? []) as any[]).forEach((r) => {
-        if (!r.model_id) return;
-        const cur = byModel.get(r.model_id) ?? {
-          model_id: r.model_id, uses: 0, total_credits: 0, unique_users: 1,
-        };
-        cur.uses += 1;
-        cur.total_credits += r.credits_used ?? 0;
-        byModel.set(r.model_id, cur);
+      const { data, error } = await callRpc("teacher_member_model_breakdown", {
+        p_class_id: classId,
+        p_user_id: userId,
+        p_since: since,
       });
-      return Array.from(byModel.values()).sort(
-        (a, b) => b.total_credits - a.total_credits,
-      );
+      if (error) throw error;
+
+      return ((data ?? []) as RpcResultRow[]).map((row) => ({
+        model_id: String(row.model_id ?? ""),
+        uses: Number(row.uses ?? 0),
+        total_credits: Number(row.total_credits ?? 0),
+        unique_users: Number(row.unique_users ?? 1),
+      }));
     },
     staleTime: 30_000,
   });
