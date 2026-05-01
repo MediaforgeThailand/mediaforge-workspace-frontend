@@ -442,7 +442,7 @@ const WorkspaceDashboardInner = () => {
   return (
     <div
       className="flex h-screen w-screen overflow-hidden bg-[hsl(0_0%_5%)] text-zinc-100"
-      style={{ fontFamily: "'Prompt', system-ui, sans-serif" }}
+      style={{ fontFamily: "var(--font-sans)" }}
     >
       {/* Persistent sidebar — shown only on tablet+ (md / 768px+). On
        *  mobile the same component renders inside the drawer below

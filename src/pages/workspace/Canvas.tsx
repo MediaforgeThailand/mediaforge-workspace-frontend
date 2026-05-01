@@ -286,16 +286,13 @@ const WorkspaceCanvasPage = () => {
   ]);
 
   return (
-    // Workspace UI uses 'Prompt' as its primary typeface — same family
-    // the marketing site renders Thai + Latin in, so the dashboard
-    // and the canvas read as one product. Falls through to system
-    // sans-serif for any environment that hasn't loaded the Google
-    // Font yet (gives the layout a stable measurement during cold
-    // load instead of a FOUT punch).
+    // Keep canvas typography pinned to the same global font stack as
+    // the dashboard, even when portals or isolated canvas surfaces
+    // would otherwise inherit a browser default.
     <div
       className="flex h-screen w-screen flex-col bg-zinc-950 text-zinc-100"
       style={{
-        fontFamily: "'Prompt', system-ui, -apple-system, 'Segoe UI', sans-serif",
+        fontFamily: "var(--font-sans)",
       }}
     >
       {/* Floating credit pill — top-right of the canvas, above tabs and

@@ -143,7 +143,7 @@ const NodeContextMenu = ({ position, items, onClose }: Props) => {
         left,
         top,
         width: PANEL_WIDTH,
-        fontFamily: "'Prompt', system-ui, sans-serif",
+        fontFamily: "var(--font-sans)",
       }}
       onContextMenu={(e) => {
         // Don't let a 2nd right-click on the menu surface re-open

@@ -417,7 +417,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
           top,
           width: PANEL_WIDTH,
           maxHeight: PANEL_MAX_HEIGHT,
-          fontFamily: "'Prompt', system-ui, sans-serif",
+          fontFamily: "var(--font-sans)",
           // CSS `transform: scale` shrinks the entire panel uniformly.
           // `transform-origin: top left` keeps the click point pinned
           // to the panel's visible top-left, so the existing

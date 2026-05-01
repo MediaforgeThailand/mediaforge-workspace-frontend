@@ -271,7 +271,7 @@ const EmbeddedCheckoutModal = ({
                     colorText: "#ffffff",
                     colorTextSecondary: "#ddd6fe",
                     colorDanger: "#ef4444",
-                    fontFamily: "system-ui, sans-serif",
+                    fontFamily: "var(--font-sans)",
                     borderRadius: "12px",
                     accessibleColorOnColorPrimary: "#ffffff",
                   },
