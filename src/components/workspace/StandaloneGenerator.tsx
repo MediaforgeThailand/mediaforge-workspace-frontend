@@ -29,6 +29,7 @@ import InsufficientCreditsDialog from "@/components/InsufficientCreditsDialog";
 import { calculateNodeCost } from "@/lib/nodeCostCalculator";
 import { useNodeCreditCosts } from "@/hooks/useNodeCreditCosts";
 import { useCredits } from "@/hooks/useCredits";
+import { DEFAULT_PROJECT_NAME } from "@/store/useWorkspaceStore";
 import { downloadFromUrl } from "./downloadAsset";
 import {
   build3dParams,
@@ -923,7 +924,10 @@ function ProjectPicker({
           <div className="max-h-[260px] space-y-1 overflow-y-auto">
             {projects.map((project) => {
               const active = project.id === activeProject?.id;
-              const canDelete = Boolean(onDeleteProject) && projects.length > 1;
+              const canDelete =
+                Boolean(onDeleteProject) &&
+                projects.length > 1 &&
+                project.name !== DEFAULT_PROJECT_NAME;
               return (
                 <div
                   key={project.id}
