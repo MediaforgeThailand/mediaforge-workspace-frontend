@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'DB Adman X';
+  src: url('/fonts/hinted-DBAdmanX.woff2') format('woff2');
+  font-weight: 300 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DB Adman X';
+  src: url('/fonts/hinted-DBAdmanX-Bold.woff2') format('woff2');
+  font-weight: 600 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* MediaForge "Midnight Neon" Design System
    Background: Deep Navy (#0a0e1a)
    Card: Slightly lighter navy (#141827)
