@@ -9,7 +9,7 @@
  * Only has an output handle — assets are sources, not sinks.
  */
 
-import { memo, useCallback } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { type NodeProps, useReactFlow } from "@xyflow/react";
 import { Image as ImageIcon, Film, Music, Box, Loader2, Maximize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -83,13 +83,31 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as unknown as AssetNodeData;
   const { setNodes } = useReactFlow();
   const { t } = useLanguage();
+  const [isHovered, setIsHovered] = useState(false);
   // Re-sign the previewUrl on mount in case it was generated under
   // the old 24h TTL and has since expired. Falls back to the raw
   // URL untouched for blob:/data: URLs and non-Supabase sources.
   // 3D models render statically from `posterUrl` here — the GLB
   // mirror only happens when the user opens the lightbox, so we
   // don't need useMirroredTripoUrl on this path.
-  const livePreviewUrl = useFreshSignedUrl(d.previewUrl);
+  const imagePreviewTransform = useMemo(
+    () => ({
+      width: Math.max(512, Math.min(1280, Math.ceil(((d.compactWidth ?? 219) as number) * 2))),
+      quality: 82,
+      resize: "contain" as const,
+    }),
+    [d.compactWidth],
+  );
+  const livePreviewUrl = useFreshSignedUrl(
+    d.previewUrl,
+    d.fieldType === "image" || d.fieldType === "model3d"
+      ? imagePreviewTransform
+      : undefined,
+  );
+  const livePosterUrl = useFreshSignedUrl(
+    d.posterUrl,
+    d.fieldType === "model3d" ? imagePreviewTransform : undefined,
+  );
 
   const onLabelChange = useCallback(
     (label: string) => {
@@ -168,6 +186,8 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
     <div
       className="ws-clean-node relative"
       data-state={selected ? "selected" : "idle"}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       // Default tile width — 219 (200 → 230 → 219). Now also
       // user-resizable via the corner handle below; persists in
       // `data.compactWidth` so the card keeps the chosen size
@@ -228,7 +248,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
          *  models still skip this — they aren't referenced as
          *  image inputs and a "general / subject / scene" role
          *  doesn't change downstream behaviour for them. */}
-        {d.fieldType !== "model3d" && (
+        {d.fieldType !== "model3d" && (selected || isHovered) && (
           <div className="ws-compact-overlay">
             <div className="ws-compact-toolbar">
               {/* Reference role picker — shares the Radix-based
@@ -259,12 +279,14 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
             // inspect. The little "3D" pill in the corner signals
             // that drilling in opens a real 3D viewer.
             <div className="relative">
-              {d.posterUrl ? (
+              {livePosterUrl ? (
                 <img
-                  src={d.posterUrl}
+                  src={livePosterUrl}
                   alt={d.label || d.fileName || "3D model"}
                   className="block h-auto w-full"
                   draggable={false}
+                  loading="lazy"
+                  decoding="async"
                   style={{ aspectRatio: "1 / 1", objectFit: "contain", background: "hsl(0 0% 6%)" }}
                 />
               ) : (
@@ -320,6 +342,8 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
               src={livePreviewUrl}
               alt={d.label || d.fileName || "asset"}
               className={cn("block h-auto w-full", d.uploading && "opacity-50")}
+              loading="lazy"
+              decoding="async"
             />
           )
         ) : (

@@ -63,6 +63,7 @@ import type { Generation } from "./NodeResultBar";
 // lists were deleted. Audio gen nodes no longer surface a voice
 // picker on the canvas — backend uses its own per-provider default.
 import { cloneNodeFresh } from "./cloneNode";
+import { useFreshSignedUrl } from "./useFreshSignedUrl";
 // Workspace-local schema + helpers — kept out of the shared file so
 // the main flow editor stays untouched.
 import {
@@ -523,6 +524,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const edges = useEdges();
   const prevHasRefVideo = useRef<boolean | undefined>(undefined);
   const [insufficientOpen, setInsufficientOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   // Used by friendlyError() to localize jargon errors before they
   // reach the user. Raw text still lands in console.error.
   const { language } = useLanguage();
@@ -561,7 +563,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     });
     ro.observe(target);
     return () => ro.disconnect();
-  }, []);
+  }, [selected, isHovered]);
 
   const d = (data ?? {}) as NodeData & { status?: "idle" | "processing" | "done" | "error" };
   const params = d.params ?? {};
@@ -2020,6 +2022,20 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const currentGen = generations.length > 0
     ? (generations[selectedGenIndex] ?? generations[0])
     : null;
+  const imagePreviewTransform = useMemo(
+    () => ({
+      width: Math.max(768, Math.min(1600, Math.ceil(((d.compactWidth ?? 437) as number) * 2))),
+      quality: 82,
+      resize: "contain" as const,
+    }),
+    [d.compactWidth],
+  );
+  const previewImageUrl = useFreshSignedUrl(
+    currentGen?.url && (currentGen.type === "image" || currentGen.model_url)
+      ? currentGen.url
+      : null,
+    imagePreviewTransform,
+  );
 
   const [imgDims, setImgDims] = useState<{ w: number; h: number } | null>(null);
   // Reset measured dims when the displayed media swaps so the badge
@@ -2185,6 +2201,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   // History dialog — opens when user clicks the preview's expand
   // affordance so they can scrub through previous generations.
   const [historyOpen, setHistoryOpen] = useState(false);
+  const showInteractiveControls =
+    selected || isHovered || isRunning || runStatus === "error" || historyOpen;
 
   /* ── Manual resize via the bottom-right corner handle ──────
    * Drag the small dot in the corner to scale the node's body
@@ -2239,6 +2257,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         className="ws-clean-node nodrag-shell"
         data-state={selected ? "selected" : "idle"}
         data-status={runStatus}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
         style={{ width: d.compactWidth ?? 437 }}
       >
         {/* ── Floating title — sits ABOVE the body, no border. ── */}
@@ -2298,9 +2318,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             <div className="relative h-full w-full">
               {currentGen.url ? (
                 <img
-                  src={currentGen.url}
+                  src={previewImageUrl ?? currentGen.url}
                   alt="3D model preview"
                   draggable={false}
+                  loading="lazy"
+                  decoding="async"
                   style={{
                     width: "100%",
                     aspectRatio: "1 / 1",
@@ -2328,9 +2350,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             </div>
           ) : currentGen?.type === "image" && currentGen.url && (
             <img
-              src={currentGen.url}
+              src={previewImageUrl ?? currentGen.url}
               alt=""
               draggable={false}
+              loading="lazy"
+              decoding="async"
               onLoad={(e) => {
                 const img = e.target as HTMLImageElement;
                 setImgDims({ w: img.naturalWidth, h: img.naturalHeight });
@@ -2377,7 +2401,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           )}
 
           {/* Multi-history affordance — only show when 2+ generations */}
-          {generations.length > 1 && (
+          {showInteractiveControls && generations.length > 1 && (
             <button
               type="button"
               onClick={(e) => {
@@ -2394,18 +2418,20 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           )}
 
           {/* ── Settings overlay — fades in on hover/select ── */}
-          <div className="ws-compact-overlay">
-            <div ref={toolbarRef} className="ws-compact-toolbar">
-              {toolbarParams.map((p) => renderToolbarParam(p))}
-              {supportsMultiGen && !isMultiShot && (
-                <MultiGenStepper
-                  count={multiGenCount}
-                  disabled={isRunning || isViewer}
-                  onChange={updateMultiGenCount}
-                />
-              )}
+          {showInteractiveControls && (
+            <div className="ws-compact-overlay">
+              <div ref={toolbarRef} className="ws-compact-toolbar">
+                {toolbarParams.map((p) => renderToolbarParam(p))}
+                {supportsMultiGen && !isMultiShot && (
+                  <MultiGenStepper
+                    count={multiGenCount}
+                    disabled={isRunning || isViewer}
+                    onChange={updateMultiGenCount}
+                  />
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* ── Prompt — pinned to the bottom of the preview, lifts
            *  on hover so it clears the settings toolbar. The Run
@@ -2414,7 +2440,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
            *  drifting up too high when hovering. The Run button is
            *  now its own anchor (see below), so the prompt overlay
            *  is purely the textarea. */}
-          {!isMultiShot && (
+          {showInteractiveControls && !isMultiShot && (
             <div
               className={cn(
                 "ws-compact-prompt-overlay has-run-anchor",
@@ -2465,7 +2491,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
            *  reads it as part of the same "controls reveal" gesture.
            *  Lives outside .ws-compact-prompt-overlay so it doesn't
            *  inherit the prompt's dynamic-lift behaviour. */}
-          {!isMultiShot && (
+          {showInteractiveControls && !isMultiShot && (
             <div className="ws-compact-run-anchor">
               <Tooltip delayDuration={150}>
                 <TooltipTrigger asChild>
@@ -2555,7 +2581,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           </div>
         )}
 
-        {isMultiShot && (
+        {showInteractiveControls && isMultiShot && (
           <div className="bg-zinc-900/60 p-2">
             <MultiShotBuilder
               scenes={multiShotScenes}
@@ -2581,7 +2607,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       </div>
 
       {/* History dialog (shared with the legacy NodeResultBar). */}
-      {generations.length > 0 && (
+      {historyOpen && generations.length > 0 && (
         <NodeResultDialog
           open={historyOpen}
           onOpenChange={setHistoryOpen}
@@ -2614,11 +2640,13 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           index={i}
         />
       ))}
-      <InsufficientCreditsDialog
-        open={insufficientOpen}
-        onOpenChange={setInsufficientOpen}
-        requiredCredits={nodeCost ?? undefined}
-      />
+      {insufficientOpen && (
+        <InsufficientCreditsDialog
+          open={insufficientOpen}
+          onOpenChange={setInsufficientOpen}
+          requiredCredits={nodeCost ?? undefined}
+        />
+      )}
     </>
   );
 });

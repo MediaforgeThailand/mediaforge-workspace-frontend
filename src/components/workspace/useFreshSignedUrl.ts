@@ -24,11 +24,18 @@
  * via a module-level Map.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 const CACHE = new Map<string, { url: string; signedAt: number }>();
 const REFRESH_AFTER_MS = 1000 * 60 * 60 * 12; // 12h — well inside any TTL
+
+export interface FreshSignedUrlTransform {
+  width?: number;
+  height?: number;
+  quality?: number;
+  resize?: "cover" | "contain" | "fill";
+}
 
 interface ParsedPath {
   bucket: string;
@@ -52,8 +59,22 @@ function parseStorageUrl(url: string): ParsedPath | null {
   };
 }
 
-export function useFreshSignedUrl(input: string | null | undefined): string | null {
+export function useFreshSignedUrl(
+  input: string | null | undefined,
+  transform?: FreshSignedUrlTransform,
+): string | null {
   const initial = typeof input === "string" && input.length > 0 ? input : null;
+  const transformKey = useMemo(
+    () => (transform ? JSON.stringify(transform) : ""),
+    [transform],
+  );
+  const normalizedTransform = useMemo(
+    () =>
+      transformKey
+        ? (JSON.parse(transformKey) as FreshSignedUrlTransform)
+        : undefined,
+    [transformKey],
+  );
   const [url, setUrl] = useState<string | null>(initial);
 
   useEffect(() => {
@@ -64,7 +85,7 @@ export function useFreshSignedUrl(input: string | null | undefined): string | nu
     if (!parsed) return; // not a Supabase URL, leave the caller's URL alone
 
     // Cache hit (and still fresh) → use it without a round-trip.
-    const cacheKey = `${parsed.bucket}:${parsed.path}`;
+    const cacheKey = `${parsed.bucket}:${parsed.path}:${transformKey}`;
     const cached = CACHE.get(cacheKey);
     if (cached && Date.now() - cached.signedAt < REFRESH_AFTER_MS) {
       setUrl(cached.url);
@@ -74,7 +95,11 @@ export function useFreshSignedUrl(input: string | null | undefined): string | nu
     let cancelled = false;
     void supabase.storage
       .from(parsed.bucket)
-      .createSignedUrl(parsed.path, 60 * 60 * 24 * 365) // 1 year
+      .createSignedUrl(
+        parsed.path,
+        60 * 60 * 24 * 365,
+        normalizedTransform ? { transform: normalizedTransform } : undefined,
+      ) // 1 year
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error || !data?.signedUrl) {
@@ -90,7 +115,7 @@ export function useFreshSignedUrl(input: string | null | undefined): string | nu
     return () => {
       cancelled = true;
     };
-  }, [initial]);
+  }, [initial, normalizedTransform, transformKey]);
 
   return url;
 }
