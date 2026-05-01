@@ -94,6 +94,10 @@
     --text-faint: 240 8% 52%;
     --text-2: 240 20% 78%;
   }
+
+  html {
+    font-size: 17px;
+  }
 }
 
 @layer base {
