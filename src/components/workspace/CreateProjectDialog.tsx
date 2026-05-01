@@ -114,10 +114,14 @@ export function CreateProjectDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="border-white/10 bg-[hsl(0_0%_8%)] text-zinc-100 sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base text-zinc-50">
-            <FolderPlus className="h-4 w-4" />
+      {/*  Sized down + tighter spacing. The previous max-w-sm with
+       *  default Dialog gap-4 felt cavernous for two short fields.
+       *  We override the gap inline (gap-3) and tighten paddings so
+       *  the dialog hugs its content. */}
+      <DialogContent className="w-[calc(100vw-2rem)] gap-3 border-white/10 bg-[hsl(0_0%_8%)] p-5 text-zinc-100 sm:max-w-[360px]">
+        <DialogHeader className="space-y-0">
+          <DialogTitle className="flex items-center gap-2 text-[15px] font-semibold text-zinc-50">
+            <FolderPlus className="h-4 w-4 text-zinc-400" />
             {language === "th" ? "สร้างโปรเจคใหม่" : "Create new project"}
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -128,8 +132,8 @@ export function CreateProjectDialog({
         </DialogHeader>
 
         {/* ── Name ─────────────────────────────────────────────── */}
-        <div className="space-y-1.5">
-          <label className="text-[12px] font-medium text-zinc-300">
+        <div className="space-y-1">
+          <label className="text-[11.5px] font-medium text-zinc-400">
             {language === "th" ? "ชื่อโปรเจค" : "Project name"}
           </label>
           <input
@@ -150,64 +154,75 @@ export function CreateProjectDialog({
                 void handleSubmit();
               }
             }}
-            className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-violet-500/40"
+            /* placeholder bumped from zinc-600 → zinc-500 for legibility
+             * on the very dark dialog bg; user reported the previous
+             * tone was almost invisible. */
+            className="w-full rounded-md border border-white/10 bg-black/40 px-2.5 py-2 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-violet-500/50"
           />
         </div>
 
-        {/* ── Private toggle ──────────────────────────────────── */}
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
-          <div className="flex min-w-0 items-start gap-2">
+        {/* ── Private toggle (compact row) ─────────────────────── */}
+        <button
+          type="button"
+          onClick={() => !submitting && setIsPrivate((v) => !v)}
+          disabled={submitting}
+          className="flex w-full items-center justify-between gap-2 rounded-md border border-white/[0.06] bg-white/[0.02] px-2.5 py-2 text-left transition-colors hover:bg-white/[0.04] disabled:opacity-60"
+        >
+          <div className="flex min-w-0 items-center gap-2">
             <span
               className={cn(
-                "mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md transition-colors",
+                "grid h-6 w-6 shrink-0 place-items-center rounded transition-colors",
                 isPrivate
-                  ? "bg-violet-500/15 text-violet-300 ring-1 ring-inset ring-violet-500/30"
-                  : "bg-white/[0.04] text-zinc-400 ring-1 ring-inset ring-white/[0.06]",
+                  ? "bg-violet-500/20 text-violet-300"
+                  : "bg-white/[0.05] text-zinc-400",
               )}
             >
               {isPrivate ? (
-                <Lock className="h-3.5 w-3.5" />
+                <Lock className="h-3 w-3" />
               ) : (
-                <Users className="h-3.5 w-3.5" />
+                <Users className="h-3 w-3" />
               )}
             </span>
             <div className="min-w-0">
               <div className="text-[12.5px] font-medium text-zinc-100">
                 {language === "th" ? "โปรเจคส่วนตัว" : "Private project"}
               </div>
-              <div className="text-[10.5px] leading-snug text-zinc-500">
+              <div className="text-[10.5px] leading-snug text-zinc-400">
                 {isPrivate
                   ? language === "th"
                     ? "เฉพาะคุณเท่านั้นที่เห็น"
-                    : "Only you can see this"
+                    : "Only you can see"
                   : language === "th"
                     ? "ทีมในองค์กรเดียวกันเห็นได้"
-                    : "Org / team members can see"}
+                    : "Team can see"}
               </div>
             </div>
           </div>
+          {/* Switch is non-interactive here — the whole row is the
+           *  hit target. Keeping the visual switch in sync gives the
+           *  expected affordance without splitting the click area. */}
           <Switch
             checked={isPrivate}
-            onCheckedChange={setIsPrivate}
-            disabled={submitting}
+            tabIndex={-1}
+            className="pointer-events-none"
             aria-label={
               language === "th" ? "เปิด/ปิดโปรเจคส่วนตัว" : "Toggle private"
             }
           />
-        </div>
+        </button>
 
         {error && (
-          <div className="rounded-md border border-red-500/30 bg-red-500/10 p-2.5 text-[12px] text-red-300">
+          <div className="rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-[12px] text-red-300">
             {error}
           </div>
         )}
 
-        <DialogFooter className="gap-2 sm:gap-2">
+        <DialogFooter className="mt-1 gap-2 sm:gap-2">
           <button
             type="button"
             onClick={handleClose}
             disabled={submitting}
-            className="inline-flex h-9 items-center justify-center rounded-md bg-white/[0.06] px-4 text-[13px] font-medium text-zinc-200 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.09] disabled:opacity-50"
+            className="inline-flex h-8 items-center justify-center rounded-md bg-white/[0.06] px-3 text-[12.5px] font-medium text-zinc-200 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.09] disabled:opacity-50"
           >
             {language === "th" ? "ยกเลิก" : "Cancel"}
           </button>
@@ -215,7 +230,7 @@ export function CreateProjectDialog({
             type="button"
             onClick={handleSubmit}
             disabled={submitting}
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-violet-600 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-violet-600 px-3 text-[12.5px] font-semibold text-white transition-colors hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? (
               <>
