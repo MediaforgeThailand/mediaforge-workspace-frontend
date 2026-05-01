@@ -38,6 +38,7 @@ import {
   CreditCard,
   Sparkles,
   Coins,
+  Building2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -50,6 +51,10 @@ export function UserMenu() {
   const { t, language, setLanguage } = useLanguage();
   const { theme, setTheme } = useTheme();
   const { credits, loading: creditsLoading } = useCredits();
+  const adminConsoleUrl =
+    (import.meta.env.VITE_ADMIN_CONSOLE_URL as string | undefined) ||
+    "https://mediaforge-admin-hub.vercel.app/org/console";
+  const hasTeamContext = Boolean(credits?.is_shared_pool || profile?.organization_id);
 
   const initial =
     (profile?.display_name?.[0] ?? user?.email?.[0] ?? "U").toUpperCase();
@@ -159,6 +164,18 @@ export function UserMenu() {
           <CreditCard className="h-3.5 w-3.5 text-zinc-400" />
           {t("workspace.usermenu.plan_billing")}
         </DropdownMenuItem>
+
+        {hasTeamContext && (
+          <DropdownMenuItem
+            onSelect={() => {
+              window.location.href = adminConsoleUrl;
+            }}
+            className="min-h-11 cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50 lg:min-h-0"
+          >
+            <Building2 className="h-3.5 w-3.5 text-zinc-400" />
+            Admin Console
+          </DropdownMenuItem>
+        )}
 
         <DropdownMenuSeparator className="bg-white/[0.06]" />
 

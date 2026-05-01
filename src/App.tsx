@@ -108,6 +108,7 @@ const WorkspaceCanvasPage = lazyWithRetry(() => import("./pages/workspace/Canvas
 const Settings = lazyWithRetry(() => import("./pages/dashboard/Settings"));
 const Transactions = lazyWithRetry(() => import("./pages/dashboard/Transactions"));
 const Pricing = lazyWithRetry(() => import("./pages/dashboard/Pricing"));
+const TeamRegister = lazyWithRetry(() => import("./pages/dashboard/TeamRegister"));
 
 // ── Org/workspace surfaces ────────────────────────────────────
 // TeacherCenter — Variant A "Command Center" for teachers + org_admins.
@@ -218,6 +219,17 @@ const App = () => (
                    *  owns its full content area (hero + plan cards +
                    *  comparison table) and reads better edge-to-edge
                    *  on wide screens. */}
+                  <Route
+                    path="/app/team-register"
+                    element={
+                      <ProtectedRoute>
+                        <WorkspacePageShell hideSidebarBelowLg>
+                          <TeamRegister />
+                        </WorkspacePageShell>
+                      </ProtectedRoute>
+                    }
+                  />
+
                   <Route
                     path="/app/pricing"
                     element={

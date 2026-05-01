@@ -69,7 +69,7 @@ export const ACCOUNT_SECTIONS: SettingsSection[] = [
 ];
 
 export const ORG_SECTIONS: SettingsSection[] = [
-  { key: "organization.my-team", labelKey: "workspace.settings.my_team", icon: Users, comingSoon: true },
+  { key: "organization.my-team", labelKey: "workspace.settings.my_team", icon: Users },
   { key: "organization.people", labelKey: "workspace.settings.people", icon: Users, comingSoon: true },
   { key: "organization.security-sso", labelKey: "workspace.settings.security_sso", icon: KeyRound, comingSoon: true },
   { key: "organization.preferences", labelKey: "workspace.settings.preferences", icon: SettingsIcon },

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ import {
   Bookmark,
   UserPlus,
   Users,
+  ExternalLink,
   KeyRound,
   CreditCard,
 } from "lucide-react";
@@ -53,12 +54,15 @@ const Settings = () => {
   const { t, language, setLanguage } = useLanguage();
   const { toast } = useToast();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Honour `?tab=…` for deep-linking. Map URL slug → SettingsSectionKey.
   const tabParam = new URLSearchParams(location.search).get("tab");
   const initialKey: SettingsSectionKey =
     tabParam === "plan-billing"
       ? "organization.plan-billing"
+      : tabParam === "team"
+      ? "organization.my-team"
       : tabParam === "preferences"
       ? "organization.preferences"
       : "account.profile";
@@ -264,6 +268,12 @@ const Settings = () => {
     </div>
   );
 
+  const renderTeamSettings = () => (
+    <TeamSettingsPanel
+      onRegister={() => navigate("/app/team-register")}
+    />
+  );
+
   const renderActiveSection = () => {
     switch (activeKey) {
       case "account.profile":
@@ -293,13 +303,7 @@ const Settings = () => {
           />
         );
       case "organization.my-team":
-        return (
-          <ComingSoon
-            icon={Users}
-            title={t("workspace.settings.my_team")}
-            description={t("workspace.settings.my_team_desc")}
-          />
-        );
+        return renderTeamSettings();
       case "organization.people":
         return (
           <ComingSoon
@@ -340,5 +344,145 @@ const Settings = () => {
     </>
   );
 };
+
+interface TeamStatusMembership {
+  id: string;
+  organization_id: string;
+  role: "org_admin" | "member";
+  status: "active" | "pending" | "invited" | "rejected" | "suspended";
+  source: string | null;
+  organization?: {
+    id: string;
+    name: string;
+    display_name: string | null;
+    type: string;
+    status: string;
+    credit_pool: number;
+    credit_pool_allocated: number;
+  } | null;
+}
+
+function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [memberships, setMemberships] = useState<TeamStatusMembership[]>([]);
+  const [canOpenConsole, setCanOpenConsole] = useState(false);
+  const adminConsoleUrl =
+    (import.meta.env.VITE_ADMIN_CONSOLE_URL as string | undefined) ||
+    "https://mediaforge-admin-hub.vercel.app/org/console";
+
+  const loadStatus = async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data, error } = await supabase.functions.invoke("workspace_org_console", {
+      body: { action: "get_team_status" },
+    });
+    if (error) {
+      toast({
+        title: "Could not load team status",
+        description: error.message,
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+    const payload = (data?.data ?? data) as {
+      memberships?: TeamStatusMembership[];
+      can_open_admin_console?: boolean;
+    };
+    setMemberships(payload.memberships ?? []);
+    setCanOpenConsole(Boolean(payload.can_open_admin_console));
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    void loadStatus();
+  }, [user?.id]);
+
+  const active = memberships.find((m) => m.status === "active");
+  const pending = memberships.find((m) => m.status === "pending" || m.status === "invited");
+
+  if (loading) {
+    return (
+      <div className="flex min-h-64 items-center justify-center">
+        <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
+      </div>
+    );
+  }
+
+  if (!active && pending) {
+    return (
+      <div className="max-w-2xl rounded-xl border border-amber-400/20 bg-amber-400/[0.06] p-6">
+        <h2 className="text-xl font-semibold text-zinc-50">Team request pending</h2>
+        <p className="mt-2 text-sm text-zinc-400">
+          Your company domain matched an organization, but an admin needs to approve your access before you can use the team dashboard or shared credit pool.
+        </p>
+        <div className="mt-4 rounded-lg border border-white/10 bg-black/20 p-3 text-sm">
+          <div className="text-zinc-500">Organization</div>
+          <div className="font-medium text-zinc-100">
+            {pending.organization?.display_name || pending.organization?.name || pending.organization_id}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!active) {
+    return (
+      <div className="max-w-2xl rounded-xl border border-white/10 bg-white/[0.03] p-6">
+        <h2 className="text-xl font-semibold text-zinc-50">Create a team workspace</h2>
+        <p className="mt-2 text-sm text-zinc-400">
+          Team accounts include a company Admin Console, member approvals, shared team credits, and seat billing at $5 per active seat. Credits are topped up separately based on real usage.
+        </p>
+        <Button className="mt-5" onClick={onRegister}>
+          <Users className="mr-2 h-4 w-4" />
+          Start team registration
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-3xl space-y-5">
+      <div>
+        <h2 className="text-xl font-semibold text-zinc-50">Team</h2>
+        <p className="mt-1 text-sm text-zinc-400">
+          Your account is connected to {active.organization?.display_name || active.organization?.name || "your organization"}.
+        </p>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="text-xs text-zinc-500">Status</div>
+          <div className="mt-1 text-lg font-semibold text-zinc-50">{active.status}</div>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="text-xs text-zinc-500">Role</div>
+          <div className="mt-1 text-lg font-semibold text-zinc-50">
+            {active.role === "org_admin" ? "Admin" : "Member"}
+          </div>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="text-xs text-zinc-500">Seat price</div>
+          <div className="mt-1 text-lg font-semibold text-zinc-50">$5 / seat</div>
+        </div>
+      </div>
+
+      {canOpenConsole ? (
+        <Button asChild>
+          <a href={adminConsoleUrl}>
+            <ExternalLink className="mr-2 h-4 w-4" />
+            Open Admin Console
+          </a>
+        </Button>
+      ) : (
+        <p className="text-sm text-zinc-500">
+          Member accounts can use the team workspace after approval. Admin Console access is available only to organization admins.
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default Settings;

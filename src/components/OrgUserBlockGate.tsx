@@ -11,6 +11,7 @@ const ALLOWED_FOR_ORG_USER: RegExp[] = [
   /^\/app\/workspace(\/|$)/,    // the only feature
   /^\/app\/org-admin(\/|$)/,    // org_admin panel (members + analytics)
   /^\/app\/settings(\/|$)/,     // logout / language / profile basics
+  /^\/app\/team-register(\/|$)/,// team signup entry from Settings > Team
   /^\/auth(\/|$)/,              // login / SSO callback
   /^\/enroll-class\//,          // QR scan landing
   /^\/reset-password/,          // edge case — they shouldn't have a password
