@@ -67,6 +67,8 @@ export interface ProjectMeta {
   updatedAt: number;
 }
 
+export const DEFAULT_PROJECT_NAME = "Default project";
+
 export interface WorkspaceMeta {
   id: string;
   projectId: string | null;
@@ -260,6 +262,24 @@ const uid = () =>
   globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2, 10);
 const now = () => Date.now();
 
+function createDefaultProjectMeta(): ProjectMeta {
+  return {
+    id: uid(),
+    name: DEFAULT_PROJECT_NAME,
+    updatedAt: now(),
+  };
+}
+
+function isDefaultProject(project: Pick<ProjectMeta, "name"> | undefined | null): boolean {
+  return project?.name === DEFAULT_PROJECT_NAME;
+}
+
+function ensureDefaultProject(projects: ProjectMeta[]): ProjectMeta[] {
+  return projects.some(isDefaultProject)
+    ? projects
+    : [createDefaultProjectMeta(), ...projects];
+}
+
 /** Default name for a new canvas tab inside a workspace. We use the
  *  pattern "Page N" where N is one greater than the highest existing
  *  Page number in the workspace — so creating tabs in order yields
@@ -342,7 +362,7 @@ function withCurrent(
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
     (set, get) => ({
-      projects: [],
+      projects: [createDefaultProjectMeta()],
       activeProjectId: null,
       workspaces: [],
       canvases: [],
@@ -380,6 +400,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
       deleteProject: (id) =>
         set((s) => {
+          const targetProject = s.projects.find((p) => p.id === id);
+          if (isDefaultProject(targetProject)) return {};
           const ownedWorkspaces = new Set(
             s.workspaces.filter((w) => w.projectId === id).map((w) => w.id),
           );
@@ -392,7 +414,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           for (const [cid, graph] of Object.entries(s.graphs)) {
             if (!ownedCanvases.has(cid)) graphs[cid] = graph;
           }
-          const projects = s.projects.filter((p) => p.id !== id);
+          const projects = ensureDefaultProject(s.projects.filter((p) => p.id !== id));
           return {
             projects,
             activeProjectId:
@@ -422,13 +444,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               }
             }
           }
-          merged.sort((a, b) => b.updatedAt - a.updatedAt);
+          const withDefault = ensureDefaultProject(merged);
+          withDefault.sort((a, b) => b.updatedAt - a.updatedAt);
           return {
-            projects: merged,
+            projects: withDefault,
             activeProjectId:
-              s.activeProjectId && merged.some((p) => p.id === s.activeProjectId)
+              s.activeProjectId && withDefault.some((p) => p.id === s.activeProjectId)
                 ? s.activeProjectId
-                : merged[0]?.id ?? null,
+                : withDefault[0]?.id ?? null,
           };
         }),
 
@@ -444,7 +467,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           projectId = uid();
           projectToInsert = {
             id: projectId,
-            name: "Untitled project",
+            name: DEFAULT_PROJECT_NAME,
             updatedAt: now(),
           };
         }
@@ -1490,13 +1513,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         // partial. Either the state was valid (returned cleaned), or
         // we hit corruption / older version and reset to empty so the
         // user lands on the dashboard with a fresh slate.
-        const reset = () => ({
-          projects: [],
-          activeProjectId: null,
-          workspaces: [],
-          canvases: [],
-          graphs: {},
-        }) as never;
+        const reset = () => {
+          const defaultProject = createDefaultProjectMeta();
+          return {
+            projects: [defaultProject],
+            activeProjectId: defaultProject.id,
+            workspaces: [],
+            canvases: [],
+            graphs: {},
+          } as never;
+        };
 
         try {
           const ps = (persistedState ?? {}) as Record<string, unknown>;
@@ -1592,10 +1618,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               id:
                 globalThis.crypto?.randomUUID?.() ??
                 `prj_${Math.random().toString(36).slice(2, 10)}`,
-              name: "My project",
+              name: DEFAULT_PROJECT_NAME,
               updatedAt: Date.now(),
             }];
           }
+          validProjects = ensureDefaultProject(validProjects);
           const projectIds = new Set(validProjects.map((p) => p.id));
           const fallbackProjectId = validProjects[0]?.id ?? null;
 

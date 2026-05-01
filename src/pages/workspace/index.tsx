@@ -75,7 +75,12 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { useWorkspaceStore, type ProjectMeta } from "@/store/useWorkspaceStore";
+import {
+  DEFAULT_PROJECT_NAME,
+  useWorkspaceStore,
+  type ProjectMeta,
+} from "@/store/useWorkspaceStore";
+import { CreateProjectDialog } from "@/components/workspace/CreateProjectDialog";
 import { UserMenu } from "@/components/workspace/UserMenu";
 import WorkspaceSidebar, {
   type SectionKey,
@@ -338,6 +343,12 @@ const WorkspaceDashboardInner = () => {
         );
         mergeServerProjects(serverProjects);
         for (const p of localOnlyProjects) void upsertProjectToServer(p, user.id);
+        const defaultProject = useWorkspaceStore
+          .getState()
+          .projects.find((p) => p.name === DEFAULT_PROJECT_NAME);
+        if (defaultProject && !serverProjectIds.has(defaultProject.id)) {
+          void upsertProjectToServer(defaultProject, user.id);
+        }
       }
       const server = await loadWorkspacesFromServer();
       if (cancelled || !server) return;
@@ -388,17 +399,36 @@ const WorkspaceDashboardInner = () => {
     }
   }, [activeProjectId, setActiveProject, standaloneProjects]);
 
+  /* "Create project" dialog state. We replaced the native browser
+   * prompt() with a styled dialog (see CreateProjectDialog) that
+   * also lets the user pick a colour, write a description, and
+   * choose privacy (private / visible-to-team). The actual store
+   * write happens inside the dialog's onCreate callback so the
+   * dialog stays in control of submitting state + error display. */
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+
   const handleCreateProject = () => {
-    const fallbackName = t("workspace.home.untitled_project_default");
-    const nextName = prompt(t("workspace.home.untitled_project_prompt"), fallbackName);
-    if (nextName === null) return;
-    const projectName = nextName.trim() || fallbackName;
-    const projectId = createProject(projectName);
+    setCreateDialogOpen(true);
+  };
+
+  const handleConfirmCreateProject = async (meta: {
+    name: string;
+    description: string | null;
+    color: string;
+    isPrivate: boolean;
+  }) => {
+    const projectId = createProject(meta.name, {
+      isPrivate: meta.isPrivate,
+      color: meta.color,
+      description: meta.description ?? undefined,
+    });
     if (user?.id) {
-      const meta = useWorkspaceStore.getState().projects.find((p) => p.id === projectId);
-      if (meta) void upsertProjectToServer(meta, user.id);
+      const stored = useWorkspaceStore
+        .getState()
+        .projects.find((p) => p.id === projectId);
+      if (stored) await upsertProjectToServer(stored, user.id);
     }
-    toast.success(t("workspace.toast.project_created", { name: projectName }));
+    toast.success(t("workspace.toast.project_created", { name: meta.name }));
   };
 
   const handleDeleteProject = (projectId: string) => {
@@ -409,6 +439,10 @@ const WorkspaceDashboardInner = () => {
     }
     const project = state.projects.find((item) => item.id === projectId);
     if (!project) return;
+    if (project.name === DEFAULT_PROJECT_NAME) {
+      toast.error(t("workspace.toast.keep_one_project"));
+      return;
+    }
     deleteProject(projectId);
     if (user?.id) void deleteProjectFromServer(projectId);
     toast.success(t("workspace.toast.project_deleted", { name: project.name }));
@@ -536,6 +570,16 @@ const WorkspaceDashboardInner = () => {
             />
           )}
       </main>
+
+      {/* Create-project dialog — replaces native prompt(). Mounted
+       *  at the page level so any of the dashboard's "+ New project"
+       *  triggers (sidebar, ProjectsCard, empty state) all open the
+       *  same controlled dialog. */}
+      <CreateProjectDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onCreate={handleConfirmCreateProject}
+      />
     </div>
   );
 };
@@ -931,13 +975,6 @@ const EducationClassDashboard = ({
   );
 };
 
-/** Name of the auto-seeded fallback project (server migration
- *  20260430090000 inserts this row for every legacy user who didn't
- *  yet have a project). It's the safety net the workspace store
- *  needs — we never want the user to delete their last home, and
- *  the server-side seed guarantees this one always exists. */
-const PROTECTED_PROJECT_NAME = "Default project";
-
 /** Phrase the user must type into the delete dialog. Match is
  *  case-insensitive + trimmed so "ยืนยัน" / "ยืนยัน " / "Confirm"
  *  all unlock the destructive button. */
@@ -1022,7 +1059,7 @@ const ProjectsCard = ({
         ) : (
           <ul className="flex flex-col gap-0.5">
             {projects.map((p) => {
-              const isProtected = p.name === PROTECTED_PROJECT_NAME;
+              const isProtected = p.name === DEFAULT_PROJECT_NAME;
               return (
                 <li key={p.id} className="group/proj relative">
                   <button
