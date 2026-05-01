@@ -114,13 +114,23 @@ export function CreateProjectDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      {/*  Sized down + tighter spacing. The previous max-w-sm with
-       *  default Dialog gap-4 felt cavernous for two short fields.
-       *  We override the gap inline (gap-3) and tighten paddings so
-       *  the dialog hugs its content. */}
-      <DialogContent className="w-[calc(100vw-2rem)] gap-3 border-white/10 bg-[hsl(0_0%_8%)] p-5 text-zinc-100 sm:max-w-[360px]">
-        <DialogHeader className="space-y-0">
-          <DialogTitle className="flex items-center gap-2 text-[15px] font-semibold text-zinc-50">
+      {/* Sizing notes:
+       *  - Width 400px gives Thai script room to breathe (Thai
+       *    diacritics + tone marks need bigger character box than
+       *    Latin); the previous 360px squished placeholders.
+       *  - Inline `fontFamily` because the Dialog renders via portal
+       *    and does NOT inherit the workspace shell's "Prompt" font;
+       *    without this it falls back to system-ui which renders
+       *    Thai compressed with thin strokes — exactly the
+       *    "อ่านไม่ออก" the user reported.
+       *  - p-6 gap-4 = standard Dialog spacing; the previous p-5
+       *    gap-3 was too tight for legible Thai. */}
+      <DialogContent
+        className="w-[calc(100vw-2rem)] gap-4 border-white/10 bg-[hsl(0_0%_8%)] p-6 text-zinc-100 sm:max-w-[400px]"
+        style={{ fontFamily: "'Prompt', system-ui, sans-serif" }}
+      >
+        <DialogHeader className="space-y-1">
+          <DialogTitle className="flex items-center gap-2 text-base font-semibold text-zinc-50">
             <FolderPlus className="h-4 w-4 text-zinc-400" />
             {language === "th" ? "สร้างโปรเจคใหม่" : "Create new project"}
           </DialogTitle>
@@ -132,8 +142,8 @@ export function CreateProjectDialog({
         </DialogHeader>
 
         {/* ── Name ─────────────────────────────────────────────── */}
-        <div className="space-y-1">
-          <label className="text-[11.5px] font-medium text-zinc-400">
+        <div className="space-y-1.5">
+          <label className="text-[13px] font-medium text-zinc-300">
             {language === "th" ? "ชื่อโปรเจค" : "Project name"}
           </label>
           <input
@@ -154,40 +164,40 @@ export function CreateProjectDialog({
                 void handleSubmit();
               }
             }}
-            /* placeholder bumped from zinc-600 → zinc-500 for legibility
-             * on the very dark dialog bg; user reported the previous
-             * tone was almost invisible. */
-            className="w-full rounded-md border border-white/10 bg-black/40 px-2.5 py-2 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-violet-500/50"
+            /* 14px input + zinc-400 placeholder = readable on the
+             * dark dialog bg AND legible on Thai (descenders/marks
+             * need the extra row height). */
+            className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2.5 text-[14px] leading-6 text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-violet-500/50"
           />
         </div>
 
-        {/* ── Private toggle (compact row) ─────────────────────── */}
+        {/* ── Private toggle (whole row is the hit target) ─────── */}
         <button
           type="button"
           onClick={() => !submitting && setIsPrivate((v) => !v)}
           disabled={submitting}
-          className="flex w-full items-center justify-between gap-2 rounded-md border border-white/[0.06] bg-white/[0.02] px-2.5 py-2 text-left transition-colors hover:bg-white/[0.04] disabled:opacity-60"
+          className="flex w-full items-center justify-between gap-3 rounded-md border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.04] disabled:opacity-60"
         >
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2.5">
             <span
               className={cn(
-                "grid h-6 w-6 shrink-0 place-items-center rounded transition-colors",
+                "grid h-8 w-8 shrink-0 place-items-center rounded-md transition-colors",
                 isPrivate
                   ? "bg-violet-500/20 text-violet-300"
                   : "bg-white/[0.05] text-zinc-400",
               )}
             >
               {isPrivate ? (
-                <Lock className="h-3 w-3" />
+                <Lock className="h-3.5 w-3.5" />
               ) : (
-                <Users className="h-3 w-3" />
+                <Users className="h-3.5 w-3.5" />
               )}
             </span>
-            <div className="min-w-0">
-              <div className="text-[12.5px] font-medium text-zinc-100">
+            <div className="min-w-0 leading-tight">
+              <div className="text-[13px] font-medium text-zinc-100">
                 {language === "th" ? "โปรเจคส่วนตัว" : "Private project"}
               </div>
-              <div className="text-[10.5px] leading-snug text-zinc-400">
+              <div className="mt-0.5 text-[12px] text-zinc-400">
                 {isPrivate
                   ? language === "th"
                     ? "เฉพาะคุณเท่านั้นที่เห็น"
@@ -198,9 +208,8 @@ export function CreateProjectDialog({
               </div>
             </div>
           </div>
-          {/* Switch is non-interactive here — the whole row is the
-           *  hit target. Keeping the visual switch in sync gives the
-           *  expected affordance without splitting the click area. */}
+          {/* Switch as passive indicator — the whole row click flips
+           *  state. pointer-events-none so it doesn't intercept. */}
           <Switch
             checked={isPrivate}
             tabIndex={-1}
@@ -212,17 +221,17 @@ export function CreateProjectDialog({
         </button>
 
         {error && (
-          <div className="rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-[12px] text-red-300">
+          <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-300">
             {error}
           </div>
         )}
 
-        <DialogFooter className="mt-1 gap-2 sm:gap-2">
+        <DialogFooter className="gap-2 sm:gap-2">
           <button
             type="button"
             onClick={handleClose}
             disabled={submitting}
-            className="inline-flex h-8 items-center justify-center rounded-md bg-white/[0.06] px-3 text-[12.5px] font-medium text-zinc-200 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.09] disabled:opacity-50"
+            className="inline-flex h-9 items-center justify-center rounded-md bg-white/[0.06] px-4 text-[13px] font-medium text-zinc-200 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.09] disabled:opacity-50"
           >
             {language === "th" ? "ยกเลิก" : "Cancel"}
           </button>
@@ -230,7 +239,7 @@ export function CreateProjectDialog({
             type="button"
             onClick={handleSubmit}
             disabled={submitting}
-            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-violet-600 px-3 text-[12.5px] font-semibold text-white transition-colors hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-violet-600 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? (
               <>
