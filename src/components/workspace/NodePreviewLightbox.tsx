@@ -18,12 +18,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, ImageOff, Download } from "lucide-react";
+import { X, ImageOff, Download, Crop as CropIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Node } from "@xyflow/react";
 import { useMirroredTripoUrl } from "./useMirroredTripoUrl";
 import { downloadFromUrl } from "./downloadAsset";
 import { loadModelViewer } from "@/lib/loadModelViewer";
+import { ImageCropTool } from "./ImageCropTool";
 
 export interface PreviewPayload {
   type: "image" | "video" | "audio" | "text" | "grid" | "model3d";
@@ -46,9 +47,20 @@ export interface PreviewPayload {
 interface Props {
   preview: PreviewPayload;
   onClose: () => void;
+  /** Optional — when provided, an "Crop" button appears for image
+   *  previews. The callback fires with the cropped Blob + a
+   *  suggested filename; caller is responsible for uploading the
+   *  blob and producing a new asset (e.g. WorkspaceCanvas spawns a
+   *  new AssetNode, AssetsView refreshes the library list). */
+  onCropConfirmed?: (blob: Blob, filename: string) => Promise<void> | void;
 }
 
-const NodePreviewLightbox = ({ preview, onClose }: Props) => {
+const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
+  // Crop-tool toggle. When true the lightbox renders the
+  // ImageCropTool overlay on top of the preview. Esc / Cancel
+  // bubbles back here to close the tool without closing the
+  // lightbox.
+  const [cropOpen, setCropOpen] = useState(false);
   // For 3D previews coming from Tripo3D generations, the model_url
   // is a CORS-blocked Tripo CDN URL — pipe through the mirror hook
   // so model-viewer can actually fetch the GLB. For non-Tripo URLs
@@ -180,6 +192,21 @@ const NodePreviewLightbox = ({ preview, onClose }: Props) => {
           )}
         </div>
         <div className="flex items-center gap-1">
+          {/* Crop tool — only for images, only when caller provided
+           *  an onCropConfirmed handler (canvas + asset library both
+           *  do; standalone gen result strip doesn't yet). */}
+          {preview.type === "image" && preview.url && onCropConfirmed && (
+            <button
+              type="button"
+              onClick={() => setCropOpen(true)}
+              title="Crop image"
+              aria-label="Crop image"
+              className="flex items-center gap-1.5 rounded px-2 py-1 text-[11.5px] text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+            >
+              <CropIcon className="h-3.5 w-3.5" />
+              Crop
+            </button>
+          )}
           {(preview.type === "image" ||
             preview.type === "video" ||
             preview.type === "audio") &&
@@ -354,6 +381,29 @@ const NodePreviewLightbox = ({ preview, onClose }: Props) => {
       >
         Esc · A · click to close
       </div>
+
+      {/* Crop overlay — sits on top of the lightbox at z-[2100]
+       *  (lightbox is z-[2000]). When active it captures all
+       *  clicks; cancel/confirm bubbles back to close the tool
+       *  without closing the lightbox. */}
+      {cropOpen && preview.type === "image" && preview.url && onCropConfirmed && (
+        <ImageCropTool
+          src={preview.url}
+          suggestedFilename={`${preview.label ?? "image"}.png`}
+          onCancel={() => setCropOpen(false)}
+          onCropConfirmed={async (blob, filename) => {
+            try {
+              await onCropConfirmed(blob, filename);
+              setCropOpen(false);
+              onClose();
+            } catch (err) {
+              // Let the caller surface its own error toast — the
+              // crop tool's UI remains open so the user can retry.
+              console.error("[NodePreviewLightbox] crop save failed:", err);
+            }
+          }}
+        />
+      )}
     </div>,
     document.body,
   );
