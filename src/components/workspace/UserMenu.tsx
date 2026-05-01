@@ -62,6 +62,12 @@ export function UserMenu() {
     creditsLoading && !credits
       ? t("workspace.usermenu.loading")
       : new Intl.NumberFormat("en-US").format(credits?.balance ?? 0);
+  const creditScopeLabel =
+    credits?.credit_scope === "team" && credits.team_name
+      ? `${t("workspace.usermenu.shared_pool")} - ${credits.team_name}`
+      : credits?.is_shared_pool
+      ? `${t("workspace.usermenu.shared_pool")} - ${credits.organization_name ?? credits.pool_domain}`
+      : t("workspace.usermenu.available_balance");
 
   const handleSignOut = async () => {
     await signOut();
@@ -121,9 +127,7 @@ export function UserMenu() {
                   {t("workspace.usermenu.credits")}
                 </div>
                 <div className="truncate text-[11px] text-zinc-500">
-                  {credits?.is_shared_pool
-                    ? `${t("workspace.usermenu.shared_pool")} · ${credits.organization_name ?? credits.pool_domain}`
-                    : t("workspace.usermenu.available_balance")}
+                  {creditScopeLabel}
                 </div>
               </div>
             </div>

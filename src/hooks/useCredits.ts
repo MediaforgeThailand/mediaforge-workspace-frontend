@@ -17,6 +17,9 @@ interface CreditBalance {
   organization_id?: string | null;
   organization_name?: string | null;
   organization_type?: string | null;
+  credit_scope?: "user" | "organization" | "team";
+  team_id?: string | null;
+  team_name?: string | null;
 }
 
 function unwrapCreditBalance(payload: unknown): CreditBalance | null {
@@ -32,6 +35,9 @@ function unwrapCreditBalance(payload: unknown): CreditBalance | null {
     organization_id: row.organization_id ?? null,
     organization_name: row.organization_name ?? null,
     organization_type: row.organization_type ?? null,
+    credit_scope: row.credit_scope ?? (row.is_shared_pool ? "organization" : "user"),
+    team_id: row.team_id ?? null,
+    team_name: row.team_name ?? null,
   };
 }
 

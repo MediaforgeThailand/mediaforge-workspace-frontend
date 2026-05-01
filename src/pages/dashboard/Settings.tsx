@@ -348,6 +348,7 @@ const Settings = () => {
 interface TeamStatusMembership {
   id: string;
   organization_id: string;
+  team_id?: string | null;
   role: "org_admin" | "member";
   status: "active" | "pending" | "invited" | "rejected" | "suspended";
   source: string | null;
@@ -359,11 +360,33 @@ interface TeamStatusMembership {
     status: string;
     credit_pool: number;
     credit_pool_allocated: number;
+    credit_available?: number;
+  } | null;
+  team?: {
+    id: string;
+    name: string;
+    code: string | null;
+    status: string;
+    credit_pool: number;
+    credit_pool_consumed: number;
+    credit_available?: number;
   } | null;
 }
 
+async function functionErrorMessage(error: unknown): Promise<string> {
+  const fallback = error instanceof Error ? error.message : String(error || "Request failed");
+  const response = (error as { context?: Response } | null)?.context;
+  if (!response || typeof response.clone !== "function") return fallback;
+  try {
+    const body = (await response.clone().json()) as { error?: unknown; message?: unknown };
+    return String(body?.error || body?.message || fallback);
+  } catch {
+    return fallback;
+  }
+}
+
 function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [memberships, setMemberships] = useState<TeamStatusMembership[]>([]);
@@ -380,14 +403,16 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
       body: { action: "get_team_status" },
     });
     if (error) {
+      const description = await functionErrorMessage(error);
       toast({
         title: "Could not load team status",
-        description: error.message,
+        description,
         variant: "destructive",
       });
       setLoading(false);
       return;
     }
+    await refreshProfile();
     const payload = (data?.data ?? data) as {
       memberships?: TeamStatusMembership[];
       can_open_admin_console?: boolean;
@@ -407,9 +432,10 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
       },
     });
     if (error) {
+      const description = await functionErrorMessage(error);
       toast({
         title: "Could not open Admin Console",
-        description: error.message,
+        description,
         variant: "destructive",
       });
       setOpeningConsole(false);
@@ -434,6 +460,7 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
 
   const active = memberships.find((m) => m.status === "active");
   const pending = memberships.find((m) => m.status === "pending" || m.status === "invited");
+  const formatCredits = (value: unknown) => new Intl.NumberFormat("en-US").format(Number(value ?? 0));
 
   if (loading) {
     return (
@@ -486,18 +513,29 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
 
       <div className="grid gap-3 md:grid-cols-3">
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-          <div className="text-xs text-zinc-500">Status</div>
-          <div className="mt-1 text-lg font-semibold text-zinc-50">{active.status}</div>
+          <div className="text-xs text-zinc-500">Shared credits</div>
+          <div className="mt-1 text-lg font-semibold text-zinc-50">
+            {formatCredits(active.organization?.credit_available ?? active.organization?.credit_pool ?? 0)}
+          </div>
+          <div className="mt-0.5 text-[11px] text-zinc-500">Organization pool</div>
         </div>
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-          <div className="text-xs text-zinc-500">Role</div>
+          <div className="text-xs text-zinc-500">Team</div>
           <div className="mt-1 text-lg font-semibold text-zinc-50">
-            {active.role === "org_admin" ? "Admin" : "Member"}
+            {active.team?.name || "Company pool"}
+          </div>
+          <div className="mt-0.5 text-[11px] text-zinc-500">
+            {active.team
+              ? `${formatCredits(active.team.credit_available ?? 0)} credits`
+              : "No sub-team assigned"}
           </div>
         </div>
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-          <div className="text-xs text-zinc-500">Seat price</div>
-          <div className="mt-1 text-lg font-semibold text-zinc-50">$5 / seat</div>
+          <div className="text-xs text-zinc-500">Access</div>
+          <div className="mt-1 text-lg font-semibold text-zinc-50">
+            {active.role === "org_admin" ? "Admin" : "Member"}
+          </div>
+          <div className="mt-0.5 text-[11px] text-zinc-500">{active.status} - $5 / seat</div>
         </div>
       </div>
 
