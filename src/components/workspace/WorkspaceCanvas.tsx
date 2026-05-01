@@ -2021,6 +2021,7 @@ const Inner = () => {
         edgesUpdatable={!isViewer}
         deleteKeyCode={isViewer ? null : DELETE_KEYS}
         fitView
+        onlyRenderVisibleElements
         proOptions={PRO_OPTIONS}
         minZoom={0.25}
         maxZoom={2.5}

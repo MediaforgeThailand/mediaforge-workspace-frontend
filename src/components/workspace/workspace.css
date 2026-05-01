@@ -21,6 +21,10 @@
   --ws-wire-number: hsl(0 0% 65%);     /* zinc  */
 }
 
+.workspace-root .react-flow__viewport {
+  will-change: transform;
+}
+
 /* ── Radial-masked grid background ────────────────────────── */
 /* Two layers: a fine dot grid, then a radial mask that fades   */
 /* it toward the edges so the user's eye stays on the work.    */
