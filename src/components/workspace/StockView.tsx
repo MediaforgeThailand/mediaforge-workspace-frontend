@@ -1,12 +1,22 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import {
+  Box,
+  Camera,
   Download,
   ExternalLink,
+  FileImage,
+  Grid2X2,
   Image as ImageIcon,
+  Layers3,
   Loader2,
   Menu,
+  Mic,
+  Music2,
+  Palette,
   Search,
-  SlidersHorizontal,
+  Shapes,
+  Sparkles,
+  Video,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -66,38 +76,129 @@ interface FreepikDownloadResponse {
   error?: string;
 }
 
-type OptLabelKey =
-  | "workspace.stock.type_all" | "workspace.stock.type_photo" | "workspace.stock.type_vector" | "workspace.stock.type_psd" | "workspace.stock.type_ai"
-  | "workspace.stock.orient_any" | "workspace.stock.orient_horizontal" | "workspace.stock.orient_vertical" | "workspace.stock.orient_square" | "workspace.stock.orient_panoramic"
-  | "workspace.stock.order_relevance" | "workspace.stock.order_recent";
+type StockCategory = {
+  id: string;
+  label: string;
+  query: string;
+  contentType?: string;
+  Icon: typeof Shapes;
+  swatch: string;
+  preview: string;
+};
 
-const STOCK_TYPES: Array<{ value: string; labelKey: OptLabelKey }> = [
-  { value: "all", labelKey: "workspace.stock.type_all" },
-  { value: "photo", labelKey: "workspace.stock.type_photo" },
-  { value: "vector", labelKey: "workspace.stock.type_vector" },
-  { value: "psd", labelKey: "workspace.stock.type_psd" },
-  { value: "ai", labelKey: "workspace.stock.type_ai" },
-];
-
-const ORIENTATIONS: Array<{ value: string; labelKey: OptLabelKey }> = [
-  { value: "all", labelKey: "workspace.stock.orient_any" },
-  { value: "horizontal", labelKey: "workspace.stock.orient_horizontal" },
-  { value: "vertical", labelKey: "workspace.stock.orient_vertical" },
-  { value: "square", labelKey: "workspace.stock.orient_square" },
-  { value: "panoramic", labelKey: "workspace.stock.orient_panoramic" },
-];
-
-const ORDERS: Array<{ value: string; labelKey: OptLabelKey }> = [
-  { value: "relevance", labelKey: "workspace.stock.order_relevance" },
-  { value: "recent", labelKey: "workspace.stock.order_recent" },
+const CATEGORIES: StockCategory[] = [
+  {
+    id: "vectors",
+    label: "Vectors",
+    query: "modern vector illustration pack",
+    contentType: "vector",
+    Icon: Shapes,
+    swatch: "from-[#ff9f8f] via-[#f75f8f] to-[#461a6b]",
+    preview: "https://img.freepik.com/free-vector/hand-drawn-flat-design-people-pattern_23-2149251292.jpg",
+  },
+  {
+    id: "photos",
+    label: "Photos",
+    query: "premium editorial lifestyle photo",
+    contentType: "photo",
+    Icon: Camera,
+    swatch: "from-[#c8fff1] via-[#8ad2ff] to-[#365d8d]",
+    preview: "https://img.freepik.com/free-photo/beautiful-shot-sea-beach-sunrise_181624-3715.jpg",
+  },
+  {
+    id: "illustrations",
+    label: "Illustrations",
+    query: "surreal digital illustration portrait",
+    contentType: "vector",
+    Icon: Palette,
+    swatch: "from-[#d5ff82] via-[#ff85b8] to-[#6d46ff]",
+    preview: "https://img.freepik.com/free-vector/gradient-abstract-colorful-background_23-2149131349.jpg",
+  },
+  {
+    id: "templates",
+    label: "Templates",
+    query: "brand presentation template",
+    Icon: Layers3,
+    swatch: "from-[#7b7dff] via-[#ff5ca8] to-[#ffc837]",
+    preview: "https://img.freepik.com/free-vector/gradient-business-template-design_23-2149575947.jpg",
+  },
+  {
+    id: "psds",
+    label: "PSDs",
+    query: "poster psd template",
+    contentType: "psd",
+    Icon: FileImage,
+    swatch: "from-[#16171d] via-[#42435a] to-[#f7d2ff]",
+    preview: "https://img.freepik.com/free-psd/vertical-poster-template-fashion-sale_23-2149488890.jpg",
+  },
+  {
+    id: "mockups",
+    label: "Mockups",
+    query: "product packaging mockup",
+    contentType: "psd",
+    Icon: Box,
+    swatch: "from-[#f8f8f8] via-[#a4a9b5] to-[#18181b]",
+    preview: "https://img.freepik.com/free-psd/isolated-business-card-mockup_125540-1382.jpg",
+  },
+  {
+    id: "videos",
+    label: "Videos",
+    query: "cinematic video thumbnail motion background",
+    Icon: Video,
+    swatch: "from-[#ffd1f2] via-[#9ed8ff] to-[#354c86]",
+    preview: "https://img.freepik.com/free-photo/beautiful-mountains-landscape_23-2150787887.jpg",
+  },
+  {
+    id: "icons",
+    label: "Icons",
+    query: "colorful icon set",
+    contentType: "vector",
+    Icon: Grid2X2,
+    swatch: "from-[#b8fff5] via-[#a78bfa] to-[#22c55e]",
+    preview: "https://img.freepik.com/free-vector/social-media-icons-set_98292-4250.jpg",
+  },
+  {
+    id: "sound",
+    label: "Sound Effects",
+    query: "audio waveform abstract",
+    Icon: Mic,
+    swatch: "from-[#40115f] via-[#b51ea1] to-[#ff75d8]",
+    preview: "https://img.freepik.com/free-vector/colorful-sound-wave-equalizer-background_23-2148420765.jpg",
+  },
+  {
+    id: "music",
+    label: "Music",
+    query: "music album visualizer cover",
+    Icon: Music2,
+    swatch: "from-[#070707] via-[#b222ff] to-[#ff8d1a]",
+    preview: "https://img.freepik.com/free-vector/gradient-music-equalizer-background_23-2149039322.jpg",
+  },
+  {
+    id: "3d",
+    label: "3D Models",
+    query: "3d abstract object white studio",
+    contentType: "photo",
+    Icon: Box,
+    swatch: "from-[#ffffff] via-[#e4e4e7] to-[#9ca3af]",
+    preview: "https://img.freepik.com/free-psd/3d-rendering-abstract-shape_23-2150901966.jpg",
+  },
+  {
+    id: "fonts",
+    label: "Fonts",
+    query: "typography font poster lettering",
+    contentType: "vector",
+    Icon: Sparkles,
+    swatch: "from-[#d9fbff] via-[#ffffff] to-[#7dd3fc]",
+    preview: "https://img.freepik.com/free-vector/hand-drawn-lettering-quotes-collection_23-2149064656.jpg",
+  },
 ];
 
 const QUICK_TERMS = [
-  "education classroom",
-  "social media marketing",
-  "product mockup",
-  "thai college student",
-  "business presentation",
+  "thai college campaign",
+  "luxury product mockup",
+  "futuristic social media post",
+  "education presentation template",
+  "minimal brand identity",
 ];
 
 function formatCount(value?: number): string {
@@ -115,13 +216,16 @@ function pickLicense(item: FreepikResource): string {
   return item.products?.[0]?.type ?? item.licenses?.[0]?.type ?? "freepik";
 }
 
+function isValidImageUrl(url: string | undefined): url is string {
+  return Boolean(url && /^https?:\/\//i.test(url));
+}
+
 export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
   const { t } = useLanguage();
-  const [query, setQuery] = useState("education classroom");
-  const [submittedQuery, setSubmittedQuery] = useState("education classroom");
-  const [contentType, setContentType] = useState("all");
-  const [orientation, setOrientation] = useState("all");
-  const [order, setOrder] = useState("relevance");
+  const [query, setQuery] = useState("creator stock content");
+  const [submittedQuery, setSubmittedQuery] = useState("creator stock content");
+  const [contentType, setContentType] = useState<string | undefined>();
+  const [activeCategory, setActiveCategory] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<FreepikResource[]>([]);
   const [meta, setMeta] = useState<FreepikSearchResponse["meta"] | null>(null);
@@ -129,30 +233,39 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const heroImages = useMemo(() => {
+    const apiImages = items
+      .map((item) => item.image?.source?.url)
+      .filter(isValidImageUrl)
+      .slice(0, 8);
+    return apiImages.length >= 4
+      ? apiImages
+      : CATEGORIES.map((category) => category.preview).slice(0, 8);
+  }, [items]);
+
   const totalLabel = useMemo(() => {
     const total = Number(meta?.total ?? 0);
-    return total ? t("workspace.stock.assets_count", { count: total.toLocaleString() }) : t("workspace.stock.total_fallback");
+    return total
+      ? t("workspace.stock.assets_count", { count: total.toLocaleString() })
+      : t("workspace.stock.total_fallback");
   }, [meta?.total, t]);
 
   const runSearch = async (nextPage = 1) => {
-    const term = submittedQuery.trim() || query.trim();
+    const term = submittedQuery.trim() || query.trim() || "creator stock content";
     setLoading(true);
     setError(null);
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke<FreepikSearchResponse>(
-        "freepik-stock",
-        {
+      const { data, error: invokeError } =
+        await supabase.functions.invoke<FreepikSearchResponse>("freepik-stock", {
           body: {
             action: "search-resources",
             query: term,
             page: nextPage,
-            limit: 30,
-            order,
-            contentType: contentType === "all" ? undefined : contentType,
-            orientation: orientation === "all" ? undefined : orientation,
+            limit: 36,
+            order: "relevance",
+            contentType,
           },
-        },
-      );
+        });
       if (invokeError) throw new Error(invokeError.message);
       if (data?.error) throw new Error(data.error);
       setItems(Array.isArray(data?.data) ? data.data : []);
@@ -170,28 +283,36 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
   useEffect(() => {
     void runSearch(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentType, orientation, order, submittedQuery]);
+  }, [submittedQuery, contentType]);
 
   const submit = (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
-    setSubmittedQuery(query.trim() || "education classroom");
+    const term = query.trim() || "creator stock content";
+    setActiveCategory("all");
+    setContentType(undefined);
+    setSubmittedQuery(term);
+  };
+
+  const searchCategory = (category: StockCategory) => {
+    setActiveCategory(category.id);
+    setContentType(category.contentType);
+    setQuery(category.query);
+    setSubmittedQuery(category.query);
   };
 
   const downloadResource = async (item: FreepikResource) => {
     const resourceId = String(item.id);
     setDownloadingId(resourceId);
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke<FreepikDownloadResponse>(
-        "freepik-stock",
-        {
+      const { data, error: invokeError } =
+        await supabase.functions.invoke<FreepikDownloadResponse>("freepik-stock", {
           body: {
             action: "download-resource",
             resourceId,
             title: item.title ?? item.filename ?? `freepik-${resourceId}`,
             imageSize: item.image?.type === "photo" ? "large" : undefined,
           },
-        },
-      );
+        });
       if (invokeError) throw new Error(invokeError.message);
       if (data?.error) throw new Error(data.error);
       const url = data?.data?.signed_url ?? data?.data?.url;
@@ -207,235 +328,321 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[hsl(0_0%_5%)] text-zinc-100">
-      <header className="flex shrink-0 items-center gap-3 border-b border-white/8 px-4 py-4 sm:px-6 lg:px-8">
-        {onOpenSidebar && (
-          <button
-            type="button"
-            onClick={onOpenSidebar}
-            className="grid h-10 w-10 place-items-center rounded-full bg-white/[0.06] text-zinc-100 ring-1 ring-inset ring-white/10 md:hidden"
-            aria-label={t("workspace.stock.open_sidebar")}
-          >
-            <Menu className="h-4 w-4" />
-          </button>
-        )}
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">{t("workspace.stock.eyebrow")}</p>
-          <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{t("workspace.stock.heading")}</h1>
-          <p className="mt-1 text-sm text-zinc-400">{totalLabel}</p>
-        </div>
-      </header>
-
-      <section className="shrink-0 border-b border-white/8 px-4 py-4 sm:px-6 lg:px-8">
-        <form onSubmit={submit} className="flex flex-col gap-3 xl:flex-row">
-          <label className="relative min-w-0 flex-1">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+    <div className="ws-scroll-hide flex h-full min-h-0 flex-col overflow-y-auto bg-[hsl(0_0%_8%)] text-zinc-100">
+      <header className="sticky top-0 z-20 border-b border-white/[0.05] bg-[hsl(0_0%_8%)]/95 px-4 py-4 backdrop-blur-xl sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-[1460px] items-center gap-3">
+          {onOpenSidebar && (
+            <button
+              type="button"
+              onClick={onOpenSidebar}
+              className="grid h-11 w-11 place-items-center rounded-full bg-white/[0.06] text-zinc-100 ring-1 ring-inset ring-white/10 md:hidden"
+              aria-label={t("workspace.stock.open_sidebar")}
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          )}
+          <form onSubmit={submit} className="mx-auto flex h-12 w-full max-w-[760px] items-center rounded-full bg-white/[0.10] px-4 text-zinc-100 ring-1 ring-inset ring-white/[0.06]">
+            <Grid2X2 className="mr-3 h-4 w-4 shrink-0 text-zinc-400" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t("workspace.stock.search_placeholder")}
-              className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.05] pl-11 pr-4 text-sm text-white outline-none transition focus:border-sky-400/60 focus:bg-white/[0.07]"
+              className="min-w-0 flex-1 bg-transparent text-[15px] text-white outline-none placeholder:text-zinc-400"
             />
-          </label>
-          <button
-            type="submit"
-            disabled={loading}
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-sky-500 px-5 text-sm font-semibold text-white transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            {t("workspace.stock.search_button")}
-          </button>
-        </form>
-
-        <div className="mt-3 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex flex-wrap gap-2">
-            {QUICK_TERMS.map((term) => (
-              <button
-                key={term}
-                type="button"
-                onClick={() => {
-                  setQuery(term);
-                  setSubmittedQuery(term);
-                }}
-                className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-zinc-300 transition hover:border-sky-400/50 hover:text-white"
-              >
-                {term}
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <StockSelect label={t("workspace.stock.filter_type")} value={contentType} onChange={setContentType} options={STOCK_TYPES} />
-            <StockSelect label={t("workspace.stock.filter_orientation")} value={orientation} onChange={setOrientation} options={ORIENTATIONS} />
-            <StockSelect label={t("workspace.stock.filter_sort")} value={order} onChange={setOrder} options={ORDERS} />
-          </div>
+            <button
+              type="button"
+              className="mr-1 grid h-9 w-9 place-items-center rounded-full text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
+              aria-label={t("workspace.stock.voice_search")}
+              title={t("workspace.stock.voice_search")}
+            >
+              <Mic className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              className="mr-1 grid h-9 w-9 place-items-center rounded-full text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
+              aria-label={t("workspace.stock.image_search")}
+              title={t("workspace.stock.image_search")}
+            >
+              <Camera className="h-4 w-4" />
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="grid h-9 w-9 place-items-center rounded-full bg-white text-zinc-950 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label={t("workspace.stock.search_button")}
+              title={t("workspace.stock.search_button")}
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            </button>
+          </form>
         </div>
-      </section>
+      </header>
 
-      <main className="ws-scroll-hide min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-8">
-        {error && (
-          <div className="mb-4 rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
-            {error}
-          </div>
-        )}
-
-        {loading && items.length === 0 ? (
-          <div className="grid min-h-[360px] place-items-center rounded-3xl border border-white/10 bg-white/[0.03]">
-            <div className="flex items-center gap-3 text-sm text-zinc-300">
-              <Loader2 className="h-5 w-5 animate-spin text-sky-300" />
-              {t("workspace.stock.searching")}
+      <main className="mx-auto w-full max-w-[1460px] flex-1 px-4 pb-16 pt-6 sm:px-6 lg:px-8">
+        <section className="relative overflow-hidden rounded-[28px] bg-black">
+          <HeroMosaic images={heroImages.slice(0, 4)} side="left" />
+          <HeroMosaic images={heroImages.slice(4, 8)} side="right" />
+          <div className="relative z-10 mx-auto flex min-h-[230px] max-w-[760px] flex-col items-center justify-center px-6 py-12 text-center">
+            <div className="mb-5 flex items-center gap-2 text-[13px] font-semibold text-zinc-300">
+              <span>{t("workspace.sidebar.home")}</span>
+              <span className="text-zinc-600">/</span>
+              <span className="text-white">{t("workspace.stock.eyebrow")}</span>
             </div>
+            <h1 className="text-balance text-[34px] font-semibold leading-tight tracking-tight text-white md:text-[44px]">
+              {t("workspace.stock.hero_title")}
+            </h1>
+            <p className="mt-4 max-w-[620px] text-pretty text-[17px] leading-7 text-zinc-200">
+              {t("workspace.stock.hero_subtitle")}
+            </p>
           </div>
-        ) : items.length === 0 ? (
-          <div className="grid min-h-[360px] place-items-center rounded-3xl border border-dashed border-white/15 bg-white/[0.03] text-center">
+        </section>
+
+        <section className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {CATEGORIES.map((category) => (
+            <button
+              key={category.id}
+              type="button"
+              onClick={() => searchCategory(category)}
+              className={cn(
+                "group flex min-h-[108px] items-center gap-5 rounded-2xl bg-white/[0.035] p-3 text-left ring-1 ring-inset ring-white/[0.04] transition",
+                "hover:-translate-y-0.5 hover:bg-white/[0.055] hover:ring-white/[0.10]",
+                activeCategory === category.id && "bg-white/[0.08] ring-sky-300/35",
+              )}
+            >
+              <div className="relative h-[86px] w-[86px] shrink-0 overflow-hidden rounded-xl bg-zinc-900">
+                <img
+                  src={category.preview}
+                  alt=""
+                  className="h-full w-full object-cover opacity-90 transition duration-300 group-hover:scale-105"
+                  loading="lazy"
+                />
+                <div className={cn("absolute inset-0 bg-gradient-to-br opacity-25", category.swatch)} />
+                <div className="absolute bottom-2 right-2 grid h-7 w-7 place-items-center rounded-lg bg-black/55 text-white backdrop-blur">
+                  <category.Icon className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="min-w-0">
+                <div className="text-[16px] font-semibold text-white">{category.label}</div>
+                <div className="mt-1 line-clamp-1 text-[13px] text-zinc-500">
+                  {category.query}
+                </div>
+              </div>
+            </button>
+          ))}
+        </section>
+
+        <section className="mt-16">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <ImageIcon className="mx-auto h-8 w-8 text-zinc-500" />
-              <h2 className="mt-4 text-lg font-semibold text-white">{t("workspace.stock.empty_title")}</h2>
-              <p className="mt-1 text-sm text-zinc-400">{t("workspace.stock.empty_hint")}</p>
+              <h2 className="text-[28px] font-semibold tracking-tight text-white">
+                {t("workspace.stock.results_title")}
+              </h2>
+              <p className="mt-2 text-[16px] text-zinc-400">{totalLabel}</p>
             </div>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-              {items.map((item) => (
-                <article
-                  key={String(item.id)}
-                  className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] transition hover:border-sky-300/40 hover:bg-white/[0.06]"
+            <div className="flex flex-wrap gap-2">
+              {QUICK_TERMS.map((term) => (
+                <button
+                  key={term}
+                  type="button"
+                  onClick={() => {
+                    setActiveCategory("all");
+                    setContentType(undefined);
+                    setQuery(term);
+                    setSubmittedQuery(term);
+                  }}
+                  className="rounded-full bg-white/[0.06] px-4 py-2 text-[13px] font-semibold text-zinc-200 ring-1 ring-inset ring-white/[0.06] transition hover:bg-white/[0.10] hover:text-white"
                 >
-                  <div className="relative aspect-[4/3] overflow-hidden bg-zinc-950">
-                    {item.image?.source?.url ? (
-                      <img
-                        src={item.image.source.url}
-                        alt={item.title ?? item.filename ?? t("workspace.stock.asset_alt")}
-                        className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="grid h-full place-items-center">
-                        <ImageIcon className="h-8 w-8 text-zinc-600" />
-                      </div>
-                    )}
-                    <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
-                      <span className="rounded-full bg-black/65 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur">
-                        {item.image?.type ?? "asset"}
-                      </span>
-                      <span className="rounded-full bg-sky-500/90 px-2 py-1 text-[11px] font-semibold text-white">
-                        {pickLicense(item)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="space-y-3 p-4">
-                    <div className="min-h-[68px]">
-                      <h3 className="line-clamp-2 text-sm font-semibold leading-5 text-white">
-                        {item.title ?? item.filename ?? t("workspace.stock.asset_id_fallback", { id: String(item.id) })}
-                      </h3>
-                      <p className="mt-1 truncate text-xs text-zinc-500">
-                        {item.author?.name ? t("workspace.stock.author_prefix", { name: item.author.name }) : t("workspace.stock.author_fallback")}
-                        {item.image?.orientation ? ` · ${item.image.orientation}` : ""}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {availableFormats(item).map((format) => (
-                        <span key={format} className="rounded-md bg-white/[0.06] px-2 py-1 text-[11px] text-zinc-300">
-                          {format.toUpperCase()}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-[11px] text-zinc-500">
-                        {t("workspace.stock.downloads_count", { count: formatCount(item.stats?.downloads) })}
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        {item.url && (
-                          <a
-                            href={item.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="grid h-9 w-9 place-items-center rounded-xl bg-white/[0.06] text-zinc-200 transition hover:bg-white/[0.12] hover:text-white"
-                            title={t("workspace.stock.open_freepik")}
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => void downloadResource(item)}
-                          disabled={downloadingId === String(item.id)}
-                          className="inline-flex h-9 items-center gap-2 rounded-xl bg-sky-500 px-3 text-xs font-semibold text-white transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {downloadingId === String(item.id) ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Download className="h-3.5 w-3.5" />
-                          )}
-                          {t("workspace.stock.download")}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </article>
+                  {term}
+                </button>
               ))}
             </div>
+          </div>
 
-            <div className="mt-6 flex flex-col items-center justify-between gap-3 border-t border-white/8 pt-5 sm:flex-row">
-              <p className="text-xs text-zinc-500">
-                {t("workspace.stock.page_of", { current: meta?.current_page ?? page, total: meta?.last_page ?? "?" })}
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={loading || page <= 1}
-                  onClick={() => void runSearch(page - 1)}
-                  className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-zinc-200 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {t("workspace.stock.previous")}
-                </button>
-                <button
-                  type="button"
-                  disabled={loading || (meta?.last_page ? page >= meta.last_page : false)}
-                  onClick={() => void runSearch(page + 1)}
-                  className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {t("workspace.stock.next")}
-                </button>
+          {error && (
+            <div className="mt-5 rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-[14px] text-rose-100">
+              {error}
+            </div>
+          )}
+
+          {loading && items.length === 0 ? (
+            <div className="mt-6 grid min-h-[360px] place-items-center rounded-3xl bg-white/[0.035] ring-1 ring-inset ring-white/[0.06]">
+              <div className="flex items-center gap-3 text-[15px] text-zinc-300">
+                <Loader2 className="h-5 w-5 animate-spin text-sky-300" />
+                {t("workspace.stock.searching")}
               </div>
             </div>
-          </>
-        )}
+          ) : items.length === 0 ? (
+            <div className="mt-6 grid min-h-[360px] place-items-center rounded-3xl border border-dashed border-white/15 bg-white/[0.03] text-center">
+              <div>
+                <ImageIcon className="mx-auto h-9 w-9 text-zinc-500" />
+                <h2 className="mt-4 text-[21px] font-semibold text-white">{t("workspace.stock.empty_title")}</h2>
+                <p className="mt-1 text-[15px] text-zinc-400">{t("workspace.stock.empty_hint")}</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                {items.map((item) => (
+                  <StockAssetCard
+                    key={String(item.id)}
+                    item={item}
+                    downloading={downloadingId === String(item.id)}
+                    onDownload={() => void downloadResource(item)}
+                  />
+                ))}
+              </div>
+
+              <div className="mt-8 flex flex-col items-center justify-between gap-3 border-t border-white/8 pt-5 sm:flex-row">
+                <p className="text-[13px] text-zinc-500">
+                  {t("workspace.stock.page_of", {
+                    current: meta?.current_page ?? page,
+                    total: meta?.last_page ?? "?",
+                  })}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={loading || page <= 1}
+                    onClick={() => void runSearch(page - 1)}
+                    className="rounded-full bg-white/[0.06] px-5 py-2.5 text-[14px] font-semibold text-zinc-200 ring-1 ring-inset ring-white/[0.08] transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {t("workspace.stock.previous")}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={loading || (meta?.last_page ? page >= meta.last_page : false)}
+                    onClick={() => void runSearch(page + 1)}
+                    className="rounded-full bg-white px-5 py-2.5 text-[14px] font-semibold text-zinc-950 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {t("workspace.stock.next")}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </section>
       </main>
     </div>
   );
 }
 
-function StockSelect({
-  label,
-  value,
-  onChange,
-  options,
+function HeroMosaic({ images, side }: { images: string[]; side: "left" | "right" }) {
+  return (
+    <div
+      className={cn(
+        "pointer-events-none absolute top-0 hidden h-full w-[31%] grid-cols-2 gap-3 opacity-85 blur-[0.1px] md:grid",
+        side === "left" ? "left-0 -translate-x-[7%]" : "right-0 translate-x-[7%]",
+      )}
+    >
+      {images.map((src, index) => (
+        <div
+          key={`${side}-${src}-${index}`}
+          className={cn(
+            "overflow-hidden rounded-xl bg-white/[0.06]",
+            index % 2 === 0 ? "translate-y-0" : "-translate-y-7",
+          )}
+        >
+          <img src={src} alt="" className="h-full w-full object-cover" loading="lazy" />
+        </div>
+      ))}
+      <div
+        className={cn(
+          "absolute inset-y-0 w-1/2",
+          side === "left"
+            ? "right-0 bg-gradient-to-r from-transparent to-black"
+            : "left-0 bg-gradient-to-l from-transparent to-black",
+        )}
+      />
+    </div>
+  );
+}
+
+function StockAssetCard({
+  item,
+  downloading,
+  onDownload,
 }: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: Array<{ value: string; labelKey: OptLabelKey }>;
+  item: FreepikResource;
+  downloading: boolean;
+  onDownload: () => void;
 }) {
   const { t } = useLanguage();
+  const imageUrl = item.image?.source?.url;
   return (
-    <label className="flex min-w-[150px] items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
-      <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-500" />
-      <span className="sr-only">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={cn(
-          "h-8 w-full bg-transparent text-xs font-semibold text-zinc-200 outline-none",
-          "[&>option]:bg-zinc-950 [&>option]:text-zinc-100",
+    <article className="group overflow-hidden rounded-2xl bg-white/[0.04] ring-1 ring-inset ring-white/[0.05] transition hover:-translate-y-0.5 hover:bg-white/[0.06] hover:ring-white/[0.13]">
+      <div className="relative aspect-[4/3] overflow-hidden bg-zinc-950">
+        {isValidImageUrl(imageUrl) ? (
+          <img
+            src={imageUrl}
+            alt={item.title ?? item.filename ?? t("workspace.stock.asset_alt")}
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.035]"
+            loading="lazy"
+          />
+        ) : (
+          <div className="grid h-full place-items-center">
+            <ImageIcon className="h-8 w-8 text-zinc-600" />
+          </div>
         )}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {t(option.labelKey)}
-          </option>
-        ))}
-      </select>
-    </label>
+        <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
+          <span className="rounded-full bg-black/65 px-2.5 py-1 text-[12px] font-semibold capitalize text-white backdrop-blur">
+            {item.image?.type ?? "asset"}
+          </span>
+          <span className="rounded-full bg-sky-500/90 px-2.5 py-1 text-[12px] font-semibold text-white">
+            {pickLicense(item)}
+          </span>
+        </div>
+      </div>
+      <div className="space-y-3 p-4">
+        <div className="min-h-[72px]">
+          <h3 className="line-clamp-2 text-[15px] font-semibold leading-6 text-white">
+            {item.title ?? item.filename ?? t("workspace.stock.asset_id_fallback", { id: String(item.id) })}
+          </h3>
+          <p className="mt-1 truncate text-[13px] text-zinc-500">
+            {item.author?.name
+              ? t("workspace.stock.author_prefix", { name: item.author.name })
+              : t("workspace.stock.author_fallback")}
+            {item.image?.orientation ? ` · ${item.image.orientation}` : ""}
+          </p>
+        </div>
+        <div className="flex min-h-7 flex-wrap gap-1.5">
+          {availableFormats(item).map((format) => (
+            <span key={format} className="rounded-md bg-white/[0.06] px-2 py-1 text-[12px] text-zinc-300">
+              {format.toUpperCase()}
+            </span>
+          ))}
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[12px] text-zinc-500">
+            {t("workspace.stock.downloads_count", { count: formatCount(item.stats?.downloads) })}
+          </div>
+          <div className="flex items-center gap-1.5">
+            {item.url && (
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noreferrer"
+                className="grid h-10 w-10 place-items-center rounded-xl bg-white/[0.06] text-zinc-200 transition hover:bg-white/[0.12] hover:text-white"
+                title={t("workspace.stock.open_freepik")}
+              >
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={onDownload}
+              disabled={downloading}
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-sky-500 px-3.5 text-[13px] font-semibold text-white transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {downloading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              {t("workspace.stock.download")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </article>
   );
 }
