@@ -1,24 +1,3 @@
-/**
- * Top-right user menu — avatar dropdown for the workspace surfaces.
- *
- * The slim workspace sidebar (Home / Spaces / Community / Projects /
- * All tools / Stock) intentionally doesn't expose account links;
- * those live here in the header instead, the same shape Magnific
- * and Figma use.
- *
- * Items:
- *   • Account label (email + display name) — non-interactive
- *   • Upgrade        → /app/pricing (prominent CTA button)
- *   • Settings       → /app/settings
- *   • Plan & billing → /app/pricing
- *   • Theme          → toggle the ThemeProvider value
- *   • Sign out       → AuthContext.signOut() then bounce to /auth
- *
- * Designed as a drop-in for any PageHeader rightSlot. It owns its
- * own state (the dropdown open/close); the parent only needs to
- * mount it where the avatar should sit.
- */
-
 import { useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
@@ -37,13 +16,141 @@ import {
   LogOut,
   CreditCard,
   Sparkles,
-  Coins,
   Building2,
+  Crown,
+  Gauge,
+  UserPlus,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "next-themes";
 import { useCredits } from "@/hooks/useCredits";
+
+const numberCompact = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+const numberFull = new Intl.NumberFormat("en-US");
+
+function clampPercent(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, value));
+}
+
+function percentOf(used: number, total: number) {
+  return total > 0 ? clampPercent((used / total) * 100) : 0;
+}
+
+function formatCompact(value: number | null | undefined) {
+  return numberCompact.format(Math.max(0, Number(value ?? 0)));
+}
+
+function CreditAvatarRing({
+  src,
+  initial,
+  personalPercent,
+  sharedPercent,
+  showShared,
+  size = 40,
+}: {
+  src?: string | null;
+  initial: string;
+  personalPercent: number;
+  sharedPercent: number;
+  showShared: boolean;
+  size?: number;
+}) {
+  const center = size / 2;
+  const outerRadius = center - 3;
+  const innerRadius = center - 7;
+  const avatarInset = size >= 48 ? 9 : 8;
+  const ring = (radius: number, percent: number) => {
+    const circumference = 2 * Math.PI * radius;
+    return {
+      strokeDasharray: `${(circumference * clampPercent(percent)) / 100} ${circumference}`,
+      strokeDashoffset: 0,
+    };
+  };
+
+  return (
+    <span className="relative inline-flex shrink-0 items-center justify-center" style={{ width: size, height: size }}>
+      <svg className="absolute inset-0 -rotate-90" viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
+        {showShared && (
+          <>
+            <circle cx={center} cy={center} r={outerRadius} fill="none" stroke="rgba(250, 204, 21, 0.18)" strokeWidth="2.6" />
+            <circle
+              cx={center}
+              cy={center}
+              r={outerRadius}
+              fill="none"
+              stroke="#facc15"
+              strokeLinecap="round"
+              strokeWidth="2.6"
+              style={ring(outerRadius, sharedPercent)}
+            />
+          </>
+        )}
+        <circle cx={center} cy={center} r={innerRadius} fill="none" stroke="rgba(56, 189, 248, 0.18)" strokeWidth="2.4" />
+        <circle
+          cx={center}
+          cy={center}
+          r={innerRadius}
+          fill="none"
+          stroke="#38bdf8"
+          strokeLinecap="round"
+          strokeWidth="2.4"
+          style={ring(innerRadius, personalPercent)}
+        />
+      </svg>
+      <Avatar
+        className="absolute rounded-full"
+        style={{
+          inset: avatarInset,
+          width: size - avatarInset * 2,
+          height: size - avatarInset * 2,
+        }}
+      >
+        <AvatarImage src={src ?? undefined} alt="" />
+        <AvatarFallback className="bg-emerald-600 text-[12px] font-semibold text-white">
+          {initial}
+        </AvatarFallback>
+      </Avatar>
+    </span>
+  );
+}
+
+function UsageRow({
+  label,
+  used,
+  total,
+  available,
+  colorClass,
+}: {
+  label: string;
+  used: number;
+  total: number;
+  available: number;
+  colorClass: string;
+}) {
+  const pct = percentOf(used, total);
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-3 text-[12px] font-medium leading-5 text-white">
+        <span className="truncate">{label}</span>
+        <span className="shrink-0 tabular-nums text-white/[0.85]">
+          {formatCompact(used)} / {formatCompact(total)}
+        </span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.12]">
+        <div className={`h-full rounded-full ${colorClass}`} style={{ width: `${pct}%` }} />
+      </div>
+      <div className="flex items-center justify-between gap-3 text-[11px] leading-4 text-white/[0.72]">
+        <span>Spent {formatCompact(used)}</span>
+        <span>Available {formatCompact(available)}</span>
+      </div>
+    </div>
+  );
+}
 
 export function UserMenu() {
   const navigate = useNavigate();
@@ -58,16 +165,32 @@ export function UserMenu() {
 
   const initial =
     (profile?.display_name?.[0] ?? user?.email?.[0] ?? "U").toUpperCase();
-  const formattedCredits =
-    creditsLoading && !credits
-      ? t("workspace.usermenu.loading")
-      : new Intl.NumberFormat("en-US").format(credits?.balance ?? 0);
+  const personalBalance = Number(credits?.personal_balance ?? credits?.balance ?? 0);
+  const personalUsed = Number(credits?.personal_total_used ?? credits?.total_used ?? 0);
+  const personalTotal = Math.max(
+    Number(credits?.personal_total_purchased ?? credits?.total_purchased ?? 0),
+    personalBalance + personalUsed,
+  );
+  const sharedBalance = Number(credits?.shared_balance ?? (credits?.is_shared_pool ? credits.balance : 0) ?? 0);
+  const sharedUsed = Number(credits?.shared_used ?? (credits?.is_shared_pool ? credits.total_used : 0) ?? 0);
+  const sharedTotal = Math.max(
+    Number(credits?.shared_total ?? (credits?.is_shared_pool ? credits.total_purchased : 0) ?? 0),
+    sharedBalance + sharedUsed,
+  );
+  const displayBalance = credits?.is_shared_pool ? sharedBalance : personalBalance;
+  const formattedCredits = creditsLoading && !credits ? t("workspace.usermenu.loading") : numberFull.format(displayBalance);
+  const personalPercent = percentOf(personalUsed, personalTotal);
+  const sharedPercent = percentOf(sharedUsed, sharedTotal);
   const creditScopeLabel =
     credits?.credit_scope === "team" && credits.team_name
       ? `${t("workspace.usermenu.shared_pool")} - ${credits.team_name}`
       : credits?.is_shared_pool
       ? `${t("workspace.usermenu.shared_pool")} - ${credits.organization_name ?? credits.pool_domain}`
       : t("workspace.usermenu.available_balance");
+  const sharedUsageLabel =
+    credits?.credit_scope === "team" && credits.team_name
+      ? credits.team_name
+      : credits?.organization_name || credits?.pool_domain || "Company pool";
 
   const handleSignOut = async () => {
     await signOut();
@@ -77,155 +200,166 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-inset ring-white/[0.08] transition-all hover:ring-white/[0.18] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40 lg:h-8 lg:w-8"
+        className="flex h-11 w-11 items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/50 lg:h-10 lg:w-10"
         aria-label={t("workspace.usermenu.account")}
       >
-        <Avatar className="h-10 w-10 lg:h-8 lg:w-8">
-          <AvatarImage src={profile?.avatar_url ?? undefined} alt="" />
-          <AvatarFallback className="bg-gradient-to-br from-fuchsia-500/40 to-violet-600/40 text-[11px] font-semibold text-white">
-            {initial}
-          </AvatarFallback>
-        </Avatar>
+        <CreditAvatarRing
+          src={profile?.avatar_url}
+          initial={initial}
+          personalPercent={personalPercent}
+          sharedPercent={sharedPercent}
+          showShared={Boolean(credits?.is_shared_pool)}
+          size={42}
+        />
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
         align="end"
         sideOffset={6}
-        className="w-72 border-white/[0.08] bg-[hsl(0_0%_8%)] text-zinc-200"
+        className="max-h-[calc(100vh-80px)] w-[304px] overflow-y-auto rounded-lg border-white/[0.10] bg-[#121212] p-0 text-white shadow-2xl"
       >
-        <DropdownMenuLabel className="flex items-center gap-3 py-2">
-          <Avatar className="h-9 w-9 shrink-0">
-            <AvatarImage src={profile?.avatar_url ?? undefined} alt="" />
-            <AvatarFallback className="bg-gradient-to-br from-fuchsia-500/40 to-violet-600/40 text-[12px] font-semibold text-white">
-              {initial}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[12.5px] font-medium text-zinc-100">
-              {profile?.display_name || t("workspace.usermenu.member_fallback")}
+        <DropdownMenuLabel className="p-0 font-normal">
+          <div className="p-4 pb-3">
+            <div className="flex items-center gap-3">
+              <CreditAvatarRing
+                src={profile?.avatar_url}
+                initial={initial}
+                personalPercent={personalPercent}
+                sharedPercent={sharedPercent}
+                showShared={Boolean(credits?.is_shared_pool)}
+                size={54}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <div className="truncate text-[13px] font-semibold leading-5 text-white">
+                    {profile?.display_name || t("workspace.usermenu.member_fallback")}
+                  </div>
+                  {hasTeamContext && <Crown className="h-3.5 w-3.5 shrink-0 fill-yellow-400 text-yellow-400" />}
+                </div>
+                <div className="truncate text-[12px] leading-5 text-white/70">
+                  {user?.email}
+                </div>
+              </div>
             </div>
-            <div className="truncate text-[11px] text-zinc-500">
-              {user?.email}
+
+            <div className="mt-3 space-y-2">
+              <button
+                type="button"
+                onClick={() => navigate("/app/pricing")}
+                className="flex h-8 w-full items-center justify-center gap-1.5 rounded-md bg-[#5367f5] px-3 text-[12.5px] font-semibold leading-5 text-white transition-colors hover:bg-[#6274ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                {t("workspace.usermenu.upgrade")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (hasTeamContext) {
+                    window.location.href = adminConsoleUrl;
+                  } else {
+                    navigate("/app/team-register");
+                  }
+                }}
+                className="flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-white/[0.16] bg-transparent px-3 text-[12.5px] font-semibold leading-5 text-white transition-colors hover:bg-white/[0.06]"
+              >
+                {hasTeamContext ? <Building2 className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}
+                {hasTeamContext ? "Admin Console" : "Create your team"}
+              </button>
             </div>
           </div>
         </DropdownMenuLabel>
 
-        {/* Prominent Upgrade CTA — sits between the account header
-         *  and the menu list. Mirrors the reference profile layout
-         *  (big purple button + quieter "Plan & billing" row below).
-         *  TODO: hide this when the user is on the highest tier (Pro)
-         *  once subscription state is reliably populated; for now we
-         *  always show it. */}
-        <div className="mx-2 rounded-md border border-violet-400/15 bg-violet-500/10 px-3 py-2.5">
-          <div className="flex items-center justify-between gap-3">
+        <div className="border-t border-white/[0.08] px-4 py-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-violet-500/15 text-violet-200">
-                <Coins className="h-4 w-4" />
-              </span>
+              <Gauge className="h-4 w-4 shrink-0 text-white" />
               <div className="min-w-0">
-                <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-violet-200/80">
-                  {t("workspace.usermenu.credits")}
-                </div>
-                <div className="truncate text-[11px] text-zinc-500">
-                  {creditScopeLabel}
-                </div>
+                <div className="text-[13px] font-semibold leading-5 text-white">Credit usage</div>
+                <div className="truncate text-[11px] leading-4 text-white/[0.64]">{creditScopeLabel}</div>
               </div>
             </div>
-            <div className="shrink-0 text-right text-[16px] font-semibold tabular-nums text-zinc-50">
-              {formattedCredits}
+            <div className="shrink-0 text-right">
+              <div className="text-[15px] font-bold leading-5 tabular-nums text-white">{formattedCredits}</div>
+              <div className="text-[10.5px] leading-4 text-white/[0.64]">available</div>
             </div>
+          </div>
+
+          <div className="space-y-3">
+            <UsageRow
+              label="Personal"
+              used={personalUsed}
+              total={personalTotal}
+              available={personalBalance}
+              colorClass="bg-sky-400"
+            />
+            {credits?.is_shared_pool && (
+              <UsageRow
+                label={sharedUsageLabel}
+                used={sharedUsed}
+                total={sharedTotal}
+                available={sharedBalance}
+                colorClass="bg-yellow-400"
+              />
+            )}
           </div>
         </div>
 
-        <div className="px-2 py-2">
-          <button
-            type="button"
-            onClick={() => navigate("/app/pricing")}
-            className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-md bg-violet-600 px-3 text-[12.5px] font-medium text-white shadow-sm transition-colors hover:bg-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/60 lg:min-h-0 lg:py-1.5"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            {t("workspace.usermenu.upgrade")}
-          </button>
-        </div>
-
-        <DropdownMenuSeparator className="bg-white/[0.06]" />
-
-        {/* Account links. Settings stays on top; Plan & billing
-         *  duplicates the Upgrade CTA's destination but follows the
-         *  reference layout (loud CTA + quiet row). */}
-        <DropdownMenuItem
-          onSelect={() => navigate("/app/settings")}
-          className="min-h-11 cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50 lg:min-h-0"
-        >
-          <SettingsIcon className="h-3.5 w-3.5 text-zinc-400" />
-          {t("workspace.usermenu.settings")}
-        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-white/[0.08]" />
 
         <DropdownMenuItem
           onSelect={() => navigate("/app/pricing")}
-          className="min-h-11 cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50 lg:min-h-0"
+          className="mx-2 my-1 h-9 cursor-pointer gap-3 rounded-md px-3 text-[12.5px] font-medium leading-5 text-white focus:bg-white/[0.06] focus:text-white"
         >
-          <CreditCard className="h-3.5 w-3.5 text-zinc-400" />
-          {t("workspace.usermenu.plan_billing")}
+          <CreditCard className="h-3.5 w-3.5 text-white/[0.82]" />
+          <span className="flex-1">{t("workspace.usermenu.plan_billing")}</span>
+          <span className="rounded bg-blue-500/[0.12] px-2 py-0.5 text-[10.5px] font-semibold text-blue-200">Premium+</span>
         </DropdownMenuItem>
 
-        {hasTeamContext && (
-          <DropdownMenuItem
-            onSelect={() => {
-              window.location.href = adminConsoleUrl;
-            }}
-            className="min-h-11 cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50 lg:min-h-0"
-          >
-            <Building2 className="h-3.5 w-3.5 text-zinc-400" />
-            Admin Console
-          </DropdownMenuItem>
-        )}
-
-        <DropdownMenuSeparator className="bg-white/[0.06]" />
-
-        {/* Theme toggle stays inside the menu so the workspace
-         *  surfaces don't need their own theme button anywhere
-         *  else. The icon flips to mirror the next state. */}
         <DropdownMenuItem
-          onSelect={(e) => {
-            // Don't auto-close the menu on theme toggle so the user
-            // can preview both states without re-opening — Radix
-            // closes by default; preventDefault keeps it open.
-            e.preventDefault();
-            setTheme(theme === "dark" ? "light" : "dark");
-          }}
-          className="min-h-11 cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50 lg:min-h-0"
+          onSelect={() => navigate("/app/settings")}
+          className="mx-2 my-1 h-9 cursor-pointer gap-3 rounded-md px-3 text-[12.5px] font-medium leading-5 text-white focus:bg-white/[0.06] focus:text-white"
         >
-          {theme === "dark" ? (
-            <Sun className="h-3.5 w-3.5 text-zinc-400" />
-          ) : (
-            <Moon className="h-3.5 w-3.5 text-zinc-400" />
-          )}
-          {theme === "dark" ? t("workspace.usermenu.theme_to_light") : t("workspace.usermenu.theme_to_dark")}
+          <SettingsIcon className="h-3.5 w-3.5 text-white/[0.82]" />
+          {t("workspace.usermenu.settings")}
         </DropdownMenuItem>
 
-        {/* Language toggle — flips between English / Thai. Same
-         *  preventDefault trick as the theme toggle so the menu stays
-         *  open and the user can read the new label immediately. The
-         *  visible label is rendered in the TARGET language (the one
-         *  you'd switch to), mirroring how OS-level language switchers
-         *  read ("English" while you're in Thai → tap to go English). */}
         <DropdownMenuItem
           onSelect={(e) => {
             e.preventDefault();
             setLanguage(language === "th" ? "en" : "th");
           }}
-          className="min-h-11 cursor-pointer gap-2 text-[12.5px] focus:bg-white/[0.06] focus:text-zinc-50 lg:min-h-0"
+          className="mx-2 my-1 h-9 cursor-pointer gap-3 rounded-md px-3 text-[12.5px] font-medium leading-5 text-white focus:bg-white/[0.06] focus:text-white"
         >
-          <Languages className="h-3.5 w-3.5 text-zinc-400" />
-          {language === "th" ? "English" : "ภาษาไทย"}
+          <Languages className="h-3.5 w-3.5 text-white/[0.82]" />
+          <span className="flex-1">Language</span>
+          <span className="rounded-md border border-white/[0.10] bg-white/[0.04] px-2 py-0.5 text-[11px] text-white">
+            {language === "th" ? "English" : "Thai"}
+          </span>
         </DropdownMenuItem>
 
-        <DropdownMenuSeparator className="bg-white/[0.06]" />
+        <DropdownMenuItem
+          onSelect={(e) => {
+            e.preventDefault();
+            setTheme(theme === "dark" ? "light" : "dark");
+          }}
+          className="mx-2 my-1 h-9 cursor-pointer gap-3 rounded-md px-3 text-[12.5px] font-medium leading-5 text-white focus:bg-white/[0.06] focus:text-white"
+        >
+          {theme === "dark" ? (
+            <Sun className="h-3.5 w-3.5 text-white/[0.82]" />
+          ) : (
+            <Moon className="h-3.5 w-3.5 text-white/[0.82]" />
+          )}
+          <span className="flex-1">Theme</span>
+          <span className="rounded-md border border-white/[0.10] bg-white/[0.04] px-2 py-0.5 text-[11px] text-white">
+            {theme === "dark" ? "Dark" : "Light"}
+          </span>
+        </DropdownMenuItem>
+
+        <DropdownMenuSeparator className="mt-1 bg-white/[0.08]" />
 
         <DropdownMenuItem
           onSelect={handleSignOut}
-          className="min-h-11 cursor-pointer gap-2 text-[12.5px] text-red-300 focus:bg-red-500/10 focus:text-red-200 lg:min-h-0"
+          className="mx-2 my-2 h-9 cursor-pointer gap-3 rounded-md px-3 text-[12.5px] font-medium leading-5 text-red-200 focus:bg-red-500/10 focus:text-red-100"
         >
           <LogOut className="h-3.5 w-3.5" />
           {t("workspace.usermenu.sign_out")}

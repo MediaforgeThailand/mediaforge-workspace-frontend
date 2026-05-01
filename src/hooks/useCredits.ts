@@ -20,6 +20,12 @@ interface CreditBalance {
   credit_scope?: "user" | "organization" | "team";
   team_id?: string | null;
   team_name?: string | null;
+  personal_balance?: number;
+  personal_total_purchased?: number;
+  personal_total_used?: number;
+  shared_balance?: number | null;
+  shared_total?: number | null;
+  shared_used?: number | null;
 }
 
 function unwrapCreditBalance(payload: unknown): CreditBalance | null {
@@ -38,6 +44,12 @@ function unwrapCreditBalance(payload: unknown): CreditBalance | null {
     credit_scope: row.credit_scope ?? (row.is_shared_pool ? "organization" : "user"),
     team_id: row.team_id ?? null,
     team_name: row.team_name ?? null,
+    personal_balance: Number(row.personal_balance ?? row.balance ?? 0),
+    personal_total_purchased: Number(row.personal_total_purchased ?? row.total_purchased ?? 0),
+    personal_total_used: Number(row.personal_total_used ?? row.total_used ?? 0),
+    shared_balance: row.shared_balance == null ? null : Number(row.shared_balance),
+    shared_total: row.shared_total == null ? null : Number(row.shared_total),
+    shared_used: row.shared_used == null ? null : Number(row.shared_used),
   };
 }
 

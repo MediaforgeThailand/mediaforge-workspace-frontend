@@ -1036,3 +1036,29 @@
   height: 0 !important;
   display: none !important;
 }
+
+/* Readability pass: keep Thai and English text open and high-contrast. */
+html,
+body,
+button,
+input,
+textarea,
+select {
+  letter-spacing: 0;
+  font-kerning: normal;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  line-height: 1.45;
+}
+
+[class*="tracking-"] {
+  letter-spacing: 0 !important;
+}
+
+:where(p, span, div, label, a, button, h1, h2, h3, h4, h5, h6, input, textarea, select).text-zinc-500,
+:where(p, span, div, label, a, button, h1, h2, h3, h4, h5, h6, input, textarea, select).text-zinc-400,
+:where(p, span, div, label, a, button, h1, h2, h3, h4, h5, h6, input, textarea, select).text-muted-foreground {
+  color: rgba(244, 244, 245, 0.82) !important;
+}
