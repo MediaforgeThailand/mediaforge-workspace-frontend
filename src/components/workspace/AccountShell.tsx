@@ -63,7 +63,7 @@ export default function AccountShell({ children }: { children?: ReactNode }) {
   return (
     <div
       className="flex h-screen w-screen overflow-hidden bg-[hsl(0_0%_5%)] text-zinc-100"
-      style={{ fontFamily: "'Prompt', system-ui, sans-serif" }}
+      style={{ fontFamily: "var(--font-sans)" }}
     >
       {/* ── Workspace sidebar (shared with the dashboard) ───────── */}
       <div className="hidden h-full lg:block">

@@ -185,7 +185,7 @@ const UpdatePaymentDialog = ({ open, onOpenChange, onSaved }: UpdatePaymentDialo
           colorBackground: "#0c1020",
           colorText: "#e5e7eb",
           colorDanger: "#ef4444",
-          fontFamily: "Prompt, system-ui, sans-serif",
+          fontFamily: "var(--font-sans)",
           borderRadius: "8px",
         },
       },

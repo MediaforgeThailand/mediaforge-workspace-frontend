@@ -72,7 +72,7 @@ const StickyNoteNode = memo(({ id, data, selected }: NodeProps) => {
         className={cn(
           "nodrag block h-full w-full resize-none bg-transparent text-[13px] leading-relaxed text-amber-950 outline-none placeholder:text-amber-900/40",
         )}
-        style={{ minHeight: 134, fontFamily: "'Prompt', system-ui, sans-serif" }}
+        style={{ minHeight: 134, fontFamily: "var(--font-sans)" }}
       />
     </div>
   );
