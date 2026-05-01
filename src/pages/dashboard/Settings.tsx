@@ -368,6 +368,7 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
   const [loading, setLoading] = useState(true);
   const [memberships, setMemberships] = useState<TeamStatusMembership[]>([]);
   const [canOpenConsole, setCanOpenConsole] = useState(false);
+  const [openingConsole, setOpeningConsole] = useState(false);
   const adminConsoleUrl =
     (import.meta.env.VITE_ADMIN_CONSOLE_URL as string | undefined) ||
     "https://mediaforge-admin-hub.vercel.app/org/console";
@@ -394,6 +395,37 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
     setMemberships(payload.memberships ?? []);
     setCanOpenConsole(Boolean(payload.can_open_admin_console));
     setLoading(false);
+  };
+
+  const openAdminConsole = async () => {
+    if (!user) return;
+    setOpeningConsole(true);
+    const { data, error } = await supabase.functions.invoke("workspace_org_console", {
+      body: {
+        action: "create_console_login_link",
+        redirect_to: adminConsoleUrl,
+      },
+    });
+    if (error) {
+      toast({
+        title: "Could not open Admin Console",
+        description: error.message,
+        variant: "destructive",
+      });
+      setOpeningConsole(false);
+      return;
+    }
+    const payload = (data?.data ?? data) as { url?: string };
+    if (!payload?.url) {
+      toast({
+        title: "Could not open Admin Console",
+        description: "The sign-in handoff did not return a redirect URL.",
+        variant: "destructive",
+      });
+      setOpeningConsole(false);
+      return;
+    }
+    window.location.assign(payload.url);
   };
 
   useEffect(() => {
@@ -470,11 +502,13 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
       </div>
 
       {canOpenConsole ? (
-        <Button asChild>
-          <a href={adminConsoleUrl}>
+        <Button onClick={openAdminConsole} disabled={openingConsole}>
+          {openingConsole ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
             <ExternalLink className="mr-2 h-4 w-4" />
-            Open Admin Console
-          </a>
+          )}
+          Open Admin Console
         </Button>
       ) : (
         <p className="text-sm text-zinc-500">
