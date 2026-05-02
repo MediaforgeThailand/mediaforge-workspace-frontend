@@ -936,17 +936,33 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   transition: max-height 200ms var(--ws-ease);
 }
 /* When the user actually clicks into the prompt, expand the
- * scrollable area so they can edit a long prompt comfortably. The
- * old 7em (≈4.6 lines) felt cramped — bump to 9 full lines so the
- * typing surface reads as a real text box, not a one-glance hint
- * strip. The container already lifts up via the `bottom` rule on
- * `.ws-compact-prompt-overlay:focus-within` so the bigger box
- * still clears the settings toolbar. */
+ * scrollable area so they can edit a long prompt comfortably.
+ *
+ * Earlier this was `calc(9 * 1.5em)` ≈ 14em ≈ 217px which on smaller
+ * preview nodes pushed the prompt nearly to the very top of the
+ * image — the user reported it "ลอยสูงเกินไป" with no obvious
+ * ceiling. New behaviour:
+ *
+ *   1. Hard cap to 6 lines (~9em ≈ 140px) so the prompt doesn't
+ *      claw past about 2/3 of a normal preview's height.
+ *   2. Top of the textarea fades into the artwork via a `mask-image`
+ *      gradient — the bottom 75% is fully opaque (text reads
+ *      crisply where the user is typing) and the top 25% fades to
+ *      transparent (so content beyond the cap doesn't visually slam
+ *      against the photo). User scrolls inside the box to reveal
+ *      anything that's hidden in the fade zone.
+ *   3. Native scrolling stays on (overflow-y: auto + the existing
+ *      `.nowheel` class on the contentEditable). */
 .ws-compact-prompt-overlay:focus-within .ws-compact-prompt-input,
 .ws-compact-prompt-overlay:focus-within textarea,
 .ws-compact-prompt-overlay:focus-within [contenteditable="true"] {
-  max-height: calc(9 * 1.5em);
+  max-height: calc(6 * 1.5em);
   overflow-y: auto;
+  /* 1:2 (top fade : solid) — top third of the focused prompt fades
+   *  to transparent so the reach of the textarea reads as soft
+   *  "more text above" instead of slamming against the artwork. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 33%, black 100%);
+          mask-image: linear-gradient(to bottom, transparent 0%, black 33%, black 100%);
 }
 
 /* ── Translucent scrollbar inside the focused prompt ───────
