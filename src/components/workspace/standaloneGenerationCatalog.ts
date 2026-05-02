@@ -464,16 +464,64 @@ export function videoDurationsForModel(model: string): number[] {
   return [5, 10];
 }
 
+/**
+ * Per-provider character / identity cue.
+ *
+ * None of our image providers expose a dedicated identity-preservation
+ * field — they all read references through the same `image_urls`/
+ * `mention_image_urls` channel. To make the "Character" button do
+ * something other than "yet another reference", we steer the model
+ * through the prompt itself.
+ *
+ * The cue text is tailored per provider because each one interprets
+ * multimodal context differently:
+ *
+ *   • Banana (Gemini Image) — treats earlier images in the parts
+ *     array as primary subjects when the prompt explicitly names
+ *     them. Phrasing "the person in Image 1" lands cleanly.
+ *   • GPT Image 2 — when refs are present, we hit
+ *     /v1/images/edits which already biases toward subject
+ *     preservation; the cue reinforces "same person".
+ *   • SeedDream — image-to-image; phrasing "from the reference photo"
+ *     matches BytePlus docs' suggested prompt grammar.
+ *
+ * The cue is prepended to the base prompt; style prefix/suffix still
+ * wrap around the result so users can stack Style + Character.
+ */
+function characterCueForModel(model: string): string {
+  if (model === "gpt-image-2") {
+    return "Keep the same person from the reference photo — preserve their face, hair, build, and identity exactly. Show that person in the following scene: ";
+  }
+  if (model.startsWith("seedream-")) {
+    return "Using the person from the reference photo, generate them in this scene with their face and identity preserved: ";
+  }
+  // Banana / Gemini Image (default)
+  return "Use the person in Image 1 as the main subject of the scene below. Preserve their face, hair, body, and identity. Scene: ";
+}
+
 export function composeStandaloneImagePrompt(
   prompt: string,
   styleId: string,
+  opts?: { hasCharacterRef?: boolean; model?: string },
 ): string {
   const base = prompt.trim();
   const style =
     IMAGE_STYLE_PRESETS.find((preset) => preset.id === styleId) ??
     IMAGE_STYLE_PRESETS[0];
-  if (!base || style.id === "none") return base;
-  return `${style.promptPrefix}${base}${style.promptSuffix}`.trim();
+  if (!base) return base;
+
+  /* Order: [character cue] + [style prefix] + [base] + [style suffix].
+   *  Character cue goes first so the model anchors identity before
+   *  applying stylistic direction, matching how diffusion / multi-
+   *  modal LLMs read prompts top-to-bottom. */
+  const characterCue = opts?.hasCharacterRef
+    ? characterCueForModel(opts.model ?? "")
+    : "";
+
+  if (style.id === "none") {
+    return `${characterCue}${base}`.trim();
+  }
+  return `${characterCue}${style.promptPrefix}${base}${style.promptSuffix}`.trim();
 }
 
 export function buildImageParams(args: {
@@ -485,8 +533,12 @@ export function buildImageParams(args: {
   quality: string;
   outputFormat: string;
   background: string;
+  hasCharacterRef?: boolean;
 }): Record<string, unknown> {
-  const styledPrompt = composeStandaloneImagePrompt(args.prompt, args.styleId);
+  const styledPrompt = composeStandaloneImagePrompt(args.prompt, args.styleId, {
+    hasCharacterRef: args.hasCharacterRef,
+    model: args.model,
+  });
   if (args.model === "gpt-image-2") {
     return {
       model_name: args.model,

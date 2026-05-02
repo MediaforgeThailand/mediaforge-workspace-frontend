@@ -75,17 +75,34 @@ const isInsufficientCreditsError = (message: string) =>
 
 type UploadSlot =
   | "image-ref"
+  /* Character slot — same upload pipeline as image-ref, but the
+   *  resulting `UploadedRef` carries `role: "character"` so the
+   *  prompt composer can inject identity-preservation cues and
+   *  re-order the ref list so the character image is read by the
+   *  provider as the primary subject (Image 1). */
+  | "image-character"
   | "video-start"
   | "video-end"
   | "video-ref-image"
   | "video-ref-video"
   | "model-image";
 
+/** Optional reference role.
+ *
+ * `character` — user uploaded this expecting the model to preserve
+ *               the person/subject's identity (face, build, outfit
+ *               cues). The composer adds an explicit cue prompt so
+ *               the LLM understands intent — even on providers that
+ *               don't have a native "identity" channel.
+ * `general`   — plain reference for composition / style / context.
+ *               Default when omitted to stay backward-compatible
+ *               with rows persisted before this change shipped. */
 interface UploadedRef {
   id: string;
   name: string;
   url: string;
   mime: string;
+  role?: "character" | "general";
 }
 
 interface StandaloneJobRow {
@@ -515,7 +532,21 @@ export default function StandaloneGenerator({
       if (slot === "image-ref") {
         const maxRefs = maxImageRefsForModel(form.model);
         updateForm({
-          imageRefs: [...form.imageRefs, uploaded].slice(0, maxRefs),
+          imageRefs: [...form.imageRefs, { ...uploaded, role: "general" }].slice(0, maxRefs),
+        });
+      } else if (slot === "image-character") {
+        /* Character upload — same `imageRefs` array as `image-ref`,
+         *  but tagged so the composer can promote it to Image 1 and
+         *  emit the identity-preservation cue prompt. We only allow
+         *  ONE active character ref at a time: a second character
+         *  upload replaces the first to keep the cue prompt
+         *  unambiguous (multiple characters needs a different UX). */
+        const maxRefs = maxImageRefsForModel(form.model);
+        const withoutPrevCharacter = form.imageRefs.filter(
+          (ref) => ref.role !== "character",
+        );
+        updateForm({
+          imageRefs: [{ ...uploaded, role: "character" }, ...withoutPrevCharacter].slice(0, maxRefs),
         });
       } else if (slot === "video-start") {
         updateForm({ videoStart: uploaded });
@@ -684,7 +715,9 @@ export default function StandaloneGenerator({
                 form={form}
                 onChange={updateForm}
                 uploading={uploading === "image-ref"}
+                uploadingCharacter={uploading === "image-character"}
                 onUpload={() => openUpload("image-ref")}
+                onUploadCharacter={() => openUpload("image-character")}
               />
             )}
             {activeTool === "video_gen" && (
@@ -1096,12 +1129,16 @@ function ImageControls({
   form,
   onChange,
   uploading,
+  uploadingCharacter,
   onUpload,
+  onUploadCharacter,
 }: {
   form: StandaloneFormState;
   onChange: (patch: Partial<StandaloneFormState>) => void;
   uploading: boolean;
+  uploadingCharacter: boolean;
   onUpload: () => void;
+  onUploadCharacter: () => void;
 }) {
   const isGpt = form.model === "gpt-image-2";
   const isSeedream = isSeedreamImageModel(form.model);
@@ -1128,7 +1165,9 @@ function ImageControls({
         refs={form.imageRefs}
         max={maxRefs}
         uploading={uploading}
+        uploadingCharacter={uploadingCharacter}
         onUpload={onUpload}
+        onUploadCharacter={onUploadCharacter}
         onRemove={(id) =>
           onChange({ imageRefs: form.imageRefs.filter((ref) => ref.id !== id) })
         }
@@ -1854,7 +1893,9 @@ function StyleReferenceTray({
   refs,
   max,
   uploading,
+  uploadingCharacter,
   onUpload,
+  onUploadCharacter,
   onRemove,
 }: {
   styleId: string;
@@ -1862,13 +1903,22 @@ function StyleReferenceTray({
   refs: UploadedRef[];
   max: number;
   uploading: boolean;
+  uploadingCharacter: boolean;
   onUpload: () => void;
+  onUploadCharacter: () => void;
   onRemove: (id: string) => void;
 }) {
   const [styleOpen, setStyleOpen] = useState(false);
   const selectedStyle =
     IMAGE_STYLE_PRESETS.find((preset) => preset.id === styleId) ??
     IMAGE_STYLE_PRESETS[0];
+  /* Character button toggles between "upload" (no active character)
+   *  and "active / replace" — when a character ref already exists,
+   *  the button shows the thumbnail with a violet ring so the user
+   *  can see the model has an identity to lock onto. Clicking it
+   *  again replaces the current character with a new upload. */
+  const characterRef = refs.find((ref) => ref.role === "character");
+  const characterActive = Boolean(characterRef);
 
   return (
     <div className="relative">
@@ -1877,7 +1927,12 @@ function StyleReferenceTray({
         <button
           type="button"
           onClick={() => setStyleOpen((open) => !open)}
-          className="flex h-[58px] w-[72px] flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-white/[0.12] bg-[#242424] text-zinc-300 outline-none transition hover:bg-[#2d2d2d] hover:text-white focus-visible:border-white/25"
+          className={cn(
+            "flex h-[58px] w-[72px] flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed text-zinc-300 outline-none transition hover:bg-[#2d2d2d] hover:text-white focus-visible:border-white/25",
+            selectedStyle.id !== "none"
+              ? "border-violet-400/50 bg-violet-500/10 text-violet-100"
+              : "border-white/[0.12] bg-[#242424]",
+          )}
         >
           <Sparkles className="h-4 w-4" />
           <span className="max-w-full truncate px-1 text-[11px] font-medium">
@@ -1886,16 +1941,39 @@ function StyleReferenceTray({
         </button>
         <button
           type="button"
-          onClick={onUpload}
-          disabled={uploading || refs.length >= max}
-          className="flex h-[58px] w-[72px] flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-white/[0.12] bg-[#242424] text-zinc-300 outline-none transition hover:bg-[#2d2d2d] hover:text-white focus-visible:border-white/25 disabled:opacity-60"
-        >
-          {uploading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <UserRound className="h-4 w-4" />
+          onClick={onUploadCharacter}
+          disabled={uploadingCharacter || (refs.length >= max && !characterActive)}
+          /* Active state: violet ring + thumb preview so the user
+           *  visually confirms identity is locked. Replacing? Click
+           *  the button again — the upload handler swaps the previous
+           *  character ref out. */
+          className={cn(
+            "relative flex h-[58px] w-[72px] flex-col items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-dashed text-zinc-300 outline-none transition focus-visible:border-white/25 disabled:opacity-60",
+            characterActive
+              ? "border-violet-400 bg-violet-500/15 text-violet-100"
+              : "border-white/[0.12] bg-[#242424] hover:bg-[#2d2d2d] hover:text-white",
           )}
-          <span className="text-[11px] font-medium">Character</span>
+          title={
+            characterActive
+              ? "Character locked — click to replace"
+              : "Upload a character/subject reference"
+          }
+        >
+          {characterActive && characterRef && (
+            <img
+              src={characterRef.url}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover opacity-30"
+            />
+          )}
+          <span className="relative flex flex-col items-center gap-1.5">
+            {uploadingCharacter ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <UserRound className="h-4 w-4" />
+            )}
+            <span className="text-[11px] font-medium">Character</span>
+          </span>
         </button>
         <button
           type="button"
@@ -1913,22 +1991,40 @@ function StyleReferenceTray({
       </div>
       {refs.length > 0 && (
         <div className="mt-2 grid grid-cols-4 gap-2">
-          {refs.slice(0, 8).map((ref) => (
-            <div
-              key={ref.id}
-              className="group relative aspect-square overflow-hidden rounded-lg bg-black/30"
-            >
-              <img src={ref.url} alt="" className="h-full w-full object-cover" />
-              <button
-                type="button"
-                onClick={() => onRemove(ref.id)}
-                className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded bg-black/70 text-zinc-200"
-                aria-label="Remove reference"
+          {refs.slice(0, 8).map((ref) => {
+            const isCharacter = ref.role === "character";
+            return (
+              <div
+                key={ref.id}
+                className={cn(
+                  "group relative aspect-square overflow-hidden rounded-lg bg-black/30",
+                  /* Visual thread: the badge on the thumbnail mirrors
+                   *  the violet hue on the Character button so the
+                   *  user can match thumb → role at a glance. */
+                  isCharacter && "ring-2 ring-violet-400/60",
+                )}
               >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          ))}
+                <img src={ref.url} alt="" className="h-full w-full object-cover" />
+                {isCharacter && (
+                  <span
+                    className="absolute left-1 top-1 flex items-center gap-0.5 rounded bg-violet-500/85 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white"
+                    title="Character reference — model will preserve identity"
+                  >
+                    <UserRound className="h-2.5 w-2.5" />
+                    Char
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onRemove(ref.id)}
+                  className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded bg-black/70 text-zinc-200"
+                  aria-label="Remove reference"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
       {styleOpen && (
@@ -2505,6 +2601,11 @@ function buildCurrentParams(
   form: StandaloneFormState,
 ): Record<string, unknown> | null {
   if (tool === "image_gen") {
+    /* Pass `hasCharacterRef` so the per-model prompt composer can
+     *  prepend the right identity-preservation cue (Banana / GPT
+     *  Image / SeedDream each phrase it slightly differently — see
+     *  `characterCueForModel` in the catalog). */
+    const hasCharacterRef = form.imageRefs.some((ref) => ref.role === "character");
     return buildImageParams({
       model: form.model,
       prompt: form.prompt,
@@ -2514,6 +2615,7 @@ function buildCurrentParams(
       quality: form.quality,
       outputFormat: form.outputFormat,
       background: form.background,
+      hasCharacterRef,
     });
   }
   if (tool === "video_gen") {
@@ -2558,11 +2660,20 @@ function buildCurrentInputs(
 ): Record<string, unknown> {
   if (tool === "image_gen") {
     if (form.imageRefs.length === 0) return {};
+    /* Promote character refs to the front of the array so the
+     *  provider sees them as Image 1 — the prompt cue
+     *  ("Use the person in Image 1 as the main subject") relies on
+     *  this ordering. Stable-sort: characters first, generals after,
+     *  preserving relative order within each group. */
+    const ordered = [
+      ...form.imageRefs.filter((ref) => ref.role === "character"),
+      ...form.imageRefs.filter((ref) => ref.role !== "character"),
+    ];
     return {
       ref_image:
-        form.imageRefs.length === 1
-          ? form.imageRefs[0].url
-          : form.imageRefs.map((ref) => ref.url),
+        ordered.length === 1
+          ? ordered[0].url
+          : ordered.map((ref) => ref.url),
     };
   }
   if (tool === "video_gen") {
