@@ -976,6 +976,7 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
    *
    *  Fallback `200px` covers the brief frame before the observer
    *  has fired so the prompt doesn't flash full-height. */
+  min-height: min(calc(3 * 1.5em), var(--ws-prompt-max-h, calc(3 * 1.5em))) !important;
   max-height: var(--ws-prompt-max-h, 200px) !important;
   overflow-y: auto !important;
   /* 1:2 (top fade : solid) — top third of the focused prompt fades

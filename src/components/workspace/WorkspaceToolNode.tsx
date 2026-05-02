@@ -92,6 +92,22 @@ const MULTI_GEN_NODE_TYPES = new Set([
   "bananaProNode",
   "klingVideoNode",
 ]);
+const PROMPT_TOOLBAR_FALLBACK_H = 28;
+const PROMPT_TOOLBAR_GAP = 20;
+const PROMPT_TOP_RESERVE_RATIO = 0.3;
+const PROMPT_TOP_RESERVE_MIN = 52;
+const PROMPT_MIN_EDIT_H = 38;
+const PROMPT_MAX_EDIT_H = 240;
+
+function computePromptMaxHeight(previewHeight: number, toolbarHeight: number): number {
+  const liftedBottom = Math.ceil(toolbarHeight) + PROMPT_TOOLBAR_GAP;
+  const topReserve = Math.max(
+    PROMPT_TOP_RESERVE_MIN,
+    Math.round(previewHeight * PROMPT_TOP_RESERVE_RATIO),
+  );
+  const available = Math.floor(previewHeight - liftedBottom - topReserve);
+  return Math.max(PROMPT_MIN_EDIT_H, Math.min(available, PROMPT_MAX_EDIT_H));
+}
 
 const NEW_ID = (): string =>
   globalThis.crypto?.randomUUID?.() ??
@@ -543,10 +559,12 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   // preview element. The CSS rule for `:hover`/`:selected`/
   // `:focus-within` then computes `bottom: calc(var(--ws-toolbar-h) +
   // gap)` so the prompt always parks just above whatever height the
-  // toolbar happens to be. Pure DOM mutation (no setState) so this
-  // can't trigger a render loop or React #185.
+  // toolbar happens to be. The same measurement also feeds the
+  // focused prompt height cap, so small resized nodes keep a real
+  // ceiling instead of letting text climb into the preview header.
   const previewRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const [promptMaxH, setPromptMaxH] = useState<number | null>(null);
   useEffect(() => {
     const target = toolbarRef.current;
     const root = previewRef.current;
@@ -557,8 +575,12 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         // padding is 0 so this == its visual height. Round up so
         // a sub-pixel size doesn't leave a 0.4px gap below the
         // text.
-        const h = Math.ceil(entry.contentRect.height);
+        const h = Math.ceil(entry.contentRect.height || PROMPT_TOOLBAR_FALLBACK_H);
+        const previewH = Math.ceil(root.getBoundingClientRect().height);
+        const promptCap = computePromptMaxHeight(previewH, h);
         root.style.setProperty("--ws-toolbar-h", `${h}px`);
+        root.style.setProperty("--ws-prompt-max-h", `${promptCap}px`);
+        setPromptMaxH(promptCap);
       }
     });
     ro.observe(target);
@@ -591,13 +613,16 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
    *  to PromptMentionTextarea as a prop and let it set
    *  `style.maxHeight` inline — that's the only way to outrank the
    *  Tailwind `max-h-[280px]` class baked into the editor. */
-  const [promptMaxH, setPromptMaxH] = useState<number | null>(null);
   useEffect(() => {
     const root = previewRef.current;
     if (!root) return;
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const h = Math.ceil(entry.contentRect.height);
+        const toolbarH = Math.ceil(
+          toolbarRef.current?.getBoundingClientRect().height ||
+            PROMPT_TOOLBAR_FALLBACK_H,
+        );
         root.style.setProperty("--ws-preview-h", `${h}px`);
         /* Compute the prompt's max-height in real px and publish it
          *  on TWO channels:
@@ -616,7 +641,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
          *    • Ceiling: 240px (~10 lines) so a tall portrait node
          *      (9:16) doesn't hand the user a 23-line wall — that
          *      felt as bad as the no-cap bug. */
-        const promptCap = Math.max(60, Math.min(Math.round(h * 0.7), 240));
+        const promptCap = computePromptMaxHeight(h, toolbarH);
+        root.style.setProperty("--ws-toolbar-h", `${toolbarH}px`);
         root.style.setProperty("--ws-prompt-max-h", `${promptCap}px`);
         setPromptMaxH(promptCap);
       }
