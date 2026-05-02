@@ -178,9 +178,9 @@ const CanvasFloatingSidebar = ({ onAddNode, onOpenSettings }: Props) => {
     // when the user aims at the gap above/below the pill.
     //
     <div
-      className="pointer-events-none fixed left-4 top-1/2 z-40 -translate-y-1/2 lg:left-3"
+      className="pointer-events-none fixed left-3 top-1/2 z-40 -translate-y-1/2 lg:left-2"
     >
-      <div className="pointer-events-auto flex flex-col items-center gap-1 rounded-full border border-zinc-800 bg-zinc-950/85 p-1 shadow-xl shadow-black/40 backdrop-blur">
+      <div className="pointer-events-auto flex flex-col items-center gap-0.5 rounded-full border border-zinc-800 bg-zinc-950/85 p-0.5 shadow-lg shadow-black/35 backdrop-blur">
         {BUTTONS.map((b, i) => (
           <SidebarButton
             key={b.id}
@@ -224,7 +224,7 @@ function SidebarButton({
   return (
     <div className="group relative">
       {button.divider && !isFirst && (
-        <div className="my-1 h-px w-6 self-center bg-zinc-800" />
+        <div className="my-0.5 h-px w-5 self-center bg-zinc-800" />
       )}
       <button
         type="button"
@@ -234,13 +234,13 @@ function SidebarButton({
         aria-label={label}
         aria-pressed={button.isMode ? isActive : undefined}
         className={cn(
-          "flex h-11 w-11 items-center justify-center rounded-full transition-colors lg:h-9 lg:w-9",
+          "flex h-9 w-9 items-center justify-center rounded-full transition-colors lg:h-8 lg:w-8",
           isActive
             ? "bg-zinc-200 text-zinc-900"
             : "text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100",
         )}
       >
-        <Icon className="h-4 w-4" />
+        <Icon className="h-3.5 w-3.5" />
       </button>
       {showTip && (
         <div className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded border border-zinc-700 bg-zinc-900/95 px-2 py-1 text-[11px] text-zinc-200 shadow-lg backdrop-blur">
@@ -281,9 +281,9 @@ function LanguageToggleButton({
         onMouseEnter={() => setShowTip(true)}
         onMouseLeave={() => setShowTip(false)}
         aria-label={targetLabel}
-        className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100 lg:h-9 lg:w-9"
+        className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100 lg:h-8 lg:w-8"
       >
-        <Languages className="h-4 w-4" />
+        <Languages className="h-3.5 w-3.5" />
       </button>
       {showTip && (
         <div className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded border border-zinc-700 bg-zinc-900/95 px-2 py-1 text-[11px] text-zinc-200 shadow-lg backdrop-blur">

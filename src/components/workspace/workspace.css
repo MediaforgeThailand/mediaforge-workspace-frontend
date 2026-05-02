@@ -22,7 +22,10 @@
 }
 
 .workspace-root .react-flow__viewport {
-  will-change: transform;
+  /* Avoid forcing the whole canvas into a long-lived bitmap layer.
+   * Chrome can keep transformed text rasterized for a moment after
+   * zooming, which made node titles look blurry before snapping sharp. */
+  will-change: auto;
 }
 
 /* ── Radial-masked grid background ────────────────────────── */
@@ -465,7 +468,7 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   /* Reserve space above the body for the floating title — keeps
    * adjacent nodes from overlapping the label region when nodes
    * are placed close together. */
-  padding-top: 30px;
+  padding-top: 36px;
 }
 
 .ws-clean-title {
@@ -473,11 +476,11 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   top: 2px;
   left: 4px;
   right: 4px;
-  height: 24px;
+  height: 30px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 5px;
+  gap: 9px;
+  padding: 0 6px;
   pointer-events: none; /* re-enabled on the input below */
 }
 .ws-clean-title-icon {
@@ -485,8 +488,8 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
    * (Film vs Image vs Music vs Box) reads at canvas zoom. The
    * tint comes from inline `style.color` on the icon element so
    * each AssetNode broadcasts its fieldType in the title. */
-  width: 17px;
-  height: 17px;
+  width: 19px;
+  height: 19px;
   flex-shrink: 0;
   opacity: 1;
   color: hsl(0 0% 92%) !important;
@@ -498,15 +501,19 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   background: transparent;
   border: none;
   outline: none;
-  font-size: 15.5px;
-  line-height: 20px;
+  font-size: 18.5px;
+  line-height: 24px;
   font-weight: 700;
   color: hsl(0 0% 100%);
   text-overflow: ellipsis;
   white-space: nowrap;
   overflow: hidden;
   pointer-events: auto; /* override the wrapper's pointer-events: none */
-  text-shadow: 0 1px 2px hsl(0 0% 0% / 0.85);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+  text-shadow:
+    0 1px 1px hsl(0 0% 0% / 0.85),
+    0 0 2px hsl(0 0% 0% / 0.55);
 }
 .ws-clean-title-input::placeholder {
   color: hsl(0 0% 72%);
@@ -538,7 +545,10 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   resize: none;
   color: hsl(0 0% 90%);
   font-family: inherit;
+  font-size: 15.5px;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
 }
 .ws-clean-textarea::placeholder,
 .ws-clean-textarea [data-placeholder]::before {
@@ -582,10 +592,10 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   border-color: hsl(0 0% 55%);
 }
 
-/* Tiny credit-cost badge that sits inside the floating title row. */
+/* Credit-cost badge that sits inside the floating title row. */
 .ws-compact-header-badge {
-  font-size: 12px;
-  line-height: 16px;
+  font-size: 13px;
+  line-height: 18px;
   font-weight: 700;
   color: hsl(258 90% 78%);
   background: hsl(258 90% 50% / 0.15);
@@ -880,7 +890,7 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   outline: none !important;
   resize: none;
   color: hsl(0 0% 98%);
-  font-size: 12px;
+  font-size: 15.5px;
   /* Tightened line-height + clean line-count snapping. Previous
    * `max-height: 4.4em` with `line-height: 1.45` rounded out at
    * ~3.04 lines, leaving a SLIVER of a 4th line clipped at the
@@ -891,7 +901,9 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
    * always lands on a clean baseline. */
   line-height: 1.5;
   font-family: inherit;
-  font-weight: 500;
+  font-weight: 550;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
   /* Resting state — fixed 3-line box so:
    *   1. The placeholder ::before (anchored at `bottom: 0`)
    *      ALWAYS has 3 lines of room above the baseline. The
@@ -1049,9 +1061,11 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   outline: none;
   resize: none;
   color: hsl(0 0% 90%);
-  font-size: 11.5px;
+  font-size: 15px;
   line-height: 1.45;
   font-family: inherit;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
 }
 .ws-compact-prompt textarea::placeholder,
 .ws-compact-prompt .ws-compact-prompt-input::placeholder {

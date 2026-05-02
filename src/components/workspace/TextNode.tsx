@@ -99,7 +99,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
           // legacy `inputNode` so a flow imported from the main
           // editor still resolves its mentions here.
           allowedNodeTypes={["assetNode", "inputNode"]}
-          className="ws-clean-textarea min-h-[110px] text-xs leading-relaxed text-zinc-100"
+          className="ws-clean-textarea min-h-[110px] text-[15.5px] leading-relaxed text-zinc-100"
         />
 
         {mentionCount > 0 && (
