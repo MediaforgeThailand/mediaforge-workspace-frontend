@@ -28,7 +28,7 @@
  * for the Spaces tab — already battle-tested for cross-device sync.
  */
 
-import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -142,6 +142,10 @@ const PREVIEW_HYDRATION_BATCH_DELAY_MS = 90;
 const MINIMAP_NODE_LIMIT = 80;
 const MINIMAP_EDGE_LIMIT = 96;
 const MINIMAP_IMAGE_LIMIT = 18;
+const PREVIEW_CACHE_PREFIX = "mf:workspace-preview:";
+const PREVIEW_CACHE_INDEX_KEY = `${PREVIEW_CACHE_PREFIX}index`;
+const PREVIEW_CACHE_MAX_ITEMS = 80;
+const PREVIEW_CACHE_MAX_DATA_URI_LENGTH = 240_000;
 
 type PreviewCanvasMeta = {
   id: string;
@@ -189,6 +193,60 @@ function graphHasPreviewContent(
   graph: { nodes?: unknown[]; edges?: unknown[] } | undefined,
 ): boolean {
   return (graph?.nodes?.length ?? 0) > 0;
+}
+
+function stableHash(input: string): string {
+  let hash = 5381;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = ((hash << 5) + hash) ^ input.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function readPreviewCache(cacheKey: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(PREVIEW_CACHE_PREFIX + stableHash(cacheKey));
+  } catch {
+    return null;
+  }
+}
+
+function writePreviewCache(cacheKey: string, dataUri: string): void {
+  if (typeof window === "undefined") return;
+  if (dataUri.length > PREVIEW_CACHE_MAX_DATA_URI_LENGTH) return;
+
+  const storageKey = PREVIEW_CACHE_PREFIX + stableHash(cacheKey);
+  try {
+    window.localStorage.setItem(storageKey, dataUri);
+    const raw = window.localStorage.getItem(PREVIEW_CACHE_INDEX_KEY);
+    const existing = raw ? (JSON.parse(raw) as unknown) : [];
+    const index = Array.isArray(existing)
+      ? existing.filter((item): item is string => typeof item === "string")
+      : [];
+    const next = [storageKey, ...index.filter((item) => item !== storageKey)];
+    for (const oldKey of next.slice(PREVIEW_CACHE_MAX_ITEMS)) {
+      window.localStorage.removeItem(oldKey);
+    }
+    window.localStorage.setItem(
+      PREVIEW_CACHE_INDEX_KEY,
+      JSON.stringify(next.slice(0, PREVIEW_CACHE_MAX_ITEMS)),
+    );
+  } catch {
+    try {
+      window.localStorage.removeItem(storageKey);
+    } catch {
+      // Ignore storage quota / privacy mode failures. The UI can still render live.
+    }
+  }
+}
+
+function escapeSvgText(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function selectMinimapNodes(nodes: MiniNode[]): MiniNode[] {
@@ -1432,6 +1490,7 @@ interface SpaceCardData {
   ownerId?: string | null;
   name: string;
   updatedAt: number;
+  previewCacheKey: string;
   tabCount: number;
   nodes: MiniNode[];
   edges: MiniEdge[];
@@ -1555,7 +1614,11 @@ const SpacesShowcaseCard = ({
               className="group/space flex min-w-0 flex-col gap-2 rounded-xl bg-[hsl(0_0%_4%)] p-1.5 transition-all hover:bg-white/[0.04]"
             >
               <div className="aspect-[4/3] overflow-hidden rounded-lg bg-[hsl(0_0%_2%)]">
-                <CanvasMinimap nodes={ws.nodes} edges={ws.edges} />
+                <CanvasMinimap
+                  cacheKey={ws.previewCacheKey}
+                  nodes={ws.nodes}
+                  edges={ws.edges}
+                />
               </div>
               <div className="px-1 pb-0.5 text-left">
                 <div className="truncate text-[14.5px] font-medium text-zinc-100">
@@ -1754,11 +1817,14 @@ function buildSpaceCardData(
     source: String(e.source),
     target: String(e.target),
   }));
+  const graphVersion =
+    (graph as { updatedAt?: number } | null | undefined)?.updatedAt ?? ws.updatedAt;
   return {
     id: ws.id,
     ownerId: ws.ownerId ?? null,
     name: ws.name,
     updatedAt: ws.updatedAt,
+    previewCacheKey: `${previewCanvasId ?? ws.id}:${graphVersion}:${nodes.length}:${edges.length}`,
     tabCount: wsCanvases.length,
     nodes,
     edges,
@@ -2616,7 +2682,11 @@ const SpaceCard = memo(function SpaceCard({
       >
         <div className="relative aspect-[16/10] overflow-hidden bg-[hsl(0_0%_5%)]">
           {renderPreview ? (
-            <CanvasMinimap nodes={ws.nodes} edges={ws.edges} />
+            <CanvasMinimap
+              cacheKey={ws.previewCacheKey}
+              nodes={ws.nodes}
+              edges={ws.edges}
+            />
           ) : (
             <div className="h-full w-full bg-[hsl(0_0%_5%)]" />
           )}
@@ -2867,20 +2937,12 @@ const NODE_FILL: Record<string, string> = {
 };
 const TOOL_FILL = "hsl(220 15% 18%)";
 
-const CanvasMinimap = memo(function CanvasMinimap({
-  nodes,
-  edges,
-}: {
-  nodes: MiniNode[];
-  edges: MiniEdge[];
-}) {
-  const svgUid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
-  const dotsId = `mm-dots-${svgUid}`;
-
-  if (nodes.length === 0) {
-    return <div className="h-full w-full bg-[hsl(0_0%_5%)]" />;
-  }
-
+function buildMinimapDataUri(
+  cacheKey: string,
+  nodes: MiniNode[],
+  edges: MiniEdge[],
+): string | null {
+  if (nodes.length === 0) return null;
   const previewNodes = selectMinimapNodes(nodes);
   const previewNodeIds = new Set(previewNodes.map((node) => node.id));
   const previewEdges = edges
@@ -2890,135 +2952,97 @@ const CanvasMinimap = memo(function CanvasMinimap({
   const minY = Math.min(...nodes.map((n) => n.y));
   const maxX = Math.max(...nodes.map((n) => n.x + n.w));
   const maxY = Math.max(...nodes.map((n) => n.y + n.h));
-  const span = Math.max(maxX - minX, maxY - minY);
+  const span = Math.max(maxX - minX, maxY - minY, 1);
   const pad = span * 0.06;
   const vbX = minX - pad;
   const vbY = minY - pad;
-  const vbW = maxX - minX + pad * 2;
-  const vbH = maxY - minY + pad * 2;
+  const vbW = Math.max(maxX - minX + pad * 2, 1);
+  const vbH = Math.max(maxY - minY + pad * 2, 1);
 
   const byId = new Map(previewNodes.map((n) => [n.id, n] as const));
   const centerOf = (n: MiniNode) => ({ x: n.x + n.w / 2, y: n.y + n.h / 2 });
-
   const strokeW = Math.max(span * 0.004, 1);
   const nodeStroke = Math.max(span * 0.0015, 0.5);
   const cornerR = Math.max(span * 0.018, 6);
+  const seed = stableHash(cacheKey);
+  const dotsId = `mm-dots-${seed}`;
 
-  return (
-    <svg
-      viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}
-      preserveAspectRatio="xMidYMid meet"
-      className="h-full w-full"
-      style={{ background: "hsl(0 0% 4%)" }}
-    >
+  const edgeSvg = previewEdges.map((e, i) => {
+    const a = byId.get(e.source);
+    const b = byId.get(e.target);
+    if (!a || !b) return "";
+    const A = centerOf(a);
+    const B = centerOf(b);
+    const dx = B.x - A.x;
+    const offset = Math.max(Math.abs(dx) * 0.4, span * 0.02);
+    return `<path data-i="${i}" d="M ${A.x},${A.y} C ${A.x + offset},${A.y} ${B.x - offset},${B.y} ${B.x},${B.y}" />`;
+  }).join("");
+
+  const nodeSvg = previewNodes.map((n) => {
+    const isGroup = n.type === "groupNode";
+    const fill = NODE_FILL[n.type ?? ""] ?? TOOL_FILL;
+    const baseStroke = isGroup ? "hsl(0 0% 100% / 0.18)" : "hsl(0 0% 100% / 0.10)";
+    const dash = isGroup ? ` stroke-dasharray="${strokeW * 3} ${strokeW * 2}"` : "";
+
+    if (n.imageUrl) {
+      const clipId = `mm-clip-${seed}-${stableHash(n.id)}`;
+      return `
+        <g>
+          <clipPath id="${clipId}">
+            <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${cornerR}" ry="${cornerR}" />
+          </clipPath>
+          <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${cornerR}" ry="${cornerR}" fill="${fill}" stroke="${baseStroke}"${dash} stroke-width="${nodeStroke}" />
+          <image href="${escapeSvgText(n.imageUrl)}" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clipId})" />
+          <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${cornerR}" ry="${cornerR}" fill="none" stroke="hsl(0 0% 100% / 0.14)" stroke-width="${nodeStroke}" />
+        </g>`;
+    }
+
+    return `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${cornerR}" ry="${cornerR}" fill="${isGroup ? "transparent" : fill}" stroke="${isGroup ? "hsl(220 15% 28%)" : "hsl(0 0% 100% / 0.10)"}" stroke-width="${nodeStroke}" />`;
+  }).join("");
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="${vbX} ${vbY} ${vbW} ${vbH}" preserveAspectRatio="xMidYMid meet">
+      <rect x="${vbX}" y="${vbY}" width="${vbW}" height="${vbH}" fill="hsl(0 0% 4%)" />
       <defs>
-        <pattern
-          id={dotsId}
-          width={Math.max(span * 0.025, 8)}
-          height={Math.max(span * 0.025, 8)}
-          patternUnits="userSpaceOnUse"
-        >
-          <circle
-            cx={0}
-            cy={0}
-            r={Math.max(span * 0.0012, 0.4)}
-            fill="hsl(0 0% 11%)"
-          />
+        <pattern id="${dotsId}" width="${Math.max(span * 0.025, 8)}" height="${Math.max(span * 0.025, 8)}" patternUnits="userSpaceOnUse">
+          <circle cx="0" cy="0" r="${Math.max(span * 0.0012, 0.4)}" fill="hsl(0 0% 11%)" />
         </pattern>
       </defs>
-      <rect x={vbX} y={vbY} width={vbW} height={vbH} fill={`url(#${dotsId})`} />
+      <rect x="${vbX}" y="${vbY}" width="${vbW}" height="${vbH}" fill="url(#${dotsId})" />
+      <g stroke="hsl(258 60% 65%)" stroke-opacity="0.55" stroke-width="${strokeW}" fill="none">${edgeSvg}</g>
+      <g>${nodeSvg}</g>
+    </svg>`;
 
-      <g stroke="hsl(258 60% 65%)" strokeOpacity={0.55} strokeWidth={strokeW} fill="none">
-        {previewEdges.map((e, i) => {
-          const a = byId.get(e.source);
-          const b = byId.get(e.target);
-          if (!a || !b) return null;
-          const A = centerOf(a);
-          const B = centerOf(b);
-          const dx = B.x - A.x;
-          const offset = Math.max(Math.abs(dx) * 0.4, span * 0.02);
-          return (
-            <path
-              key={i}
-              d={`M ${A.x},${A.y} C ${A.x + offset},${A.y} ${B.x - offset},${B.y} ${B.x},${B.y}`}
-            />
-          );
-        })}
-      </g>
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
 
-      <g>
-        {previewNodes.map((n) => {
-          const isGroup = n.type === "groupNode";
-          const fill = NODE_FILL[n.type ?? ""] ?? TOOL_FILL;
+const CanvasMinimap = memo(function CanvasMinimap({
+  cacheKey,
+  nodes,
+  edges,
+}: {
+  cacheKey: string;
+  nodes: MiniNode[];
+  edges: MiniEdge[];
+}) {
+  const src = useMemo(() => {
+    if (nodes.length === 0) return null;
+    const cached = readPreviewCache(cacheKey);
+    if (cached) return cached;
+    const generated = buildMinimapDataUri(cacheKey, nodes, edges);
+    if (generated) writePreviewCache(cacheKey, generated);
+    return generated;
+  }, [cacheKey, nodes, edges]);
 
-          if (n.imageUrl) {
-            const clipId = `mm-clip-${svgUid}-${n.id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
-            return (
-              <g key={n.id}>
-                <defs>
-                  <clipPath id={clipId}>
-                    <rect
-                      x={n.x}
-                      y={n.y}
-                      width={n.w}
-                      height={n.h}
-                      rx={cornerR}
-                      ry={cornerR}
-                    />
-                  </clipPath>
-                </defs>
-                <rect
-                  x={n.x}
-                  y={n.y}
-                  width={n.w}
-                  height={n.h}
-                  rx={cornerR}
-                  ry={cornerR}
-                  fill={fill}
-                  stroke={isGroup ? "hsl(0 0% 100% / 0.18)" : "hsl(0 0% 100% / 0.10)"}
-                  strokeDasharray={isGroup ? `${strokeW * 3} ${strokeW * 2}` : undefined}
-                  strokeWidth={nodeStroke}
-                />
-                <image
-                  href={n.imageUrl}
-                  x={n.x}
-                  y={n.y}
-                  width={n.w}
-                  height={n.h}
-                  preserveAspectRatio="xMidYMid slice"
-                  clipPath={`url(#${clipId})`}
-                />
-                <rect
-                  x={n.x}
-                  y={n.y}
-                  width={n.w}
-                  height={n.h}
-                  rx={cornerR}
-                  ry={cornerR}
-                  fill="none"
-                  stroke="hsl(0 0% 100% / 0.14)"
-                  strokeWidth={nodeStroke}
-                />
-              </g>
-            );
-          }
+  if (!src) return <div className="h-full w-full bg-[hsl(0_0%_5%)]" />;
 
-          return (
-            <rect
-              key={n.id}
-              x={n.x}
-              y={n.y}
-              width={n.w}
-              height={n.h}
-              rx={cornerR}
-              ry={cornerR}
-              fill={isGroup ? "transparent" : fill}
-              stroke={isGroup ? "hsl(220 15% 28%)" : "hsl(0 0% 100% / 0.10)"}
-              strokeWidth={nodeStroke}
-            />
-          );
-        })}
-      </g>
-    </svg>
+  return (
+    <img
+      src={src}
+      alt=""
+      decoding="async"
+      draggable={false}
+      className="h-full w-full object-cover"
+    />
   );
 });
