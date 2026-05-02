@@ -16,9 +16,14 @@ import {
   Bookmark,
   UserPlus,
   Users,
+  Activity,
+  Building2,
+  Clock3,
   ExternalLink,
   KeyRound,
   CreditCard,
+  ReceiptText,
+  Wallet,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -373,6 +378,75 @@ interface TeamStatusMembership {
   } | null;
 }
 
+interface TeamConsoleOverview {
+  organization?: TeamStatusMembership["organization"] & {
+    slug?: string | null;
+    type?: string | null;
+    created_at?: string | null;
+  };
+  members?: Array<TeamStatusMembership & {
+    user_id: string;
+    email?: string | null;
+    display_name?: string | null;
+    last_active_at?: string | null;
+    last_sign_in_at?: string | null;
+    last_activity_type?: string | null;
+  }>;
+  teams?: Array<NonNullable<TeamStatusMembership["team"]> & {
+    member_count?: number;
+    credit_policy?: string | null;
+    credit_amount?: number | null;
+    created_at?: string | null;
+  }>;
+  payments?: Array<{
+    id: string;
+    user_id?: string | null;
+    email?: string | null;
+    display_name?: string | null;
+    amount_thb?: number | null;
+    credits_added?: number | null;
+    status?: string | null;
+    payment_method?: string | null;
+    created_at?: string | null;
+  }>;
+  generations?: Array<{
+    id: string;
+    user_id?: string | null;
+    class_id?: string | null;
+    email?: string | null;
+    display_name?: string | null;
+    feature?: string | null;
+    model?: string | null;
+    provider?: string | null;
+    credits_spent?: number | null;
+    status?: string | null;
+    created_at?: string | null;
+  }>;
+  pool_transactions?: Array<{
+    id: string;
+    user_id?: string | null;
+    class_id?: string | null;
+    organization_id?: string | null;
+    triggered_by?: string | null;
+    actor_email?: string | null;
+    actor_display_name?: string | null;
+    amount?: number | null;
+    reason?: string | null;
+    description?: string | null;
+    created_at?: string | null;
+  }>;
+  usage_summary?: {
+    payment_count?: number;
+    topup_amount_thb_total?: number;
+    topup_credits_total?: number;
+    generation_count?: number;
+    generation_count_30d?: number;
+    generation_credits_total?: number;
+    generation_credits_30d?: number;
+  };
+  seat_price_usd?: number;
+}
+
 async function functionErrorMessage(error: unknown): Promise<string> {
   const fallback = error instanceof Error ? error.message : String(error || "Request failed");
   const response = (error as { context?: Response } | null)?.context;
@@ -390,6 +464,7 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [memberships, setMemberships] = useState<TeamStatusMembership[]>([]);
+  const [overview, setOverview] = useState<TeamConsoleOverview | null>(null);
   const [canOpenConsole, setCanOpenConsole] = useState(false);
   const [openingConsole, setOpeningConsole] = useState(false);
   const adminConsoleUrl =
@@ -419,6 +494,24 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
     };
     setMemberships(payload.memberships ?? []);
     setCanOpenConsole(Boolean(payload.can_open_admin_console));
+    if (payload.can_open_admin_console) {
+      const { data: overviewData, error: overviewError } = await supabase.functions.invoke("workspace_org_console", {
+        body: { action: "get_console_overview" },
+      });
+      if (overviewError) {
+        const description = await functionErrorMessage(overviewError);
+        toast({
+          title: "Could not load team dashboard",
+          description,
+          variant: "destructive",
+        });
+        setOverview(null);
+      } else {
+        setOverview((overviewData?.data ?? overviewData) as TeamConsoleOverview);
+      }
+    } else {
+      setOverview(null);
+    }
     setLoading(false);
   };
 
@@ -461,6 +554,43 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
   const active = memberships.find((m) => m.status === "active");
   const pending = memberships.find((m) => m.status === "pending" || m.status === "invited");
   const formatCredits = (value: unknown) => new Intl.NumberFormat("en-US").format(Number(value ?? 0));
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return "No activity yet";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "No activity yet";
+    return new Intl.DateTimeFormat("th-TH", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(date);
+  };
+  const formatRelative = (value?: string | null) => {
+    if (!value) return "never";
+    const then = new Date(value).getTime();
+    if (!Number.isFinite(then)) return "never";
+    const diff = Date.now() - then;
+    const minutes = Math.max(0, Math.floor(diff / 60000));
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
+  const onlineWindowMs = 10 * 60 * 1000;
+  const teamById = new Map((overview?.teams ?? []).map((team) => [team.id, team]));
+  const orgName = overview?.organization?.display_name || overview?.organization?.name || active?.organization?.display_name || active?.organization?.name || "your organization";
+  const members = overview?.members ?? [];
+  const teams = overview?.teams ?? [];
+  const activeMembers = members.filter((member) => member.status === "active");
+  const onlineMembers = activeMembers.filter((member) => {
+    const t = new Date(member.last_active_at ?? member.last_sign_in_at ?? "").getTime();
+    return Number.isFinite(t) && Date.now() - t <= onlineWindowMs;
+  });
+  const organizationCredits = overview?.organization?.credit_available ?? active?.organization?.credit_available ?? active?.organization?.credit_pool ?? 0;
+  const generationCredits30d = overview?.usage_summary?.generation_credits_30d ?? 0;
+  const allocationTransactions = (overview?.pool_transactions ?? [])
+    .filter((tx) => ["class_pool_allocation", "class_pool_revoked", "org_pool_allocation", "org_pool_revoked", "org_pool_topup"].includes(String(tx.reason ?? "")))
+    .slice(0, 8);
 
   if (loading) {
     return (
@@ -503,54 +633,217 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
   }
 
   return (
-    <div className="max-w-5xl space-y-[24px]">
-      <div>
-        <h2 className="text-[23px] font-semibold leading-[28px] text-zinc-50">Team</h2>
-        <p className="mt-[8px] text-[16px] leading-[24px] text-zinc-200">
-          Your account is connected to {active.organization?.display_name || active.organization?.name || "your organization"}.
-        </p>
+    <div className="w-full max-w-[1480px] space-y-[22px] pr-[24px]">
+      <div className="flex flex-col gap-[12px] lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-[13px] font-semibold uppercase tracking-[0.08em] text-zinc-500">Team dashboard</p>
+          <h2 className="mt-[6px] text-[27px] font-semibold leading-[34px] text-zinc-50">{orgName}</h2>
+          <p className="mt-[8px] text-[16px] leading-[24px] text-zinc-300">
+            Shared credits, team pools, member presence, and recent credit movements for this organization.
+          </p>
+        </div>
+        {canOpenConsole ? (
+          <Button className="h-[40px] w-fit px-[15px] text-[14px]" onClick={openAdminConsole} disabled={openingConsole}>
+            {openingConsole ? (
+              <Loader2 className="mr-[8px] h-[16px] w-[16px] animate-spin" />
+            ) : (
+              <ExternalLink className="mr-[8px] h-[16px] w-[16px]" />
+            )}
+            Open Admin Console
+          </Button>
+        ) : null}
       </div>
 
-      <div className="grid gap-[16px] md:grid-cols-3">
+      <div className="grid gap-[14px] md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-lg border border-white/10 bg-white/[0.03] p-[16px]">
-          <div className="text-[14px] font-medium leading-[18px] text-zinc-200">Shared credits</div>
-          <div className="mt-[10px] text-[24px] font-semibold leading-[30px] text-zinc-50">
-            {formatCredits(active.organization?.credit_available ?? active.organization?.credit_pool ?? 0)}
+          <div className="flex items-center gap-[8px] text-[14px] font-medium leading-[18px] text-zinc-200">
+            <Wallet className="h-[17px] w-[17px] text-sky-300" />
+            Shared credits
           </div>
-          <div className="mt-[6px] text-[13.5px] leading-[18px] text-zinc-300">Organization pool</div>
+          <div className="mt-[10px] text-[27px] font-semibold leading-[34px] text-zinc-50">
+            {formatCredits(organizationCredits)}
+          </div>
+          <div className="mt-[6px] text-[14px] leading-[19px] text-zinc-300">Available in organization pool</div>
         </div>
         <div className="rounded-lg border border-white/10 bg-white/[0.03] p-[16px]">
-          <div className="text-[14px] font-medium leading-[18px] text-zinc-200">Team</div>
-          <div className="mt-[10px] text-[22px] font-semibold leading-[28px] text-zinc-50">
-            {active.team?.name || "Company pool"}
+          <div className="flex items-center gap-[8px] text-[14px] font-medium leading-[18px] text-zinc-200">
+            <Building2 className="h-[17px] w-[17px] text-violet-300" />
+            Teams
           </div>
-          <div className="mt-[6px] text-[13.5px] leading-[18px] text-zinc-300">
-            {active.team
-              ? `${formatCredits(active.team.credit_available ?? 0)} credits`
-              : "No sub-team assigned"}
+          <div className="mt-[10px] text-[27px] font-semibold leading-[34px] text-zinc-50">
+            {formatCredits(Math.max(1, teams.length || (active.team ? 1 : 0)))}
           </div>
+          <div className="mt-[6px] text-[14px] leading-[19px] text-zinc-300">Includes the company pool</div>
         </div>
         <div className="rounded-lg border border-white/10 bg-white/[0.03] p-[16px]">
-          <div className="text-[14px] font-medium leading-[18px] text-zinc-200">Access</div>
-          <div className="mt-[10px] text-[22px] font-semibold leading-[28px] text-zinc-50">
-            {active.role === "org_admin" ? "Admin" : "Member"}
+          <div className="flex items-center gap-[8px] text-[14px] font-medium leading-[18px] text-zinc-200">
+            <Activity className="h-[17px] w-[17px] text-emerald-300" />
+            Online now
           </div>
-          <div className="mt-[6px] text-[13.5px] leading-[18px] text-zinc-300">{active.status} - $5 / seat</div>
+          <div className="mt-[10px] text-[27px] font-semibold leading-[34px] text-zinc-50">
+            {formatCredits(onlineMembers.length)}
+          </div>
+          <div className="mt-[6px] text-[14px] leading-[19px] text-zinc-300">{formatCredits(activeMembers.length)} active seats</div>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-[16px]">
+          <div className="flex items-center gap-[8px] text-[14px] font-medium leading-[18px] text-zinc-200">
+            <ReceiptText className="h-[17px] w-[17px] text-amber-300" />
+            Credits used 30d
+          </div>
+          <div className="mt-[10px] text-[27px] font-semibold leading-[34px] text-zinc-50">
+            {formatCredits(generationCredits30d)}
+          </div>
+          <div className="mt-[6px] text-[14px] leading-[19px] text-zinc-300">
+            {formatCredits(overview?.usage_summary?.generation_count_30d ?? 0)} generations
+          </div>
         </div>
       </div>
 
-      {canOpenConsole ? (
-        <Button className="h-[36px] px-[14px] text-[14px]" onClick={openAdminConsole} disabled={openingConsole}>
-          {openingConsole ? (
-            <Loader2 className="mr-[8px] h-[16px] w-[16px] animate-spin" />
-          ) : (
-            <ExternalLink className="mr-[8px] h-[16px] w-[16px]" />
-          )}
-          Open Admin Console
-        </Button>
+      {overview ? (
+        <>
+          <section className="space-y-[12px]">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[18px] font-semibold leading-[24px] text-zinc-50">Teams and credit pools</h3>
+              <p className="text-[14px] leading-[20px] text-zinc-500">Organization: {orgName}</p>
+            </div>
+            <div className="grid gap-[14px] lg:grid-cols-2 2xl:grid-cols-3">
+              <div className="rounded-lg border border-white/10 bg-white/[0.035] p-[16px]">
+                <div className="flex items-start justify-between gap-[12px]">
+                  <div>
+                    <h4 className="text-[17px] font-semibold leading-[23px] text-zinc-50">Company pool</h4>
+                    <p className="mt-[4px] text-[14px] leading-[20px] text-zinc-400">{orgName}</p>
+                  </div>
+                  <Badge className="bg-emerald-400/15 text-emerald-200 hover:bg-emerald-400/15">active</Badge>
+                </div>
+                <div className="mt-[16px] grid grid-cols-2 gap-[10px]">
+                  <div className="rounded-md bg-black/25 p-[10px]">
+                    <div className="text-[12.5px] text-zinc-500">Available</div>
+                    <div className="mt-[4px] text-[18px] font-semibold text-zinc-50">{formatCredits(overview.organization?.credit_available ?? 0)}</div>
+                  </div>
+                  <div className="rounded-md bg-black/25 p-[10px]">
+                    <div className="text-[12.5px] text-zinc-500">Allocated</div>
+                    <div className="mt-[4px] text-[18px] font-semibold text-zinc-50">{formatCredits(overview.organization?.credit_pool_allocated ?? 0)}</div>
+                  </div>
+                </div>
+              </div>
+              {teams.map((team) => {
+                const pool = Number(team.credit_pool ?? 0);
+                const used = Number(team.credit_pool_consumed ?? 0);
+                const percent = pool > 0 ? Math.min(100, Math.round((used / pool) * 100)) : 0;
+                return (
+                  <div key={team.id} className="rounded-lg border border-white/10 bg-white/[0.035] p-[16px]">
+                    <div className="flex items-start justify-between gap-[12px]">
+                      <div>
+                        <h4 className="text-[17px] font-semibold leading-[23px] text-zinc-50">{team.name}</h4>
+                        <p className="mt-[4px] text-[14px] leading-[20px] text-zinc-400">{team.code || orgName}</p>
+                      </div>
+                      <Badge className="bg-zinc-800 text-zinc-200 hover:bg-zinc-800">{team.status}</Badge>
+                    </div>
+                    <div className="mt-[16px] h-[8px] overflow-hidden rounded-full bg-zinc-800">
+                      <div className="h-full rounded-full bg-sky-400" style={{ width: `${percent}%` }} />
+                    </div>
+                    <div className="mt-[10px] flex flex-wrap items-center justify-between gap-[8px] text-[13.5px] leading-[18px] text-zinc-300">
+                      <span>{formatCredits(used)} used / {formatCredits(pool)}</span>
+                      <span>{formatCredits(team.member_count ?? 0)} members</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="grid gap-[14px] xl:grid-cols-[minmax(0,1.4fr)_minmax(360px,0.8fr)]">
+            <div className="rounded-lg border border-white/10 bg-white/[0.03]">
+              <div className="flex items-center justify-between border-b border-white/10 p-[16px]">
+                <div>
+                  <h3 className="text-[18px] font-semibold leading-[24px] text-zinc-50">Members</h3>
+                  <p className="mt-[3px] text-[14px] text-zinc-400">Status, team, access level, and latest activity.</p>
+                </div>
+                <Badge className="bg-white/10 text-zinc-200 hover:bg-white/10">{formatCredits(members.length)} accounts</Badge>
+              </div>
+              <div className="divide-y divide-white/10">
+                {members.slice(0, 10).map((member) => {
+                  const last = member.last_active_at ?? member.last_sign_in_at ?? member.updated_at;
+                  const lastTime = last ? new Date(last).getTime() : 0;
+                  const isOnline = Number.isFinite(lastTime) && Date.now() - lastTime <= onlineWindowMs;
+                  const team = member.team_id ? teamById.get(member.team_id) : null;
+                  return (
+                    <div key={member.id} className="grid gap-[12px] p-[14px] md:grid-cols-[minmax(220px,1.2fr)_minmax(160px,0.8fr)_minmax(120px,0.5fr)_minmax(180px,0.8fr)] md:items-center">
+                      <div>
+                        <div className="text-[15px] font-semibold leading-[21px] text-zinc-50">
+                          {member.display_name || member.email || member.user_id}
+                        </div>
+                        <div className="text-[13.5px] leading-[19px] text-zinc-400">{member.email || "No email"}</div>
+                      </div>
+                      <div className="text-[14px] leading-[20px] text-zinc-300">
+                        <span className="text-zinc-500">Team</span>
+                        <div className="font-medium text-zinc-100">{team?.name || "Company pool"}</div>
+                      </div>
+                      <div>
+                        <Badge className={cn(
+                          "gap-[6px] hover:bg-transparent",
+                          isOnline ? "bg-emerald-400/12 text-emerald-200" : "bg-zinc-800 text-zinc-300",
+                        )}>
+                          <span className={cn("h-[7px] w-[7px] rounded-full", isOnline ? "bg-emerald-300" : "bg-zinc-500")} />
+                          {isOnline ? "active" : "offline"}
+                        </Badge>
+                        <div className="mt-[6px] text-[12.5px] text-zinc-500">{member.role === "org_admin" ? "Admin" : "Member"}</div>
+                      </div>
+                      <div className="text-[13.5px] leading-[19px] text-zinc-300">
+                        <div className="flex items-center gap-[6px]">
+                          <Clock3 className="h-[14px] w-[14px] text-zinc-500" />
+                          {formatRelative(last)}
+                        </div>
+                        <div className="mt-[3px] text-zinc-500">{formatDateTime(last)}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-white/10 bg-white/[0.03]">
+              <div className="border-b border-white/10 p-[16px]">
+                <h3 className="text-[18px] font-semibold leading-[24px] text-zinc-50">Credit movements</h3>
+                <p className="mt-[3px] text-[14px] text-zinc-400">Top-ups and org-to-team allocations.</p>
+              </div>
+              <div className="divide-y divide-white/10">
+                {allocationTransactions.length > 0 ? allocationTransactions.map((tx) => {
+                  const team = tx.class_id ? teamById.get(tx.class_id) : null;
+                  const isPositive = Number(tx.amount ?? 0) >= 0;
+                  return (
+                    <div key={tx.id} className="p-[14px]">
+                      <div className="flex items-start justify-between gap-[10px]">
+                        <div>
+                          <div className="text-[14.5px] font-semibold leading-[20px] text-zinc-50">
+                            {team?.name || (tx.organization_id ? "Organization pool" : "Member credit")}
+                          </div>
+                          <div className="mt-[3px] text-[13px] leading-[18px] text-zinc-400">
+                            {tx.description || tx.reason || "Credit movement"}
+                          </div>
+                        </div>
+                        <div className={cn("text-right text-[15px] font-semibold", isPositive ? "text-emerald-200" : "text-amber-200")}>
+                          {isPositive ? "+" : ""}{formatCredits(tx.amount ?? 0)}
+                        </div>
+                      </div>
+                      <div className="mt-[8px] flex items-center justify-between gap-[10px] text-[12.5px] text-zinc-500">
+                        <span>{tx.actor_display_name || tx.actor_email || "System"}</span>
+                        <span>{formatDateTime(tx.created_at)}</span>
+                      </div>
+                    </div>
+                  );
+                }) : (
+                  <div className="p-[16px] text-[14px] leading-[20px] text-zinc-400">
+                    No team credit allocation transactions yet.
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        </>
       ) : (
         <p className="max-w-4xl text-[16px] leading-[24px] text-zinc-200">
-          Member accounts can use the team workspace after approval. Admin Console access is available only to organization admins.
+          Your account uses {active.team?.name || "the company pool"} in {orgName}. Full team analytics, member status, and credit transfer logs are available to organization admins.
         </p>
       )}
     </div>
