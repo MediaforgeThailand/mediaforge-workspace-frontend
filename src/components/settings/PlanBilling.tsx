@@ -399,27 +399,35 @@ const PlanBilling = () => {
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-[8px]">
-            <div className="flex items-center gap-[8px] text-[12px] leading-[16px] text-zinc-400" title="Auto-refill - top up automatically when balance is low">
-              <span>Auto-refill</span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={autoRefill}
-                aria-label="Auto-refill credits"
-                onClick={() => void handleAutoRefill(!autoRefill)}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={autoRefill}
+              aria-label="Auto-refill credits"
+              onClick={() => void handleAutoRefill(!autoRefill)}
+              title="Auto-refill - top up automatically when balance is low"
+              className={cn(
+                "flex h-[34px] items-center gap-[8px] rounded-full border px-[10px] text-[12px] font-semibold leading-[16px] transition-colors",
+                autoRefill
+                  ? "border-emerald-400/35 bg-emerald-500/12 text-emerald-100 hover:bg-emerald-500/18"
+                  : "border-white/10 bg-white/[0.04] text-zinc-300 hover:border-white/15 hover:bg-white/[0.07] hover:text-white",
+              )}
+            >
+              <span>{autoRefill ? "Auto-refill on" : "Auto-refill off"}</span>
+              <span
                 className={cn(
-                  "relative h-[20px] w-[36px] rounded-full border border-white/10 transition-colors",
-                  autoRefill ? "bg-violet-600" : "bg-white/[0.08]",
+                  "relative h-[18px] w-[32px] rounded-full border transition-colors",
+                  autoRefill ? "border-emerald-300/25 bg-emerald-400" : "border-white/10 bg-zinc-900",
                 )}
               >
                 <span
                   className={cn(
-                    "absolute top-[2px] h-[16px] w-[16px] rounded-full bg-zinc-950 shadow-sm transition-transform",
-                    autoRefill ? "translate-x-[16px]" : "translate-x-[2px]",
+                    "absolute top-[2px] h-[12px] w-[12px] rounded-full shadow-sm transition-transform",
+                    autoRefill ? "translate-x-[15px] bg-zinc-950" : "translate-x-[3px] bg-zinc-500",
                   )}
                 />
-              </button>
-            </div>
+              </span>
+            </button>
             <Button
               size="sm"
               onClick={() => setShowBuyCredits(true)}

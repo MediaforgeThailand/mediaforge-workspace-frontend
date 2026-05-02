@@ -307,14 +307,11 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
         <DropdownMenuSeparator className="bg-white/[0.08]" />
 
         <DropdownMenuItem
-          disabled
-          className="mx-2 my-1 h-9 gap-3 rounded-md px-3 text-[14px] font-medium leading-5 text-white/55 data-[disabled]:opacity-100"
+          onSelect={() => navigate("/app/settings?tab=plan-billing")}
+          className="mx-2 my-1 h-9 cursor-pointer gap-3 rounded-md px-3 text-[14px] font-medium leading-5 text-white focus:bg-white/[0.06] focus:text-white"
         >
-          <CreditCard className="h-3.5 w-3.5 text-white/55" />
-          <span className="flex-1">{t("workspace.usermenu.plan_billing")}</span>
-          <span className="rounded bg-white/[0.06] px-2 py-0.5 text-[12px] font-semibold text-white/60">
-            {t("workspace.settings.coming_soon_pill")}
-          </span>
+          <CreditCard className="h-3.5 w-3.5 text-white/[0.82]" />
+          {t("workspace.usermenu.plan_billing")}
         </DropdownMenuItem>
 
         <DropdownMenuItem
