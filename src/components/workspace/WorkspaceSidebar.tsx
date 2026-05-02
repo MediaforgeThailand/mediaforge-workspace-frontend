@@ -39,18 +39,19 @@ import {
   Plus,
   Settings as SettingsIcon,
   Languages,
-  Crown,
   Palette,
   School,
   Box,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useIsOrgAdmin } from "@/hooks/useIsOrgUser";
+import { useIsClassTeacher, useIsOrgAdmin } from "@/hooks/useIsOrgUser";
 import { useOrgBranding } from "@/hooks/useOrgBranding";
+import { useCredits } from "@/hooks/useCredits";
 import OrgCreditBadge from "@/components/OrgCreditBadge";
 import ActiveClassPicker from "@/components/ActiveClassPicker";
 
@@ -285,28 +286,41 @@ export default function WorkspaceSidebar({
   );
 }
 
-/** "Manage Org" + "Branding" buttons — visible only to
- *  teachers + org_admins. Manage Org → Teacher Command Center;
- *  Branding → logo / short name /
- *  subdomain admin. Branding is also reachable by host-resolved org
- *  admins (no class memberships) via direct URL — useful for the
- *  DMD demo where the admin user hasn't been enrolled into any
- *  class yet. */
+/** Education admins manage institutions/classes; enterprise admins manage teams.
+ *  The database still uses "organization" as the tenant primitive, but customer
+ *  UI should not expose that internal naming for enterprise accounts. */
 const OrgAdminLink = () => {
   const isOrgAdmin = useIsOrgAdmin();
+  const isClassTeacher = useIsClassTeacher();
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { credits } = useCredits();
+  const orgType = String(credits?.organization_type ?? "").toLowerCase();
+  const isEnterprise = orgType === "enterprise";
+  const isEducation = orgType === "school" || orgType === "university";
+
   if (!isOrgAdmin) return null;
+  if (!isClassTeacher && !isEnterprise && !isEducation) return null;
+
+  const primaryLabel = isEnterprise
+    ? t("workspace.sidebar.manage_team")
+    : t("workspace.sidebar.manage_institution");
+  const primaryTip = isEnterprise
+    ? t("workspace.sidebar.manage_team_tip")
+    : t("workspace.sidebar.manage_institution_tip");
+  const PrimaryIcon = isEnterprise ? UsersRound : School;
+  const primaryTarget = isEnterprise ? "/app/settings?tab=team" : "/app/org-admin";
+
   return (
     <div className="mt-[8px] space-y-[4px] border-t border-white/5 px-[12px] pb-[8px] pt-[8px]">
       <button
         type="button"
-        onClick={() => navigate("/app/org-admin")}
+        onClick={() => navigate(primaryTarget)}
         className="flex h-[32px] w-full items-center gap-[8px] rounded-md px-[8px] text-[14px] text-amber-200/90 transition-colors hover:bg-amber-300/10 hover:text-amber-100"
-        title={t("workspace.sidebar.manage_org_tip")}
+        title={primaryTip}
       >
-        <Crown className="h-[14px] w-[14px]" />
-        {t("workspace.sidebar.manage_org")}
+        <PrimaryIcon className="h-[14px] w-[14px]" />
+        {primaryLabel}
       </button>
       <button
         type="button"
