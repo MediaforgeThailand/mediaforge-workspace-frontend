@@ -10,14 +10,6 @@ import {
   type WorkspaceNode,
 } from "@/store/useWorkspaceStore";
 import { selectCanMutate, useWorkspaceShareRole } from "@/store/useWorkspaceShareRole";
-import {
-  colorForCollaborator,
-  useCanvasCollaborationStore,
-  type CanvasCollaborator,
-  type CanvasNodeLock,
-  type CursorMessage,
-  type NodeLockMessage,
-} from "./canvasCollaboration";
 
 type PatchPayload =
   | {
@@ -44,26 +36,6 @@ type PatchPayload =
     };
 
 const BROADCAST_EVENT = "canvas_patch";
-const NODE_LOCK_EVENT = "node_lock";
-const CURSOR_EVENT = "presence_cursor";
-
-type NodeLockPayload = NodeLockMessage & {
-  canvasId: string;
-  clientId: string;
-  userId: string;
-  name: string;
-  color: string;
-};
-
-type CursorPayload = CursorMessage & {
-  canvasId: string;
-  clientId: string;
-  userId: string;
-  name: string;
-  color: string;
-  avatarUrl?: string | null;
-  email?: string | null;
-};
 
 function tabClientId(): string {
   const key = "workspace-realtime-client-id";
@@ -117,70 +89,6 @@ function graphFingerprint(graph: CanvasGraph): string {
   });
 }
 
-function userCollaborator(user: NonNullable<ReturnType<typeof useAuth>["user"]>, clientId: string): CanvasCollaborator {
-  const metadata = (user.user_metadata ?? {}) as Record<string, unknown>;
-  const rawName =
-    metadata.full_name ??
-    metadata.name ??
-    metadata.user_name ??
-    metadata.preferred_username;
-  const name =
-    typeof rawName === "string" && rawName.trim()
-      ? rawName.trim()
-      : user.email?.split("@")[0] ?? "Member";
-  const rawAvatar = metadata.avatar_url ?? metadata.picture;
-  const avatarUrl = typeof rawAvatar === "string" ? rawAvatar : null;
-  return {
-    clientId,
-    userId: user.id,
-    name,
-    email: user.email ?? null,
-    avatarUrl,
-    color: colorForCollaborator(user.id || clientId),
-    onlineAt: Date.now(),
-  };
-}
-
-function flattenPresenceState(
-  state: Record<string, unknown[]>,
-): CanvasCollaborator[] {
-  const members: CanvasCollaborator[] = [];
-  for (const entries of Object.values(state)) {
-    if (!Array.isArray(entries)) continue;
-    for (const entry of entries) {
-      const item = entry as Partial<CanvasCollaborator>;
-      if (!item.clientId || !item.userId || !item.name) continue;
-      members.push({
-        clientId: item.clientId,
-        userId: item.userId,
-        name: item.name,
-        email: item.email ?? null,
-        avatarUrl: item.avatarUrl ?? null,
-        color: item.color ?? colorForCollaborator(item.userId),
-        onlineAt: typeof item.onlineAt === "number" ? item.onlineAt : Date.now(),
-        selectedNodeId: item.selectedNodeId ?? null,
-        cursorEnabled: Boolean(item.cursorEnabled),
-        cursor: item.cursor ?? null,
-      });
-    }
-  }
-  return members;
-}
-
-function lockFromPayload(payload: NodeLockPayload): CanvasNodeLock | null {
-  if (!payload.nodeId || !payload.clientId || !payload.userId) return null;
-  if (payload.kind === "release") return null;
-  return {
-    nodeId: payload.nodeId,
-    clientId: payload.clientId,
-    userId: payload.userId,
-    name: payload.name || "Member",
-    color: payload.color || colorForCollaborator(payload.userId),
-    updatedAt: payload.updatedAt,
-    expiresAt: payload.expiresAt,
-  };
-}
-
 function toGraph(row: Record<string, unknown>): CanvasGraph | null {
   const id = typeof row.id === "string" ? row.id : "";
   const workspaceId = typeof row.workspace_id === "string" ? row.workspace_id : "";
@@ -209,17 +117,10 @@ export function useCanvasRealtime() {
   const remoteApplyingRef = useRef(false);
   const pendingTimerRef = useRef<number | null>(null);
   const clientId = useMemo(tabClientId, []);
-  const localUser = useMemo(
-    () => (user ? userCollaborator(user, clientId) : null),
-    [clientId, user],
-  );
 
   useEffect(() => {
     const canvasId = current?.id;
-    if (!canvasId || !user?.id || !localUser) return;
-
-    const collaboration = useCanvasCollaborationStore.getState();
-    collaboration.setLocalUser(localUser);
+    if (!canvasId || !user?.id) return;
 
     const channel = supabase.channel(`workspace-canvas:${canvasId}`, {
       config: {
@@ -228,63 +129,6 @@ export function useCanvasRealtime() {
       },
     });
     channelRef.current = channel;
-
-    const trackPresence = () => {
-      const state = useCanvasCollaborationStore.getState();
-      if (!state.localUser) return;
-      void channel.track({
-        ...state.localUser,
-        onlineAt: Date.now(),
-        selectedNodeId: state.selectedNodeId,
-        cursorEnabled: state.cursorEnabled,
-      });
-    };
-
-    collaboration.setRealtimeSenders({
-      trackPresence,
-      sendNodeLock: (message) => {
-        const state = useCanvasCollaborationStore.getState();
-        if (!state.localUser) return;
-        const payload: NodeLockPayload = {
-          ...message,
-          canvasId,
-          clientId,
-          userId: state.localUser.userId,
-          name: state.localUser.name,
-          color: state.localUser.color,
-        };
-        void channel.send({
-          type: "broadcast",
-          event: NODE_LOCK_EVENT,
-          payload,
-        });
-      },
-      sendCursor: (message) => {
-        const state = useCanvasCollaborationStore.getState();
-        if (!state.localUser) return;
-        const payload: CursorPayload = {
-          ...message,
-          canvasId,
-          clientId,
-          userId: state.localUser.userId,
-          name: state.localUser.name,
-          email: state.localUser.email,
-          avatarUrl: state.localUser.avatarUrl,
-          color: state.localUser.color,
-        };
-        void channel.send({
-          type: "broadcast",
-          event: CURSOR_EVENT,
-          payload,
-        });
-      },
-    });
-
-    channel.on("presence", { event: "sync" }, () => {
-      useCanvasCollaborationStore
-        .getState()
-        .setMembers(flattenPresenceState(channel.presenceState() as Record<string, unknown[]>));
-    });
 
     channel.on("broadcast", { event: BROADCAST_EVENT }, ({ payload }) => {
       const patch = payload as PatchPayload | undefined;
@@ -304,43 +148,6 @@ export function useCanvasRealtime() {
           updatedAt: patch.sentAt,
         });
       }
-    });
-
-    channel.on("broadcast", { event: NODE_LOCK_EVENT }, ({ payload }) => {
-      const message = payload as NodeLockPayload | undefined;
-      if (!message || message.canvasId !== canvasId || message.clientId === clientId) return;
-      const store = useCanvasCollaborationStore.getState();
-      if (message.kind === "release") {
-        store.releaseRemoteNodeLock(message.nodeId, message.clientId, message.updatedAt);
-        return;
-      }
-      const lock = lockFromPayload(message);
-      if (lock) store.applyRemoteNodeLock(lock);
-    });
-
-    channel.on("broadcast", { event: CURSOR_EVENT }, ({ payload }) => {
-      const message = payload as CursorPayload | undefined;
-      if (!message || message.canvasId !== canvasId || message.clientId === clientId) return;
-      useCanvasCollaborationStore.getState().upsertCursor({
-        clientId: message.clientId,
-        userId: message.userId,
-        name: message.name || "Member",
-        email: message.email ?? null,
-        avatarUrl: message.avatarUrl ?? null,
-        color: message.color || colorForCollaborator(message.userId),
-        onlineAt: Date.now(),
-        cursorEnabled: message.cursorEnabled,
-        cursor:
-          message.cursorEnabled &&
-          typeof message.xPct === "number" &&
-          typeof message.yPct === "number"
-            ? {
-                xPct: message.xPct,
-                yPct: message.yPct,
-                sentAt: message.sentAt,
-              }
-            : null,
-      });
     });
 
     channel.on(
@@ -364,32 +171,17 @@ export function useCanvasRealtime() {
     );
 
     channel.subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        trackPresence();
-      }
       if (status === "CHANNEL_ERROR") {
         console.warn("[canvas-realtime] channel authorization failed or disconnected");
       }
     });
 
-    const heartbeat = window.setInterval(() => {
-      useCanvasCollaborationStore.getState().refreshOwnedNodeLocks();
-      trackPresence();
-    }, 10_000);
-    const cleanup = window.setInterval(() => {
-      useCanvasCollaborationStore.getState().cleanupExpiredLocks();
-    }, 2_500);
-
     return () => {
       if (pendingTimerRef.current) window.clearTimeout(pendingTimerRef.current);
-      window.clearInterval(heartbeat);
-      window.clearInterval(cleanup);
-      useCanvasCollaborationStore.getState().releaseOwnedNodeLocks();
-      useCanvasCollaborationStore.getState().clearCanvasCollaboration();
       channelRef.current = null;
       void supabase.removeChannel(channel);
     };
-  }, [applyRemoteCanvasPatch, clientId, current?.id, localUser, replaceCanvasGraph, user?.id]);
+  }, [applyRemoteCanvasPatch, clientId, current?.id, replaceCanvasGraph, user?.id]);
 
   useEffect(() => {
     if (!current?.id) {

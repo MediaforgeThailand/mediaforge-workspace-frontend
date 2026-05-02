@@ -869,21 +869,27 @@ const HomeView = ({
   const projectCards = useMemo<ProjectCardItem[]>(() => {
     const spaceCountByProject = new Map<string, number>();
     for (const workspace of workspaces) {
-      if (!workspace.projectId) continue;
+      const projectId = workspace.projectId ?? activeProjectId;
+      if (!projectId) continue;
       spaceCountByProject.set(
-        workspace.projectId,
-        (spaceCountByProject.get(workspace.projectId) ?? 0) + 1,
+        projectId,
+        (spaceCountByProject.get(projectId) ?? 0) + 1,
       );
     }
     return [...projects]
-      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .sort(
+        (a, b) =>
+          Number(b.id === activeProjectId) -
+            Number(a.id === activeProjectId) ||
+          b.updatedAt - a.updatedAt,
+      )
       .map((project, index) => ({
         ...project,
         color: PROJECT_COLOR_SWATCHES[index % PROJECT_COLOR_SWATCHES.length],
         icon: index === 0 ? Lock : Layers,
         spaceCount: spaceCountByProject.get(project.id) ?? 0,
       }));
-  }, [projects, workspaces]);
+  }, [activeProjectId, projects, workspaces]);
 
   /* Recent spaces — top 3 by updatedAt with rendered minimaps so the
    * Home preview stays fixed-width and never pushes the Tools column
@@ -1341,14 +1347,20 @@ const ProjectQuickSwitch = ({
   if (projects.length === 0) return null;
   const counts = new Map<string, number>();
   for (const workspace of workspaces) {
-    if (!workspace.projectId) continue;
-    counts.set(workspace.projectId, (counts.get(workspace.projectId) ?? 0) + 1);
+    const projectId = workspace.projectId ?? activeProjectId;
+    if (!projectId) continue;
+    counts.set(projectId, (counts.get(projectId) ?? 0) + 1);
   }
 
   return (
     <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
       {[...projects]
-        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .sort(
+          (a, b) =>
+            Number(b.id === activeProjectId) -
+              Number(a.id === activeProjectId) ||
+            b.updatedAt - a.updatedAt,
+        )
         .map((project, index) => {
           const active = activeProjectId === project.id;
           const teamProject = Boolean(project.ownerId && project.ownerId !== user?.id);
@@ -1681,14 +1693,20 @@ const ProjectsManagerView = ({
   const projectCards = useMemo<ProjectCardItem[]>(() => {
     const spaceCountByProject = new Map<string, number>();
     for (const workspace of workspaces) {
-      if (!workspace.projectId) continue;
+      const projectId = workspace.projectId ?? activeProjectId;
+      if (!projectId) continue;
       spaceCountByProject.set(
-        workspace.projectId,
-        (spaceCountByProject.get(workspace.projectId) ?? 0) + 1,
+        projectId,
+        (spaceCountByProject.get(projectId) ?? 0) + 1,
       );
     }
     return [...projects]
-      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .sort(
+        (a, b) =>
+          Number(b.id === selectedProjectId) -
+            Number(a.id === selectedProjectId) ||
+          b.updatedAt - a.updatedAt,
+      )
       .map((project, index) => ({
         ...project,
         color: project.color ?? PROJECT_COLOR_SWATCHES[index % PROJECT_COLOR_SWATCHES.length],
@@ -1700,7 +1718,7 @@ const ProjectsManagerView = ({
               : Layers,
         spaceCount: spaceCountByProject.get(project.id) ?? 0,
       }));
-  }, [projects, user?.id, workspaces]);
+  }, [activeProjectId, projects, selectedProjectId, user?.id, workspaces]);
 
   const projectWorkspaceIds = useMemo(
     () =>
@@ -1840,44 +1858,45 @@ const ProjectsManagerView = ({
         rightSlot={<UserMenu />}
         onOpenSidebar={onOpenSidebar}
       />
-      <div className="ws-scroll-hide flex-1 overflow-y-auto">
-        <div className="mx-auto grid w-full max-w-[1500px] gap-5 px-4 pb-16 pt-6 md:px-6 lg:grid-cols-[300px_minmax(0,1fr)] lg:px-8">
-          <aside className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-3 ring-1 ring-inset ring-white/[0.06]">
-            <div className="mb-3 flex items-center justify-between px-1">
-              <div className="text-[13.5px] font-semibold uppercase tracking-[0.14em] text-zinc-300">
+      <div className="ws-scroll-hide flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="mx-auto grid w-full max-w-[1480px] gap-4 px-4 pb-16 pt-5 md:px-6 lg:grid-cols-[280px_minmax(0,1fr)] lg:px-7">
+          <aside className="min-w-0 rounded-xl bg-[hsl(0_0%_7%)] p-2.5 ring-1 ring-inset ring-white/[0.06]">
+            <div className="mb-2 flex items-center justify-between px-1">
+              <div className="text-[12.5px] font-semibold uppercase tracking-[0.12em] text-zinc-300">
                 Projects
               </div>
               <button
                 type="button"
                 onClick={onCreateProject}
-                className="grid h-8 w-8 place-items-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white"
+                className="grid h-7 w-7 place-items-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white"
                 title={t("workspace.home.new_project_tooltip")}
               >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-3 w-3" />
               </button>
             </div>
-            <ul className="space-y-1">
+            <ul className="space-y-0.5">
               {projectCards.map((project) => {
                 const active = selectedProject?.id === project.id;
                 const canManage = !project.ownerId || project.ownerId === user?.id;
                 const protectedProject = project.name === DEFAULT_PROJECT_NAME;
+                const teamProject = Boolean(project.ownerId && project.ownerId !== user?.id);
                 return (
                   <li key={project.id} className="group/project relative">
                     <button
                       type="button"
                       onClick={() => onSelectProject(project.id)}
                       className={cn(
-                        "flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[14.5px] transition-colors",
+                        "flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] transition-colors",
                         active
                           ? "bg-white/[0.08] text-zinc-50 ring-1 ring-inset ring-white/[0.08]"
                           : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100",
                       )}
                     >
                       <span
-                        className="grid h-5 w-5 shrink-0 place-items-center rounded"
+                        className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded"
                         style={{ background: project.color }}
                       >
-                        <project.icon className="h-3 w-3 text-zinc-950" />
+                        <project.icon className="h-2.5 w-2.5 text-zinc-950" />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium">{project.name}</span>
@@ -1885,7 +1904,7 @@ const ProjectsManagerView = ({
                           {project.spaceCount} spaces
                         </span>
                       </span>
-                      {project.ownerId && (
+                      {teamProject && (
                         <span className="rounded bg-sky-400/15 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-sky-200">
                           Team
                         </span>
@@ -1911,16 +1930,16 @@ const ProjectsManagerView = ({
           </aside>
 
           <section className="min-w-0">
-            <div className="mb-5 flex flex-col gap-4 rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06] md:flex-row md:items-center md:justify-between">
+            <div className="mb-4 flex flex-col gap-3 rounded-xl bg-[hsl(0_0%_7%)] p-3.5 ring-1 ring-inset ring-white/[0.06] md:flex-row md:items-center md:justify-between">
               <div className="min-w-0">
-                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white/[0.05] px-2.5 py-1 text-[11.5px] font-bold uppercase tracking-[0.14em] text-zinc-400 ring-1 ring-inset ring-white/[0.06]">
+                <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/[0.05] px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.12em] text-zinc-400 ring-1 ring-inset ring-white/[0.06]">
                   <Users className="h-3 w-3" />
                   {ownerLabel}
                 </div>
-                <h1 className="truncate text-[30px] font-semibold leading-tight tracking-tight text-zinc-50 md:text-[36px]">
+                <h1 className="truncate text-[26px] font-semibold leading-tight tracking-tight text-zinc-50 md:text-[30px]">
                   {selectedProject?.name ?? "Projects"}
                 </h1>
-                <p className="mt-1 text-[14.5px] text-zinc-500">
+                <p className="mt-1 text-[13.5px] text-zinc-500">
                   {spaces.length} visible space{spaces.length === 1 ? "" : "s"}
                 </p>
               </div>
@@ -1931,7 +1950,7 @@ const ProjectsManagerView = ({
                     type="button"
                     onClick={() => setFilter(item)}
                     className={cn(
-                      "h-9 rounded-lg px-3 text-[13.5px] font-medium capitalize transition-colors",
+                      "h-8 rounded-md px-3 text-[12.5px] font-medium capitalize transition-colors",
                       filter === item
                         ? "bg-white text-zinc-950"
                         : "bg-white/[0.05] text-zinc-300 ring-1 ring-inset ring-white/[0.07] hover:bg-white/[0.09] hover:text-white",
@@ -1943,7 +1962,7 @@ const ProjectsManagerView = ({
                 <button
                   type="button"
                   onClick={handleNewSpace}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-white/[0.08] px-3 text-[13.5px] font-semibold text-zinc-50 ring-1 ring-inset ring-white/[0.10] transition-colors hover:bg-white/[0.13]"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md bg-white/[0.08] px-3 text-[12.5px] font-semibold text-zinc-50 ring-1 ring-inset ring-white/[0.10] transition-colors hover:bg-white/[0.13]"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   {t("workspace.spaces.new_space")}
@@ -1966,7 +1985,7 @@ const ProjectsManagerView = ({
                 }
               />
             ) : (
-              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                 {spaces.map((space) => (
                   <SpaceCard
                     key={space.id}
