@@ -577,7 +577,7 @@ const AssetTile = ({
       onDragStart={(e) => onAssetDragStart(e, asset)}
       onClick={openPreview}
       className={cn(
-        "group relative cursor-pointer overflow-hidden rounded-xl bg-white/[0.02] ring-1 ring-inset ring-white/[0.06]",
+        "group relative cursor-pointer overflow-hidden rounded-xl bg-white/[0.02]",
         "transition-all hover:bg-white/[0.05] hover:ring-white/[0.12] hover:shadow-[0_6px_18px_-8px_hsl(0_0%_0%/0.6)]",
         "active:cursor-grabbing",
       )}

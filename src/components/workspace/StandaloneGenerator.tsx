@@ -649,7 +649,7 @@ export default function StandaloneGenerator({
           />
 
           <div
-            className="mt-0 rounded-xl p-3.5 ring-1 ring-inset ring-white/[0.04] lg:mt-3"
+            className="mt-0 rounded-xl p-3.5 lg:mt-3"
             style={{
               background:
                 "linear-gradient(135deg, color-mix(in srgb, var(--tool-accent) 16%, transparent), #202331)",
@@ -666,7 +666,7 @@ export default function StandaloneGenerator({
                   {activeDef.title}
                 </h2>
               </div>
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white/[0.05] text-zinc-300 ring-1 ring-inset ring-white/[0.04]">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white/[0.05] text-zinc-300">
                 <activeDef.icon className="h-4 w-4" />
               </div>
             </div>
@@ -1036,7 +1036,7 @@ function ModelPicker({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="mt-2 flex h-9 w-full items-center justify-between gap-3 rounded-lg bg-[#2a2a2a] px-3 text-left ring-1 ring-inset ring-white/[0.03] transition hover:bg-[#333333]"
+        className="mt-2 flex h-9 w-full items-center justify-between gap-3 rounded-lg bg-[#2a2a2a] px-3 text-left transition hover:bg-[#333333]"
       >
         <span className="flex min-w-0 items-center gap-2">
           <span className="grid h-5 w-5 shrink-0 place-items-center rounded-md bg-white/[0.08] text-[11px] font-black text-white">
@@ -1916,7 +1916,7 @@ function StyleReferenceTray({
           {refs.slice(0, 8).map((ref) => (
             <div
               key={ref.id}
-              className="group relative aspect-square overflow-hidden rounded-lg bg-black/30 ring-1 ring-white/[0.08]"
+              className="group relative aspect-square overflow-hidden rounded-lg bg-black/30"
             >
               <img src={ref.url} alt="" className="h-full w-full object-cover" />
               <button
@@ -1985,7 +1985,7 @@ function ToggleRow({
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="flex h-9 w-full items-center justify-between rounded-lg bg-[#252525] px-3 ring-1 ring-inset ring-white/[0.04]"
+      className="flex h-9 w-full items-center justify-between rounded-lg bg-[#252525] px-3"
     >
       <span className="text-[12px] font-semibold text-zinc-200">{label}</span>
       <span
@@ -2228,7 +2228,7 @@ function CreationRow({ job }: { job: StandaloneJobRow }) {
   const isActive = job.status === "queued" || job.status === "running";
   const isFailed = job.status === "failed" || job.status === "permanent_failed";
   return (
-    <article className="rounded-xl bg-[#222222] px-3 py-3 ring-1 ring-inset ring-white/[0.02]">
+    <article className="rounded-xl bg-[#222222] px-3 py-3">
       <div className="mb-2 flex items-start justify-between gap-3">
         <h3 className="line-clamp-1 min-w-0 text-[12px] font-semibold text-zinc-100">
           {title}
@@ -2362,7 +2362,7 @@ function CreationRow({ job }: { job: StandaloneJobRow }) {
                 href={url}
                 target="_blank"
                 rel="noreferrer"
-                className="grid h-9 w-9 place-items-center rounded-lg bg-[#2f2f2f] text-zinc-300 ring-1 ring-inset ring-white/[0.04] hover:bg-[#3a3a3a]"
+                className="grid h-9 w-9 place-items-center rounded-lg bg-[#2f2f2f] text-zinc-300 hover:bg-[#3a3a3a]"
                 aria-label="Open"
               >
                 <ExternalLink className="h-4 w-4" />

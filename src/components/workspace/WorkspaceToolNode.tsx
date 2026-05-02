@@ -2668,7 +2668,7 @@ function MultiGenStepper({
 
   return (
     <div
-      className="nodrag flex h-7 items-center gap-0.5 rounded-full bg-black/35 px-1 text-[11px] font-semibold text-zinc-100 ring-1 ring-inset ring-white/10"
+      className="nodrag flex h-7 items-center gap-0.5 rounded-full bg-black/35 px-1 text-[11px] font-semibold text-zinc-100"
       title="Generate multiple variations when Run is pressed"
       onMouseDown={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}

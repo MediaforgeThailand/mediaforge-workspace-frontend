@@ -839,7 +839,7 @@ function AssetCard({
 
   return (
     <div
-      className="group relative flex flex-col overflow-hidden rounded-lg bg-zinc-900/60 ring-1 ring-inset ring-white/5 transition-colors hover:ring-white/15"
+      className="group relative flex flex-col overflow-hidden rounded-lg bg-zinc-900/60 transition-colors hover:bg-white/[0.04]"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onTouchStart={() => setHovered(true)}

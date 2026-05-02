@@ -162,7 +162,7 @@ const WorkspaceCanvasPagePill = () => {
               "group flex h-11 items-center gap-2 rounded-full border border-white/[0.06] bg-zinc-900/85 px-4 text-[12px] text-zinc-100 shadow-lg shadow-black/40 backdrop-blur transition-all lg:h-9 lg:px-3",
               "hover:-translate-y-0.5 hover:bg-zinc-800/90 hover:shadow-xl",
               open &&
-                "ring-1 ring-white/15 bg-zinc-800/90 -translate-y-0.5 shadow-xl",
+                "bg-zinc-800/90 -translate-y-0.5 shadow-xl",
             )}
           >
             <FolderOpen className="h-3.5 w-3.5 shrink-0 text-zinc-300" />

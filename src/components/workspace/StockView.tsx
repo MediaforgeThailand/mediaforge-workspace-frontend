@@ -343,13 +343,13 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
             <button
               type="button"
               onClick={onOpenSidebar}
-              className="grid h-11 w-11 place-items-center rounded-full bg-white/[0.06] text-zinc-100 ring-1 ring-inset ring-white/10 md:hidden"
+              className="grid h-11 w-11 place-items-center rounded-full bg-white/[0.06] text-zinc-100 md:hidden"
               aria-label={t("workspace.stock.open_sidebar")}
             >
               <Menu className="h-5 w-5" />
             </button>
           )}
-          <form onSubmit={submit} className="mx-auto flex h-12 w-full max-w-[760px] items-center rounded-full bg-white/[0.10] px-4 text-zinc-100 ring-1 ring-inset ring-white/[0.06]">
+          <form onSubmit={submit} className="mx-auto flex h-12 w-full max-w-[760px] items-center rounded-full bg-white/[0.10] px-4 text-zinc-100">
             <Grid2X2 className="mr-3 h-4 w-4 shrink-0 text-zinc-400" />
             <input
               value={query}
@@ -412,7 +412,7 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
               type="button"
               onClick={() => searchCategory(category)}
               className={cn(
-                "group flex min-h-[108px] items-center gap-5 rounded-2xl bg-white/[0.035] p-3 text-left ring-1 ring-inset ring-white/[0.04] transition",
+                "group flex min-h-[108px] items-center gap-5 rounded-2xl bg-white/[0.035] p-3 text-left transition",
                 "hover:-translate-y-0.5 hover:bg-white/[0.055] hover:ring-white/[0.10]",
                 activeCategory === category.id && "bg-white/[0.08] ring-sky-300/35",
               )}
@@ -457,7 +457,7 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
                     setQuery(term);
                     setSubmittedQuery(term);
                   }}
-                  className="rounded-full bg-white/[0.06] px-4 py-2 text-[13px] font-semibold text-zinc-200 ring-1 ring-inset ring-white/[0.06] transition hover:bg-white/[0.10] hover:text-white"
+                  className="rounded-full bg-white/[0.06] px-4 py-2 text-[13px] font-semibold text-zinc-200 transition hover:bg-white/[0.10] hover:text-white"
                 >
                   {term}
                 </button>
@@ -472,7 +472,7 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
           )}
 
           {loading && items.length === 0 ? (
-            <div className="mt-6 grid min-h-[360px] place-items-center rounded-3xl bg-white/[0.035] ring-1 ring-inset ring-white/[0.06]">
+            <div className="mt-6 grid min-h-[360px] place-items-center rounded-3xl bg-white/[0.035]">
               <div className="flex items-center gap-3 text-[15px] text-zinc-300">
                 <Loader2 className="h-5 w-5 animate-spin text-sky-300" />
                 {t("workspace.stock.searching")}
@@ -512,7 +512,7 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
                     type="button"
                     disabled={loading || page <= 1}
                     onClick={() => void runSearch(page - 1)}
-                    className="rounded-full bg-white/[0.06] px-5 py-2.5 text-[14px] font-semibold text-zinc-200 ring-1 ring-inset ring-white/[0.08] transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="rounded-full bg-white/[0.06] px-5 py-2.5 text-[14px] font-semibold text-zinc-200 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {t("workspace.stock.previous")}
                   </button>
@@ -590,7 +590,7 @@ function StockAssetCard({
   return (
     <article
       onClick={onPreview}
-      className="group cursor-zoom-in overflow-hidden rounded-[24px] bg-white/[0.04] ring-1 ring-inset ring-white/[0.05] transition hover:-translate-y-0.5 hover:bg-white/[0.06] hover:ring-white/[0.13]"
+      className="group cursor-zoom-in overflow-hidden rounded-[24px] bg-white/[0.04] transition hover:-translate-y-0.5 hover:bg-white/[0.06]"
     >
       <div className="relative aspect-[16/11] overflow-hidden bg-zinc-950 md:aspect-[4/3]">
         {isValidImageUrl(imageUrl) ? (
@@ -675,7 +675,7 @@ function StockPreviewModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[92vh] w-full max-w-[1280px] flex-col overflow-hidden rounded-[28px] bg-zinc-950 ring-1 ring-white/10 lg:flex-row"
+        className="flex max-h-[92vh] w-full max-w-[1280px] flex-col overflow-hidden rounded-[28px] bg-zinc-950 lg:flex-row"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="grid min-h-[320px] flex-1 place-items-center bg-black lg:min-h-[720px]">

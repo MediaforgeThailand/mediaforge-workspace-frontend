@@ -202,7 +202,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
             type="button"
             onClick={handleClose}
             disabled={submitting}
-            className="inline-flex h-9 items-center justify-center rounded-md bg-white/[0.06] px-4 text-[13px] font-medium text-zinc-200 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.09]"
+            className="inline-flex h-9 items-center justify-center rounded-md bg-white/[0.06] px-4 text-[13px] font-medium text-zinc-200 transition-colors hover:bg-white/[0.09]"
           >
             {language === "th" ? "ยกเลิก" : "Cancel"}
           </button>

@@ -534,7 +534,7 @@ const WorkspaceDashboardInner = () => {
               type="button"
               aria-label={t("workspace.spaces.close_sidebar")}
               onClick={() => setMobileSidebarOpen(false)}
-              className="absolute -right-12 top-3 grid h-10 w-10 place-items-center rounded-full bg-white/[0.08] text-zinc-100 ring-1 ring-inset ring-white/10"
+              className="absolute -right-12 top-3 grid h-10 w-10 place-items-center rounded-full bg-white/[0.08] text-zinc-100"
             >
               <X className="h-4 w-4" />
             </button>
@@ -1304,7 +1304,7 @@ const ProjectsCard = ({
             <button
               type="button"
               onClick={closeDialog}
-              className="inline-flex h-9 items-center justify-center rounded-md bg-white/[0.06] px-4 text-[14.5px] font-medium text-zinc-200 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.09] hover:text-white"
+              className="inline-flex h-9 items-center justify-center rounded-md bg-white/[0.06] px-4 text-[14.5px] font-medium text-zinc-200 transition-colors hover:bg-white/[0.09] hover:text-white"
             >
               {t("workspace.home.delete_dialog_cancel")}
             </button>
@@ -1419,7 +1419,7 @@ const SpacesShowcaseCard = ({
 }) => {
   const { t } = useLanguage();
   return (
-    <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
+    <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4">
       <div className="mb-3 flex items-center justify-between">
         <button
           type="button"
@@ -1454,7 +1454,7 @@ const SpacesShowcaseCard = ({
               key={ws.id}
               type="button"
               onClick={() => onOpen(ws.id)}
-              className="group/space flex min-w-0 flex-col gap-2 rounded-xl bg-[hsl(0_0%_4%)] p-1.5 ring-1 ring-inset ring-white/[0.05] transition-all hover:ring-white/[0.14]"
+              className="group/space flex min-w-0 flex-col gap-2 rounded-xl bg-[hsl(0_0%_4%)] p-1.5 transition-all hover:bg-white/[0.04]"
             >
               <div className="aspect-[4/3] overflow-hidden rounded-lg bg-[hsl(0_0%_2%)]">
                 <CanvasMinimap nodes={ws.nodes} edges={ws.edges} />
@@ -1484,7 +1484,7 @@ const ToolsCard = ({
 }) => {
   const { t } = useLanguage();
   return (
-    <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
+    <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4">
       <div className="mb-3 flex items-center justify-between">
         <button
           type="button"
@@ -1505,7 +1505,7 @@ const ToolsCard = ({
               className="group/tool flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 text-[15.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white lg:min-h-9"
             >
               <span
-                className="flex h-5 w-5 items-center justify-center rounded-md ring-1 ring-inset ring-white/[0.08]"
+                className="flex h-5 w-5 items-center justify-center rounded-md"
                 style={{ background: tool.accent }}
               >
                 <tool.icon className="h-3 w-3 text-zinc-950" />
@@ -1526,7 +1526,7 @@ const ToolsCard = ({
 };
 
 const AcademyVideoTile = ({ video }: { video: AcademyVideo }) => (
-  <li className="overflow-hidden rounded-2xl bg-[hsl(0_0%_7%)] ring-1 ring-inset ring-white/[0.06]">
+  <li className="overflow-hidden rounded-2xl bg-[hsl(0_0%_7%)]">
     <video
       className="aspect-video w-full bg-black object-cover"
       controls
@@ -1546,7 +1546,7 @@ const AcademyVideoTile = ({ video }: { video: AcademyVideo }) => (
           {video.description}
         </p>
       </div>
-      <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-1 text-[13.5px] font-semibold text-zinc-400 ring-1 ring-inset ring-white/[0.08]">
+      <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-1 text-[13.5px] font-semibold text-zinc-400">
         {video.duration}
       </span>
     </div>
@@ -1939,7 +1939,7 @@ const ProjectsManagerView = ({
           <section className="min-w-0">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md bg-[hsl(0_0%_8.5%)] px-3 py-2">
               <div className="min-w-0">
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.05] px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.12em] text-zinc-400 ring-1 ring-inset ring-white/[0.06]">
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.05] px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.12em] text-zinc-400">
                   <Users className="h-3 w-3" />
                   {ownerLabel}
                 </div>
@@ -2322,7 +2322,7 @@ const SpacesView = ({
               <button
                 type="button"
                 onClick={handleNew}
-                className="flex h-11 items-center gap-1.5 rounded-lg bg-white/[0.06] px-3.5 text-[14.5px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.12] lg:h-9"
+                className="flex h-11 items-center gap-1.5 rounded-lg bg-white/[0.06] px-3.5 text-[14.5px] font-medium text-zinc-100 transition-colors hover:bg-white/[0.12] lg:h-9"
               >
                 <Plus className="h-3.5 w-3.5" /> {t("workspace.spaces.new_space")}
               </button>
@@ -2403,7 +2403,7 @@ const SpacesTabs = ({
     { key: "templates", label: t("workspace.spaces.tab_templates"), icon: LayoutGrid },
   ];
   return (
-    <div className="inline-flex rounded-xl bg-white/[0.03] p-1 ring-1 ring-inset ring-white/[0.05]">
+    <div className="inline-flex rounded-xl bg-white/[0.03] p-1">
       {items.map((it) => {
         const active = tab === it.key;
         const Icon = it.icon;
@@ -2415,7 +2415,7 @@ const SpacesTabs = ({
             className={cn(
               "flex h-11 items-center gap-1.5 rounded-lg px-3 text-[15.5px] font-medium transition-colors lg:h-8",
               active
-                ? "bg-white/[0.08] text-zinc-50 ring-1 ring-inset ring-white/[0.06]"
+                ? "bg-white/[0.08] text-zinc-50"
                 : "text-zinc-400 hover:text-zinc-200",
             )}
           >
@@ -2441,7 +2441,7 @@ const SpacesIconBtn = ({
     type="button"
     title={title}
     aria-label={title}
-    className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/[0.03] text-zinc-400 ring-1 ring-inset ring-white/[0.05] transition-colors hover:bg-white/[0.08] hover:text-zinc-100 lg:h-9 lg:w-9"
+    className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/[0.03] text-zinc-400 transition-colors hover:bg-white/[0.08] hover:text-zinc-100 lg:h-9 lg:w-9"
   >
     <Icon className="h-3.5 w-3.5" />
   </button>
@@ -2454,7 +2454,7 @@ const SpaceToolbar = ({ onNew }: { onNew: () => void }) => {
       <button
         type="button"
         onClick={onNew}
-        className="flex items-center gap-1.5 rounded-md bg-white/[0.06] px-3 py-1.5 text-[13.5px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.08] transition-colors hover:bg-white/[0.1]"
+        className="flex items-center gap-1.5 rounded-md bg-white/[0.06] px-3 py-1.5 text-[13.5px] font-medium text-zinc-100 transition-colors hover:bg-white/[0.1]"
       >
         <Plus className="h-3.5 w-3.5" /> {t("workspace.spaces.new_space")}
       </button>
@@ -2595,7 +2595,7 @@ const PageHeader = ({
 
 const MonthHeader = ({ label }: { label: string }) => (
   <div className="mb-3 flex items-center gap-2 text-[15.5px] text-zinc-400">
-    <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full ring-1 ring-inset ring-white/15">
+    <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full">
       <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
     </span>
     {label}
@@ -2611,7 +2611,7 @@ const ChromePill = ({
 }) => (
   <button
     type="button"
-    className="flex h-8 items-center gap-1.5 rounded-md bg-white/[0.04] px-2.5 text-[14.5px] text-zinc-300 ring-1 ring-inset ring-white/[0.06] transition-colors hover:bg-white/[0.08] hover:text-zinc-100"
+    className="flex h-8 items-center gap-1.5 rounded-md bg-white/[0.04] px-2.5 text-[14.5px] text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-zinc-100"
   >
     <span>{label}</span>
     {Icon && <Icon className="h-3.5 w-3.5 text-zinc-500" />}
@@ -2634,7 +2634,7 @@ const ChromeIconBtn = ({
     className={cn(
       "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
       active
-        ? "bg-white/[0.08] text-zinc-100 ring-1 ring-inset ring-white/[0.08]"
+        ? "bg-white/[0.08] text-zinc-100"
         : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100",
     )}
   >
@@ -2660,7 +2660,7 @@ const EmptyState = ({
       <button
         type="button"
         onClick={cta.onClick}
-        className="mt-5 inline-flex min-h-11 items-center gap-1.5 rounded-md bg-white/[0.08] px-4 text-[13.5px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.10] transition-colors hover:bg-white/[0.12] lg:min-h-0 lg:py-1.5"
+        className="mt-5 inline-flex min-h-11 items-center gap-1.5 rounded-md bg-white/[0.08] px-4 text-[13.5px] font-medium text-zinc-100 transition-colors hover:bg-white/[0.12] lg:min-h-0 lg:py-1.5"
       >
         <Plus className="h-3.5 w-3.5" />
         {cta.label}

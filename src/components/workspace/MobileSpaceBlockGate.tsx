@@ -62,7 +62,7 @@ export default function MobileSpaceBlockGate({
     >
       <section className="w-full max-w-sm rounded-lg border border-zinc-800 bg-zinc-900/80 p-5 shadow-2xl shadow-black/40">
         <div className="mb-5 flex items-center gap-3">
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-zinc-800 text-zinc-200 ring-1 ring-inset ring-zinc-700">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-zinc-800 text-zinc-200">
             <Monitor className="h-5 w-5" />
           </div>
           <div className="min-w-0">
