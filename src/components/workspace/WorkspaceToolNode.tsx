@@ -565,6 +565,38 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     return () => ro.disconnect();
   }, [selected, isHovered]);
 
+  /* ── Publish preview height as `--ws-preview-h` ──
+   *
+   * The compact prompt overlay (`.ws-compact-prompt-overlay`) needs
+   * to cap its growth at a percentage of the actual rendered
+   * preview height so it doesn't swallow the artwork on small
+   * landscape nodes. CSS `max-height: 70%` alone doesn't work
+   * because the overlay is a `display: flex` auto-height absolute
+   * box — `%` on a max-height resolves against an auto containing
+   * block ⇒ the cap is effectively ignored, which is exactly what
+   * the user kept seeing ("ลอยขึ้นไปสูงเลย").
+   *
+   * Fix: same pattern as `--ws-toolbar-h` above — observe the
+   * preview's actual rendered px height with a ResizeObserver and
+   * publish it on the same element. The prompt CSS then uses
+   * `max-height: calc(0.7 * var(--ws-preview-h, 320px))` to cap
+   * itself in real px, which IS a resolved length the engine can
+   * apply. Fallback `320px` is the rough size of a 16:9 preview at
+   * the default node width — used for the brief frame before the
+   * observer has fired so the prompt doesn't flash full-height. */
+  useEffect(() => {
+    const root = previewRef.current;
+    if (!root) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const h = Math.ceil(entry.contentRect.height);
+        root.style.setProperty("--ws-preview-h", `${h}px`);
+      }
+    });
+    ro.observe(root);
+    return () => ro.disconnect();
+  }, []);
+
   const d = (data ?? {}) as NodeData & { status?: "idle" | "processing" | "done" | "error" };
   const params = d.params ?? {};
   const selectedModel = (params.model_name as string) ?? schema?.defaultModel ?? "";
