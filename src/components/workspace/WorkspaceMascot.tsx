@@ -31,7 +31,7 @@ const SRC = "/videos/workspace-mascot-4.mp4";
 
 /* Display width in CSS px. The drawing canvas matches the source's
  * intrinsic aspect ratio so the mascot doesn't squish at this width. */
-const WIDTH = 130;
+const WIDTH = 92;
 
 /* RGB Euclidean-distance² threshold. A pixel within this distance
  * of the sampled bg colour is considered bg. Squared so the inner
@@ -51,8 +51,10 @@ const WorkspaceMascot = () => {
 
   return (
     <div
-      className="pointer-events-none fixed bottom-3 left-[60px] z-[40] select-none"
-      // 60px clears the compact tool palette (52px) + a small gutter.
+      className="pointer-events-none fixed bottom-2 left-2 z-[40] select-none"
+      // Keep the mascot tucked into the canvas corner. The compact
+      // tool palette is vertically centred, so the bottom-left corner
+      // can stay visually quiet without reserving a wide gutter.
       // pointer-events-none so the mascot can't intercept canvas drags.
       aria-hidden="true"
     >

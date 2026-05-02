@@ -9,12 +9,11 @@
  *
  * Layout:
  *   - Fixed at bottom-left of the viewport.
- *   - The Compact Tool Palette sits at the LEFT EDGE (~52 px wide,
- *     vertically centred) so it doesn't conflict here.
- *   - The mascot lives at `bottom-3 left-[60px]` and is ~130 × 165
- *     px tall. The pill is parked to the RIGHT of the mascot at
- *     `left: 220px` (60 + 130 + 30 gutter) so the two pieces of
- *     bottom-left chrome don't overlap.
+ *   - The Compact Tool Palette sits at the LEFT EDGE, vertically
+ *     centred, so it doesn't conflict here.
+ *   - The mascot lives tucked into `bottom-2 left-2` at 92px wide.
+ *     The pill sits just to its right so bottom-left chrome stays
+ *     compact instead of spanning a large dead zone.
  *
  * Store wiring is identical to the tab bar — this is a pure visual
  * relocation, not a behaviour change.
@@ -149,7 +148,7 @@ const WorkspaceCanvasPagePill = () => {
 
   return (
     <div
-      className="fixed bottom-4 left-24 z-50 md:left-[220px]"
+      className="fixed bottom-4 left-[116px] z-50"
       style={{
         fontFamily: "var(--font-sans)",
       }}

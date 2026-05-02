@@ -162,7 +162,9 @@ const App = () => (
                     path="/app/workspace"
                     element={
                       <ProtectedRoute>
-                        <WorkspaceDashboard />
+                        <MobileSpaceBlockGate>
+                          <WorkspaceDashboard />
+                        </MobileSpaceBlockGate>
                       </ProtectedRoute>
                     }
                   />
@@ -246,11 +248,11 @@ const App = () => (
                   <Route
                     path="/app/workspace/:workspaceId"
                     element={
-                      <MobileSpaceBlockGate>
-                        <ProtectedRoute>
+                      <ProtectedRoute>
+                        <MobileSpaceBlockGate>
                           <WorkspaceCanvasPage />
-                        </ProtectedRoute>
-                      </MobileSpaceBlockGate>
+                        </MobileSpaceBlockGate>
+                      </ProtectedRoute>
                     }
                   />
 
