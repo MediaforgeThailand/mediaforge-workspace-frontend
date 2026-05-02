@@ -97,6 +97,14 @@ import { useCanvasToolStore } from "./useCanvasToolStore";
 import { useWorkspaceShortcuts } from "./useWorkspaceShortcuts";
 import { useCanvasAutosave } from "./useCanvasAutosave";
 import { useCanvasRealtime } from "./useCanvasRealtime";
+import CanvasPresenceBar from "./CanvasPresenceBar";
+import CanvasRemoteCursors from "./CanvasRemoteCursors";
+import CanvasLockBadges from "./CanvasLockBadges";
+import {
+  getRemoteNodeLock,
+  isNodeLockedByOther,
+  useCanvasCollaborationStore,
+} from "./canvasCollaboration";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useNavigate } from "react-router-dom";
 
@@ -512,14 +520,81 @@ const Inner = () => {
   // fresh `[]` literal each call would loop the store-snapshot check.
   const nodes = useWorkspaceStore((s) => (s.current?.nodes as Node[] | undefined) ?? STABLE_EMPTY_NODES);
   const edges = useWorkspaceStore((s) => (s.current?.edges as Edge[] | undefined) ?? STABLE_EMPTY_EDGES);
-  const onNodesChange = useWorkspaceStore((s) => s.onNodesChange);
+  const storeOnNodesChange = useWorkspaceStore((s) => s.onNodesChange);
   const onEdgesChange = useWorkspaceStore((s) => s.onEdgesChange);
-  const onConnect = useWorkspaceStore((s) => s.onConnect);
+  const storeOnConnect = useWorkspaceStore((s) => s.onConnect);
   const addSchemaNode = useWorkspaceStore((s) => s.addSchemaNode);
   const addAssetNode = useWorkspaceStore((s) => s.addAssetNode);
   const updateNodeData = useWorkspaceStore((s) => s.updateNodeData);
   const setSelectedNode = useWorkspaceStore((s) => s.setSelectedNode);
   const pushHistory = useWorkspaceStore((s) => s.pushHistory);
+  const nodeLocks = useCanvasCollaborationStore((s) => s.nodeLocks);
+  const claimNodeLock = useCanvasCollaborationStore((s) => s.claimNodeLock);
+  const releaseNodeLock = useCanvasCollaborationStore((s) => s.releaseNodeLock);
+  const releaseOwnedNodeLocks = useCanvasCollaborationStore((s) => s.releaseOwnedNodeLocks);
+  const publishCursor = useCanvasCollaborationStore((s) => s.publishCursor);
+  const publishSelection = useCanvasCollaborationStore((s) => s.setSelectedNode);
+  const cursorEnabled = useCanvasCollaborationStore((s) => s.cursorEnabled);
+  const cursorThrottleRef = useRef(0);
+  const lastInteractiveLockRef = useRef<string | null>(null);
+  const dragLockedNodeIdsRef = useRef<Set<string>>(new Set());
+
+  const renderNodes = useMemo(
+    () =>
+      nodes.map((node) => {
+        const locked = isNodeLockedByOther(node.id);
+        if (!locked) return node;
+        return {
+          ...node,
+          draggable: false,
+          connectable: false,
+          deletable: false,
+          className: cn(node.className as string | undefined, "ws-node-remote-locked"),
+        };
+      }),
+    [nodeLocks, nodes],
+  );
+
+  const ensureNodeEditable = useCallback((nodeId: string, intent = "edit") => {
+    const lock = getRemoteNodeLock(nodeId);
+    if (!lock) return true;
+    toast.info(`${lock.name} is ${intent === "drag" ? "moving" : "editing"} this node.`);
+    return false;
+  }, [nodeLocks]);
+
+  const claimEditableNode = useCallback(
+    (nodeId: string, intent = "edit") => {
+      if (!ensureNodeEditable(nodeId, intent)) return false;
+      return claimNodeLock(nodeId);
+    },
+    [claimNodeLock, ensureNodeEditable],
+  );
+
+  const onNodesChange = useCallback(
+    (changes: Parameters<typeof storeOnNodesChange>[0]) => {
+      const filtered = changes.filter((change) => {
+        const id = (change as { id?: string }).id;
+        if (!id || !isNodeLockedByOther(id)) return true;
+        return change.type === "select";
+      });
+      if (filtered.length > 0) storeOnNodesChange(filtered);
+    },
+    [nodeLocks, storeOnNodesChange],
+  );
+
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      if (
+        (connection.source && isNodeLockedByOther(connection.source)) ||
+        (connection.target && isNodeLockedByOther(connection.target))
+      ) {
+        toast.info("That node is locked by a teammate.");
+        return;
+      }
+      storeOnConnect(connection);
+    },
+    [nodeLocks, storeOnConnect],
+  );
 
   useEffect(() => {
     if (!canvasId) return;
@@ -777,8 +852,11 @@ const Inner = () => {
   );
 
   const onNodeClick: NodeMouseHandler = useCallback(
-    (_e, node) => setSelectedNode(node.id),
-    [setSelectedNode],
+    (_e, node) => {
+      setSelectedNode(node.id);
+      publishSelection(node.id);
+    },
+    [publishSelection, setSelectedNode],
   );
   const onPaneClick = useCallback(
     (e: React.MouseEvent) => {
@@ -811,8 +889,10 @@ const Inner = () => {
         return;
       }
       setSelectedNode(null);
+      publishSelection(null);
+      releaseOwnedNodeLocks();
     },
-    [setSelectedNode, screenToFlowPosition, reparentSpawned],
+    [publishSelection, releaseOwnedNodeLocks, setSelectedNode, screenToFlowPosition, reparentSpawned],
   );
 
   /** Cut tool: clicking a wire deletes it. Bound to React Flow's
@@ -1046,9 +1126,14 @@ const Inner = () => {
   const onCtxDuplicate = useCallback(
     (nodes: Node[]) => {
       if (nodes.length === 0) return;
+      const unlocked = nodes.filter((node) => !isNodeLockedByOther(node.id));
+      if (unlocked.length !== nodes.length) {
+        toast.info("Locked teammate nodes were skipped.");
+      }
+      if (unlocked.length === 0) return;
       pushHistory();
       const idMap = new Map<string, string>();
-      const cloned: Node[] = nodes.map((n) => {
+      const cloned: Node[] = unlocked.map((n) => {
         const newId = `n_${crypto.randomUUID()}`;
         idMap.set(n.id, newId);
         const fresh = cloneNodeFresh(n, newId);
@@ -1074,20 +1159,25 @@ const Inner = () => {
       ]);
       setEdges((eds) => [...eds, ...internalEdges]);
     },
-    [getEdges, setNodes, setEdges, pushHistory],
+    [getEdges, nodeLocks, setNodes, setEdges, pushHistory],
   );
 
   const onCtxDelete = useCallback(
     (nodes: Node[]) => {
       if (nodes.length === 0) return;
+      const unlocked = nodes.filter((node) => !isNodeLockedByOther(node.id));
+      if (unlocked.length !== nodes.length) {
+        toast.info("Locked teammate nodes were skipped.");
+      }
+      if (unlocked.length === 0) return;
       pushHistory();
-      const ids = new Set(nodes.map((n) => n.id));
+      const ids = new Set(unlocked.map((n) => n.id));
       setNodes((nds) => nds.filter((n) => !ids.has(n.id)));
       setEdges((eds) =>
         eds.filter((e) => !ids.has(e.source) && !ids.has(e.target)),
       );
     },
-    [setNodes, setEdges, pushHistory],
+    [nodeLocks, setNodes, setEdges, pushHistory],
   );
 
   /** Build the action list for the current right-click target — used
@@ -1261,7 +1351,7 @@ const Inner = () => {
         flow: screenToFlowPosition({ x: cx, y: cy }), // spawn point
       });
     },
-    [screenToFlowPosition],
+    [releaseNodeLock, screenToFlowPosition],
   );
 
   /* ── Keyboard shortcuts ───────────────────────────────────
@@ -1515,6 +1605,14 @@ const Inner = () => {
    */
   const onNodeDragStart = useCallback(
     (event: React.MouseEvent, _node: Node, draggedNodes: Node[]) => {
+      const moving = draggedNodes && draggedNodes.length > 0 ? draggedNodes : [_node];
+      for (const node of moving) {
+        if (!claimEditableNode(node.id, "drag")) {
+          event.preventDefault();
+          return;
+        }
+        dragLockedNodeIdsRef.current.add(node.id);
+      }
       if (!event.altKey) return;
       if (!draggedNodes || draggedNodes.length === 0) return;
 
@@ -1554,11 +1652,16 @@ const Inner = () => {
       setNodes((nds) => [...nds, ...cloned]);
       setEdges((eds) => [...eds, ...clonedEdges]);
     },
-    [getEdges, setNodes, setEdges, pushHistory],
+    [claimEditableNode, getEdges, setNodes, setEdges, pushHistory],
   );
 
   const onNodeDragStop = useCallback(
     (_e: React.MouseEvent | React.TouchEvent, dragged: Node) => {
+      const lockedIds = Array.from(dragLockedNodeIdsRef.current);
+      dragLockedNodeIdsRef.current.clear();
+      window.setTimeout(() => {
+        for (const nodeId of lockedIds) releaseNodeLock(nodeId);
+      }, 900);
       // Don't reparent groups themselves.
       if (dragged.type === "groupNode") return;
       // Hard guard — React Flow occasionally emits a drag-stop with an
@@ -1652,18 +1755,23 @@ const Inner = () => {
         return [...groups, ...others];
       });
     },
-    [setNodes],
+    [releaseNodeLock, setNodes],
   );
 
   const onConnectStart = useCallback(
-    (_e: React.MouseEvent | React.TouchEvent, params: OnConnectStartParams) => {
+    (event: React.MouseEvent | React.TouchEvent, params: OnConnectStartParams) => {
+      if (params.nodeId && !claimEditableNode(params.nodeId, "edit")) {
+        event.preventDefault();
+        connectStartRef.current = null;
+        return;
+      }
       connectStartRef.current = {
         nodeId: params.nodeId,
         handleId: params.handleId,
         handleType: params.handleType,
       };
     },
-    [],
+    [claimEditableNode],
   );
 
   const onConnectEnd = useCallback(
@@ -1674,6 +1782,7 @@ const Inner = () => {
       const start = connectStartRef.current;
       connectStartRef.current = null;
       if (!start?.nodeId || !start.handleType) return;
+      window.setTimeout(() => releaseNodeLock(start.nodeId!), 1200);
 
       const targetEl = event.target as HTMLElement | null;
       const droppedOnHandle =
@@ -1856,6 +1965,12 @@ const Inner = () => {
     const edgeList = state.current?.edges ?? [];
     const src = nodeList.find((n) => n.id === conn.source);
     if (!src) return true;
+    if (
+      (conn.source && isNodeLockedByOther(conn.source)) ||
+      (conn.target && isNodeLockedByOther(conn.target))
+    ) {
+      return false;
+    }
 
     const th = conn.targetHandle ?? "";
     const srcType = src.type ?? "";
@@ -1936,14 +2051,103 @@ const Inner = () => {
     }
 
     return true;
-  }, []);
+  }, [nodeLocks]);
 
   const memoNodeTypes = useMemo(() => nodeTypes, []);
+  const findNodeIdFromTarget = useCallback((target: EventTarget | null) => {
+    const el = target as HTMLElement | null;
+    const nodeEl = el?.closest?.(".react-flow__node") as HTMLElement | null;
+    return nodeEl?.dataset.id ?? null;
+  }, []);
+
+  const isInteractiveTarget = useCallback((target: EventTarget | null) => {
+    const el = target as HTMLElement | null;
+    if (!el) return false;
+    const tag = el.tagName;
+    return Boolean(
+      tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        tag === "BUTTON" ||
+        el.isContentEditable ||
+        el.closest("input, textarea, select, button, [contenteditable='true']"),
+    );
+  }, []);
+
+  const onCollabPointerDownCapture = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const nodeId = findNodeIdFromTarget(event.target);
+      if (!nodeId) return;
+      const interactive = isInteractiveTarget(event.target);
+      const lock = getRemoteNodeLock(nodeId);
+      if (lock && interactive) {
+        event.preventDefault();
+        event.stopPropagation();
+        toast.info(`${lock.name} is editing this node.`);
+        return;
+      }
+      if (interactive && claimEditableNode(nodeId, "edit")) {
+        lastInteractiveLockRef.current = nodeId;
+      }
+    },
+    [claimEditableNode, findNodeIdFromTarget, isInteractiveTarget, nodeLocks],
+  );
+
+  const onCollabFocusCapture = useCallback(
+    (event: React.FocusEvent<HTMLDivElement>) => {
+      const nodeId = findNodeIdFromTarget(event.target);
+      if (!nodeId || !isInteractiveTarget(event.target)) return;
+      if (!claimEditableNode(nodeId, "edit")) {
+        event.preventDefault();
+        (event.target as HTMLElement | null)?.blur?.();
+        return;
+      }
+      lastInteractiveLockRef.current = nodeId;
+    },
+    [claimEditableNode, findNodeIdFromTarget, isInteractiveTarget],
+  );
+
+  const onCollabBlurCapture = useCallback(
+    (event: React.FocusEvent<HTMLDivElement>) => {
+      const nodeId = findNodeIdFromTarget(event.target);
+      if (!nodeId || lastInteractiveLockRef.current !== nodeId) return;
+      window.setTimeout(() => {
+        const active = document.activeElement as HTMLElement | null;
+        const activeNodeId = findNodeIdFromTarget(active);
+        if (activeNodeId === nodeId) return;
+        releaseNodeLock(nodeId);
+        if (lastInteractiveLockRef.current === nodeId) {
+          lastInteractiveLockRef.current = null;
+        }
+      }, 80);
+    },
+    [findNodeIdFromTarget, releaseNodeLock],
+  );
+
+  const onCollabPointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!cursorEnabled || !wrapperRef.current) return;
+      const nowMs = performance.now();
+      if (nowMs - cursorThrottleRef.current < 85) return;
+      cursorThrottleRef.current = nowMs;
+      const rect = wrapperRef.current.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      publishCursor(
+        Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100)),
+        Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100)),
+      );
+    },
+    [cursorEnabled, publishCursor],
+  );
 
   return (
     <div
       ref={wrapperRef}
       className="workspace-root relative h-full w-full bg-zinc-950"
+      onPointerDownCapture={onCollabPointerDownCapture}
+      onFocusCapture={onCollabFocusCapture}
+      onBlurCapture={onCollabBlurCapture}
+      onPointerMove={onCollabPointerMove}
       onDragOver={onDragOver}
       onDrop={onDrop}
       onContextMenu={(e) => {
@@ -2009,7 +2213,7 @@ const Inner = () => {
       <div className="workspace-grid-surface" />
 
       <ReactFlow
-        nodes={nodes}
+        nodes={renderNodes}
         edges={edges}
         nodeTypes={memoNodeTypes}
         onNodesChange={onNodesChange}
@@ -2077,6 +2281,7 @@ const Inner = () => {
          *  Mounts into `.react-flow__viewport` via portal so it
          *  inherits the viewport's pan/zoom transform. */}
         <MultiSelectionFrame />
+        <CanvasLockBadges />
         {/* Glow on edges that touch the selected node(s). Reads
          *  selection from React-Flow store + edges from useEdges()
          *  → injects a `<style>` tag with rules keyed off each
@@ -2134,6 +2339,10 @@ const Inner = () => {
         onAddNode={openContextMenuAtAnchor}
         onOpenSettings={() => setSettingsOpen(true)}
       />
+      <CanvasRemoteCursors />
+      <div className="fixed right-4 top-[58px] z-50">
+        <CanvasPresenceBar />
+      </div>
       <ShortcutsDialog
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}

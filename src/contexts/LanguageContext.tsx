@@ -1762,6 +1762,7 @@ const translations = {
     // ─── Workspace shell (Wave 4 i18n) ────────────────────────
     // Sidebar
     "workspace.sidebar.home": "Home",
+    "workspace.sidebar.projects": "Projects",
     "workspace.sidebar.all_assets": "All assets",
     "workspace.sidebar.stock": "Stock",
     "workspace.sidebar.spaces": "Spaces",
@@ -4030,6 +4031,7 @@ const translations = {
     // ─── Workspace shell (Wave 4 i18n) ────────────────────────
     // Sidebar
     "workspace.sidebar.home": "หน้าหลัก",
+    "workspace.sidebar.projects": "โปรเจค",
     "workspace.sidebar.all_assets": "ไฟล์ทั้งหมด",
     "workspace.sidebar.stock": "Stock",
     "workspace.sidebar.spaces": "Spaces",

@@ -80,6 +80,7 @@ import {
   DEFAULT_PROJECT_NAME,
   useWorkspaceStore,
   type ProjectMeta,
+  type WorkspaceMeta,
 } from "@/store/useWorkspaceStore";
 import { CreateProjectDialog } from "@/components/workspace/CreateProjectDialog";
 import { UserMenu } from "@/components/workspace/UserMenu";
@@ -225,6 +226,7 @@ function groupByMonth<T extends { updatedAt: number }>(
 
 const VALID_SECTIONS: Section[] = [
   "home",
+  "projects",
   "history",
   "assets",
   "stock",
@@ -551,9 +553,21 @@ const WorkspaceDashboardInner = () => {
             onOpenSidebar={() => setMobileSidebarOpen(true)}
           />
         )}
+        {section === "projects" && (
+          <ProjectsManagerView
+            projects={projects}
+            activeProjectId={activeProjectId}
+            onSelectProject={setActiveProject}
+            onCreateProject={handleCreateProject}
+            onDeleteProject={handleDeleteProject}
+            onOpenSidebar={() => setMobileSidebarOpen(true)}
+          />
+        )}
         {section === "spaces" && (
           <SpacesView
             activeProjectId={activeProjectId}
+            projects={projects}
+            onSelectProject={setActiveProject}
             onOpenSidebar={() => setMobileSidebarOpen(true)}
           />
         )}
@@ -576,6 +590,7 @@ const WorkspaceDashboardInner = () => {
           />
         )}
         {section !== "home" &&
+          section !== "projects" &&
           section !== "spaces" &&
           section !== "history" &&
           section !== "assets" &&
@@ -1311,6 +1326,67 @@ interface SpaceCardData {
   edges: MiniEdge[];
 }
 
+const ProjectQuickSwitch = ({
+  projects,
+  workspaces,
+  activeProjectId,
+  onSelectProject,
+}: {
+  projects: ProjectMeta[];
+  workspaces: WorkspaceMeta[];
+  activeProjectId: string | null;
+  onSelectProject: (id: string | null) => void;
+}) => {
+  const { user } = useAuth();
+  if (projects.length === 0) return null;
+  const counts = new Map<string, number>();
+  for (const workspace of workspaces) {
+    if (!workspace.projectId) continue;
+    counts.set(workspace.projectId, (counts.get(workspace.projectId) ?? 0) + 1);
+  }
+
+  return (
+    <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
+      {[...projects]
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .map((project, index) => {
+          const active = activeProjectId === project.id;
+          const teamProject = Boolean(project.ownerId && project.ownerId !== user?.id);
+          return (
+            <button
+              key={project.id}
+              type="button"
+              onClick={() => onSelectProject(project.id)}
+              className={cn(
+                "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-[13.5px] font-medium ring-1 ring-inset transition-colors",
+                active
+                  ? "bg-white/[0.10] text-zinc-50 ring-white/[0.14]"
+                  : "bg-white/[0.03] text-zinc-400 ring-white/[0.06] hover:bg-white/[0.07] hover:text-zinc-100",
+              )}
+            >
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{
+                  background:
+                    project.color ?? PROJECT_COLOR_SWATCHES[index % PROJECT_COLOR_SWATCHES.length],
+                }}
+              />
+              <span className="max-w-[180px] truncate">{project.name}</span>
+              {teamProject && (
+                <span className="rounded bg-sky-400/15 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-sky-200">
+                  Team
+                </span>
+              )}
+              <span className="rounded bg-white/[0.06] px-1.5 py-px text-[10.5px] font-bold text-zinc-400">
+                {counts.get(project.id) ?? 0}
+              </span>
+            </button>
+          );
+        })}
+    </div>
+  );
+};
+
 const SpacesShowcaseCard = ({
   spaces,
   onOpen,
@@ -1572,11 +1648,354 @@ function buildSpaceCardData(
   };
 }
 
+const ProjectsManagerView = ({
+  projects,
+  activeProjectId,
+  onSelectProject,
+  onCreateProject,
+  onDeleteProject,
+  onOpenSidebar,
+}: {
+  projects: ProjectMeta[];
+  activeProjectId: string | null;
+  onSelectProject: (id: string | null) => void;
+  onCreateProject: () => void;
+  onDeleteProject: (id: string) => void;
+  onOpenSidebar?: () => void;
+}) => {
+  const navigate = useNavigate();
+  const { t } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
+  const workspaces = useWorkspaceStore((s) => s.workspaces);
+  const canvases = useWorkspaceStore((s) => s.canvases);
+  const graphs = useWorkspaceStore((s) => s.graphs);
+  const createWorkspace = useWorkspaceStore((s) => s.createWorkspace);
+  const renameWorkspace = useWorkspaceStore((s) => s.renameWorkspace);
+  const deleteWorkspace = useWorkspaceStore((s) => s.deleteWorkspace);
+  const duplicateWorkspace = useWorkspaceStore((s) => s.duplicateWorkspace);
+  const selectedProjectId = activeProjectId ?? projects[0]?.id ?? null;
+  const selectedProject =
+    projects.find((project) => project.id === selectedProjectId) ?? projects[0] ?? null;
+  const [filter, setFilter] = useState<"all" | "mine" | "team">("all");
+
+  const projectCards = useMemo<ProjectCardItem[]>(() => {
+    const spaceCountByProject = new Map<string, number>();
+    for (const workspace of workspaces) {
+      if (!workspace.projectId) continue;
+      spaceCountByProject.set(
+        workspace.projectId,
+        (spaceCountByProject.get(workspace.projectId) ?? 0) + 1,
+      );
+    }
+    return [...projects]
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .map((project, index) => ({
+        ...project,
+        color: project.color ?? PROJECT_COLOR_SWATCHES[index % PROJECT_COLOR_SWATCHES.length],
+        icon:
+          project.ownerId && project.ownerId !== user?.id
+            ? Users
+            : index === 0
+              ? Lock
+              : Layers,
+        spaceCount: spaceCountByProject.get(project.id) ?? 0,
+      }));
+  }, [projects, user?.id, workspaces]);
+
+  const projectWorkspaceIds = useMemo(
+    () =>
+      workspaces
+        .filter((workspace) =>
+          selectedProjectId
+            ? workspace.projectId === selectedProjectId ||
+              (!workspace.projectId && selectedProjectId === activeProjectId)
+            : true,
+        )
+        .map((workspace) => workspace.id),
+    [activeProjectId, selectedProjectId, workspaces],
+  );
+  useHydrateSpacePreviewGraphs(projectWorkspaceIds, user?.id, authLoading);
+
+  const spaces = useMemo(() => {
+    return [...workspaces]
+      .filter((workspace) =>
+        selectedProjectId
+          ? workspace.projectId === selectedProjectId ||
+            (!workspace.projectId && selectedProjectId === activeProjectId)
+          : true,
+      )
+      .filter((workspace) => {
+        if (filter === "team") return Boolean(workspace.ownerId && workspace.ownerId !== user?.id);
+        if (filter === "mine") return !workspace.ownerId || workspace.ownerId === user?.id;
+        return true;
+      })
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .map((workspace) => buildSpaceCardData(workspace, canvases, graphs));
+  }, [activeProjectId, canvases, filter, graphs, selectedProjectId, user?.id, workspaces]);
+
+  const ownerLabel = selectedProject?.ownerId && selectedProject.ownerId !== user?.id
+    ? "Team project"
+    : "Owned by you";
+
+  const handleNewSpace = () => {
+    const { workspaceId } = createWorkspace(
+      t("workspace.spaces.untitled_space"),
+      selectedProject?.id ?? activeProjectId,
+    );
+    if (user?.id) {
+      const state = useWorkspaceStore.getState();
+      const meta = state.workspaces.find((workspace) => workspace.id === workspaceId);
+      const project = meta?.projectId
+        ? state.projects.find((item) => item.id === meta.projectId)
+        : null;
+      if (meta) {
+        if (project && (!project.ownerId || project.ownerId === user.id)) {
+          void upsertProjectToServer(project, user.id).then(() =>
+            upsertWorkspaceToServer(meta, user.id),
+          );
+        } else {
+          void upsertWorkspaceToServer(meta, user.id);
+        }
+      }
+    }
+    navigate(`/app/workspace/${workspaceId}`);
+  };
+
+  const handleRename = (id: string, currentName: string) => {
+    const next = prompt(t("workspace.spaces.rename_prompt"), currentName);
+    if (next?.trim() && next.trim() !== currentName) {
+      renameWorkspace(id, next.trim());
+      if (user?.id) {
+        const meta = useWorkspaceStore.getState().workspaces.find((w) => w.id === id);
+        if (meta) void upsertWorkspaceToServer(meta, user.id);
+      }
+    }
+  };
+
+  const handleDelete = (id: string, displayName: string) => {
+    if (!confirm(t("workspace.spaces.delete_confirm", { name: displayName }))) return;
+    deleteWorkspace(id);
+    if (user?.id) void deleteWorkspaceFromServer(id);
+  };
+
+  const handleDuplicate = (id: string) => {
+    const toastId = toast.loading(t("workspace.toast.duplicating"));
+    const res = duplicateWorkspace(id);
+    if (res.workspaceId === id) {
+      toast.error(t("workspace.toast.couldnt_duplicate"), { id: toastId });
+      return;
+    }
+    const newMeta = useWorkspaceStore
+      .getState()
+      .workspaces.find((workspace) => workspace.id === res.workspaceId);
+    const newName = newMeta?.name ?? t("workspace.toast.duplicated_space_fallback");
+    if (!user?.id) {
+      toast.success(t("workspace.toast.duplicated_as", { name: newName }), {
+        id: toastId,
+        action: {
+          label: t("workspace.toast.open"),
+          onClick: () => navigate(`/app/workspace/${res.workspaceId}`),
+        },
+      });
+      return;
+    }
+    void (async () => {
+      try {
+        if (newMeta) await upsertWorkspaceToServer(newMeta, user.id);
+        const newCanvases = useWorkspaceStore
+          .getState()
+          .canvases.filter((canvas) => canvas.workspaceId === res.workspaceId);
+        const nextGraphs = useWorkspaceStore.getState().graphs;
+        await Promise.all(
+          newCanvases.map((canvas) =>
+            nextGraphs[canvas.id]
+              ? saveCanvasToServer(nextGraphs[canvas.id], user.id)
+              : Promise.resolve(),
+          ),
+        );
+        toast.success(t("workspace.toast.duplicated_as", { name: newName }), {
+          id: toastId,
+          action: {
+            label: t("workspace.toast.open"),
+            onClick: () => navigate(`/app/workspace/${res.workspaceId}`),
+          },
+        });
+      } catch (err) {
+        console.warn("[workspace-projects] duplicate server push failed:", err);
+        toast.warning(t("workspace.toast.duplicated_offline", { name: newName }), {
+          id: toastId,
+          action: {
+            label: t("workspace.toast.open"),
+            onClick: () => navigate(`/app/workspace/${res.workspaceId}`),
+          },
+        });
+      }
+    })();
+  };
+
+  return (
+    <>
+      <PageHeader
+        title="Projects"
+        rightSlot={<UserMenu />}
+        onOpenSidebar={onOpenSidebar}
+      />
+      <div className="ws-scroll-hide flex-1 overflow-y-auto">
+        <div className="mx-auto grid w-full max-w-[1500px] gap-5 px-4 pb-16 pt-6 md:px-6 lg:grid-cols-[300px_minmax(0,1fr)] lg:px-8">
+          <aside className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-3 ring-1 ring-inset ring-white/[0.06]">
+            <div className="mb-3 flex items-center justify-between px-1">
+              <div className="text-[13.5px] font-semibold uppercase tracking-[0.14em] text-zinc-300">
+                Projects
+              </div>
+              <button
+                type="button"
+                onClick={onCreateProject}
+                className="grid h-8 w-8 place-items-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white"
+                title={t("workspace.home.new_project_tooltip")}
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <ul className="space-y-1">
+              {projectCards.map((project) => {
+                const active = selectedProject?.id === project.id;
+                const canManage = !project.ownerId || project.ownerId === user?.id;
+                const protectedProject = project.name === DEFAULT_PROJECT_NAME;
+                return (
+                  <li key={project.id} className="group/project relative">
+                    <button
+                      type="button"
+                      onClick={() => onSelectProject(project.id)}
+                      className={cn(
+                        "flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[14.5px] transition-colors",
+                        active
+                          ? "bg-white/[0.08] text-zinc-50 ring-1 ring-inset ring-white/[0.08]"
+                          : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100",
+                      )}
+                    >
+                      <span
+                        className="grid h-5 w-5 shrink-0 place-items-center rounded"
+                        style={{ background: project.color }}
+                      >
+                        <project.icon className="h-3 w-3 text-zinc-950" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">{project.name}</span>
+                        <span className="block text-[11.5px] text-zinc-500">
+                          {project.spaceCount} spaces
+                        </span>
+                      </span>
+                      {project.ownerId && (
+                        <span className="rounded bg-sky-400/15 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-sky-200">
+                          Team
+                        </span>
+                      )}
+                    </button>
+                    {canManage && !protectedProject && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDeleteProject(project.id);
+                        }}
+                        className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-md text-zinc-500 opacity-0 transition-all hover:bg-red-500/15 hover:text-red-300 group-hover/project:opacity-100"
+                        title={t("workspace.home.delete_project_tooltip", { name: project.name })}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </aside>
+
+          <section className="min-w-0">
+            <div className="mb-5 flex flex-col gap-4 rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06] md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0">
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white/[0.05] px-2.5 py-1 text-[11.5px] font-bold uppercase tracking-[0.14em] text-zinc-400 ring-1 ring-inset ring-white/[0.06]">
+                  <Users className="h-3 w-3" />
+                  {ownerLabel}
+                </div>
+                <h1 className="truncate text-[30px] font-semibold leading-tight tracking-tight text-zinc-50 md:text-[36px]">
+                  {selectedProject?.name ?? "Projects"}
+                </h1>
+                <p className="mt-1 text-[14.5px] text-zinc-500">
+                  {spaces.length} visible space{spaces.length === 1 ? "" : "s"}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {(["all", "mine", "team"] as const).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setFilter(item)}
+                    className={cn(
+                      "h-9 rounded-lg px-3 text-[13.5px] font-medium capitalize transition-colors",
+                      filter === item
+                        ? "bg-white text-zinc-950"
+                        : "bg-white/[0.05] text-zinc-300 ring-1 ring-inset ring-white/[0.07] hover:bg-white/[0.09] hover:text-white",
+                    )}
+                  >
+                    {item}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={handleNewSpace}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-white/[0.08] px-3 text-[13.5px] font-semibold text-zinc-50 ring-1 ring-inset ring-white/[0.10] transition-colors hover:bg-white/[0.13]"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {t("workspace.spaces.new_space")}
+                </button>
+              </div>
+            </div>
+
+            {spaces.length === 0 ? (
+              <EmptyState
+                title={filter === "team" ? "No team spaces in this project" : t("workspace.spaces.empty_no_spaces")}
+                hint={
+                  filter === "team"
+                    ? "Spaces from teammates in this project will appear here."
+                    : t("workspace.spaces.empty_no_spaces_hint")
+                }
+                cta={
+                  filter !== "team"
+                    ? { label: t("workspace.spaces.new_space"), onClick: handleNewSpace }
+                    : undefined
+                }
+              />
+            ) : (
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {spaces.map((space) => (
+                  <SpaceCard
+                    key={space.id}
+                    ws={space}
+                    canManage={!space.ownerId || space.ownerId === user?.id}
+                    onOpen={() => navigate(`/app/workspace/${space.id}`)}
+                    onRename={() => handleRename(space.id, space.name)}
+                    onDuplicate={() => handleDuplicate(space.id)}
+                    onDelete={() => handleDelete(space.id, space.name)}
+                  />
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      </div>
+    </>
+  );
+};
+
 const SpacesView = ({
   activeProjectId,
+  projects,
+  onSelectProject,
   onOpenSidebar,
 }: {
   activeProjectId: string | null;
+  projects: ProjectMeta[];
+  onSelectProject: (id: string | null) => void;
   onOpenSidebar?: () => void;
 }) => {
   const navigate = useNavigate();
@@ -1844,6 +2263,13 @@ const SpacesView = ({
               {t("workspace.spaces.subtitle")}
             </p>
           </header>
+
+          <ProjectQuickSwitch
+            projects={projects}
+            workspaces={workspaces}
+            activeProjectId={activeProjectId}
+            onSelectProject={onSelectProject}
+          />
 
           {/* ── Tabs row — left: tab switcher / right: actions ──
               Mirrors the Magnific layout exactly — segmented tabs on

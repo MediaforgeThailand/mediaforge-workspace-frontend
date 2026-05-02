@@ -60,7 +60,7 @@ function CreditAvatarRing({
   const center = size / 2;
   const outerRadius = center - 3;
   const innerRadius = center - 7;
-  const avatarInset = size >= 48 ? 9 : 8;
+  const avatarInset = size <= 34 ? 6 : size >= 48 ? 9 : 8;
   const ring = (radius: number, percent: number) => {
     const circumference = 2 * Math.PI * radius;
     return {
@@ -108,7 +108,10 @@ function CreditAvatarRing({
         }}
       >
         <AvatarImage src={src ?? undefined} alt="" />
-        <AvatarFallback className="bg-emerald-600 text-[13.5px] font-semibold text-white">
+        <AvatarFallback
+          className="bg-emerald-600 font-semibold text-white"
+          style={{ fontSize: size <= 34 ? 11.5 : 13.5 }}
+        >
           {initial}
         </AvatarFallback>
       </Avatar>
@@ -149,7 +152,7 @@ function UsageRow({
   );
 }
 
-export function UserMenu() {
+export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
   const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
   const { t, language, setLanguage } = useLanguage();
@@ -196,7 +199,8 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="flex h-11 w-11 items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/50 lg:h-10 lg:w-10"
+        className="flex items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/50"
+        style={{ width: compact ? 32 : 40, height: compact ? 32 : 40 }}
         aria-label={t("workspace.usermenu.account")}
       >
         <CreditAvatarRing
@@ -205,7 +209,7 @@ export function UserMenu() {
           personalPercent={personalPercent}
           sharedPercent={sharedPercent}
           showShared={Boolean(credits?.is_shared_pool)}
-          size={42}
+          size={compact ? 32 : 42}
         />
       </DropdownMenuTrigger>
 

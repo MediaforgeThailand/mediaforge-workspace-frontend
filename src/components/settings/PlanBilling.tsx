@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -88,6 +87,25 @@ interface PaymentMethod {
   funding: string | null;
 }
 
+interface BillingAddress {
+  name?: string;
+  email?: string;
+  line1?: string;
+  city?: string;
+  postal_code?: string;
+  country?: string;
+  tax_id?: string;
+}
+
+interface PlanBillingProfile {
+  subscription_plan_id?: string | null;
+  current_plan_id?: string | null;
+  subscription_billing_cycle?: string | null;
+  billing_interval?: string | null;
+  billing_address?: BillingAddress | null;
+  current_period_end?: string | null;
+}
+
 const formatPaymentLabel = (pm: PaymentMethod | null | undefined) => {
   if (!pm) return null;
   if (pm.type === "card" && pm.last4) {
@@ -105,11 +123,25 @@ const formatLongDate = (iso: string | null | undefined) => {
   return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 };
 
+const denseButtonClass =
+  "h-[32px] gap-[6px] rounded-lg px-[12px] text-[12.5px] leading-[16px] [&_svg]:size-[14px]";
+const compactOutlineButtonClass = cn(
+  denseButtonClass,
+  "border-white/10 text-zinc-300 hover:bg-white/5",
+);
+const compactPrimaryButtonClass = cn(
+  denseButtonClass,
+  "bg-violet-600 text-white hover:bg-violet-500",
+);
+
 const PlanBilling = () => {
   const { user, profile, refreshProfile } = useAuth();
   const { credits } = useCredits();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const billingProfile = profile as (typeof profile & PlanBillingProfile) | null;
+  const planId = billingProfile?.subscription_plan_id || billingProfile?.current_plan_id;
+  const currentPeriodEnd = billingProfile?.current_period_end;
 
   // ── State ────────────────────────────────────────────────────
   const [plan, setPlan] = useState<PlanRow | null>(null);
@@ -132,7 +164,6 @@ const PlanBilling = () => {
   // profile exposes a subscription_plan_id, otherwise we render the
   // "Free" fallback.
   useEffect(() => {
-    const planId = (profile as any)?.subscription_plan_id || (profile as any)?.current_plan_id;
     if (!planId) {
       setPlan(null);
       return;
@@ -148,7 +179,7 @@ const PlanBilling = () => {
       setPlan(data as unknown as PlanRow | null);
     })();
     return () => { cancelled = true; };
-  }, [profile]);
+  }, [planId]);
 
   // Read auto_refill from profile (column added in
   // 20260429190000_profiles_billing_settings_columns).
@@ -191,12 +222,11 @@ const PlanBilling = () => {
   useEffect(() => {
     if (!user) return;
     void refreshPaymentMethods();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   // ── Derived ──────────────────────────────────────────────────
   const isFree = !plan;
-  const billingCycle = (profile as any)?.subscription_billing_cycle ?? (profile as any)?.billing_interval ?? "monthly";
+  const billingCycle = billingProfile?.subscription_billing_cycle ?? billingProfile?.billing_interval ?? "monthly";
   const isAnnual = billingCycle === "annual";
 
   const planPrice = useMemo(() => {
@@ -212,9 +242,7 @@ const PlanBilling = () => {
   const defaultPm = paymentMethods.find((pm) => pm.id === defaultPmId) ?? null;
   const defaultPaymentLabel = formatPaymentLabel(defaultPm);
 
-  const billingAddress = (profile as any)?.billing_address as
-    | { name?: string; email?: string; line1?: string; city?: string; postal_code?: string; country?: string; tax_id?: string }
-    | null;
+  const billingAddress = billingProfile?.billing_address ?? null;
   const billingName = billingAddress?.name ?? profile?.display_name ?? "—";
   const billingEmail = billingAddress?.email ?? user?.email ?? "—";
 
@@ -300,61 +328,61 @@ const PlanBilling = () => {
   };
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-3xl space-y-[14px]">
       <div>
-        <h2 className="text-xl font-semibold text-zinc-50">Plan & billing</h2>
-        <p className="text-[12px] text-zinc-500 mt-0.5">
+        <h2 className="text-[21px] font-semibold leading-[27px] text-zinc-50">Plan & billing</h2>
+        <p className="mt-[2px] text-[13px] leading-[18px] text-zinc-500">
           Manage your subscription, credits, and payment methods.
         </p>
       </div>
 
       {/* ── 1. Plan section ─────────────────────────────────── */}
-      <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-        <div className="flex items-start justify-between gap-4">
+      <section className="rounded-lg border border-white/10 bg-white/[0.02] p-[14px]">
+        <div className="flex items-center justify-between gap-[14px]">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-[15px] font-semibold text-zinc-50">
+            <div className="flex flex-wrap items-center gap-[8px]">
+              <h3 className="text-[14px] font-semibold leading-[18px] text-zinc-50">
                 {plan?.name ?? "Free plan"}
               </h3>
               {!isFree && (
-                <span className="text-[13px] text-zinc-300">
+                <span className="text-[13px] leading-[18px] text-zinc-300">
                   {formatThb(planPrice)}
                   <span className="text-zinc-500">/{isAnnual ? "year" : "month"}</span>
                 </span>
               )}
               {isFree && (
-                <Badge variant="outline" className="text-[10px] border-white/15 text-zinc-400">
+                <Badge variant="outline" className="border-white/15 px-[7px] py-[1px] text-[10.5px] leading-[14px] text-zinc-400">
                   No active subscription
                 </Badge>
               )}
             </div>
-            <div className="mt-1 flex items-center gap-2 text-[11px] text-zinc-500">
+            <div className="mt-[6px] flex items-center gap-[8px] text-[12px] leading-[16px] text-zinc-500">
               {!isFree && <span>Billed {isAnnual ? "annually" : "monthly"}</span>}
-              {!isFree && (profile as any)?.current_period_end && (
+              {!isFree && currentPeriodEnd && (
                 <>
                   <span className="text-zinc-700">·</span>
-                  <span>Next payment: {formatLongDate((profile as any).current_period_end)}</span>
+                  <span>Next payment: {formatLongDate(currentPeriodEnd)}</span>
                 </>
               )}
               {isFree && <span>Upgrade to unlock more credits and pro features.</span>}
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex flex-shrink-0 items-center gap-[8px]">
             <Button
               size="sm"
               variant="outline"
               onClick={() => setShowTeamPlaceholder(true)}
-              className="border-white/10 text-zinc-300 hover:bg-white/5"
+              className={compactOutlineButtonClass}
             >
-              <Building2 className="w-3.5 h-3.5 mr-1.5" />
+              <Building2 />
               Create your team
             </Button>
             <Button
               size="sm"
               onClick={() => navigate("/app/pricing")}
-              className="bg-violet-600 hover:bg-violet-500 text-white"
+              className={compactPrimaryButtonClass}
             >
-              <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+              <Sparkles />
               {isFree ? "View plans" : "Upgrade plan"}
             </Button>
           </div>
@@ -362,35 +390,58 @@ const PlanBilling = () => {
       </section>
 
       {/* ── 2. Credits section ──────────────────────────────── */}
-      <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-        <div className="flex items-start justify-between gap-4 mb-4">
+      <section className="rounded-lg border border-white/10 bg-white/[0.02] p-[14px]">
+        <div className="mb-[10px] flex flex-wrap items-start justify-between gap-[10px]">
           <div>
-            <h3 className="text-[14px] font-semibold text-zinc-50">Credits</h3>
-            <p className="text-[11px] text-zinc-500 mt-0.5">
+            <h3 className="text-[14px] font-semibold leading-[18px] text-zinc-50">Credits</h3>
+            <p className="mt-[2px] text-[12px] leading-[16px] text-zinc-500">
               Credits reset every {isAnnual ? "year" : "month"} on renewal.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-zinc-400" title="Auto-refill — top up automatically when balance is low">
-            <span>Auto-refill</span>
-            <Switch
-              checked={autoRefill}
-              onCheckedChange={handleAutoRefill}
-              aria-label="Auto-refill credits"
-            />
+          <div className="flex flex-wrap items-center justify-end gap-[8px]">
+            <div className="flex items-center gap-[8px] text-[12px] leading-[16px] text-zinc-400" title="Auto-refill - top up automatically when balance is low">
+              <span>Auto-refill</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={autoRefill}
+                aria-label="Auto-refill credits"
+                onClick={() => void handleAutoRefill(!autoRefill)}
+                className={cn(
+                  "relative h-[20px] w-[36px] rounded-full border border-white/10 transition-colors",
+                  autoRefill ? "bg-violet-600" : "bg-white/[0.08]",
+                )}
+              >
+                <span
+                  className={cn(
+                    "absolute top-[2px] h-[16px] w-[16px] rounded-full bg-zinc-950 shadow-sm transition-transform",
+                    autoRefill ? "translate-x-[16px]" : "translate-x-[2px]",
+                  )}
+                />
+              </button>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setShowBuyCredits(true)}
+              className={compactPrimaryButtonClass}
+            >
+              <Plus />
+              Buy extra credits
+            </Button>
           </div>
         </div>
 
-        <div className="space-y-2">
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-3xl font-bold text-zinc-50 tabular-nums">
+        <div className="space-y-[8px]">
+          <div className="flex items-baseline gap-[6px]">
+            <span className="text-[28px] font-bold leading-[34px] tabular-nums text-zinc-50">
               {formatCreditsBig(balance)}
             </span>
-            <span className="text-[12px] text-zinc-500">total credits</span>
+            <span className="text-[12px] leading-[16px] text-zinc-500">total credits</span>
           </div>
 
-          <Progress value={usagePct} className="h-1.5 bg-white/[0.05]" />
+          <Progress value={usagePct} className="h-[5px] bg-white/[0.05]" />
 
-          <div className="flex items-center justify-between text-[11px] text-zinc-400">
+          <div className="flex items-center justify-between text-[12px] leading-[16px] text-zinc-400">
             <span>
               Spent: <span className="text-zinc-200 tabular-nums">{used.toLocaleString()}</span>
             </span>
@@ -400,41 +451,31 @@ const PlanBilling = () => {
           </div>
         </div>
 
-        <div className="mt-4 flex justify-end">
-          <Button
-            size="sm"
-            onClick={() => setShowBuyCredits(true)}
-            className="bg-violet-600 hover:bg-violet-500 text-white"
-          >
-            <Plus className="w-3.5 h-3.5 mr-1.5" />
-            Buy extra credits
-          </Button>
-        </div>
       </section>
 
       {/* ── 3. Billing information ───────────────────────────── */}
-      <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-        <div className="flex items-start justify-between gap-4">
+      <section className="rounded-lg border border-white/10 bg-white/[0.02] p-[14px]">
+        <div className="flex items-center justify-between gap-[14px]">
           <div className="min-w-0">
-            <h3 className="text-[14px] font-semibold text-zinc-50">Billing information</h3>
-            <p className="text-[12px] text-zinc-300 mt-1">
+            <h3 className="text-[14px] font-semibold leading-[18px] text-zinc-50">Billing information</h3>
+            <p className="mt-[6px] text-[12px] leading-[16px] text-zinc-300">
               {billingName} <span className="text-zinc-600">·</span>{" "}
               <span className="text-zinc-400">{billingEmail}</span>
             </p>
             {billingAddress?.line1 && (
-              <p className="text-[11px] text-zinc-500 mt-0.5 truncate">
+              <p className="mt-[2px] truncate text-[11px] leading-[15px] text-zinc-500">
                 {[billingAddress.line1, billingAddress.city, billingAddress.postal_code, billingAddress.country]
                   .filter(Boolean)
                   .join(", ")}
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex flex-shrink-0 items-center gap-[8px]">
             <Button
               size="sm"
               variant="outline"
               onClick={() => setShowBillingInfo(true)}
-              className="border-white/10 text-zinc-300 hover:bg-white/5"
+              className={compactOutlineButtonClass}
             >
               Change
             </Button>
@@ -442,7 +483,7 @@ const PlanBilling = () => {
               size="sm"
               variant="outline"
               onClick={() => setShowBillingHistory(true)}
-              className="border-white/10 text-zinc-300 hover:bg-white/5"
+              className={compactOutlineButtonClass}
             >
               History
             </Button>
@@ -451,11 +492,11 @@ const PlanBilling = () => {
       </section>
 
       {/* ── 4. Payment details ───────────────────────────────── */}
-      <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-        <div className="flex items-start justify-between gap-4 mb-3">
+      <section className="rounded-lg border border-white/10 bg-white/[0.02] p-[14px]">
+        <div className="mb-[10px] flex items-start justify-between gap-[14px]">
           <div>
-            <h3 className="text-[14px] font-semibold text-zinc-50">Payment details</h3>
-            <p className="text-[11px] text-zinc-500 mt-0.5">
+            <h3 className="text-[14px] font-semibold leading-[18px] text-zinc-50">Payment details</h3>
+            <p className="mt-[2px] text-[12px] leading-[16px] text-zinc-500">
               Cards saved here are reused for renewals and auto-refills.
             </p>
           </div>
@@ -463,21 +504,21 @@ const PlanBilling = () => {
             size="sm"
             variant="outline"
             onClick={() => setShowUpdatePayment(true)}
-            className="border-white/10 text-zinc-300 hover:bg-white/5"
+            className={compactOutlineButtonClass}
           >
             Update
           </Button>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-[8px]">
           {loadingPMs && (
-            <div className="flex items-center gap-2 py-2 text-xs text-zinc-500">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <div className="flex items-center gap-[8px] py-[8px] text-[12px] leading-[16px] text-zinc-500">
+              <Loader2 className="h-[14px] w-[14px] animate-spin" />
               Loading payment methods…
             </div>
           )}
           {!loadingPMs && paymentMethods.length === 0 && (
-            <p className="text-[11px] text-zinc-500 italic">
+            <p className="text-[12px] leading-[16px] text-zinc-500 italic">
               No payment methods saved yet. Click "Update" to add a card.
             </p>
           )}
@@ -488,32 +529,32 @@ const PlanBilling = () => {
               <div
                 key={pm.id}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg border px-3 py-2.5",
+                  "flex items-center gap-[10px] rounded-lg border px-[12px] py-[9px]",
                   isDefault
                     ? "border-violet-500/30 bg-violet-500/[0.05]"
                     : "border-white/10 bg-white/[0.02]",
                 )}
               >
-                <div className="w-8 h-8 rounded-md bg-white/[0.05] flex items-center justify-center flex-shrink-0">
+                <div className="flex h-[32px] w-[32px] flex-shrink-0 items-center justify-center rounded-md bg-white/[0.05]">
                   {isCard ? (
-                    <CreditCard className="w-3.5 h-3.5 text-zinc-300" />
+                    <CreditCard className="h-[14px] w-[14px] text-zinc-300" />
                   ) : (
-                    <QrCode className="w-3.5 h-3.5 text-emerald-300" />
+                    <QrCode className="h-[14px] w-[14px] text-emerald-300" />
                   )}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-medium text-zinc-100">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12px] font-medium leading-[16px] text-zinc-100">
                     {formatPaymentLabel(pm)}
                   </p>
                   {isCard && pm.exp_month && pm.exp_year && (
-                    <p className="text-[10px] text-zinc-500">
+                    <p className="text-[11px] leading-[15px] text-zinc-500">
                       Expires {String(pm.exp_month).padStart(2, "0")}/{String(pm.exp_year).slice(-2)}
                     </p>
                   )}
                 </div>
                 {isDefault && (
-                  <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-200 border border-violet-500/30">
-                    <Star className="w-2.5 h-2.5 inline mr-0.5 -mt-0.5" />
+                  <span className="rounded border border-violet-500/30 bg-violet-500/15 px-[6px] py-[2px] text-[10px] font-bold uppercase leading-[13px] text-violet-200">
+                    <Star className="-mt-[2px] mr-[2px] inline h-[10px] w-[10px]" />
                     Default
                   </span>
                 )}
@@ -531,7 +572,7 @@ const PlanBilling = () => {
                         toast({ title: "Default updated" });
                       }
                     }}
-                    className="text-[10px] text-zinc-400 hover:text-zinc-100 transition-colors"
+                    className="text-[11px] leading-[15px] text-zinc-400 transition-colors hover:text-zinc-100"
                   >
                     Make default
                   </button>
@@ -549,10 +590,10 @@ const PlanBilling = () => {
                         await refreshPaymentMethods();
                       }
                     }}
-                    className="text-zinc-500 hover:text-red-400 transition-colors p-1"
+                    className="p-[4px] text-zinc-500 transition-colors hover:text-red-400"
                     aria-label="Remove payment method"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="h-[14px] w-[14px]" />
                   </button>
                 )}
               </div>
@@ -562,23 +603,23 @@ const PlanBilling = () => {
       </section>
 
       {/* ── 5. Danger zone ──────────────────────────────────── */}
-      <Accordion type="single" collapsible className="border border-red-500/15 bg-red-500/[0.02] rounded-xl">
-        <AccordionItem value="danger" className="border-0 px-5">
-          <AccordionTrigger className="text-[13px] font-medium text-red-300 hover:text-red-200 hover:no-underline py-4">
-            <div className="flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4" />
+      <Accordion type="single" collapsible className="rounded-lg border border-red-500/15 bg-red-500/[0.02]">
+        <AccordionItem value="danger" className="border-0 px-[16px]">
+          <AccordionTrigger className="py-[12px] text-[13px] font-medium leading-[18px] text-red-300 hover:text-red-200 hover:no-underline">
+            <div className="flex items-center gap-[8px]">
+              <ShieldAlert className="h-[16px] w-[16px]" />
               Danger zone — Cancel a subscription
             </div>
           </AccordionTrigger>
-          <AccordionContent className="pb-4">
-            <div className="space-y-3 text-[12px] text-zinc-400">
+          <AccordionContent className="pb-[14px]">
+            <div className="space-y-[12px] text-[12px] leading-[18px] text-zinc-400">
               <p>
                 Cancelling closes auto-renewal but lets you keep access until the end of the current billing period.
-                {(profile as any)?.current_period_end && (
+                {currentPeriodEnd && (
                   <>
                     {" "}You'll keep access until{" "}
                     <span className="text-zinc-200 font-medium">
-                      {formatLongDate((profile as any).current_period_end)}
+                      {formatLongDate(currentPeriodEnd)}
                     </span>.
                   </>
                 )}
@@ -588,7 +629,7 @@ const PlanBilling = () => {
                 variant="outline"
                 disabled={isFree}
                 onClick={() => setConfirmCancel(true)}
-                className="border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:opacity-50"
+                className={cn(denseButtonClass, "border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:opacity-50")}
               >
                 {isFree ? "No active subscription" : "Cancel subscription"}
               </Button>

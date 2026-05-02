@@ -1781,3 +1781,44 @@ body.ws-lightbox-open .react-flow__node .ws-clean-title {
   pointer-events: none;
   white-space: nowrap;
 }
+
+.workspace-root .react-flow__node.ws-node-remote-locked {
+  cursor: default !important;
+}
+
+.workspace-root .react-flow__node.ws-node-remote-locked::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border: 1px solid hsl(199 89% 62% / 0.5);
+  border-radius: 14px;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px hsl(0 0% 0% / 0.6), 0 0 22px hsl(199 89% 62% / 0.14);
+}
+
+.ws-node-lock-badge {
+  position: absolute;
+  z-index: 7;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 180px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid;
+  border-radius: 999px;
+  background: hsl(0 0% 0% / 0.78);
+  box-shadow: 0 8px 24px hsl(0 0% 0% / 0.34);
+  backdrop-filter: blur(8px);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.ws-node-lock-badge span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

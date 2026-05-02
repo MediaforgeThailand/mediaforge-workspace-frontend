@@ -30,6 +30,7 @@
 import {
   Home as HomeIcon,
   History as HistoryIcon,
+  FolderKanban,
   Workflow,
   Image as ImageIcon,
   Images,
@@ -82,6 +83,7 @@ type NavItem = {
   /** Translation key for the label. Resolved at render time. */
   labelKey:
     | "workspace.sidebar.home"
+    | "workspace.sidebar.projects"
     | "workspace.sidebar.all_assets"
     | "workspace.sidebar.stock"
     | "workspace.sidebar.spaces"
@@ -94,6 +96,7 @@ type NavItem = {
 
 const NAV_TOP: NavItem[] = [
   { id: "home",   labelKey: "workspace.sidebar.home",       icon: HomeIcon },
+  { id: "projects", labelKey: "workspace.sidebar.projects", icon: FolderKanban },
   // Sidebar entry points to AssetsView (the Magnific-style asset
   // library that replaced the old HistoryView). The legacy
   // `?section=history` URL still resolves to this view because the

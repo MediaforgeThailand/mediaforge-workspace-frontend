@@ -71,58 +71,58 @@ const CanvasHeader = () => {
 
   return (
     <div
-      className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-white/[0.04] bg-[hsl(0_0%_4%)] px-3 lg:h-12"
+      className="flex h-[40px] shrink-0 items-center justify-between gap-[10px] border-b border-white/[0.04] bg-[hsl(0_0%_4%)] px-[14px]"
       style={{ fontFamily: "var(--font-sans)" }}
     >
       {/* Left — back arrow + breadcrumb */}
-      <div className="flex min-w-0 flex-1 items-center gap-2">
+      <div className="flex min-w-0 flex-1 items-center gap-[8px]">
         <Link
           to="/app/workspace"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-100 lg:h-8 lg:w-8"
+          className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-100"
           title={t("workspace.canvas.back_dashboard")}
           aria-label={t("workspace.canvas.back_dashboard")}
         >
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft className="h-[15px] w-[15px]" />
         </Link>
 
         {/* Project chip — coloured square + label */}
         <button
           type="button"
-          className="flex h-10 shrink-0 items-center gap-1.5 rounded-md px-2 text-[12.5px] text-zinc-200 transition-colors hover:bg-white/[0.04] lg:h-8 lg:px-1.5"
+          className="flex h-[30px] shrink-0 items-center gap-[6px] rounded-md px-[8px] text-[12px] leading-[16px] text-zinc-200 transition-colors hover:bg-white/[0.04]"
           title={t("workspace.canvas.project_tooltip", { name: projectLabel })}
         >
           <span
-            className="flex h-5 w-5 items-center justify-center rounded-[5px]"
+            className="flex h-[22px] w-[22px] items-center justify-center rounded-[5px]"
             style={{ background: projectAccent }}
           >
-            <Layers className="h-3 w-3 text-zinc-950" />
+            <Layers className="h-[13px] w-[13px] text-zinc-950" />
           </span>
           <span className="font-medium">{projectLabel}</span>
         </button>
 
-        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-600" />
+        <ChevronRight className="h-[13px] w-[13px] shrink-0 text-zinc-600" />
 
         {/* Workspace name — slightly italic + soft glyph to read as
          *  "the document title", consistent with Figma/Notion patterns. */}
-        <span className="min-w-0 truncate text-[12.5px] italic text-zinc-300">
+        <span className="min-w-0 truncate text-[12px] leading-[16px] italic text-zinc-300">
           {workspace?.name || t("workspace.canvas.untitled_space")}
         </span>
       </div>
 
       {/* Right — Share + UserMenu */}
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-[10px]">
         {canShare && (
           <button
             type="button"
             onClick={() => setShareOpen(true)}
-            className="flex h-10 items-center gap-1.5 rounded-md bg-white px-3 text-[12px] font-medium text-zinc-900 transition-colors hover:bg-zinc-200 lg:h-8"
+            className="flex h-[32px] items-center gap-[6px] rounded-lg bg-white px-[12px] text-[12px] font-semibold leading-[16px] text-zinc-900 transition-colors hover:bg-zinc-200"
             title={t("workspace.canvas.share_workspace")}
           >
-            <Users className="h-3.5 w-3.5" />
+            <Users className="h-[15px] w-[15px]" />
             {t("workspace.canvas.share")}
           </button>
         )}
-        <UserMenu />
+        <UserMenu compact />
       </div>
 
       {canShare && currentWorkspaceId && (

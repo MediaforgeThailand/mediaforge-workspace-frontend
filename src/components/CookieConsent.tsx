@@ -27,7 +27,11 @@ const CookieConsent = () => {
   const decline = () => {
     localStorage.setItem("mf-cookie-consent", "declined");
     // One-shot capture before declining (PostHog may not be initialized yet, this is best-effort)
-    try { posthog.capture("cookie_consent_declined"); } catch {}
+    try {
+      posthog.capture("cookie_consent_declined");
+    } catch (error) {
+      if (import.meta.env.DEV) console.debug("[cookie-consent] decline capture failed", error);
+    }
     setVisible(false);
   };
 
@@ -39,31 +43,31 @@ const CookieConsent = () => {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 100, opacity: 0 }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-lg rounded-2xl border border-border/50 bg-card/95 p-5 shadow-2xl backdrop-blur-xl sm:left-6 sm:right-auto"
+          className="fixed bottom-3 left-3 right-3 z-[100] mx-auto max-w-sm rounded-xl border border-border/50 bg-card/95 p-[14px] shadow-2xl backdrop-blur-xl sm:left-5 sm:right-auto"
         >
-          <button onClick={decline} className="absolute right-3 top-3 text-muted-foreground hover:text-foreground">
+          <button onClick={decline} className="absolute right-[10px] top-[10px] text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
           </button>
-          <div className="flex items-start gap-3">
-            <Cookie className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+          <div className="flex items-start gap-[10px] pr-[18px]">
+            <Cookie className="mt-[2px] h-4 w-4 shrink-0 text-primary" />
             <div>
-              <p className="text-sm font-semibold text-foreground">{t("cookieTitle" as any)}</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                {t("cookieDesc" as any)}{" "}
+              <p className="text-[13px] font-semibold leading-[18px] text-foreground">{t("cookieTitle")}</p>
+              <p className="mt-[4px] text-[11.5px] leading-[17px] text-muted-foreground">
+                {t("cookieDesc")}{" "}
                 <Link to="/privacy" className="underline hover:text-foreground">
                   {t("landingFooterPrivacy")}
                 </Link>
                 {" · "}
                 <Link to="/cookies" className="underline hover:text-foreground">
-                  {t("cookieManageLink" as any)}
+                  {t("cookieManageLink")}
                 </Link>
               </p>
-              <div className="mt-3 flex gap-2">
-                <Button variant="gradient" size="sm" onClick={accept}>
-                  {t("cookieAccept" as any)}
+              <div className="mt-[10px] flex gap-[8px]">
+                <Button variant="gradient" size="sm" onClick={accept} className="h-[30px] px-[12px] text-[12px] leading-[16px]">
+                  {t("cookieAccept")}
                 </Button>
-                <Button variant="ghost" size="sm" onClick={decline}>
-                  {t("cookieDecline" as any)}
+                <Button variant="ghost" size="sm" onClick={decline} className="h-[30px] px-[12px] text-[12px] leading-[16px]">
+                  {t("cookieDecline")}
                 </Button>
               </div>
             </div>
