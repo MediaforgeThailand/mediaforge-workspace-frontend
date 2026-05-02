@@ -127,6 +127,13 @@ interface MiniEdge {
   target: string;
 }
 
+type PreviewMediaKind = "image" | "video";
+
+interface PreviewMedia {
+  url: string;
+  kind: PreviewMediaKind;
+}
+
 interface MonthBucket<T> {
   /** "April 2026" */
   label: string;
@@ -142,6 +149,7 @@ const PREVIEW_HYDRATION_BATCH_DELAY_MS = 90;
 const MINIMAP_NODE_LIMIT = 80;
 const MINIMAP_EDGE_LIMIT = 96;
 const MINIMAP_IMAGE_LIMIT = 18;
+const SPACE_PREVIEW_MEDIA_LIMIT = 6;
 const PREVIEW_CACHE_PREFIX = "mf:workspace-preview:v2:";
 const PREVIEW_CACHE_INDEX_KEY = `${PREVIEW_CACHE_PREFIX}index`;
 const PREVIEW_CACHE_MAX_ITEMS = 80;
@@ -257,6 +265,118 @@ function selectMinimapNodes(nodes: MiniNode[]): MiniNode[] {
   return [...imageNodes, ...shapeNodes].sort(
     (a, b) => (originalIndex.get(a.id) ?? 0) - (originalIndex.get(b.id) ?? 0),
   );
+}
+
+function inferPreviewMediaKind(
+  url: string,
+  key = "",
+  explicitType?: unknown,
+): PreviewMediaKind | null {
+  const value = url.trim();
+  if (!value || value.startsWith("blob:")) return null;
+  const type = String(explicitType ?? "").toLowerCase();
+  if (/audio|model|glb|gltf|obj|text/.test(type)) return null;
+  if (/\.(mp3|wav|m4a|aac|flac|glb|gltf|obj|fbx|zip)(\?|#|$)/i.test(value)) return null;
+  if (type === "video" || /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(value)) {
+    return "video";
+  }
+  if (
+    type === "image" ||
+    value.startsWith("data:image/") ||
+    /\.(png|jpe?g|webp|gif|avif)(\?|#|$)/i.test(value) ||
+    /poster|thumb|thumbnail|preview|image|frame|render|cover|file|url/i.test(key)
+  ) {
+    return "image";
+  }
+  if (/\/storage\/v1\/object\//i.test(value) && !/\.(mp3|wav|glb|gltf|obj)(\?|#|$)/i.test(value)) {
+    return "image";
+  }
+  return null;
+}
+
+function pushPreviewMedia(
+  out: PreviewMedia[],
+  seen: Set<string>,
+  key: string,
+  value: unknown,
+  explicitType?: unknown,
+) {
+  if (typeof value !== "string") return;
+  const url = value.trim();
+  if (!url || seen.has(url)) return;
+  const kind = inferPreviewMediaKind(url, key, explicitType);
+  if (!kind) return;
+  seen.add(url);
+  out.push({ url, kind });
+}
+
+function collectPreviewMediaFromNodeData(
+  data: Record<string, unknown>,
+  nodeType?: string,
+): PreviewMedia[] {
+  const media: PreviewMedia[] = [];
+  const seen = new Set<string>();
+  const add = (key: string, value: unknown, explicitType?: unknown) => {
+    if (media.length >= SPACE_PREVIEW_MEDIA_LIMIT) return;
+    pushPreviewMedia(media, seen, key, value, explicitType);
+  };
+
+  const generations = Array.isArray(data.generations)
+    ? (data.generations as Array<Record<string, unknown>>)
+    : [];
+  for (const generation of generations) {
+    add("rendered_image_url", generation.rendered_image_url, "image");
+    add("posterUrl", generation.posterUrl, "image");
+    add("poster_url", generation.poster_url, "image");
+    add("thumbnailUrl", generation.thumbnailUrl, "image");
+    add("thumbnail_url", generation.thumbnail_url, "image");
+    add("previewUrl", generation.previewUrl, generation.type);
+    add("preview_url", generation.preview_url, generation.type);
+    add("image_url", generation.image_url, "image");
+    add("output_image", generation.output_image, "image");
+    add("url", generation.url, generation.type);
+    add("video_url", generation.video_url, "video");
+    add("output_video", generation.output_video, "video");
+  }
+
+  const outputs =
+    data.outputs && typeof data.outputs === "object"
+      ? (data.outputs as Record<string, unknown>)
+      : null;
+  if (outputs) {
+    add("image_url", outputs.image_url, "image");
+    add("output_image", outputs.output_image, "image");
+    add("result_url", outputs.result_url);
+    add("url", outputs.url);
+    add("video_url", outputs.video_url, "video");
+    add("output_video", outputs.output_video, "video");
+  }
+
+  add("posterUrl", data.posterUrl, "image");
+  add("poster_url", data.poster_url, "image");
+  add("thumbnailUrl", data.thumbnailUrl, "image");
+  add("thumbnail_url", data.thumbnail_url, "image");
+  add("previewUrl", data.previewUrl, nodeType === "assetNode" ? data.fieldType ?? "image" : data.fieldType);
+  add("preview_url", data.preview_url, data.fieldType);
+  add("imageUrl", data.imageUrl, "image");
+  add("image_url", data.image_url, "image");
+  add("resultUrl", data.resultUrl);
+  add("result_url", data.result_url);
+  add("outputUrl", data.outputUrl);
+  add("output_url", data.output_url);
+  add("fileUrl", data.fileUrl);
+  add("file_url", data.file_url);
+  add("videoUrl", data.videoUrl, "video");
+  add("video_url", data.video_url, "video");
+  add("outputVideo", data.outputVideo, "video");
+  add("output_video", data.output_video, "video");
+
+  if (Array.isArray(data.reference_image_urls)) {
+    for (const url of data.reference_image_urls) add("reference_image_urls", url, "image");
+  }
+  add("frontal_image_url", data.frontal_image_url, "image");
+
+  return media;
 }
 
 /** "5 minutes ago" / "yesterday" / "Apr 12". */
@@ -1484,6 +1604,7 @@ interface SpaceCardData {
   updatedAt: number;
   previewCacheKey: string;
   tabCount: number;
+  previewMedia: PreviewMedia[];
   nodes: MiniNode[];
   edges: MiniEdge[];
 }
@@ -1606,11 +1727,7 @@ const SpacesShowcaseCard = ({
               className="group/space flex min-w-0 flex-col gap-2 rounded-xl bg-[hsl(0_0%_4%)] p-1.5 transition-all hover:bg-white/[0.04]"
             >
               <div className="aspect-[4/3] overflow-hidden rounded-lg bg-[hsl(0_0%_2%)]">
-                <CanvasMinimap
-                  cacheKey={ws.previewCacheKey}
-                  nodes={ws.nodes}
-                  edges={ws.edges}
-                />
+                <SpaceMediaPreview media={ws.previewMedia} />
               </div>
               <div className="px-1 pb-0.5 text-left">
                 <div className="truncate text-[14.5px] font-medium text-zinc-100">
@@ -1723,6 +1840,16 @@ function buildSpaceCardData(
 
   const rawNodes = (graph?.nodes ?? []) as Array<Record<string, unknown>>;
   const rawById = new Map(rawNodes.map((n) => [String(n.id), n] as const));
+  const previewMedia: PreviewMedia[] = [];
+  const seenPreviewMedia = new Set<string>();
+  const addPreviewMedia = (media: PreviewMedia[]) => {
+    for (const item of media) {
+      if (previewMedia.length >= SPACE_PREVIEW_MEDIA_LIMIT) break;
+      if (!item.url || seenPreviewMedia.has(item.url)) continue;
+      seenPreviewMedia.add(item.url);
+      previewMedia.push(item);
+    }
+  };
   const absolutePositionOf = (node: Record<string, unknown>) => {
     let x = ((node.position as { x?: number } | undefined)?.x ?? 0);
     let y = ((node.position as { y?: number } | undefined)?.y ?? 0);
@@ -1750,17 +1877,19 @@ function buildSpaceCardData(
   };
   const nodes: MiniNode[] = rawNodes.map((n) => {
     const d = (n.data ?? {}) as Record<string, unknown>;
-    let imageUrl: string | undefined;
     const nType = n.type as string | undefined;
+    const nodePreviewMedia = collectPreviewMediaFromNodeData(d, nType);
+    addPreviewMedia(nodePreviewMedia);
+    let imageUrl = nodePreviewMedia.find((item) => item.kind === "image")?.url;
     const fieldType = d.fieldType as string | undefined;
-    if (typeof d.posterUrl === "string") {
+    if (!imageUrl && typeof d.posterUrl === "string") {
       imageUrl = d.posterUrl;
-    } else if (
+    } else if (!imageUrl &&
       typeof d.previewUrl === "string" &&
       (fieldType === "image" || fieldType === "model3d")
     ) {
       imageUrl = d.previewUrl;
-    } else {
+    } else if (!imageUrl) {
       if (nType === "assetNode" && typeof d.posterUrl === "string") {
         imageUrl = d.posterUrl;
       }
@@ -1818,6 +1947,7 @@ function buildSpaceCardData(
     updatedAt: ws.updatedAt,
     previewCacheKey: `${previewCanvasId ?? ws.id}:${graphVersion}:${nodes.length}:${edges.length}`,
     tabCount: wsCanvases.length,
+    previewMedia,
     nodes,
     edges,
   };
@@ -2626,6 +2756,70 @@ const SpaceToolbar = ({ onNew }: { onNew: () => void }) => {
   );
 };
 
+const SpaceMediaTile = ({
+  item,
+  className,
+}: {
+  item: PreviewMedia;
+  className?: string;
+}) => {
+  if (item.kind === "video") {
+    return (
+      <video
+        src={item.url}
+        muted
+        playsInline
+        preload="metadata"
+        className={cn("h-full w-full bg-black object-cover", className)}
+      />
+    );
+  }
+  return (
+    <img
+      src={item.url}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      draggable={false}
+      className={cn("h-full w-full bg-black object-cover", className)}
+    />
+  );
+};
+
+const SpaceMediaPreview = memo(function SpaceMediaPreview({
+  media,
+}: {
+  media: PreviewMedia[];
+}) {
+  const items = media.slice(0, SPACE_PREVIEW_MEDIA_LIMIT);
+  if (items.length === 0) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_50%_35%,hsl(0_0%_13%),hsl(0_0%_4%)_72%)]">
+        <Layers className="h-8 w-8 text-white/12" strokeWidth={1.5} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative h-full w-full overflow-hidden bg-black">
+      <SpaceMediaTile item={items[0]} className="transition-transform duration-500 group-hover:scale-[1.035] group-hover/space:scale-[1.035]" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/42 via-black/8 to-transparent" />
+      {items.length > 1 && (
+        <div className="pointer-events-none absolute bottom-2 right-2 flex max-w-[72%] gap-1">
+          {items.slice(1, 4).map((item, index) => (
+            <div
+              key={`${item.url}-${index}`}
+              className="h-10 w-12 overflow-hidden rounded-md bg-black/60 ring-1 ring-white/20 backdrop-blur-sm"
+            >
+              <SpaceMediaTile item={item} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});
+
 const SpaceCard = memo(function SpaceCard({
   ws,
   canManage = true,
@@ -2674,11 +2868,7 @@ const SpaceCard = memo(function SpaceCard({
       >
         <div className="relative aspect-[16/10] overflow-hidden bg-[hsl(0_0%_5%)]">
           {renderPreview ? (
-            <CanvasMinimap
-              cacheKey={ws.previewCacheKey}
-              nodes={ws.nodes}
-              edges={ws.edges}
-            />
+            <SpaceMediaPreview media={ws.previewMedia} />
           ) : (
             <div className="h-full w-full bg-[hsl(0_0%_5%)]" />
           )}
