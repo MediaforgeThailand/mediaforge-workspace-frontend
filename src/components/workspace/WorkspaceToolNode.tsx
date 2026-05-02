@@ -584,6 +584,14 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
    * apply. Fallback `320px` is the rough size of a 16:9 preview at
    * the default node width — used for the brief frame before the
    * observer has fired so the prompt doesn't flash full-height. */
+  /* Computed prompt cap in px. Recomputed by the ResizeObserver
+   *  below every time the preview's actual rendered height changes
+   *  (e.g. user resizes the node, or a new image with a different
+   *  aspect ratio lands). Stored in React state so we can pass it
+   *  to PromptMentionTextarea as a prop and let it set
+   *  `style.maxHeight` inline — that's the only way to outrank the
+   *  Tailwind `max-h-[280px]` class baked into the editor. */
+  const [promptMaxH, setPromptMaxH] = useState<number | null>(null);
   useEffect(() => {
     const root = previewRef.current;
     if (!root) return;
@@ -591,25 +599,26 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       for (const entry of entries) {
         const h = Math.ceil(entry.contentRect.height);
         root.style.setProperty("--ws-preview-h", `${h}px`);
-        /* Pre-compute the prompt's max-height in real px and publish
-         *  it as `--ws-prompt-max-h`. The previous attempt put the
-         *  formula `calc(0.7 * var(...))` in the CSS, which works in
-         *  theory but lost out to the inline `max-h-[280px]` Tailwind
-         *  class on the contentEditable for some users — the cap was
-         *  effectively never applied on short post-generation nodes
-         *  (16:9 landscape / wide-and-short). Computing it in JS and
-         *  shipping a single resolved pixel length removes every
-         *  source of ambiguity:
+        /* Compute the prompt's max-height in real px and publish it
+         *  on TWO channels:
+         *    1. CSS var `--ws-prompt-max-h` for the focus-within
+         *       rule in workspace.css (kept for backward compat).
+         *    2. React state → inline style on the contentEditable.
+         *       Inline style is the only thing that reliably beats
+         *       Tailwind's `max-h-[280px]` class on every browser
+         *       and every cascade order, so this is the channel
+         *       that ACTUALLY enforces the cap.
          *
-         *    • Floor: 60px (~2.5 lines) so the empty placeholder is
-         *      always readable even on the tiniest preview slot.
-         *    • 70% of the preview, per the spec the user asked for.
+         *  Knobs:
+         *    • Floor: 60px (~2.5 lines) so the empty placeholder
+         *      stays readable on the tiniest preview slot.
+         *    • 70% of the preview, per the user's spec.
          *    • Ceiling: 240px (~10 lines) so a tall portrait node
-         *      (e.g. 9:16) doesn't hand the user a 23-line wall of
-         *      typing surface — that felt as bad as the no-cap bug.
-         */
+         *      (9:16) doesn't hand the user a 23-line wall — that
+         *      felt as bad as the no-cap bug. */
         const promptCap = Math.max(60, Math.min(Math.round(h * 0.7), 240));
         root.style.setProperty("--ws-prompt-max-h", `${promptCap}px`);
+        setPromptMaxH(promptCap);
       }
     });
     ro.observe(root);
@@ -2502,6 +2511,12 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                 <PromptMentionTextarea
                   value={String(params.prompt ?? "")}
                   onChange={(v) => updateParam("prompt", v)}
+                  /* Inline-style cap that scales with the preview
+                   *  height. Beats every other CSS rule in the
+                   *  cascade so the prompt never swallows a small
+                   *  node — the user kept hitting that bug on
+                   *  resize after generation. */
+                  maxHeightPx={promptMaxH}
                   placeholder={
                     schema.displayName.toLowerCase().includes("video")
                       ? `Try "ocean waves at sunset, slow pan"`

@@ -36,6 +36,15 @@ interface PromptMentionTextareaProps {
    *  "show every node of the allowed types" behaviour (e.g. TextNode
    *  uses globally-mentionable assets). */
   allowedNodeIds?: ReadonlySet<string> | null;
+  /** Hard cap on the editor's rendered height in CSS pixels.
+   *
+   *  Applied as an inline `style.maxHeight` so it beats every CSS
+   *  rule on the cascade — Tailwind `max-h-[280px]`, the focus-
+   *  within rule in workspace.css, anything. Used by the canvas
+   *  tool node, which observes the rendered preview height with a
+   *  ResizeObserver and feeds 70% of it down here. Pass `null` to
+   *  skip the inline cap and let class/CSS rules decide. */
+  maxHeightPx?: number | null;
 }
 
 interface MentionOption {
@@ -281,6 +290,7 @@ const PromptMentionTextarea = memo(({
   allowedTextVarTypes = ["textInputNode"],
   maxLength,
   allowedNodeIds = null,
+  maxHeightPx = null,
 }: PromptMentionTextareaProps) => {
   const { t } = useLanguage();
   const { getNodes } = useReactFlow();
@@ -930,8 +940,18 @@ const PromptMentionTextarea = memo(({
          *  the prompt is scrollable and grab the thumb with the
          *  mouse. Inline style wins over the `* { ... !important }`
          *  global because of CSS specificity ordering for inline
-         *  styles. */
-        style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.18) transparent" }}
+         *  styles.
+         *
+         *  `maxHeightPx` (canvas tool nodes) lands here too — inline
+         *  style is the only way to outrank the `max-h-[280px]`
+         *  Tailwind class baked into the className list below. When
+         *  the prop is null we leave the property undefined so the
+         *  CSS rules in workspace.css can decide. */
+        style={{
+          scrollbarWidth: "thin",
+          scrollbarColor: "rgba(255,255,255,0.18) transparent",
+          ...(typeof maxHeightPx === "number" ? { maxHeight: `${maxHeightPx}px`, overflowY: "auto" as const } : null),
+        }}
         role="textbox"
         aria-multiline="true"
       />
