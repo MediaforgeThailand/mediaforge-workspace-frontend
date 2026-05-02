@@ -452,11 +452,18 @@ const PromptMentionTextarea = memo(({
     if (hadFocus && sel && savedOffset >= 0) {
       restoreCaretByOffset(editor, savedOffset);
     }
-    /* Put the user's scroll position back. We do this AFTER the
-     *  caret restore — `restoreCaretByOffset` calls
-     *  `selection.addRange()` which the browser may auto-scroll
-     *  into view, so we have to reapply the user's intent last. */
+    /* Put the user's scroll position back. We do this twice:
+     *  synchronously here, AND on the next animation frame.
+     *  `restoreCaretByOffset` → `sel.addRange()` can trigger an
+     *  async "scroll caret into view" pass on some browsers
+     *  (Chrome on macOS in particular) that fires AFTER our sync
+     *  assignment but before the next paint, hijacking the user's
+     *  scroll. The rAF reapply lands after that scroll heuristic so
+     *  the user's intent always wins. */
     editor.scrollTop = savedScrollTop;
+    requestAnimationFrame(() => {
+      if (editor.isConnected) editor.scrollTop = savedScrollTop;
+    });
   }, [value, mentionOptions, textVarOptions]);
 
   /* ── Read DOM → raw string on every input ── */
@@ -597,9 +604,13 @@ const PromptMentionTextarea = memo(({
     const savedRange = mentionRangeRef.current;
     if (!savedRange) return;
 
-    // Ensure editor has focus without losing the range
+    // Ensure editor has focus without losing the range OR scroll
     if (document.activeElement !== editor) {
-      editor.focus();
+      /* `preventScroll: true` stops the browser from snapping the
+       *  editor (or its scroll container) into view when we focus
+       *  it programmatically — preserves the user's manual scroll
+       *  position when picking a mention from the dropdown. */
+      editor.focus({ preventScroll: true });
     }
 
     // Restore the exact range that covers "@query"
@@ -873,7 +884,22 @@ const PromptMentionTextarea = memo(({
         onClick={stopDrag}
         onMouseDown={stopDrag}
         onWheel={handlePromptWheel}
-        onBlur={() => { syncFromDom(); setTimeout(() => setShowMentions(false), 150); }}
+        onBlur={(e) => {
+          syncFromDom();
+          setTimeout(() => setShowMentions(false), 150);
+          /* When the canvas tool node's compact prompt overlay loses
+           *  focus, `workspace.css` snaps `overflow-y` back to
+           *  `hidden` AND the editor's `scrollTop` is whatever the
+           *  browser auto-scrolled to during typing (usually wherever
+           *  the caret was — often line N of N for a long prompt).
+           *  Combined, that means line 1 is hidden ABOVE the visible
+           *  window and the user can't scroll to recover it without
+           *  re-focusing. Resetting scrollTop to 0 here means the
+           *  resting state always shows the prompt's first line, so
+           *  the user sees what they wrote when they look at the node
+           *  on the canvas. */
+          e.currentTarget.scrollTop = 0;
+        }}
         data-placeholder={placeholder}
         className={cn(
           "prompt-editable",
