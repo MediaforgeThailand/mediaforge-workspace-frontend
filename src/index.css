@@ -1062,6 +1062,38 @@
   display: none !important;
 }
 
+/* ── Exception: long prompt textareas inside canvas nodes ──
+ * The global `scrollbar-width: none !important` rule above hides
+ * scrollbars everywhere, which is correct for chrome but lethal for
+ * a tall multi-line prompt input — the user couldn't tell that the
+ * field was scrollable, so prompts longer than the visible window
+ * felt broken. Restore a slim scrollbar JUST for `.prompt-editable`
+ * so users can see (and grab) the thumb on long prompts. */
+.prompt-editable {
+  -ms-overflow-style: auto !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(255, 255, 255, 0.20) transparent !important;
+}
+
+.prompt-editable::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+  display: block !important;
+}
+
+.prompt-editable::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.prompt-editable::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-radius: 999px !important;
+}
+
+.prompt-editable::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32) !important;
+}
+
 /* Readability pass: keep Thai and English text open and high-contrast. */
 html,
 body,

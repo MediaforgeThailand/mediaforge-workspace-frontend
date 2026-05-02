@@ -730,8 +730,36 @@ const PromptMentionTextarea = memo(({
   const overLimit = typeof maxLength === "number" && maxLength > 0 && charCount > maxLength;
   const nearLimit = typeof maxLength === "number" && maxLength > 0 && !overLimit && charCount >= Math.floor(maxLength * 0.9);
 
+  /* 2026-05 fix: when the prompt grows past `max-h-[200px]`, React
+   *  Flow used to eat the wheel event before the contentEditable
+   *  could scroll — `.nowheel` sat on the OUTER wrapper, not the
+   *  scrollable element itself, so wheels on a tall prompt panned
+   *  the canvas instead of scrolling the prompt. The user couldn't
+   *  reach lines that were clipped above/below the visible window.
+   *
+   *  Fix is two-fold:
+   *    1. Put `nowheel` directly on the scrollable contentEditable
+   *       so React Flow ignores wheels there.
+   *    2. Defensive `onWheel` handler that calls stopPropagation
+   *       only when the element has scroll headroom in the wheel
+   *       direction — that way an at-edge wheel still bubbles up to
+   *       the canvas (so the user can keep panning past the prompt
+   *       once they've hit the top/bottom). */
+  const handlePromptWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const atTop = el.scrollTop <= 0;
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+    const goingUp = e.deltaY < 0;
+    const goingDown = e.deltaY > 0;
+    // We can absorb the wheel if there's still room to scroll that direction.
+    const canScroll = (goingDown && !atBottom) || (goingUp && !atTop);
+    if (canScroll) {
+      e.stopPropagation();
+    }
+  }, []);
+
   return (
-    <div className="relative nodrag nopan nowheel" onMouseDown={stopDrag}>
+    <div className="relative nodrag nopan" onMouseDown={stopDrag}>
       {/* Editable div */}
       <div
         ref={editorRef}
@@ -745,15 +773,24 @@ const PromptMentionTextarea = memo(({
         onPaste={handlePaste}
         onClick={stopDrag}
         onMouseDown={stopDrag}
+        onWheel={handlePromptWheel}
         onBlur={() => { syncFromDom(); setTimeout(() => setShowMentions(false), 150); }}
         data-placeholder={placeholder}
         className={cn(
           "prompt-editable",
+          /* nowheel must sit on the scrollable element (not the
+           *  parent) — React Flow checks the event.target's class
+           *  list, not its ancestors, when deciding whether to pan. */
+          "nowheel nodrag nopan",
           "w-full bg-transparent border rounded px-2 py-1.5",
           overLimit ? "border-red-500/70" : "border-white/[0.06]",
           "text-[11px] leading-[1.5] tracking-normal font-sans",
           "text-white/80 caret-white/70",
-          "min-h-[40px] max-h-[200px] overflow-y-auto",
+          /* max-h bumped 200 → 280 so common long prompts fit
+           *  without scrolling at all. The defensive wheel handler
+           *  + scrollbar-thin override below keep the experience
+           *  smooth when content does exceed the cap. */
+          "min-h-[40px] max-h-[280px] overflow-y-auto",
           "focus:outline-none",
           overLimit ? "focus:border-red-400" : "focus:border-white/20",
           "break-words whitespace-pre-wrap",
@@ -762,6 +799,14 @@ const PromptMentionTextarea = memo(({
           isEmpty && "is-empty",
           className,
         )}
+        /* Inline scrollbar override: the global rule in index.css
+         *  hides every native scrollbar (`scrollbar-width: none`),
+         *  but we want a slim track here so the user can SEE that
+         *  the prompt is scrollable and grab the thumb with the
+         *  mouse. Inline style wins over the `* { ... !important }`
+         *  global because of CSS specificity ordering for inline
+         *  styles. */
+        style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.18) transparent" }}
         role="textbox"
         aria-multiline="true"
       />
