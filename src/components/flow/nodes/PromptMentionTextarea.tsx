@@ -298,6 +298,23 @@ const PromptMentionTextarea = memo(({
   // Track whether we're doing an internal DOM update to avoid re-render loops
   const suppressSync = useRef(false);
 
+  /* ── Internal undo/redo history ──────────────────────────────
+   * The browser's native undo stack on contentEditable is fragile
+   * here: every time `value` propagates back through React, the
+   * effect below can replace `innerHTML` to redraw mention pills,
+   * which silently wipes the browser's undo history. So we track
+   * our own history at the raw-string level — every value commit
+   * pushes onto `historyRef`, Ctrl+Z pops, Ctrl+Shift+Z / Ctrl+Y
+   * restores from `redoRef`.
+   *
+   * `suppressHistory` is the same trick as `suppressSync`: when
+   * we're applying an undo/redo, we don't want THAT change to
+   * push back onto the stack and create an infinite loop. */
+  const historyRef = useRef<string[]>([]);
+  const redoRef = useRef<string[]>([]);
+  const lastCommittedValueRef = useRef<string>(value);
+  const suppressHistory = useRef(false);
+
   /* ── Mention options (@ trigger — image/video/ai nodes) ──
    *
    * The list is filtered down to nodes that:
@@ -392,6 +409,15 @@ const PromptMentionTextarea = memo(({
       preDiv.appendChild(preRange.cloneContents());
       savedOffset = domToRaw(preDiv).length;
     }
+    /* Capture scrollTop BEFORE we wipe innerHTML — when we rebuild
+     *  from segments, the browser resets scrollTop to 0, then
+     *  `restoreCaretByOffset` pulls scrollTop back to wherever the
+     *  caret lives. That hijacks the user's manual scroll position
+     *  ("text กลืนไปด้านบน, เลื่อนขึ้นไม่ได้" — they scroll up, the
+     *  next sync resets it). Stashing the value here + restoring it
+     *  AFTER the rebuild keeps the user's scroll exactly where they
+     *  left it. */
+    const savedScrollTop = editor.scrollTop;
 
     // Build DOM from parsed segments
     const segments = parseSegments(normalizedValue);
@@ -426,6 +452,11 @@ const PromptMentionTextarea = memo(({
     if (hadFocus && sel && savedOffset >= 0) {
       restoreCaretByOffset(editor, savedOffset);
     }
+    /* Put the user's scroll position back. We do this AFTER the
+     *  caret restore — `restoreCaretByOffset` calls
+     *  `selection.addRange()` which the browser may auto-scroll
+     *  into view, so we have to reapply the user's intent last. */
+    editor.scrollTop = savedScrollTop;
   }, [value, mentionOptions, textVarOptions]);
 
   /* ── Read DOM → raw string on every input ── */
@@ -436,9 +467,55 @@ const PromptMentionTextarea = memo(({
     const normalizedValue = normalizePromptTokens(value);
     if (raw !== normalizedValue) {
       suppressSync.current = true;
+      /* Push the previous value onto the undo stack before swapping
+       *  it out — but only for genuine user edits. When we're
+       *  applying an undo/redo, `suppressHistory` short-circuits this
+       *  so we don't loop. Cap stack at 200 entries to bound memory
+       *  on a long editing session. */
+      if (!suppressHistory.current) {
+        const prev = lastCommittedValueRef.current;
+        if (prev !== raw) {
+          historyRef.current.push(prev);
+          if (historyRef.current.length > 200) historyRef.current.shift();
+          /* A fresh edit invalidates any pending redo branch — same
+           *  semantics as VS Code / Notes / every text editor ever. */
+          redoRef.current = [];
+        }
+      }
+      lastCommittedValueRef.current = raw;
       onChange(raw);
     }
   }, [onChange, value]);
+
+  /* ── Apply an undo or redo step ──
+   * Pull a snapshot from the history stack, swap into both the DOM
+   * and the parent's `value`, and place the caret at the end so the
+   * user sees the result immediately. Returns whether anything
+   * actually changed (so the keydown handler can fall through to
+   * native behaviour when our stack is empty — e.g. a freshly
+   * mounted editor with no edits yet). */
+  const applyHistoryStep = useCallback(
+    (direction: "undo" | "redo"): boolean => {
+      const sourceStack = direction === "undo" ? historyRef.current : redoRef.current;
+      const targetStack = direction === "undo" ? redoRef.current : historyRef.current;
+      const editor = editorRef.current;
+      if (!editor || sourceStack.length === 0) return false;
+
+      const snapshot = sourceStack.pop()!;
+      targetStack.push(lastCommittedValueRef.current);
+      lastCommittedValueRef.current = snapshot;
+
+      suppressHistory.current = true;
+      suppressSync.current = false; // allow the effect to rebuild from snapshot
+      onChange(snapshot);
+      // suppressHistory drops back on the next syncFromDom (microtask after)
+      queueMicrotask(() => {
+        suppressHistory.current = false;
+      });
+      return true;
+    },
+    [onChange],
+  );
 
   /* ── Detect @ or # trigger ── */
   const checkForMentionTrigger = useCallback(() => {
@@ -568,6 +645,28 @@ const PromptMentionTextarea = memo(({
     // CRITICAL: Stop Backspace/Delete from bubbling to React Flow (which would delete the node)
     if (e.key === "Backspace" || e.key === "Delete") {
       e.stopPropagation();
+    }
+
+    /* ── Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y → use OUR history stack ──
+     * The workspace canvas binds Cmd/Ctrl+Z to graph-level undo,
+     * and even though useWorkspaceShortcuts checks `isContentEditable`
+     * to bail out, the browser's native contentEditable undo stack
+     * is unreliable here — DOM rebuilds for mention pills wipe it.
+     * So we keep an internal text-level stack and apply it directly
+     * on these key combos. `stopPropagation` so the canvas-level
+     * handler doesn't ALSO undo a graph mutation. */
+    const ctrlOrCmd = e.ctrlKey || e.metaKey;
+    if (ctrlOrCmd && (e.key === "z" || e.key === "Z")) {
+      e.preventDefault();
+      e.stopPropagation();
+      applyHistoryStep(e.shiftKey ? "redo" : "undo");
+      return;
+    }
+    if (ctrlOrCmd && (e.key === "y" || e.key === "Y")) {
+      e.preventDefault();
+      e.stopPropagation();
+      applyHistoryStep("redo");
+      return;
     }
 
     if (showMentions && filteredOptions.length > 0) {
