@@ -1052,7 +1052,7 @@ function ModelPicker({
         </span>
       </button>
       {open && (
-        <div className="absolute left-0 right-0 top-[58px] z-40 rounded-2xl border border-white/[0.06] bg-[#111111] p-2 shadow-2xl shadow-black/70">
+        <div className="absolute left-0 right-0 top-[58px] z-40 rounded-2xl bg-[#181818] p-2 shadow-2xl shadow-black/70">
           {models.map((model) => {
             const active = model.id === value;
             return (
@@ -1932,7 +1932,7 @@ function StyleReferenceTray({
         </div>
       )}
       {styleOpen && (
-        <div className="absolute left-0 right-0 top-[102px] z-40 rounded-2xl border border-white/[0.06] bg-[#111111] p-2 shadow-2xl shadow-black/70">
+        <div className="absolute left-0 right-0 top-[102px] z-40 rounded-2xl bg-[#181818] p-2 shadow-2xl shadow-black/70">
           {IMAGE_STYLE_PRESETS.map((style) => {
             const active = style.id === styleId;
             return (

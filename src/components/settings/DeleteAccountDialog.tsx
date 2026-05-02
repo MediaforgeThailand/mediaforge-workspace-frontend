@@ -159,7 +159,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
             disabled={submitting}
             autoComplete="off"
             spellCheck={false}
-            className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-red-500/40"
+            className="w-full rounded-md bg-black/40 px-3 py-2 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-red-500/40"
           />
         </div>
 
@@ -174,7 +174,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
             onChange={(e) => setPassword(e.target.value)}
             disabled={submitting}
             autoComplete="current-password"
-            className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-[13px] text-zinc-100 outline-none focus:border-red-500/40"
+            className="w-full rounded-md bg-black/40 px-3 py-2 text-[13px] text-zinc-100 outline-none focus:border-red-500/40"
           />
         </div>
 
@@ -193,7 +193,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
                 ? "ช่วยให้เราพัฒนาบริการ"
                 : "Helps us improve the product"
             }
-            className="w-full resize-none rounded-md border border-white/10 bg-black/40 px-3 py-2 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-red-500/40"
+            className="w-full resize-none rounded-md bg-black/40 px-3 py-2 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-red-500/40"
           />
         </div>
 

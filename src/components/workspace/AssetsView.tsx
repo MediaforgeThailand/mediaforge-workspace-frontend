@@ -512,7 +512,7 @@ export default function AssetsView({
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
-            className="rounded-md border border-white/10 bg-white/[0.04] p-1.5 text-zinc-300 hover:bg-white/[0.08] md:hidden"
+            className="rounded-md bg-white/[0.06] p-1.5 text-zinc-300 hover:bg-white/[0.08] md:hidden"
             aria-label={t("workspace.assets.open_filters")}
             title={t("workspace.assets.filters")}
           >
@@ -553,7 +553,7 @@ export default function AssetsView({
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value as FilterKind)}
-              className="block rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[12px] text-zinc-200 sm:hidden"
+              className="block rounded-md bg-white/[0.06] px-2 py-1 text-[12px] text-zinc-200 sm:hidden"
             >
               {FILTER_BUTTONS.map((b) => (
                 <option key={b.key} value={b.key} className="bg-zinc-900">
@@ -673,7 +673,7 @@ export default function AssetsView({
                   <button
                     type="button"
                     onClick={() => void fetchGenPage(genAssets.length)}
-                    className="rounded-md border border-white/10 bg-white/[0.04] px-4 py-2 text-xs text-zinc-300 hover:bg-white/[0.08] hover:text-zinc-100"
+                    className="rounded-md bg-white/[0.06] px-4 py-2 text-xs text-zinc-300 hover:bg-white/[0.08] hover:text-zinc-100"
                   >
                     {t("workspace.assets.load_more")}
                   </button>
@@ -1007,7 +1007,7 @@ function PlaceholderTab({
       <button
         type="button"
         onClick={onGoTo}
-        className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-zinc-200 hover:bg-white/[0.08]"
+        className="rounded-md bg-white/[0.06] px-3 py-1.5 text-xs text-zinc-200 hover:bg-white/[0.08]"
       >
         {t("workspace.assets.go_to_all")}
       </button>
