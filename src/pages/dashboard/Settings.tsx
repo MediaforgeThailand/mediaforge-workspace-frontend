@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +19,6 @@ import {
   Users,
   Activity,
   Building2,
-  Clock3,
   ExternalLink,
   KeyRound,
   CreditCard,
@@ -602,12 +602,12 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
 
   if (!active && pending) {
     return (
-      <div className="max-w-2xl rounded-lg border border-amber-400/20 bg-amber-400/[0.06] p-[20px]">
+      <div className="max-w-2xl rounded-[16px] bg-amber-400/[0.08] p-[20px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         <h2 className="text-[20px] font-semibold leading-[26px] text-zinc-50">Team request pending</h2>
         <p className="mt-[8px] text-[14px] leading-[22px] text-zinc-400">
           Your company domain matched an organization, but an admin needs to approve your access before you can use the team dashboard or shared credit pool.
         </p>
-        <div className="mt-[16px] rounded-lg border border-white/10 bg-black/20 p-[12px] text-[14px] leading-[20px]">
+        <div className="mt-[16px] rounded-[12px] bg-black/30 p-[12px] text-[14px] leading-[20px]">
           <div className="text-zinc-500">Organization</div>
           <div className="font-medium text-zinc-100">
             {pending.organization?.display_name || pending.organization?.name || pending.organization_id}
@@ -619,7 +619,7 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
 
   if (!active) {
     return (
-      <div className="max-w-2xl rounded-lg border border-white/10 bg-white/[0.03] p-[20px]">
+      <div className="max-w-2xl rounded-[16px] bg-zinc-900/60 p-[20px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         <h2 className="text-[20px] font-semibold leading-[26px] text-zinc-50">Create a team workspace</h2>
         <p className="mt-[8px] text-[14px] leading-[22px] text-zinc-400">
           Team accounts include a company Admin Console, member approvals, shared team credits, and seat billing at $5 per active seat. Credits are topped up separately based on real usage.
@@ -633,94 +633,116 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
   }
 
   return (
-    <div className="w-full max-w-[1480px] space-y-[22px] pr-[24px]">
-      <div className="flex flex-col gap-[12px] lg:flex-row lg:items-end lg:justify-between">
+    <motion.div
+      className="w-full max-w-[1420px] space-y-[16px] pr-[24px]"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.24, ease: "easeOut" }}
+    >
+      <div className="flex flex-col gap-[12px] lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-[13px] font-semibold uppercase tracking-[0.08em] text-zinc-500">Team dashboard</p>
-          <h2 className="mt-[6px] text-[27px] font-semibold leading-[34px] text-zinc-50">{orgName}</h2>
-          <p className="mt-[8px] text-[16px] leading-[24px] text-zinc-300">
-            Shared credits, team pools, member presence, and recent credit movements for this organization.
-          </p>
+          <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Team</p>
+          <h2 className="mt-[4px] text-[28px] font-semibold leading-[34px] text-zinc-50">{orgName}</h2>
         </div>
         {canOpenConsole ? (
-          <Button className="h-[40px] w-fit px-[15px] text-[14px]" onClick={openAdminConsole} disabled={openingConsole}>
+          <Button className="h-[38px] w-fit rounded-full bg-white/[0.08] px-[14px] text-[14px] hover:bg-white/[0.14]" onClick={openAdminConsole} disabled={openingConsole}>
             {openingConsole ? (
               <Loader2 className="mr-[8px] h-[16px] w-[16px] animate-spin" />
             ) : (
               <ExternalLink className="mr-[8px] h-[16px] w-[16px]" />
             )}
-            Open Admin Console
+            Admin Console
           </Button>
         ) : null}
       </div>
 
-      <div className="grid gap-[14px] md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-[16px]">
+      <div className="grid gap-[10px] md:grid-cols-2 xl:grid-cols-4">
+        <motion.div className="relative overflow-hidden rounded-[14px] bg-zinc-900/70 px-[14px] py-[12px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}>
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-sky-400/16 to-transparent" />
+          <div className="relative flex items-center justify-between gap-[12px]">
+            <div>
           <div className="flex items-center gap-[8px] text-[14px] font-medium leading-[18px] text-zinc-200">
             <Wallet className="h-[17px] w-[17px] text-sky-300" />
-            Shared credits
+            Shared
           </div>
-          <div className="mt-[10px] text-[27px] font-semibold leading-[34px] text-zinc-50">
+          <div className="mt-[7px] text-[24px] font-semibold leading-[28px] text-zinc-50">
             {formatCredits(organizationCredits)}
           </div>
-          <div className="mt-[6px] text-[14px] leading-[19px] text-zinc-300">Available in organization pool</div>
-        </div>
-        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-[16px]">
+            </div>
+            <span className="rounded-full bg-black/30 px-[9px] py-[5px] text-[12px] leading-[15px] text-zinc-400">available</span>
+          </div>
+        </motion.div>
+        <motion.div className="relative overflow-hidden rounded-[14px] bg-zinc-900/70 px-[14px] py-[12px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.03 }}>
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-violet-400/16 to-transparent" />
+          <div className="relative flex items-center justify-between gap-[12px]">
+            <div>
           <div className="flex items-center gap-[8px] text-[14px] font-medium leading-[18px] text-zinc-200">
             <Building2 className="h-[17px] w-[17px] text-violet-300" />
             Teams
           </div>
-          <div className="mt-[10px] text-[27px] font-semibold leading-[34px] text-zinc-50">
+          <div className="mt-[7px] text-[24px] font-semibold leading-[28px] text-zinc-50">
             {formatCredits(Math.max(1, teams.length || (active.team ? 1 : 0)))}
           </div>
-          <div className="mt-[6px] text-[14px] leading-[19px] text-zinc-300">Includes the company pool</div>
-        </div>
-        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-[16px]">
+            </div>
+            <span className="rounded-full bg-black/30 px-[9px] py-[5px] text-[12px] leading-[15px] text-zinc-400">incl. pool</span>
+          </div>
+        </motion.div>
+        <motion.div className="relative overflow-hidden rounded-[14px] bg-zinc-900/70 px-[14px] py-[12px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.06 }}>
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-emerald-400/16 to-transparent" />
+          <div className="relative flex items-center justify-between gap-[12px]">
+            <div>
           <div className="flex items-center gap-[8px] text-[14px] font-medium leading-[18px] text-zinc-200">
             <Activity className="h-[17px] w-[17px] text-emerald-300" />
-            Online now
+            Online
           </div>
-          <div className="mt-[10px] text-[27px] font-semibold leading-[34px] text-zinc-50">
+          <div className="mt-[7px] text-[24px] font-semibold leading-[28px] text-zinc-50">
             {formatCredits(onlineMembers.length)}
           </div>
-          <div className="mt-[6px] text-[14px] leading-[19px] text-zinc-300">{formatCredits(activeMembers.length)} active seats</div>
-        </div>
-        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-[16px]">
+            </div>
+            <span className="rounded-full bg-black/30 px-[9px] py-[5px] text-[12px] leading-[15px] text-zinc-400">{formatCredits(activeMembers.length)} seats</span>
+          </div>
+        </motion.div>
+        <motion.div className="relative overflow-hidden rounded-[14px] bg-zinc-900/70 px-[14px] py-[12px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.09 }}>
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-amber-400/16 to-transparent" />
+          <div className="relative flex items-center justify-between gap-[12px]">
+            <div>
           <div className="flex items-center gap-[8px] text-[14px] font-medium leading-[18px] text-zinc-200">
             <ReceiptText className="h-[17px] w-[17px] text-amber-300" />
-            Credits used 30d
+            Used 30d
           </div>
-          <div className="mt-[10px] text-[27px] font-semibold leading-[34px] text-zinc-50">
+          <div className="mt-[7px] text-[24px] font-semibold leading-[28px] text-zinc-50">
             {formatCredits(generationCredits30d)}
           </div>
-          <div className="mt-[6px] text-[14px] leading-[19px] text-zinc-300">
-            {formatCredits(overview?.usage_summary?.generation_count_30d ?? 0)} generations
+            </div>
+            <span className="rounded-full bg-black/30 px-[9px] py-[5px] text-[12px] leading-[15px] text-zinc-400">
+              {formatCredits(overview?.usage_summary?.generation_count_30d ?? 0)} runs
+            </span>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {overview ? (
         <>
-          <section className="space-y-[12px]">
+          <section className="rounded-[16px] bg-zinc-900/55 p-[12px] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
             <div className="flex items-center justify-between">
-              <h3 className="text-[18px] font-semibold leading-[24px] text-zinc-50">Teams and credit pools</h3>
-              <p className="text-[14px] leading-[20px] text-zinc-500">Organization: {orgName}</p>
+              <h3 className="text-[17px] font-semibold leading-[22px] text-zinc-50">Credit pools</h3>
+              <p className="text-[12.5px] leading-[18px] text-zinc-500">{orgName}</p>
             </div>
-            <div className="grid gap-[14px] lg:grid-cols-2 2xl:grid-cols-3">
-              <div className="rounded-lg border border-white/10 bg-white/[0.035] p-[16px]">
+            <div className="mt-[10px] space-y-[8px]">
+              <div className="rounded-[12px] bg-black/22 p-[12px]">
                 <div className="flex items-start justify-between gap-[12px]">
                   <div>
-                    <h4 className="text-[17px] font-semibold leading-[23px] text-zinc-50">Company pool</h4>
-                    <p className="mt-[4px] text-[14px] leading-[20px] text-zinc-400">{orgName}</p>
+                    <h4 className="text-[15px] font-semibold leading-[20px] text-zinc-50">Company pool</h4>
+                    <p className="mt-[2px] text-[12.5px] leading-[17px] text-zinc-500">{orgName}</p>
                   </div>
                   <Badge className="bg-emerald-400/15 text-emerald-200 hover:bg-emerald-400/15">active</Badge>
                 </div>
-                <div className="mt-[16px] grid grid-cols-2 gap-[10px]">
-                  <div className="rounded-md bg-black/25 p-[10px]">
+                <div className="mt-[10px] grid grid-cols-2 gap-[8px]">
+                  <div className="rounded-[10px] bg-black/25 p-[9px]">
                     <div className="text-[12.5px] text-zinc-500">Available</div>
                     <div className="mt-[4px] text-[18px] font-semibold text-zinc-50">{formatCredits(overview.organization?.credit_available ?? 0)}</div>
                   </div>
-                  <div className="rounded-md bg-black/25 p-[10px]">
+                  <div className="rounded-[10px] bg-black/25 p-[9px]">
                     <div className="text-[12.5px] text-zinc-500">Allocated</div>
                     <div className="mt-[4px] text-[18px] font-semibold text-zinc-50">{formatCredits(overview.organization?.credit_pool_allocated ?? 0)}</div>
                   </div>
@@ -731,53 +753,51 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
                 const used = Number(team.credit_pool_consumed ?? 0);
                 const percent = pool > 0 ? Math.min(100, Math.round((used / pool) * 100)) : 0;
                 return (
-                  <div key={team.id} className="rounded-lg border border-white/10 bg-white/[0.035] p-[16px]">
-                    <div className="flex items-start justify-between gap-[12px]">
+                  <motion.div key={team.id} className="rounded-[12px] bg-black/22 p-[12px]" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2 }}>
+                    <div className="flex items-center justify-between gap-[12px]">
                       <div>
-                        <h4 className="text-[17px] font-semibold leading-[23px] text-zinc-50">{team.name}</h4>
-                        <p className="mt-[4px] text-[14px] leading-[20px] text-zinc-400">{team.code || orgName}</p>
+                        <h4 className="text-[15px] font-semibold leading-[20px] text-zinc-50">{team.name}</h4>
+                        <p className="mt-[2px] text-[12.5px] uppercase leading-[17px] text-zinc-500">{team.code || "team"}</p>
                       </div>
-                      <Badge className="bg-zinc-800 text-zinc-200 hover:bg-zinc-800">{team.status}</Badge>
+                      <span className="text-[12.5px] text-zinc-400">{formatCredits(team.member_count ?? 0)} members</span>
                     </div>
-                    <div className="mt-[16px] h-[8px] overflow-hidden rounded-full bg-zinc-800">
-                      <div className="h-full rounded-full bg-sky-400" style={{ width: `${percent}%` }} />
+                    <div className="mt-[9px] h-[6px] overflow-hidden rounded-full bg-zinc-800">
+                      <motion.div className="h-full rounded-full bg-sky-400" initial={{ width: 0 }} animate={{ width: `${percent}%` }} transition={{ duration: 0.5, ease: "easeOut" }} />
                     </div>
-                    <div className="mt-[10px] flex flex-wrap items-center justify-between gap-[8px] text-[13.5px] leading-[18px] text-zinc-300">
-                      <span>{formatCredits(used)} used / {formatCredits(pool)}</span>
-                      <span>{formatCredits(team.member_count ?? 0)} members</span>
+                    <div className="mt-[6px] text-[12.5px] leading-[17px] text-zinc-400">
+                      {formatCredits(used)} / {formatCredits(pool)}
                     </div>
-                  </div>
+                  </motion.div>
                 );
               })}
             </div>
           </section>
 
-          <section className="grid gap-[14px] xl:grid-cols-[minmax(0,1.4fr)_minmax(360px,0.8fr)]">
-            <div className="rounded-lg border border-white/10 bg-white/[0.03]">
-              <div className="flex items-center justify-between border-b border-white/10 p-[16px]">
+          <section className="grid gap-[12px] xl:grid-cols-[minmax(0,1.4fr)_minmax(340px,0.8fr)]">
+            <div className="rounded-[16px] bg-zinc-900/55 p-[12px] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
+              <div className="mb-[10px] flex items-center justify-between px-[2px]">
                 <div>
-                  <h3 className="text-[18px] font-semibold leading-[24px] text-zinc-50">Members</h3>
-                  <p className="mt-[3px] text-[14px] text-zinc-400">Status, team, access level, and latest activity.</p>
+                  <h3 className="text-[17px] font-semibold leading-[22px] text-zinc-50">Members</h3>
                 </div>
-                <Badge className="bg-white/10 text-zinc-200 hover:bg-white/10">{formatCredits(members.length)} accounts</Badge>
+                <span className="rounded-full bg-white/[0.07] px-[10px] py-[5px] text-[12px] text-zinc-300">{formatCredits(members.length)} accounts</span>
               </div>
-              <div className="divide-y divide-white/10">
+              <div className="space-y-[7px]">
                 {members.slice(0, 10).map((member) => {
                   const last = member.last_active_at ?? member.last_sign_in_at ?? member.updated_at;
                   const lastTime = last ? new Date(last).getTime() : 0;
                   const isOnline = Number.isFinite(lastTime) && Date.now() - lastTime <= onlineWindowMs;
                   const team = member.team_id ? teamById.get(member.team_id) : null;
                   return (
-                    <div key={member.id} className="grid gap-[12px] p-[14px] md:grid-cols-[minmax(220px,1.2fr)_minmax(160px,0.8fr)_minmax(120px,0.5fr)_minmax(180px,0.8fr)] md:items-center">
+                    <motion.div key={member.id} className="grid gap-[10px] rounded-[12px] bg-black/20 px-[12px] py-[10px] md:grid-cols-[minmax(220px,1fr)_150px_116px_150px] md:items-center" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }}>
                       <div>
-                        <div className="text-[15px] font-semibold leading-[21px] text-zinc-50">
+                        <div className="truncate text-[14.5px] font-semibold leading-[20px] text-zinc-50">
                           {member.display_name || member.email || member.user_id}
                         </div>
-                        <div className="text-[13.5px] leading-[19px] text-zinc-400">{member.email || "No email"}</div>
+                        <div className="truncate text-[12.5px] leading-[18px] text-zinc-500">{member.email || "No email"}</div>
                       </div>
-                      <div className="text-[14px] leading-[20px] text-zinc-300">
-                        <span className="text-zinc-500">Team</span>
-                        <div className="font-medium text-zinc-100">{team?.name || "Company pool"}</div>
+                      <div>
+                        <div className="truncate text-[13.5px] font-medium text-zinc-200">{team?.name || "Company pool"}</div>
+                        <div className="text-[12px] text-zinc-500">{member.role === "org_admin" ? "Admin" : "Member"}</div>
                       </div>
                       <div>
                         <Badge className={cn(
@@ -787,54 +807,52 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
                           <span className={cn("h-[7px] w-[7px] rounded-full", isOnline ? "bg-emerald-300" : "bg-zinc-500")} />
                           {isOnline ? "active" : "offline"}
                         </Badge>
-                        <div className="mt-[6px] text-[12.5px] text-zinc-500">{member.role === "org_admin" ? "Admin" : "Member"}</div>
                       </div>
-                      <div className="text-[13.5px] leading-[19px] text-zinc-300">
+                      <div className="text-[12.5px] leading-[18px] text-zinc-400">
                         <div className="flex items-center gap-[6px]">
-                          <Clock3 className="h-[14px] w-[14px] text-zinc-500" />
                           {formatRelative(last)}
                         </div>
-                        <div className="mt-[3px] text-zinc-500">{formatDateTime(last)}</div>
+                        <div className="text-zinc-600">{formatDateTime(last)}</div>
                       </div>
-                    </div>
+                    </motion.div>
                   );
                 })}
               </div>
             </div>
 
-            <div className="rounded-lg border border-white/10 bg-white/[0.03]">
-              <div className="border-b border-white/10 p-[16px]">
-                <h3 className="text-[18px] font-semibold leading-[24px] text-zinc-50">Credit movements</h3>
-                <p className="mt-[3px] text-[14px] text-zinc-400">Top-ups and org-to-team allocations.</p>
+            <div className="rounded-[16px] bg-zinc-900/55 p-[12px] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
+              <div className="mb-[10px] flex items-center justify-between px-[2px]">
+                <h3 className="text-[17px] font-semibold leading-[22px] text-zinc-50">Credit flow</h3>
+                <span className="text-[12.5px] text-zinc-500">latest</span>
               </div>
-              <div className="divide-y divide-white/10">
+              <div className="space-y-[8px]">
                 {allocationTransactions.length > 0 ? allocationTransactions.map((tx) => {
                   const team = tx.class_id ? teamById.get(tx.class_id) : null;
                   const isPositive = Number(tx.amount ?? 0) >= 0;
                   return (
-                    <div key={tx.id} className="p-[14px]">
+                    <motion.div key={tx.id} className="rounded-[12px] bg-black/22 p-[11px]" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.18 }}>
                       <div className="flex items-start justify-between gap-[10px]">
-                        <div>
-                          <div className="text-[14.5px] font-semibold leading-[20px] text-zinc-50">
+                        <div className="min-w-0">
+                          <div className="truncate text-[14px] font-semibold leading-[19px] text-zinc-50">
                             {team?.name || (tx.organization_id ? "Organization pool" : "Member credit")}
                           </div>
-                          <div className="mt-[3px] text-[13px] leading-[18px] text-zinc-400">
+                          <div className="mt-[3px] line-clamp-2 text-[12.5px] leading-[17px] text-zinc-500">
                             {tx.description || tx.reason || "Credit movement"}
                           </div>
                         </div>
-                        <div className={cn("text-right text-[15px] font-semibold", isPositive ? "text-emerald-200" : "text-amber-200")}>
+                        <div className={cn("rounded-full px-[9px] py-[5px] text-[13px] font-semibold", isPositive ? "bg-emerald-400/12 text-emerald-200" : "bg-amber-400/12 text-amber-200")}>
                           {isPositive ? "+" : ""}{formatCredits(tx.amount ?? 0)}
                         </div>
                       </div>
-                      <div className="mt-[8px] flex items-center justify-between gap-[10px] text-[12.5px] text-zinc-500">
-                        <span>{tx.actor_display_name || tx.actor_email || "System"}</span>
-                        <span>{formatDateTime(tx.created_at)}</span>
+                      <div className="mt-[8px] flex items-center justify-between gap-[10px] text-[12px] text-zinc-600">
+                        <span className="truncate">{tx.actor_display_name || tx.actor_email || "System"}</span>
+                        <span>{formatRelative(tx.created_at)}</span>
                       </div>
-                    </div>
+                    </motion.div>
                   );
                 }) : (
-                  <div className="p-[16px] text-[14px] leading-[20px] text-zinc-400">
-                    No team credit allocation transactions yet.
+                  <div className="rounded-[12px] bg-black/22 p-[14px] text-[13.5px] leading-[20px] text-zinc-500">
+                    No team allocation yet.
                   </div>
                 )}
               </div>
@@ -846,7 +864,7 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
           Your account uses {active.team?.name || "the company pool"} in {orgName}. Full team analytics, member status, and credit transfer logs are available to organization admins.
         </p>
       )}
-    </div>
+    </motion.div>
   );
 }
 
