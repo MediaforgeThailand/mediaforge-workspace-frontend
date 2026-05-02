@@ -876,20 +876,28 @@ const HomeView = ({
         (spaceCountByProject.get(projectId) ?? 0) + 1,
       );
     }
-    return [...projects]
+    let defaultProjectShown = false;
+    return projects
+      .filter((project) => Boolean(user?.id) && project.ownerId === user?.id)
       .sort(
         (a, b) =>
           Number(b.id === activeProjectId) -
             Number(a.id === activeProjectId) ||
           b.updatedAt - a.updatedAt,
       )
+      .filter((project) => {
+        if (project.name !== DEFAULT_PROJECT_NAME) return true;
+        if (defaultProjectShown) return false;
+        defaultProjectShown = true;
+        return true;
+      })
       .map((project, index) => ({
         ...project,
         color: PROJECT_COLOR_SWATCHES[index % PROJECT_COLOR_SWATCHES.length],
         icon: index === 0 ? Lock : Layers,
         spaceCount: spaceCountByProject.get(project.id) ?? 0,
       }));
-  }, [activeProjectId, projects, workspaces]);
+  }, [activeProjectId, projects, user?.id, workspaces]);
 
   /* Recent spaces — top 3 by updatedAt with rendered minimaps so the
    * Home preview stays fixed-width and never pushes the Tools column
@@ -991,7 +999,7 @@ const HomeView = ({
           </div>
 
           <section className="mt-6">
-            <div className="flex items-center justify-center border-b border-white/[0.06]">
+            <div className="flex items-center justify-center">
               <div className="relative h-11 px-3 text-[15.5px] font-medium text-zinc-50 lg:h-9">
                 {t("workspace.home.academy")}
                 <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-t-sm bg-zinc-100" />
@@ -2569,7 +2577,10 @@ const PageHeader = ({
 }) => {
   const { t } = useLanguage();
   return (
-  <div className="flex h-14 shrink-0 items-center gap-3 border-b border-white/5 px-4 md:px-6 lg:h-12 lg:px-8">
+  /* 2026-05: drop the bottom hairline. Header sits flush on Layer-0
+   *  page bg; the content cards underneath are Layer-1/2 so the
+   *  header reads as a top strip without needing a divider. */
+  <div className="flex h-14 shrink-0 items-center gap-3 px-4 md:px-6 lg:h-12 lg:px-8">
     {onOpenSidebar && (
       <button
         type="button"
