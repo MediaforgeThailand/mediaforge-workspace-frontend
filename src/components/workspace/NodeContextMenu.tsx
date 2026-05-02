@@ -134,7 +134,7 @@ const NodeContextMenu = ({ position, items, onClose }: Props) => {
       aria-label={t("workspace.nodemenu.aria")}
       className={cn(
         "fixed z-[1310] flex flex-col overflow-hidden",
-        "rounded-xl border border-white/10",
+        "rounded-xl",
         "bg-[hsl(220_10%_8%)]/95 backdrop-blur-2xl",
         "shadow-[0_18px_48px_-16px_hsl(0_0%_0%/0.7),0_0_0_1px_hsl(0_0%_100%/0.04)]",
         "py-1",

@@ -337,7 +337,7 @@ const PlanBilling = () => {
       </div>
 
       {/* ── 1. Plan section ─────────────────────────────────── */}
-      <section className="rounded-lg border border-white/10 bg-white/[0.02] p-[14px]">
+      <section className="rounded-lg bg-white/[0.04] p-[14px]">
         <div className="flex items-center justify-between gap-[14px]">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-[8px]">
@@ -390,7 +390,7 @@ const PlanBilling = () => {
       </section>
 
       {/* ── 2. Credits section ──────────────────────────────── */}
-      <section className="rounded-lg border border-white/10 bg-white/[0.02] p-[14px]">
+      <section className="rounded-lg bg-white/[0.04] p-[14px]">
         <div className="mb-[10px] flex flex-wrap items-start justify-between gap-[10px]">
           <div>
             <h3 className="text-[14px] font-semibold leading-[18px] text-zinc-50">Credits</h3>
@@ -462,7 +462,7 @@ const PlanBilling = () => {
       </section>
 
       {/* ── 3. Billing information ───────────────────────────── */}
-      <section className="rounded-lg border border-white/10 bg-white/[0.02] p-[14px]">
+      <section className="rounded-lg bg-white/[0.04] p-[14px]">
         <div className="flex items-center justify-between gap-[14px]">
           <div className="min-w-0">
             <h3 className="text-[14px] font-semibold leading-[18px] text-zinc-50">Billing information</h3>
@@ -500,7 +500,7 @@ const PlanBilling = () => {
       </section>
 
       {/* ── 4. Payment details ───────────────────────────────── */}
-      <section className="rounded-lg border border-white/10 bg-white/[0.02] p-[14px]">
+      <section className="rounded-lg bg-white/[0.04] p-[14px]">
         <div className="mb-[10px] flex items-start justify-between gap-[14px]">
           <div>
             <h3 className="text-[14px] font-semibold leading-[18px] text-zinc-50">Payment details</h3>

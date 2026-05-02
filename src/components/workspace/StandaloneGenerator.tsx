@@ -1786,7 +1786,7 @@ function PromptBox({
         onChange={(event) => onChange(event.target.value)}
         rows={minRows}
         placeholder={placeholder}
-        className="mt-2 min-h-[126px] w-full resize-none rounded-lg border border-white/[0.08] bg-[#171717] px-3 py-3 text-[13px] leading-relaxed text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-white/[0.16] focus:bg-[#141414]"
+        className="mt-2 min-h-[126px] w-full resize-none rounded-lg bg-[#181818] px-3 py-3 text-[13px] leading-relaxed text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-white/[0.16] focus:bg-[#141414]"
       />
     </div>
   );
@@ -1812,7 +1812,7 @@ function SelectField({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 h-9 w-full rounded-lg border border-white/[0.05] bg-[#252525] px-2 text-[11px] font-semibold text-white outline-none focus:border-white/[0.16] disabled:cursor-not-allowed"
+        className="mt-2 h-9 w-full rounded-lg bg-[#252525] px-2 text-[11px] font-semibold text-white outline-none focus:border-white/[0.16] disabled:cursor-not-allowed"
       >
         {options.map((option) => (
           <option key={option} value={option} className="bg-zinc-950">
@@ -1842,7 +1842,7 @@ function TextInputField({
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 h-9 w-full rounded-lg border border-white/[0.08] bg-[#171717] px-3 text-[12px] text-white outline-none placeholder:text-zinc-500 focus:border-white/[0.16]"
+        className="mt-2 h-9 w-full rounded-lg bg-[#181818] px-3 text-[12px] text-white outline-none placeholder:text-zinc-500 focus:border-white/[0.16]"
       />
     </label>
   );
@@ -2027,7 +2027,7 @@ function ReferenceTray({
         {refs.map((ref) => (
           <div
             key={ref.id}
-            className="group relative aspect-square overflow-hidden rounded-xl border border-white/10 bg-white/[0.04]"
+            className="group relative aspect-square overflow-hidden rounded-xl bg-white/[0.06]"
           >
             <img src={ref.url} alt="" className="h-full w-full object-cover" />
             <button
@@ -2238,7 +2238,7 @@ function CreationRow({ job }: { job: StandaloneJobRow }) {
           {duration && <MiniMeta label={`${duration} sec`} />}
           {ratio && <MiniMeta label={ratio} />}
           <MiniMeta label={`+${job.attempts ?? 1}`} />
-          <span className="flex h-5 items-center gap-1 rounded border border-white/[0.08] px-1.5 text-[10px] text-zinc-300">
+          <span className="flex h-5 items-center gap-1 rounded bg-white/[0.06] px-1.5 text-[10px] text-zinc-300">
             <span className="h-3 w-3 rounded-sm border border-zinc-600" />
             {formatDate(job.created_at)}
           </span>
@@ -2388,7 +2388,7 @@ function CreationRow({ job }: { job: StandaloneJobRow }) {
 
 function MiniMeta({ label }: { label: string }) {
   return (
-    <span className="h-5 rounded border border-white/[0.08] bg-[#1a1a1a] px-2 text-[10px] font-semibold leading-5 text-zinc-100">
+    <span className="h-5 rounded bg-white/[0.06] bg-[#1a1a1a] px-2 text-[10px] font-semibold leading-5 text-zinc-100">
       {label}
     </span>
   );

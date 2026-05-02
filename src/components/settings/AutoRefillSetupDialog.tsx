@@ -303,7 +303,7 @@ export function AutoRefillSetupDialog({
                       Math.max(50, Math.min(10000, Number(e.target.value) || 100)),
                     )
                   }
-                  className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-[13px] text-zinc-100 outline-none focus:border-violet-500/40"
+                  className="mt-1 w-full rounded-md bg-black/40 px-3 py-2 text-[13px] text-zinc-100 outline-none focus:border-violet-500/40"
                 />
                 <p className="mt-1 text-[10.5px] text-zinc-500">
                   {language === "th"
@@ -330,7 +330,7 @@ export function AutoRefillSetupDialog({
                         Math.max(100, Math.min(10000, Number(e.target.value) || 500)),
                       )
                     }
-                    className="w-full rounded-md border border-white/10 bg-black/40 py-2 pl-7 pr-3 text-[13px] text-zinc-100 outline-none focus:border-violet-500/40"
+                    className="w-full rounded-md bg-black/40 py-2 pl-7 pr-3 text-[13px] text-zinc-100 outline-none focus:border-violet-500/40"
                   />
                 </div>
                 <p className="mt-1 text-[10.5px] text-zinc-500">

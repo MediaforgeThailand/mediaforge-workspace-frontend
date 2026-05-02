@@ -45,7 +45,7 @@ const NodeResultBar = memo(
     return (
       <>
         <div
-          className="node-result-bar overflow-hidden border border-white/10 bg-black/60"
+          className="node-result-bar overflow-hidden bg-black/70"
           style={{ width, borderRadius: 10 }}
         >
           {current ? (

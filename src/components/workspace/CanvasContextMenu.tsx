@@ -377,7 +377,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
         aria-modal="true"
         className={cn(
           "fixed z-[1310] flex flex-col overflow-hidden rounded-[13px]",
-          "border border-white/[0.08] bg-[#1f1f1f]/96 text-white backdrop-blur-xl",
+          "bg-[#1f1f1f]/96 text-white backdrop-blur-xl",
           "shadow-[0_20px_70px_-28px_rgba(0,0,0,0.95),0_0_0_1px_rgba(255,255,255,0.025)]",
         )}
         style={{

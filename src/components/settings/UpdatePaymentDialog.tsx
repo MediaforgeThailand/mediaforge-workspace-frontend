@@ -207,7 +207,7 @@ const UpdatePaymentDialog = ({ open, onOpenChange, onSaved }: UpdatePaymentDialo
         </div>
 
         <Tabs defaultValue="card" className="px-6 pb-5">
-          <TabsList className="bg-white/[0.04] border border-white/[0.06] mb-4">
+          <TabsList className="bg-white/[0.06] mb-4">
             <TabsTrigger value="card" className="text-xs data-[state=active]:bg-violet-500/20 data-[state=active]:text-violet-100">
               <CreditCard className="w-3.5 h-3.5 mr-1.5" />
               Card
@@ -239,7 +239,7 @@ const UpdatePaymentDialog = ({ open, onOpenChange, onSaved }: UpdatePaymentDialo
           </TabsContent>
 
           <TabsContent value="promptpay" className="m-0">
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-3">
+            <div className="rounded-xl bg-white/[0.04] p-5 space-y-3">
               <div className="flex items-center gap-2">
                 <QrCode className="w-4 h-4 text-emerald-400" />
                 <p className="text-sm font-medium text-zinc-100">
