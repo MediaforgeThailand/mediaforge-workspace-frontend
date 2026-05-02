@@ -340,16 +340,16 @@ const Auth = () => {
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="email-login">{t("authEmailLabel")}</Label>
-                      <Input id="email-login" type="email" placeholder="you@example.com" className="bg-input border-border" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} onBlur={() => void checkOrgEmail(loginEmail)} required />
+                      <Input id="email-login" type="email" placeholder="you@example.com" className="" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} onBlur={() => void checkOrgEmail(loginEmail)} required />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="password-login">{t("authPasswordLabel")}</Label>
-                      <Input id="password-login" type="password" placeholder="••••••••" className="bg-input border-border" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required />
+                      <Input id="password-login" type="password" placeholder="••••••••" className="" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required />
                       <button type="button" onClick={handleForgotPassword} disabled={isForgotLoading} className="text-xs text-primary hover:underline mt-1 disabled:opacity-50">
                         {isForgotLoading ? t("authForgotSending") : t("authForgotPasswordLink")}
                       </button>
                     </div>
-                    <Button type="submit" variant="gradient" size="xl" className="w-full" disabled={isLoading}>
+                    <Button type="submit" variant="gradient" className="w-full" disabled={isLoading}>
                       {isLoading ? <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         {t("authSigningIn")}
@@ -398,17 +398,17 @@ const Auth = () => {
                   <form onSubmit={handleSignup} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="name-signup">{t("authFullNameLabel")}</Label>
-                      <Input id="name-signup" type="text" placeholder={t("authFullNamePlaceholder")} className="bg-input border-border" value={signupName} onChange={e => setSignupName(e.target.value)} />
+                      <Input id="name-signup" type="text" placeholder={t("authFullNamePlaceholder")} className="" value={signupName} onChange={e => setSignupName(e.target.value)} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="email-signup">{t("authEmailLabel")}</Label>
-                      <Input id="email-signup" type="email" placeholder="you@example.com" className="bg-input border-border" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} onBlur={() => void checkOrgEmail(signupEmail)} required />
+                      <Input id="email-signup" type="email" placeholder="you@example.com" className="" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} onBlur={() => void checkOrgEmail(signupEmail)} required />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="password-signup">{t("authPasswordLabel")}</Label>
-                      <Input id="password-signup" type="password" placeholder="••••••••" className="bg-input border-border" value={signupPassword} onChange={e => setSignupPassword(e.target.value)} required minLength={6} />
+                      <Input id="password-signup" type="password" placeholder="••••••••" className="" value={signupPassword} onChange={e => setSignupPassword(e.target.value)} required minLength={6} />
                     </div>
-                    <Button type="submit" variant="gradient" size="xl" className="w-full" disabled={isLoading}>
+                    <Button type="submit" variant="gradient" className="w-full" disabled={isLoading}>
                       {isLoading ? <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         {t("authCreatingAccount")}

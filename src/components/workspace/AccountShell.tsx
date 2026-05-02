@@ -61,8 +61,11 @@ export default function AccountShell({ children }: { children?: ReactNode }) {
   const isSettingsRoute = location.pathname.startsWith("/app/settings");
 
   return (
+    /* 2026-05 redesign: page bg is Layer 0 (--surface-0). The
+     *  sidebar itself is a Layer-1 floating panel, content area
+     *  is Layer 0 too with its own Layer-2 cards inside. */
     <div
-      className="mf-readable flex h-screen w-screen overflow-hidden bg-[hsl(0_0%_5%)] text-zinc-100"
+      className="mf-readable flex h-screen w-screen overflow-hidden bg-[hsl(var(--surface-0))] text-zinc-100"
       style={{ fontFamily: "var(--font-sans)" }}
     >
       {/* ── Workspace sidebar (shared with the dashboard) ───────── */}
@@ -72,7 +75,9 @@ export default function AccountShell({ children }: { children?: ReactNode }) {
 
       {/* ── Account content area ─────────────────────────────── */}
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex h-[48px] shrink-0 items-center gap-[10px] border-b border-white/5 px-[16px] md:px-[20px]">
+        {/* 2026-05: header drops the bottom hairline; content scroll
+         *  area sits flush with no hard line. */}
+        <header className="flex h-[48px] shrink-0 items-center gap-[10px] px-[16px] md:px-[20px]">
           <button
             type="button"
             onClick={() => navigate("/app/workspace")}
@@ -115,7 +120,7 @@ export default function AccountShell({ children }: { children?: ReactNode }) {
           </div>
         </header>
 
-        <div className="ws-scroll-hide flex-1 overflow-y-auto bg-[hsl(0_0%_5%)]">
+        <div className="ws-scroll-hide flex-1 overflow-y-auto bg-[hsl(var(--surface-0))]">
           <div
             className={cn(
               "w-full text-zinc-200",
@@ -150,7 +155,7 @@ function AccountFooter() {
   const linkClass =
     "text-zinc-500 transition-colors hover:text-zinc-200 underline-offset-4 hover:underline";
   return (
-    <footer className="border-t border-white/5 px-4 py-4 md:px-6">
+    <footer className="px-4 py-4 md:px-6">
       <nav
         className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-3 gap-y-2 text-[13px] leading-5 text-zinc-400"
         aria-label="Legal"

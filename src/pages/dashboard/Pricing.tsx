@@ -298,7 +298,7 @@ const Pricing = () => {
 
         {/* Credit balance widget */}
         {credits && (
-          <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-neutral-300 md:mt-6">
+          <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-white/[0.06] px-4 py-2 text-xs text-neutral-300 md:mt-6">
             <Sparkles className="w-3.5 h-3.5 text-purple-400" />
             <span>
               {credits.balance.toLocaleString()}{" "}
@@ -313,7 +313,7 @@ const Pricing = () => {
             <button
               onClick={handleManageSubscription}
               disabled={openingPortal}
-              className="inline-flex items-center gap-2 text-sm text-neutral-300 hover:text-white border border-white/10 hover:border-white/20 rounded-full px-4 py-1.5 transition-colors disabled:opacity-60"
+              className="inline-flex items-center gap-2 text-sm text-neutral-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.10] rounded-full px-4 py-1.5 transition-colors disabled:opacity-60"
             >
               {openingPortal ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -473,7 +473,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
       ? "bg-blue-600 hover:bg-blue-500"
       : isTeam
         ? "bg-purple-600 hover:bg-purple-500"
-        : "bg-neutral-800 hover:bg-neutral-700 border border-neutral-700";
+        : "bg-neutral-800 hover:bg-neutral-700";
 
   return (
     <div
@@ -569,7 +569,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
 
       {/* Credits pill */}
       {!isTeam && (
-        <div className="rounded-xl border border-neutral-700/60 bg-neutral-800/80 px-3 py-3 text-center">
+        <div className="rounded-xl bg-neutral-800/80 px-3 py-3 text-center">
           <span className="text-sm font-semibold text-white sm:text-base">
             {credits.toLocaleString()}{" "}
             <span className="text-neutral-400 font-normal">

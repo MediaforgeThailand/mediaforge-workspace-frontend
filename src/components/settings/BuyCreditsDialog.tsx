@@ -292,7 +292,7 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
             </div>
 
             {/* Live preview */}
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] px-4 py-3">
+            <div className="rounded-xl bg-white/[0.04] px-4 py-3">
               <div className="flex items-center justify-between">
                 <span className="text-[11.5px] text-zinc-400">
                   เครดิตที่จะได้รับ
@@ -337,7 +337,7 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
         {/* ── Step: qr ────────────────────────────────────── */}
         {step === "qr" && qrData && (
           <div className="space-y-4 px-6 pb-6 pt-2">
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-4">
+            <div className="rounded-xl bg-white/[0.04] p-4">
               <div className="flex items-center justify-between text-[11px]">
                 <span className="text-zinc-400">ยอดชำระ</span>
                 <span className="font-semibold text-zinc-100">
@@ -352,7 +352,7 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
               </div>
             </div>
 
-            <div className="flex flex-col items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.025] p-5">
+            <div className="flex flex-col items-center gap-2 rounded-xl bg-white/[0.04] p-5">
               {qrData.qrCodeSvgUrl ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img

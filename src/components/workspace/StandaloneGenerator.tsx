@@ -1510,12 +1510,12 @@ function VoiceControls({
             </div>
           )}
           {elevenLoading && (
-            <div className="mt-2 rounded-md border border-white/[0.06] bg-white/[0.02] px-2.5 py-2 text-[11px] text-zinc-500">
+            <div className="mt-2 rounded-md bg-white/[0.04] px-2.5 py-2 text-[11px] text-zinc-500">
               Loading ElevenLabs voices from your account…
             </div>
           )}
           {!elevenLoading && elevenVoices && elevenVoices.length === 0 && !elevenError && (
-            <div className="mt-2 rounded-md border border-white/[0.06] bg-white/[0.02] px-2.5 py-2 text-[11px] text-zinc-500">
+            <div className="mt-2 rounded-md bg-white/[0.04] px-2.5 py-2 text-[11px] text-zinc-500">
               No voices in this ElevenLabs account.
             </div>
           )}
@@ -1613,7 +1613,7 @@ function ElevenLabsVoiceParams({
   ];
 
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-3">
+    <div className="rounded-xl bg-white/[0.04] px-3 py-3">
       <div className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
         Voice style
       </div>

@@ -18,57 +18,77 @@
   font-display: swap;
 }
 
-/* MediaForge "Midnight Neon" Design System
-   Background: Deep Navy (#0a0e1a)
-   Card: Slightly lighter navy (#141827)
-   Primary: Electric Purple
-   Accent: Magenta-Purple
-   Text: Near-white (#f1f5f9)
-   Muted: Light slate (#94a3b8)
-   Dark-only — no light theme
+/* MediaForge "Magnific-style" Design System (2026-05 redesign)
+   Layered elevation, no hairlines — boxes are defined by background
+   tone differences, not borders.
+     Layer 0 — page bg     : hsl(0 0% 4%)   #0a0a0a
+     Layer 1 — panels      : hsl(0 0% 7%)   #121212
+     Layer 2 — cards/rows  : hsl(0 0% 10%)  #1a1a1a
+     Layer 3 — hover/active: hsl(0 0% 14%)  #242424
+   Borders kept at near-zero opacity for the rare component that
+   genuinely needs a hairline (popover edges, focus rings).
 */
 
 @layer base {
   :root {
     --font-sans: 'DB Adman X', 'Adman X', 'ADMAN X', 'Prompt', 'Noto Sans Thai', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --background: 150 50% 1%;
+    /* Layer 0 — deepest, used as page bg + behind floating panels */
+    --background: 0 0% 4%;
     --foreground: 0 0% 100%;
 
-    --card: 220 30% 6%;
+    /* Layer 2 — card surface, ~6% lighter than page bg */
+    --card: 0 0% 10%;
     --card-foreground: 0 0% 100%;
 
-    --popover: 220 30% 6%;
+    /* Popover same elevation as card */
+    --popover: 0 0% 10%;
     --popover-foreground: 0 0% 100%;
 
     --primary: 262.1 83.3% 57.8%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 25% 10%;
+    /* Layer 1 — panel surface (sidebar, dialog inner panels) */
+    --secondary: 0 0% 7%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 220 25% 10%;
-    --muted-foreground: 0 0% 80%;
+    /* Muted = inputs / subtle row fills. Same as panel layer. */
+    --muted: 0 0% 7%;
+    --muted-foreground: 0 0% 65%;
 
-    --accent: 283 55% 60%;
+    --accent: 0 0% 14%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 25% 12%;
-    --input: 220 25% 12%;
+    /* Low-contrast so explicit `border` calls are barely visible.
+       Boxes should be defined by bg tone, not hairlines.
+       (Plain HSL — no alpha — to keep `border-border/N` modifiers
+       valid for components that genuinely need stronger borders.) */
+    --border: 0 0% 14%;
+    --input: 0 0% 14%;
     --ring: 262.1 83.3% 57.8%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 150 20% 2%;
+    /* Sidebar = Layer 1 (panel) so it reads as a floating box on the
+       Layer-0 page bg. */
+    --sidebar-background: 0 0% 7%;
     --sidebar-foreground: 0 0% 100%;
     --sidebar-primary: 262.1 83.3% 57.8%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 283 55% 65%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 220 25% 12%;
+    --sidebar-border: 0 0% 14%;
     --sidebar-ring: 262.1 83.3% 57.8%;
+
+    /* Elevation aliases for components that need explicit step-up
+       backgrounds (e.g. nested rows inside a card). */
+    --surface-0: 0 0% 4%;   /* page bg */
+    --surface-1: 0 0% 7%;   /* panel/sidebar */
+    --surface-2: 0 0% 10%;  /* card */
+    --surface-3: 0 0% 14%;  /* hover/active row */
+    --surface-4: 0 0% 18%;  /* pressed */
 
     --gradient-primary: linear-gradient(135deg, hsl(262 83% 58%) 0%, hsl(283 47% 45%) 100%);
     --gradient-subtle: linear-gradient(135deg, hsl(150 20% 2%) 0%, hsl(220 30% 6%) 100%);
@@ -95,8 +115,13 @@
     --text-2: 240 20% 78%;
   }
 
+  /* 2026-05 redesign: drop the legacy 22.63px (≈ √2 × 16) inflation
+   * factor that made every rem-based Tailwind class 1.4× too big
+   * (h-9 was rendering 51px instead of 36px). Standard 16px root +
+   * the `.mf-readable` text-bump utility already covers Thai
+   * legibility on dense panels. */
   html {
-    font-size: 22.63px;
+    font-size: 16px;
   }
 }
 

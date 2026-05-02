@@ -28,7 +28,7 @@ export default function TeamRegister() {
         </Button>
 
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-          <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-6">
+          <section className="rounded-2xl bg-white/[0.05] p-6">
             <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-violet-500/15 text-violet-200">
               <Building2 className="h-5 w-5" />
             </div>
@@ -52,7 +52,7 @@ export default function TeamRegister() {
               </div>
             </div>
 
-            <div className="mt-6 rounded-xl border border-white/10 bg-black/20 p-4">
+            <div className="mt-6 rounded-xl bg-black/30 p-4">
               <div className="text-xs uppercase tracking-[0.12em] text-zinc-500">Next step</div>
               <p className="mt-1 text-sm text-zinc-300">
                 The Admin Console handles real member approval and billing. This registration screen is the user-facing entry point; domain verification and payment wiring attach here next.
@@ -82,7 +82,7 @@ export default function TeamRegister() {
 
 function Feature({ icon, title, body }: { icon: React.ReactNode; title: string; body: string }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4">
+    <div className="rounded-xl bg-white/[0.05] p-4">
       <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.06] text-zinc-200">{icon}</div>
       <div className="text-sm font-medium text-zinc-100">{title}</div>
       <p className="mt-1 text-xs leading-5 text-zinc-500">{body}</p>

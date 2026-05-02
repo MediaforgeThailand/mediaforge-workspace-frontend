@@ -156,8 +156,15 @@ export default function WorkspaceSidebar({
     else handleClick("spaces");
   };
 
+  // 2026-05 redesign: sidebar floats as a Layer-1 panel.
+  //   • Outer wrapper carries the page-bg padding (8px around).
+  //   • aside itself is a rounded card sitting inside.
+  //   • No more right border — the page bg already separates the
+  //     panel from the main content (different elevation).
+  //   • Width tightened 198 → 192 keeps the visual rhythm.
   return (
-    <aside className="mf-readable ws-scroll-hide flex h-full w-[198px] shrink-0 flex-col overflow-y-auto border-r border-white/5 bg-[hsl(0_0%_4%)]">
+    <div className="ws-scroll-hide h-full shrink-0 bg-[hsl(var(--surface-0))] py-[8px] pl-[8px]">
+      <aside className="mf-readable ws-scroll-hide flex h-full w-[192px] flex-col overflow-y-auto rounded-xl bg-[hsl(var(--surface-1))]">
       {/* ── Brand row — PSC : Digital Media ──────────────────────
        *  Logo lives at /public/psc-logo.png. Save the orange
        *  Digital Media wordmark there; the full lockup is wide
@@ -282,7 +289,8 @@ export default function WorkspaceSidebar({
           onClick={() => setLanguage(language === "th" ? "en" : "th")}
         />
       </div>
-    </aside>
+      </aside>
+    </div>
   );
 }
 
@@ -312,7 +320,9 @@ const OrgAdminLink = () => {
   const primaryTarget = isEnterprise ? "/app/settings?tab=team" : "/app/org-admin";
 
   return (
-    <div className="mt-[8px] space-y-[4px] border-t border-white/5 px-[12px] pb-[8px] pt-[8px]">
+    /* 2026-05: drop the divider line — we use a small mt gap instead
+     *  to keep the floating-panel surface clean. */
+    <div className="mt-[12px] space-y-[4px] px-[12px] pb-[8px] pt-[4px]">
       <button
         type="button"
         onClick={() => navigate(primaryTarget)}
@@ -350,9 +360,11 @@ const NavLink = ({
     type="button"
     onClick={onClick}
     className={cn(
+      /* 2026-05: drop the inset 1px stroke on active — bg lift alone
+       *  is enough now that the sidebar is a Layer-1 panel. */
       "flex h-[32px] items-center gap-[8px] rounded-md px-[8px] text-[14px] font-medium transition-colors",
       active
-        ? "bg-white/[0.07] text-zinc-50 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.05)]"
+        ? "bg-white/[0.08] text-zinc-50"
         : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100",
     )}
   >

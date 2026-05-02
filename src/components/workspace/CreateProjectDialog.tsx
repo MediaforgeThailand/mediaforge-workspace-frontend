@@ -167,7 +167,7 @@ export function CreateProjectDialog({
             /* 14px input + zinc-400 placeholder = readable on the
              * dark dialog bg AND legible on Thai (descenders/marks
              * need the extra row height). */
-            className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2.5 text-[14px] leading-6 text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-violet-500/50"
+            className="w-full rounded-md bg-black/40 px-3 py-2.5 text-[14px] leading-6 text-zinc-100 outline-none placeholder:text-zinc-500 focus:ring-1 focus:ring-violet-500/50"
           />
         </div>
 
@@ -176,7 +176,7 @@ export function CreateProjectDialog({
           type="button"
           onClick={() => !submitting && setIsPrivate((v) => !v)}
           disabled={submitting}
-          className="flex w-full items-center justify-between gap-3 rounded-md border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.04] disabled:opacity-60"
+          className="flex w-full items-center justify-between gap-3 rounded-md bg-white/[0.04] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.08] disabled:opacity-60"
         >
           <div className="flex min-w-0 items-center gap-2.5">
             <span

@@ -1053,7 +1053,7 @@ const EducationClassDashboard = ({
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
-        <div className="rounded-xl border border-white/10 bg-white/[0.08] p-3">
+        <div className="rounded-xl bg-white/[0.06] p-3">
           <div className="flex items-center gap-2 text-xs uppercase tracking-[0.14em] text-emerald-100/70">
             <WalletCards className="h-3.5 w-3.5" />
             Balance
@@ -1063,14 +1063,14 @@ const EducationClassDashboard = ({
           </p>
           <p className="mt-1 text-xs text-emerald-50/55">credits available for this class</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/[0.08] p-3">
+        <div className="rounded-xl bg-white/[0.06] p-3">
           <div className="text-xs uppercase tracking-[0.14em] text-emerald-100/70">Received</div>
           <p className="mt-2 text-2xl font-semibold text-white">
             {active.credits_lifetime_received.toLocaleString()}
           </p>
           <p className="mt-1 text-xs text-emerald-50/55">teacher and class grants</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/[0.08] p-3">
+        <div className="rounded-xl bg-white/[0.06] p-3">
           <div className="mb-2 flex justify-between text-xs uppercase tracking-[0.14em] text-emerald-100/70">
             <span>Used</span>
             <span>{pctUsed}%</span>
@@ -1146,7 +1146,8 @@ const ProjectsCard = ({
 
   return (
     <>
-      <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4 ring-1 ring-inset ring-white/[0.06]">
+      {/* 2026-05: drop ring — bg differentiation alone reads as the box. */}
+      <div className="min-w-0 rounded-xl bg-[hsl(var(--surface-1))] p-4">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-1 text-[13.5px] font-semibold uppercase tracking-[0.14em] text-zinc-300">
             {t("workspace.home.projects")}
@@ -1166,7 +1167,7 @@ const ProjectsCard = ({
           <button
             type="button"
             onClick={onCreate}
-            className="flex min-h-[132px] w-full items-center justify-center rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] px-4 text-[13.5px] text-zinc-500 transition-colors hover:border-white/[0.20] hover:bg-white/[0.04] hover:text-zinc-200"
+            className="flex min-h-[112px] w-full items-center justify-center rounded-xl bg-white/[0.02] px-4 text-[13px] text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-zinc-200"
           >
             {t("workspace.home.create_first_project")}
           </button>
@@ -1177,29 +1178,35 @@ const ProjectsCard = ({
               const canManage = !p.ownerId || p.ownerId === userId;
               return (
                 <li key={p.id} className="group/proj relative">
+                  {/* 2026-05 redesign: rows match content height. The
+                   *  legacy 44px (mobile) / 36px (desktop) gave room for
+                   *  2 lines of text but only ever held 1 — the user
+                   *  flagged it as the most visible "too big" offender.
+                   *  Now: 32px desktop / 36px mobile, 13px text.
+                   *  Active state: bg-elevation only, no ring border. */}
                   <button
                     type="button"
                     onClick={() => onSelect(p.id)}
                     className={cn(
-                      "flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 text-[15.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white lg:min-h-9",
+                      "flex h-9 w-full items-center gap-2 rounded-md px-2 text-[13px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white lg:h-8",
                       activeProjectId === p.id &&
-                        "bg-white/[0.07] text-white ring-1 ring-inset ring-white/[0.08]",
+                        "bg-white/[0.08] text-white",
                     )}
                   >
                     <span
-                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px]"
+                      className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px]"
                       style={{ background: p.color }}
                     >
-                      <p.icon className="h-2.5 w-2.5 text-zinc-950" />
+                      <p.icon className="h-2 w-2 text-zinc-950" />
                     </span>
-                    <span className="flex-1 truncate text-left">{p.name}</span>
-                    <span className="rounded bg-white/[0.05] px-1.5 py-px text-[10.5px] font-semibold text-zinc-400 ring-1 ring-inset ring-white/[0.06]">
+                    <span className="flex-1 truncate text-left font-medium">{p.name}</span>
+                    <span className="rounded bg-white/[0.05] px-1 py-px text-[10px] font-semibold text-zinc-400">
                       {p.spaceCount}
                     </span>
                     {activeProjectId === p.id ? (
                       <span
                         className={cn(
-                          "rounded bg-emerald-500/15 px-1.5 py-px text-[13.5px] font-bold uppercase tracking-wide text-emerald-300 ring-1 ring-inset ring-emerald-500/30 transition-opacity",
+                          "rounded bg-emerald-500/15 px-1 py-px text-[10px] font-bold uppercase tracking-wide text-emerald-300 transition-opacity",
                           /* Fade the badge so the trash button can
                            * take its slot — but only when this row is
                            * actually deletable. The protected project
@@ -1212,7 +1219,7 @@ const ProjectsCard = ({
                     ) : (
                       <Lock
                         className={cn(
-                          "h-3 w-3 text-zinc-600 transition-opacity",
+                          "h-2.5 w-2.5 text-zinc-600 transition-opacity",
                           canManage && !isProtected && "group-hover/proj:opacity-0",
                         )}
                       />
@@ -1436,7 +1443,7 @@ const SpacesShowcaseCard = ({
         <button
           type="button"
           onClick={onNew}
-          className="flex min-h-[150px] w-full items-center justify-center rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] px-4 text-[13.5px] text-zinc-500 transition-colors hover:border-white/[0.20] hover:bg-white/[0.04] hover:text-zinc-200"
+          className="flex min-h-[120px] w-full items-center justify-center rounded-xl bg-white/[0.02] px-4 text-[13px] text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-zinc-200"
         >
           {t("workspace.home.create_first_space")}
         </button>
@@ -1859,22 +1866,22 @@ const ProjectsManagerView = ({
         onOpenSidebar={onOpenSidebar}
       />
       <div className="ws-scroll-hide flex-1 overflow-y-auto overflow-x-hidden">
-        <div className="mx-auto grid w-full max-w-[1480px] gap-4 px-4 pb-16 pt-5 md:px-6 lg:grid-cols-[280px_minmax(0,1fr)] lg:px-7">
-          <aside className="min-w-0 rounded-xl bg-[hsl(0_0%_7%)] p-2.5 ring-1 ring-inset ring-white/[0.06]">
-            <div className="mb-2 flex items-center justify-between px-1">
-              <div className="text-[12.5px] font-semibold uppercase tracking-[0.12em] text-zinc-300">
+        <div className="grid w-full gap-4 px-4 pb-16 pt-5 md:px-6 lg:grid-cols-[218px_minmax(0,1fr)] lg:px-7">
+          <aside className="min-w-0 self-start rounded-md bg-[hsl(0_0%_8.5%)] p-1.5">
+            <div className="mb-1 flex items-center justify-between px-1.5">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-500">
                 Projects
               </div>
               <button
                 type="button"
                 onClick={onCreateProject}
-                className="grid h-7 w-7 place-items-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white"
+                className="grid h-5 w-5 place-items-center rounded text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-white"
                 title={t("workspace.home.new_project_tooltip")}
               >
-                <Plus className="h-3 w-3" />
+                <Plus className="h-3 w-3" strokeWidth={2} />
               </button>
             </div>
-            <ul className="space-y-0.5">
+            <ul className="ws-scroll-hide max-h-[360px] space-y-px overflow-y-auto">
               {projectCards.map((project) => {
                 const active = selectedProject?.id === project.id;
                 const canManage = !project.ownerId || project.ownerId === user?.id;
@@ -1886,23 +1893,23 @@ const ProjectsManagerView = ({
                       type="button"
                       onClick={() => onSelectProject(project.id)}
                       className={cn(
-                        "flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] transition-colors",
+                        "flex h-7 w-full items-center gap-1.5 rounded px-1.5 text-left text-[12px] transition-colors",
                         active
-                          ? "bg-white/[0.08] text-zinc-50 ring-1 ring-inset ring-white/[0.08]"
-                          : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100",
+                          ? "bg-[hsl(0_0%_16%)] text-zinc-50"
+                          : "text-zinc-500 hover:bg-[hsl(0_0%_13%)] hover:text-zinc-200",
                       )}
                     >
                       <span
-                        className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded"
+                        className="grid h-3.5 w-3.5 shrink-0 place-items-center rounded-[3px]"
                         style={{ background: project.color }}
                       >
-                        <project.icon className="h-2.5 w-2.5 text-zinc-950" />
+                        <project.icon className="h-2 w-2 text-zinc-950" />
                       </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium">{project.name}</span>
-                        <span className="block text-[11.5px] text-zinc-500">
-                          {project.spaceCount} spaces
-                        </span>
+                      <span className="min-w-0 flex-1 truncate font-medium">
+                        {project.name}
+                      </span>
+                      <span className="min-w-4 rounded bg-black/20 px-1 py-px text-center text-[10px] font-semibold text-zinc-500">
+                        {project.spaceCount}
                       </span>
                       {teamProject && (
                         <span className="rounded bg-sky-400/15 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-sky-200">
@@ -1917,10 +1924,10 @@ const ProjectsManagerView = ({
                           event.stopPropagation();
                           onDeleteProject(project.id);
                         }}
-                        className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-md text-zinc-500 opacity-0 transition-all hover:bg-red-500/15 hover:text-red-300 group-hover/project:opacity-100"
+                        className="absolute right-1 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded text-zinc-500 opacity-0 transition-all hover:bg-red-500/15 hover:text-red-300 group-hover/project:opacity-100"
                         title={t("workspace.home.delete_project_tooltip", { name: project.name })}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-2.5 w-2.5" />
                       </button>
                     )}
                   </li>
@@ -1930,41 +1937,37 @@ const ProjectsManagerView = ({
           </aside>
 
           <section className="min-w-0">
-            <div className="mb-4 flex flex-col gap-3 rounded-xl bg-[hsl(0_0%_7%)] p-3.5 ring-1 ring-inset ring-white/[0.06] md:flex-row md:items-center md:justify-between">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md bg-[hsl(0_0%_8.5%)] px-3 py-2">
               <div className="min-w-0">
-                <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/[0.05] px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.12em] text-zinc-400 ring-1 ring-inset ring-white/[0.06]">
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.05] px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.12em] text-zinc-400 ring-1 ring-inset ring-white/[0.06]">
                   <Users className="h-3 w-3" />
                   {ownerLabel}
                 </div>
-                <h1 className="truncate text-[26px] font-semibold leading-tight tracking-tight text-zinc-50 md:text-[30px]">
-                  {selectedProject?.name ?? "Projects"}
-                </h1>
-                <p className="mt-1 text-[13.5px] text-zinc-500">
-                  {spaces.length} visible space{spaces.length === 1 ? "" : "s"}
-                </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {(["all", "mine", "team"] as const).map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setFilter(item)}
-                    className={cn(
-                      "h-8 rounded-md px-3 text-[12.5px] font-medium capitalize transition-colors",
-                      filter === item
-                        ? "bg-white text-zinc-950"
-                        : "bg-white/[0.05] text-zinc-300 ring-1 ring-inset ring-white/[0.07] hover:bg-white/[0.09] hover:text-white",
-                    )}
-                  >
-                    {item}
-                  </button>
-                ))}
+                <div className="inline-flex items-center rounded-md bg-[hsl(0_0%_12%)] p-0.5">
+                  {(["all", "mine", "team"] as const).map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => setFilter(item)}
+                      className={cn(
+                        "h-6 rounded px-2.5 text-[11.5px] font-medium capitalize transition-colors",
+                        filter === item
+                          ? "bg-white text-zinc-950"
+                          : "text-zinc-400 hover:bg-white/[0.05] hover:text-white",
+                      )}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
                 <button
                   type="button"
                   onClick={handleNewSpace}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-md bg-white/[0.08] px-3 text-[12.5px] font-semibold text-zinc-50 ring-1 ring-inset ring-white/[0.10] transition-colors hover:bg-white/[0.13]"
+                  className="inline-flex h-7 items-center gap-1.5 rounded-md bg-white/[0.08] px-2.5 text-[11.5px] font-semibold text-zinc-50 transition-colors hover:bg-white/[0.13]"
                 >
-                  <Plus className="h-3.5 w-3.5" />
+                  <Plus className="h-3 w-3" />
                   {t("workspace.spaces.new_space")}
                 </button>
               </div>
@@ -1985,7 +1988,7 @@ const ProjectsManagerView = ({
                 }
               />
             ) : (
-              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
                 {spaces.map((space) => (
                   <SpaceCard
                     key={space.id}
@@ -1997,6 +2000,25 @@ const ProjectsManagerView = ({
                     onDelete={() => handleDelete(space.id, space.name)}
                   />
                 ))}
+                <li className="group relative cursor-pointer overflow-hidden rounded-lg bg-[hsl(0_0%_8.5%)] transition-colors hover:bg-[hsl(0_0%_10%)]">
+                  <button
+                    type="button"
+                    onClick={handleNewSpace}
+                    className="block w-full text-left"
+                  >
+                    <div className="flex aspect-[16/10] items-center justify-center bg-[hsl(0_0%_5%)] text-zinc-500">
+                      <Plus className="h-5 w-5" />
+                    </div>
+                    <div className="px-3.5 py-3">
+                      <div className="truncate text-[13.5px] font-semibold leading-tight text-zinc-50">
+                        {t("workspace.spaces.new_space")}
+                      </div>
+                      <div className="mt-1 text-[15.5px] leading-normal text-transparent" aria-hidden="true">
+                        .
+                      </div>
+                    </div>
+                  </button>
+                </li>
               </ul>
             )}
           </section>
@@ -2463,18 +2485,13 @@ const SpaceCard = ({
 }) => {
   const { t } = useLanguage();
   return (
-    <li
-      className={cn(
-        "group relative cursor-pointer overflow-hidden rounded-2xl bg-[hsl(0_0%_7%)] ring-1 ring-inset ring-white/[0.06]",
-        "transition-all hover:ring-white/[0.14] hover:shadow-[0_18px_40px_-20px_hsl(0_0%_0%/0.7)]",
-      )}
-    >
+    <li className="group relative cursor-pointer overflow-hidden rounded-lg bg-[hsl(0_0%_8.5%)] transition-colors hover:bg-[hsl(0_0%_10%)]">
       <button
         type="button"
         onClick={onOpen}
         className="block w-full text-left"
       >
-        <div className="relative aspect-[16/10] overflow-hidden bg-[hsl(0_0%_4%)]">
+        <div className="relative aspect-[16/10] overflow-hidden bg-[hsl(0_0%_5%)]">
           <CanvasMinimap nodes={ws.nodes} edges={ws.edges} />
         </div>
 
@@ -2636,7 +2653,7 @@ const EmptyState = ({
   hint: string;
   cta?: { label: string; onClick: () => void };
 }) => (
-  <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-5 py-14 text-center md:px-10 md:py-20">
+  <div className="rounded-2xl bg-white/[0.02] px-5 py-12 text-center md:px-10 md:py-16">
     <div className="text-[16.5px] font-semibold text-zinc-200">{title}</div>
     <p className="mt-2 text-[15.5px] text-zinc-500">{hint}</p>
     {cta && (
@@ -2731,11 +2748,7 @@ const CanvasMinimap = ({
   const dotsId = `mm-dots-${svgUid}`;
 
   if (nodes.length === 0) {
-    return (
-      <div className="flex h-full w-full items-center justify-center text-zinc-700">
-        <Layers className="h-12 w-12" />
-      </div>
-    );
+    return <div className="h-full w-full bg-[hsl(0_0%_5%)]" />;
   }
 
   const minX = Math.min(...nodes.map((n) => n.x));

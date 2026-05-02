@@ -127,8 +127,8 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
   return (
     <div className="min-h-full">
       {/* Mobile horizontal scroller — the rail collapses to a tab bar
-          on narrow screens. */}
-      <div className="md:hidden border-b border-white/5 bg-[hsl(0_0%_5%)] sticky top-0 z-10">
+          on narrow screens. 2026-05: bg lifts to Layer 1, no hairline. */}
+      <div className="md:hidden bg-[hsl(var(--surface-1))] sticky top-0 z-10">
         <div className="flex gap-1 overflow-x-auto px-4 py-2 scrollbar-none">
           {allSections.map((s) => {
             const active = activeKey === s.key;
@@ -153,8 +153,9 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
       </div>
 
       <div className="flex min-h-full">
-        {/* Desktop left rail */}
-        <aside className="hidden min-h-[calc(100vh-48px)] w-[206px] shrink-0 border-r border-white/5 bg-[hsl(0_0%_4%)] px-[12px] py-[20px] md:block">
+        {/* Desktop left rail. 2026-05: rail = Layer 1 panel, no hairline.
+         *  Width tightened 206→200 to align with the workspace sidebar. */}
+        <aside className="hidden min-h-[calc(100vh-48px)] w-[200px] shrink-0 bg-[hsl(var(--surface-1))] px-[12px] py-[20px] md:block">
           <div className="space-y-[20px]">
           {renderGroup(t("workspace.settings.account"), ACCOUNT_SECTIONS)}
           {renderGroup(t("workspace.settings.organization"), ORG_SECTIONS)}

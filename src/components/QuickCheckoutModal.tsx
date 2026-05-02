@@ -181,7 +181,7 @@ const QuickCheckoutModal = ({
             <button
               onClick={() => handlePurchase(STANDARD_TOPUP.id, "topup")}
               disabled={!!loadingId}
-              className="w-full flex items-center justify-between p-3 rounded-xl border border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06] hover:border-purple-500/30 transition-all group"
+              className="w-full flex items-center justify-between p-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] transition-colors group"
             >
               <div className="flex items-center gap-2.5 text-left">
                 <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center flex-shrink-0">
@@ -210,7 +210,7 @@ const QuickCheckoutModal = ({
             <button
               onClick={() => handlePurchase(proPlan.id, "subscription")}
               disabled={!!loadingId}
-              className="w-full flex items-center justify-between p-3 rounded-xl border border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06] hover:border-purple-500/30 transition-all group"
+              className="w-full flex items-center justify-between p-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] transition-colors group"
             >
               <div className="flex items-center gap-2.5 text-left">
                 <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center flex-shrink-0">

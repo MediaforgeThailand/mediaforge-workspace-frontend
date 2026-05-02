@@ -4,31 +4,45 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * Button — Magnific-style minimal palette.
+ *
+ * 2026-05 redesign:
+ *   • Heights tightened: default 36px, sm 32px, lg 40px, xl 44px
+ *     (was 40/36/44/56 — the legacy `xl` was as tall as a navbar).
+ *   • Default + secondary lose their backdrop-blur + 1px borders;
+ *     the box now reads from bg only, matching the Card primitive.
+ *   • Gradient keeps a softer glow + drops the hover scale so it
+ *     doesn't jiggle inside small dialogs.
+ *   • rounded-xl → rounded-lg so the corner radius matches Card +
+ *     Input again (the buttons used to look chunkier than every
+ *     surface around them).
+ */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold ring-offset-background transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.97] active:brightness-90",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium ring-offset-background transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98]",
   {
     variants: {
       variant: {
         default:
-          "bg-white/[0.08] backdrop-blur-xl border border-white/[0.12] text-foreground shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1),0_4px_12px_rgba(0,0,0,0.4),0_0_0_1px_rgba(255,255,255,0.05)] hover:bg-white/[0.14] hover:border-white/[0.2] hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15),0_6px_20px_rgba(0,0,0,0.5),0_0_15px_rgba(124,58,237,0.1)]",
+          "bg-white/[0.06] text-foreground hover:bg-white/[0.10]",
         destructive:
-          "bg-destructive/20 backdrop-blur-xl border border-destructive/30 text-destructive-foreground shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_4px_12px_rgba(239,68,68,0.2)] hover:bg-destructive/30 hover:border-destructive/40 hover:shadow-[0_6px_20px_rgba(239,68,68,0.3)]",
+          "bg-destructive/20 text-destructive-foreground hover:bg-destructive/30",
         outline:
-          "border border-white/[0.1] bg-transparent backdrop-blur-md text-foreground hover:bg-white/[0.06] hover:border-white/[0.18] hover:shadow-[0_0_12px_rgba(124,58,237,0.08)]",
+          "bg-transparent text-foreground hover:bg-white/[0.06]",
         secondary:
-          "bg-white/[0.06] backdrop-blur-xl border border-white/[0.08] text-secondary-foreground shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_2px_8px_rgba(0,0,0,0.3)] hover:bg-white/[0.1] hover:border-white/[0.14]",
+          "bg-secondary text-secondary-foreground hover:bg-white/[0.10]",
         ghost:
-          "text-foreground hover:bg-white/[0.06] hover:shadow-[0_0_10px_rgba(124,58,237,0.06)]",
+          "text-foreground hover:bg-white/[0.06]",
         link: "text-primary underline-offset-4 hover:underline",
         gradient:
-          "bg-gradient-to-br from-purple-600/80 to-fuchsia-600/70 backdrop-blur-xl border border-purple-400/20 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15),0_4px_16px_rgba(124,58,237,0.35),0_0_24px_rgba(124,58,237,0.15)] hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2),0_6px_24px_rgba(124,58,237,0.45),0_0_40px_rgba(124,58,237,0.2)] hover:scale-[1.02]",
+          "bg-gradient-to-b from-violet-500 to-violet-600 text-white shadow-[0_4px_14px_-4px_rgba(124,58,237,0.55)] hover:from-violet-400 hover:to-violet-500",
       },
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-lg px-3",
-        lg: "h-11 rounded-xl px-8",
-        xl: "h-14 rounded-2xl px-10 text-base",
-        icon: "h-10 w-10",
+        default: "h-9 px-4",
+        sm: "h-8 rounded-md px-3 text-[13px]",
+        lg: "h-10 px-6",
+        xl: "h-11 px-8 text-[15px]",
+        icon: "h-9 w-9",
       },
     },
     defaultVariants: {

@@ -43,7 +43,7 @@ const Transactions = () => {
       </div>
 
       <Tabs defaultValue="credits" className="w-full">
-        <TabsList className="bg-card/60 backdrop-blur-xl border border-border rounded-2xl shadow-lg shadow-black/20">
+        <TabsList className="bg-card/60 backdrop-blur-xl rounded-xl">
           <TabsTrigger value="credits" className="data-[state=active]:bg-primary/20"><Coins className="w-4 h-4 mr-1.5" /> {t("creditHistory")}</TabsTrigger>
           <TabsTrigger value="payments" className="data-[state=active]:bg-primary/20"><Receipt className="w-4 h-4 mr-1.5" /> {t("payments")}</TabsTrigger>
         </TabsList>
