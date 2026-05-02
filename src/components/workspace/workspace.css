@@ -965,19 +965,19 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
 .ws-compact-prompt-overlay:focus-within .ws-compact-prompt-input,
 .ws-compact-prompt-overlay:focus-within textarea,
 .ws-compact-prompt-overlay:focus-within [contenteditable="true"] {
-  /* 70% of the preview's actual rendered height (px), published by
-   *  WorkspaceToolNode via ResizeObserver as `--ws-preview-h`.
+  /* The cap is computed in JS by WorkspaceToolNode's ResizeObserver
+   *  and shipped as a single resolved px length on `--ws-prompt-
+   *  max-h`. Using the var directly (no calc/min/max in the CSS)
+   *  removes any chance of the engine rejecting the value as
+   *  unresolved, and `!important` overrules the inline
+   *  `max-h-[280px]` Tailwind class that lived on the
+   *  contentEditable for years and stubbornly won the cascade on
+   *  short post-generation nodes.
    *
-   *  Why `calc(... * px)` and not the simpler `max-height: 70%`:
-   *  the overlay is a `position: absolute; display: flex` box with
-   *  no explicit height, so a `%` on a descendant's max-height
-   *  resolves against an auto containing block and the browser
-   *  treats it as `none`. Using a real px value via the CSS
-   *  custom property gives the engine a resolved length and the
-   *  cap actually applies. Floor at 4.5em (~3 lines) so a tiny
-   *  empty-state square still has somewhere to type. */
-  max-height: max(calc(0.7 * var(--ws-preview-h, 320px)), calc(3 * 1.5em));
-  overflow-y: auto;
+   *  Fallback `200px` covers the brief frame before the observer
+   *  has fired so the prompt doesn't flash full-height. */
+  max-height: var(--ws-prompt-max-h, 200px) !important;
+  overflow-y: auto !important;
   /* 1:2 (top fade : solid) — top third of the focused prompt fades
    *  to transparent so the reach of the textarea reads as soft
    *  "more text above" instead of slamming against the artwork. */

@@ -591,6 +591,25 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       for (const entry of entries) {
         const h = Math.ceil(entry.contentRect.height);
         root.style.setProperty("--ws-preview-h", `${h}px`);
+        /* Pre-compute the prompt's max-height in real px and publish
+         *  it as `--ws-prompt-max-h`. The previous attempt put the
+         *  formula `calc(0.7 * var(...))` in the CSS, which works in
+         *  theory but lost out to the inline `max-h-[280px]` Tailwind
+         *  class on the contentEditable for some users — the cap was
+         *  effectively never applied on short post-generation nodes
+         *  (16:9 landscape / wide-and-short). Computing it in JS and
+         *  shipping a single resolved pixel length removes every
+         *  source of ambiguity:
+         *
+         *    • Floor: 60px (~2.5 lines) so the empty placeholder is
+         *      always readable even on the tiniest preview slot.
+         *    • 70% of the preview, per the spec the user asked for.
+         *    • Ceiling: 240px (~10 lines) so a tall portrait node
+         *      (e.g. 9:16) doesn't hand the user a 23-line wall of
+         *      typing surface — that felt as bad as the no-cap bug.
+         */
+        const promptCap = Math.max(60, Math.min(Math.round(h * 0.7), 240));
+        root.style.setProperty("--ws-prompt-max-h", `${promptCap}px`);
       }
     });
     ro.observe(root);
