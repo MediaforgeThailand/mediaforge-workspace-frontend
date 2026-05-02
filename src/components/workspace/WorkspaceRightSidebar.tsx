@@ -256,7 +256,7 @@ function PillTab({
       className={cn(
         "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors",
         active
-          ? "bg-white/10 text-zinc-50 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.06)]"
+          ? "bg-white/[0.10] text-zinc-50"
           : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200",
       )}
     >

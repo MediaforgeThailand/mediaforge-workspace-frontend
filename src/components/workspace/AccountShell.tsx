@@ -100,7 +100,7 @@ export default function AccountShell({ children }: { children?: ReactNode }) {
                   className={cn(
                     "flex h-[32px] shrink-0 items-center gap-[6px] rounded-md px-[10px] text-[14px] font-medium leading-[18px] transition-colors",
                     active
-                      ? "bg-white/[0.07] text-zinc-50 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.05)]"
+                      ? "bg-white/[0.08] text-zinc-50"
                       : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100",
                   )}
                 >

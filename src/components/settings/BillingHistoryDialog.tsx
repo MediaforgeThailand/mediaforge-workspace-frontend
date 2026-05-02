@@ -119,7 +119,7 @@ const BillingHistoryDialog = ({ open, onOpenChange }: BillingHistoryDialogProps)
           )}
 
           {!loading && !error && rows.length > 0 && (
-            <div className="divide-y divide-white/5">
+            <div className="space-y-px">
               {rows.map((row) => {
                 const link = row.hosted_invoice_url || row.invoice_pdf_url || row.receipt_url || null;
                 const statusClass = STATUS_COLOR[row.status] ?? "text-zinc-400 bg-white/5 border-white/10";

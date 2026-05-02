@@ -205,7 +205,7 @@ const WorkspaceTabBar = () => {
               className={cn(
                 "group relative flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-3 text-[11.5px] transition-colors",
                 isActive
-                  ? "bg-white/10 text-zinc-50 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.05)]"
+                  ? "bg-white/[0.10] text-zinc-50"
                   : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200",
               )}
               style={{ minWidth: TAB_MIN_W, maxWidth: TAB_MAX_W }}
