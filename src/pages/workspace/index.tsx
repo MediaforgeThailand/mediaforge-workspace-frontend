@@ -348,15 +348,30 @@ const WorkspaceDashboardInner = () => {
       if (cancelled) return;
       if (serverProjects) {
         const localProjectsBefore = useWorkspaceStore.getState().projects;
+        const localState = useWorkspaceStore.getState();
         const serverProjectIds = new Set(serverProjects.map((p) => p.id));
         const hasOwnedServerDefaultProject = serverProjects.some(
           (p) => p.ownerId === user.id && p.name === DEFAULT_PROJECT_NAME,
         );
+        const projectHasOwnedWork = (projectId: string) =>
+          localState.workspaces.some(
+            (workspace) =>
+              workspace.projectId === projectId &&
+              (!workspace.ownerId || workspace.ownerId === user.id),
+          ) ||
+          localState.canvases.some(
+            (canvas) =>
+              canvas.projectId === projectId &&
+              (!canvas.ownerId || canvas.ownerId === user.id),
+          );
         const localOnlyProjects = localProjectsBefore.filter(
           (p) =>
             (!p.ownerId || p.ownerId === user.id) &&
             !serverProjectIds.has(p.id) &&
-            !(p.name === DEFAULT_PROJECT_NAME && hasOwnedServerDefaultProject) &&
+            (
+              p.name !== DEFAULT_PROJECT_NAME ||
+              (!hasOwnedServerDefaultProject && projectHasOwnedWork(p.id))
+            ) &&
             nowMs - p.updatedAt < PENDING_PUSH_WINDOW_MS,
         );
         mergeServerProjects(serverProjects);
@@ -367,7 +382,8 @@ const WorkspaceDashboardInner = () => {
         if (
           defaultProject &&
           !hasOwnedServerDefaultProject &&
-          !serverProjectIds.has(defaultProject.id)
+          !serverProjectIds.has(defaultProject.id) &&
+          projectHasOwnedWork(defaultProject.id)
         ) {
           void upsertProjectToServer(defaultProject, user.id);
         }
