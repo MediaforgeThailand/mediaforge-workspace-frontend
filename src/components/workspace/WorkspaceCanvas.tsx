@@ -96,10 +96,30 @@ import ShortcutsDialog from "./ShortcutsDialog";
 import { useCanvasToolStore } from "./useCanvasToolStore";
 import { useWorkspaceShortcuts } from "./useWorkspaceShortcuts";
 import { useCanvasAutosave } from "./useCanvasAutosave";
+import { useCanvasRealtime } from "./useCanvasRealtime";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useNavigate } from "react-router-dom";
 
 const VIEWPORT_KEY = (canvasId: string) => `workspace-viewport-${canvasId}`;
 const STORAGE_BUCKET = "ai-media";
+
+type NodeDataWithParams = {
+  params?: { model_name?: string };
+};
+
+type AssetNodeData = {
+  fieldType?: string;
+};
+
+function nodeModelName(node: Node | undefined, fallback: string): string {
+  const data = node?.data as NodeDataWithParams | undefined;
+  return data?.params?.model_name ?? fallback;
+}
+
+function assetFieldType(node: Node | undefined): string | undefined {
+  const data = node?.data as AssetNodeData | undefined;
+  return typeof data?.fieldType === "string" ? data.fieldType : undefined;
+}
 // Supabase Storage signed-URL TTL. Was 24h — way too short for a
 // canvas the user keeps open across sessions. The previous value
 // turned every asset into a ticking time-bomb (URL 403'd at the
@@ -455,6 +475,7 @@ const Inner = () => {
   } = useReactFlow();
   const { user } = useAuth();
   const { t } = useLanguage();
+  const navigate = useNavigate();
   // Viewer-mode flag — when true, the canvas renders read-only:
   // no node drags, no new connections, no marquee selection (still
   // selectable so the lightbox/preview affordances work, just no
@@ -479,6 +500,7 @@ const Inner = () => {
   // value is also broadcast to the tab bar via a window event so
   // a small "Saved / Saving…" indicator can render up there.
   const saveState = useCanvasAutosave();
+  useCanvasRealtime();
   useEffect(() => {
     window.dispatchEvent(
       new CustomEvent("workspace-save-state", { detail: { state: saveState } }),
@@ -619,7 +641,7 @@ const Inner = () => {
       });
       URL.revokeObjectURL(localPreview);
     },
-    [user, addAssetNode, updateNodeData, setNodes],
+    [user, addAssetNode, updateNodeData, setNodes, t],
   );
 
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -1213,11 +1235,11 @@ const Inner = () => {
         // files go through the existing uploadAsset flow.
         window.dispatchEvent(new CustomEvent("workspace-trigger-upload"));
       } else if (item.action === "stock") {
-        toast.info(t("workspace.toast.stock_soon"));
+        navigate("/app/workspace?section=stock");
       }
       setContextMenu(null);
     },
-    [],
+    [navigate],
   );
 
   /** "+" button in the floating sidebar — opens the same picker, but
@@ -1675,9 +1697,7 @@ const Inner = () => {
         if (tgt) {
           const schema = getWorkspaceSchema(tgt.type ?? "");
           if (schema) {
-            const selectedModel =
-              ((tgt.data as any)?.params?.model_name as string | undefined) ??
-              schema.defaultModel;
+            const selectedModel = nodeModelName(tgt, schema.defaultModel);
             const handle = schema.inputs.find(
               (i) =>
                 i.id === tgtHandle &&
@@ -1732,7 +1752,7 @@ const Inner = () => {
               if (src?.type === "textNode") srcKind = "text";
               else if (src?.type === "elementNode") srcKind = "element";
               else if (src?.type === "assetNode") {
-                srcKind = ((src.data as any)?.fieldType as string) ?? "media";
+                srcKind = assetFieldType(src) ?? "media";
               } else if (src?.type) {
                 const sh = start.handleId ?? "";
                 if (sh === "output_video" || sh === "video") srcKind = "video";
@@ -1851,7 +1871,7 @@ const Inner = () => {
     if (srcType === "textNode") typeOk = TEXT_TARGETS.has(th);
     else if (srcType === "elementNode") typeOk = ELEMENT_TARGETS.has(th);
     else if (srcType === "assetNode") {
-      const ft = (src.data as any)?.fieldType;
+      const ft = assetFieldType(src);
       if (ft === "image") typeOk = IMAGE_TARGETS.has(th);
       else if (ft === "video") typeOk = VIDEO_TARGETS.has(th);
       else if (ft === "audio") typeOk = AUDIO_TARGETS.has(th);
@@ -1884,9 +1904,7 @@ const Inner = () => {
       const tgt = nodeList.find((n) => n.id === conn.target);
       const schema = tgt ? getWorkspaceSchema(tgt.type ?? "") : undefined;
       if (schema && tgt) {
-        const selectedModel =
-          ((tgt.data as any)?.params?.model_name as string | undefined) ??
-          schema.defaultModel;
+        const selectedModel = nodeModelName(tgt, schema.defaultModel);
         // Find the visible variant of this handle for the active model
         // (handles can be split per provider, e.g. ref_image with
         // different maxConnections for Banana 14 vs OpenAI 16).
