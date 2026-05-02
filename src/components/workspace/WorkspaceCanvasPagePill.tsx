@@ -38,6 +38,7 @@ import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { deleteCanvasFromServer } from "./canvasPersistence";
 import SaveStateBadge from "./SaveStateBadge";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { selectCanMutate, useWorkspaceShareRole } from "@/store/useWorkspaceShareRole";
 
 const WorkspaceCanvasPagePill = () => {
   const { t } = useLanguage();
@@ -56,6 +57,7 @@ const WorkspaceCanvasPagePill = () => {
   const deleteCanvas = useWorkspaceStore((s) => s.deleteCanvas);
   const openCanvasAction = useWorkspaceStore((s) => s.openCanvas);
   const graphs = useWorkspaceStore((s) => s.graphs);
+  const canMutate = useWorkspaceShareRole(selectCanMutate);
 
   /* ── Local UI state ───────────────────────────────────────── */
   const [open, setOpen] = useState(false);
@@ -77,6 +79,7 @@ const WorkspaceCanvasPagePill = () => {
   };
 
   const newTab = () => {
+    if (!canMutate) return;
     const id = createCanvas(currentWorkspaceId ?? undefined);
     openCanvasAction(id);
     setOpen(false);
@@ -85,6 +88,7 @@ const WorkspaceCanvasPagePill = () => {
   const closeTab = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
+    if (!canMutate) return;
 
     // Confirm-on-dirty: warn before discarding a tab that has nodes.
     const graph = graphs[id];
@@ -123,6 +127,7 @@ const WorkspaceCanvasPagePill = () => {
 
   const startRename = (id: string, currentName: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!canMutate) return;
     setEditingId(id);
     setEditValue(currentName);
   };
@@ -216,7 +221,7 @@ const WorkspaceCanvasPagePill = () => {
                   key={c.id}
                   data-tab-id={c.id}
                   onClick={() => !isEditing && openTab(c.id)}
-                  onDoubleClick={(e) => startRename(c.id, c.name, e)}
+                  onDoubleClick={(e) => canMutate && startRename(c.id, c.name, e)}
                   className={cn(
                     "group relative flex min-h-11 cursor-pointer items-center gap-1.5 rounded px-2 text-[12px] transition-colors lg:min-h-8",
                     isActive
@@ -269,7 +274,7 @@ const WorkspaceCanvasPagePill = () => {
                   )}
 
                   {/* Hover affordances — rename + close. */}
-                  {!isEditing && (
+                  {!isEditing && canMutate && (
                     <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
                       <button
                         type="button"
@@ -297,7 +302,7 @@ const WorkspaceCanvasPagePill = () => {
           </div>
 
           {/* Footer — new page button. */}
-          <div className="mt-1 border-t border-white/[0.06] pt-1">
+          {canMutate && <div className="mt-1 border-t border-white/[0.06] pt-1">
             <button
               type="button"
               onClick={newTab}
@@ -306,7 +311,7 @@ const WorkspaceCanvasPagePill = () => {
               <Plus className="h-3.5 w-3.5" />
               {t("workspace.pill.new_page")}
             </button>
-          </div>
+          </div>}
         </PopoverContent>
       </Popover>
     </div>

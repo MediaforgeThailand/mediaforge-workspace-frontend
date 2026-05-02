@@ -63,14 +63,19 @@ export interface ChatMessage {
  *  Maps 1:1 with what the dashboard at /app/workspace lists. */
 export interface ProjectMeta {
   id: string;
+  ownerId?: string | null;
   name: string;
   updatedAt: number;
+  description?: string | null;
+  color?: string | null;
+  isPrivate?: boolean;
 }
 
 export const DEFAULT_PROJECT_NAME = "Default project";
 
 export interface WorkspaceMeta {
   id: string;
+  ownerId?: string | null;
   projectId: string | null;
   name: string;
   updatedAt: number;
@@ -78,6 +83,7 @@ export interface WorkspaceMeta {
 
 export interface CanvasMeta {
   id: string;
+  ownerId?: string | null;
   projectId: string | null;
   /** Which workspace this tab belongs to. Tabs without a workspace
    *  are legacy persisted state from v1 and get migrated on load. */
@@ -89,6 +95,18 @@ export interface CanvasMeta {
 export interface CanvasGraph extends CanvasMeta {
   nodes: WorkspaceNode[];
   edges: WorkspaceEdge[];
+}
+
+export interface RemoteCanvasPatch {
+  nodes?: WorkspaceNode[];
+  edges?: WorkspaceEdge[];
+  viewport?: CanvasGraph["viewport"];
+  nodePositions?: Array<{
+    id: string;
+    position: XYPosition;
+    positionAbsolute?: XYPosition;
+  }>;
+  updatedAt?: number;
 }
 
 /** Snapshot used by the undo / redo stacks — only nodes + edges,
@@ -132,7 +150,14 @@ interface WorkspaceState {
    *  whenever any new mutation lands. */
   redoStack: HistorySnap[];
 
-  createProject: (name?: string) => string;
+  createProject: (
+    name?: string,
+    options?: {
+      description?: string | null;
+      color?: string | null;
+      isPrivate?: boolean;
+    },
+  ) => string;
   renameProject: (id: string, name: string) => void;
   deleteProject: (id: string) => void;
   setActiveProject: (id: string | null) => void;
@@ -177,6 +202,7 @@ interface WorkspaceState {
    *  if it wasn't there yet (e.g. user opens a server-only canvas
    *  from a different device). */
   replaceCanvasGraph: (graph: CanvasGraph) => void;
+  applyRemoteCanvasPatch: (canvasId: string, patch: RemoteCanvasPatch) => void;
 
   /** Merge a server-side workspace list into the local list. Used by
    *  the dashboard's mount-time hydration to make spaces appear that
@@ -379,12 +405,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
       /* ── Workspace-level actions ──────────────────────────── */
 
-      createProject: (name) => {
+      createProject: (name, options) => {
         const id = uid();
         const project: ProjectMeta = {
           id,
           name: name || "Untitled project",
           updatedAt: now(),
+          description: options?.description ?? null,
+          color: options?.color ?? null,
+          isPrivate: options?.isPrivate ?? false,
         };
         set((s) => ({
           projects: [project, ...s.projects],
@@ -574,6 +603,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const newWorkspaceId = uid();
         const newWorkspace: WorkspaceMeta = {
           id: newWorkspaceId,
+          ownerId: null,
           projectId: source.projectId,
           name: `${source.name} (copy)`,
           updatedAt: ts,
@@ -593,6 +623,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           idMap[c.id] = newId;
           return {
             id: newId,
+            ownerId: null,
             projectId: source.projectId,
             workspaceId: newWorkspaceId,
             // Keep the page name verbatim — users named these for a
@@ -660,6 +691,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           newGraphs[targetCanvasId] = {
             ...sourceGraph,
             id: targetCanvasId,
+            ownerId: null,
             projectId: source.projectId,
             workspaceId: newWorkspaceId,
             name: sourceGraph.name,
@@ -855,6 +887,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((s) => {
           const meta: CanvasMeta = {
             id: graph.id,
+            ownerId: graph.ownerId ?? null,
             projectId:
               graph.projectId ??
               s.workspaces.find((w) => w.id === graph.workspaceId)?.projectId ??
@@ -879,6 +912,47 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             // the server-loaded graph state.
             history: s.current?.id === graph.id ? [] : s.history,
             redoStack: s.current?.id === graph.id ? [] : s.redoStack,
+          };
+        }),
+
+      applyRemoteCanvasPatch: (canvasId, patch) =>
+        set((s) => {
+          const base = s.graphs[canvasId] ?? (s.current?.id === canvasId ? s.current : null);
+          if (!base) return s;
+
+          const positionById = new Map(
+            (patch.nodePositions ?? []).map((item) => [item.id, item] as const),
+          );
+          const nextNodes = patch.nodes
+            ? patch.nodes
+            : positionById.size > 0
+              ? base.nodes.map((node) => {
+                  const pos = positionById.get(node.id);
+                  if (!pos) return node;
+                  return {
+                    ...node,
+                    position: pos.position,
+                    positionAbsolute: pos.positionAbsolute ?? (node as any).positionAbsolute,
+                  } as WorkspaceNode;
+                })
+              : base.nodes;
+
+          const next: CanvasGraph = {
+            ...base,
+            nodes: nextNodes,
+            edges: patch.edges ?? base.edges,
+            viewport: patch.viewport ?? base.viewport,
+            updatedAt: patch.updatedAt ?? now(),
+          };
+
+          return {
+            graphs: { ...s.graphs, [canvasId]: next },
+            canvases: s.canvases.map((c) =>
+              c.id === canvasId
+                ? { ...c, name: next.name, ownerId: next.ownerId ?? c.ownerId ?? null, updatedAt: next.updatedAt }
+                : c,
+            ),
+            current: s.current?.id === canvasId ? next : s.current,
           };
         }),
 

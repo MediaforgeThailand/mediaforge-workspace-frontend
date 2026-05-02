@@ -141,6 +141,7 @@ export function useCanvasAutosave(): SaveState {
       if (!c?.id) return;
       const fp = fingerprint(c);
       if (fp === lastSavedRef.current.get(c.id)) return;
+      if (timerRef.current) window.clearTimeout(timerRef.current);
       flushSaveOnUnload(c, user.id);
     };
     window.addEventListener("beforeunload", onUnload);
@@ -161,8 +162,13 @@ export function useCanvasAutosave(): SaveState {
       if (!c?.id) return;
       const fp = fingerprint(c);
       if (fp === lastSavedRef.current.get(c.id)) return;
-      // Try the keepalive path so the request survives the page
-      // pause (mobile Safari aggressively suspends background tabs).
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+      void saveCanvasToServer(c, user.id).then((res) => {
+        if (res.ok) {
+          lastSavedRef.current.set(c.id, fp);
+          setState("saved");
+        }
+      });
       flushSaveOnUnload(c, user.id);
     };
     document.addEventListener("visibilitychange", onVisibility);

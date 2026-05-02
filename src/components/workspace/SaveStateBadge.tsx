@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Check, CloudOff, Loader2 } from "lucide-react";
+import { CloudOff, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SaveState } from "./useCanvasAutosave";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -62,11 +62,7 @@ const SaveStateBadge = ({ variant = "block", className }: Props) => {
       icon: Loader2,
       color: "text-amber-300",
     },
-    saved: {
-      label: t("workspace.save.saved"),
-      icon: Check,
-      color: "text-emerald-300",
-    },
+    saved: null,
     error: {
       label: t("workspace.save.error_msg"),
       icon: CloudOff,

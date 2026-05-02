@@ -72,6 +72,20 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
   const [loadingList, setLoadingList] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
+  const appOrigin = () => {
+    const configured =
+      (import.meta.env.VITE_WORKSPACE_PUBLIC_URL as string | undefined) ||
+      (import.meta.env.VITE_PUBLIC_WORKSPACE_URL as string | undefined) ||
+      "https://workspace.mediaforge.co";
+    const host = window.location.hostname.toLowerCase();
+    const isLocal =
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "::1" ||
+      host.startsWith("127.");
+    return (isLocal ? configured : window.location.origin).replace(/\/+$/, "");
+  };
+
   /** Refresh the active-shares list. */
   const refreshList = useCallback(async () => {
     if (!workspaceId) return;
@@ -79,7 +93,7 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
     try {
       const { data, error } = await supabase.functions.invoke<{ shares: ShareRow[] }>(
         "workspace_share_list",
-        { body: { workspace_id: workspaceId } },
+        { body: { workspace_id: workspaceId, app_origin: appOrigin() } },
       );
       if (error) throw error;
       setShares(data?.shares ?? []);
@@ -115,7 +129,7 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
         created_at: string;
         share_url: string;
       }>("workspace_share_create", {
-        body: { workspace_id: workspaceId, role },
+        body: { workspace_id: workspaceId, role, app_origin: appOrigin() },
       });
       if (error) throw error;
       if (!data) throw new Error("Empty response");

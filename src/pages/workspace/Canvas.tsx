@@ -58,6 +58,7 @@ import WorkspaceErrorBoundary from "@/components/workspace/WorkspaceErrorBoundar
 import OrgCreditBadge from "@/components/OrgCreditBadge";
 import {
   loadCanvasFromServer,
+  loadWorkspaceFromServer,
   loadCanvasesByWorkspaceFromServer,
 } from "@/components/workspace/canvasPersistence";
 import { useShareTokenResolution } from "@/components/workspace/useShareTokenResolution";
@@ -77,6 +78,7 @@ const WorkspaceCanvasPage = () => {
   const navigate = useNavigate();
   const openCanvas = useWorkspaceStore((s) => s.openCanvas);
   const replaceCanvasGraph = useWorkspaceStore((s) => s.replaceCanvasGraph);
+  const mergeServerWorkspaces = useWorkspaceStore((s) => s.mergeServerWorkspaces);
   const createCanvas = useWorkspaceStore((s) => s.createCanvas);
   const { user, loading: authLoading } = useAuth();
   const [hydrated, setHydrated] = useState(false);
@@ -123,6 +125,13 @@ const WorkspaceCanvasPage = () => {
   useEffect(() => {
     if (!routeId) return;
     if (bounced) return;
+    if (
+      shareStatus.phase === "resolving" ||
+      shareStatus.phase === "redirecting" ||
+      shareStatus.phase === "error"
+    ) {
+      return;
+    }
     let cancelled = false;
 
     const state = useWorkspaceStore.getState();
@@ -253,6 +262,27 @@ const WorkspaceCanvasPage = () => {
      *  on another device that hasn't been mirrored locally yet. */
     (async () => {
       try {
+        const workspace = await loadWorkspaceFromServer(routeId);
+        if (cancelled) return;
+        if (workspace) {
+          mergeServerWorkspaces([workspace]);
+          const serverCanvases =
+            await loadCanvasesByWorkspaceFromServer(routeId);
+          if (cancelled) return;
+
+          if (serverCanvases && serverCanvases.length > 0) {
+            for (const graph of serverCanvases) replaceCanvasGraph(graph);
+            openCanvas(serverCanvases[0].id);
+            setHydrated(true);
+            return;
+          }
+
+          const fresh = createCanvas(routeId);
+          openCanvas(fresh);
+          setHydrated(true);
+          return;
+        }
+
         const g = await loadCanvasFromServer(routeId);
         if (cancelled) return;
         if (g) {
@@ -276,11 +306,13 @@ const WorkspaceCanvasPage = () => {
   }, [
     routeId,
     targetCanvasId,
+    shareStatus.phase,
     user?.id,
     authLoading,
     bounced,
     openCanvas,
     replaceCanvasGraph,
+    mergeServerWorkspaces,
     createCanvas,
     navigate,
   ]);

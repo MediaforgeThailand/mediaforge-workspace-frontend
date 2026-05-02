@@ -44,6 +44,7 @@ interface ServerCanvasRow {
 function rowToCanvasGraph(row: ServerCanvasRow): CanvasGraph {
   return {
     id: row.id,
+    ownerId: row.user_id,
     projectId: row.project_id ?? null,
     workspaceId: row.workspace_id,
     name: row.name,
@@ -263,7 +264,7 @@ export async function saveCanvasToServer(
     const { error } = await supabase.from("workspace_canvases").upsert(
       {
         id: graph.id,
-        user_id: userId,
+        user_id: graph.ownerId ?? userId,
         project_id: graph.projectId ?? null,
         workspace_id: graph.workspaceId,
         name: graph.name,
@@ -328,7 +329,7 @@ export function flushSaveOnUnload(graph: CanvasGraph, userId: string): void {
 
     const body = JSON.stringify({
       id: graph.id,
-      user_id: userId,
+      user_id: graph.ownerId ?? userId,
       project_id: graph.projectId ?? null,
       workspace_id: graph.workspaceId,
       name: graph.name,
@@ -411,6 +412,9 @@ interface ServerProjectRow {
   id: string;
   user_id: string;
   name: string;
+  description?: string | null;
+  color?: string | null;
+  is_private?: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -439,12 +443,47 @@ export async function loadWorkspacesFromServer(): Promise<
 
     return (data as ServerWorkspaceRow[]).map((row) => ({
       id: row.id,
+      ownerId: row.user_id,
       projectId: row.project_id ?? null,
       name: row.name,
       updatedAt: new Date(row.updated_at).getTime(),
     }));
   } catch (err) {
     console.warn("[canvasPersistence] load workspaces threw:", err);
+    return null;
+  }
+}
+
+export async function loadWorkspaceFromServer(
+  workspaceId: string,
+): Promise<WorkspaceMeta | null> {
+  try {
+    const { data, error } = await supabase
+      .from("workspaces")
+      .select("id, user_id, project_id, name, created_at, updated_at")
+      .eq("id", workspaceId)
+      .maybeSingle();
+
+    if (error) {
+      if (isMissingWorkspacesTableError(error)) {
+        warnOnceAboutMissingWorkspacesTable();
+        return null;
+      }
+      console.warn("[canvasPersistence] load workspace failed:", error.message);
+      return null;
+    }
+    if (!data) return null;
+
+    const row = data as ServerWorkspaceRow;
+    return {
+      id: row.id,
+      ownerId: row.user_id,
+      projectId: row.project_id ?? null,
+      name: row.name,
+      updatedAt: new Date(row.updated_at).getTime(),
+    };
+  } catch (err) {
+    console.warn("[canvasPersistence] load workspace threw:", err);
     return null;
   }
 }
@@ -461,7 +500,7 @@ export async function upsertWorkspaceToServer(
     const { error } = await supabase.from("workspaces").upsert(
       {
         id: meta.id,
-        user_id: userId,
+        user_id: meta.ownerId ?? userId,
         project_id: meta.projectId ?? null,
         name: meta.name,
         // updated_at is set by the table's `workspaces_touch` trigger
@@ -565,9 +604,9 @@ function warnOnceAboutMissingWorkspacesTable(): void {
 
 export async function loadProjectsFromServer(): Promise<ProjectMeta[] | null> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("workspace_projects")
-      .select("id, user_id, name, created_at, updated_at")
+      .select("id, user_id, name, description, color, is_private, created_at, updated_at")
       .order("updated_at", { ascending: false });
 
     if (error) {
@@ -581,7 +620,11 @@ export async function loadProjectsFromServer(): Promise<ProjectMeta[] | null> {
     if (!Array.isArray(data)) return [];
     return (data as ServerProjectRow[]).map((row) => ({
       id: row.id,
+      ownerId: row.user_id,
       name: row.name,
+      description: row.description ?? null,
+      color: row.color ?? null,
+      isPrivate: Boolean(row.is_private),
       updatedAt: new Date(row.updated_at).getTime(),
     }));
   } catch (err) {
@@ -596,11 +639,14 @@ export async function upsertProjectToServer(
 ): Promise<void> {
   if (!userId) return;
   try {
-    const { error } = await supabase.from("workspace_projects").upsert(
+    const { error } = await (supabase as any).from("workspace_projects").upsert(
       {
         id: meta.id,
-        user_id: userId,
+        user_id: meta.ownerId ?? userId,
         name: meta.name,
+        description: meta.description ?? null,
+        color: meta.color ?? null,
+        is_private: Boolean(meta.isPrivate),
       },
       { onConflict: "id" },
     );

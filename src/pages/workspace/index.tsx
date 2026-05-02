@@ -349,6 +349,7 @@ const WorkspaceDashboardInner = () => {
         const serverProjectIds = new Set(serverProjects.map((p) => p.id));
         const localOnlyProjects = localProjectsBefore.filter(
           (p) =>
+            (!p.ownerId || p.ownerId === user.id) &&
             !serverProjectIds.has(p.id) &&
             nowMs - p.updatedAt < PENDING_PUSH_WINDOW_MS,
         );
@@ -368,6 +369,7 @@ const WorkspaceDashboardInner = () => {
       const tombstones = useWorkspaceStore.getState().deletedWorkspaceIds;
       const localOnly = localBefore.filter(
         (w) =>
+          (!w.ownerId || w.ownerId === user.id) &&
           !serverIds.has(w.id) &&
           !(w.id in tombstones) &&
           nowMs - w.updatedAt < PENDING_PUSH_WINDOW_MS,
@@ -450,6 +452,10 @@ const WorkspaceDashboardInner = () => {
     }
     const project = state.projects.find((item) => item.id === projectId);
     if (!project) return;
+    if (project.ownerId && project.ownerId !== user?.id) {
+      toast.error(t("workspace.toast.couldnt_delete_shared_project"));
+      return;
+    }
     if (project.name === DEFAULT_PROJECT_NAME) {
       toast.error(t("workspace.toast.keep_one_project"));
       return;
@@ -811,6 +817,7 @@ const HomeView = ({
       const tombstones = useWorkspaceStore.getState().deletedWorkspaceIds;
       const localOnly = localBefore.filter(
         (w) =>
+          (!w.ownerId || w.ownerId === user.id) &&
           !serverIds.has(w.id) &&
           !(w.id in tombstones) &&
           nowMs - w.updatedAt < PENDING_PUSH_WINDOW_MS,
@@ -830,6 +837,7 @@ const HomeView = ({
         const hasContent =
           (graph.nodes?.length ?? 0) > 0 || (graph.edges?.length ?? 0) > 0;
         if (!hasContent) continue;
+        if (graph.ownerId && graph.ownerId !== user.id) continue;
         if (!knownWorkspaceIds.has(graph.workspaceId)) continue;
         if (graph.workspaceId in tombstones) continue;
         void saveCanvasToServer(graph, user.id);
@@ -895,7 +903,7 @@ const HomeView = ({
         ? state.projects.find((p) => p.id === meta.projectId)
         : null;
       if (meta) {
-        if (project) {
+        if (project && (!project.ownerId || project.ownerId === user.id)) {
           void upsertProjectToServer(project, user.id).then(() =>
             upsertWorkspaceToServer(meta, user.id),
           );
@@ -927,6 +935,7 @@ const HomeView = ({
             <ProjectsCard
               projects={projectCards}
               activeProjectId={activeProjectId}
+              userId={user?.id ?? null}
               onSelect={onSelectProject}
               onCreate={onCreateProject}
               onDelete={onDeleteProject}
@@ -1066,12 +1075,14 @@ const DELETE_CONFIRM_PHRASE_FALLBACK = "confirm";
 const ProjectsCard = ({
   projects,
   activeProjectId,
+  userId,
   onSelect,
   onCreate,
   onDelete,
 }: {
   projects: ProjectCardItem[];
   activeProjectId: string | null;
+  userId: string | null;
   onSelect: (id: string | null) => void;
   onCreate: () => void;
   onDelete: (id: string) => void;
@@ -1142,6 +1153,7 @@ const ProjectsCard = ({
           <ul className="flex flex-col gap-0.5">
             {projects.map((p) => {
               const isProtected = p.name === DEFAULT_PROJECT_NAME;
+              const canManage = !p.ownerId || p.ownerId === userId;
               return (
                 <li key={p.id} className="group/proj relative">
                   <button
@@ -1171,7 +1183,7 @@ const ProjectsCard = ({
                            * take its slot — but only when this row is
                            * actually deletable. The protected project
                            * keeps its badge full-strength on hover. */
-                          !isProtected && "group-hover/proj:opacity-0",
+                          canManage && !isProtected && "group-hover/proj:opacity-0",
                         )}
                       >
                         {t("workspace.home.active")}
@@ -1180,7 +1192,7 @@ const ProjectsCard = ({
                       <Lock
                         className={cn(
                           "h-3 w-3 text-zinc-600 transition-opacity",
-                          !isProtected && "group-hover/proj:opacity-0",
+                          canManage && !isProtected && "group-hover/proj:opacity-0",
                         )}
                       />
                     )}
@@ -1195,7 +1207,7 @@ const ProjectsCard = ({
                    * Hidden entirely on the protected "Default project"
                    * row — that's the server-side fallback every user
                    * gets, and we never want it deleted. */}
-                  {!isProtected && (
+                  {canManage && !isProtected && (
                     <button
                       type="button"
                       onPointerDown={(e) => e.stopPropagation()}
@@ -1291,6 +1303,7 @@ const ProjectsCard = ({
 
 interface SpaceCardData {
   id: string;
+  ownerId?: string | null;
   name: string;
   updatedAt: number;
   tabCount: number;
@@ -1452,7 +1465,7 @@ const AcademyVideoTile = ({ video }: { video: AcademyVideo }) => (
 /** Build minimap-friendly data for a single workspace. Reused by both
  *  HomeView (recent carousel) and SpacesView (full grid). */
 function buildSpaceCardData(
-  ws: { id: string; name: string; updatedAt: number },
+  ws: { id: string; ownerId?: string | null; name: string; updatedAt: number },
   canvases: ReadonlyArray<{ id: string; workspaceId: string; updatedAt: number }>,
   graphs: Record<string, { nodes?: unknown[]; edges?: unknown[] } | undefined>,
 ): SpaceCardData {
@@ -1550,6 +1563,7 @@ function buildSpaceCardData(
   }));
   return {
     id: ws.id,
+    ownerId: ws.ownerId ?? null,
     name: ws.name,
     updatedAt: ws.updatedAt,
     tabCount: wsCanvases.length,
@@ -1605,6 +1619,7 @@ const SpacesView = ({
       const tombstones = useWorkspaceStore.getState().deletedWorkspaceIds;
       const localOnly = localBefore.filter(
         (w) =>
+          (!w.ownerId || w.ownerId === user.id) &&
           !serverIds.has(w.id) &&
           !(w.id in tombstones) &&
           nowMs - w.updatedAt < PENDING_PUSH_WINDOW_MS,
@@ -1624,6 +1639,7 @@ const SpacesView = ({
         const hasContent =
           (graph.nodes?.length ?? 0) > 0 || (graph.edges?.length ?? 0) > 0;
         if (!hasContent) continue;
+        if (graph.ownerId && graph.ownerId !== user.id) continue;
         if (!knownWorkspaceIds.has(graph.workspaceId)) continue;
         if (graph.workspaceId in tombstones) continue;
         void saveCanvasToServer(graph, user.id);
@@ -1646,7 +1662,7 @@ const SpacesView = ({
         ? state.projects.find((p) => p.id === meta.projectId)
         : null;
       if (meta) {
-        if (project) {
+        if (project && (!project.ownerId || project.ownerId === user.id)) {
           void upsertProjectToServer(project, user.id).then(() =>
             upsertWorkspaceToServer(meta, user.id),
           );
@@ -1658,6 +1674,8 @@ const SpacesView = ({
     navigate(`/app/workspace/${workspaceId}`);
   };
 
+  const [tab, setTab] = useState<"mine" | "shared" | "templates">("mine");
+
   const visibleWorkspaceIds = useMemo(() => {
     return [...workspaces]
       .filter(
@@ -1666,8 +1684,15 @@ const SpacesView = ({
           !ws.projectId ||
           ws.projectId === activeProjectId,
       )
+      .filter((ws) =>
+        tab === "shared"
+          ? Boolean(ws.ownerId && ws.ownerId !== user?.id)
+          : tab === "mine"
+            ? !ws.ownerId || ws.ownerId === user?.id
+            : false,
+      )
       .map((ws) => ws.id);
-  }, [activeProjectId, workspaces]);
+  }, [activeProjectId, tab, user?.id, workspaces]);
 
   useHydrateSpacePreviewGraphs(visibleWorkspaceIds, user?.id, authLoading);
 
@@ -1680,9 +1705,16 @@ const SpacesView = ({
             !ws.projectId ||
             ws.projectId === activeProjectId,
         )
+        .filter((ws) =>
+          tab === "shared"
+            ? Boolean(ws.ownerId && ws.ownerId !== user?.id)
+            : tab === "mine"
+              ? !ws.ownerId || ws.ownerId === user?.id
+              : false,
+        )
         .map((ws) => buildSpaceCardData(ws, canvases, graphs)),
     );
-  }, [activeProjectId, workspaces, canvases, graphs]);
+  }, [activeProjectId, tab, user?.id, workspaces, canvases, graphs]);
 
   const handleRename = (id: string, currentName: string) => {
     const next = prompt(t("workspace.spaces.rename_prompt"), currentName);
@@ -1786,8 +1818,6 @@ const SpacesView = ({
   // spaces" is wired today — Shared and Templates are placeholders
   // we'll hook up once those features land. Switching to one of them
   // shows an inline empty-state so the click isn't a dead-end.
-  const [tab, setTab] = useState<"mine" | "shared" | "templates">("mine");
-
   return (
     <>
       {/* Slim chrome bar — keeps the workspace selector + user menu
@@ -1838,20 +1868,28 @@ const SpacesView = ({
           {/* ── Content — only "My spaces" has data today; Shared /
               Templates render an empty placeholder so the tabs aren't
               dead clicks. */}
-          {tab !== "mine" ? (
+          {tab === "templates" ? (
             <EmptyState
-              title={tab === "shared" ? t("workspace.spaces.empty_no_shared") : t("workspace.spaces.empty_no_templates")}
-              hint={
-                tab === "shared"
-                  ? t("workspace.spaces.empty_no_shared_hint")
-                  : t("workspace.spaces.empty_no_templates_hint")
-              }
+              title={t("workspace.spaces.empty_no_templates")}
+              hint={t("workspace.spaces.empty_no_templates_hint")}
             />
           ) : buckets.length === 0 ? (
             <EmptyState
-              title={t("workspace.spaces.empty_no_spaces")}
-              hint={t("workspace.spaces.empty_no_spaces_hint")}
-              cta={{ label: t("workspace.spaces.new_space"), onClick: handleNew }}
+              title={
+                tab === "shared"
+                  ? t("workspace.spaces.empty_no_shared")
+                  : t("workspace.spaces.empty_no_spaces")
+              }
+              hint={
+                tab === "shared"
+                  ? t("workspace.spaces.empty_no_shared_hint")
+                  : t("workspace.spaces.empty_no_spaces_hint")
+              }
+              cta={
+                tab === "mine"
+                  ? { label: t("workspace.spaces.new_space"), onClick: handleNew }
+                  : undefined
+              }
             />
           ) : (
             buckets.map((b) => (
@@ -1862,6 +1900,7 @@ const SpacesView = ({
                     <SpaceCard
                       key={ws.id}
                       ws={ws}
+                      canManage={!ws.ownerId || ws.ownerId === user?.id}
                       onOpen={() => handleOpen(ws.id)}
                       onRename={() => handleRename(ws.id, ws.name)}
                       onDuplicate={() => handleDuplicate(ws.id)}
@@ -1964,12 +2003,14 @@ const SpaceToolbar = ({ onNew }: { onNew: () => void }) => {
 
 const SpaceCard = ({
   ws,
+  canManage = true,
   onOpen,
   onRename,
   onDuplicate,
   onDelete,
 }: {
   ws: SpaceCardData;
+  canManage?: boolean;
   onOpen: () => void;
   onRename: () => void;
   onDuplicate: () => void;
@@ -1993,8 +2034,16 @@ const SpaceCard = ({
         </div>
 
         <div className="px-3.5 py-3">
-          <div className="truncate text-[14.5px] font-semibold leading-tight text-zinc-50">
-            {ws.name}
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1 truncate text-[14.5px] font-semibold leading-tight text-zinc-50">
+              {ws.name}
+            </div>
+            {!canManage && (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded bg-white/[0.08] px-1.5 py-0.5 text-[10px] font-medium text-zinc-300">
+                <Users className="h-3 w-3" />
+                Team
+              </span>
+            )}
           </div>
           <div className="mt-1 text-[15.5px] text-zinc-500">
             {timeAgo(ws.updatedAt)}
@@ -2003,9 +2052,13 @@ const SpaceCard = ({
       </button>
 
       <div className="pointer-events-auto absolute right-2 top-2 flex gap-1 opacity-100 transition-opacity lg:pointer-events-none lg:opacity-0 lg:group-hover:pointer-events-auto lg:group-hover:opacity-100">
-        <ActionButton title={t("workspace.spaces.action_rename")} onClick={(e) => { e.stopPropagation(); onRename(); }} icon={Pencil} />
+        {canManage && (
+          <ActionButton title={t("workspace.spaces.action_rename")} onClick={(e) => { e.stopPropagation(); onRename(); }} icon={Pencil} />
+        )}
         <ActionButton title={t("workspace.spaces.action_duplicate")} onClick={(e) => { e.stopPropagation(); onDuplicate(); }} icon={Copy} />
-        <ActionButton title={t("workspace.spaces.action_delete")} danger onClick={(e) => { e.stopPropagation(); onDelete(); }} icon={Trash2} />
+        {canManage && (
+          <ActionButton title={t("workspace.spaces.action_delete")} danger onClick={(e) => { e.stopPropagation(); onDelete(); }} icon={Trash2} />
+        )}
       </div>
     </li>
   );

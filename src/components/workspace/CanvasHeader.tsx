@@ -34,9 +34,11 @@ import { useWorkspaceShareRole } from "@/store/useWorkspaceShareRole";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { UserMenu } from "@/components/workspace/UserMenu";
 import ShareDialog from "@/components/workspace/ShareDialog";
+import { useAuth } from "@/contexts/AuthContext";
 
 const CanvasHeader = () => {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const currentWorkspaceId = useWorkspaceStore(
     (s) => s.current?.workspaceId ?? null,
   );
@@ -56,9 +58,12 @@ const CanvasHeader = () => {
   // half-built. Hide until the workspace_shares migration + edge
   // functions land. Re-enable by setting SHARE_FEATURE_ENABLED=true
   // (or flipping this constant) once the backend is in place.
-  const SHARE_FEATURE_ENABLED = false;
+  const SHARE_FEATURE_ENABLED = true;
   const canShare =
-    SHARE_FEATURE_ENABLED && shareRole === "owner" && !!currentWorkspaceId;
+    SHARE_FEATURE_ENABLED &&
+    shareRole === "owner" &&
+    !!currentWorkspaceId &&
+    (!workspace?.ownerId || workspace.ownerId === user?.id);
   const [shareOpen, setShareOpen] = useState(false);
 
   const projectLabel = t("workspace.canvas.personal");

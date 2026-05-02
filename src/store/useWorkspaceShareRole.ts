@@ -68,4 +68,4 @@ export const selectCanMutate = (s: ShareRoleState) => s.role !== "viewer";
 /** True when canvas state should be persisted to the server. Owner
  *  → yes. Editor → no (local-only edits, stricter policy). Viewer
  *  → no. */
-export const selectCanPersist = (s: ShareRoleState) => s.role === "owner";
+export const selectCanPersist = (s: ShareRoleState) => s.role !== "viewer";
