@@ -135,59 +135,59 @@ const Settings = () => {
 
   // ── Section dispatch ────────────────────────────────────────
   const renderProfile = () => (
-    <div className="max-w-3xl space-y-8">
+    <div className="max-w-4xl space-y-[24px]">
       <div>
-        <h2 className="text-[28px] font-semibold leading-9 text-zinc-50">{t("profile")}</h2>
+        <h2 className="text-[23px] font-semibold leading-[28px] text-zinc-50">{t("profile")}</h2>
       </div>
 
-      <div className="space-y-2">
-        <Label className="text-[16px] font-medium leading-6 text-zinc-200">{t("Avatar")}</Label>
-        <div className="relative group w-16 h-16">
-          <Avatar className="w-16 h-16 border-2 border-white/10">
+      <div className="space-y-[8px]">
+        <Label className="text-[14px] font-medium leading-[18px] text-zinc-100">{t("Avatar")}</Label>
+        <div className="relative group h-[56px] w-[56px]">
+          <Avatar className="h-[56px] w-[56px] border border-white/10">
             <AvatarImage src={avatarUrl} />
-            <AvatarFallback className="bg-primary/20 text-primary text-xl">
+            <AvatarFallback className="bg-primary/20 text-primary text-[23px]">
               {displayName?.charAt(0)?.toUpperCase() || "U"}
             </AvatarFallback>
           </Avatar>
           <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-            {uploading ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <Camera className="w-4 h-4 text-white" />}
+            {uploading ? <Loader2 className="h-[16px] w-[16px] animate-spin text-white" /> : <Camera className="h-[16px] w-[16px] text-white" />}
             <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
           </label>
         </div>
       </div>
 
-      <div className="max-w-md space-y-1.5">
-        <Label htmlFor="displayName" className="text-[16px] font-medium leading-6 text-zinc-200">{t("displayName")}</Label>
+      <div className="max-w-[330px] space-y-[6px]">
+        <Label htmlFor="displayName" className="text-[14px] font-medium leading-[18px] text-zinc-100">{t("displayName")}</Label>
         <Input
           id="displayName"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           placeholder={t("displayName")}
-          className="h-11 border-white/10 bg-black/30 text-[16px] text-zinc-100"
+          className="h-[36px] rounded-md border-white/10 bg-black/30 px-[12px] text-[14px] text-zinc-100"
         />
       </div>
 
-      <div className="max-w-md space-y-1.5">
-        <Label htmlFor="company" className="text-[16px] font-medium leading-6 text-zinc-200">{t("company")}</Label>
+      <div className="max-w-[330px] space-y-[6px]">
+        <Label htmlFor="company" className="text-[14px] font-medium leading-[18px] text-zinc-100">{t("company")}</Label>
         <Input
           id="company"
           value={company}
           onChange={(e) => setCompany(e.target.value)}
           placeholder={t("companyPlaceholder")}
-          className="h-11 border-white/10 bg-black/30 text-[16px] text-zinc-100"
+          className="h-[36px] rounded-md border-white/10 bg-black/30 px-[12px] text-[14px] text-zinc-100"
         />
       </div>
 
-      <div className="space-y-1.5">
-        <Label className="text-[16px] font-medium leading-6 text-zinc-200">{t("authEmailLabel")}</Label>
-        <p className="text-[16px] leading-6 text-zinc-300">{user?.email}</p>
+      <div className="space-y-[6px]">
+        <Label className="text-[14px] font-medium leading-[18px] text-zinc-100">{t("authEmailLabel")}</Label>
+        <p className="text-[14px] leading-[20px] text-zinc-200">{user?.email}</p>
       </div>
 
       <Separator className="bg-white/5" />
 
-      <div className="space-y-2">
-        <div className="flex items-center gap-3">
-          <span className="text-[16px] leading-6 text-zinc-300">{t("currentPlan")}</span>
+      <div className="space-y-[8px]">
+        <div className="flex items-center gap-[12px]">
+          <span className="text-[14px] leading-[20px] text-zinc-200">{t("currentPlan")}</span>
           {getPlanBadge()}
         </div>
         {profile?.current_period_end && profile?.subscription_status !== "free" && (
@@ -217,8 +217,8 @@ const Settings = () => {
         )}
       </div>
 
-      <Button onClick={handleSave} disabled={saving} className="h-10 px-4 text-[15px]">
-        {saving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
+      <Button onClick={handleSave} disabled={saving} className="h-[36px] px-[14px] text-[14px]">
+        {saving ? <Loader2 className="mr-[6px] h-[14px] w-[14px] animate-spin" /> : <Save className="mr-[6px] h-[14px] w-[14px]" />}
         {t("saveChanges")}
       </Button>
 
@@ -228,11 +228,11 @@ const Settings = () => {
        * no actual UI — non-compliance the moment any user files
        * a request. This block is the user-facing entry point. */}
       <Separator className="bg-white/5" />
-      <div className="rounded-xl border border-red-500/20 bg-red-500/[0.04] p-5">
-        <h3 className="text-[16px] font-semibold leading-6 text-red-200">
+      <div className="max-w-xl rounded-lg border border-red-500/20 bg-red-500/[0.04] p-[16px]">
+        <h3 className="text-[15px] font-semibold leading-[20px] text-red-200">
           {language === "th" ? "พื้นที่อันตราย" : "Danger zone"}
         </h3>
-        <p className="mt-2 text-[15px] leading-6 text-zinc-300">
+        <p className="mt-1.5 text-[14px] leading-[22px] text-zinc-300">
           {language === "th"
             ? "การลบบัญชีจะเอาข้อมูล โปรเจค ผลงาน เครดิต และประวัติการชำระทั้งหมดออกถาวร — กู้คืนไม่ได้"
             : "Deleting your account permanently removes all data, projects, generations, credits, and billing history — this cannot be undone."}
@@ -240,7 +240,7 @@ const Settings = () => {
         <button
           type="button"
           onClick={() => setDeleteDialogOpen(true)}
-          className="mt-4 inline-flex h-10 items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-3.5 text-[15px] font-medium text-red-200 transition-colors hover:bg-red-500/20"
+          className="mt-[12px] inline-flex h-[36px] items-center gap-[6px] rounded-md border border-red-500/30 bg-red-500/10 px-[12px] text-[14px] font-medium text-red-200 transition-colors hover:bg-red-500/20"
         >
           {language === "th" ? "ลบบัญชีถาวร" : "Delete account"}
         </button>
@@ -249,17 +249,17 @@ const Settings = () => {
   );
 
   const renderPreferences = () => (
-    <div className="max-w-2xl space-y-6">
-      <h2 className="text-[28px] font-semibold leading-9 text-zinc-50">{t("workspace.settings.preferences")}</h2>
-      <div className="space-y-1 max-w-lg">
-        <div className="flex items-center justify-between py-3">
-          <span className="flex items-center gap-2.5 text-[16px] leading-6 text-zinc-200">
-            <Globe className="w-4 h-4 text-zinc-500" />
+    <div className="max-w-2xl space-y-[20px]">
+      <h2 className="text-[23px] font-semibold leading-[28px] text-zinc-50">{t("workspace.settings.preferences")}</h2>
+      <div className="max-w-lg space-y-[4px]">
+        <div className="flex items-center justify-between py-[8px]">
+          <span className="flex items-center gap-[8px] text-[14px] leading-[20px] text-zinc-100">
+            <Globe className="h-[16px] w-[16px] text-zinc-500" />
             {t("language")}
           </span>
           <button
             onClick={toggleLanguage}
-            className="rounded-lg bg-white/[0.05] px-3.5 py-2 text-[15px] font-medium text-zinc-200 transition-colors hover:text-zinc-100"
+            className="rounded-md bg-white/[0.05] px-[12px] py-[6px] text-[14px] font-medium text-zinc-200 transition-colors hover:text-zinc-100"
           >
             {language === "en" ? "EN → TH" : "TH → EN"}
           </button>
@@ -464,20 +464,20 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-64 items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
+      <div className="flex min-h-[256px] items-center justify-center">
+        <Loader2 className="h-[20px] w-[20px] animate-spin text-zinc-500" />
       </div>
     );
   }
 
   if (!active && pending) {
     return (
-      <div className="max-w-2xl rounded-xl border border-amber-400/20 bg-amber-400/[0.06] p-6">
-        <h2 className="text-xl font-semibold text-zinc-50">Team request pending</h2>
-        <p className="mt-2 text-sm text-zinc-400">
+      <div className="max-w-2xl rounded-lg border border-amber-400/20 bg-amber-400/[0.06] p-[20px]">
+        <h2 className="text-[20px] font-semibold leading-[26px] text-zinc-50">Team request pending</h2>
+        <p className="mt-[8px] text-[14px] leading-[22px] text-zinc-400">
           Your company domain matched an organization, but an admin needs to approve your access before you can use the team dashboard or shared credit pool.
         </p>
-        <div className="mt-4 rounded-lg border border-white/10 bg-black/20 p-3 text-sm">
+        <div className="mt-[16px] rounded-lg border border-white/10 bg-black/20 p-[12px] text-[14px] leading-[20px]">
           <div className="text-zinc-500">Organization</div>
           <div className="font-medium text-zinc-100">
             {pending.organization?.display_name || pending.organization?.name || pending.organization_id}
@@ -489,13 +489,13 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
 
   if (!active) {
     return (
-      <div className="max-w-2xl rounded-xl border border-white/10 bg-white/[0.03] p-6">
-        <h2 className="text-xl font-semibold text-zinc-50">Create a team workspace</h2>
-        <p className="mt-2 text-sm text-zinc-400">
+      <div className="max-w-2xl rounded-lg border border-white/10 bg-white/[0.03] p-[20px]">
+        <h2 className="text-[20px] font-semibold leading-[26px] text-zinc-50">Create a team workspace</h2>
+        <p className="mt-[8px] text-[14px] leading-[22px] text-zinc-400">
           Team accounts include a company Admin Console, member approvals, shared team credits, and seat billing at $5 per active seat. Credits are topped up separately based on real usage.
         </p>
-        <Button className="mt-5" onClick={onRegister}>
-          <Users className="mr-2 h-4 w-4" />
+        <Button className="mt-[20px] h-[36px] px-[14px] text-[14px]" onClick={onRegister}>
+          <Users className="mr-[8px] h-[16px] w-[16px]" />
           Start team registration
         </Button>
       </div>
@@ -503,53 +503,53 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
   }
 
   return (
-    <div className="max-w-5xl space-y-7">
+    <div className="max-w-5xl space-y-[24px]">
       <div>
-        <h2 className="text-[28px] font-semibold leading-9 text-zinc-50">Team</h2>
-        <p className="mt-2 text-[18px] leading-7 text-zinc-200">
+        <h2 className="text-[23px] font-semibold leading-[28px] text-zinc-50">Team</h2>
+        <p className="mt-[8px] text-[16px] leading-[24px] text-zinc-200">
           Your account is connected to {active.organization?.display_name || active.organization?.name || "your organization"}.
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
-          <div className="text-[15px] font-medium leading-5 text-zinc-200">Shared credits</div>
-          <div className="mt-3 text-[26px] font-semibold leading-8 text-zinc-50">
+      <div className="grid gap-[16px] md:grid-cols-3">
+        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-[16px]">
+          <div className="text-[14px] font-medium leading-[18px] text-zinc-200">Shared credits</div>
+          <div className="mt-[10px] text-[24px] font-semibold leading-[30px] text-zinc-50">
             {formatCredits(active.organization?.credit_available ?? active.organization?.credit_pool ?? 0)}
           </div>
-          <div className="mt-2 text-[14px] leading-5 text-zinc-300">Organization pool</div>
+          <div className="mt-[6px] text-[13.5px] leading-[18px] text-zinc-300">Organization pool</div>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
-          <div className="text-[15px] font-medium leading-5 text-zinc-200">Team</div>
-          <div className="mt-3 text-[24px] font-semibold leading-8 text-zinc-50">
+        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-[16px]">
+          <div className="text-[14px] font-medium leading-[18px] text-zinc-200">Team</div>
+          <div className="mt-[10px] text-[22px] font-semibold leading-[28px] text-zinc-50">
             {active.team?.name || "Company pool"}
           </div>
-          <div className="mt-2 text-[14px] leading-5 text-zinc-300">
+          <div className="mt-[6px] text-[13.5px] leading-[18px] text-zinc-300">
             {active.team
               ? `${formatCredits(active.team.credit_available ?? 0)} credits`
               : "No sub-team assigned"}
           </div>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
-          <div className="text-[15px] font-medium leading-5 text-zinc-200">Access</div>
-          <div className="mt-3 text-[24px] font-semibold leading-8 text-zinc-50">
+        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-[16px]">
+          <div className="text-[14px] font-medium leading-[18px] text-zinc-200">Access</div>
+          <div className="mt-[10px] text-[22px] font-semibold leading-[28px] text-zinc-50">
             {active.role === "org_admin" ? "Admin" : "Member"}
           </div>
-          <div className="mt-2 text-[14px] leading-5 text-zinc-300">{active.status} - $5 / seat</div>
+          <div className="mt-[6px] text-[13.5px] leading-[18px] text-zinc-300">{active.status} - $5 / seat</div>
         </div>
       </div>
 
       {canOpenConsole ? (
-        <Button onClick={openAdminConsole} disabled={openingConsole}>
+        <Button className="h-[36px] px-[14px] text-[14px]" onClick={openAdminConsole} disabled={openingConsole}>
           {openingConsole ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 className="mr-[8px] h-[16px] w-[16px] animate-spin" />
           ) : (
-            <ExternalLink className="mr-2 h-4 w-4" />
+            <ExternalLink className="mr-[8px] h-[16px] w-[16px]" />
           )}
           Open Admin Console
         </Button>
       ) : (
-        <p className="max-w-4xl text-[18px] leading-7 text-zinc-200">
+        <p className="max-w-4xl text-[16px] leading-[24px] text-zinc-200">
           Member accounts can use the team workspace after approval. Admin Console access is available only to organization admins.
         </p>
       )}

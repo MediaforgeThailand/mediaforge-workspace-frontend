@@ -153,17 +153,17 @@ export default function WorkspaceSidebar({
   };
 
   return (
-    <aside className="mf-readable ws-scroll-hide flex h-full w-[212px] shrink-0 flex-col overflow-y-auto border-r border-white/5 bg-[hsl(0_0%_4%)] lg:w-[228px]">
+    <aside className="mf-readable ws-scroll-hide flex h-full w-[198px] shrink-0 flex-col overflow-y-auto border-r border-white/5 bg-[hsl(0_0%_4%)]">
       {/* ── Brand row — PSC : Digital Media ──────────────────────
        *  Logo lives at /public/psc-logo.png. Save the orange
        *  Digital Media wordmark there; the full lockup is wide
        *  so we use object-contain to fit the 34px square slot
        *  without distorting the trefoil + wordmark proportions. */}
-      <div className="flex h-14 shrink-0 items-center px-3 lg:px-4">
+      <div className="flex h-[48px] shrink-0 items-center px-[12px]">
         <button
           type="button"
           onClick={() => navigate("/app/workspace")}
-          className="flex items-center gap-2 text-[15.5px] font-semibold tracking-tight text-zinc-50 transition-colors hover:text-white"
+          className="flex items-center gap-[8px] text-[14px] font-semibold text-zinc-50 transition-colors hover:text-white"
         >
           {/* Brand logo — defaults to the workspace mascot, swapped
            *  to the tenant org logo when the user is on a claimed
@@ -173,7 +173,7 @@ export default function WorkspaceSidebar({
           <img
             src={brandLogo}
             alt={brandName}
-            className="h-[34px] w-[34px] shrink-0 select-none object-contain"
+            className="h-[28px] w-[28px] shrink-0 select-none object-contain"
             draggable={false}
           />
           <span className="leading-tight">{brandName}</span>
@@ -181,23 +181,23 @@ export default function WorkspaceSidebar({
       </div>
 
       {/* ── Create button (primary action) ─────────────────────── */}
-      <div className="px-3 pb-2 pt-1">
+      <div className="px-[12px] pb-[8px] pt-[2px]">
         <button
           type="button"
           onClick={handleCreate}
           className={cn(
-            "flex h-11 w-full items-center justify-center gap-1.5 rounded-lg px-3 text-[15.5px] font-semibold text-white lg:h-10",
+            "flex h-[36px] w-full items-center justify-center gap-[6px] rounded-lg px-[12px] text-[14px] font-semibold text-white",
             "bg-gradient-to-b from-[#ff3d8e] to-[#e8327f] shadow-[0_2px_8px_-2px_rgba(255,61,142,0.45)]",
             "transition-[transform,box-shadow] hover:from-[#ff4da0] hover:to-[#ef3a8c] hover:shadow-[0_4px_12px_-2px_rgba(255,61,142,0.55)]",
             "active:scale-[0.98]",
           )}
         >
-          <Plus className="h-3.5 w-3.5" /> {t("workspace.sidebar.create")}
+          <Plus className="h-[14px] w-[14px]" /> {t("workspace.sidebar.create")}
         </button>
       </div>
 
       {/* ── Top nav group ──────────────────────────────────────── */}
-      <nav className="flex flex-col gap-0.5 px-3 pb-2 pt-1">
+      <nav className="flex flex-col gap-[2px] px-[12px] pb-[8px] pt-[4px]">
         {NAV_TOP.map((it) => (
           <NavLink
             key={it.id}
@@ -210,14 +210,14 @@ export default function WorkspaceSidebar({
       </nav>
 
       {/* ── Section divider with label ─────────────────────────── */}
-      <div className="px-5 pb-1.5 pt-3">
-        <div className="text-[14px] font-semibold uppercase text-zinc-400">
+      <div className="px-[16px] pb-[4px] pt-[12px]">
+        <div className="text-[12.75px] font-semibold uppercase text-zinc-400">
           {t("workspace.sidebar.all_tools")}
         </div>
       </div>
 
       {/* ── Tools nav group ────────────────────────────────────── */}
-      <nav className="flex flex-col gap-0.5 px-3">
+      <nav className="flex flex-col gap-[2px] px-[12px]">
         {NAV_TOOLS.map((it) => (
           <NavLink
             key={it.id}
@@ -237,25 +237,25 @@ export default function WorkspaceSidebar({
 
       {/* Active class switcher — only renders when student is in 2+
        *  classes; consumers/single-class students see nothing. */}
-      <div className="mt-auto px-3">
+      <div className="mt-auto px-[12px]">
         <ActiveClassPicker variant="compact" className="w-full" />
       </div>
 
       {/* Org credit badge — visible to org members so they can see
        *  their balance at a glance. Returns null for consumer/guests. */}
-      <div className="px-4 py-2">
+      <div className="px-[12px] py-[6px]">
         <OrgCreditBadge variant="card" />
       </div>
 
       {isPscDemoUser && (
-        <div className="px-3 pt-2">
+        <div className="px-[12px] pt-[8px]">
           <button
             type="button"
             onClick={() => navigate("/app/university")}
-            className="flex h-11 w-full items-center gap-2.5 rounded-md border border-fuchsia-400/25 bg-fuchsia-500/10 px-2.5 text-[16px] font-semibold text-fuchsia-100 transition-colors hover:bg-fuchsia-500/18 hover:text-white lg:h-10"
+            className="flex h-[32px] w-full items-center gap-[8px] rounded-md border border-fuchsia-400/25 bg-fuchsia-500/10 px-[8px] text-[14px] font-semibold text-fuchsia-100 transition-colors hover:bg-fuchsia-500/18 hover:text-white"
             title={t("workspace.sidebar.psc_demo_tip")}
           >
-            <School className="h-3.5 w-3.5" />
+            <School className="h-[14px] w-[14px]" />
             PSC
           </button>
         </div>
@@ -270,7 +270,7 @@ export default function WorkspaceSidebar({
        *  parallel UtilityBtn — same visual weight, no special
        *  treatment beyond label rendering the TARGET language in its
        *  own script (universal language-switcher convention). */}
-      <div className="flex items-center gap-1 px-3 pb-3 pt-4">
+      <div className="flex items-center gap-[4px] px-[12px] pb-[12px] pt-[12px]">
         <UtilityBtn icon={SettingsIcon} title={t("workspace.sidebar.settings")} onClick={() => navigate("/app/settings")} />
         <UtilityBtn
           icon={Languages}
@@ -295,23 +295,23 @@ const OrgAdminLink = () => {
   const { t } = useLanguage();
   if (!isOrgAdmin) return null;
   return (
-    <div className="px-3 pt-3 pb-2 border-t border-white/5 mt-3 space-y-1">
+    <div className="mt-[8px] space-y-[4px] border-t border-white/5 px-[12px] pb-[8px] pt-[8px]">
       <button
         type="button"
         onClick={() => navigate("/app/org-admin")}
-        className="flex h-11 w-full items-center gap-2.5 rounded-md px-2.5 text-[16px] text-amber-200/90 transition-colors hover:bg-amber-300/10 hover:text-amber-100 lg:h-10"
+        className="flex h-[32px] w-full items-center gap-[8px] rounded-md px-[8px] text-[14px] text-amber-200/90 transition-colors hover:bg-amber-300/10 hover:text-amber-100"
         title={t("workspace.sidebar.manage_org_tip")}
       >
-        <Crown className="h-3.5 w-3.5" />
+        <Crown className="h-[14px] w-[14px]" />
         {t("workspace.sidebar.manage_org")}
       </button>
       <button
         type="button"
         onClick={() => navigate("/app/org-admin/branding")}
-        className="flex h-11 w-full items-center gap-2.5 rounded-md px-2.5 text-[16px] text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-100 lg:h-10"
+        className="flex h-[32px] w-full items-center gap-[8px] rounded-md px-[8px] text-[14px] text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-100"
         title={t("workspace.sidebar.branding_tip")}
       >
-        <Palette className="h-3.5 w-3.5" />
+        <Palette className="h-[14px] w-[14px]" />
         {t("workspace.sidebar.branding")}
       </button>
     </div>
@@ -333,13 +333,13 @@ const NavLink = ({
     type="button"
     onClick={onClick}
     className={cn(
-      "flex h-10 items-center gap-2.5 rounded-lg px-2.5 text-[15.5px] font-medium transition-colors lg:h-10",
+      "flex h-[32px] items-center gap-[8px] rounded-md px-[8px] text-[14px] font-medium transition-colors",
       active
         ? "bg-white/[0.07] text-zinc-50 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.05)]"
         : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100",
     )}
   >
-    <Icon className="h-4 w-4 shrink-0" />
+    <Icon className="h-[15px] w-[15px] shrink-0" />
     {label}
   </button>
 );
@@ -366,9 +366,9 @@ const UtilityBtn = ({
     title={title}
     aria-label={title}
     onClick={onClick}
-    className="relative flex h-10 w-10 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-100 lg:h-8 lg:w-8"
+    className="relative flex h-[32px] w-[32px] items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-100"
   >
-    <Icon className="h-4 w-4" />
+    <Icon className="h-[15px] w-[15px]" />
     {badge && (
       <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-rose-400 ring-2 ring-[hsl(0_0%_4%)]" />
     )}

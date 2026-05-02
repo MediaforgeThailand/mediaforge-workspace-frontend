@@ -72,17 +72,17 @@ export default function AccountShell({ children }: { children?: ReactNode }) {
 
       {/* ── Account content area ─────────────────────────────── */}
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 shrink-0 items-center gap-3 border-b border-white/5 px-4 md:px-7 lg:h-14">
+        <header className="flex h-[48px] shrink-0 items-center gap-[10px] border-b border-white/5 px-[16px] md:px-[20px]">
           <button
             type="button"
             onClick={() => navigate("/app/workspace")}
-            className="flex h-10 w-10 items-center justify-center rounded-md text-zinc-300 transition-colors hover:bg-white/[0.05] hover:text-zinc-100 lg:h-9 lg:w-9"
+            className="flex h-[32px] w-[32px] items-center justify-center rounded-md text-zinc-300 transition-colors hover:bg-white/[0.05] hover:text-zinc-100"
             title={t("workspace.account.back")}
             aria-label={t("workspace.account.back")}
           >
-            <ChevronLeft className="h-5 w-5" />
+            <ChevronLeft className="h-[16px] w-[16px]" />
           </button>
-          <span className="text-[15px] font-medium leading-5 text-zinc-200">{t("workspace.account.title")}</span>
+          <span className="text-[14px] font-medium leading-[18px] text-zinc-200">{t("workspace.account.title")}</span>
           <span className="text-zinc-600">/</span>
           <nav className="flex min-w-0 items-center gap-0.5 overflow-x-auto">
             {ACCOUNT_TABS.map((tab) => {
@@ -93,13 +93,13 @@ export default function AccountShell({ children }: { children?: ReactNode }) {
                   type="button"
                   onClick={() => navigate(tab.path)}
                   className={cn(
-                    "flex h-10 shrink-0 items-center gap-2 rounded-md px-3 text-[14.5px] font-medium leading-5 transition-colors lg:h-9 lg:px-3",
+                    "flex h-[32px] shrink-0 items-center gap-[6px] rounded-md px-[10px] text-[14px] font-medium leading-[18px] transition-colors",
                     active
                       ? "bg-white/[0.07] text-zinc-50 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.05)]"
                       : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100",
                   )}
                 >
-                  <tab.icon className="h-4 w-4" />
+                  <tab.icon className="h-[15px] w-[15px]" />
                   {t(tab.labelKey)}
                 </button>
               );
@@ -144,7 +144,7 @@ function AccountFooter() {
   const { t } = useLanguage();
   const sep = (
     <span className="select-none text-zinc-700" aria-hidden>
-      {t("footerSeparator" as any)}
+      {t("footerSeparator")}
     </span>
   );
   const linkClass =
@@ -156,27 +156,27 @@ function AccountFooter() {
         aria-label="Legal"
       >
         <Link to="/privacy" className={linkClass}>
-          {t("footerPrivacy" as any)}
+          {t("footerPrivacy")}
         </Link>
         {sep}
         <Link to="/terms" className={linkClass}>
-          {t("footerTerms" as any)}
+          {t("footerTerms")}
         </Link>
         {sep}
         <Link to="/refund" className={linkClass}>
-          {t("footerRefund" as any)}
+          {t("footerRefund")}
         </Link>
         {sep}
         <Link to="/aup" className={linkClass}>
-          {t("footerAup" as any)}
+          {t("footerAup")}
         </Link>
         {sep}
         <Link to="/cookies" className={linkClass}>
-          {t("footerCookies" as any)}
+          {t("footerCookies")}
         </Link>
         {sep}
         <a href="mailto:support@mediaforge.co" className={linkClass}>
-          {t("footerContact" as any)}
+          {t("footerContact")}
         </a>
       </nav>
     </footer>
