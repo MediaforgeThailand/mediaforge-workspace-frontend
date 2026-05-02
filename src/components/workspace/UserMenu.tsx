@@ -157,7 +157,7 @@ export function UserMenu() {
   const adminConsoleUrl =
     (import.meta.env.VITE_ADMIN_CONSOLE_URL as string | undefined) ||
     "https://mediaforge-admin-hub.vercel.app/org/console";
-  const hasTeamContext = Boolean(credits?.is_shared_pool || profile?.organization_id);
+  const hasTeamContext = Boolean(credits?.is_shared_pool || credits?.organization_id);
 
   const initial =
     (profile?.display_name?.[0] ?? user?.email?.[0] ?? "U").toUpperCase();
