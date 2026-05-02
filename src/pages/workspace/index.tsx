@@ -349,18 +349,26 @@ const WorkspaceDashboardInner = () => {
       if (serverProjects) {
         const localProjectsBefore = useWorkspaceStore.getState().projects;
         const serverProjectIds = new Set(serverProjects.map((p) => p.id));
+        const hasOwnedServerDefaultProject = serverProjects.some(
+          (p) => p.ownerId === user.id && p.name === DEFAULT_PROJECT_NAME,
+        );
         const localOnlyProjects = localProjectsBefore.filter(
           (p) =>
             (!p.ownerId || p.ownerId === user.id) &&
             !serverProjectIds.has(p.id) &&
+            !(p.name === DEFAULT_PROJECT_NAME && hasOwnedServerDefaultProject) &&
             nowMs - p.updatedAt < PENDING_PUSH_WINDOW_MS,
         );
         mergeServerProjects(serverProjects);
         for (const p of localOnlyProjects) void upsertProjectToServer(p, user.id);
         const defaultProject = useWorkspaceStore
           .getState()
-          .projects.find((p) => p.name === DEFAULT_PROJECT_NAME);
-        if (defaultProject && !serverProjectIds.has(defaultProject.id)) {
+          .projects.find((p) => (!p.ownerId || p.ownerId === user.id) && p.name === DEFAULT_PROJECT_NAME);
+        if (
+          defaultProject &&
+          !hasOwnedServerDefaultProject &&
+          !serverProjectIds.has(defaultProject.id)
+        ) {
           void upsertProjectToServer(defaultProject, user.id);
         }
       }

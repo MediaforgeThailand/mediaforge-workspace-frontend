@@ -306,6 +306,51 @@ function ensureDefaultProject(projects: ProjectMeta[]): ProjectMeta[] {
     : [createDefaultProjectMeta(), ...projects];
 }
 
+function dedupeDefaultProjects(
+  projects: ProjectMeta[],
+  activeProjectId: string | null,
+  workspaces: WorkspaceMeta[],
+): ProjectMeta[] {
+  const workspaceCountByProject = new Map<string, number>();
+  for (const workspace of workspaces) {
+    if (!workspace.projectId) continue;
+    workspaceCountByProject.set(
+      workspace.projectId,
+      (workspaceCountByProject.get(workspace.projectId) ?? 0) + 1,
+    );
+  }
+
+  const defaultsByOwner = new Map<string, ProjectMeta>();
+  const score = (project: ProjectMeta) => [
+    project.id === activeProjectId ? 1 : 0,
+    workspaceCountByProject.get(project.id) ?? 0,
+    project.updatedAt,
+  ];
+  const isBetterDefault = (candidate: ProjectMeta, current: ProjectMeta) => {
+    const a = score(candidate);
+    const b = score(current);
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i] !== b[i]) return a[i] > b[i];
+    }
+    return candidate.id > current.id;
+  };
+
+  const out: ProjectMeta[] = [];
+  for (const project of projects) {
+    if (!isDefaultProject(project)) {
+      out.push(project);
+      continue;
+    }
+    const ownerKey = project.ownerId ?? "__local__";
+    const current = defaultsByOwner.get(ownerKey);
+    if (!current || isBetterDefault(project, current)) {
+      defaultsByOwner.set(ownerKey, project);
+    }
+  }
+  out.push(...defaultsByOwner.values());
+  return out;
+}
+
 /** Default name for a new canvas tab inside a workspace. We use the
  *  pattern "Page N" where N is one greater than the highest existing
  *  Page number in the workspace — so creating tabs in order yields
@@ -475,7 +520,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               }
             }
           }
-          const withDefault = ensureDefaultProject(merged);
+          const withDefault = ensureDefaultProject(
+            dedupeDefaultProjects(merged, s.activeProjectId, s.workspaces),
+          );
           withDefault.sort((a, b) => b.updatedAt - a.updatedAt);
           return {
             projects: withDefault,
