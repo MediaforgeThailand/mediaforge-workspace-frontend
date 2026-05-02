@@ -255,7 +255,7 @@ interface Props {
 }
 
 const PANEL_WIDTH = 270;
-const PANEL_MAX_HEIGHT = 508;
+const PANEL_MAX_HEIGHT = 440;
 
 const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
   const { t } = useLanguage();
@@ -402,7 +402,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
           />
         </label>
 
-        <div className="flex shrink-0 items-center gap-1 px-2.5 py-2">
+        <div className="flex shrink-0 items-center gap-0.5 px-2.5 py-1.5">
           {CATEGORY_TABS.map((category) => {
             const Icon = category.icon;
             const isActive = active === category.id;
@@ -415,7 +415,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
                 aria-label={t(category.labelKey)}
                 aria-pressed={isActive}
                 className={cn(
-                  "grid h-7 w-7 place-items-center rounded-lg transition-colors",
+                  "grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-colors [aspect-ratio:1/1]",
                   isActive
                     ? "bg-white/[0.10] text-zinc-50"
                     : "text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200",
@@ -427,18 +427,18 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
           })}
         </div>
 
-        <div className="ws-picker-scroll min-h-0 flex-1 overflow-y-auto px-3 pb-8">
+        <div className="ws-picker-scroll max-h-[356px] overflow-y-auto px-2.5 pb-7">
           {visibleItems.length === 0 ? (
             <div className="px-1 py-8 text-center text-[14px] font-medium text-zinc-400">
               {t("workspace.picker.no_match", { query })}
             </div>
           ) : (
             groupedItems.map((group) => (
-              <div key={group.section} className="pb-2">
-                <div className="px-1 pb-1 pt-1.5 text-[10.5px] font-semibold uppercase tracking-[0.03em] text-zinc-500">
+              <div key={group.section} className="pb-1">
+                <div className="px-1 pb-0.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.03em] text-zinc-500">
                   {SECTION_LABELS[group.section]}
                 </div>
-                <ul className="space-y-0.5">
+                <ul className="space-y-px">
                   {group.items.map(({ item, index }) => {
                     const Icon = item.icon;
                     const isHighlight = index === highlight;
@@ -453,7 +453,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
                           onClick={() => fire(item)}
                           title={item.description}
                           className={cn(
-                            "group flex h-9 w-full items-center gap-2.5 rounded-md px-1.5 text-left transition-colors",
+                            "group flex h-8 w-full items-center gap-2 rounded-md px-1.5 text-left transition-colors",
                             isHighlight
                               ? "bg-white/[0.075] text-zinc-50"
                               : "text-zinc-200 hover:bg-white/[0.055] hover:text-zinc-50",
@@ -462,13 +462,13 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
                         >
                           <span
                             className={cn(
-                              "grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[5px] ring-1 ring-inset",
+                              "grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[5px] ring-1 ring-inset [aspect-ratio:1/1]",
                               TINT_CLASSES[item.tint ?? "zinc"],
                             )}
                           >
-                            <Icon className="h-[13px] w-[13px]" />
+                            <Icon className="h-[12.5px] w-[12.5px]" />
                           </span>
-                          <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-none text-inherit">
+                          <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium leading-none text-inherit">
                             {item.label}
                           </span>
                           {item.isNew && <Chip>{t("workspace.picker.new")}</Chip>}
@@ -483,7 +483,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
           )}
         </div>
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex h-7 items-center gap-3 bg-gradient-to-t from-[#1f1f1f] via-[#1f1f1f]/96 to-transparent px-3 text-[10.5px] font-medium text-zinc-500">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex h-6 items-center gap-2.5 bg-gradient-to-t from-[#1f1f1f] via-[#1f1f1f]/96 to-transparent px-3 text-[10px] font-medium text-zinc-500">
           <HintKey>N</HintKey>
           <span>{t("workspace.picker.hint_open")}</span>
           <HintKey>↕</HintKey>
@@ -507,7 +507,7 @@ function Chip({ children }: { children: ReactNode }) {
 
 function HintKey({ children }: { children: ReactNode }) {
   return (
-    <kbd className="grid h-[15px] min-w-[18px] place-items-center rounded bg-white/[0.08] px-1 font-mono text-[9px] font-semibold text-zinc-300">
+    <kbd className="grid h-[14px] min-w-[17px] place-items-center rounded bg-white/[0.08] px-1 font-mono text-[8.5px] font-semibold text-zinc-300">
       {children}
     </kbd>
   );
