@@ -202,6 +202,7 @@ interface WorkspaceState {
    *  if it wasn't there yet (e.g. user opens a server-only canvas
    *  from a different device). */
   replaceCanvasGraph: (graph: CanvasGraph) => void;
+  replaceCanvasGraphs: (graphs: CanvasGraph[]) => void;
   applyRemoteCanvasPatch: (canvasId: string, patch: RemoteCanvasPatch) => void;
 
   /** Merge a server-side workspace list into the local list. Used by
@@ -959,6 +960,56 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             // the server-loaded graph state.
             history: s.current?.id === graph.id ? [] : s.history,
             redoStack: s.current?.id === graph.id ? [] : s.redoStack,
+          };
+        }),
+
+      replaceCanvasGraphs: (incoming) =>
+        set((s) => {
+          if (incoming.length === 0) return {};
+
+          const workspaceProjectById = new Map(
+            s.workspaces.map((workspace) => [workspace.id, workspace.projectId] as const),
+          );
+          const existingCanvasIds = new Set(s.canvases.map((canvas) => canvas.id));
+          const nextGraphs = { ...s.graphs };
+          const nextMetaById = new Map<string, CanvasMeta>();
+          let nextCurrent = s.current;
+          let touchedCurrent = false;
+
+          for (const graph of incoming) {
+            nextGraphs[graph.id] = graph;
+            nextMetaById.set(graph.id, {
+              id: graph.id,
+              ownerId: graph.ownerId ?? null,
+              projectId:
+                graph.projectId ??
+                workspaceProjectById.get(graph.workspaceId) ??
+                s.activeProjectId ??
+                null,
+              workspaceId: graph.workspaceId,
+              name: graph.name,
+              updatedAt: graph.updatedAt,
+            });
+            if (s.current?.id === graph.id) {
+              nextCurrent = graph;
+              touchedCurrent = true;
+            }
+          }
+
+          const newMetas: CanvasMeta[] = [];
+          for (const [id, meta] of nextMetaById) {
+            if (!existingCanvasIds.has(id)) newMetas.push(meta);
+          }
+
+          return {
+            graphs: nextGraphs,
+            canvases: [
+              ...newMetas,
+              ...s.canvases.map((canvas) => nextMetaById.get(canvas.id) ?? canvas),
+            ],
+            current: nextCurrent,
+            history: touchedCurrent ? [] : s.history,
+            redoStack: touchedCurrent ? [] : s.redoStack,
           };
         }),
 

@@ -28,7 +28,7 @@
  * for the Spaces tab — already battle-tested for cross-device sync.
  */
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -137,17 +137,44 @@ interface MonthBucket<T> {
 
 const FALLBACK_W = 300;
 const FALLBACK_H = 320;
+const PREVIEW_HYDRATION_BATCH_SIZE = 12;
+const PREVIEW_HYDRATION_BATCH_DELAY_MS = 90;
+const MINIMAP_NODE_LIMIT = 80;
+const MINIMAP_EDGE_LIMIT = 96;
+const MINIMAP_IMAGE_LIMIT = 18;
+
+type PreviewCanvasMeta = {
+  id: string;
+  workspaceId: string;
+  updatedAt: number;
+};
+
+function buildCanvasIndex(
+  canvases: ReadonlyArray<PreviewCanvasMeta>,
+): Map<string, PreviewCanvasMeta[]> {
+  const index = new Map<string, PreviewCanvasMeta[]>();
+  for (const canvas of canvases) {
+    const list = index.get(canvas.workspaceId);
+    if (list) {
+      list.push(canvas);
+    } else {
+      index.set(canvas.workspaceId, [canvas]);
+    }
+  }
+  for (const list of index.values()) {
+    list.sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+  return index;
+}
 
 /** Pull the per-canvas graph for the minimap — picks the
  *  most-recently-updated canvas in the workspace. */
 function pickPreviewCanvasId(
   workspaceId: string,
-  canvases: ReadonlyArray<{ id: string; workspaceId: string; updatedAt: number }>,
+  canvasIndex: Map<string, PreviewCanvasMeta[]>,
   graphs?: Record<string, { nodes?: unknown[]; edges?: unknown[] } | undefined>,
 ): string | null {
-  const matches = canvases
-    .filter((c) => c.workspaceId === workspaceId)
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+  const matches = canvasIndex.get(workspaceId) ?? [];
   if (matches.length === 0) return null;
   if (!graphs) return matches[0].id;
 
@@ -162,6 +189,24 @@ function graphHasPreviewContent(
   graph: { nodes?: unknown[]; edges?: unknown[] } | undefined,
 ): boolean {
   return (graph?.nodes?.length ?? 0) > 0;
+}
+
+function selectMinimapNodes(nodes: MiniNode[]): MiniNode[] {
+  if (nodes.length <= MINIMAP_NODE_LIMIT) return nodes;
+
+  const originalIndex = new Map(nodes.map((node, index) => [node.id, index] as const));
+  const imageNodes = nodes
+    .filter((node) => Boolean(node.imageUrl))
+    .slice(0, MINIMAP_IMAGE_LIMIT);
+  const selectedIds = new Set(imageNodes.map((node) => node.id));
+  const remainingSlots = Math.max(MINIMAP_NODE_LIMIT - imageNodes.length, 0);
+  const shapeNodes = nodes
+    .filter((node) => !selectedIds.has(node.id))
+    .slice(0, remainingSlots);
+
+  return [...imageNodes, ...shapeNodes].sort(
+    (a, b) => (originalIndex.get(a.id) ?? 0) - (originalIndex.get(b.id) ?? 0),
+  );
 }
 
 /** "5 minutes ago" / "yesterday" / "Apr 12". */
@@ -746,7 +791,7 @@ function useHydrateSpacePreviewGraphs(
   userId: string | undefined,
   authLoading: boolean,
 ) {
-  const replaceCanvasGraph = useWorkspaceStore((s) => s.replaceCanvasGraph);
+  const replaceCanvasGraphs = useWorkspaceStore((s) => s.replaceCanvasGraphs);
   const requestedRef = useRef<Set<string>>(new Set());
   const signature = workspaceIds.join("|");
 
@@ -758,11 +803,12 @@ function useHydrateSpacePreviewGraphs(
     }
 
     const state = useWorkspaceStore.getState();
+    const canvasIndex = buildCanvasIndex(state.canvases);
     const missing = workspaceIds.filter((workspaceId) => {
       if (requestedRef.current.has(workspaceId)) return false;
       const previewCanvasId = pickPreviewCanvasId(
         workspaceId,
-        state.canvases,
+        canvasIndex,
         state.graphs,
       );
       const previewGraph = previewCanvasId
@@ -775,24 +821,43 @@ function useHydrateSpacePreviewGraphs(
     for (const workspaceId of missing) requestedRef.current.add(workspaceId);
 
     let cancelled = false;
-    loadLatestCanvasPreviewsByWorkspaceIds(missing).then((graphs) => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const hydrateBatch = (startIndex: number) => {
       if (cancelled) return;
-      if (!graphs) {
-        for (const workspaceId of missing) requestedRef.current.delete(workspaceId);
-        return;
-      }
-      for (const graph of graphs) {
-        replaceCanvasGraph(graph);
-      }
-    }).catch((err) => {
-      for (const workspaceId of missing) requestedRef.current.delete(workspaceId);
-      console.warn("[workspace-dashboard] preview hydration failed:", err);
-    });
+      const batch = missing.slice(
+        startIndex,
+        startIndex + PREVIEW_HYDRATION_BATCH_SIZE,
+      );
+      if (batch.length === 0) return;
+
+      loadLatestCanvasPreviewsByWorkspaceIds(batch).then((graphs) => {
+        if (cancelled) return;
+        if (!graphs) {
+          for (const workspaceId of batch) requestedRef.current.delete(workspaceId);
+          return;
+        }
+        replaceCanvasGraphs(graphs);
+        const nextIndex = startIndex + PREVIEW_HYDRATION_BATCH_SIZE;
+        if (nextIndex < missing.length) {
+          timer = setTimeout(
+            () => hydrateBatch(nextIndex),
+            PREVIEW_HYDRATION_BATCH_DELAY_MS,
+          );
+        }
+      }).catch((err) => {
+        for (const workspaceId of batch) requestedRef.current.delete(workspaceId);
+        console.warn("[workspace-dashboard] preview hydration failed:", err);
+      });
+    };
+
+    hydrateBatch(0);
 
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
     };
-  }, [authLoading, replaceCanvasGraph, signature, userId, workspaceIds]);
+  }, [authLoading, replaceCanvasGraphs, signature, userId, workspaceIds]);
 }
 
 const HomeView = ({
@@ -818,6 +883,7 @@ const HomeView = ({
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const canvases = useWorkspaceStore((s) => s.canvases);
   const graphs = useWorkspaceStore((s) => s.graphs);
+  const canvasIndex = useMemo(() => buildCanvasIndex(canvases), [canvases]);
   // `projects` was previously a free reference inside the projectCards
   // useMemo below — never declared in this scope, never threaded as a
   // prop (the parent passes it but we ignore the prop). That blew up
@@ -944,8 +1010,8 @@ const HomeView = ({
     return [...workspaces]
       .filter((ws) => recentIds.has(ws.id))
       .sort((a, b) => b.updatedAt - a.updatedAt)
-      .map((ws) => buildSpaceCardData(ws, canvases, graphs));
-  }, [recentWorkspaceIds, workspaces, canvases, graphs]);
+      .map((ws) => buildSpaceCardData(ws, canvasIndex, graphs));
+  }, [recentWorkspaceIds, workspaces, canvasIndex, graphs]);
 
   const handleNew = () => {
     const { workspaceId } = createWorkspace(t("workspace.spaces.untitled_space"), activeProjectId);
@@ -1593,11 +1659,11 @@ const AcademyVideoTile = ({ video }: { video: AcademyVideo }) => (
  *  HomeView (recent carousel) and SpacesView (full grid). */
 function buildSpaceCardData(
   ws: { id: string; ownerId?: string | null; name: string; updatedAt: number },
-  canvases: ReadonlyArray<{ id: string; workspaceId: string; updatedAt: number }>,
+  canvasIndex: Map<string, PreviewCanvasMeta[]>,
   graphs: Record<string, { nodes?: unknown[]; edges?: unknown[] } | undefined>,
 ): SpaceCardData {
-  const wsCanvases = canvases.filter((c) => c.workspaceId === ws.id);
-  const previewCanvasId = pickPreviewCanvasId(ws.id, canvases, graphs);
+  const wsCanvases = canvasIndex.get(ws.id) ?? [];
+  const previewCanvasId = pickPreviewCanvasId(ws.id, canvasIndex, graphs);
   const graph = previewCanvasId ? graphs[previewCanvasId] : null;
 
   const rawNodes = (graph?.nodes ?? []) as Array<Record<string, unknown>>;
@@ -1720,6 +1786,7 @@ const ProjectsManagerView = ({
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const canvases = useWorkspaceStore((s) => s.canvases);
   const graphs = useWorkspaceStore((s) => s.graphs);
+  const canvasIndex = useMemo(() => buildCanvasIndex(canvases), [canvases]);
   const createWorkspace = useWorkspaceStore((s) => s.createWorkspace);
   const renameWorkspace = useWorkspaceStore((s) => s.renameWorkspace);
   const deleteWorkspace = useWorkspaceStore((s) => s.deleteWorkspace);
@@ -1787,8 +1854,8 @@ const ProjectsManagerView = ({
         return true;
       })
       .sort((a, b) => b.updatedAt - a.updatedAt)
-      .map((workspace) => buildSpaceCardData(workspace, canvases, graphs));
-  }, [activeProjectId, canvases, filter, graphs, selectedProjectId, user?.id, workspaces]);
+      .map((workspace) => buildSpaceCardData(workspace, canvasIndex, graphs));
+  }, [activeProjectId, canvasIndex, filter, graphs, selectedProjectId, user?.id, workspaces]);
 
   const ownerLabel = selectedProject?.ownerId && selectedProject.ownerId !== user?.id
     ? "Team project"
@@ -2077,6 +2144,7 @@ const SpacesView = ({
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const canvases = useWorkspaceStore((s) => s.canvases);
   const graphs = useWorkspaceStore((s) => s.graphs);
+  const canvasIndex = useMemo(() => buildCanvasIndex(canvases), [canvases]);
   const createWorkspace = useWorkspaceStore((s) => s.createWorkspace);
   const renameWorkspace = useWorkspaceStore((s) => s.renameWorkspace);
   const deleteWorkspace = useWorkspaceStore((s) => s.deleteWorkspace);
@@ -2204,9 +2272,9 @@ const SpacesView = ({
               ? !ws.ownerId || ws.ownerId === user?.id
               : false,
         )
-        .map((ws) => buildSpaceCardData(ws, canvases, graphs)),
+        .map((ws) => buildSpaceCardData(ws, canvasIndex, graphs)),
     );
-  }, [activeProjectId, tab, user?.id, workspaces, canvases, graphs]);
+  }, [activeProjectId, tab, user?.id, workspaces, canvasIndex, graphs]);
 
   const handleRename = (id: string, currentName: string) => {
     const next = prompt(t("workspace.spaces.rename_prompt"), currentName);
@@ -2500,7 +2568,7 @@ const SpaceToolbar = ({ onNew }: { onNew: () => void }) => {
   );
 };
 
-const SpaceCard = ({
+const SpaceCard = memo(function SpaceCard({
   ws,
   canManage = true,
   onOpen,
@@ -2514,17 +2582,44 @@ const SpaceCard = ({
   onRename: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
-}) => {
+}) {
   const { t } = useLanguage();
+  const cardRef = useRef<HTMLLIElement | null>(null);
+  const [renderPreview, setRenderPreview] = useState(false);
+
+  useEffect(() => {
+    if (renderPreview) return;
+    const el = cardRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setRenderPreview(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setRenderPreview(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "900px 0px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [renderPreview]);
+
   return (
-    <li className="group relative cursor-pointer overflow-hidden rounded-lg bg-[hsl(0_0%_8.5%)] transition-colors hover:bg-[hsl(0_0%_10%)]">
+    <li ref={cardRef} className="group relative cursor-pointer overflow-hidden rounded-lg bg-[hsl(0_0%_8.5%)] transition-colors hover:bg-[hsl(0_0%_10%)]">
       <button
         type="button"
         onClick={onOpen}
         className="block w-full text-left"
       >
         <div className="relative aspect-[16/10] overflow-hidden bg-[hsl(0_0%_5%)]">
-          <CanvasMinimap nodes={ws.nodes} edges={ws.edges} />
+          {renderPreview ? (
+            <CanvasMinimap nodes={ws.nodes} edges={ws.edges} />
+          ) : (
+            <div className="h-full w-full bg-[hsl(0_0%_5%)]" />
+          )}
         </div>
 
         <div className="px-3.5 py-3">
@@ -2556,7 +2651,7 @@ const SpaceCard = ({
       </div>
     </li>
   );
-};
+});
 
 const ActionButton = ({
   title,
@@ -2772,13 +2867,13 @@ const NODE_FILL: Record<string, string> = {
 };
 const TOOL_FILL = "hsl(220 15% 18%)";
 
-const CanvasMinimap = ({
+const CanvasMinimap = memo(function CanvasMinimap({
   nodes,
   edges,
 }: {
   nodes: MiniNode[];
   edges: MiniEdge[];
-}) => {
+}) {
   const svgUid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const dotsId = `mm-dots-${svgUid}`;
 
@@ -2786,6 +2881,11 @@ const CanvasMinimap = ({
     return <div className="h-full w-full bg-[hsl(0_0%_5%)]" />;
   }
 
+  const previewNodes = selectMinimapNodes(nodes);
+  const previewNodeIds = new Set(previewNodes.map((node) => node.id));
+  const previewEdges = edges
+    .filter((edge) => previewNodeIds.has(edge.source) && previewNodeIds.has(edge.target))
+    .slice(0, MINIMAP_EDGE_LIMIT);
   const minX = Math.min(...nodes.map((n) => n.x));
   const minY = Math.min(...nodes.map((n) => n.y));
   const maxX = Math.max(...nodes.map((n) => n.x + n.w));
@@ -2797,7 +2897,7 @@ const CanvasMinimap = ({
   const vbW = maxX - minX + pad * 2;
   const vbH = maxY - minY + pad * 2;
 
-  const byId = new Map(nodes.map((n) => [n.id, n] as const));
+  const byId = new Map(previewNodes.map((n) => [n.id, n] as const));
   const centerOf = (n: MiniNode) => ({ x: n.x + n.w / 2, y: n.y + n.h / 2 });
 
   const strokeW = Math.max(span * 0.004, 1);
@@ -2829,7 +2929,7 @@ const CanvasMinimap = ({
       <rect x={vbX} y={vbY} width={vbW} height={vbH} fill={`url(#${dotsId})`} />
 
       <g stroke="hsl(258 60% 65%)" strokeOpacity={0.55} strokeWidth={strokeW} fill="none">
-        {edges.map((e, i) => {
+        {previewEdges.map((e, i) => {
           const a = byId.get(e.source);
           const b = byId.get(e.target);
           if (!a || !b) return null;
@@ -2847,7 +2947,7 @@ const CanvasMinimap = ({
       </g>
 
       <g>
-        {nodes.map((n) => {
+        {previewNodes.map((n) => {
           const isGroup = n.type === "groupNode";
           const fill = NODE_FILL[n.type ?? ""] ?? TOOL_FILL;
 
@@ -2921,4 +3021,4 @@ const CanvasMinimap = ({
       </g>
     </svg>
   );
-};
+});
