@@ -97,6 +97,8 @@ import { useCanvasToolStore } from "./useCanvasToolStore";
 import { useWorkspaceShortcuts } from "./useWorkspaceShortcuts";
 import { useCanvasAutosave } from "./useCanvasAutosave";
 import { useCanvasRealtime } from "./useCanvasRealtime";
+import CanvasCollaborationOverlay from "./CanvasCollaborationOverlay";
+import { useCanvasCollaborationStore } from "./canvasCollaboration";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useNavigate } from "react-router-dom";
 
@@ -520,6 +522,40 @@ const Inner = () => {
   const updateNodeData = useWorkspaceStore((s) => s.updateNodeData);
   const setSelectedNode = useWorkspaceStore((s) => s.setSelectedNode);
   const pushHistory = useWorkspaceStore((s) => s.pushHistory);
+  const cursorEnabled = useCanvasCollaborationStore((s) => s.cursorEnabled);
+  const publishCursor = useCanvasCollaborationStore((s) => s.publishCursor);
+  const publishSelection = useCanvasCollaborationStore((s) => s.publishSelection);
+  const cursorThrottleRef = useRef(0);
+
+  const publishCanvasCursor = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!canvasId || !cursorEnabled) return;
+      const rect = wrapperRef.current?.getBoundingClientRect();
+      if (!rect || rect.width <= 0 || rect.height <= 0) return;
+      const now = Date.now();
+      if (now - cursorThrottleRef.current < 100) return;
+      cursorThrottleRef.current = now;
+      publishCursor({
+        canvasId,
+        xPct: (event.clientX - rect.left) / rect.width,
+        yPct: (event.clientY - rect.top) / rect.height,
+        sentAt: now,
+        cursorEnabled: true,
+      });
+    },
+    [canvasId, cursorEnabled, publishCursor],
+  );
+
+  const hideCanvasCursor = useCallback(() => {
+    if (!canvasId) return;
+    publishCursor({
+      canvasId,
+      xPct: 0,
+      yPct: 0,
+      sentAt: Date.now(),
+      cursorEnabled: false,
+    });
+  }, [canvasId, publishCursor]);
 
   useEffect(() => {
     if (!canvasId) return;
@@ -777,8 +813,11 @@ const Inner = () => {
   );
 
   const onNodeClick: NodeMouseHandler = useCallback(
-    (_e, node) => setSelectedNode(node.id),
-    [setSelectedNode],
+    (_e, node) => {
+      setSelectedNode(node.id);
+      publishSelection(node.id);
+    },
+    [publishSelection, setSelectedNode],
   );
   const onPaneClick = useCallback(
     (e: React.MouseEvent) => {
@@ -811,8 +850,9 @@ const Inner = () => {
         return;
       }
       setSelectedNode(null);
+      publishSelection(null);
     },
-    [setSelectedNode, screenToFlowPosition, reparentSpawned],
+    [publishSelection, setSelectedNode, screenToFlowPosition, reparentSpawned],
   );
 
   /** Cut tool: clicking a wire deletes it. Bound to React Flow's
@@ -1515,6 +1555,7 @@ const Inner = () => {
    */
   const onNodeDragStart = useCallback(
     (event: React.MouseEvent, _node: Node, draggedNodes: Node[]) => {
+      publishSelection(_node.id);
       if (!event.altKey) return;
       if (!draggedNodes || draggedNodes.length === 0) return;
 
@@ -1554,7 +1595,7 @@ const Inner = () => {
       setNodes((nds) => [...nds, ...cloned]);
       setEdges((eds) => [...eds, ...clonedEdges]);
     },
-    [getEdges, setNodes, setEdges, pushHistory],
+    [getEdges, publishSelection, setNodes, setEdges, pushHistory],
   );
 
   const onNodeDragStop = useCallback(
@@ -1946,6 +1987,8 @@ const Inner = () => {
       className="workspace-root relative h-full w-full bg-zinc-950"
       onDragOver={onDragOver}
       onDrop={onDrop}
+      onPointerMove={publishCanvasCursor}
+      onPointerLeave={hideCanvasCursor}
       onContextMenu={(e) => {
         // Wrapper-level right-click handler — fires for clicks on
         // the pane AND on nodes. We open the categorised picker at
@@ -2036,7 +2079,7 @@ const Inner = () => {
         // the click-to-open-lightbox affordance keeps working.
         nodesDraggable={!isViewer}
         nodesConnectable={!isViewer}
-        edgesUpdatable={!isViewer}
+        edgesReconnectable={!isViewer}
         deleteKeyCode={isViewer ? null : DELETE_KEYS}
         fitView
         onlyRenderVisibleElements
@@ -2084,6 +2127,7 @@ const Inner = () => {
          *  mutation, no autosave dirty. */}
         <EdgeHighlightOnNodeSelect />
       </ReactFlow>
+      <CanvasCollaborationOverlay />
       {picker && (
         <CanvasNodePicker
           state={picker}
