@@ -140,7 +140,7 @@ const AssetExpandedDialog = ({ open, onOpenChange, nodeId, data }: Props) => {
           </div>
 
           {/* Tool sidebar */}
-          <aside className="flex w-full shrink-0 flex-col border-t border-zinc-800 bg-zinc-950 md:w-72 md:border-l md:border-t-0">
+          <aside className="flex w-full shrink-0 flex-col bg-zinc-950 md:w-72 md:border-t-0">
             <div className="border-b border-zinc-800 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
               Apply tool
             </div>
@@ -157,7 +157,7 @@ const AssetExpandedDialog = ({ open, onOpenChange, nodeId, data }: Props) => {
                       <button
                         type="button"
                         onClick={() => applyTool(t)}
-                        className="flex w-full items-start gap-2 rounded border border-zinc-800 bg-zinc-900 px-3 py-2 text-left hover:border-zinc-600 hover:bg-zinc-800"
+                        className="flex w-full items-start gap-2 rounded bg-zinc-900 px-3 py-2 text-left hover:bg-zinc-800"
                       >
                         <ToolIcon className="mt-0.5 h-4 w-4 shrink-0 text-zinc-300" />
                         <div className="min-w-0">

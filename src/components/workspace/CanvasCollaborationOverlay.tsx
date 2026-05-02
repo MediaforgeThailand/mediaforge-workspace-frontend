@@ -77,7 +77,7 @@ export default function CanvasCollaborationOverlay() {
               style={{ color: member.color }}
             />
             <span
-              className="mt-3 max-w-[150px] truncate rounded-full border border-black/30 px-2 py-1 text-[11px] font-semibold leading-none text-zinc-950 shadow-lg"
+              className="mt-3 max-w-[150px] truncate rounded-full px-2 py-1 text-[11px] font-semibold leading-none text-zinc-950 shadow-lg"
               style={{ backgroundColor: member.color }}
             >
               {member.name}
@@ -89,7 +89,7 @@ export default function CanvasCollaborationOverlay() {
       {(members.length > 0 || status === "connected" || status === "connecting") && (
         <div
           data-collab-presence
-          className="pointer-events-auto absolute right-3 top-3 flex h-7 items-center gap-1 rounded-full border border-white/[0.07] bg-zinc-950/70 px-1 py-1 text-white shadow-lg backdrop-blur-xl"
+          className="pointer-events-auto absolute right-3 top-3 flex h-7 items-center gap-1 rounded-full bg-zinc-950/80 px-1 py-1 text-white shadow-lg backdrop-blur-xl"
         >
           <button
             type="button"

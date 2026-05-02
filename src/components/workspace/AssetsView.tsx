@@ -427,7 +427,7 @@ export default function AssetsView({
   return (
     <div className="flex h-full min-h-0 w-full overflow-hidden text-zinc-100">
       {/* ── Left sub-sidebar (≥ md) ─────────────────────────── */}
-      <aside className="hidden h-full w-[212px] shrink-0 flex-col overflow-y-auto border-r border-white/5 bg-[hsl(0_0%_5%)] md:flex">
+      <aside className="hidden h-full w-[212px] shrink-0 flex-col overflow-y-auto bg-[hsl(0_0%_7%)] md:flex">
         <SubNav
           section={section}
           setSection={(s) => {
@@ -452,7 +452,7 @@ export default function AssetsView({
             className="absolute inset-0 bg-black/65"
             onClick={() => setDrawerOpen(false)}
           />
-          <aside className="relative z-10 h-full w-[268px] max-w-[84vw] overflow-y-auto border-r border-white/5 bg-[hsl(0_0%_5%)]">
+          <aside className="relative z-10 h-full w-[268px] max-w-[84vw] overflow-y-auto bg-[hsl(0_0%_7%)]">
             <div className="flex items-center justify-between px-4 py-3">
               <span className="text-[13px] font-semibold text-zinc-100">{t("workspace.assets.browse")}</span>
               <button
@@ -486,7 +486,7 @@ export default function AssetsView({
       {/* ── Main panel ─────────────────────────────────────── */}
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-white/5 px-4 py-3 sm:px-6">
+        <div className="flex flex-wrap items-center gap-2 px-4 py-3 sm:px-6">
           {/* Workspace sidebar toggle (mobile) — only shown when the
            *  dashboard wired in `onOpenSidebar`. Different button from
            *  the filters drawer below; this opens the OUTER sidebar
@@ -597,7 +597,7 @@ export default function AssetsView({
         </div>
 
         {searchOpen && (
-          <div className="border-b border-white/5 bg-white/[0.02] px-4 py-2 sm:px-6">
+          <div className="bg-white/[0.03] px-4 py-2 sm:px-6">
             <div className="flex items-center gap-2">
               <SearchIcon className="h-3.5 w-3.5 text-zinc-500" />
               <input
@@ -766,7 +766,7 @@ function SubNav({
         })}
       </nav>
       {projects.length > 0 && (
-        <div className="border-t border-white/5 pt-2">
+        <div className="pt-2">
           <div className="flex items-center justify-between px-3 pb-1">
             <span className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
               {t("workspace.assets.projects_heading")}

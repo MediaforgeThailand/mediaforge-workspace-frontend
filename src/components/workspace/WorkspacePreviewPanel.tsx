@@ -17,7 +17,7 @@ const WorkspacePreviewPanel = () => {
 
   if (!node) {
     return (
-      <aside className="flex h-full w-[320px] shrink-0 flex-col border-l border-zinc-800 bg-zinc-950 text-zinc-300">
+      <aside className="flex h-full w-[320px] shrink-0 flex-col bg-zinc-950 text-zinc-300">
         <div className="border-b border-zinc-800 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
           Preview
         </div>
@@ -34,7 +34,7 @@ const WorkspacePreviewPanel = () => {
   const selectedModel = (d.params?.model_name as string) ?? schema?.defaultModel ?? "—";
 
   return (
-    <aside className="flex h-full w-[320px] shrink-0 flex-col border-l border-zinc-800 bg-zinc-950 text-zinc-200">
+    <aside className="flex h-full w-[320px] shrink-0 flex-col bg-zinc-950 text-zinc-200">
       <div className="border-b border-zinc-800 px-3 py-2">
         <div className="text-sm font-medium leading-tight">{title}</div>
         <div className="truncate text-[11px] text-zinc-500">{selectedModel}</div>
@@ -47,7 +47,7 @@ const WorkspacePreviewPanel = () => {
         </div>
       </div>
 
-      <div className="mt-auto border-t border-zinc-800 px-3 py-2 text-[11px] text-zinc-500">
+      <div className="mt-auto px-3 py-2 text-[11px] text-zinc-500">
         Edit parameters directly on the node.
       </div>
     </aside>

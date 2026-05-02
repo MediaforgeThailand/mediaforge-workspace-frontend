@@ -182,7 +182,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
        * Tripo's docs). For text + grid we don't surface a download
        * since there's no obvious single file. */}
       <div
-        className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 border-b border-white/5 bg-zinc-950/70 px-4 py-2.5 text-sm text-zinc-200"
+        className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 bg-zinc-950/80 px-4 py-2.5 text-sm text-zinc-200"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="min-w-0 flex-1 truncate">
@@ -264,7 +264,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
         )}
 
         {preview.type === "audio" && preview.url && (
-          <div className="flex flex-col items-center gap-3 rounded-md border border-zinc-700 bg-zinc-900 p-6">
+          <div className="flex flex-col items-center gap-3 rounded-md bg-zinc-900 p-6">
             <div className="text-xs uppercase tracking-wide text-zinc-500">
               Audio
             </div>
@@ -273,7 +273,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
         )}
 
         {preview.type === "text" && (
-          <div className="rounded-md border border-zinc-800 bg-zinc-900 p-6 text-[13px] leading-relaxed text-zinc-100 whitespace-pre-wrap">
+          <div className="rounded-md bg-zinc-900 p-6 text-[13px] leading-relaxed text-zinc-100 whitespace-pre-wrap">
             {preview.text || (
               <span className="italic text-zinc-500">(empty text)</span>
             )}
@@ -348,7 +348,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
               target="_blank"
               rel="noopener noreferrer"
               download
-              className="absolute bottom-3 right-3 rounded-md border border-zinc-700 bg-black/70 px-3 py-1.5 text-[11px] text-zinc-200 backdrop-blur hover:bg-black/90"
+              className="absolute bottom-3 right-3 rounded-md bg-black/70 px-3 py-1.5 text-[11px] text-zinc-200 backdrop-blur hover:bg-black/90"
             >
               Download .glb
             </a>
@@ -367,7 +367,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
                   key={u + i}
                   src={u}
                   alt=""
-                  className="aspect-square w-full rounded border border-zinc-800 object-cover"
+                  className="aspect-square w-full rounded object-cover"
                   draggable={false}
                 />
               ))
@@ -378,7 +378,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
 
       {/* Footer hint */}
       <div
-        className="absolute inset-x-0 bottom-0 border-t border-white/5 bg-zinc-950/70 px-4 py-2 text-center text-[11px] text-zinc-500"
+        className="absolute inset-x-0 bottom-0 bg-zinc-950/80 px-4 py-2 text-center text-[11px] text-zinc-500"
         onClick={(e) => e.stopPropagation()}
       >
         Esc · A · click to close

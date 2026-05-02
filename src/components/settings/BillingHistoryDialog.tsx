@@ -164,7 +164,7 @@ const BillingHistoryDialog = ({ open, onOpenChange }: BillingHistoryDialogProps)
           )}
         </div>
 
-        <div className="border-t border-white/5 px-6 py-3 flex justify-end">
+        <div className="px-6 py-3 flex justify-end">
           <Button
             variant="ghost"
             size="sm"

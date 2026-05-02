@@ -408,7 +408,7 @@ const WorkspaceAIAssistantPanel = () => {
        *  caption. The "คุยกับ Max" title lives in the sidebar tab
        *  itself now, so we don't duplicate it here. */}
       <div className="border-b border-zinc-800 px-3 py-2">
-        <div className="grid grid-cols-2 gap-1 rounded-md border border-zinc-800 bg-zinc-950 p-0.5">
+        <div className="grid grid-cols-2 gap-1 rounded-md bg-zinc-900/50 bg-zinc-950 p-0.5">
           {MODELS.map((m) => (
             <button
               key={m.slug}
@@ -438,13 +438,13 @@ const WorkspaceAIAssistantPanel = () => {
             <Sparkles className="mx-auto mb-2 h-5 w-5 text-zinc-600" />
             ทักมาเลยครับ บอก Max ว่าอยากได้รูปหรือวิดีโอแบบไหน
             <div className="mt-3 space-y-1.5 text-left text-zinc-600">
-              <div className="rounded border border-zinc-800 px-2 py-1.5">
+              <div className="rounded bg-zinc-900/50 px-2 py-1.5">
                 "อยากได้ภาพ product shot นาฬิกาบนพื้นหินอ่อน แสง golden hour"
               </div>
-              <div className="rounded border border-zinc-800 px-2 py-1.5">
+              <div className="rounded bg-zinc-900/50 px-2 py-1.5">
                 "ช่วยปรับ prompt นี้ให้กล้อง dolly-in ช้า ๆ"
               </div>
-              <div className="rounded border border-zinc-800 px-2 py-1.5">
+              <div className="rounded bg-zinc-900/50 px-2 py-1.5">
                 "Element ของ Kling Omni ใช้ตอนไหน"
               </div>
             </div>
@@ -478,7 +478,7 @@ const WorkspaceAIAssistantPanel = () => {
             {pendingAttachments.map((att, i) => (
               <div
                 key={i}
-                className="group relative h-12 w-12 overflow-hidden rounded border border-zinc-700"
+                className="group relative h-12 w-12 overflow-hidden rounded bg-white/[0.04]"
               >
                 <img
                   src={att.dataUrl}
@@ -513,7 +513,7 @@ const WorkspaceAIAssistantPanel = () => {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isStreaming}
-            className="rounded border border-zinc-800 p-1.5 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded bg-zinc-900/50 p-1.5 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
             title="แนบรูป (หรือ Ctrl+V วางจาก clipboard)"
           >
             <Paperclip className="h-3.5 w-3.5" />
@@ -526,7 +526,7 @@ const WorkspaceAIAssistantPanel = () => {
             placeholder="พิมพ์ที่อยากได้ หรือวาง prompt / รูป ให้ Max ดู…"
             rows={2}
             disabled={isStreaming}
-            className="flex-1 resize-none rounded border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-zinc-600 disabled:opacity-50"
+            className="flex-1 resize-none rounded bg-zinc-900/50 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-zinc-600 disabled:opacity-50"
           />
           <button
             type="button"
@@ -609,7 +609,7 @@ const MessageBubble = ({
           ? "ml-6 bg-zinc-800 text-zinc-100"
           : isError
             ? "border border-amber-900/60 bg-amber-950/20 text-amber-200"
-            : "border border-zinc-800 bg-zinc-900 text-zinc-200",
+            : "bg-zinc-900 text-zinc-200",
       )}
     >
       <div className="mb-1 flex items-center gap-1 text-[9px] uppercase tracking-wide text-zinc-500">
@@ -624,7 +624,7 @@ const MessageBubble = ({
               key={i}
               src={att.dataUrl}
               alt=""
-              className="max-h-32 max-w-full rounded border border-zinc-700 object-contain"
+              className="max-h-32 max-w-full rounded bg-white/[0.04] object-contain"
             />
           ))}
         </div>

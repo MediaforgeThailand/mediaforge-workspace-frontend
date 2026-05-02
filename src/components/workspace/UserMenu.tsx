@@ -260,7 +260,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
                     navigate("/app/team-register");
                   }
                 }}
-                className="flex h-9 w-full items-center justify-center gap-2 rounded-md border border-white/[0.16] bg-transparent px-3 text-[14px] font-semibold leading-5 text-white transition-colors hover:bg-white/[0.06]"
+                className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-white/[0.06] px-3 text-[14px] font-semibold leading-5 text-white transition-colors hover:bg-white/[0.10]"
               >
                 {hasTeamContext ? <Building2 className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}
                 {hasTeamContext ? "Admin Console" : "Create your team"}
@@ -269,7 +269,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
           </div>
         </DropdownMenuLabel>
 
-        <div className="border-t border-white/[0.08] px-4 py-3.5">
+        <div className="bg-white/[0.02] px-4 py-3.5">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <Gauge className="h-4 w-4 shrink-0 text-white" />
@@ -331,7 +331,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
         >
           <Languages className="h-3.5 w-3.5 text-white/[0.82]" />
           <span className="flex-1">Language</span>
-          <span className="rounded-md border border-white/[0.10] bg-white/[0.04] px-2 py-0.5 text-[12.5px] text-white">
+          <span className="rounded-md bg-white/[0.08] px-2 py-0.5 text-[12.5px] text-white">
             {language === "th" ? "English" : "Thai"}
           </span>
         </DropdownMenuItem>

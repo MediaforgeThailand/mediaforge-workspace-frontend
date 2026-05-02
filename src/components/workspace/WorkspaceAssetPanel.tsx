@@ -479,7 +479,7 @@ const WorkspaceAssetPanel = () => {
 
       {/* Footer hint — dim, mono. Same styling as the context menu's
        *  footer row so users feel they're in a consistent system. */}
-      <div className="border-t border-white/5 px-4 py-2.5 text-[11px] text-zinc-500">
+      <div className="px-4 py-2.5 text-[11px] text-zinc-500">
         Drag a tile to the canvas to re-use it.
       </div>
 

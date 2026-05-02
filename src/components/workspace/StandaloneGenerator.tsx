@@ -913,7 +913,7 @@ function ProjectPicker({
       {open && (
         <div
           className={cn(
-            "absolute left-0 top-11 z-50 w-[260px] rounded-xl border border-white/[0.07] bg-[#111111] p-2 shadow-2xl shadow-black/70",
+            "absolute left-0 top-11 z-50 w-[260px] rounded-xl bg-[#111111] p-2 shadow-2xl shadow-black/70",
             compact && "left-1/2 -translate-x-1/2",
           )}
           role="menu"

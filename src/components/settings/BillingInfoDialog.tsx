@@ -220,7 +220,7 @@ const BillingInfoDialog = ({
           )}
         </div>
 
-        <div className="border-t border-white/5 px-6 py-3 flex items-center justify-end gap-2">
+        <div className="px-6 py-3 flex items-center justify-end gap-2">
           <Button
             variant="ghost"
             size="sm"

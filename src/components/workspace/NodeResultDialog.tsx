@@ -77,7 +77,7 @@ const NodeResultDialog = memo(
           </div>
 
           {/* Meta row */}
-          <div className="flex items-center justify-between border-t border-zinc-800 px-4 py-2 text-[11px] text-zinc-400">
+          <div className="flex items-center justify-between px-4 py-2 text-[11px] text-zinc-400">
             <div>
               {selectedIndex === 0 ? "Latest" : `#${generations.length - selectedIndex}`} ·{" "}
               {formatTime(current.createdAt)}
@@ -87,7 +87,7 @@ const NodeResultDialog = memo(
 
           {/* History filmstrip */}
           {generations.length > 1 && (
-            <div className="border-t border-zinc-800 bg-zinc-950 p-3">
+            <div className="bg-zinc-950 p-3">
               <div className="mb-2 text-[11px] uppercase tracking-wide text-zinc-500">
                 History — {generations.length} generation{generations.length === 1 ? "" : "s"}
               </div>

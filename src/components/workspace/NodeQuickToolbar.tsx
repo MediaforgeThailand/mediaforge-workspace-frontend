@@ -513,7 +513,7 @@ const NodeQuickToolbar = memo(() => {
   // matrix — we already compute screen-space coords above.
   return createPortal(
     <div
-      className="ws-quick-toolbar pointer-events-auto fixed z-[1000] flex max-w-[calc(100vw-1rem)] -translate-x-1/2 -translate-y-full items-center gap-1 overflow-x-auto rounded-lg border border-zinc-700/80 bg-zinc-900/95 p-1 shadow-xl shadow-black/40 backdrop-blur lg:gap-0.5"
+      className="ws-quick-toolbar pointer-events-auto fixed z-[1000] flex max-w-[calc(100vw-1rem)] -translate-x-1/2 -translate-y-full items-center gap-1 overflow-x-auto rounded-lg bg-zinc-900/95 p-1 shadow-xl shadow-black/40 backdrop-blur lg:gap-0.5"
       style={{ left: screenPos.x, top: screenPos.y - 12 }}
       // Don't let clicks here fall through to the canvas (which would
       // deselect the very nodes the toolbar is acting on).

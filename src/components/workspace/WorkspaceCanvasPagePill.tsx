@@ -159,7 +159,7 @@ const WorkspaceCanvasPagePill = () => {
             type="button"
             aria-label={t("workspace.pill.aria_switch", { name: activeName })}
             className={cn(
-              "group flex h-11 items-center gap-2 rounded-full border border-white/[0.06] bg-zinc-900/85 px-4 text-[12px] text-zinc-100 shadow-lg shadow-black/40 backdrop-blur transition-all lg:h-9 lg:px-3",
+              "group flex h-11 items-center gap-2 rounded-full bg-zinc-900/85 px-4 text-[12px] text-zinc-100 shadow-lg shadow-black/40 backdrop-blur transition-all lg:h-9 lg:px-3",
               "hover:-translate-y-0.5 hover:bg-zinc-800/90 hover:shadow-xl",
               open &&
                 "bg-zinc-800/90 -translate-y-0.5 shadow-xl",
@@ -301,7 +301,7 @@ const WorkspaceCanvasPagePill = () => {
           </div>
 
           {/* Footer — new page button. */}
-          {canMutate && <div className="mt-1 border-t border-white/[0.06] pt-1">
+          {canMutate && <div className="mt-1 pt-1">
             <button
               type="button"
               onClick={newTab}

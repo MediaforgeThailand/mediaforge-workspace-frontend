@@ -303,7 +303,7 @@ export function ImageCropTool({
       onPointerLeave={onPointerUp}
     >
       {/* Top toolbar */}
-      <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 border-b border-white/10 bg-zinc-950/90 px-4 py-2.5 text-sm text-zinc-100">
+      <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 bg-zinc-950/90 px-4 py-2.5 text-sm text-zinc-100">
         <div className="flex items-center gap-2 font-medium">
           <CropIcon className="h-4 w-4" />
           {t("workspace.crop.heading")}
@@ -485,7 +485,7 @@ export function ImageCropTool({
       </div>
 
       {/* Info / error footer */}
-      <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-3 border-t border-white/10 bg-zinc-950/90 px-4 py-2 text-[11px] text-zinc-400">
+      <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-3 bg-zinc-950/90 px-4 py-2 text-[11px] text-zinc-400">
         {error ? (
           <span className="text-red-300">{error}</span>
         ) : crop && naturalSize ? (

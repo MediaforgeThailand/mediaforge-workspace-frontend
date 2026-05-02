@@ -643,7 +643,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
 
       {/* 250M+ Premium assets — only Creator/Pro/Team (Starter excluded) */}
       {plan.name !== "Starter" && (
-        <div className="mt-2 pt-3 border-t border-white/5">
+        <div className="mt-2 pt-3">
           <div className="flex items-center gap-2 text-neutral-200 text-xs">
             <Check className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
             <span className="font-medium">

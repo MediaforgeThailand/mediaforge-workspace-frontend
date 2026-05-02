@@ -365,7 +365,7 @@ function ElementRefThumb({
       title={title}
       className={cn(
         "aspect-square w-full rounded object-cover",
-        accent ? "border border-pink-500/40" : "border border-zinc-800",
+        accent ? "border border-pink-500/40" : "",
       )}
       draggable={false}
     />

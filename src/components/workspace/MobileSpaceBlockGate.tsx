@@ -60,7 +60,7 @@ export default function MobileSpaceBlockGate({
         paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))",
       }}
     >
-      <section className="w-full max-w-sm rounded-lg border border-zinc-800 bg-zinc-900/80 p-5 shadow-2xl shadow-black/40">
+      <section className="w-full max-w-sm rounded-lg bg-zinc-900/80 p-5 shadow-2xl shadow-black/40">
         <div className="mb-5 flex items-center gap-3">
           <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-zinc-800 text-zinc-200">
             <Monitor className="h-5 w-5" />
@@ -89,11 +89,11 @@ export default function MobileSpaceBlockGate({
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-2 text-xs font-medium text-zinc-400">
-          <div className="flex items-center gap-2 rounded-md border border-zinc-800 bg-black/25 px-3 py-2">
+          <div className="flex items-center gap-2 rounded-md bg-black/25 px-3 py-2">
             <Smartphone className="h-3.5 w-3.5 text-zinc-500" />
             {isThai ? "มือถือถูกบล็อก" : "Phone blocked"}
           </div>
-          <div className="flex items-center gap-2 rounded-md border border-zinc-800 bg-black/25 px-3 py-2">
+          <div className="flex items-center gap-2 rounded-md bg-black/25 px-3 py-2">
             <Maximize2 className="h-3.5 w-3.5 text-zinc-500" />
             {isThai ? "ใช้จอใหญ่กว่า" : "Bigger screen"}
           </div>

@@ -91,7 +91,7 @@ const WorkspaceRightSidebar = () => {
       <aside
         className={cn(
           "pointer-events-auto fixed right-3 top-1/2 z-30 -translate-y-1/2",
-          "flex flex-col items-center gap-1 rounded-2xl border border-white/10 bg-[hsl(220_10%_8%)]/95 p-1.5 backdrop-blur-2xl",
+          "flex flex-col items-center gap-1 rounded-2xl bg-[hsl(220_10%_10%)]/95 p-1.5 backdrop-blur-2xl",
           "shadow-[0_24px_60px_-20px_hsl(0_0%_0%/0.7),0_0_0_1px_hsl(0_0%_100%/0.04)]",
         )}
         // `zoom: 0.8` — keeps the collapsed rail visually consistent
@@ -145,7 +145,7 @@ const WorkspaceRightSidebar = () => {
         //  - subtle white-on-white border to separate from canvas
         //  - heavy drop shadow for depth, paired with a 1px inner
         //    light ring (the "edge of frosted glass" highlight)
-        "rounded-2xl border border-white/10 bg-[hsl(220_10%_8%)]/95 backdrop-blur-2xl",
+        "rounded-2xl bg-[hsl(220_10%_10%)]/95 backdrop-blur-2xl",
         "shadow-[0_24px_60px_-20px_hsl(0_0%_0%/0.7),0_0_0_1px_hsl(0_0%_100%/0.04)]",
       )}
       style={{

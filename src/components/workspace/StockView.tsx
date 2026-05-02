@@ -337,7 +337,7 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
 
   return (
     <div className="ws-scroll-hide flex h-full min-h-0 flex-col overflow-y-auto bg-[hsl(0_0%_8%)] text-zinc-100">
-      <header className="sticky top-0 z-20 border-b border-white/[0.05] bg-[hsl(0_0%_8%)]/95 px-4 py-4 backdrop-blur-xl sm:px-6 lg:px-8">
+      <header className="sticky top-0 z-20 bg-[hsl(0_0%_8%)]/95 px-4 py-4 backdrop-blur-xl sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-[1460px] items-center gap-3">
           {onOpenSidebar && (
             <button
@@ -500,7 +500,7 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
                 ))}
               </div>
 
-              <div className="mt-8 flex flex-col items-center justify-between gap-3 border-t border-white/8 pt-5 sm:flex-row">
+              <div className="mt-8 flex flex-col items-center justify-between gap-3 pt-5 sm:flex-row">
                 <p className="text-[13px] text-zinc-500">
                   {t("workspace.stock.page_of", {
                     current: meta?.current_page ?? page,
@@ -689,7 +689,7 @@ function StockPreviewModal({
             <ImageIcon className="h-14 w-14 text-zinc-700" />
           )}
         </div>
-        <aside className="w-full shrink-0 border-t border-white/10 p-5 lg:w-[340px] lg:border-l lg:border-t-0">
+        <aside className="w-full shrink-0 bg-white/[0.02] p-5 lg:w-[340px]">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-[13px] font-semibold uppercase tracking-[0.18em] text-sky-300">

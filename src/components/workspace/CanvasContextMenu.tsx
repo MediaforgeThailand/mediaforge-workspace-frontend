@@ -390,7 +390,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
         onClick={(event) => event.stopPropagation()}
         onContextMenu={(event) => event.preventDefault()}
       >
-        <label className="flex h-9 shrink-0 items-center border-b border-white/[0.06] px-3">
+        <label className="flex h-9 shrink-0 items-center px-3">
           <Search className="h-4 w-4 shrink-0 text-zinc-500" />
           <input
             ref={inputRef}

@@ -142,11 +142,11 @@ const ShortcutsDialog = ({ open, onClose }: Props) => {
       aria-modal="true"
     >
       <div
-        className="relative flex max-h-[86vh] w-[min(720px,90vw)] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl"
+        className="relative flex max-h-[86vh] w-[min(720px,90vw)] flex-col overflow-hidden rounded-xl bg-zinc-950 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
+        <div className="flex items-center gap-2 px-4 py-3">
           <Keyboard className="h-4 w-4 text-zinc-400" />
           <h2 className="text-sm font-semibold text-zinc-100">
             {t("workspace.shortcuts.heading")}
@@ -207,7 +207,7 @@ const ShortcutsDialog = ({ open, onClose }: Props) => {
 const Kbd = ({ k }: { k: string }) => (
   <kbd
     className={cn(
-      "inline-flex min-w-[1.5rem] items-center justify-center rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-zinc-200 shadow-[inset_0_-1px_0_hsl(0_0%_0%/0.4)]",
+      "inline-flex min-w-[1.5rem] items-center justify-center rounded bg-zinc-900 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-zinc-200 shadow-[inset_0_-1px_0_hsl(0_0%_0%/0.4)]",
     )}
   >
     {k}

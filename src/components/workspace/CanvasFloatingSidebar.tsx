@@ -180,7 +180,7 @@ const CanvasFloatingSidebar = ({ onAddNode, onOpenSettings }: Props) => {
     <div
       className="pointer-events-none fixed left-2 top-1/2 z-40 -translate-y-1/2 lg:left-1.5"
     >
-      <div className="pointer-events-auto flex flex-col items-center gap-[1.5px] rounded-full border border-zinc-800 bg-zinc-950/85 p-[1.5px] shadow-md shadow-black/35 backdrop-blur">
+      <div className="pointer-events-auto flex flex-col items-center gap-[1.5px] rounded-full  bg-zinc-950/85 p-[1.5px] shadow-md shadow-black/35 backdrop-blur">
         {BUTTONS.map((b, i) => (
           <SidebarButton
             key={b.id}
@@ -243,7 +243,7 @@ function SidebarButton({
         <Icon className="h-[10.8px] w-[10.8px]" />
       </button>
       {showTip && (
-        <div className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded border border-zinc-700 bg-zinc-900/95 px-2 py-1 text-[11px] text-zinc-200 shadow-lg backdrop-blur">
+        <div className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded  bg-zinc-900/95 px-2 py-1 text-[11px] text-zinc-200 shadow-lg backdrop-blur">
           <span>{label}</span>
           {button.shortcut && (
             <span className="ml-2 font-mono text-[9.5px] text-zinc-500">
@@ -286,7 +286,7 @@ function LanguageToggleButton({
         <Languages className="h-[10.8px] w-[10.8px]" />
       </button>
       {showTip && (
-        <div className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded border border-zinc-700 bg-zinc-900/95 px-2 py-1 text-[11px] text-zinc-200 shadow-lg backdrop-blur">
+        <div className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded  bg-zinc-900/95 px-2 py-1 text-[11px] text-zinc-200 shadow-lg backdrop-blur">
           <span>{targetLabel}</span>
         </div>
       )}

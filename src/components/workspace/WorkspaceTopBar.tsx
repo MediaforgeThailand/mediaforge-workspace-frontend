@@ -52,7 +52,7 @@ const WorkspaceTopBar = () => {
   };
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-950 px-3 text-zinc-200">
+    <header className="flex h-12 shrink-0 items-center gap-3 bg-zinc-950 px-3 text-zinc-200">
       <Link
         to="/app/workspace"
         className="flex items-center gap-1 rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
@@ -87,7 +87,7 @@ const WorkspaceTopBar = () => {
       <button
         type="button"
         disabled
-        className="flex items-center gap-1 rounded border border-zinc-800 px-2 py-1 text-xs text-zinc-500"
+        className="flex items-center gap-1 rounded bg-white/[0.04] px-2 py-1 text-xs text-zinc-500"
         title={t("workspace.topbar.save_not_wired")}
       >
         <Save className="h-3.5 w-3.5" /> {t("workspace.topbar.save")}
@@ -96,7 +96,7 @@ const WorkspaceTopBar = () => {
       <button
         type="button"
         disabled
-        className="flex items-center gap-1 rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-300"
+        className="flex items-center gap-1 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-300"
         title={t("workspace.topbar.run_not_wired")}
       >
         <Play className="h-3.5 w-3.5" /> {t("workspace.topbar.run")}

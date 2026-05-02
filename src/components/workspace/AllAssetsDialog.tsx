@@ -328,7 +328,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
     >
       <div
         className={cn(
-          "relative flex h-[88vh] w-[min(1280px,94vw)] overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl",
+          "relative flex h-[88vh] w-[min(1280px,94vw)] overflow-hidden rounded-xl  bg-zinc-950 shadow-2xl",
           draggingExternal && "ring-2 ring-sky-500/70",
         )}
         onClick={(e) => e.stopPropagation()}
@@ -346,7 +346,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
 
         {/* ── Left column: browse ── */}
         <div className="flex flex-1 flex-col">
-          <div className="flex items-center gap-3 border-b border-zinc-800 px-4 py-3">
+          <div className="flex items-center gap-3 px-4 py-3">
             <Layers className="h-4 w-4 text-zinc-400" />
             <h2 className="text-sm font-semibold text-zinc-100">{t("workspace.assets_dialog.title")}</h2>
             <span className="font-mono text-[10px] text-zinc-500">
@@ -360,7 +360,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={t("workspace.assets_dialog.search_placeholder")}
-                  className="w-56 rounded border border-zinc-800 bg-zinc-900 py-1.5 pl-7 pr-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-zinc-600"
+                  className="w-56 rounded  bg-zinc-900 py-1.5 pl-7 pr-2 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-zinc-600"
                 />
               </div>
               <button
@@ -375,7 +375,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
           </div>
 
           {/* Filter row */}
-          <div className="flex flex-wrap items-center gap-1.5 border-b border-zinc-800 px-4 py-2">
+          <div className="flex flex-wrap items-center gap-1.5 px-4 py-2">
             <SegmentPill
               active={typeFilter === "all"}
               onClick={() => setTypeFilter("all")}
@@ -534,14 +534,14 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
             )}
           </div>
 
-          <div className="border-t border-zinc-800 px-4 py-2 text-[11px] leading-snug text-zinc-500">
+          <div className="px-4 py-2 text-[11px] leading-snug text-zinc-500">
             {t("workspace.assets_dialog.help")}
           </div>
         </div>
 
         {/* ── Right column: cart ── */}
-        <div className="flex w-[320px] flex-col border-l border-zinc-800 bg-zinc-925">
-          <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+        <div className="flex w-[320px] flex-col bg-zinc-925">
+          <div className="flex items-center justify-between px-4 py-3">
             <span className="text-xs font-semibold text-zinc-200">{t("workspace.assets_dialog.selected")}</span>
             <span className="font-mono text-[11px] text-zinc-400">
               {selectedAssets.length}/{assets.length}
@@ -558,7 +558,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
                     key={a.id}
                     draggable
                     onDragStart={(e) => onAssetDragStart(e, a)}
-                    className="group relative aspect-square cursor-grab overflow-hidden rounded-md border border-zinc-800 bg-zinc-900"
+                    className="group relative aspect-square cursor-grab overflow-hidden rounded-md  bg-zinc-900"
                   >
                     {a.fieldType === "image" || a.fieldType === "model3d" ? (
                       <img
@@ -634,12 +634,12 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
           </div>
 
           {/* CTA bar */}
-          <div className="flex items-center gap-2 border-t border-zinc-800 px-3 py-3">
+          <div className="flex items-center gap-2 px-3 py-3">
             <button
               type="button"
               onClick={() => setSelected(new Set())}
               disabled={selectedAssets.length === 0}
-              className="flex items-center gap-1.5 rounded border border-zinc-700 px-3 py-2 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800 disabled:opacity-40 disabled:hover:bg-transparent"
+              className="flex items-center gap-1.5 rounded bg-white/[0.06] px-3 py-2 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800 disabled:opacity-40 disabled:hover:bg-transparent"
             >
               <Trash2 className="h-3.5 w-3.5" />
               {t("workspace.assets_dialog.clear_all")}

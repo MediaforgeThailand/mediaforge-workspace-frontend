@@ -452,7 +452,7 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
         onContextMenu={(e) => e.preventDefault()}
       />
       <div
-        className="fixed z-50 w-[280px] max-w-[calc(100vw-1rem)] rounded-xl border border-zinc-700 bg-zinc-950 shadow-xl"
+        className="fixed z-50 w-[280px] max-w-[calc(100vw-1rem)] rounded-xl  bg-zinc-950 shadow-xl"
         style={{
           left: state.screen.x,
           top: state.screen.y,
@@ -567,7 +567,7 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
               if (!g || g.children.length <= 1) return null;
               return (
                 <div
-                  className="absolute left-full ml-2 w-52 rounded-xl border border-zinc-700 bg-zinc-950 shadow-xl"
+                  className="absolute left-full ml-2 w-52 rounded-xl  bg-zinc-950 shadow-xl"
                   style={{
                     top: flyoutAnchor ? flyoutAnchor.top : 0,
                     animation: "canvas-picker-flyout-in 100ms ease-out",

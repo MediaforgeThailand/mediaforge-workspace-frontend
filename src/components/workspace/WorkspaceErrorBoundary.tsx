@@ -67,7 +67,7 @@ class WorkspaceErrorBoundary extends Component<Props, State> {
             </button>
             <a
               href="/app/workspace"
-              className="inline-flex items-center gap-1.5 rounded-md border border-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-800"
+              className="inline-flex items-center gap-1.5 rounded-md bg-white/[0.06] px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-white/[0.10]"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               กลับ Dashboard
