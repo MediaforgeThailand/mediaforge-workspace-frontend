@@ -142,7 +142,7 @@ const PREVIEW_HYDRATION_BATCH_DELAY_MS = 90;
 const MINIMAP_NODE_LIMIT = 80;
 const MINIMAP_EDGE_LIMIT = 96;
 const MINIMAP_IMAGE_LIMIT = 18;
-const PREVIEW_CACHE_PREFIX = "mf:workspace-preview:";
+const PREVIEW_CACHE_PREFIX = "mf:workspace-preview:v2:";
 const PREVIEW_CACHE_INDEX_KEY = `${PREVIEW_CACHE_PREFIX}index`;
 const PREVIEW_CACHE_MAX_ITEMS = 80;
 const PREVIEW_CACHE_MAX_DATA_URI_LENGTH = 240_000;
@@ -239,14 +239,6 @@ function writePreviewCache(cacheKey: string, dataUri: string): void {
       // Ignore storage quota / privacy mode failures. The UI can still render live.
     }
   }
-}
-
-function escapeSvgText(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 function selectMinimapNodes(nodes: MiniNode[]): MiniNode[] {
@@ -2985,14 +2977,11 @@ function buildMinimapDataUri(
     const dash = isGroup ? ` stroke-dasharray="${strokeW * 3} ${strokeW * 2}"` : "";
 
     if (n.imageUrl) {
-      const clipId = `mm-clip-${seed}-${stableHash(n.id)}`;
       return `
         <g>
-          <clipPath id="${clipId}">
-            <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${cornerR}" ry="${cornerR}" />
-          </clipPath>
-          <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${cornerR}" ry="${cornerR}" fill="${fill}" stroke="${baseStroke}"${dash} stroke-width="${nodeStroke}" />
-          <image href="${escapeSvgText(n.imageUrl)}" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clipId})" />
+          <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${cornerR}" ry="${cornerR}" fill="hsl(215 22% 18%)" stroke="${baseStroke}"${dash} stroke-width="${nodeStroke}" />
+          <rect x="${n.x + n.w * 0.08}" y="${n.y + n.h * 0.1}" width="${n.w * 0.84}" height="${n.h * 0.8}" rx="${cornerR * 0.65}" ry="${cornerR * 0.65}" fill="hsl(210 18% 30%)" opacity="0.7" />
+          <path d="M ${n.x + n.w * 0.12},${n.y + n.h * 0.78} L ${n.x + n.w * 0.38},${n.y + n.h * 0.48} L ${n.x + n.w * 0.56},${n.y + n.h * 0.62} L ${n.x + n.w * 0.86},${n.y + n.h * 0.28} L ${n.x + n.w * 0.88},${n.y + n.h * 0.86} L ${n.x + n.w * 0.12},${n.y + n.h * 0.86} Z" fill="hsl(160 55% 42%)" opacity="0.9" />
           <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${cornerR}" ry="${cornerR}" fill="none" stroke="hsl(0 0% 100% / 0.14)" stroke-width="${nodeStroke}" />
         </g>`;
     }
