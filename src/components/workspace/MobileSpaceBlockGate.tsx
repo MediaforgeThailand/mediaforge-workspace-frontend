@@ -1,5 +1,6 @@
-import { Maximize2, Monitor, Smartphone } from "lucide-react";
+import { ArrowLeft, Maximize2, Monitor, Smartphone } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 function isPhoneViewport() {
@@ -35,6 +36,7 @@ export default function MobileSpaceBlockGate({
   children: ReactNode;
 }) {
   const { language } = useLanguage();
+  const navigate = useNavigate();
   const [isPhone, setIsPhone] = useState(() => isPhoneViewport());
 
   useEffect(() => {
@@ -51,6 +53,11 @@ export default function MobileSpaceBlockGate({
   if (!isPhone) return <>{children}</>;
 
   const isThai = language === "th";
+
+  // Always send the user back to the dashboard rather than `history.back()`
+  // — they often arrive at a Space via a direct link (share / push notif),
+  // so back-button could land them outside the app entirely.
+  const goBack = () => navigate("/app/workspace", { replace: true });
 
   return (
     <main
@@ -98,6 +105,15 @@ export default function MobileSpaceBlockGate({
             {isThai ? "ใช้จอใหญ่กว่า" : "Bigger screen"}
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={goBack}
+          className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-white text-sm font-semibold text-zinc-900 transition hover:bg-zinc-200"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          {isThai ? "กลับหน้าหลัก" : "Back to dashboard"}
+        </button>
       </section>
     </main>
   );

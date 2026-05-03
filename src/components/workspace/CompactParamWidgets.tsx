@@ -25,8 +25,8 @@
  *   handlers don't intercept the click.
  */
 
-import { useCallback, useMemo, useState } from "react";
-import { ChevronDown, Minus, Plus } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { ChevronDown, Minus, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Select,
@@ -40,6 +40,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Command as CommandPrimitive } from "cmdk";
+import {
+  Command,
+  CommandEmpty,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 
 /**
  * Returns true when the given select param ought to render as a
@@ -130,6 +137,14 @@ interface MiniSelectProps {
   /** Optional preview prefix shown before the value (e.g. an icon
    *  glyph rendered as text). Use sparingly. */
   prefix?: string;
+  /** When true, the dropdown opens with a search input at the top
+   *  and a visible scrollbar — matches the cmdk-style picker the
+   *  user designs around. Use for long lists like the model picker
+   *  where typing-to-filter saves a scroll hunt. */
+  searchable?: boolean;
+  /** Footer hint shown under the searchable list, e.g. "All models".
+   *  Defaults sensibly when omitted. */
+  searchFooter?: string;
 }
 
 export function MiniSelect({
@@ -139,11 +154,26 @@ export function MiniSelect({
   onChange,
   truncateAt = 24,
   prefix,
+  searchable = false,
+  searchFooter,
 }: MiniSelectProps) {
   const labelOf = (v: string) => optionLabels?.[v] ?? v;
   const display = labelOf(value);
   const truncated =
     display.length > truncateAt ? display.slice(0, truncateAt - 1) + "…" : display;
+
+  if (searchable) {
+    return (
+      <SearchableMiniSelect
+        value={value}
+        options={options}
+        labelOf={labelOf}
+        onChange={onChange}
+        triggerLabel={prefix ? `${prefix} ${truncated}` : truncated}
+        searchFooter={searchFooter}
+      />
+    );
+  }
 
   // NOTE on event handling: we deliberately DO NOT stopPropagation
   // on the wrapper's pointer/mouse events. Doing so blocks Radix's
@@ -162,7 +192,7 @@ export function MiniSelect({
           </SelectValue>
         </SelectTrigger>
         <SelectContent
-          className="bg-popover border-white/10 z-[9999] max-h-[260px]"
+          className="bg-popover border-0 z-[9999] max-h-[260px] shadow-2xl shadow-black/40"
           position="popper"
           sideOffset={4}
         >
@@ -170,13 +200,110 @@ export function MiniSelect({
             <SelectItem
               key={opt}
               value={opt}
-              className="text-[11px] text-popover-foreground focus:bg-accent focus:text-accent-foreground"
+              className="text-[12.5px] text-popover-foreground focus:bg-accent focus:text-accent-foreground"
             >
               {labelOf(opt)}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
+    </div>
+  );
+}
+
+/** Searchable dropdown — Popover + cmdk Command. The trigger keeps
+ *  the same compact-pill look as the non-searchable MiniSelect; the
+ *  popover content adds an autofocused search input on top, a
+ *  filtered list with a visible scrollbar, and a discreet footer
+ *  hint. Keyboard nav (↑↓ + Enter) ships free with cmdk. */
+function SearchableMiniSelect({
+  value,
+  options,
+  labelOf,
+  onChange,
+  triggerLabel,
+  searchFooter,
+}: {
+  value: string;
+  options: string[];
+  labelOf: (v: string) => string;
+  onChange: (v: string) => void;
+  triggerLabel: string;
+  searchFooter?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  return (
+    <div className="nodrag nopan nowheel">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            ref={triggerRef}
+            type="button"
+            className="ws-mini-select-trigger nodrag"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="truncate">{triggerLabel}</span>
+            <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          sideOffset={4}
+          className="z-[9999] w-[260px] overflow-hidden border-0 bg-popover p-0 shadow-2xl shadow-black/40"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          <Command className="bg-transparent">
+            {/* Search row — distinguished by a slightly lighter fill
+             *  instead of a hairline divider, per the borderless
+             *  setting-node aesthetic. We use cmdk's primitive input
+             *  directly (NOT the shadcn `CommandInput` wrapper) so
+             *  there's only one search icon — the wrapper would add
+             *  a second icon plus an extra border row. */}
+            <div className="flex items-center bg-white/[0.04] px-2.5">
+              <Search className="mr-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+              <CommandPrimitive.Input
+                placeholder="Search"
+                className="h-8 w-full border-0 bg-transparent px-0 py-0 text-[13px] outline-none placeholder:text-muted-foreground"
+              />
+            </div>
+            <CommandList className="ws-picker-scroll max-h-[260px]">
+              <CommandEmpty className="py-4 text-center text-[12.5px] text-muted-foreground">
+                No results
+              </CommandEmpty>
+              {options.map((opt) => {
+                const label = labelOf(opt);
+                return (
+                  <CommandItem
+                    key={opt}
+                    value={`${label} ${opt}`}
+                    onSelect={() => {
+                      onChange(opt);
+                      setOpen(false);
+                    }}
+                    className={cn(
+                      "mx-1 my-px cursor-pointer rounded-md px-2 py-1.5 text-[12.5px] aria-selected:bg-accent",
+                      opt === value && "bg-accent/40 font-medium",
+                    )}
+                  >
+                    <span className="truncate">{label}</span>
+                  </CommandItem>
+                );
+              })}
+            </CommandList>
+            {/* Footer — same tinted-fill trick as the search row. */}
+            <div className="flex items-center justify-between bg-white/[0.03] px-3 py-1.5 text-[10.5px] uppercase tracking-wide text-muted-foreground">
+              <span>{searchFooter ?? "All options"}</span>
+              <span className="flex items-center gap-1">
+                <kbd className="rounded bg-white/10 px-1 py-px font-mono text-[9px]">
+                  ↑↓
+                </kbd>
+                Navigate
+              </span>
+            </div>
+          </Command>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
@@ -224,12 +351,12 @@ export function MiniSlider({
         </button>
       </PopoverTrigger>
       <PopoverContent
-        className="z-[9999] w-[220px] border-white/10 bg-popover p-3"
+        className="z-[9999] w-[250px] border-0 bg-popover p-3.5 shadow-2xl shadow-black/40"
         side="top"
         sideOffset={6}
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        <div className="mb-2 flex items-center justify-between text-[10.5px] font-medium text-white/75">
+        <div className="mb-2.5 flex items-center justify-between text-[12px] font-medium text-white/75">
           <span>{label}</span>
           <span className="font-mono tabular-nums text-white/90">
             {formatted}

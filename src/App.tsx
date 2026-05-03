@@ -162,9 +162,7 @@ const App = () => (
                     path="/app/workspace"
                     element={
                       <ProtectedRoute>
-                        <MobileSpaceBlockGate>
-                          <WorkspaceDashboard />
-                        </MobileSpaceBlockGate>
+                        <WorkspaceDashboard />
                       </ProtectedRoute>
                     }
                   />
