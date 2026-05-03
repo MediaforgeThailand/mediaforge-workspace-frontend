@@ -36,12 +36,19 @@ function findOpenAiImageCost(params: Record<string, unknown>, creditCosts: Credi
   const quality = ["low", "medium", "high"].includes(rawQuality) ? rawQuality : "medium";
   const size = String(params.size ?? "1024x1024").toLowerCase();
   const tier = resolutionTier(size === "auto" ? "1024x1024" : size);
-  const keys = [
-    `${model}:${size === "auto" ? "1024x1024" : size}:${quality}`,
-    `${model}:${tier}:${quality}`,
-    `${model}-${quality}`,
-    model,
-  ];
+  const exactGptImage2Sku = model.match(/^gpt-image-2:(1k|2k|4k):(low|medium|high)$/);
+  const keys = exactGptImage2Sku
+    ? [model]
+    : model === "gpt-image-2"
+      ? [
+          `${model}:${size === "auto" ? "1024x1024" : size}:${quality}`,
+          `${model}:${tier}:${quality}`,
+        ]
+      : [
+          `${model}:${size === "auto" ? "1024x1024" : size}:${quality}`,
+          `${model}:${tier}:${quality}`,
+          model,
+        ];
   for (const key of keys) {
     const row = creditCosts.find((r) => r.feature === "generate_openai_image" && r.model === key);
     if (row) return row.cost;
