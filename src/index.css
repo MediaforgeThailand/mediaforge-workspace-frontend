@@ -114,7 +114,7 @@
     --text-faint: 240 8% 52%;
     --text-2: 240 20% 78%;
 
-    --mf-ui-scale: 1.265;
+    --mf-ui-scale: 1.455;
   }
 
   /* 2026-05 redesign: drop the legacy 22.63px (≈ √2 × 16) inflation
@@ -1146,30 +1146,58 @@ body {
    sizes, especially for Thai. Scoped by `.mf-readable` so dense canvas
    node internals can keep their compact technical labels. */
 .mf-readable :where([class*="text-[9px]"], [class*="text-[9.5px]"], [class*="text-[10px]"], [class*="text-[10.5px]"], [class*="text-[11px]"], [class*="text-[11.5px]"]) {
-  font-size: 14px !important;
-  line-height: 1.25rem !important;
-}
-
-.mf-readable :where([class*="text-[12px]"], [class*="text-[12.5px]"]) {
-  font-size: 14.5px !important;
-  line-height: 1.35rem !important;
-}
-
-.mf-readable :where([class*="text-[13px]"], [class*="text-[13.5px]"]) {
-  font-size: 15px !important;
+  font-size: 16.1px !important;
   line-height: 1.45rem !important;
 }
 
+.mf-readable :where([class*="text-[12px]"], [class*="text-[12.5px]"]) {
+  font-size: 16.7px !important;
+  line-height: 1.55rem !important;
+}
+
+.mf-readable :where([class*="text-[13px]"], [class*="text-[13.5px]"]) {
+  font-size: 17.25px !important;
+  line-height: 1.65rem !important;
+}
+
+.mf-readable :where([class*="text-[14px]"], [class*="text-[14.5px]"]) {
+  font-size: 18.4px !important;
+  line-height: 1.75rem !important;
+}
+
+.mf-readable :where([class*="text-[15px]"], [class*="text-[15.5px]"], [class*="text-[16px]"]) {
+  font-size: 19.55px !important;
+  line-height: 1.85rem !important;
+}
+
 .mf-readable :where(.text-xs) {
-  font-size: 14.5px !important;
-  line-height: 1.35rem !important;
+  font-size: 16.7px !important;
+  line-height: 1.55rem !important;
 }
 
 .mf-readable :where(.text-sm) {
-  font-size: 16.5px !important;
-  line-height: 1.55rem !important;
+  font-size: 19px !important;
+  line-height: 1.8rem !important;
 }
 
 .mf-readable :where([class*="tracking-"]) {
   letter-spacing: 0 !important;
+}
+
+.mf-readable .workspace-home-compact :where([class*="text-[13px]"], [class*="text-[13.5px]"], [class*="text-[14.5px]"], [class*="text-[15px]"], [class*="text-[15.5px]"]) {
+  line-height: 1.18 !important;
+}
+
+.mf-readable .workspace-home-compact :where([class*="leading-none"], [class*="leading-tight"]) {
+  line-height: 1.08 !important;
+}
+
+.mf-readable .workspace-spaces-compact :where([class*="text-[13px]"], [class*="text-[13.5px]"], [class*="text-[14px]"], [class*="text-[14.5px]"], [class*="text-[15px]"], [class*="text-[15.5px]"]) {
+  font-size: 15px !important;
+  line-height: 1 !important;
+}
+
+.mf-readable .workspace-spaces-compact :where([class*="text-[10px]"], [class*="text-[10.5px]"]) {
+  font-size: 12px !important;
+  line-height: 1 !important;
 }

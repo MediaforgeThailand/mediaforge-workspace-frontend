@@ -323,7 +323,7 @@ const WorkspaceCanvasPage = () => {
     // the dashboard, even when portals or isolated canvas surfaces
     // would otherwise inherit a browser default.
     <div
-      className="flex h-screen w-screen flex-col bg-zinc-950 text-zinc-100"
+      className="mf-readable flex h-screen w-screen flex-col bg-zinc-950 text-zinc-100"
       style={{
         fontFamily: "var(--font-sans)",
       }}

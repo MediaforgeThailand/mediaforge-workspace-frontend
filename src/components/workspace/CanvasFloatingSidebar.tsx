@@ -180,7 +180,7 @@ const CanvasFloatingSidebar = ({ onAddNode, onOpenSettings }: Props) => {
     <div
       className="pointer-events-none fixed left-2 top-1/2 z-40 -translate-y-1/2 lg:left-1.5"
     >
-      <div className="pointer-events-auto flex flex-col items-center gap-[2px] rounded-full bg-zinc-950/85 p-[2px] shadow-md shadow-black/35 backdrop-blur">
+      <div className="pointer-events-auto flex flex-col items-center gap-[3px] rounded-full bg-zinc-950/85 p-[3px] shadow-md shadow-black/35 backdrop-blur">
         {BUTTONS.map((b, i) => (
           <SidebarButton
             key={b.id}
@@ -224,7 +224,7 @@ function SidebarButton({
   return (
     <div className="group relative">
       {button.divider && !isFirst && (
-        <div className="my-px h-px w-[21px] self-center bg-zinc-800" />
+        <div className="my-px h-px w-[24px] self-center bg-zinc-800" />
       )}
       <button
         type="button"
@@ -234,19 +234,19 @@ function SidebarButton({
         aria-label={label}
         aria-pressed={button.isMode ? isActive : undefined}
         className={cn(
-          "flex h-[37px] w-[37px] items-center justify-center rounded-full transition-colors lg:h-[33px] lg:w-[33px]",
+          "flex h-[43px] w-[43px] items-center justify-center rounded-full transition-colors lg:h-[38px] lg:w-[38px]",
           isActive
             ? "bg-zinc-200 text-zinc-900"
             : "text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100",
         )}
       >
-        <Icon className="h-[12.5px] w-[12.5px]" />
+        <Icon className="h-[14.5px] w-[14.5px]" />
       </button>
       {showTip && (
-        <div className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded bg-zinc-900/95 px-2 py-1 text-[12.5px] text-zinc-200 shadow-lg backdrop-blur">
+        <div className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded bg-zinc-900/95 px-2.5 py-1.5 text-[14.5px] text-zinc-200 shadow-lg backdrop-blur">
           <span>{label}</span>
           {button.shortcut && (
-            <span className="ml-2 font-mono text-[11px] text-zinc-500">
+            <span className="ml-2 font-mono text-[12.5px] text-zinc-500">
               {button.shortcut}
             </span>
           )}
@@ -281,12 +281,12 @@ function LanguageToggleButton({
         onMouseEnter={() => setShowTip(true)}
         onMouseLeave={() => setShowTip(false)}
         aria-label={targetLabel}
-        className="flex h-[37px] w-[37px] items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100 lg:h-[33px] lg:w-[33px]"
+        className="flex h-[43px] w-[43px] items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100 lg:h-[38px] lg:w-[38px]"
       >
-        <Languages className="h-[12.5px] w-[12.5px]" />
+        <Languages className="h-[14.5px] w-[14.5px]" />
       </button>
       {showTip && (
-        <div className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded bg-zinc-900/95 px-2 py-1 text-[12.5px] text-zinc-200 shadow-lg backdrop-blur">
+        <div className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded bg-zinc-900/95 px-2.5 py-1.5 text-[14.5px] text-zinc-200 shadow-lg backdrop-blur">
           <span>{targetLabel}</span>
         </div>
       )}

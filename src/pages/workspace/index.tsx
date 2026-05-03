@@ -1220,7 +1220,7 @@ const HomeView = ({
       <div className="ws-scroll-hide flex-1 overflow-y-auto overflow-x-hidden">
         <div className="mx-auto min-w-0 w-full max-w-[1400px] px-4 pb-16 pt-5 md:px-6 lg:px-8 lg:pt-6">
           {/* ── Top trio: Projects · Spaces · Tools ───────────── */}
-          <section className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)]">
+          <section className="workspace-home-compact grid min-w-0 items-start grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)]">
             <ProjectsCard
               projects={projectCards}
               activeProjectId={activeProjectId}
@@ -1415,8 +1415,8 @@ const ProjectsCard = ({
   return (
     <>
       {/* 2026-05: drop ring — bg differentiation alone reads as the box. */}
-      <div className="min-w-0 rounded-xl bg-[hsl(var(--surface-1))] p-4">
-        <div className="mb-3 flex items-center justify-between">
+      <div className="min-w-0 rounded-xl bg-[hsl(var(--surface-1))] p-3">
+        <div className="mb-2.5 flex items-center justify-between">
           <div className="flex items-center gap-1 text-[13.5px] font-semibold uppercase tracking-[0.14em] text-zinc-300">
             {t("workspace.home.projects")}
             <ChevronRight className="h-3 w-3 text-zinc-500" />
@@ -1435,7 +1435,7 @@ const ProjectsCard = ({
           <button
             type="button"
             onClick={onCreate}
-            className="flex min-h-[112px] w-full items-center justify-center rounded-xl bg-white/[0.02] px-4 text-[13px] text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-zinc-200"
+            className="flex min-h-[86px] w-full items-center justify-center rounded-xl bg-white/[0.02] px-4 text-[13px] text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-zinc-200"
           >
             {t("workspace.home.create_first_project")}
           </button>
@@ -1630,7 +1630,7 @@ const ProjectQuickSwitch = ({
   }
 
   return (
-    <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
+    <div className="flex min-w-0 flex-wrap gap-1.5">
       {[...projects]
         .sort(
           (a, b) =>
@@ -1647,7 +1647,7 @@ const ProjectQuickSwitch = ({
               type="button"
               onClick={() => onSelectProject(project.id)}
               className={cn(
-                "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-[13.5px] font-medium ring-1 ring-inset transition-colors",
+                "inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[13.5px] font-medium ring-1 ring-inset transition-colors",
                 active
                   ? "bg-white/[0.10] text-zinc-50 ring-white/[0.14]"
                   : "bg-white/[0.03] text-zinc-400 ring-white/[0.06] hover:bg-white/[0.07] hover:text-zinc-100",
@@ -1660,13 +1660,13 @@ const ProjectQuickSwitch = ({
                     project.color ?? PROJECT_COLOR_SWATCHES[index % PROJECT_COLOR_SWATCHES.length],
                 }}
               />
-              <span className="max-w-[180px] truncate">{project.name}</span>
+              <span className="max-w-[150px] truncate">{project.name}</span>
               {teamProject && (
                 <span className="rounded bg-sky-400/15 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-sky-200">
                   Team
                 </span>
               )}
-              <span className="rounded bg-white/[0.06] px-1.5 py-px text-[10.5px] font-bold text-zinc-400">
+              <span className="rounded bg-white/[0.06] px-1.5 py-px text-[10px] font-bold text-zinc-400">
                 {counts.get(project.id) ?? 0}
               </span>
             </button>
@@ -1689,8 +1689,8 @@ const SpacesShowcaseCard = ({
 }) => {
   const { t } = useLanguage();
   return (
-    <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4">
-      <div className="mb-3 flex items-center justify-between">
+    <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-3">
+      <div className="mb-2.5 flex items-center justify-between">
         <button
           type="button"
           onClick={onSeeAll}
@@ -1703,7 +1703,7 @@ const SpacesShowcaseCard = ({
           type="button"
           onClick={onNew}
           title={t("workspace.home.new_space_tooltip")}
-          className="flex h-10 w-10 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white lg:h-8 lg:w-8"
+          className="flex h-9 w-9 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white lg:h-7 lg:w-7"
         >
           <Plus className="h-3.5 w-3.5" />
         </button>
@@ -1713,23 +1713,23 @@ const SpacesShowcaseCard = ({
         <button
           type="button"
           onClick={onNew}
-          className="flex min-h-[120px] w-full items-center justify-center rounded-xl bg-white/[0.02] px-4 text-[13px] text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-zinc-200"
+          className="flex min-h-[86px] w-full items-center justify-center rounded-xl bg-white/[0.02] px-4 text-[13px] text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-zinc-200"
         >
           {t("workspace.home.create_first_space")}
         </button>
       ) : (
-        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid min-w-0 grid-cols-1 gap-2.5 sm:grid-cols-3">
           {spaces.map((ws) => (
             <button
               key={ws.id}
               type="button"
               onClick={() => onOpen(ws.id)}
-              className="group/space flex min-w-0 flex-col gap-2 rounded-xl bg-[hsl(0_0%_4%)] p-1.5 transition-all hover:bg-white/[0.04]"
+              className="group/space flex min-w-0 flex-col gap-1.5 rounded-xl bg-[hsl(0_0%_4%)] p-1.5 transition-all hover:bg-white/[0.04]"
             >
-              <div className="aspect-[4/3] overflow-hidden rounded-lg bg-[hsl(0_0%_2%)]">
+              <div className="aspect-video overflow-hidden rounded-lg bg-[hsl(0_0%_2%)]">
                 <SpaceMediaPreview media={ws.previewMedia} />
               </div>
-              <div className="px-1 pb-0.5 text-left">
+              <div className="px-1 pb-0 text-left">
                 <div className="truncate text-[14.5px] font-medium text-zinc-100">
                   {ws.name}
                 </div>
@@ -1754,8 +1754,8 @@ const ToolsCard = ({
 }) => {
   const { t } = useLanguage();
   return (
-    <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-4">
-      <div className="mb-3 flex items-center justify-between">
+    <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-3">
+      <div className="mb-2.5 flex items-center justify-between">
         <button
           type="button"
           onClick={() => onOpen(tools[0]?.id ?? "image_gen")}
@@ -1766,23 +1766,23 @@ const ToolsCard = ({
         </button>
       </div>
 
-      <ul className="flex flex-col gap-0.5">
+      <ul className="flex flex-col gap-0">
         {tools.map((tool) => (
           <li key={tool.id}>
             <button
               type="button"
               onClick={() => onOpen(tool.id)}
-              className="group/tool flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 text-[15.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white lg:min-h-9"
+              className="group/tool flex w-full items-start gap-2.5 rounded-md px-2 py-1.5 text-[15px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white"
             >
               <span
-                className="flex h-5 w-5 items-center justify-center rounded-md"
+                className="mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center rounded-md"
                 style={{ background: tool.accent }}
               >
                 <tool.icon className="h-3 w-3 text-zinc-950" />
               </span>
-              <span className="min-w-0 flex-1 text-left">
-                <span className="block truncate">{tool.label}</span>
-                <span className="block truncate text-[13.5px] text-zinc-600 group-hover/tool:text-zinc-400">
+              <span className="flex min-w-0 flex-1 flex-col justify-start gap-[2px] text-left">
+                <span className="block truncate leading-none">{tool.label}</span>
+                <span className="block truncate text-[13px] leading-none text-zinc-600 group-hover/tool:text-zinc-400">
                   {tool.subtitle}
                 </span>
               </span>
@@ -2582,43 +2582,38 @@ const SpacesView = ({
       />
 
       <div className="ws-scroll-hide flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1400px] px-4 pb-16 pt-6 md:px-6 lg:px-8 lg:pt-10">
-          {/* ── Hero header — big title + subtitle ─────────────── */}
-          <header className="mb-8">
-            <h1 className="text-[40px] font-bold leading-none tracking-tight text-zinc-50 md:text-[48px] lg:text-[56px]">
+        <div className="mx-auto max-w-[1400px] px-4 pb-16 pt-2 md:px-6 md:pt-3 lg:px-8 lg:pt-3">
+          {/* ── Compact header + controls ─────────────────────── */}
+          <header className="workspace-spaces-compact mb-4 flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="mr-2 text-[40px] font-bold leading-none tracking-tight text-zinc-50 md:text-[48px] lg:text-[56px]">
               {t("workspace.spaces.title")}
-            </h1>
-            <p className="mt-3 text-[15.5px] text-zinc-400">
-              {t("workspace.spaces.subtitle")}
-            </p>
-          </header>
-
-          <ProjectQuickSwitch
-            projects={projects}
-            workspaces={workspaces}
-            activeProjectId={activeProjectId}
-            onSelectProject={onSelectProject}
-          />
-
-          {/* ── Tabs row — left: tab switcher / right: actions ──
-              Mirrors the Magnific layout exactly — segmented tabs on
-              the left, "+ New space" + filter / favourites / search
-              icon row on the right. */}
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-            <SpacesTabs tab={tab} onChange={setTab} />
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleNew}
-                className="flex h-11 items-center gap-1.5 rounded-lg bg-white/[0.06] px-3.5 text-[14.5px] font-medium text-zinc-100 transition-colors hover:bg-white/[0.12] lg:h-9"
-              >
-                <Plus className="h-3.5 w-3.5" /> {t("workspace.spaces.new_space")}
-              </button>
-              <SpacesIconBtn icon={Heart} title={t("workspace.spaces.favorites")} />
-              <SpacesIconBtn icon={SlidersHorizontal} title={t("workspace.spaces.filter")} />
-              <SpacesIconBtn icon={Search} title={t("workspace.spaces.search")} />
+              </h1>
+              <ProjectQuickSwitch
+                projects={projects}
+                workspaces={workspaces}
+                activeProjectId={activeProjectId}
+                onSelectProject={onSelectProject}
+              />
             </div>
-          </div>
+
+            {/* ── Filter/action row — compact by design ────────── */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <SpacesTabs tab={tab} onChange={setTab} />
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleNew}
+                  className="flex h-[34px] items-center gap-1.5 rounded-lg bg-white/[0.06] px-3 text-[14px] font-medium text-zinc-100 transition-colors hover:bg-white/[0.12]"
+                >
+                  <Plus className="h-3.5 w-3.5" /> {t("workspace.spaces.new_space")}
+                </button>
+                <SpacesIconBtn icon={Heart} title={t("workspace.spaces.favorites")} />
+                <SpacesIconBtn icon={SlidersHorizontal} title={t("workspace.spaces.filter")} />
+                <SpacesIconBtn icon={Search} title={t("workspace.spaces.search")} />
+              </div>
+            </div>
+          </header>
 
           {/* ── Content — only "My spaces" has data today; Shared /
               Templates render an empty placeholder so the tabs aren't
@@ -2691,7 +2686,7 @@ const SpacesTabs = ({
     { key: "templates", label: t("workspace.spaces.tab_templates"), icon: LayoutGrid },
   ];
   return (
-    <div className="inline-flex rounded-xl bg-white/[0.03] p-1">
+    <div className="inline-flex rounded-lg bg-white/[0.03] p-0.5">
       {items.map((it) => {
         const active = tab === it.key;
         const Icon = it.icon;
@@ -2701,13 +2696,13 @@ const SpacesTabs = ({
             type="button"
             onClick={() => onChange(it.key)}
             className={cn(
-              "flex h-11 items-center gap-1.5 rounded-lg px-3 text-[15.5px] font-medium transition-colors lg:h-8",
+              "flex h-[34px] items-center gap-1.5 rounded-md px-2.5 text-[14px] font-medium transition-colors",
               active
                 ? "bg-white/[0.08] text-zinc-50"
                 : "text-zinc-400 hover:text-zinc-200",
             )}
           >
-            <Icon className="h-3.5 w-3.5" />
+            <Icon className="h-3.5 w-3.5 shrink-0" />
             {it.label}
           </button>
         );
@@ -2729,7 +2724,7 @@ const SpacesIconBtn = ({
     type="button"
     title={title}
     aria-label={title}
-    className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/[0.03] text-zinc-400 transition-colors hover:bg-white/[0.08] hover:text-zinc-100 lg:h-9 lg:w-9"
+    className="flex h-[34px] w-[34px] items-center justify-center rounded-lg bg-white/[0.03] text-zinc-400 transition-colors hover:bg-white/[0.08] hover:text-zinc-100"
   >
     <Icon className="h-3.5 w-3.5" />
   </button>
@@ -2866,7 +2861,7 @@ const SpaceCard = memo(function SpaceCard({
         onClick={onOpen}
         className="block w-full text-left"
       >
-        <div className="relative aspect-[16/10] overflow-hidden bg-[hsl(0_0%_5%)]">
+        <div className="relative aspect-video overflow-hidden bg-[hsl(0_0%_5%)]">
           {renderPreview ? (
             <SpaceMediaPreview media={ws.previewMedia} />
           ) : (
@@ -2874,7 +2869,7 @@ const SpaceCard = memo(function SpaceCard({
           )}
         </div>
 
-        <div className="px-3.5 py-3">
+        <div className="px-3.5 py-2.5">
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1 truncate text-[14.5px] font-semibold leading-tight text-zinc-50">
               {ws.name}
@@ -2886,7 +2881,7 @@ const SpaceCard = memo(function SpaceCard({
               </span>
             )}
           </div>
-          <div className="mt-1 text-[15.5px] text-zinc-500">
+          <div className="mt-0.5 text-[14.5px] text-zinc-500">
             {timeAgo(ws.updatedAt)}
           </div>
         </div>
@@ -2951,7 +2946,7 @@ const PageHeader = ({
   /* 2026-05: drop the bottom hairline. Header sits flush on Layer-0
    *  page bg; the content cards underneath are Layer-1/2 so the
    *  header reads as a top strip without needing a divider. */
-  <div className="flex h-14 shrink-0 items-center gap-3 px-4 md:px-6 lg:h-12 lg:px-8">
+  <div className="flex h-11 shrink-0 items-center gap-3 px-4 md:px-6 lg:h-10 lg:px-8">
     {onOpenSidebar && (
       <button
         type="button"

@@ -51,11 +51,11 @@ const WorkspaceRightSidebar = () => {
           "flex flex-col items-center gap-1 rounded-2xl bg-[hsl(220_10%_10%)]/95 p-1.5 backdrop-blur-2xl",
           "shadow-[0_24px_60px_-20px_hsl(0_0%_0%/0.7),0_0_0_1px_hsl(0_0%_100%/0.04)]",
         )}
-        // `zoom: 0.8` — keeps the collapsed rail visually consistent
+        // `zoom: 0.92` — keeps the collapsed rail visually consistent
         // with the expanded panel (which is also zoomed). The canvas
         // and tab bar stay at native scale; only the sidebar chrome
         // shrinks.
-        style={{ fontFamily: "var(--font-sans)", zoom: 0.8 }}
+        style={{ fontFamily: "var(--font-sans)", zoom: 0.92 }}
       >
         <RailButton
           title="Expand assets"
@@ -103,7 +103,7 @@ const WorkspaceRightSidebar = () => {
         "shadow-[0_24px_60px_-20px_hsl(0_0%_0%/0.7),0_0_0_1px_hsl(0_0%_100%/0.04)]",
       )}
       style={{
-        // Geometry note — `zoom: 0.8` scales EVERY length on this
+        // Geometry note — `zoom: 0.92` scales EVERY length on this
         // element, INCLUDING position offsets like `top` / `bottom`.
         // So if we want an effective gap of ~24px below the 44px
         // tab bar (visible top = 68 from viewport) the raw value
@@ -114,16 +114,15 @@ const WorkspaceRightSidebar = () => {
         // sidebar auto-stretch to fill everything between the two
         // anchors, so the panel reaches the bottom of the viewport
         // without us having to recompute the calc() height.
-        top: 85,
-        bottom: 16,
+        top: 74,
+        bottom: 18,
         fontFamily: "var(--font-sans)",
-        // `zoom: 0.8` — shrinks JUST this sidebar to ~80% of native
-        // size. The canvas, tab bar, and floating left rail stay at
-        // their normal scale; only the asset / AI chrome scales
-        // down. We use `zoom` (not transform: scale) so click
+        // `zoom: 0.92` — keeps this sidebar slightly compact while
+        // following the 15% UI bump. We use `zoom` (not transform:
+        // scale) so click
         // positions, drag-drop, and contentEditable focus regions
         // all stay correctly aligned.
-        zoom: 0.8,
+        zoom: 0.92,
       }}
     >
       {/* Top sheen highlight — single thin gradient at the top edge,
