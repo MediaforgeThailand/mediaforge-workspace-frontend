@@ -190,6 +190,8 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
     credits?.credit_scope === "team" && credits.team_name
       ? credits.team_name
       : credits?.organization_name || credits?.pool_domain || "Company pool";
+  const triggerSize = compact ? 43 : 40;
+  const ringSize = compact ? 43 : 42;
 
   const handleSignOut = async () => {
     await signOut();
@@ -200,7 +202,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
     <DropdownMenu>
       <DropdownMenuTrigger
         className="flex items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/50"
-        style={{ width: compact ? 32 : 40, height: compact ? 32 : 40 }}
+        style={{ width: triggerSize, height: triggerSize }}
         aria-label={t("workspace.usermenu.account")}
       >
         <CreditAvatarRing
@@ -209,7 +211,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
           personalPercent={personalPercent}
           sharedPercent={sharedPercent}
           showShared={Boolean(credits?.is_shared_pool)}
-          size={compact ? 32 : 42}
+          size={ringSize}
         />
       </DropdownMenuTrigger>
 

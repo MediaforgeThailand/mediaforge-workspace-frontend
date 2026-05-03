@@ -18,7 +18,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, ImageOff, Download, Crop as CropIcon } from "lucide-react";
+import {
+  X,
+  ImageOff,
+  Download,
+  Crop as CropIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Node } from "@xyflow/react";
 import { useMirroredTripoUrl } from "./useMirroredTripoUrl";
@@ -166,6 +172,68 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose]);
 
+  const canCrop = preview.type === "image" && !!preview.url && !!onCropConfirmed;
+  const canDownload =
+    (preview.type === "image" ||
+      preview.type === "video" ||
+      preview.type === "audio") &&
+    !!preview.url;
+  const modelDownloadUrl =
+    preview.type === "model3d"
+      ? (mirroredModelUrl ?? preview.model_url)
+      : undefined;
+  const canDownloadModel = preview.type === "model3d" && !!modelDownloadUrl;
+
+  const previewTools = (mobile = false) => (
+    <div
+      className={cn(
+        "flex border border-white/10 bg-zinc-950/85 p-2 shadow-2xl shadow-black/40 backdrop-blur-md",
+        mobile
+          ? "items-center gap-1.5 rounded-2xl"
+          : "flex-col items-stretch gap-1.5 rounded-[18px]",
+      )}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {canCrop && (
+        <PreviewToolButton
+          icon={CropIcon}
+          label={t("workspace.lightbox.crop")}
+          title={t("workspace.lightbox.crop_image")}
+          onClick={() => setCropOpen(true)}
+          mobile={mobile}
+        />
+      )}
+      {canDownload && preview.url && (
+        <PreviewToolButton
+          icon={Download}
+          label={t("workspace.lightbox.download")}
+          title={t("workspace.lightbox.download")}
+          onClick={() => void downloadFromUrl(preview.url!, preview.label)}
+          mobile={mobile}
+          tone="primary"
+        />
+      )}
+      {canDownloadModel && modelDownloadUrl && (
+        <PreviewToolButton
+          icon={Download}
+          label="GLB"
+          title="Download .glb"
+          onClick={() =>
+            void downloadFromUrl(modelDownloadUrl, preview.label ?? "3d-model")
+          }
+          mobile={mobile}
+          tone="primary"
+        />
+      )}
+      <PreviewToolButton
+        icon={X}
+        title={t("workspace.lightbox.close_preview")}
+        onClick={onClose}
+        mobile={mobile}
+      />
+    </div>
+  );
+
   return createPortal(
     <div
       className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/85 backdrop-blur-sm"
@@ -182,7 +250,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
        * Tripo's docs). For text + grid we don't surface a download
        * since there's no obvious single file. */}
       <div
-        className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 bg-zinc-950/80 px-4 py-2.5 text-sm text-zinc-200"
+        className="absolute inset-x-0 top-0 flex items-center gap-3 bg-zinc-950/80 px-4 py-2.5 text-sm text-zinc-200"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="min-w-0 flex-1 truncate">
@@ -193,7 +261,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="hidden items-center gap-1">
           {/* Crop tool — only for images, only when caller provided
            *  an onCropConfirmed handler (canvas + asset library both
            *  do; standalone gen result strip doesn't yet). */}
@@ -240,8 +308,8 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
       {/* Body — clicking the actual media doesn't bubble to backdrop */}
       <div
         className={cn(
-          "max-h-[86vh] max-w-[90vw] overflow-auto",
-          preview.type === "text" && "w-[min(720px,90vw)]",
+          "relative max-h-[86vh] max-w-[calc(90vw-88px)] overflow-visible",
+          preview.type === "text" && "w-[min(720px,calc(90vw-88px))]",
         )}
         onClick={(e) => e.stopPropagation()}
       >
@@ -249,7 +317,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
           <img
             src={preview.url}
             alt={preview.label ?? t("workspace.lightbox.alt_preview")}
-            className="max-h-[86vh] max-w-[90vw] rounded-md object-contain shadow-2xl shadow-black"
+            className="max-h-[86vh] max-w-[calc(90vw-88px)] rounded-md object-contain shadow-2xl shadow-black"
             draggable={false}
           />
         )}
@@ -259,7 +327,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
             src={preview.url}
             controls
             autoPlay
-            className="max-h-[86vh] max-w-[90vw] rounded-md shadow-2xl shadow-black"
+            className="max-h-[86vh] max-w-[calc(90vw-88px)] rounded-md shadow-2xl shadow-black"
           />
         )}
 
@@ -268,7 +336,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
             <div className="text-xs uppercase tracking-wide text-zinc-500">
               Audio
             </div>
-            <audio src={preview.url} controls autoPlay className="w-[480px] max-w-[80vw]" />
+            <audio src={preview.url} controls autoPlay className="w-[480px] max-w-[calc(90vw-88px)]" />
           </div>
         )}
 
@@ -286,7 +354,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
           // are NOT needed here because the lightbox's outer overlay
           // already swallows pan-canvas gestures; the model-viewer
           // owns the whole rectangle.
-          <div className="relative w-[min(900px,90vw)] aspect-square rounded-md bg-zinc-950 shadow-2xl shadow-black overflow-hidden">
+          <div className="relative aspect-square w-[min(900px,calc(90vw-88px))] overflow-hidden rounded-md bg-zinc-950 shadow-2xl shadow-black">
             <model-viewer
               ref={(el) => {
                 modelViewerRef.current = el as HTMLElement | null;
@@ -343,20 +411,11 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
                 Loading 3D…
               </span>
             </div>
-            <a
-              href={mirroredModelUrl ?? preview.model_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              download
-              className="absolute bottom-3 right-3 rounded-md bg-black/70 px-3 py-1.5 text-[11px] text-zinc-200 backdrop-blur hover:bg-black/90"
-            >
-              Download .glb
-            </a>
           </div>
         )}
 
         {preview.type === "grid" && Array.isArray(preview.urls) && (
-          <div className="grid w-[min(900px,90vw)] grid-cols-3 gap-3">
+          <div className="grid w-[min(900px,calc(90vw-88px))] grid-cols-3 gap-3">
             {preview.urls.length === 0 ? (
               <div className="col-span-3 flex h-32 items-center justify-center text-xs text-zinc-500">
                 <ImageOff className="mr-2 h-4 w-4" /> Empty group
@@ -374,6 +433,13 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
             )}
           </div>
         )}
+        <div className="absolute left-full top-1/2 ml-4 hidden -translate-y-1/2 sm:block">
+          {previewTools(false)}
+        </div>
+      </div>
+
+      <div className="absolute bottom-7 left-1/2 z-10 -translate-x-1/2 sm:hidden">
+        {previewTools(true)}
       </div>
 
       {/* Footer hint */}
@@ -410,6 +476,45 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
     document.body,
   );
 };
+
+function PreviewToolButton({
+  icon: Icon,
+  label,
+  title,
+  onClick,
+  mobile = false,
+  tone = "default",
+}: {
+  icon: LucideIcon;
+  label?: string;
+  title: string;
+  onClick: () => void;
+  mobile?: boolean;
+  tone?: "default" | "primary";
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      className={cn(
+        "group inline-flex shrink-0 items-center justify-center rounded-xl text-zinc-200 transition-colors hover:bg-white/10 hover:text-white",
+        mobile
+          ? "h-12 min-w-12 gap-2 px-2.5 text-[12px]"
+          : "min-h-[60px] min-w-[72px] flex-col gap-1.5 px-2.5 py-2 text-[12px]",
+        tone === "primary" && "bg-white text-zinc-950 hover:bg-zinc-200 hover:text-zinc-950",
+      )}
+    >
+      <Icon className="h-5 w-5" />
+      {label && (
+        <span className={cn("max-w-[68px] truncate font-semibold", mobile && "max-w-[90px]")}>
+          {label}
+        </span>
+      )}
+    </button>
+  );
+}
 
 export default NodePreviewLightbox;
 

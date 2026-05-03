@@ -26,9 +26,6 @@ function memberSort(a: CanvasCollaborator, b: CanvasCollaborator): number {
 export default function CanvasCollaborationOverlay() {
   const localClientId = useCanvasCollaborationStore((state) => state.localUser?.clientId ?? null);
   const membersByClientId = useCanvasCollaborationStore((state) => state.members);
-  const status = useCanvasCollaborationStore((state) => state.status);
-  const cursorEnabled = useCanvasCollaborationStore((state) => state.cursorEnabled);
-  const setCursorEnabled = useCanvasCollaborationStore((state) => state.setCursorEnabled);
 
   const now = Date.now();
   const members = useMemo(
@@ -85,67 +82,90 @@ export default function CanvasCollaborationOverlay() {
           </div>
         );
       })}
+    </div>
+  );
+}
 
-      {(members.length > 0 || status === "connected" || status === "connecting") && (
-        <div
-          data-collab-presence
-          className="pointer-events-auto absolute right-3 top-3 flex h-7 items-center gap-1 rounded-full bg-zinc-950/80 px-1 py-1 text-white shadow-lg backdrop-blur-xl"
-        >
-          <button
-            type="button"
-            onClick={() => setCursorEnabled(!cursorEnabled)}
-            className={cn(
-              "grid h-5 w-5 place-items-center rounded-full transition-colors",
-              cursorEnabled
-                ? "bg-sky-400/16 text-sky-100"
-                : "bg-white/[0.05] text-zinc-500",
-            )}
-            title={cursorEnabled ? "Hide your live cursor" : "Show your live cursor"}
-          >
-            <MousePointer2 className="h-3 w-3" />
-          </button>
-          {members.length > 0 && (
-          <div className="flex -space-x-1">
-            {members.slice(0, 4).map((member) => (
-              <div
-                key={member.clientId}
-                className="grid h-5 w-5 place-items-center rounded-full border border-zinc-950 text-[8.5px] font-black text-zinc-950"
-                style={{ backgroundColor: member.color }}
-                title={`${member.name}${member.selectedNodeId ? " is selecting a node" : ""}`}
-              >
-                {member.avatarUrl ? (
-                  <img
-                    src={member.avatarUrl}
-                    alt=""
-                    className="h-full w-full rounded-full object-cover"
-                  />
-                ) : (
-                  initials(member.name)
-                )}
-              </div>
-            ))}
-          </div>
-          )}
-          <div className="flex items-center gap-1 px-1 text-[10px] font-semibold leading-none text-zinc-300">
-            {members.length > 0 ? (
-              <>
-                <Users className="h-3 w-3 text-zinc-500" />
-                {members.length}
-              </>
-            ) : (
-              <>
-                <span
-                  className={cn(
-                    "h-1.5 w-1.5 rounded-full",
-                    status === "connected" ? "bg-emerald-400" : "bg-zinc-500",
-                  )}
+export function CollaborationPresencePill() {
+  const localClientId = useCanvasCollaborationStore((state) => state.localUser?.clientId ?? null);
+  const membersByClientId = useCanvasCollaborationStore((state) => state.members);
+  const status = useCanvasCollaborationStore((state) => state.status);
+  const cursorEnabled = useCanvasCollaborationStore((state) => state.cursorEnabled);
+  const setCursorEnabled = useCanvasCollaborationStore((state) => state.setCursorEnabled);
+
+  const now = Date.now();
+  const members = useMemo(
+    () =>
+      Object.values(membersByClientId)
+        .filter(
+          (member) =>
+            member.clientId !== localClientId &&
+            now - member.onlineAt < MEMBER_STALE_MS,
+        )
+        .sort(memberSort),
+    [localClientId, membersByClientId, now],
+  );
+
+  if (!isCanvasCollaborationEnabled()) return null;
+
+  return (
+    <div
+      data-collab-presence
+      className="pointer-events-auto flex h-[37px] items-center gap-[6px] rounded-full bg-zinc-950/85 px-[6px] py-[5px] text-white shadow-lg backdrop-blur-xl"
+    >
+      <button
+        type="button"
+        onClick={() => setCursorEnabled(!cursorEnabled)}
+        className={cn(
+          "grid h-[27px] w-[27px] place-items-center rounded-full transition-colors",
+          cursorEnabled
+            ? "bg-sky-400/16 text-sky-100"
+            : "bg-white/[0.05] text-zinc-500",
+        )}
+        title={cursorEnabled ? "Hide your live cursor" : "Show your live cursor"}
+      >
+        <MousePointer2 className="h-[16px] w-[16px]" />
+      </button>
+      {members.length > 0 && (
+        <div className="flex -space-x-1">
+          {members.slice(0, 4).map((member) => (
+            <div
+              key={member.clientId}
+              className="grid h-[27px] w-[27px] place-items-center rounded-full border border-zinc-950 text-[11.5px] font-black text-zinc-950"
+              style={{ backgroundColor: member.color }}
+              title={`${member.name}${member.selectedNodeId ? " is selecting a node" : ""}`}
+            >
+              {member.avatarUrl ? (
+                <img
+                  src={member.avatarUrl}
+                  alt=""
+                  className="h-full w-full rounded-full object-cover"
                 />
-                {status === "connected" ? "Live" : "..."}
-              </>
-            )}
-          </div>
+              ) : (
+                initials(member.name)
+              )}
+            </div>
+          ))}
         </div>
       )}
+      <div className="flex items-center gap-[6px] px-1 text-[13px] font-semibold leading-none text-zinc-300">
+        {members.length > 0 ? (
+          <>
+            <Users className="h-[16px] w-[16px] text-zinc-500" />
+            {members.length}
+          </>
+        ) : (
+          <>
+            <span
+              className={cn(
+                "h-[8px] w-[8px] rounded-full",
+                status === "connected" ? "bg-emerald-400" : "bg-zinc-500",
+              )}
+            />
+            {status === "connected" ? "Live" : status === "error" ? "Retry" : "..."}
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -35,6 +35,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { UserMenu } from "@/components/workspace/UserMenu";
 import ShareDialog from "@/components/workspace/ShareDialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { CollaborationPresencePill } from "@/components/workspace/CanvasCollaborationOverlay";
 
 const CanvasHeader = () => {
   const { t } = useLanguage();
@@ -71,54 +72,55 @@ const CanvasHeader = () => {
 
   return (
     <div
-      className="flex h-[40px] shrink-0 items-center justify-between gap-[10px] bg-[hsl(0_0%_4%)] px-[14px]"
+      className="relative z-[80] flex h-[46px] shrink-0 items-center justify-between gap-[12px] bg-[hsl(0_0%_4%)] px-[16px]"
       style={{ fontFamily: "var(--font-sans)" }}
     >
       {/* Left — back arrow + breadcrumb */}
-      <div className="flex min-w-0 flex-1 items-center gap-[8px]">
+      <div className="flex min-w-0 flex-1 items-center gap-[9px]">
         <Link
           to="/app/workspace"
-          className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-100"
+          className="flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-100"
           title={t("workspace.canvas.back_dashboard")}
           aria-label={t("workspace.canvas.back_dashboard")}
         >
-          <ChevronLeft className="h-[15px] w-[15px]" />
+          <ChevronLeft className="h-[17px] w-[17px]" />
         </Link>
 
         {/* Project chip — coloured square + label */}
         <button
           type="button"
-          className="flex h-[30px] shrink-0 items-center gap-[6px] rounded-md px-[8px] text-[12px] leading-[16px] text-zinc-200 transition-colors hover:bg-white/[0.04]"
+          className="flex h-[35px] shrink-0 items-center gap-[7px] rounded-md px-[9px] text-[14px] leading-[18px] text-zinc-200 transition-colors hover:bg-white/[0.04]"
           title={t("workspace.canvas.project_tooltip", { name: projectLabel })}
         >
           <span
-            className="flex h-[22px] w-[22px] items-center justify-center rounded-[5px]"
+            className="flex h-[25px] w-[25px] items-center justify-center rounded-[6px]"
             style={{ background: projectAccent }}
           >
-            <Layers className="h-[13px] w-[13px] text-zinc-950" />
+            <Layers className="h-[15px] w-[15px] text-zinc-950" />
           </span>
           <span className="font-medium">{projectLabel}</span>
         </button>
 
-        <ChevronRight className="h-[13px] w-[13px] shrink-0 text-zinc-600" />
+        <ChevronRight className="h-[15px] w-[15px] shrink-0 text-zinc-600" />
 
         {/* Workspace name — slightly italic + soft glyph to read as
          *  "the document title", consistent with Figma/Notion patterns. */}
-        <span className="min-w-0 truncate text-[12px] leading-[16px] italic text-zinc-300">
+        <span className="min-w-0 truncate text-[14px] leading-[18px] italic text-zinc-300">
           {workspace?.name || t("workspace.canvas.untitled_space")}
         </span>
       </div>
 
       {/* Right — Share + UserMenu */}
-      <div className="flex shrink-0 items-center gap-[10px]">
+      <div className="fixed right-[16px] top-[2px] z-[95] flex shrink-0 items-center gap-[9px]">
+        <CollaborationPresencePill />
         {canShare && (
           <button
             type="button"
             onClick={() => setShareOpen(true)}
-            className="flex h-[32px] items-center gap-[6px] rounded-lg bg-white px-[12px] text-[12px] font-semibold leading-[16px] text-zinc-900 transition-colors hover:bg-zinc-200"
+            className="flex h-[30px] items-center gap-[6px] rounded-lg bg-white px-[11px] text-[12px] font-semibold leading-[15px] text-zinc-900 shadow-[0_8px_18px_rgba(0,0,0,0.24)] transition-colors hover:bg-zinc-200"
             title={t("workspace.canvas.share_workspace")}
           >
-            <Users className="h-[15px] w-[15px]" />
+            <Users className="h-[14px] w-[14px]" />
             {t("workspace.canvas.share")}
           </button>
         )}

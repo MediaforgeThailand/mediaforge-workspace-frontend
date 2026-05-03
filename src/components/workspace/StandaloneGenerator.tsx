@@ -30,7 +30,11 @@ import { calculateNodeCost } from "@/lib/nodeCostCalculator";
 import { useNodeCreditCosts } from "@/hooks/useNodeCreditCosts";
 import { useCredits } from "@/hooks/useCredits";
 import { DEFAULT_PROJECT_NAME } from "@/store/useWorkspaceStore";
-import { buildDownloadFilename, downloadFromUrl } from "./downloadAsset";
+import {
+  buildDownloadFilename,
+  downloadFromUrl,
+  triggerBlobDownload,
+} from "./downloadAsset";
 import NodePreviewLightbox, { type PreviewPayload } from "./NodePreviewLightbox";
 import { useFreshSignedUrl } from "./useFreshSignedUrl";
 import {
@@ -313,6 +317,150 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
   },
 };
 
+type TranslationFn = ReturnType<typeof useLanguage>["t"];
+type TranslationKey = Parameters<TranslationFn>[0];
+
+const STANDALONE_TOOL_TITLE_KEYS = {
+  image_gen: "workspace.standalone.tool.image_gen.title",
+  video_gen: "workspace.standalone.tool.video_gen.title",
+  voice_gen: "workspace.standalone.tool.voice_gen.title",
+  image_to_3d: "workspace.standalone.tool.image_to_3d.title",
+} as const satisfies Record<StandaloneToolKey, TranslationKey>;
+
+const STANDALONE_TOOL_NAV_KEYS = {
+  image_gen: "workspace.standalone.tool.image_gen.nav",
+  video_gen: "workspace.standalone.tool.video_gen.nav",
+  voice_gen: "workspace.standalone.tool.voice_gen.nav",
+  image_to_3d: "workspace.standalone.tool.image_to_3d.nav",
+} as const satisfies Record<StandaloneToolKey, TranslationKey>;
+
+const STANDALONE_MODEL_DESCRIPTION_KEYS = {
+  "nano-banana-2": "workspace.standalone.model.nano_banana_2.desc",
+  "nano-banana-pro": "workspace.standalone.model.nano_banana_pro.desc",
+  "seedream-5-0-260128": "workspace.standalone.model.seedream_5_0.desc",
+  "seedream-5-0-lite-260128": "workspace.standalone.model.seedream_5_0_lite.desc",
+  "seedream-4-5-251128": "workspace.standalone.model.seedream_4_5.desc",
+  "gpt-image-2": "workspace.standalone.model.gpt_image_2.desc",
+  "kling-v2-6-pro": "workspace.standalone.model.kling_v2_6_pro.desc",
+  "kling-v2-6-motion-pro": "workspace.standalone.model.kling_v2_6_motion_pro.desc",
+  "kling-v3-pro": "workspace.standalone.model.kling_v3_pro.desc",
+  "kling-v3-motion-pro": "workspace.standalone.model.kling_v3_motion_pro.desc",
+  "kling-v3-omni": "workspace.standalone.model.kling_v3_omni.desc",
+  "seedance-1-0-pro-250528": "workspace.standalone.model.seedance_1_0_pro.desc",
+  "seedance-1-0-pro-fast-251015": "workspace.standalone.model.seedance_1_0_pro_fast.desc",
+  "seedance-1-5-pro-251215": "workspace.standalone.model.seedance_1_5_pro.desc",
+  "seedance-2-0-lite": "workspace.standalone.model.seedance_2_0_lite.desc",
+  "seedance-2-0-pro": "workspace.standalone.model.seedance_2_0_pro.desc",
+  "elevenlabs-multilingual-v2": "workspace.standalone.model.elevenlabs_multilingual_v2.desc",
+  "elevenlabs-turbo-v2-5": "workspace.standalone.model.elevenlabs_turbo_v2_5.desc",
+  "gemini-2.5-pro-preview-tts": "workspace.standalone.model.gemini_2_5_pro_tts.desc",
+  "google-tts-studio": "workspace.standalone.model.google_tts_studio.desc",
+  "tripo3d-p1": "workspace.standalone.model.tripo3d_p1.desc",
+  "tripo3d-v3.1": "workspace.standalone.model.tripo3d_v3_1.desc",
+  "tripo3d-v3.0": "workspace.standalone.model.tripo3d_v3_0.desc",
+  "tripo3d-turbo": "workspace.standalone.model.tripo3d_turbo.desc",
+  "tripo3d-v2.5": "workspace.standalone.model.tripo3d_v2_5.desc",
+  "tripo3d-v2.0": "workspace.standalone.model.tripo3d_v2_0.desc",
+  "tripo3d-v1.4": "workspace.standalone.model.tripo3d_v1_4.desc",
+  "hyper3d-gen2-260112": "workspace.standalone.model.hyper3d_gen2.desc",
+} as const satisfies Record<string, TranslationKey>;
+
+const STYLE_LABEL_KEYS = {
+  none: "workspace.standalone.style.none.label",
+  cinematic: "workspace.standalone.style.cinematic.label",
+  product: "workspace.standalone.style.product.label",
+  editorial: "workspace.standalone.style.editorial.label",
+  anime: "workspace.standalone.style.anime.label",
+  watercolor: "workspace.standalone.style.watercolor.label",
+} as const satisfies Record<string, TranslationKey>;
+
+const STYLE_DESCRIPTION_KEYS = {
+  none: "workspace.standalone.style.none.desc",
+  cinematic: "workspace.standalone.style.cinematic.desc",
+  product: "workspace.standalone.style.product.desc",
+  editorial: "workspace.standalone.style.editorial.desc",
+  anime: "workspace.standalone.style.anime.desc",
+  watercolor: "workspace.standalone.style.watercolor.desc",
+} as const satisfies Record<string, TranslationKey>;
+
+const STYLE_CHIP_KEYS = {
+  none: "workspace.standalone.style.none.chip",
+  cinematic: "workspace.standalone.style.cinematic.chip",
+  product: "workspace.standalone.style.product.chip",
+  editorial: "workspace.standalone.style.editorial.chip",
+  anime: "workspace.standalone.style.anime.chip",
+  watercolor: "workspace.standalone.style.watercolor.chip",
+} as const satisfies Record<string, TranslationKey>;
+
+const OPTION_LABEL_KEYS = {
+  Auto: "workspace.standalone.option.auto",
+  auto: "workspace.standalone.option.auto",
+  low: "workspace.standalone.option.low",
+  medium: "workspace.standalone.option.medium",
+  high: "workspace.standalone.option.high",
+  transparent: "workspace.standalone.option.transparent",
+  opaque: "workspace.standalone.option.opaque",
+  image: "workspace.standalone.option.image",
+  video: "workspace.standalone.option.video",
+} as const satisfies Record<string, TranslationKey>;
+
+const STATUS_LABEL_KEYS = {
+  queued: "workspace.standalone.status.queued",
+  running: "workspace.standalone.status.running",
+  completed: "workspace.standalone.status.completed",
+  failed: "workspace.standalone.status.failed",
+  permanent_failed: "workspace.standalone.status.permanent_failed",
+} as const satisfies Record<StandaloneJobRow["status"], TranslationKey>;
+
+function standaloneToolTitle(tool: StandaloneToolKey, t: TranslationFn) {
+  return t(STANDALONE_TOOL_TITLE_KEYS[tool]);
+}
+
+function standaloneToolNav(tool: StandaloneToolKey, t: TranslationFn) {
+  return t(STANDALONE_TOOL_NAV_KEYS[tool]);
+}
+
+function standaloneModelDescription(
+  modelId: string,
+  fallback: string,
+  t: TranslationFn,
+) {
+  const key =
+    STANDALONE_MODEL_DESCRIPTION_KEYS[
+      modelId as keyof typeof STANDALONE_MODEL_DESCRIPTION_KEYS
+    ];
+  return key ? t(key) : fallback;
+}
+
+function standaloneStyleLabel(styleId: string, fallback: string, t: TranslationFn) {
+  const key = STYLE_LABEL_KEYS[styleId as keyof typeof STYLE_LABEL_KEYS];
+  return key ? t(key) : fallback;
+}
+
+function standaloneStyleDescription(
+  styleId: string,
+  fallback: string,
+  t: TranslationFn,
+) {
+  const key =
+    STYLE_DESCRIPTION_KEYS[styleId as keyof typeof STYLE_DESCRIPTION_KEYS];
+  return key ? t(key) : fallback;
+}
+
+function standaloneStyleChip(styleId: string, fallback: string, t: TranslationFn) {
+  const key = STYLE_CHIP_KEYS[styleId as keyof typeof STYLE_CHIP_KEYS];
+  return key ? t(key) : fallback;
+}
+
+function standaloneOptionLabel(option: string, t: TranslationFn) {
+  const key = OPTION_LABEL_KEYS[option as keyof typeof OPTION_LABEL_KEYS];
+  return key ? t(key) : option;
+}
+
+function standaloneStatusLabel(status: StandaloneJobRow["status"], t: TranslationFn) {
+  return t(STATUS_LABEL_KEYS[status]);
+}
+
 export default function StandaloneGenerator({
   activeTool,
   onToolChange,
@@ -584,7 +732,7 @@ export default function StandaloneGenerator({
       toast.error(t("workspace.toast.tool_not_ready"));
       return;
     }
-    const validation = validateForm(activeTool, form);
+    const validation = validateForm(activeTool, form, t);
     if (validation) {
       toast.error(validation);
       return;
@@ -623,7 +771,7 @@ export default function StandaloneGenerator({
         throw new Error(
           resp?.error ??
             (error as { message?: string } | null)?.message ??
-            "Failed to queue generation",
+            t("workspace.standalone.error_failed_queue"),
         );
       }
       toast.success(t("workspace.toast.gen_queued"));
@@ -693,10 +841,10 @@ export default function StandaloneGenerator({
               <div>
                 <div className="flex items-center gap-1 text-[11px] font-medium text-zinc-400">
                   <ChevronDown className="h-3.5 w-3.5 rotate-90" />
-                  Tools
+                  {t("workspace.standalone.tools")}
                 </div>
               <h2 className="mt-1 text-[14px] font-bold leading-tight text-white">
-                  {activeDef.title}
+                  {standaloneToolTitle(activeTool, t)}
                 </h2>
               </div>
               <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white/[0.05] text-zinc-300">
@@ -760,10 +908,10 @@ export default function StandaloneGenerator({
             ) : (
               <Sparkles className="h-3.5 w-3.5" />
             )}
-            Generate
+            {t("workspace.standalone.generate")}
             {estimatedCost != null && (
               <span className="rounded-md bg-black/20 px-1.5 py-0.5 text-[10px] text-zinc-300">
-                {estimatedCost} credits
+                {estimatedCost} {t("workspace.standalone.credits")}
               </span>
             )}
           </button>
@@ -800,6 +948,7 @@ function ToolTabs({
   onToolChange: (tool: StandaloneToolKey) => void;
   className?: string;
 }) {
+  const { t } = useLanguage();
   return (
     <div
       className={cn(
@@ -822,7 +971,7 @@ function ToolTabs({
                 : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100",
             )}
           >
-            {item.navLabel}
+            {standaloneToolNav(item.key, t)}
           </button>
         );
       })}
@@ -849,6 +998,8 @@ function MobileHeader({
   onCreateProject: () => void;
   onDeleteProject?: (projectId: string) => void;
 }) {
+  const { t } = useLanguage();
+
   return (
     <header className="shrink-0 bg-[#0c0c0d] px-4 pb-0 pt-4 lg:hidden">
       <div className="mx-auto mb-4 flex max-w-[390px] items-center justify-between">
@@ -856,7 +1007,7 @@ function MobileHeader({
           type="button"
           onClick={onOpenSidebar}
           className="grid h-8 w-8 place-items-center rounded-md text-zinc-200"
-          aria-label="Menu"
+          aria-label={t("workspace.standalone.menu")}
         >
           <Menu className="h-4 w-4" />
         </button>
@@ -920,7 +1071,9 @@ function ProjectPicker({
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const projectName = activeProject?.name?.trim() || "Create project";
+  const { t } = useLanguage();
+  const projectName =
+    activeProject?.name?.trim() || t("workspace.standalone.create_project");
 
   return (
     <div className="relative min-w-0">
@@ -954,7 +1107,7 @@ function ProjectPicker({
           role="menu"
         >
           <div className="px-2 pb-2 text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-500">
-            Projects
+            {t("workspace.standalone.projects")}
           </div>
           <div className="max-h-[260px] space-y-1 overflow-y-auto">
             {projects.map((project) => {
@@ -986,7 +1139,7 @@ function ProjectPicker({
                     <span className="min-w-0 flex-1 truncate">{project.name}</span>
                     {active && (
                       <span className="rounded bg-white/[0.08] px-1.5 py-0.5 text-[9px] uppercase text-zinc-400">
-                        Active
+                        {t("workspace.standalone.active")}
                       </span>
                     )}
                   </button>
@@ -995,13 +1148,21 @@ function ProjectPicker({
                       type="button"
                       onClick={(event) => {
                         event.stopPropagation();
-                        if (!window.confirm(`Delete project "${project.name}"?`)) return;
+                        if (
+                          !window.confirm(
+                            t("workspace.standalone.delete_project_confirm", {
+                              name: project.name,
+                            }),
+                          )
+                        ) return;
                         onDeleteProject?.(project.id);
                         setOpen(false);
                       }}
                       className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-500 transition hover:bg-red-500/10 hover:text-red-300"
-                      aria-label={`Delete ${project.name}`}
-                      title="Delete project"
+                      aria-label={t("workspace.standalone.delete_project_aria", {
+                        name: project.name,
+                      })}
+                      title={t("workspace.standalone.delete_project")}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -1020,7 +1181,7 @@ function ProjectPicker({
             role="menuitem"
           >
             <Plus className="h-3.5 w-3.5" />
-            New project
+            {t("workspace.standalone.new_project")}
           </button>
         </div>
       )}
@@ -1029,18 +1190,19 @@ function ProjectPicker({
 }
 
 function GenerationHistoryHeader({ onRefresh }: { onRefresh: () => void }) {
+  const { t } = useLanguage();
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="flex h-8 items-center gap-1.5 rounded-full bg-[#2b2b2b] px-3 text-[12px] font-semibold text-white">
         <Sparkles className="h-3.5 w-3.5" />
-        Creations
+        {t("workspace.standalone.creations")}
       </div>
       <button
         type="button"
         onClick={onRefresh}
         className="grid h-8 w-8 place-items-center rounded-lg bg-[#252525] text-zinc-400 transition hover:bg-[#303030] hover:text-zinc-100"
-        aria-label="Refresh"
-        title="Refresh"
+        aria-label={t("workspace.standalone.refresh")}
+        title={t("workspace.standalone.refresh")}
       >
         <RefreshCw className="h-3.5 w-3.5" />
       </button>
@@ -1064,10 +1226,11 @@ function ModelPicker({
   onChange: (model: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const { t } = useLanguage();
   const selected = models.find((model) => model.id === value) ?? models[0];
   return (
     <div className="relative">
-      <FieldLabel label="Model" />
+      <FieldLabel label={t("workspace.standalone.model")} />
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -1110,7 +1273,7 @@ function ModelPicker({
                     {model.label}
                   </span>
                   <span className="mt-0.5 block text-[11px] leading-snug text-zinc-400">
-                    {model.description}
+                    {standaloneModelDescription(model.id, model.description, t)}
                   </span>
                 </span>
                 {model.badge && (
@@ -1142,6 +1305,7 @@ function ImageControls({
   onUpload: () => void;
   onUploadCharacter: () => void;
 }) {
+  const { t } = useLanguage();
   const isGpt = form.model === "gpt-image-2";
   const isSeedream = isSeedreamImageModel(form.model);
   const resolutionOptions = isGpt
@@ -1176,8 +1340,8 @@ function ImageControls({
       />
 
       <PromptBox
-        label="Prompt"
-        placeholder="Describe the image you want to create"
+        label={t("workspace.standalone.prompt")}
+        placeholder={t("workspace.standalone.describe_image")}
         value={form.prompt}
         onChange={(prompt) => onChange({ prompt })}
       />
@@ -1185,14 +1349,14 @@ function ImageControls({
       <div className={cn("grid gap-2", isSeedream ? "grid-cols-1" : "grid-cols-2")}>
         {!isSeedream && (
           <SelectField
-            label="Aspect"
+            label={t("workspace.standalone.aspect")}
             value={form.aspectRatio}
             options={isGpt ? GPT_IMAGE_ASPECT_RATIOS : ["Auto", "1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"]}
             onChange={(aspectRatio) => onChange({ aspectRatio })}
           />
         )}
         <SelectField
-          label="Resolution"
+          label={t("workspace.standalone.resolution")}
           value={form.imageResolution}
           options={resolutionOptions}
           onChange={(imageResolution) => onChange({ imageResolution })}
@@ -1202,19 +1366,19 @@ function ImageControls({
       {isGpt && (
         <div className="grid grid-cols-2 gap-2">
           <SelectField
-            label="Quality"
+            label={t("workspace.standalone.quality")}
             value={form.quality}
             options={["low", "medium", "high"]}
             onChange={(quality) => onChange({ quality })}
           />
           <SelectField
-            label="Format"
+            label={t("workspace.standalone.format")}
             value={form.outputFormat}
             options={["png", "jpeg", "webp"]}
             onChange={(outputFormat) => onChange({ outputFormat })}
           />
           <SelectField
-            label="Background"
+            label={t("workspace.standalone.background")}
             value={form.background}
             options={["auto", "transparent", "opaque"]}
             onChange={(background) => onChange({ background })}
@@ -1250,6 +1414,7 @@ function VideoControls({
   onUploadRefImage: () => void;
   onUploadRefVideo: () => void;
 }) {
+  const { t } = useLanguage();
   const isSeedance = isSeedanceVideoModel(form.model);
   const isMotion = isKlingMotionVideoModel(form.model);
   const supportsStartEnd = videoSupportsStartEndFrames(form.model);
@@ -1277,7 +1442,7 @@ function VideoControls({
     referenceSlots.push(
       {
         key: "start",
-        label: "Start image",
+        label: t("workspace.standalone.start_image"),
         refItem: form.videoStart,
         uploading: uploadingStart,
         onUpload: onUploadStart,
@@ -1285,7 +1450,7 @@ function VideoControls({
       },
       {
         key: "end",
-        label: "End image",
+        label: t("workspace.standalone.end_image"),
         refItem: form.videoEnd,
         uploading: uploadingEnd,
         onUpload: onUploadEnd,
@@ -1296,7 +1461,9 @@ function VideoControls({
   if (supportsRefImage) {
     referenceSlots.push({
       key: "ref-image",
-      label: isMotion ? "Reference image" : "Ref image",
+      label: isMotion
+        ? t("workspace.standalone.reference_image")
+        : t("workspace.standalone.ref_image"),
       refItem: form.videoRefImage,
       uploading: uploadingRefImage,
       onUpload: onUploadRefImage,
@@ -1306,7 +1473,9 @@ function VideoControls({
   if (supportsRefVideo) {
     referenceSlots.push({
       key: "ref-video",
-      label: isMotion ? "Motion video" : "Ref video",
+      label: isMotion
+        ? t("workspace.standalone.motion_video")
+        : t("workspace.standalone.ref_video"),
       refItem: form.videoRefVideo,
       uploading: uploadingRefVideo,
       onUpload: onUploadRefVideo,
@@ -1330,21 +1499,21 @@ function VideoControls({
         </div>
       )}
       <PromptBox
-        label="Prompt"
-        placeholder="Describe camera movement, subject, scene, and mood"
+        label={t("workspace.standalone.prompt")}
+        placeholder={t("workspace.standalone.describe_video")}
         value={form.prompt}
         onChange={(prompt) => onChange({ prompt })}
       />
       {!isMotion ? (
         <div className="grid grid-cols-2 gap-2">
           <SelectField
-            label="Aspect"
+            label={t("workspace.standalone.aspect")}
             value={form.videoRatio}
             options={isSeedance ? ["16:9", "9:16", "1:1", "4:3"] : ["Auto", "16:9", "9:16", "1:1"]}
             onChange={(videoRatio) => onChange({ videoRatio })}
           />
           <SelectField
-            label="Duration"
+            label={t("workspace.standalone.duration")}
             value={String(form.videoDuration)}
             options={durations.map(String)}
             onChange={(videoDuration) =>
@@ -1353,7 +1522,7 @@ function VideoControls({
           />
           {isSeedance && (
             <SelectField
-              label="Resolution"
+              label={t("workspace.standalone.resolution")}
               value={form.videoResolution}
               options={["480p", "720p", "1080p"]}
               onChange={(videoResolution) => onChange({ videoResolution })}
@@ -1363,7 +1532,7 @@ function VideoControls({
       ) : (
         <div className="grid grid-cols-2 gap-2">
           <SelectField
-            label="Orientation"
+            label={t("workspace.standalone.orientation")}
             value={form.videoCharacterOrientation}
             options={["image", "video"]}
             onChange={(videoCharacterOrientation) =>
@@ -1377,14 +1546,14 @@ function VideoControls({
       )}
       {!isMotion && (
         <ToggleRow
-          label="Generate audio"
+          label={t("workspace.standalone.generate_audio")}
           checked={form.videoWithAudio}
           onChange={(videoWithAudio) => onChange({ videoWithAudio })}
         />
       )}
       {(isMotion || form.model === "kling-v3-omni") && supportsRefVideo && (
         <ToggleRow
-          label="Keep original sound"
+          label={t("workspace.standalone.keep_original_sound")}
           checked={form.videoKeepOriginalSound}
           onChange={(videoKeepOriginalSound) =>
             onChange({ videoKeepOriginalSound })
@@ -1455,6 +1624,7 @@ function VoiceControls({
   form: StandaloneFormState;
   onChange: (patch: Partial<StandaloneFormState>) => void;
 }) {
+  const { t } = useLanguage();
   const provider = inferVoiceProvider(form.model);
 
   // ElevenLabs voice catalog — pulled live from the user's account
@@ -1523,8 +1693,8 @@ function VoiceControls({
   return (
     <>
       <PromptBox
-        label="Script"
-        placeholder="Paste the script you want to turn into speech"
+        label={t("workspace.standalone.script")}
+        placeholder={t("workspace.standalone.script_placeholder")}
         value={form.script}
         onChange={(script) => onChange({ script })}
         minRows={7}
@@ -1536,12 +1706,14 @@ function VoiceControls({
         // hardcoded preset catalog — what's in the API is what we show.
         <div>
           <FieldLabel
-            label="Voice"
+            label={t("workspace.standalone.voice")}
             meta={
               elevenLoading
-                ? "Loading…"
+                ? t("workspace.standalone.loading")
                 : elevenVoices?.length
-                  ? `${elevenVoices.length} from your account`
+                  ? t("workspace.standalone.from_account", {
+                      count: elevenVoices.length,
+                    })
                   : "ElevenLabs"
             }
           />
@@ -1552,12 +1724,12 @@ function VoiceControls({
           )}
           {elevenLoading && (
             <div className="mt-2 rounded-md bg-white/[0.04] px-2.5 py-2 text-[11px] text-zinc-500">
-              Loading ElevenLabs voices from your account…
+              {t("workspace.standalone.loading_elevenlabs")}
             </div>
           )}
           {!elevenLoading && elevenVoices && elevenVoices.length === 0 && !elevenError && (
             <div className="mt-2 rounded-md bg-white/[0.04] px-2.5 py-2 text-[11px] text-zinc-500">
-              No voices in this ElevenLabs account.
+              {t("workspace.standalone.no_elevenlabs_voices")}
             </div>
           )}
           {elevenVoices && elevenVoices.length > 0 && (
@@ -1605,12 +1777,12 @@ function VoiceControls({
         // executor falls back to its provider default
         // (`Charon` for Gemini, `en-US-Studio-O` for Google).
         <TextInputField
-          label="Voice ID"
+          label={t("workspace.standalone.voice_id")}
           value={form.voice}
           placeholder={
             provider === "gemini"
-              ? "Optional · e.g. Charon, Aoede (defaults to Charon)"
-              : "Optional · e.g. en-US-Studio-O (defaults to Studio-O)"
+              ? t("workspace.standalone.voice_id_gemini_placeholder")
+              : t("workspace.standalone.voice_id_google_placeholder")
           }
           onChange={(voice) => onChange({ voice })}
         />
@@ -1622,12 +1794,12 @@ function VoiceControls({
       )}
       {provider !== "elevenlabs" && (
         <TextInputField
-          label="Voice instructions"
+          label={t("workspace.standalone.voice_instructions")}
           value={form.voiceStyle}
           placeholder={
             provider === "gemini"
-              ? "e.g. Calmly, with a warm tone"
-              : "e.g. Calm, confident, slightly slower pace"
+              ? t("workspace.standalone.voice_instructions_gemini_placeholder")
+              : t("workspace.standalone.voice_instructions_google_placeholder")
           }
           onChange={(voiceStyle) => onChange({ voiceStyle })}
         />
@@ -1647,16 +1819,17 @@ function ElevenLabsVoiceParams({
   form: StandaloneFormState;
   onChange: (patch: Partial<StandaloneFormState>) => void;
 }) {
+  const { t } = useLanguage();
   const presets: Array<{ id: StandaloneFormState["voiceStylePreset"]; label: string }> = [
-    { id: "expressive", label: "Expressive" },
-    { id: "neutral",    label: "Neutral" },
-    { id: "consistent", label: "Consistent" },
+    { id: "expressive", label: t("workspace.standalone.voice_style_expressive") },
+    { id: "neutral", label: t("workspace.standalone.voice_style_neutral") },
+    { id: "consistent", label: t("workspace.standalone.voice_style_consistent") },
   ];
 
   return (
     <div className="rounded-xl bg-white/[0.04] px-3 py-3">
       <div className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
-        Voice style
+        {t("workspace.standalone.voice_style")}
       </div>
       <div className="mt-2 inline-flex w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[11px]">
         {presets.map((p) => {
@@ -1680,7 +1853,7 @@ function ElevenLabsVoiceParams({
       </div>
 
       <RangeSlider
-        label="Speed"
+        label={t("workspace.standalone.speed")}
         meta={`${form.voiceSpeed.toFixed(2)}×`}
         min={0.7}
         max={1.2}
@@ -1689,7 +1862,7 @@ function ElevenLabsVoiceParams({
         onChange={(voiceSpeed) => onChange({ voiceSpeed })}
       />
       <RangeSlider
-        label="Stability"
+        label={t("workspace.standalone.stability")}
         meta={`${Math.round(form.voiceStability * 100)}%`}
         min={0}
         max={1}
@@ -1698,7 +1871,7 @@ function ElevenLabsVoiceParams({
         onChange={(voiceStability) => onChange({ voiceStability })}
       />
       <RangeSlider
-        label="Similarity"
+        label={t("workspace.standalone.similarity")}
         meta={`${Math.round(form.voiceSimilarity * 100)}%`}
         min={0}
         max={1}
@@ -1707,7 +1880,7 @@ function ElevenLabsVoiceParams({
         onChange={(voiceSimilarity) => onChange({ voiceSimilarity })}
       />
       <RangeSlider
-        label="Style amount"
+        label={t("workspace.standalone.style_amount")}
         meta={`${Math.round(form.voiceStyleAmount * 100)}%`}
         min={0}
         max={1}
@@ -1776,10 +1949,11 @@ function ThreeDControls({
   uploading: boolean;
   onUpload: () => void;
 }) {
+  const { t } = useLanguage();
   return (
     <>
       <SingleReferenceButton
-        label="Reference image"
+        label={t("workspace.standalone.reference_image")}
         refItem={form.modelImage}
         uploading={uploading}
         onUpload={onUpload}
@@ -1787,12 +1961,12 @@ function ThreeDControls({
         tall
       />
       <ToggleRow
-        label="Texture"
+        label={t("workspace.standalone.texture")}
         checked={form.texture}
         onChange={(texture) => onChange({ texture })}
       />
       <ToggleRow
-        label="PBR materials"
+        label={t("workspace.standalone.pbr_materials")}
         checked={form.pbr}
         onChange={(pbr) => onChange({ pbr })}
       />
@@ -1846,6 +2020,7 @@ function SelectField({
   onChange: (value: string) => void;
   disabled?: boolean;
 }) {
+  const { t } = useLanguage();
   return (
     <label className={cn("block", disabled && "opacity-50")}>
       <FieldLabel label={label} />
@@ -1857,7 +2032,7 @@ function SelectField({
       >
         {options.map((option) => (
           <option key={option} value={option} className="bg-zinc-950">
-            {option}
+            {standaloneOptionLabel(option, t)}
           </option>
         ))}
       </select>
@@ -1910,6 +2085,7 @@ function StyleReferenceTray({
   onUploadCharacter: () => void;
   onRemove: (id: string) => void;
 }) {
+  const { t } = useLanguage();
   const [styleOpen, setStyleOpen] = useState(false);
   const selectedStyle =
     IMAGE_STYLE_PRESETS.find((preset) => preset.id === styleId) ??
@@ -1924,7 +2100,10 @@ function StyleReferenceTray({
 
   return (
     <div className="relative">
-      <FieldLabel label="References" meta={`${refs.length}/${max}`} />
+      <FieldLabel
+        label={t("workspace.standalone.references")}
+        meta={`${refs.length}/${max}`}
+      />
       <div className="mt-2 flex flex-wrap gap-2">
         <button
           type="button"
@@ -1938,7 +2117,9 @@ function StyleReferenceTray({
         >
           <Sparkles className="h-4 w-4" />
           <span className="max-w-full truncate px-1 text-[11px] font-medium">
-            {selectedStyle.id === "none" ? "Style" : selectedStyle.label}
+            {selectedStyle.id === "none"
+              ? t("workspace.standalone.style")
+              : standaloneStyleLabel(selectedStyle.id, selectedStyle.label, t)}
           </span>
         </button>
         <button
@@ -1957,8 +2138,8 @@ function StyleReferenceTray({
           )}
           title={
             characterActive
-              ? "Character locked — click to replace"
-              : "Upload a character/subject reference"
+              ? t("workspace.standalone.character_locked_title")
+              : t("workspace.standalone.character_upload_title")
           }
         >
           {characterActive && characterRef && (
@@ -1974,7 +2155,9 @@ function StyleReferenceTray({
             ) : (
               <UserRound className="h-4 w-4" />
             )}
-            <span className="text-[11px] font-medium">Character</span>
+            <span className="text-[11px] font-medium">
+              {t("workspace.standalone.character")}
+            </span>
           </span>
         </button>
         <button
@@ -1988,7 +2171,9 @@ function StyleReferenceTray({
           ) : (
             <Plus className="h-4 w-4" />
           )}
-          <span className="text-[11px] font-medium">Add</span>
+          <span className="text-[11px] font-medium">
+            {t("workspace.standalone.add")}
+          </span>
         </button>
       </div>
       {refs.length > 0 && (
@@ -2010,17 +2195,17 @@ function StyleReferenceTray({
                 {isCharacter && (
                   <span
                     className="absolute left-1 top-1 flex items-center gap-0.5 rounded bg-violet-500/85 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white"
-                    title="Character reference — model will preserve identity"
+                    title={t("workspace.standalone.character_reference_title")}
                   >
                     <UserRound className="h-2.5 w-2.5" />
-                    Char
+                    {t("workspace.standalone.character_badge")}
                   </span>
                 )}
                 <button
                   type="button"
                   onClick={() => onRemove(ref.id)}
                   className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded bg-black/70 text-zinc-200"
-                  aria-label="Remove reference"
+                  aria-label={t("workspace.standalone.remove_reference")}
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -2052,14 +2237,14 @@ function StyleReferenceTray({
                 />
                 <span className="min-w-0">
                   <span className="block truncate text-[12px] font-bold text-white">
-                    {style.label}
+                    {standaloneStyleLabel(style.id, style.label, t)}
                   </span>
                   <span className="line-clamp-1 text-[11px] text-zinc-500">
-                    {style.description}
+                    {standaloneStyleDescription(style.id, style.description, t)}
                   </span>
                 </span>
                 <span className="ml-auto rounded bg-white/[0.08] px-1.5 py-0.5 text-[9px] font-bold uppercase text-zinc-400">
-                  {style.chip}
+                  {standaloneStyleChip(style.id, style.chip, t)}
                 </span>
               </button>
             );
@@ -2132,7 +2317,7 @@ function ReferenceTray({
               type="button"
               onClick={() => onRemove(ref.id)}
               className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-lg bg-black/70 text-zinc-200"
-              aria-label="Remove reference"
+              aria-label={t("workspace.standalone.remove_reference")}
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -2235,6 +2420,12 @@ function CreationFeed({
   loading: boolean;
 }) {
   const [preview, setPreview] = useState<PreviewPayload | null>(null);
+  const { t } = useLanguage();
+  const onStandaloneCropConfirmed = (blob: Blob, filename: string) => {
+    const cleanName = filename.replace(/\.[a-z0-9]{2,5}$/i, "") || "crop";
+    triggerBlobDownload(blob, buildDownloadFilename(cleanName, "png"));
+    toast.success(t("workspace.stock.download_started"));
+  };
 
   if (loading) {
     return (
@@ -2251,10 +2442,10 @@ function CreationFeed({
             <FolderOpen className="h-6 w-6" />
           </div>
           <h2 className="mt-4 text-[16px] font-bold text-white">
-            Ready to create something?
+            {t("workspace.standalone.empty_title")}
           </h2>
           <p className="mt-2 text-[13px] text-zinc-400">
-            Start generating to see your creations here.
+            {t("workspace.standalone.empty_body")}
           </p>
         </div>
       </div>
@@ -2275,6 +2466,7 @@ function CreationFeed({
         <NodePreviewLightbox
           preview={preview}
           onClose={() => setPreview(null)}
+          onCropConfirmed={preview.type === "image" ? onStandaloneCropConfirmed : undefined}
         />
       )}
     </>
@@ -2334,12 +2526,18 @@ function CreationRow({
   onPreview: (preview: PreviewPayload) => void;
 }) {
   const [cancelling, setCancelling] = useState(false);
+  const { language, t } = useLanguage();
   const result = job.result;
   const params = job.request?.params ?? {};
   const prompt = String(params.prompt ?? "");
   const title =
     prompt.trim().slice(0, 90) ||
-    String(params.nodeName ?? params.model_name ?? job.model ?? "Generation");
+    String(
+      params.nodeName ??
+        params.model_name ??
+        job.model ??
+        t("workspace.standalone.generation_fallback"),
+    );
 
   /* User-initiated cancel for an in-flight standalone gen.
    *
@@ -2357,13 +2555,17 @@ function CreationRow({
     try {
       const { error } = await supabase.rpc("cancel_workspace_job", { p_job_id: job.id });
       if (error) {
-        toast.error(`ยกเลิกไม่สำเร็จ / Cancel failed: ${error.message}`);
+        toast.error(
+          t("workspace.standalone.cancel_failed", { message: error.message }),
+        );
         return;
       }
-      toast.success("ยกเลิกแล้ว — คืนเครดิตให้แล้ว / Cancelled — credits refunded");
+      toast.success(t("workspace.standalone.cancelled_refunded"));
     } catch (err) {
       toast.error(
-        `ยกเลิกไม่สำเร็จ / Cancel failed: ${err instanceof Error ? err.message : String(err)}`,
+        t("workspace.standalone.cancel_failed", {
+          message: err instanceof Error ? err.message : String(err),
+        }),
       );
     } finally {
       setCancelling(false);
@@ -2399,6 +2601,10 @@ function CreationRow({
   const isFailed = job.status === "failed" || job.status === "permanent_failed";
   const canPreviewImage =
     resultType === "image" && !!displayPreviewUrl && !isActive && !isFailed;
+  const canPreviewVideo =
+    resultType === "video" && !!playbackUrl && !isActive && !isFailed;
+  const canPreviewAudio =
+    resultType === "audio" && !!playbackUrl && !isActive && !isFailed;
   const openModelPreview = () => {
     if (!modelUrl) return;
     onPreview({
@@ -2406,7 +2612,7 @@ function CreationRow({
       model_url: modelUrl,
       poster: displayPreviewUrl,
       label: modelName,
-      caption: "Drag to rotate / scroll to zoom",
+      caption: t("workspace.standalone.preview_3d_caption"),
     });
   };
   const openMediaPreview = () => {
@@ -2421,9 +2627,28 @@ function CreationRow({
         label: title,
         caption: modelName,
       });
+      return;
+    }
+    if (canPreviewVideo && playbackUrl) {
+      onPreview({
+        type: "video",
+        url: playbackUrl,
+        label: title,
+        caption: modelName,
+      });
+      return;
+    }
+    if (canPreviewAudio && playbackUrl) {
+      onPreview({
+        type: "audio",
+        url: playbackUrl,
+        label: title,
+        caption: modelName,
+      });
     }
   };
-  const canOpenPreview = !!modelUrl || canPreviewImage;
+  const canOpenPreview =
+    !!modelUrl || canPreviewImage || canPreviewVideo || canPreviewAudio;
   return (
     <article className="rounded-xl bg-[#222222] px-3 py-3">
       <div className="mb-2 flex items-start justify-between gap-3">
@@ -2432,12 +2657,14 @@ function CreationRow({
         </h3>
         <div className="hidden shrink-0 flex-wrap justify-end gap-1 md:flex">
           <MiniMeta label={modelName} />
-          {duration && <MiniMeta label={`${duration} sec`} />}
+          {duration && (
+            <MiniMeta label={`${duration} ${t("workspace.standalone.sec")}`} />
+          )}
           {ratio && <MiniMeta label={ratio} />}
           <MiniMeta label={`+${job.attempts ?? 1}`} />
           <span className="flex h-5 items-center gap-1 rounded bg-white/[0.06] px-1.5 text-[10px] text-zinc-300">
             <span className="h-3 w-3 rounded-sm border border-zinc-600" />
-            {formatDate(job.created_at)}
+            {formatDate(job.created_at, language)}
           </span>
         </div>
       </div>
@@ -2462,10 +2689,14 @@ function CreationRow({
           }
           aria-label={
             modelUrl
-              ? "Preview 3D model"
+              ? t("workspace.standalone.preview_3d_model")
               : canPreviewImage
-                ? "Preview image"
-                : undefined
+                ? t("workspace.standalone.preview_image")
+                : canPreviewVideo
+                  ? t("workspace.standalone.result.video")
+                  : canPreviewAudio
+                    ? t("workspace.standalone.result.audio")
+                    : undefined
           }
           data-testid={canOpenPreview ? "standalone-preview-tile" : undefined}
         >
@@ -2473,7 +2704,7 @@ function CreationRow({
             <div className="absolute inset-0 grid place-items-center">
               <div className="flex items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 text-[12px] text-zinc-300">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                {job.status}
+                {standaloneStatusLabel(job.status, t)}
               </div>
             </div>
           )}
@@ -2481,7 +2712,7 @@ function CreationRow({
             <div className="absolute inset-0 grid place-items-center">
               <div className="flex items-center gap-2 rounded-full bg-red-950/70 px-3 py-1.5 text-[12px] text-red-100">
                 <AlertCircle className="h-3.5 w-3.5" />
-                failed
+                {t("workspace.standalone.status.failed")}
               </div>
             </div>
           )}
@@ -2514,12 +2745,12 @@ function CreationRow({
           )}
           <div className="absolute bottom-2 left-2 rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">
             {result?.type === "audio"
-              ? "audio"
+              ? t("workspace.standalone.result.audio")
               : result?.type === "video"
-                ? "0:06"
+                ? t("workspace.standalone.result.video")
                 : isModel3d
-                  ? "3d"
-                  : "image"}
+                  ? t("workspace.standalone.result.model_3d")
+                  : t("workspace.standalone.result.image")}
           </div>
         </div>
 
@@ -2531,14 +2762,14 @@ function CreationRow({
                 statusTone,
               )}
             >
-              {job.status}
+              {standaloneStatusLabel(job.status, t)}
             </span>
             <span className="rounded-full bg-white/[0.05] px-2 py-1 text-[11px] text-zinc-400">
               {job.model ?? params.model_name?.toString() ?? "model"}
             </span>
             {typeof job.credits_charged === "number" && (
               <span className="rounded-full bg-white/[0.05] px-2 py-1 text-[11px] text-zinc-400">
-                {job.credits_charged} credits
+                {job.credits_charged} {t("workspace.standalone.credits")}
               </span>
             )}
           </div>
@@ -2546,8 +2777,10 @@ function CreationRow({
             {title}
           </h3>
           <div className="mt-2 text-[11px] text-zinc-500">
-            {formatDate(job.created_at)}
-            {job.attempts ? ` · attempt ${job.attempts}` : ""}
+            {formatDate(job.created_at, language)}
+            {job.attempts
+              ? ` · ${t("workspace.standalone.attempt")} ${job.attempts}`
+              : ""}
           </div>
           {failureMessage && (
             <div className="mt-3 rounded-xl bg-red-500/10 px-3 py-2 text-[12px] text-red-200">
@@ -2567,8 +2800,8 @@ function CreationRow({
               onClick={handleCancel}
               disabled={cancelling}
               className="grid h-9 w-9 place-items-center rounded-lg bg-red-500/15 text-red-300 ring-1 ring-inset ring-red-500/30 transition-colors hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-60"
-              aria-label="Cancel generation"
-              title="ยกเลิก / Cancel"
+              aria-label={t("workspace.standalone.cancel_generation")}
+              title={t("workspace.standalone.cancel_title")}
             >
               {cancelling ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -2584,7 +2817,7 @@ function CreationRow({
                 onClick={() => void downloadFromUrl(downloadUrl, downloadName)}
                 data-testid="standalone-download"
                 className="grid h-9 w-9 place-items-center rounded-lg bg-white text-zinc-950 hover:bg-zinc-200"
-                aria-label="Download"
+                aria-label={t("workspace.standalone.download")}
               >
                 <Download className="h-4 w-4" />
               </button>
@@ -2594,7 +2827,7 @@ function CreationRow({
                   target="_blank"
                   rel="noreferrer"
                   className="grid h-9 w-9 place-items-center rounded-lg bg-[#2f2f2f] text-zinc-300 hover:bg-[#3a3a3a]"
-                  aria-label="Open file"
+                  aria-label={t("workspace.standalone.open_file")}
                 >
                   <ExternalLink className="h-4 w-4" />
                 </a>
@@ -2607,8 +2840,8 @@ function CreationRow({
               onClick={openModelPreview}
               data-testid="standalone-open-3d-preview"
               className="grid h-9 w-9 place-items-center rounded-lg bg-amber-300 text-zinc-950 hover:bg-amber-200"
-              aria-label="Preview 3D model"
-              title="Preview 3D"
+              aria-label={t("workspace.standalone.preview_3d_model")}
+              title={t("workspace.standalone.preview_3d_model")}
             >
               <Box className="h-4 w-4" />
             </button>
@@ -2838,16 +3071,17 @@ function buildCurrentInputs(
 function validateForm(
   tool: StandaloneToolKey,
   form: StandaloneFormState,
+  t: TranslationFn,
 ): string | null {
   if (tool === "image_gen" && !form.prompt.trim()) {
-    return "Image generation needs a prompt.";
+    return t("workspace.standalone.validation.image_prompt");
   }
   if (
     tool === "video_gen" &&
     isKlingMotionVideoModel(form.model) &&
     (!form.videoRefImage || !form.videoRefVideo)
   ) {
-    return "Motion video needs a reference image and a motion video.";
+    return t("workspace.standalone.validation.motion_refs");
   }
   if (
     tool === "video_gen" &&
@@ -2855,7 +3089,7 @@ function validateForm(
     form.videoEnd &&
     !form.videoStart
   ) {
-    return "End image needs a start image too.";
+    return t("workspace.standalone.validation.end_needs_start");
   }
   if (
     tool === "video_gen" &&
@@ -2864,16 +3098,16 @@ function validateForm(
     !form.videoRefImage &&
     !form.videoRefVideo
   ) {
-    return "Video generation needs a prompt or start image.";
+    return t("workspace.standalone.validation.video_input");
   }
   if (tool === "voice_gen" && !form.script.trim()) {
-    return "Voice generation needs a script.";
+    return t("workspace.standalone.validation.voice_script");
   }
   if (tool === "voice_gen" && form.script.length > 5000) {
-    return "Script is too long. Maximum is 5,000 characters.";
+    return t("workspace.standalone.validation.script_too_long");
   }
   if (tool === "image_to_3d" && !form.modelImage) {
-    return "3D generation needs a reference image.";
+    return t("workspace.standalone.validation.model_image");
   }
   return null;
 }
@@ -2892,10 +3126,13 @@ function filterJobsForTool(
   return jobs.filter((job) => job.node_type === nodeType);
 }
 
-function formatDate(value: string): string {
+function formatDate(
+  value: string,
+  language: ReturnType<typeof useLanguage>["language"],
+): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString(undefined, {
+  return date.toLocaleString(language === "th" ? "th-TH" : "en-US", {
     month: "short",
     day: "numeric",
     hour: "2-digit",

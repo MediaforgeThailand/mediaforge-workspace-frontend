@@ -114,7 +114,7 @@
     --text-faint: 240 8% 52%;
     --text-2: 240 20% 78%;
 
-    --mf-ui-scale: 1.1;
+    --mf-ui-scale: 1.265;
   }
 
   /* 2026-05 redesign: drop the legacy 22.63px (≈ √2 × 16) inflation
@@ -122,8 +122,9 @@
    * (h-9 was rendering 51px instead of 36px). Standard 16px root +
    * the `.mf-readable` text-bump utility already covers Thai
    * legibility on dense panels. */
+  /* Current scale is applied here so pointer coordinates stay native. */
   html {
-    font-size: 16px;
+    font-size: calc(16px * var(--mf-ui-scale));
   }
 }
 
@@ -139,28 +140,20 @@
   }
 
   #root {
-    width: calc(100vw / var(--mf-ui-scale));
-    min-height: calc(100dvh / var(--mf-ui-scale));
-    transform-origin: top left;
-    zoom: var(--mf-ui-scale);
+    width: 100vw;
+    min-height: 100dvh;
   }
 
   #root :where(.w-screen) {
-    width: calc(100vw / var(--mf-ui-scale)) !important;
+    width: 100vw !important;
   }
 
   #root :where(.h-screen) {
-    height: calc(100dvh / var(--mf-ui-scale)) !important;
+    height: 100dvh !important;
   }
 
   #root :where(.min-h-screen) {
-    min-height: calc(100dvh / var(--mf-ui-scale)) !important;
-  }
-
-  @supports not (zoom: 1) {
-    #root {
-      transform: scale(var(--mf-ui-scale));
-    }
+    min-height: 100dvh !important;
   }
 }
 

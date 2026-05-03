@@ -45,6 +45,11 @@ interface PromptMentionTextareaProps {
    *  ResizeObserver and feeds 70% of it down here. Pass `null` to
    *  skip the inline cap and let class/CSS rules decide. */
   maxHeightPx?: number | null;
+  /** Stable key used to remember manual prompt scroll across hover
+   *  hide/show cycles. Canvas tool nodes unmount the compact prompt
+   *  when the mouse leaves, so local component state alone is not
+   *  enough to preserve the user's place in a long prompt. */
+  scrollRestoreKey?: string | null;
 }
 
 interface MentionOption {
@@ -280,6 +285,8 @@ function placeCaretAtEnd(el: HTMLElement) {
 
 /* ── Component ── */
 
+const promptScrollMemory = new Map<string, number>();
+
 const PromptMentionTextarea = memo(({
   value,
   onChange,
@@ -291,6 +298,7 @@ const PromptMentionTextarea = memo(({
   maxLength,
   allowedNodeIds = null,
   maxHeightPx = null,
+  scrollRestoreKey = null,
 }: PromptMentionTextareaProps) => {
   const { t } = useLanguage();
   const { getNodes } = useReactFlow();
@@ -307,6 +315,32 @@ const PromptMentionTextarea = memo(({
 
   // Track whether we're doing an internal DOM update to avoid re-render loops
   const suppressSync = useRef(false);
+
+  const rememberScrollTop = useCallback((next: number) => {
+    if (!scrollRestoreKey) return;
+    promptScrollMemory.set(scrollRestoreKey, Math.max(0, Math.round(next)));
+  }, [scrollRestoreKey]);
+
+  const restoreRememberedScrollTop = useCallback(() => {
+    if (!scrollRestoreKey) return;
+    const editor = editorRef.current;
+    if (!editor) return;
+    const remembered = promptScrollMemory.get(scrollRestoreKey);
+    if (typeof remembered !== "number") return;
+    const apply = () => {
+      if (!editor.isConnected) return;
+      editor.scrollTop = Math.min(
+        remembered,
+        Math.max(0, editor.scrollHeight - editor.clientHeight),
+      );
+    };
+    apply();
+    requestAnimationFrame(apply);
+  }, [scrollRestoreKey]);
+
+  useEffect(() => {
+    restoreRememberedScrollTop();
+  }, [restoreRememberedScrollTop, maxHeightPx, value]);
 
   /* ── Internal undo/redo history ──────────────────────────────
    * The browser's native undo stack on contentEditable is fragile
@@ -427,7 +461,13 @@ const PromptMentionTextarea = memo(({
      *  next sync resets it). Stashing the value here + restoring it
      *  AFTER the rebuild keeps the user's scroll exactly where they
      *  left it. */
-    const savedScrollTop = editor.scrollTop;
+    const rememberedScrollTop = scrollRestoreKey
+      ? promptScrollMemory.get(scrollRestoreKey)
+      : undefined;
+    const savedScrollTop =
+      !hadFocus && typeof rememberedScrollTop === "number"
+        ? rememberedScrollTop
+        : editor.scrollTop;
 
     // Build DOM from parsed segments
     const segments = parseSegments(normalizedValue);
@@ -474,7 +514,8 @@ const PromptMentionTextarea = memo(({
     requestAnimationFrame(() => {
       if (editor.isConnected) editor.scrollTop = savedScrollTop;
     });
-  }, [value, mentionOptions, textVarOptions]);
+    rememberScrollTop(savedScrollTop);
+  }, [value, mentionOptions, textVarOptions, rememberScrollTop, scrollRestoreKey]);
 
   /* ── Read DOM → raw string on every input ── */
   const syncFromDom = useCallback(() => {
@@ -876,7 +917,12 @@ const PromptMentionTextarea = memo(({
     if (canScroll) {
       e.stopPropagation();
     }
-  }, []);
+    requestAnimationFrame(() => rememberScrollTop(el.scrollTop));
+  }, [rememberScrollTop]);
+
+  const handlePromptScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    rememberScrollTop(e.currentTarget.scrollTop);
+  }, [rememberScrollTop]);
 
   return (
     <div className="relative nodrag nopan" onMouseDown={stopDrag}>
@@ -894,21 +940,12 @@ const PromptMentionTextarea = memo(({
         onClick={stopDrag}
         onMouseDown={stopDrag}
         onWheel={handlePromptWheel}
+        onScroll={handlePromptScroll}
+        onFocus={restoreRememberedScrollTop}
         onBlur={(e) => {
+          rememberScrollTop(e.currentTarget.scrollTop);
           syncFromDom();
           setTimeout(() => setShowMentions(false), 150);
-          /* When the canvas tool node's compact prompt overlay loses
-           *  focus, `workspace.css` snaps `overflow-y` back to
-           *  `hidden` AND the editor's `scrollTop` is whatever the
-           *  browser auto-scrolled to during typing (usually wherever
-           *  the caret was — often line N of N for a long prompt).
-           *  Combined, that means line 1 is hidden ABOVE the visible
-           *  window and the user can't scroll to recover it without
-           *  re-focusing. Resetting scrollTop to 0 here means the
-           *  resting state always shows the prompt's first line, so
-           *  the user sees what they wrote when they look at the node
-           *  on the canvas. */
-          e.currentTarget.scrollTop = 0;
         }}
         data-placeholder={placeholder}
         className={cn(

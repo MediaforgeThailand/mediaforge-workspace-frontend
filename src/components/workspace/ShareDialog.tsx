@@ -197,7 +197,7 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[520px]">
+      <DialogContent className="w-[min(calc(100vw-32px),520px)] overflow-hidden sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle>{t("workspace.share.title")}</DialogTitle>
           <DialogDescription className="text-xs">
@@ -253,12 +253,12 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
 
         {/* ─── Last-generated URL ─── */}
         {latestUrl && (
-          <div className="flex items-center gap-2">
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
             <Input
               readOnly
               value={latestUrl}
               onFocus={(e) => e.currentTarget.select()}
-              className="font-mono text-xs"
+              className="min-w-0 truncate font-mono text-xs"
             />
             <Button
               type="button"
@@ -291,11 +291,11 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
             </p>
           )}
 
-          <div className="max-h-64 space-y-1.5 overflow-y-auto">
+          <div className="max-h-64 min-w-0 space-y-1.5 overflow-y-auto overflow-x-hidden">
             {shares.map((s) => (
               <div
                 key={s.id}
-                className="flex items-center gap-2 rounded-md border bg-card/50 px-2.5 py-2 text-xs"
+                className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 rounded-md border bg-card/50 px-2.5 py-2 text-xs"
               >
                 <span
                   className={cn(
@@ -307,7 +307,7 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
                 >
                   {s.role}
                 </span>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 overflow-hidden">
                   <div className="truncate font-mono text-[11px] text-muted-foreground">
                     {s.share_url}
                   </div>
