@@ -30,7 +30,9 @@ import { calculateNodeCost } from "@/lib/nodeCostCalculator";
 import { useNodeCreditCosts } from "@/hooks/useNodeCreditCosts";
 import { useCredits } from "@/hooks/useCredits";
 import { DEFAULT_PROJECT_NAME } from "@/store/useWorkspaceStore";
-import { downloadFromUrl } from "./downloadAsset";
+import { buildDownloadFilename, downloadFromUrl } from "./downloadAsset";
+import NodePreviewLightbox, { type PreviewPayload } from "./NodePreviewLightbox";
+import { useFreshSignedUrl } from "./useFreshSignedUrl";
 import {
   build3dParams,
   buildAudioParams,
@@ -2232,6 +2234,8 @@ function CreationFeed({
   jobs: StandaloneJobRow[];
   loading: boolean;
 }) {
+  const [preview, setPreview] = useState<PreviewPayload | null>(null);
+
   if (loading) {
     return (
       <div className="grid min-h-[420px] place-items-center rounded-xl bg-[#1f1f1f]">
@@ -2257,15 +2261,78 @@ function CreationFeed({
     );
   }
   return (
-    <div className="space-y-3">
-      {jobs.map((job) => (
-        <CreationRow key={job.id} job={job} />
-      ))}
-    </div>
+    <>
+      <div className="space-y-3">
+        {jobs.map((job) => (
+          <CreationRow
+            key={job.id}
+            job={job}
+            onPreviewModel={setPreview}
+          />
+        ))}
+      </div>
+      {preview && (
+        <NodePreviewLightbox
+          preview={preview}
+          onClose={() => setPreview(null)}
+        />
+      )}
+    </>
   );
 }
 
-function CreationRow({ job }: { job: StandaloneJobRow }) {
+const MODEL_FILE_RE = /\.(glb|gltf|usdz|obj|fbx)(?:[?#].*)?$/i;
+
+const firstText = (...values: Array<unknown>): string | undefined => {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+};
+
+function getStandaloneModelUrl(result: StandaloneResult | null | undefined) {
+  if (!result) return undefined;
+  const outputs = result.outputs ?? {};
+  const direct = firstText(
+    result.provider_meta?.model_url,
+    outputs.model_url,
+    outputs.glb_url,
+    outputs.gltf_url,
+    outputs.mesh_url,
+    outputs.model,
+  );
+  if (direct) return direct;
+  const assetUrl = firstText(outputs.asset_url, outputs.url, result.url);
+  return assetUrl && MODEL_FILE_RE.test(assetUrl) ? assetUrl : undefined;
+}
+
+function getStandalonePosterUrl(
+  result: StandaloneResult | null | undefined,
+  modelUrl?: string,
+) {
+  if (!result) return undefined;
+  const outputs = result.outputs ?? {};
+  const poster = firstText(
+    result.provider_meta?.rendered_image,
+    outputs.rendered_image,
+    outputs.preview_image,
+    outputs.thumbnail_url,
+    outputs.poster,
+    result.url,
+  );
+  if (!poster || poster === modelUrl || MODEL_FILE_RE.test(poster)) {
+    return undefined;
+  }
+  return poster;
+}
+
+function CreationRow({
+  job,
+  onPreviewModel,
+}: {
+  job: StandaloneJobRow;
+  onPreviewModel: (preview: PreviewPayload) => void;
+}) {
   const [cancelling, setCancelling] = useState(false);
   const result = job.result;
   const params = job.request?.params ?? {};
@@ -2309,20 +2376,37 @@ function CreationRow({ job }: { job: StandaloneJobRow }) {
         ? "text-red-300"
         : "text-amber-300";
   const url = result?.url;
-  const modelUrl = result?.provider_meta?.model_url;
-  const isModel3d = result?.type === "model_3d" || !!modelUrl;
-  const previewUrl = isModel3d
-    ? (result?.provider_meta?.rendered_image ?? url)
-    : url;
+  const modelUrl = getStandaloneModelUrl(result);
+  const resultType = String(result?.type ?? "");
+  const isModel3d = resultType === "model_3d" || resultType === "model3d" || !!modelUrl;
+  const rawPreviewUrl = isModel3d ? getStandalonePosterUrl(result, modelUrl) : url;
+  const mediaUrl = useFreshSignedUrl(url);
+  const previewUrl = useFreshSignedUrl(rawPreviewUrl);
   const duration = String(params.duration ?? "");
   const ratio = String(params.ratio ?? params.aspect_ratio ?? params.size ?? "");
   const modelName = String(params.model_name ?? job.model ?? "model");
+  const playbackUrl = mediaUrl ?? url;
+  const displayPreviewUrl = previewUrl ?? rawPreviewUrl;
+  const downloadUrl = modelUrl ?? playbackUrl;
+  const downloadName =
+    resultType === "audio" ? buildDownloadFilename(title, "mp3") : title;
+  const externalUrl = isModel3d ? modelUrl : playbackUrl;
   const failureMessage =
     job.status === "failed" || job.status === "permanent_failed"
       ? (job.error ?? job.last_error)
       : null;
   const isActive = job.status === "queued" || job.status === "running";
   const isFailed = job.status === "failed" || job.status === "permanent_failed";
+  const openModelPreview = () => {
+    if (!modelUrl) return;
+    onPreviewModel({
+      type: "model3d",
+      model_url: modelUrl,
+      poster: displayPreviewUrl,
+      label: modelName,
+      caption: "Drag to rotate / scroll to zoom",
+    });
+  };
   return (
     <article className="rounded-xl bg-[#222222] px-3 py-3">
       <div className="mb-2 flex items-start justify-between gap-3">
@@ -2341,7 +2425,26 @@ function CreationRow({ job }: { job: StandaloneJobRow }) {
         </div>
       </div>
       <div className="flex flex-col gap-3 md:flex-row md:items-start">
-        <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black md:w-[265px]">
+        <div
+          className={cn(
+            "relative aspect-video w-full overflow-hidden rounded-xl bg-black md:w-[265px]",
+            modelUrl && "cursor-zoom-in",
+          )}
+          role={modelUrl ? "button" : undefined}
+          tabIndex={modelUrl ? 0 : undefined}
+          onClick={modelUrl ? openModelPreview : undefined}
+          onKeyDown={
+            modelUrl
+              ? (event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    openModelPreview();
+                  }
+                }
+              : undefined
+          }
+          aria-label={modelUrl ? "Preview 3D model" : undefined}
+        >
           {isActive && (
             <div className="absolute inset-0 grid place-items-center">
               <div className="flex items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 text-[12px] text-zinc-300">
@@ -2358,23 +2461,29 @@ function CreationRow({ job }: { job: StandaloneJobRow }) {
               </div>
             </div>
           )}
-          {(result?.type === "image" || result?.type === "model_3d") && previewUrl && (
-            <img src={previewUrl} alt="" className="h-full w-full object-cover" />
+          {(result?.type === "image" || isModel3d) && displayPreviewUrl && (
+            <img src={displayPreviewUrl} alt="" className="h-full w-full object-cover" />
           )}
-          {result?.type === "video" && url && (
+          {result?.type === "video" && playbackUrl && (
             <video
-              src={url}
+              src={playbackUrl}
               controls
               playsInline
               className="h-full w-full object-cover"
             />
           )}
-          {result?.type === "audio" && url && (
+          {result?.type === "audio" && playbackUrl && (
             <div className="flex h-full w-full items-center justify-center p-4">
-              <audio src={url} controls className="w-full" />
+              <audio
+                src={playbackUrl}
+                controls
+                preload="metadata"
+                className="w-full"
+                data-testid="standalone-audio-player"
+              />
             </div>
           )}
-          {modelUrl && !url && (
+          {modelUrl && !displayPreviewUrl && (
             <div className="grid h-full place-items-center text-zinc-500">
               <Box className="h-8 w-8" />
             </div>
@@ -2444,37 +2553,41 @@ function CreationRow({ job }: { job: StandaloneJobRow }) {
               )}
             </button>
           )}
-          {url && (
+          {downloadUrl && (
             <>
               <button
                 type="button"
-                onClick={() => void downloadFromUrl(url, title)}
+                onClick={() => void downloadFromUrl(downloadUrl, downloadName)}
+                data-testid="standalone-download"
                 className="grid h-9 w-9 place-items-center rounded-lg bg-white text-zinc-950 hover:bg-zinc-200"
                 aria-label="Download"
               >
                 <Download className="h-4 w-4" />
               </button>
-              <a
-                href={url}
-                target="_blank"
-                rel="noreferrer"
-                className="grid h-9 w-9 place-items-center rounded-lg bg-[#2f2f2f] text-zinc-300 hover:bg-[#3a3a3a]"
-                aria-label="Open"
-              >
-                <ExternalLink className="h-4 w-4" />
-              </a>
+              {externalUrl && (
+                <a
+                  href={externalUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="grid h-9 w-9 place-items-center rounded-lg bg-[#2f2f2f] text-zinc-300 hover:bg-[#3a3a3a]"
+                  aria-label="Open file"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              )}
             </>
           )}
           {modelUrl && (
-            <a
-              href={modelUrl}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              type="button"
+              onClick={openModelPreview}
+              data-testid="standalone-open-3d-preview"
               className="grid h-9 w-9 place-items-center rounded-lg bg-amber-300 text-zinc-950 hover:bg-amber-200"
-              aria-label="Open 3D model"
+              aria-label="Preview 3D model"
+              title="Preview 3D"
             >
               <Box className="h-4 w-4" />
-            </a>
+            </button>
           )}
         </div>
       </div>
@@ -2519,7 +2632,7 @@ function useStandaloneJobs(
     refetchInterval: false,
     queryFn: async () => {
       if (!projectId) return [];
-      const base = (supabase as any)
+      const base = supabase
         .from("workspace_generation_jobs")
         .select(STANDALONE_JOB_SELECT)
         .eq("project_id", projectId)
@@ -2530,7 +2643,7 @@ function useStandaloneJobs(
           .in("status", ["queued", "running"])
           .order("created_at", { ascending: false })
           .limit(100),
-        (supabase as any)
+        supabase
           .from("workspace_generation_jobs")
           .select(STANDALONE_JOB_SELECT)
           .eq("project_id", projectId)
