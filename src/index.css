@@ -1191,3 +1191,13 @@ body {
 .mf-readable .workspace-home-compact :where([class*="leading-none"], [class*="leading-tight"]) {
   line-height: 1.08 !important;
 }
+
+.mf-readable .workspace-spaces-compact :where([class*="text-[13px]"], [class*="text-[13.5px]"], [class*="text-[14px]"], [class*="text-[14.5px]"], [class*="text-[15px]"], [class*="text-[15.5px]"]) {
+  font-size: 15px !important;
+  line-height: 1 !important;
+}
+
+.mf-readable .workspace-spaces-compact :where([class*="text-[10px]"], [class*="text-[10.5px]"]) {
+  font-size: 12px !important;
+  line-height: 1 !important;
+}
