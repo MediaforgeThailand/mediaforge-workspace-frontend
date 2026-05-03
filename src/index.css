@@ -113,6 +113,8 @@
     --text-dim: 240 20% 78%;
     --text-faint: 240 8% 52%;
     --text-2: 240 20% 78%;
+
+    --mf-ui-scale: 1.1;
   }
 
   /* 2026-05 redesign: drop the legacy 22.63px (≈ √2 × 16) inflation
@@ -133,6 +135,32 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
+    overflow-x: hidden;
+  }
+
+  #root {
+    width: calc(100vw / var(--mf-ui-scale));
+    min-height: calc(100dvh / var(--mf-ui-scale));
+    transform-origin: top left;
+    zoom: var(--mf-ui-scale);
+  }
+
+  #root :where(.w-screen) {
+    width: calc(100vw / var(--mf-ui-scale)) !important;
+  }
+
+  #root :where(.h-screen) {
+    height: calc(100dvh / var(--mf-ui-scale)) !important;
+  }
+
+  #root :where(.min-h-screen) {
+    min-height: calc(100dvh / var(--mf-ui-scale)) !important;
+  }
+
+  @supports not (zoom: 1) {
+    #root {
+      transform: scale(var(--mf-ui-scale));
+    }
   }
 }
 
