@@ -158,14 +158,14 @@ const App = () => (
                    *  so it sits outside DashboardLayout — no chrome
                    *  competition with the legacy consumer sidebar. */}
                   <Route path="/app" element={<Navigate to="/app/workspace" replace />} />
-                  <Route
-                    path="/app/workspace"
-                    element={
-                      <ProtectedRoute>
-                        <WorkspaceDashboard />
-                      </ProtectedRoute>
-                    }
-                  />
+                  {/* Dashboard ("Home", Spaces grid, Tools, Stock) is
+                   *  PUBLIC. Guests can browse the surface and the tool
+                   *  catalogue without logging in. Auth-only actions
+                   *  (opening a Space canvas, creating a project, etc.)
+                   *  bounce to /auth via their own ProtectedRoute or via
+                   *  inline guards inside the dashboard's interactive
+                   *  surfaces. */}
+                  <Route path="/app/workspace" element={<WorkspaceDashboard />} />
 
                   {/* Org-admin panel — DEFINED BEFORE the AccountShell outlet
                       below because the outlet's `*` catch-all otherwise

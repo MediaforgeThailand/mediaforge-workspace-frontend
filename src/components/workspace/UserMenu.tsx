@@ -157,6 +157,27 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
   const { user, profile, signOut } = useAuth();
   const { t, language, setLanguage } = useLanguage();
   const { credits, loading: creditsLoading } = useCredits();
+
+  // Guest fallback — when no user is signed in (the dashboard / home
+  // is public per Workspace V2), render a compact "Sign in" pill in
+  // place of the credit-ring avatar. Clicking it deep-links to /auth
+  // with the current path remembered so the user lands back here
+  // after authenticating.
+  if (!user) {
+    return (
+      <button
+        type="button"
+        onClick={() =>
+          navigate("/auth", {
+            state: { from: { pathname: window.location.pathname, search: window.location.search } },
+          })
+        }
+        className="inline-flex h-9 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-semibold text-zinc-950 transition hover:bg-zinc-200"
+      >
+        {t("authSignInButton")}
+      </button>
+    );
+  }
   const adminConsoleUrl =
     (import.meta.env.VITE_ADMIN_CONSOLE_URL as string | undefined) ||
     "https://mediaforge-admin-hub.vercel.app/org/console";
