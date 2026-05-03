@@ -1160,6 +1160,16 @@ body {
   line-height: 1.65rem !important;
 }
 
+.mf-readable :where([class*="text-[14px]"], [class*="text-[14.5px]"]) {
+  font-size: 18.4px !important;
+  line-height: 1.75rem !important;
+}
+
+.mf-readable :where([class*="text-[15px]"], [class*="text-[15.5px]"], [class*="text-[16px]"]) {
+  font-size: 19.55px !important;
+  line-height: 1.85rem !important;
+}
+
 .mf-readable :where(.text-xs) {
   font-size: 16.7px !important;
   line-height: 1.55rem !important;
@@ -1176,4 +1186,8 @@ body {
 
 .mf-readable .workspace-home-compact :where([class*="text-[13px]"], [class*="text-[13.5px]"], [class*="text-[14.5px]"], [class*="text-[15px]"], [class*="text-[15.5px]"]) {
   line-height: 1.18 !important;
+}
+
+.mf-readable .workspace-home-compact :where([class*="leading-none"], [class*="leading-tight"]) {
+  line-height: 1.08 !important;
 }

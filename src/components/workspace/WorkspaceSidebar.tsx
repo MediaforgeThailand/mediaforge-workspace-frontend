@@ -51,6 +51,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useIsClassTeacher, useIsOrgAdmin } from "@/hooks/useIsOrgUser";
 import { useOrgBranding } from "@/hooks/useOrgBranding";
 import { useCredits } from "@/hooks/useCredits";
+import { supabase } from "@/integrations/supabase/client";
 import OrgCreditBadge from "@/components/OrgCreditBadge";
 import ActiveClassPicker from "@/components/ActiveClassPicker";
 
@@ -112,6 +113,39 @@ const NAV_TOOLS: NavItem[] = [
   { id: "voice_gen",  labelKey: "workspace.sidebar.voice_gen",   icon: Mic2 },
   { id: "image_to_3d", labelKey: "workspace.sidebar.threed_gen", icon: Box },
 ];
+
+const DEFAULT_ADMIN_HUB_URL = "https://mediaforge-admin-hub.vercel.app";
+
+function normalizeUniversityHandoffUrl(rawUrl: string): string {
+  try {
+    const url = new URL(rawUrl, window.location.origin);
+    if (url.pathname === "/" || url.pathname === "/school/center") {
+      url.pathname = "/school/session-handoff";
+    }
+    return url.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
+function getUniversityHandoffUrl(): string {
+  const env = import.meta.env as Record<string, string | undefined>;
+  const explicit =
+    env.VITE_ERP_SCHOOL_HANDOFF_URL ||
+    env.VITE_ERP_SCHOOL_CENTER_URL ||
+    env.VITE_UNIVERSITY_PORTAL_URL;
+
+  if (explicit) return normalizeUniversityHandoffUrl(explicit);
+
+  const adminConsoleUrl = env.VITE_ADMIN_CONSOLE_URL;
+  if (!adminConsoleUrl) return `${DEFAULT_ADMIN_HUB_URL}/school/session-handoff`;
+
+  try {
+    return `${new URL(adminConsoleUrl).origin}/school/session-handoff`;
+  } catch {
+    return `${DEFAULT_ADMIN_HUB_URL}/school/session-handoff`;
+  }
+}
 
 export interface WorkspaceSidebarProps {
   /** Highlighted section. Pass undefined when the current surface
@@ -300,7 +334,31 @@ const OrgAdminLink = () => {
     ? t("workspace.sidebar.manage_team_tip")
     : t("workspace.sidebar.university_tip");
   const PrimaryIcon = isEnterprise ? UsersRound : School;
-  const primaryTarget = isEnterprise ? "/app/settings?tab=team" : "/app/org-admin";
+
+  const handlePrimaryClick = async () => {
+    if (isEnterprise) {
+      navigate("/app/settings?tab=team");
+      return;
+    }
+
+    const { data, error } = await supabase.auth.getSession();
+    const session = data.session;
+    if (error || !session?.access_token || !session.refresh_token) {
+      navigate("/auth");
+      return;
+    }
+
+    const target = new URL(getUniversityHandoffUrl(), window.location.origin);
+    const handoff = new URLSearchParams({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+      token_type: session.token_type || "bearer",
+      type: "workspace_handoff",
+    });
+    if (session.expires_at) handoff.set("expires_at", String(session.expires_at));
+    target.hash = handoff.toString();
+    window.location.assign(target.toString());
+  };
 
   return (
     /* 2026-05: drop the divider line — we use a small mt gap instead
@@ -308,7 +366,7 @@ const OrgAdminLink = () => {
     <div className="mt-[12px] space-y-[4px] px-[12px] pb-[8px] pt-[4px]">
       <button
         type="button"
-        onClick={() => navigate(primaryTarget)}
+        onClick={() => void handlePrimaryClick()}
         className="flex h-[32px] w-full items-center gap-[8px] rounded-md px-[8px] text-[14px] text-amber-200/90 transition-colors hover:bg-amber-300/10 hover:text-amber-100"
         title={primaryTip}
       >

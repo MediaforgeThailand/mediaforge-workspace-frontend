@@ -1772,17 +1772,17 @@ const ToolsCard = ({
             <button
               type="button"
               onClick={() => onOpen(tool.id)}
-              className="group/tool flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-[15px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white"
+              className="group/tool flex w-full items-start gap-2.5 rounded-md px-2 py-1.5 text-[15px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white"
             >
               <span
-                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md"
+                className="mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center rounded-md"
                 style={{ background: tool.accent }}
               >
                 <tool.icon className="h-3 w-3 text-zinc-950" />
               </span>
-              <span className="min-w-0 flex-1 text-left">
-                <span className="block truncate">{tool.label}</span>
-                <span className="block truncate text-[13px] leading-tight text-zinc-600 group-hover/tool:text-zinc-400">
+              <span className="flex min-w-0 flex-1 flex-col justify-start gap-[2px] text-left">
+                <span className="block truncate leading-none">{tool.label}</span>
+                <span className="block truncate text-[13px] leading-none text-zinc-600 group-hover/tool:text-zinc-400">
                   {tool.subtitle}
                 </span>
               </span>
@@ -2582,9 +2582,9 @@ const SpacesView = ({
       />
 
       <div className="ws-scroll-hide flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1400px] px-4 pb-16 pt-6 md:px-6 lg:px-8 lg:pt-10">
+        <div className="mx-auto max-w-[1400px] px-4 pb-16 pt-2 md:px-6 md:pt-3 lg:px-8 lg:pt-3">
           {/* ── Hero header — big title + subtitle ─────────────── */}
-          <header className="mb-8">
+          <header className="mb-5">
             <h1 className="text-[40px] font-bold leading-none tracking-tight text-zinc-50 md:text-[48px] lg:text-[56px]">
               {t("workspace.spaces.title")}
             </h1>
@@ -2604,7 +2604,7 @@ const SpacesView = ({
               Mirrors the Magnific layout exactly — segmented tabs on
               the left, "+ New space" + filter / favourites / search
               icon row on the right. */}
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <SpacesTabs tab={tab} onChange={setTab} />
             <div className="flex items-center gap-2">
               <button
@@ -2951,7 +2951,7 @@ const PageHeader = ({
   /* 2026-05: drop the bottom hairline. Header sits flush on Layer-0
    *  page bg; the content cards underneath are Layer-1/2 so the
    *  header reads as a top strip without needing a divider. */
-  <div className="flex h-14 shrink-0 items-center gap-3 px-4 md:px-6 lg:h-12 lg:px-8">
+  <div className="flex h-11 shrink-0 items-center gap-3 px-4 md:px-6 lg:h-10 lg:px-8">
     {onOpenSidebar && (
       <button
         type="button"
