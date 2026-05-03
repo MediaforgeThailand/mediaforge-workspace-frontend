@@ -49,6 +49,7 @@ import WorkspaceCanvas from "@/components/workspace/WorkspaceCanvas";
 // delete the file or the import. The leading underscore silences
 // the unused-import warning while the JSX is commented out.
 import _WorkspaceRightSidebar from "@/components/workspace/WorkspaceRightSidebar";
+import WorkspaceCanvasMediaBridges from "@/components/workspace/WorkspaceCanvasMediaBridges";
 import WorkspaceMascot from "@/components/workspace/WorkspaceMascot";
 // DebugPanel still gated — its persisted Zustand store hasn't been
 // audited end-to-end and we don't need it for the demo. Bring back
@@ -330,7 +331,7 @@ const WorkspaceCanvasPage = () => {
       {/* Floating credit pill — top-right of the canvas, above tabs and
           toolbars. OrgCreditBadge returns null for consumer/guest users
           (no membership), so the consumer flow is unaffected. */}
-      <div className="pointer-events-none fixed right-4 top-3 z-50">
+      <div className="pointer-events-none fixed right-[178px] top-[11px] z-[70]">
         <div className="pointer-events-auto">
           <OrgCreditBadge variant="pill" />
         </div>
@@ -375,6 +376,10 @@ const WorkspaceCanvasPage = () => {
            *  user request. Restore by uncommenting + renaming the
            *  import above back to `WorkspaceRightSidebar`. */}
           {/* <WorkspaceRightSidebar /> */}
+          {/* Always-mounted bridges so the canvas right-click menu's
+           *  Upload / Assets / Stock entries keep working even while
+           *  the right sidebar (which used to host them) is hidden. */}
+          <WorkspaceCanvasMediaBridges />
         </div>
         {/* <WorkspaceDebugPanel /> — kept disabled until persist
          *   middleware is audited (not blocking demo). */}

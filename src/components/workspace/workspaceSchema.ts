@@ -53,6 +53,12 @@ const SEEDANCE_VIDEO_REF_MODELS = [
   "seedance-2-0-lite",
   "seedance-2-0-pro",
 ] as const;
+/** Google Veo (Standard tier only). Backend dispatches anything
+ *  starting with "veo-" to the Gemini API `predictLongRunning`
+ *  endpoint. Real spec verified against
+ *  https://ai.google.dev/gemini-api/docs/video — see backend
+ *  `_shared/veo.ts` for the param contract. */
+const VEO_MODELS = ["veo-3.1-generate-preview"] as const;
 const BANANA_MODELS = ["nano-banana-2", "nano-banana-pro"] as const;
 /** Backend dispatches anything starting with "gpt-image" to OpenAI's
  *  /v1/images/edits or /v1/images/generations endpoint. */
@@ -396,10 +402,11 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
   },
 
   /**
-   * Unified Video Generation — Kling family + SeedDance family.
-   * Kling-specific features (multi-shot, ref_image/ref_video) are
-   * gated by `supportedModels`, so they naturally disable when a
-   * SeedDance model is picked.
+   * Unified Video Generation — Kling family + SeedDance family +
+   * Google Veo 3.1. Provider-specific features (multi-shot,
+   * ref_image/ref_video, personGeneration) are gated by
+   * `supportedModels`, so they naturally disable when an unrelated
+   * model is picked.
    */
   videoGenNode: {
     displayName: "Video Generation",
@@ -408,6 +415,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     supportedModels: [
       ...KLING_MODELS.map((m) => m.value),
       ...SEEDANCE_MODELS,
+      ...VEO_MODELS,
     ],
     defaultModel: "kling-v2-6-pro",
     inputs: [
@@ -416,11 +424,20 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         id: "start_frame",
         label: "start_frame",
         color: "blue",
+        // Required for Kling/Seedance image-to-video; OPTIONAL for Veo
+        // (Veo also supports text-to-video). The required flag is
+        // honoured per-model by the canvas validator.
         required: true,
         supportedModels: [
           "kling-v2-6-pro", "kling-v3-pro", "kling-v3-omni",
           ...SEEDANCE_MODELS,
         ],
+      },
+      {
+        id: "start_frame",
+        label: "start_frame",
+        color: "blue",
+        supportedModels: [...VEO_MODELS],
       },
       {
         id: "end_frame",
@@ -429,6 +446,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         supportedModels: [
           "kling-v2-6-pro", "kling-v3-pro", "kling-v3-omni",
           ...SEEDANCE_MODELS,
+          ...VEO_MODELS,
         ],
       },
       {
@@ -465,6 +483,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         supportedModels: [
           "kling-v2-6-pro", "kling-v2-6-motion-pro",
           "kling-v3-pro", "kling-v3-motion-pro", "kling-v3-omni",
+          ...VEO_MODELS,
         ],
       },
       {
@@ -474,6 +493,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         supportedModels: [
           "kling-v2-6-pro", "kling-v2-6-motion-pro",
           "kling-v3-pro", "kling-v3-motion-pro", "kling-v3-omni",
+          ...VEO_MODELS,
         ],
       },
       {
@@ -491,6 +511,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         options: [
           ...KLING_MODELS.map((m) => m.value),
           ...SEEDANCE_MODELS,
+          ...VEO_MODELS,
         ],
         optionLabels: {
           ...KLING_LABELS,
@@ -499,6 +520,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           "seedance-1-5-pro-251215": "SeedDance 1.5 Pro (Latest)",
           "seedance-2-0-lite": "SeedDance 2.0 Fast",
           "seedance-2-0-pro": "SeedDance 2.0 Pro",
+          "veo-3.1-generate-preview": "Google Veo 3.1",
         },
         default: "kling-v2-6-pro",
         required: true,
@@ -535,6 +557,15 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         supportedModels: [...SEEDANCE_MODELS],
       },
       {
+        // Veo 3.1 only accepts "16:9" or "9:16" — see real spec.
+        key: "aspect_ratio",
+        label: "Aspect Ratio",
+        type: "select",
+        options: ["16:9", "9:16"],
+        default: "16:9",
+        supportedModels: [...VEO_MODELS],
+      },
+      {
         key: "resolution",
         label: "Resolution",
         type: "select",
@@ -543,19 +574,31 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         supportedModels: [...SEEDANCE_MODELS],
       },
       {
+        // Veo 3.1 supports 720p / 1080p (4k is gated). Picking 1080p
+        // forces durationSeconds=8 server-side per Google's docs.
+        key: "resolution",
+        label: "Resolution",
+        type: "select",
+        options: ["720p", "1080p"],
+        default: "720p",
+        supportedModels: [...VEO_MODELS],
+      },
+      {
         key: "duration",
         label: "Duration (s)",
         type: "dynamic",
-        // Per-model valid duration ranges. BytePlus / Kling reject
-        // anything outside these and the user's only feedback is a
-        // 400 InvalidParameter mid-gen — so the UI has to gate the
-        // values, not just hint them.
+        // Per-model valid duration ranges. BytePlus / Kling / Veo
+        // reject anything outside these and the user's only feedback
+        // is a 400 InvalidParameter mid-gen — so the UI has to gate
+        // the values, not just hint them.
         //
         //   Seedance 1.0 Lite          → discrete [5, 10]
         //   Seedance 1.0 Pro / Pro Fast → 2-12s slider
         //   Seedance 1.5 Pro            → discrete [4..12]
         //   Seedance 2.0 (Lite / Pro)   → 4-15s slider
         //   Kling v3 Omni / v3 Pro      → 3-15s slider
+        //   Veo 3.1                     → discrete [4, 6, 8]
+        //                                 (1080p forces 8 server-side)
         //   everything else (legacy)    → discrete [5, 10]
         //
         // Order matters: more specific prefixes (`seedance-1-5-`,
@@ -565,6 +608,15 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           const isV3 = model === "kling-v3-omni" || model === "kling-v3-pro";
           if (isV3)
             return { type: "slider" as const, min: 3, max: 15, step: 1, default: 5 };
+
+          // Veo 3.1 — only 4, 6, or 8 seconds are valid per Google's
+          // generateVideos spec.
+          if (model.startsWith("veo-"))
+            return {
+              type: "select" as const,
+              options: ["4", "6", "8"],
+              default: "8",
+            };
 
           // Seedance 2.0 — Lite + Pro share the same window. Direct
           // BytePlus IDs (`dreamina-seedance-*`) get the same treatment
@@ -602,7 +654,23 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         supportedModels: [
           "kling-v2-6-pro", "kling-v3-pro", "kling-v3-omni",
           ...SEEDANCE_MODELS,
+          ...VEO_MODELS,
         ],
+      },
+      {
+        // Veo 3.1 — controls whether people may appear in the output.
+        // "allow_adult" is the safer default; "allow_all" permits
+        // children's faces (subject to Google's content policy).
+        key: "person_generation",
+        label: "People in output",
+        type: "select",
+        options: ["allow_adult", "allow_all"],
+        optionLabels: {
+          allow_adult: "Adults only",
+          allow_all: "Allow children too",
+        },
+        default: "allow_adult",
+        supportedModels: [...VEO_MODELS],
       },
       {
         key: "has_audio",

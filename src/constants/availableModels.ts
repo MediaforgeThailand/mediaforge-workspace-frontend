@@ -43,15 +43,19 @@ const mergeAudioModels: ModelEntry[] = (NODE_API_SCHEMA.mergeAudioNode?.supporte
   return { slug, label: optionLabels?.[slug] ?? slug };
 });
 
-const videoModels: ModelEntry[] = KLING_MODELS.flatMap((m) => {
-  const base: ModelEntry = { slug: m.value, label: m.label };
-  // Omni/O1 models have a higher-priced video-ref tier
-  const hasVideoRef = ["kling-v3-omni"].includes(m.value);
-  if (hasVideoRef) {
-    return [base, { slug: `${m.value}-video-ref`, label: `${m.label} + Video Ref` }];
-  }
-  return [base];
-});
+const videoModels: ModelEntry[] = [
+  ...KLING_MODELS.flatMap((m) => {
+    const base: ModelEntry = { slug: m.value, label: m.label };
+    // Omni/O1 models have a higher-priced video-ref tier
+    const hasVideoRef = ["kling-v3-omni"].includes(m.value);
+    if (hasVideoRef) {
+      return [base, { slug: `${m.value}-video-ref`, label: `${m.label} + Video Ref` }];
+    }
+    return [base];
+  }),
+  // Google Veo (Standard tier only — Lite/Fast not yet wired in).
+  { slug: "veo-3.1-generate-preview", label: "Google Veo 3.1" },
+];
 
 export const AVAILABLE_MODELS: FeatureModels[] = [
   { feature: "chat_ai", featureLabel: "Chat AI", models: chatModels },

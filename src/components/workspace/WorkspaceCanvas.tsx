@@ -100,7 +100,6 @@ import { useCanvasRealtime } from "./useCanvasRealtime";
 import CanvasCollaborationOverlay from "./CanvasCollaborationOverlay";
 import { useCanvasCollaborationStore } from "./canvasCollaboration";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useNavigate } from "react-router-dom";
 
 const VIEWPORT_KEY = (canvasId: string) => `workspace-viewport-${canvasId}`;
 const STORAGE_BUCKET = "ai-media";
@@ -477,7 +476,6 @@ const Inner = () => {
   } = useReactFlow();
   const { user } = useAuth();
   const { t } = useLanguage();
-  const navigate = useNavigate();
   // Viewer-mode flag — when true, the canvas renders read-only:
   // no node drags, no new connections, no marquee selection (still
   // selectable so the lightbox/preview affordances work, just no
@@ -1259,27 +1257,22 @@ const Inner = () => {
   );
 
   /** Non-spawn actions from the right-click menu — Upload / Assets /
-   *  Stock. Bridges to the pre-existing event channels so we don't
-   *  duplicate logic. Stock is a "soon" placeholder. */
+   *  Stock. Bridges to pre-existing event channels handled by
+   *  WorkspaceCanvasMediaBridges (mounted on the Canvas page) so we
+   *  don't duplicate dialog/file-picker logic. */
   const onContextMenuAction = useCallback(
     (item: ToolItem) => {
       if (item.action === "assets") {
-        // Pop the AllAssetsDialog. The asset panel owns its own
-        // toggle, but a window event lets the menu open it without
-        // prop drilling. We listen for this event in
-        // WorkspaceAssetPanel.
         window.dispatchEvent(new CustomEvent("workspace-open-all-assets"));
       } else if (item.action === "upload") {
-        // Click a hidden file input by dispatching to the canvas's
-        // upload bridge. The user gets a native picker; selected
-        // files go through the existing uploadAsset flow.
         window.dispatchEvent(new CustomEvent("workspace-trigger-upload"));
       } else if (item.action === "stock") {
-        navigate("/app/workspace?section=stock");
+        // Inline picker — never navigates the user away from the canvas.
+        window.dispatchEvent(new CustomEvent("workspace-open-stock"));
       }
       setContextMenu(null);
     },
-    [navigate],
+    [],
   );
 
   /** "+" button in the floating sidebar — opens the same picker, but

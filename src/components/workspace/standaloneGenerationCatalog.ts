@@ -268,6 +268,14 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
         badge: "v2 Pro",
         description: "Latest Seedance 2.0 — premium quality.",
       },
+      // ── Google Veo family (Standard tier only) ─────────────
+      {
+        id: "veo-3.1-generate-preview",
+        label: "Google Veo 3.1",
+        provider: "Google",
+        badge: "Standard",
+        description: "Google Veo 3.1 with native audio — 4/6/8s, 720p/1080p, 16:9 or 9:16.",
+      },
     ],
   },
   voice_gen: {
@@ -416,12 +424,17 @@ export function isKlingMotionVideoModel(model: string): boolean {
   return model === "kling-v2-6-motion-pro" || model === "kling-v3-motion-pro";
 }
 
+export function isVeoVideoModel(model: string): boolean {
+  return model.startsWith("veo-");
+}
+
 export function videoSupportsStartEndFrames(model: string): boolean {
   return (
     model === "kling-v2-6-pro" ||
     model === "kling-v3-pro" ||
     model === "kling-v3-omni" ||
-    isSeedanceVideoModel(model)
+    isSeedanceVideoModel(model) ||
+    isVeoVideoModel(model)
   );
 }
 
@@ -441,6 +454,11 @@ export function videoSupportsReferenceVideo(model: string): boolean {
 export function videoDurationsForModel(model: string): number[] {
   if (model === "kling-v3-omni" || model === "kling-v3-pro") {
     return [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+  }
+  if (isVeoVideoModel(model)) {
+    // Veo 3.1 only accepts these three discrete values per Google's
+    // generateVideos spec. 1080p forces 8s server-side.
+    return [4, 6, 8];
   }
   if (
     model.startsWith("seedance-2-0") ||
@@ -590,6 +608,24 @@ export function buildVideoParams(args: {
   hasReferenceVideo?: boolean;
 }): Record<string, unknown> {
   const hasReferenceVideo = !!args.hasReferenceVideo;
+  if (isVeoVideoModel(args.model)) {
+    // Veo 3.1 only accepts "16:9" or "9:16" for aspectRatio. Coerce
+    // anything else (e.g. the dashboard's "Auto" default) to 16:9.
+    const aspect = args.ratio === "9:16" ? "9:16" : "16:9";
+    // Resolution: Veo accepts "720p" or "1080p"; default 720p.
+    const res = args.resolution === "1080p" ? "1080p" : "720p";
+    // Duration: snap to the nearest valid value (4 / 6 / 8).
+    const dur = args.duration <= 4 ? 4 : args.duration <= 6 ? 6 : 8;
+    return {
+      model_name: args.model,
+      prompt: args.prompt.trim(),
+      aspect_ratio: aspect,
+      resolution: res,
+      duration: String(dur),
+      // Audio is always-on for Veo (no toggle); withAudio arg ignored.
+      person_generation: "allow_adult",
+    };
+  }
   if (isSeedanceVideoModel(args.model)) {
     return {
       model_name: args.model,

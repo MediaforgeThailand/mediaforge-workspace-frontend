@@ -1341,6 +1341,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       // dispatch by `provider_meta.provider`:
       //   - "tripo3d"  → POST action="poll_tripo3d"
       //   - "seedance" → POST action="poll_seedance"
+      //   - "veo"      → POST action="poll_veo"
       //   - else       → POST action="poll_kling"  (default for video)
       const pollEndpoint = r.provider_meta?.poll_endpoint;
       const pollProvider = String(r.provider_meta?.provider ?? "kling").toLowerCase();
@@ -1348,18 +1349,23 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         const pollStart = Date.now();
         const isTripo3d = pollProvider === "tripo3d";
         const isSeedance = pollProvider === "seedance";
+        const isVeo = pollProvider === "veo";
         const POLL_INTERVAL_MS = isTripo3d ? 4_000 : 5_000;
         const POLL_TIMEOUT_MS = isTripo3d ? 8 * 60_000 : 6 * 60_000;
         const pollAction = isTripo3d
           ? "poll_tripo3d"
           : isSeedance
             ? "poll_seedance"
-            : "poll_kling";
+            : isVeo
+              ? "poll_veo"
+              : "poll_kling";
         const providerLabel = isTripo3d
           ? "Tripo3D"
           : isSeedance
             ? "Seedance"
-            : "Kling";
+            : isVeo
+              ? "Veo"
+              : "Kling";
         let polledUrl: string | undefined;
         let polledModelUrl: string | undefined;
         let polledPreview: string | undefined;
@@ -2239,6 +2245,13 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             options={effectiveOptions}
             optionLabels={effectiveLabels}
             onChange={(v) => updateParam(param.key, v)}
+            // Long lists (model_name today, future picker-style params)
+            // open as a search-and-keyboard-nav dropdown instead of a
+            // plain Radix Select. Keeps short dropdowns snappy.
+            searchable={param.key === "model_name"}
+            searchFooter={
+              param.key === "model_name" ? "All models" : undefined
+            }
           />
         );
       }
@@ -2549,6 +2562,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                       : `Try "happy dog wearing sunglasses, studio light"`
                   }
                   excludeNodeId={id}
+                  scrollRestoreKey={`workspace-tool-node:${id}:prompt`}
                   className="ws-compact-prompt-input"
                   allowedNodeTypes={[
                     "assetNode",

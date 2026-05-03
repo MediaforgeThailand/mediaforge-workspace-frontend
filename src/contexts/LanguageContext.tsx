@@ -1,8 +1,8 @@
-import { Avatar } from "@radix-ui/react-avatar";
-import { clear } from "console";
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 
 type Language = "en" | "th";
+
+const LANGUAGE_STORAGE_KEY = "mf-lang";
 
 const translations = {
   en: {
@@ -1917,6 +1917,165 @@ const translations = {
     "workspace.toast.sign_in_first": "Please sign in before generating.",
     "workspace.toast.tool_not_ready": "This tool is not ready yet.",
 
+    // Standalone generator
+    "workspace.standalone.menu": "Menu",
+    "workspace.standalone.tools": "Tools",
+    "workspace.standalone.tool.image_gen.nav": "Image",
+    "workspace.standalone.tool.image_gen.title": "Image Generator",
+    "workspace.standalone.tool.video_gen.nav": "Video",
+    "workspace.standalone.tool.video_gen.title": "Video Generator",
+    "workspace.standalone.tool.voice_gen.nav": "Audio",
+    "workspace.standalone.tool.voice_gen.title": "Voice Generator",
+    "workspace.standalone.tool.image_to_3d.nav": "3D",
+    "workspace.standalone.tool.image_to_3d.title": "Image to 3D",
+    "workspace.standalone.generate": "Generate",
+    "workspace.standalone.credits": "credits",
+    "workspace.standalone.model": "Model",
+    "workspace.standalone.prompt": "Prompt",
+    "workspace.standalone.aspect": "Aspect",
+    "workspace.standalone.resolution": "Resolution",
+    "workspace.standalone.quality": "Quality",
+    "workspace.standalone.format": "Format",
+    "workspace.standalone.background": "Background",
+    "workspace.standalone.duration": "Duration",
+    "workspace.standalone.orientation": "Orientation",
+    "workspace.standalone.start_image": "Start image",
+    "workspace.standalone.end_image": "End image",
+    "workspace.standalone.reference_image": "Reference image",
+    "workspace.standalone.ref_image": "Ref image",
+    "workspace.standalone.motion_video": "Motion video",
+    "workspace.standalone.ref_video": "Ref video",
+    "workspace.standalone.describe_image": "Describe the image you want to create",
+    "workspace.standalone.describe_video": "Describe camera movement, subject, scene, and mood",
+    "workspace.standalone.generate_audio": "Generate audio",
+    "workspace.standalone.keep_original_sound": "Keep original sound",
+    "workspace.standalone.script": "Script",
+    "workspace.standalone.script_placeholder": "Paste the script you want to turn into speech",
+    "workspace.standalone.voice": "Voice",
+    "workspace.standalone.loading": "Loading…",
+    "workspace.standalone.from_account": "{count} from your account",
+    "workspace.standalone.loading_elevenlabs": "Loading ElevenLabs voices from your account…",
+    "workspace.standalone.no_elevenlabs_voices": "No voices in this ElevenLabs account.",
+    "workspace.standalone.voice_id": "Voice ID",
+    "workspace.standalone.voice_id_gemini_placeholder": "Optional · e.g. Charon, Aoede (defaults to Charon)",
+    "workspace.standalone.voice_id_google_placeholder": "Optional · e.g. en-US-Studio-O (defaults to Studio-O)",
+    "workspace.standalone.voice_instructions": "Voice instructions",
+    "workspace.standalone.voice_instructions_gemini_placeholder": "e.g. Calmly, with a warm tone",
+    "workspace.standalone.voice_instructions_google_placeholder": "e.g. Calm, confident, slightly slower pace",
+    "workspace.standalone.voice_style": "Voice style",
+    "workspace.standalone.voice_style_expressive": "Expressive",
+    "workspace.standalone.voice_style_neutral": "Neutral",
+    "workspace.standalone.voice_style_consistent": "Consistent",
+    "workspace.standalone.speed": "Speed",
+    "workspace.standalone.stability": "Stability",
+    "workspace.standalone.similarity": "Similarity",
+    "workspace.standalone.style_amount": "Style amount",
+    "workspace.standalone.texture": "Texture",
+    "workspace.standalone.pbr_materials": "PBR materials",
+    "workspace.standalone.references": "References",
+    "workspace.standalone.style": "Style",
+    "workspace.standalone.character": "Character",
+    "workspace.standalone.add": "Add",
+    "workspace.standalone.character_locked_title": "Character locked — click to replace",
+    "workspace.standalone.character_upload_title": "Upload a character/subject reference",
+    "workspace.standalone.character_reference_title": "Character reference — model will preserve identity",
+    "workspace.standalone.character_badge": "Char",
+    "workspace.standalone.remove_reference": "Remove reference",
+    "workspace.standalone.projects": "Projects",
+    "workspace.standalone.create_project": "Create project",
+    "workspace.standalone.new_project": "New project",
+    "workspace.standalone.active": "Active",
+    "workspace.standalone.delete_project": "Delete project",
+    "workspace.standalone.delete_project_confirm": "Delete project \"{name}\"?",
+    "workspace.standalone.delete_project_aria": "Delete {name}",
+    "workspace.standalone.creations": "Creations",
+    "workspace.standalone.refresh": "Refresh",
+    "workspace.standalone.empty_title": "Ready to create something?",
+    "workspace.standalone.empty_body": "Start generating to see your creations here.",
+    "workspace.standalone.generation_fallback": "Generation",
+    "workspace.standalone.preview_3d_model": "Preview 3D model",
+    "workspace.standalone.preview_image": "Preview image",
+    "workspace.standalone.preview_3d_caption": "Drag to rotate / scroll to zoom",
+    "workspace.standalone.cancel_generation": "Cancel generation",
+    "workspace.standalone.cancel_title": "Cancel",
+    "workspace.standalone.cancel_failed": "Cancel failed: {message}",
+    "workspace.standalone.cancelled_refunded": "Cancelled — credits refunded",
+    "workspace.standalone.download": "Download",
+    "workspace.standalone.open_file": "Open file",
+    "workspace.standalone.sec": "sec",
+    "workspace.standalone.attempt": "attempt",
+    "workspace.standalone.status.queued": "queued",
+    "workspace.standalone.status.running": "running",
+    "workspace.standalone.status.completed": "completed",
+    "workspace.standalone.status.failed": "failed",
+    "workspace.standalone.status.permanent_failed": "failed",
+    "workspace.standalone.result.audio": "audio",
+    "workspace.standalone.result.image": "image",
+    "workspace.standalone.result.video": "0:06",
+    "workspace.standalone.result.model_3d": "3D",
+    "workspace.standalone.option.auto": "Auto",
+    "workspace.standalone.option.low": "Low",
+    "workspace.standalone.option.medium": "Medium",
+    "workspace.standalone.option.high": "High",
+    "workspace.standalone.option.transparent": "Transparent",
+    "workspace.standalone.option.opaque": "Opaque",
+    "workspace.standalone.option.image": "Image",
+    "workspace.standalone.option.video": "Video",
+    "workspace.standalone.style.none.label": "No style",
+    "workspace.standalone.style.none.desc": "Use my prompt as written",
+    "workspace.standalone.style.none.chip": "Base",
+    "workspace.standalone.style.cinematic.label": "Cinematic",
+    "workspace.standalone.style.cinematic.desc": "Film still, controlled light, depth",
+    "workspace.standalone.style.cinematic.chip": "Film",
+    "workspace.standalone.style.product.label": "Product",
+    "workspace.standalone.style.product.desc": "Clean commercial product shot",
+    "workspace.standalone.style.product.chip": "Studio",
+    "workspace.standalone.style.editorial.label": "Editorial",
+    "workspace.standalone.style.editorial.desc": "Magazine-ready composition",
+    "workspace.standalone.style.editorial.chip": "Mag",
+    "workspace.standalone.style.anime.label": "Anime",
+    "workspace.standalone.style.anime.desc": "Stylized illustration look",
+    "workspace.standalone.style.anime.chip": "Art",
+    "workspace.standalone.style.watercolor.label": "Watercolor",
+    "workspace.standalone.style.watercolor.desc": "Soft handmade texture",
+    "workspace.standalone.style.watercolor.chip": "Paint",
+    "workspace.standalone.model.nano_banana_2.desc": "Fast general image generation with up to 14 reference images.",
+    "workspace.standalone.model.nano_banana_pro.desc": "Higher quality Banana with 4K support and Flex tier control.",
+    "workspace.standalone.model.seedream_5_0.desc": "BytePlus's latest image model, great for stylised renders.",
+    "workspace.standalone.model.seedream_5_0_lite.desc": "Lighter SeedDream 5.0 — faster and cheaper.",
+    "workspace.standalone.model.seedream_4_5.desc": "Previous-generation SeedDream — broad style coverage.",
+    "workspace.standalone.model.gpt_image_2.desc": "Best for precise style and quality control.",
+    "workspace.standalone.model.kling_v2_6_pro.desc": "Classic text/image-to-video workflow.",
+    "workspace.standalone.model.kling_v2_6_motion_pro.desc": "Motion-controlled video — drives subject from a reference clip.",
+    "workspace.standalone.model.kling_v3_pro.desc": "Newer Kling model with longer duration control.",
+    "workspace.standalone.model.kling_v3_motion_pro.desc": "V3 motion-controlled variant.",
+    "workspace.standalone.model.kling_v3_omni.desc": "Multi-input Kling 3 with audio and video reference.",
+    "workspace.standalone.model.seedance_1_0_pro.desc": "Original Seedance Pro pipeline.",
+    "workspace.standalone.model.seedance_1_0_pro_fast.desc": "Faster Seedance 1.0 for drafts and social clips.",
+    "workspace.standalone.model.seedance_1_5_pro.desc": "Reliable text or start-frame video generation.",
+    "workspace.standalone.model.seedance_2_0_lite.desc": "Latest Seedance 2.0 — fast tier with broad input support.",
+    "workspace.standalone.model.seedance_2_0_pro.desc": "Latest Seedance 2.0 — premium quality.",
+    "workspace.standalone.model.elevenlabs_multilingual_v2.desc": "Best-quality TTS — 32 languages, expressive prosody.",
+    "workspace.standalone.model.elevenlabs_turbo_v2_5.desc": "Half the latency of v2 with similar quality.",
+    "workspace.standalone.model.gemini_2_5_pro_tts.desc": "Gemini Pro voices — 30 official preset speakers.",
+    "workspace.standalone.model.google_tts_studio.desc": "Premium Studio + Neural2 voices for English & Thai.",
+    "workspace.standalone.model.tripo3d_p1.desc": "Newest preview model for high detail.",
+    "workspace.standalone.model.tripo3d_v3_1.desc": "Detailed image-to-3D model output — the default.",
+    "workspace.standalone.model.tripo3d_v3_0.desc": "Previous-gen Tripo v3 — solid baseline.",
+    "workspace.standalone.model.tripo3d_turbo.desc": "Faster drafts for 3D concept checks.",
+    "workspace.standalone.model.tripo3d_v2_5.desc": "Tripo v2.5 — legacy model.",
+    "workspace.standalone.model.tripo3d_v2_0.desc": "Tripo v2.0 — legacy model.",
+    "workspace.standalone.model.tripo3d_v1_4.desc": "Oldest Tripo model kept for compatibility.",
+    "workspace.standalone.model.hyper3d_gen2.desc": "BytePlus image-to-3D — alternative engine to Tripo.",
+    "workspace.standalone.validation.image_prompt": "Image generation needs a prompt.",
+    "workspace.standalone.validation.motion_refs": "Motion video needs a reference image and a motion video.",
+    "workspace.standalone.validation.end_needs_start": "End image needs a start image too.",
+    "workspace.standalone.validation.video_input": "Video generation needs a prompt or start image.",
+    "workspace.standalone.validation.voice_script": "Voice generation needs a script.",
+    "workspace.standalone.validation.script_too_long": "Script is too long. Maximum is 5,000 characters.",
+    "workspace.standalone.validation.model_image": "3D generation needs a reference image.",
+    "workspace.standalone.error_failed_queue": "Failed to queue generation",
+
     // ─── Share dialog / banner / invalid screen ─────────────────────
     "workspace.share.title": "Share workspace",
     "workspace.share.description": "Mint a link for \"{name}\". Active links are listed below — revoke any time.",
@@ -2251,6 +2410,9 @@ const translations = {
     "workspace.stock.download_opened": "Download link opened",
     "workspace.stock.download_started": "Download started",
     "workspace.stock.no_url": "Download URL is unavailable",
+    "workspace.stock.insert": "Insert",
+    "workspace.stock.insert_success": "Added to canvas",
+    "workspace.stock.insert_failed": "Couldn't add to canvas",
     "workspace.stock.filter_type": "Type",
     "workspace.stock.filter_orientation": "Orientation",
     "workspace.stock.filter_sort": "Sort",
@@ -4190,6 +4352,165 @@ const translations = {
     "workspace.toast.sign_in_first": "กรุณาเข้าสู่ระบบก่อนสร้าง",
     "workspace.toast.tool_not_ready": "เครื่องมือนี้ยังไม่พร้อมใช้งาน",
 
+    // Standalone generator
+    "workspace.standalone.menu": "เมนู",
+    "workspace.standalone.tools": "เครื่องมือ",
+    "workspace.standalone.tool.image_gen.nav": "รูปภาพ",
+    "workspace.standalone.tool.image_gen.title": "สร้างรูปภาพ",
+    "workspace.standalone.tool.video_gen.nav": "วิดีโอ",
+    "workspace.standalone.tool.video_gen.title": "สร้างวิดีโอ",
+    "workspace.standalone.tool.voice_gen.nav": "เสียง",
+    "workspace.standalone.tool.voice_gen.title": "สร้างเสียง",
+    "workspace.standalone.tool.image_to_3d.nav": "3D",
+    "workspace.standalone.tool.image_to_3d.title": "แปลงรูปเป็น 3D",
+    "workspace.standalone.generate": "สร้าง",
+    "workspace.standalone.credits": "เครดิต",
+    "workspace.standalone.model": "โมเดล",
+    "workspace.standalone.prompt": "คำสั่ง",
+    "workspace.standalone.aspect": "สัดส่วน",
+    "workspace.standalone.resolution": "ความละเอียด",
+    "workspace.standalone.quality": "คุณภาพ",
+    "workspace.standalone.format": "รูปแบบไฟล์",
+    "workspace.standalone.background": "พื้นหลัง",
+    "workspace.standalone.duration": "ความยาว",
+    "workspace.standalone.orientation": "แนวภาพ",
+    "workspace.standalone.start_image": "ภาพเริ่มต้น",
+    "workspace.standalone.end_image": "ภาพจบ",
+    "workspace.standalone.reference_image": "ภาพอ้างอิง",
+    "workspace.standalone.ref_image": "ภาพอ้างอิง",
+    "workspace.standalone.motion_video": "วิดีโอการเคลื่อนไหว",
+    "workspace.standalone.ref_video": "วิดีโออ้างอิง",
+    "workspace.standalone.describe_image": "อธิบายรูปภาพที่ต้องการสร้าง",
+    "workspace.standalone.describe_video": "อธิบายการเคลื่อนกล้อง ตัวแบบ ฉาก และอารมณ์ภาพ",
+    "workspace.standalone.generate_audio": "สร้างเสียงประกอบ",
+    "workspace.standalone.keep_original_sound": "คงเสียงต้นฉบับ",
+    "workspace.standalone.script": "สคริปต์",
+    "workspace.standalone.script_placeholder": "วางสคริปต์ที่ต้องการแปลงเป็นเสียงพูด",
+    "workspace.standalone.voice": "เสียง",
+    "workspace.standalone.loading": "กำลังโหลด…",
+    "workspace.standalone.from_account": "{count} รายการจากบัญชีของคุณ",
+    "workspace.standalone.loading_elevenlabs": "กำลังโหลดเสียง ElevenLabs จากบัญชีของคุณ…",
+    "workspace.standalone.no_elevenlabs_voices": "บัญชี ElevenLabs นี้ยังไม่มีเสียง",
+    "workspace.standalone.voice_id": "Voice ID",
+    "workspace.standalone.voice_id_gemini_placeholder": "ไม่บังคับ · เช่น Charon, Aoede (ค่าเริ่มต้นคือ Charon)",
+    "workspace.standalone.voice_id_google_placeholder": "ไม่บังคับ · เช่น en-US-Studio-O (ค่าเริ่มต้นคือ Studio-O)",
+    "workspace.standalone.voice_instructions": "คำสั่งสำหรับเสียง",
+    "workspace.standalone.voice_instructions_gemini_placeholder": "เช่น อ่านอย่างนุ่มนวล ด้วยน้ำเสียงอบอุ่น",
+    "workspace.standalone.voice_instructions_google_placeholder": "เช่น สุขุม มั่นใจ และพูดช้าลงเล็กน้อย",
+    "workspace.standalone.voice_style": "สไตล์เสียง",
+    "workspace.standalone.voice_style_expressive": "มีอารมณ์",
+    "workspace.standalone.voice_style_neutral": "เป็นกลาง",
+    "workspace.standalone.voice_style_consistent": "คงเส้นคงวา",
+    "workspace.standalone.speed": "ความเร็ว",
+    "workspace.standalone.stability": "ความนิ่ง",
+    "workspace.standalone.similarity": "ความใกล้เคียง",
+    "workspace.standalone.style_amount": "ระดับสไตล์",
+    "workspace.standalone.texture": "พื้นผิว",
+    "workspace.standalone.pbr_materials": "วัสดุ PBR",
+    "workspace.standalone.references": "ภาพอ้างอิง",
+    "workspace.standalone.style": "สไตล์",
+    "workspace.standalone.character": "ตัวละคร",
+    "workspace.standalone.add": "เพิ่ม",
+    "workspace.standalone.character_locked_title": "ล็อกตัวละครแล้ว — คลิกเพื่อเปลี่ยน",
+    "workspace.standalone.character_upload_title": "อัปโหลดภาพอ้างอิงตัวละคร/ตัวแบบ",
+    "workspace.standalone.character_reference_title": "ภาพอ้างอิงตัวละคร — โมเดลจะคงอัตลักษณ์ไว้",
+    "workspace.standalone.character_badge": "ตัวละคร",
+    "workspace.standalone.remove_reference": "ลบภาพอ้างอิง",
+    "workspace.standalone.projects": "โปรเจค",
+    "workspace.standalone.create_project": "สร้างโปรเจค",
+    "workspace.standalone.new_project": "โปรเจคใหม่",
+    "workspace.standalone.active": "กำลังใช้",
+    "workspace.standalone.delete_project": "ลบโปรเจค",
+    "workspace.standalone.delete_project_confirm": "ลบโปรเจค \"{name}\"?",
+    "workspace.standalone.delete_project_aria": "ลบ {name}",
+    "workspace.standalone.creations": "งานที่สร้าง",
+    "workspace.standalone.refresh": "รีเฟรช",
+    "workspace.standalone.empty_title": "พร้อมเริ่มสร้างหรือยัง?",
+    "workspace.standalone.empty_body": "เริ่มสร้างงานแล้วผลงานจะแสดงที่นี่",
+    "workspace.standalone.generation_fallback": "งานที่สร้าง",
+    "workspace.standalone.preview_3d_model": "ดูตัวอย่างโมเดล 3D",
+    "workspace.standalone.preview_image": "ดูตัวอย่างรูปภาพ",
+    "workspace.standalone.preview_3d_caption": "ลากเพื่อหมุน / เลื่อนเพื่อซูม",
+    "workspace.standalone.cancel_generation": "ยกเลิกการสร้าง",
+    "workspace.standalone.cancel_title": "ยกเลิก",
+    "workspace.standalone.cancel_failed": "ยกเลิกไม่สำเร็จ: {message}",
+    "workspace.standalone.cancelled_refunded": "ยกเลิกแล้ว — คืนเครดิตให้แล้ว",
+    "workspace.standalone.download": "ดาวน์โหลด",
+    "workspace.standalone.open_file": "เปิดไฟล์",
+    "workspace.standalone.sec": "วิ",
+    "workspace.standalone.attempt": "ครั้งที่",
+    "workspace.standalone.status.queued": "รอคิว",
+    "workspace.standalone.status.running": "กำลังสร้าง",
+    "workspace.standalone.status.completed": "เสร็จแล้ว",
+    "workspace.standalone.status.failed": "ล้มเหลว",
+    "workspace.standalone.status.permanent_failed": "ล้มเหลว",
+    "workspace.standalone.result.audio": "เสียง",
+    "workspace.standalone.result.image": "รูปภาพ",
+    "workspace.standalone.result.video": "0:06",
+    "workspace.standalone.result.model_3d": "3D",
+    "workspace.standalone.option.auto": "อัตโนมัติ",
+    "workspace.standalone.option.low": "ต่ำ",
+    "workspace.standalone.option.medium": "กลาง",
+    "workspace.standalone.option.high": "สูง",
+    "workspace.standalone.option.transparent": "โปร่งใส",
+    "workspace.standalone.option.opaque": "ทึบ",
+    "workspace.standalone.option.image": "รูปภาพ",
+    "workspace.standalone.option.video": "วิดีโอ",
+    "workspace.standalone.style.none.label": "ไม่ใช้สไตล์",
+    "workspace.standalone.style.none.desc": "ใช้คำสั่งตามที่เขียนไว้",
+    "workspace.standalone.style.none.chip": "พื้นฐาน",
+    "workspace.standalone.style.cinematic.label": "ภาพยนตร์",
+    "workspace.standalone.style.cinematic.desc": "ภาพนิ่งแบบภาพยนตร์ แสงคุมดี มีมิติ",
+    "workspace.standalone.style.cinematic.chip": "ฟิล์ม",
+    "workspace.standalone.style.product.label": "สินค้า",
+    "workspace.standalone.style.product.desc": "ภาพสินค้าเชิงพาณิชย์แบบสะอาด",
+    "workspace.standalone.style.product.chip": "สตูดิโอ",
+    "workspace.standalone.style.editorial.label": "Editorial",
+    "workspace.standalone.style.editorial.desc": "องค์ประกอบพร้อมใช้แบบนิตยสาร",
+    "workspace.standalone.style.editorial.chip": "แมกกาซีน",
+    "workspace.standalone.style.anime.label": "Anime",
+    "workspace.standalone.style.anime.desc": "ลุคภาพวาดสไตล์การ์ตูน",
+    "workspace.standalone.style.anime.chip": "ศิลปะ",
+    "workspace.standalone.style.watercolor.label": "สีน้ำ",
+    "workspace.standalone.style.watercolor.desc": "พื้นผิววาดมือที่นุ่มนวล",
+    "workspace.standalone.style.watercolor.chip": "ระบายสี",
+    "workspace.standalone.model.nano_banana_2.desc": "สร้างรูปภาพทั่วไปได้เร็ว พร้อมภาพอ้างอิงได้สูงสุด 14 รูป",
+    "workspace.standalone.model.nano_banana_pro.desc": "Banana คุณภาพสูงขึ้น รองรับ 4K และควบคุม Flex tier ได้",
+    "workspace.standalone.model.seedream_5_0.desc": "โมเดลรูปภาพล่าสุดจาก BytePlus เหมาะกับงานเรนเดอร์มีสไตล์",
+    "workspace.standalone.model.seedream_5_0_lite.desc": "SeedDream 5.0 รุ่นเบา เร็วกว่าและประหยัดกว่า",
+    "workspace.standalone.model.seedream_4_5.desc": "SeedDream รุ่นก่อนหน้า รองรับสไตล์ได้กว้าง",
+    "workspace.standalone.model.gpt_image_2.desc": "เหมาะกับการควบคุมสไตล์และคุณภาพอย่างละเอียด",
+    "workspace.standalone.model.kling_v2_6_pro.desc": "เวิร์กโฟลว์ text/image-to-video แบบคลาสสิก",
+    "workspace.standalone.model.kling_v2_6_motion_pro.desc": "วิดีโอควบคุมการเคลื่อนไหวจากคลิปอ้างอิง",
+    "workspace.standalone.model.kling_v3_pro.desc": "Kling รุ่นใหม่ขึ้น พร้อมควบคุมความยาวได้มากขึ้น",
+    "workspace.standalone.model.kling_v3_motion_pro.desc": "รุ่น V3 สำหรับควบคุมการเคลื่อนไหว",
+    "workspace.standalone.model.kling_v3_omni.desc": "Kling 3 แบบหลายอินพุต พร้อมเสียงและวิดีโออ้างอิง",
+    "workspace.standalone.model.seedance_1_0_pro.desc": "Pipeline Seedance Pro รุ่นแรก",
+    "workspace.standalone.model.seedance_1_0_pro_fast.desc": "Seedance 1.0 ที่เร็วขึ้นสำหรับ draft และคลิปโซเชียล",
+    "workspace.standalone.model.seedance_1_5_pro.desc": "สร้างวิดีโอจากข้อความหรือภาพเริ่มต้นได้เสถียร",
+    "workspace.standalone.model.seedance_2_0_lite.desc": "Seedance 2.0 ล่าสุด tier เร็ว รองรับอินพุตได้กว้าง",
+    "workspace.standalone.model.seedance_2_0_pro.desc": "Seedance 2.0 ล่าสุด คุณภาพพรีเมียม",
+    "workspace.standalone.model.elevenlabs_multilingual_v2.desc": "TTS คุณภาพสูง รองรับ 32 ภาษาและน้ำเสียงที่มีอารมณ์",
+    "workspace.standalone.model.elevenlabs_turbo_v2_5.desc": "Latency ประมาณครึ่งหนึ่งของ v2 โดยคุณภาพใกล้เคียงกัน",
+    "workspace.standalone.model.gemini_2_5_pro_tts.desc": "เสียง Gemini Pro พร้อม preset speaker ทางการ 30 เสียง",
+    "workspace.standalone.model.google_tts_studio.desc": "เสียง Studio + Neural2 ระดับพรีเมียมสำหรับอังกฤษและไทย",
+    "workspace.standalone.model.tripo3d_p1.desc": "โมเดล preview ล่าสุดสำหรับรายละเอียดสูง",
+    "workspace.standalone.model.tripo3d_v3_1.desc": "สร้างโมเดล 3D จากรูปภาพแบบละเอียด เป็นค่าเริ่มต้น",
+    "workspace.standalone.model.tripo3d_v3_0.desc": "Tripo v3 รุ่นก่อนหน้า เป็น baseline ที่เสถียร",
+    "workspace.standalone.model.tripo3d_turbo.desc": "draft งาน 3D ได้เร็วสำหรับตรวจคอนเซปต์",
+    "workspace.standalone.model.tripo3d_v2_5.desc": "Tripo v2.5 รุ่น legacy",
+    "workspace.standalone.model.tripo3d_v2_0.desc": "Tripo v2.0 รุ่น legacy",
+    "workspace.standalone.model.tripo3d_v1_4.desc": "Tripo รุ่นเก่าสุดที่คงไว้เพื่อความเข้ากันได้",
+    "workspace.standalone.model.hyper3d_gen2.desc": "image-to-3D จาก BytePlus เป็น engine ทางเลือกจาก Tripo",
+    "workspace.standalone.validation.image_prompt": "การสร้างรูปภาพต้องมีคำสั่ง",
+    "workspace.standalone.validation.motion_refs": "วิดีโอแบบ motion ต้องมีภาพอ้างอิงและวิดีโอการเคลื่อนไหว",
+    "workspace.standalone.validation.end_needs_start": "ถ้ามีภาพจบ ต้องใส่ภาพเริ่มต้นด้วย",
+    "workspace.standalone.validation.video_input": "การสร้างวิดีโอต้องมีคำสั่งหรือภาพเริ่มต้น",
+    "workspace.standalone.validation.voice_script": "การสร้างเสียงต้องมีสคริปต์",
+    "workspace.standalone.validation.script_too_long": "สคริปต์ยาวเกินไป สูงสุด 5,000 ตัวอักษร",
+    "workspace.standalone.validation.model_image": "การสร้าง 3D ต้องมีภาพอ้างอิง",
+    "workspace.standalone.error_failed_queue": "ส่งคำสั่งสร้างไม่สำเร็จ",
+
     // ─── Share dialog / banner / invalid screen ─────────────────────
     "workspace.share.title": "แชร์ Workspace",
     "workspace.share.description": "สร้างลิงก์สำหรับ \"{name}\" ลิงก์ที่ใช้งานอยู่จะแสดงด้านล่าง — เพิกถอนได้ทุกเมื่อ",
@@ -4523,6 +4844,9 @@ const translations = {
     "workspace.stock.download_opened": "เปิดลิงก์ดาวน์โหลดแล้ว",
     "workspace.stock.download_started": "เริ่มดาวน์โหลดแล้ว",
     "workspace.stock.no_url": "ไม่พบ URL สำหรับดาวน์โหลด",
+    "workspace.stock.insert": "วางลง Canvas",
+    "workspace.stock.insert_success": "เพิ่มลง Canvas แล้ว",
+    "workspace.stock.insert_failed": "เพิ่มลง Canvas ไม่สำเร็จ",
     "workspace.stock.filter_type": "ประเภท",
     "workspace.stock.filter_orientation": "การวาง",
     "workspace.stock.filter_sort": "เรียง",
@@ -4571,33 +4895,112 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-/** Detect if user is likely in Thailand based on timezone + navigator.language */
-const detectDefaultLanguage = (): Language => {
+const ENGLISH_DEFAULT_COUNTRIES = new Set([
+  "AG",
+  "AI",
+  "AU",
+  "BB",
+  "BM",
+  "BS",
+  "BZ",
+  "CA",
+  "GB",
+  "GG",
+  "GI",
+  "IE",
+  "IM",
+  "JE",
+  "JM",
+  "KY",
+  "MS",
+  "MT",
+  "NZ",
+  "SG",
+  "TC",
+  "TT",
+  "US",
+  "VG",
+  "VI",
+  "ZA",
+]);
+
+const getStoredLanguage = (): Language | null => {
+  if (typeof localStorage === "undefined") return null;
+  const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+  return saved === "en" || saved === "th" ? saved : null;
+};
+
+const countryToLanguage = (countryCode: string | null): Language | null => {
+  const code = countryCode?.trim().toUpperCase();
+  if (!code) return null;
+  if (code === "TH") return "th";
+  if (ENGLISH_DEFAULT_COUNTRIES.has(code)) return "en";
+  return null;
+};
+
+/** Fast local fallback while IP detection is still pending or unavailable. */
+const detectBrowserDefaultLanguage = (): Language => {
   try {
-    // Check timezone
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (tz === "Asia/Bangkok") return "th";
 
-    // Check navigator language
     const navLang = navigator.language || (navigator as any).userLanguage || "";
     if (navLang.startsWith("th")) return "th";
   } catch {
-    // fallback
+    // Use English when browser signals are unavailable.
   }
   return "en";
 };
 
+const parseCloudflareTraceCountry = (trace: string): string | null => {
+  const line = trace
+    .split("\n")
+    .find((entry) => entry.trim().toLowerCase().startsWith("loc="));
+  return line ? line.split("=")[1]?.trim() || null : null;
+};
+
+const detectIpDefaultLanguage = async (): Promise<Language | null> => {
+  if (typeof fetch === "undefined") return null;
+  try {
+    const response = await fetch("https://www.cloudflare.com/cdn-cgi/trace", {
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    return countryToLanguage(parseCloudflareTraceCountry(await response.text()));
+  } catch {
+    return null;
+  }
+};
+
 export const LanguageProvider = ({ children }: { children: ReactNode }) => {
-  const [language, setLanguage] = useState<Language>(() => {
-    // Check localStorage first for user preference
-    const saved = localStorage.getItem("mf-lang") as Language | null;
-    if (saved === "en" || saved === "th") return saved;
-    // Auto-detect
-    return detectDefaultLanguage();
-  });
+  const hadStoredLanguageRef = useRef(getStoredLanguage() !== null);
+  const userSelectedLanguageRef = useRef(hadStoredLanguageRef.current);
+  const [language, setLanguageState] = useState<Language>(
+    () => getStoredLanguage() ?? detectBrowserDefaultLanguage(),
+  );
+
+  const setLanguage = (lang: Language) => {
+    userSelectedLanguageRef.current = true;
+    setLanguageState(lang);
+  };
 
   useEffect(() => {
-    localStorage.setItem("mf-lang", language);
+    if (hadStoredLanguageRef.current) return;
+    let cancelled = false;
+    void detectIpDefaultLanguage().then((detectedLanguage) => {
+      if (!cancelled && detectedLanguage && !userSelectedLanguageRef.current) {
+        setLanguageState(detectedLanguage);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
+    }
   }, [language]);
 
   // Keep <html lang="…"> in sync with the active UI language so screen
