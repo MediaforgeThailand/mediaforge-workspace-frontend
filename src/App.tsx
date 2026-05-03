@@ -32,7 +32,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -123,6 +123,10 @@ const OrgBranding = lazyWithRetry(() => import("./pages/org-admin/branding"));
 
 const queryClient = new QueryClient();
 const PageLoader = () => <PageLoadingAnim />;
+const PricingAliasRedirect = () => {
+  const location = useLocation();
+  return <Navigate to={{ pathname: "/app/pricing", search: location.search }} replace />;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -152,6 +156,7 @@ const App = () => (
                   <Route path="/refund" element={<Refund />} />
                   <Route path="/aup" element={<AUP />} />
                   <Route path="/cookies" element={<Cookies />} />
+                  <Route path="/pricing" element={<PricingAliasRedirect />} />
 
                   {/* Workspace dashboard owns its own sidebar (Home /
                    *  Spaces / Community / Projects / All tools / Stock),

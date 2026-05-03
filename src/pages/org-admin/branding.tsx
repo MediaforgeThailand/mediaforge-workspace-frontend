@@ -8,13 +8,11 @@
  * service-role on the backend so a curious user opening the page
  * directly can read but not mutate anything they shouldn't.
  *
- * The page is wired against the workspace DB tables created in
- * 20260429220000_org_domains_branding.sql:
- *   - sso_organizations (display_name_short, logo_url, brand_color)
- *   - org_domains       (hostname, is_primary)
- *   - storage bucket    org-branding (public read)
+ * Writes go through workspace_org_console so the browser never needs direct
+ * table/storage write access. That keeps the branding bucket public-read but
+ * admin-write only.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -34,17 +32,39 @@ import {
 
 interface OrgRow {
   id: string;
-  display_name: string;
+  name?: string | null;
+  display_name: string | null;
   display_name_short: string | null;
   logo_url: string | null;
   brand_color: string | null;
-  primary_domain: string;
+  settings?: Record<string, unknown> | null;
 }
 
 interface DomainRow {
   id: string;
   hostname: string;
   is_primary: boolean;
+}
+
+interface BrandingPayload {
+  org: OrgRow | null;
+  domains: DomainRow[];
+}
+
+async function orgConsole<T>(body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke("workspace_org_console", { body });
+  if (error) throw error;
+  if ((data as any)?.error) throw new Error((data as any).error);
+  return ((data as any)?.data ?? data) as T;
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error ?? new Error("Unable to read logo file"));
+    reader.readAsDataURL(file);
+  });
 }
 
 export default function OrgBrandingPanel() {
@@ -55,14 +75,16 @@ export default function OrgBrandingPanel() {
   // Auth gate — same shape as org-admin/index.tsx so behaviour is
   // predictable across the section.
   if (!user) return <Navigate to="/auth" replace />;
-  if (!profile?.org_id && !isOrgAdmin) {
+  const profileOrgId = ((profile as any)?.organization_id ?? (profile as any)?.org_id ?? null) as string | null;
+
+  if (!profileOrgId && !isOrgAdmin) {
     return <Navigate to="/app/workspace" replace />;
   }
 
   // The org id lives on profile.org_id (legacy) OR is resolvable via
   // the current host's branding. We try profile first, then host.
   const branding = useOrgBranding();
-  const orgId = (profile?.org_id ?? branding?.orgId) ?? null;
+  const orgId = (profileOrgId ?? branding?.orgId) ?? null;
 
   if (!orgId) {
     return (
@@ -90,29 +112,13 @@ function BrandingForm({ orgId }: { orgId: string }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  const orgQ = useQuery<OrgRow | null>({
-    queryKey: ["org-branding-row", orgId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("sso_organizations" as any)
-        .select("id, display_name, display_name_short, logo_url, brand_color, primary_domain")
-        .eq("id", orgId)
-        .maybeSingle();
-      return (data as any) ?? null;
-    },
+  const brandingQ = useQuery<BrandingPayload>({
+    queryKey: ["org-branding-admin", orgId],
+    queryFn: async () => orgConsole<BrandingPayload>({ action: "get_org_branding", organization_id: orgId }),
   });
 
-  const domainsQ = useQuery<DomainRow[]>({
-    queryKey: ["org-branding-domains", orgId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("org_domains" as any)
-        .select("id, hostname, is_primary")
-        .eq("org_id", orgId)
-        .order("is_primary", { ascending: false });
-      return ((data as any) ?? []) as DomainRow[];
-    },
-  });
+  const org = brandingQ.data?.org ?? null;
+  const domains = brandingQ.data?.domains ?? [];
 
   // Local form state — populated from the query then edited freely.
   const [shortName, setShortName] = useState("");
@@ -120,22 +126,23 @@ function BrandingForm({ orgId }: { orgId: string }) {
   const [newHostname, setNewHostname] = useState("");
 
   useEffect(() => {
-    if (orgQ.data) {
-      setShortName(orgQ.data.display_name_short ?? "");
-      setBrandColor(orgQ.data.brand_color ?? "");
+    if (org) {
+      setShortName(org.display_name_short ?? "");
+      setBrandColor(org.brand_color ?? "");
     }
-  }, [orgQ.data?.id]);
+  }, [org?.id]);
 
   const saveOrgMut = useMutation({
-    mutationFn: async (patch: Partial<OrgRow>) => {
-      const { error } = await supabase
-        .from("sso_organizations" as any)
-        .update(patch)
-        .eq("id", orgId);
-      if (error) throw error;
+    mutationFn: async () => {
+      await orgConsole<BrandingPayload>({
+        action: "save_org_branding",
+        organization_id: orgId,
+        display_name_short: shortName.trim() || null,
+        brand_color: brandColor.trim() || null,
+      });
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["org-branding-row", orgId] });
+      qc.invalidateQueries({ queryKey: ["org-branding-admin", orgId] });
       qc.invalidateQueries({ queryKey: ["org-branding"] });
       toast.success("Branding saved");
     },
@@ -144,28 +151,18 @@ function BrandingForm({ orgId }: { orgId: string }) {
 
   const uploadLogoMut = useMutation({
     mutationFn: async (file: File) => {
-      const ext = (file.name.split(".").pop() || "png").toLowerCase();
-      const path = `${orgId}/logo.${ext}`;
-      // upsert so re-uploads cleanly replace the old logo without
-      // leaving orphaned objects under different extensions.
-      const { error: upErr } = await supabase.storage
-        .from("org-branding")
-        .upload(path, file, { upsert: true, contentType: file.type });
-      if (upErr) throw upErr;
-      const { data: pub } = supabase.storage
-        .from("org-branding")
-        .getPublicUrl(path);
-      // Cache-bust on the URL so the chrome refreshes immediately.
-      const url = `${pub.publicUrl}?v=${Date.now()}`;
-      const { error: updErr } = await supabase
-        .from("sso_organizations" as any)
-        .update({ logo_url: url })
-        .eq("id", orgId);
-      if (updErr) throw updErr;
-      return url;
+      if (file.size > 2 * 1024 * 1024) throw new Error("Logo file must be 2 MB or smaller");
+      const logoDataUrl = await fileToDataUrl(file);
+      await orgConsole<BrandingPayload>({
+        action: "save_org_branding",
+        organization_id: orgId,
+        logo_data_url: logoDataUrl,
+        logo_filename: file.name,
+        logo_content_type: file.type,
+      });
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["org-branding-row", orgId] });
+      qc.invalidateQueries({ queryKey: ["org-branding-admin", orgId] });
       qc.invalidateQueries({ queryKey: ["org-branding"] });
       toast.success("Logo uploaded");
     },
@@ -181,19 +178,16 @@ function BrandingForm({ orgId }: { orgId: string }) {
       if (!/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/.test(lower)) {
         throw new Error("Hostname must be a valid DNS name");
       }
-      const isFirst = (domainsQ.data ?? []).length === 0;
-      const { error } = await supabase
-        .from("org_domains" as any)
-        .insert({
-          org_id: orgId,
-          hostname: lower,
-          is_primary: isFirst, // first domain is auto-primary
-        });
-      if (error) throw error;
+      await orgConsole<BrandingPayload>({
+        action: "add_branding_domain",
+        organization_id: orgId,
+        hostname: lower,
+        is_primary: domains.length === 0,
+      });
     },
     onSuccess: () => {
       setNewHostname("");
-      qc.invalidateQueries({ queryKey: ["org-branding-domains", orgId] });
+      qc.invalidateQueries({ queryKey: ["org-branding-admin", orgId] });
       toast.success("Domain added");
     },
     onError: (e: any) => toast.error(e?.message ?? "Add failed"),
@@ -201,14 +195,14 @@ function BrandingForm({ orgId }: { orgId: string }) {
 
   const removeDomainMut = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("org_domains" as any)
-        .delete()
-        .eq("id", id);
-      if (error) throw error;
+      await orgConsole<BrandingPayload>({
+        action: "remove_branding_domain",
+        organization_id: orgId,
+        domain_id: id,
+      });
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["org-branding-domains", orgId] });
+      qc.invalidateQueries({ queryKey: ["org-branding-admin", orgId] });
       toast.success("Domain removed");
     },
     onError: (e: any) => toast.error(e?.message ?? "Remove failed"),
@@ -220,28 +214,23 @@ function BrandingForm({ orgId }: { orgId: string }) {
       // first, then set the chosen one. Two round-trips, but this
       // page mutates rarely enough that batching isn't worth a stored
       // procedure.
-      const { error: clearErr } = await supabase
-        .from("org_domains" as any)
-        .update({ is_primary: false })
-        .eq("org_id", orgId);
-      if (clearErr) throw clearErr;
-      const { error: setErr } = await supabase
-        .from("org_domains" as any)
-        .update({ is_primary: true })
-        .eq("id", id);
-      if (setErr) throw setErr;
+      await orgConsole<BrandingPayload>({
+        action: "set_primary_branding_domain",
+        organization_id: orgId,
+        domain_id: id,
+      });
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["org-branding-domains", orgId] });
+      qc.invalidateQueries({ queryKey: ["org-branding-admin", orgId] });
       toast.success("Primary domain updated");
     },
     onError: (e: any) => toast.error(e?.message ?? "Update failed"),
   });
 
-  const previewLogo = orgQ.data?.logo_url ?? DEFAULT_BRAND_LOGO;
-  const previewName = shortName || orgQ.data?.display_name_short || orgQ.data?.display_name || DEFAULT_BRAND_NAME;
+  const previewLogo = org?.logo_url ?? DEFAULT_BRAND_LOGO;
+  const previewName = shortName || org?.display_name_short || org?.display_name || org?.name || DEFAULT_BRAND_NAME;
 
-  if (orgQ.isLoading) {
+  if (brandingQ.isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin" />
@@ -257,7 +246,7 @@ function BrandingForm({ orgId }: { orgId: string }) {
         </Button>
         <h1 className="text-3xl font-bold">Org Branding</h1>
         <p className="text-sm text-muted-foreground">
-          Logo, short name, and subdomains for {orgQ.data?.display_name ?? "your organisation"}.
+          Logo, short name, and subdomains for {org?.display_name ?? org?.name ?? "your organisation"}.
         </p>
       </div>
 
@@ -331,12 +320,7 @@ function BrandingForm({ orgId }: { orgId: string }) {
 
           <div className="flex justify-end">
             <Button
-              onClick={() =>
-                saveOrgMut.mutate({
-                  display_name_short: shortName.trim() || null,
-                  brand_color: brandColor.trim() || null,
-                } as any)
-              }
+              onClick={() => saveOrgMut.mutate()}
               disabled={saveOrgMut.isPending}
             >
               {saveOrgMut.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -401,12 +385,12 @@ function BrandingForm({ orgId }: { orgId: string }) {
           </div>
 
           <div className="rounded-md border divide-y">
-            {(domainsQ.data ?? []).length === 0 ? (
+            {domains.length === 0 ? (
               <div className="p-4 text-sm text-muted-foreground text-center">
                 No subdomains registered yet.
               </div>
             ) : (
-              (domainsQ.data ?? []).map((d) => (
+              domains.map((d) => (
                 <div key={d.id} className="flex items-center gap-3 p-3">
                   <Globe className="h-4 w-4 text-muted-foreground" />
                   <span className="font-mono text-sm flex-1">{d.hostname}</span>

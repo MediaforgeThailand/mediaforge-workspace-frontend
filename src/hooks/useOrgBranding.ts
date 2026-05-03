@@ -57,11 +57,24 @@ async function fetchOrgBranding(): Promise<OrgBranding | null> {
   if (!domainRow) return null;
 
   const orgId = (domainRow as any).org_id as string;
-  const { data: orgRow } = await supabase
+  let { data: orgRow, error: orgError } = await supabase
     .from("sso_organizations" as any)
     .select("id, display_name, display_name_short, logo_url, brand_color, status")
     .eq("id", orgId)
     .maybeSingle();
+
+  // Some live databases expose sso_organizations as a Schema-C compatibility
+  // view that does not include display_name_short yet. Fall back without that
+  // optional field so tenant logo/colour still load instead of losing all
+  // branding.
+  if (orgError) {
+    const fallback = await supabase
+      .from("sso_organizations" as any)
+      .select("id, display_name, logo_url, brand_color, status")
+      .eq("id", orgId)
+      .maybeSingle();
+    orgRow = fallback.data;
+  }
 
   if (!orgRow) return null;
   // Suspended orgs lose their branding so a hostile host can't keep
