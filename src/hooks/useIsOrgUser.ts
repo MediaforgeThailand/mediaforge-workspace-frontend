@@ -57,7 +57,7 @@ export interface ClassMembershipInfo {
 export function useUserClassMemberships() {
   const { user, profile } = useAuth();
   // Schema C uses profile.organization_id (was profile.org_id in v2)
-  const enabled = !!user && !!(profile as any)?.organization_id;
+  const enabled = !!user && !!((profile as any)?.organization_id ?? profile?.org_id);
   return useQuery<ClassMembershipInfo[]>({
     queryKey: ["class-memberships", user?.id],
     enabled,

@@ -403,6 +403,9 @@ interface ServerWorkspaceRow {
   id: string;
   user_id: string;
   project_id: string | null;
+  class_id?: string | null;
+  education_status?: "active" | "submitted" | "passed" | "ended" | null;
+  education_completed_at?: string | null;
   name: string;
   created_at: string;
   updated_at: string;
@@ -428,7 +431,7 @@ export async function loadWorkspacesFromServer(): Promise<
   try {
     const { data, error } = await supabase
       .from("workspaces")
-      .select("id, user_id, project_id, name, created_at, updated_at")
+      .select("id, user_id, project_id, class_id, education_status, education_completed_at, name, created_at, updated_at")
       .order("updated_at", { ascending: false });
 
     if (error) {
@@ -445,6 +448,9 @@ export async function loadWorkspacesFromServer(): Promise<
       id: row.id,
       ownerId: row.user_id,
       projectId: row.project_id ?? null,
+      classId: row.class_id ?? null,
+      educationStatus: row.education_status ?? null,
+      educationCompletedAt: row.education_completed_at ?? null,
       name: row.name,
       updatedAt: new Date(row.updated_at).getTime(),
     }));
@@ -460,7 +466,7 @@ export async function loadWorkspaceFromServer(
   try {
     const { data, error } = await supabase
       .from("workspaces")
-      .select("id, user_id, project_id, name, created_at, updated_at")
+      .select("id, user_id, project_id, class_id, education_status, education_completed_at, name, created_at, updated_at")
       .eq("id", workspaceId)
       .maybeSingle();
 
@@ -479,6 +485,9 @@ export async function loadWorkspaceFromServer(
       id: row.id,
       ownerId: row.user_id,
       projectId: row.project_id ?? null,
+      classId: row.class_id ?? null,
+      educationStatus: row.education_status ?? null,
+      educationCompletedAt: row.education_completed_at ?? null,
       name: row.name,
       updatedAt: new Date(row.updated_at).getTime(),
     };
@@ -502,6 +511,8 @@ export async function upsertWorkspaceToServer(
         id: meta.id,
         user_id: meta.ownerId ?? userId,
         project_id: meta.projectId ?? null,
+        class_id: meta.classId ?? null,
+        education_status: meta.educationStatus ?? null,
         name: meta.name,
         // updated_at is set by the table's `workspaces_touch` trigger
         // — don't send it from the client so concurrent writes don't

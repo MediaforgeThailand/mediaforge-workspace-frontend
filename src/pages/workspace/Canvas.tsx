@@ -63,6 +63,7 @@ import {
   loadCanvasesByWorkspaceFromServer,
 } from "@/components/workspace/canvasPersistence";
 import { useShareTokenResolution } from "@/components/workspace/useShareTokenResolution";
+import { useWorkspaceShareRole } from "@/store/useWorkspaceShareRole";
 import ShareModeBanner from "@/components/workspace/ShareModeBanner";
 import ShareLinkInvalidScreen from "@/components/workspace/ShareLinkInvalidScreen";
 import { useEducationPresence } from "@/hooks/useEducationPresence";
@@ -81,7 +82,12 @@ const WorkspaceCanvasPage = () => {
   const replaceCanvasGraph = useWorkspaceStore((s) => s.replaceCanvasGraph);
   const mergeServerWorkspaces = useWorkspaceStore((s) => s.mergeServerWorkspaces);
   const createCanvas = useWorkspaceStore((s) => s.createCanvas);
+  const routeWorkspace = useWorkspaceStore((s) =>
+    routeId ? s.workspaces.find((workspace) => workspace.id === routeId) ?? null : null,
+  );
   const { user, loading: authLoading } = useAuth();
+  const setShare = useWorkspaceShareRole((s) => s.setShare);
+  const clearShare = useWorkspaceShareRole((s) => s.clear);
   const [hydrated, setHydrated] = useState(false);
   const [bounced, setBounced] = useState(false);
 
@@ -91,6 +97,21 @@ const WorkspaceCanvasPage = () => {
   // the global useWorkspaceShareRole store. Components downstream
   // (autosave, run buttons, banner) read that store.
   const shareStatus = useShareTokenResolution();
+
+  useEffect(() => {
+    if (!routeId || shareStatus.phase !== "no-token") return;
+    const status = routeWorkspace?.educationStatus;
+    if (status === "passed" || status === "ended") {
+      setShare({
+        role: "viewer",
+        ownerLabel: status === "passed" ? "Passed class space" : "Ended class space",
+        workspaceId: routeId,
+        shareId: null,
+      });
+    } else {
+      clearShare();
+    }
+  }, [clearShare, routeId, routeWorkspace?.educationStatus, setShare, shareStatus.phase]);
 
   // Resolve `:routeId` → most-recent canvas in that workspace. If
   // the workspace has no canvases yet, return null so we can

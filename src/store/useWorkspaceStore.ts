@@ -77,6 +77,9 @@ export interface WorkspaceMeta {
   id: string;
   ownerId?: string | null;
   projectId: string | null;
+  classId?: string | null;
+  educationStatus?: "active" | "submitted" | "passed" | "ended" | null;
+  educationCompletedAt?: string | null;
   name: string;
   updatedAt: number;
 }
@@ -554,6 +557,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const wsMeta: WorkspaceMeta = {
           id: wsId,
           projectId,
+          classId: null,
+          educationStatus: null,
+          educationCompletedAt: null,
           name: name || "Untitled workspace",
           updatedAt: now(),
         };
@@ -653,6 +659,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           id: newWorkspaceId,
           ownerId: null,
           projectId: source.projectId,
+          classId: null,
+          educationStatus: null,
+          educationCompletedAt: null,
           name: `${source.name} (copy)`,
           updatedAt: ts,
         };
@@ -906,7 +915,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               // Keep the local fresher copy (rename in flight). The
               // dashboard's fire-and-forget upsert will catch the
               // server up shortly.
-              merged.push(local);
+              merged.push({
+                ...local,
+                classId: server.classId ?? local.classId ?? null,
+                educationStatus: server.educationStatus ?? local.educationStatus ?? null,
+                educationCompletedAt: server.educationCompletedAt ?? local.educationCompletedAt ?? null,
+              });
             } else {
               merged.push(server);
             }
@@ -1724,6 +1738,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             const defaultWs: WorkspaceMeta = {
               id: defaultWsId,
               projectId: defaultProjectId,
+              classId: null,
+              educationStatus: null,
+              educationCompletedAt: null,
               name: "My workspace",
               updatedAt:
                 Math.max(
@@ -1817,6 +1834,21 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               projectId: rawProjectId && projectIds.has(rawProjectId)
                 ? rawProjectId
                 : fallbackProjectId,
+              classId: typeof (w as unknown as { classId?: unknown }).classId === "string"
+                ? String((w as unknown as { classId: string }).classId)
+                : typeof (w as unknown as { class_id?: unknown }).class_id === "string"
+                  ? String((w as unknown as { class_id: string }).class_id)
+                  : null,
+              educationStatus: ["active", "submitted", "passed", "ended"].includes(
+                String((w as unknown as { educationStatus?: unknown }).educationStatus ?? (w as unknown as { education_status?: unknown }).education_status ?? ""),
+              )
+                ? String((w as unknown as { educationStatus?: unknown }).educationStatus ?? (w as unknown as { education_status?: unknown }).education_status) as WorkspaceMeta["educationStatus"]
+                : null,
+              educationCompletedAt: typeof (w as unknown as { educationCompletedAt?: unknown }).educationCompletedAt === "string"
+                ? String((w as unknown as { educationCompletedAt: string }).educationCompletedAt)
+                : typeof (w as unknown as { education_completed_at?: unknown }).education_completed_at === "string"
+                  ? String((w as unknown as { education_completed_at: string }).education_completed_at)
+                  : null,
               name: w.name,
               updatedAt: typeof w.updatedAt === "number" ? w.updatedAt : Date.now(),
             };

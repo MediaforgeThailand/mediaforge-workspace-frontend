@@ -100,6 +100,8 @@ import {
 import { useEducationPresence } from "@/hooks/useEducationPresence";
 import {
   useActiveClass,
+  useIsOrgAdmin,
+  useIsOrgUser,
   useUserClassMemberships,
   type ClassMembershipInfo,
 } from "@/hooks/useIsOrgUser";
@@ -511,6 +513,9 @@ const WorkspaceDashboardInner = () => {
   const [section, setSection] = useState<Section>(initialSection);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { user, loading: authLoading } = useAuth();
+  const isOrgUser = useIsOrgUser();
+  const isOrgAdmin = useIsOrgAdmin();
+  const educationLockedStudent = isOrgUser && !isOrgAdmin;
   const navigate = useNavigate();
   const projects = useWorkspaceStore((s) => s.projects);
   const activeProjectId = useWorkspaceStore((s) => s.activeProjectId);
@@ -581,6 +586,7 @@ const WorkspaceDashboardInner = () => {
           );
         const localOnlyProjects = localProjectsBefore.filter(
           (p) =>
+            !educationLockedStudent &&
             (!p.ownerId || p.ownerId === user.id) &&
             !serverProjectIds.has(p.id) &&
             (
@@ -608,9 +614,10 @@ const WorkspaceDashboardInner = () => {
       const localBefore = useWorkspaceStore.getState().workspaces;
       const serverIds = new Set(server.map((w) => w.id));
       const tombstones = useWorkspaceStore.getState().deletedWorkspaceIds;
-      const localOnly = localBefore.filter(
-        (w) =>
-          (!w.ownerId || w.ownerId === user.id) &&
+        const localOnly = localBefore.filter(
+          (w) =>
+            !educationLockedStudent &&
+            (!w.ownerId || w.ownerId === user.id) &&
           !serverIds.has(w.id) &&
           !(w.id in tombstones) &&
           nowMs - w.updatedAt < PENDING_PUSH_WINDOW_MS,
@@ -638,7 +645,7 @@ const WorkspaceDashboardInner = () => {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, mergeServerProjects, mergeServerWorkspaces, setActiveProject, user?.id]);
+  }, [authLoading, educationLockedStudent, mergeServerProjects, mergeServerWorkspaces, setActiveProject, user?.id]);
 
   useEffect(() => {
     if (standaloneProjects.length === 0) {
@@ -662,6 +669,11 @@ const WorkspaceDashboardInner = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const handleCreateProject = () => {
+    if (educationLockedStudent) {
+      toast.error("Class students can only use spaces created from a class QR or link.");
+      setSection("spaces");
+      return;
+    }
     setCreateDialogOpen(true);
   };
 
@@ -790,17 +802,22 @@ const WorkspaceDashboardInner = () => {
             onCreateProject={handleCreateProject}
             onDeleteProject={handleDeleteProject}
             onOpenSidebar={() => setMobileSidebarOpen(true)}
+            educationLockedStudent={educationLockedStudent}
           />
         )}
         {section === "projects" && (
-          <ProjectsManagerView
-            projects={projects}
-            activeProjectId={activeProjectId}
-            onSelectProject={setActiveProject}
-            onCreateProject={handleCreateProject}
-            onDeleteProject={handleDeleteProject}
-            onOpenSidebar={() => setMobileSidebarOpen(true)}
-          />
+          educationLockedStudent ? (
+            <EducationLockedToolView onOpenSpaces={() => setSection("spaces")} onOpenSidebar={() => setMobileSidebarOpen(true)} />
+          ) : (
+            <ProjectsManagerView
+              projects={projects}
+              activeProjectId={activeProjectId}
+              onSelectProject={setActiveProject}
+              onCreateProject={handleCreateProject}
+              onDeleteProject={handleDeleteProject}
+              onOpenSidebar={() => setMobileSidebarOpen(true)}
+            />
+          )
         )}
         {section === "spaces" && (
           <SpacesView
@@ -808,6 +825,7 @@ const WorkspaceDashboardInner = () => {
             projects={projects}
             onSelectProject={setActiveProject}
             onOpenSidebar={() => setMobileSidebarOpen(true)}
+            educationLockedStudent={educationLockedStudent}
           />
         )}
         {(section === "history" || section === "assets") && (
@@ -817,16 +835,20 @@ const WorkspaceDashboardInner = () => {
           <StockView onOpenSidebar={() => setMobileSidebarOpen(true)} />
         )}
         {isStandaloneSection(section) && (
-          <StandaloneGenerator
-            activeTool={section}
-            onToolChange={(next) => setSection(next)}
-            onOpenSidebar={() => setMobileSidebarOpen(true)}
-            projects={standaloneProjects}
-            activeProjectId={activeProjectId}
-            onSelectProject={setActiveProject}
-            onCreateProject={handleCreateProject}
-            onDeleteProject={handleDeleteProject}
-          />
+          educationLockedStudent ? (
+            <EducationLockedToolView onOpenSpaces={() => setSection("spaces")} onOpenSidebar={() => setMobileSidebarOpen(true)} />
+          ) : (
+            <StandaloneGenerator
+              activeTool={section}
+              onToolChange={(next) => setSection(next)}
+              onOpenSidebar={() => setMobileSidebarOpen(true)}
+              projects={standaloneProjects}
+              activeProjectId={activeProjectId}
+              onSelectProject={setActiveProject}
+              onCreateProject={handleCreateProject}
+              onDeleteProject={handleDeleteProject}
+            />
+          )
         )}
         {section !== "home" &&
           section !== "projects" &&
@@ -1038,6 +1060,7 @@ const HomeView = ({
   onCreateProject,
   onDeleteProject,
   onOpenSidebar,
+  educationLockedStudent = false,
 }: {
   onSection: (s: Section) => void;
   projects: ProjectMeta[];
@@ -1046,6 +1069,7 @@ const HomeView = ({
   onCreateProject: () => void;
   onDeleteProject: (id: string) => void;
   onOpenSidebar?: () => void;
+  educationLockedStudent?: boolean;
 }) => {
   const navigate = useNavigate();
   const { t } = useLanguage();
@@ -1092,6 +1116,7 @@ const HomeView = ({
       const tombstones = useWorkspaceStore.getState().deletedWorkspaceIds;
       const localOnly = localBefore.filter(
         (w) =>
+          !educationLockedStudent &&
           (!w.ownerId || w.ownerId === user.id) &&
           !serverIds.has(w.id) &&
           !(w.id in tombstones) &&
@@ -1124,7 +1149,7 @@ const HomeView = ({
     return () => {
       cancelled = true;
     };
-  }, [user?.id, authLoading, mergeServerWorkspaces]);
+  }, [user?.id, authLoading, educationLockedStudent, mergeServerWorkspaces]);
 
   const projectCards = useMemo<ProjectCardItem[]>(() => {
     const spaceCountByProject = new Map<string, number>();
@@ -1166,12 +1191,13 @@ const HomeView = ({
     return [...workspaces]
       .filter(
         (ws) =>
-          !activeProjectId || !ws.projectId || ws.projectId === activeProjectId,
+          (educationLockedStudent ? Boolean(ws.classId) : true) &&
+          (educationLockedStudent || !activeProjectId || !ws.projectId || ws.projectId === activeProjectId),
       )
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, 3)
       .map((ws) => ws.id);
-  }, [activeProjectId, workspaces]);
+  }, [activeProjectId, educationLockedStudent, workspaces]);
 
   useHydrateSpacePreviewGraphs(recentWorkspaceIds, user?.id, authLoading);
 
@@ -1184,6 +1210,11 @@ const HomeView = ({
   }, [recentWorkspaceIds, workspaces, canvasIndex, graphs]);
 
   const handleNew = () => {
+    if (educationLockedStudent) {
+      toast.error("Scan a class QR or link to create a class space.");
+      onSection("spaces");
+      return;
+    }
     const { workspaceId } = createWorkspace(t("workspace.spaces.untitled_space"), activeProjectId);
     if (user?.id) {
       const state = useWorkspaceStore.getState();
@@ -1221,21 +1252,23 @@ const HomeView = ({
         <div className="mx-auto min-w-0 w-full max-w-[1400px] px-4 pb-16 pt-5 md:px-6 lg:px-8 lg:pt-6">
           {/* ── Top trio: Projects · Spaces · Tools ───────────── */}
           <section className="workspace-home-compact grid min-w-0 items-start grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)]">
-            <ProjectsCard
-              projects={projectCards}
-              activeProjectId={activeProjectId}
-              userId={user?.id ?? null}
-              onSelect={onSelectProject}
-              onCreate={onCreateProject}
-              onDelete={onDeleteProject}
-            />
+            {!educationLockedStudent && (
+              <ProjectsCard
+                projects={projectCards}
+                activeProjectId={activeProjectId}
+                userId={user?.id ?? null}
+                onSelect={onSelectProject}
+                onCreate={onCreateProject}
+                onDelete={onDeleteProject}
+              />
+            )}
             <SpacesShowcaseCard
               spaces={recentSpaces}
               onOpen={(id) => navigate(`/app/workspace/${id}`)}
-              onNew={handleNew}
+              onNew={educationLockedStudent ? undefined : handleNew}
               onSeeAll={() => onSection("spaces")}
             />
-            <ToolsCard tools={HOME_TOOLS} onOpen={(tool) => onSection(tool)} />
+            {!educationLockedStudent && <ToolsCard tools={HOME_TOOLS} onOpen={(tool) => onSection(tool)} />}
           </section>
 
           {activeClass && (
@@ -1277,6 +1310,36 @@ const HomeView = ({
     </>
   );
 };
+
+const EducationLockedToolView = ({
+  onOpenSpaces,
+  onOpenSidebar,
+}: {
+  onOpenSpaces: () => void;
+  onOpenSidebar?: () => void;
+}) => (
+  <>
+    <PageHeader title="Class workspace" rightSlot={<UserMenu />} onOpenSidebar={onOpenSidebar} />
+    <div className="flex flex-1 items-center justify-center px-5 py-10">
+      <div className="w-full max-w-[520px] rounded-2xl border border-white/[0.08] bg-[hsl(0_0%_7%)] p-6 text-center">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300">
+          <Lock className="h-6 w-6" />
+        </div>
+        <h2 className="mt-4 text-xl font-semibold text-zinc-50">Class spaces only</h2>
+        <p className="mt-2 text-sm leading-6 text-zinc-400">
+          Student accounts on a university domain can generate only inside spaces created by a class QR or link.
+        </p>
+        <button
+          type="button"
+          onClick={onOpenSpaces}
+          className="mt-5 inline-flex h-9 items-center justify-center rounded-lg bg-emerald-500 px-4 text-sm font-semibold text-white transition hover:bg-emerald-400"
+        >
+          Open class spaces
+        </button>
+      </div>
+    </div>
+  </>
+);
 
 const EducationClassDashboard = ({
   active,
@@ -1600,6 +1663,8 @@ const ProjectsCard = ({
 interface SpaceCardData {
   id: string;
   ownerId?: string | null;
+  classId?: string | null;
+  educationStatus?: WorkspaceMeta["educationStatus"];
   name: string;
   updatedAt: number;
   previewCacheKey: string;
@@ -1684,7 +1749,7 @@ const SpacesShowcaseCard = ({
 }: {
   spaces: SpaceCardData[];
   onOpen: (id: string) => void;
-  onNew: () => void;
+  onNew?: () => void;
   onSeeAll: () => void;
 }) => {
   const { t } = useLanguage();
@@ -1699,24 +1764,32 @@ const SpacesShowcaseCard = ({
           {t("workspace.home.spaces")}
           <ChevronRight className="h-3 w-3 text-zinc-500" />
         </button>
-        <button
-          type="button"
-          onClick={onNew}
-          title={t("workspace.home.new_space_tooltip")}
-          className="flex h-9 w-9 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white lg:h-7 lg:w-7"
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
+        {onNew && (
+          <button
+            type="button"
+            onClick={onNew}
+            title={t("workspace.home.new_space_tooltip")}
+            className="flex h-9 w-9 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white lg:h-7 lg:w-7"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
       {spaces.length === 0 ? (
-        <button
-          type="button"
-          onClick={onNew}
-          className="flex min-h-[86px] w-full items-center justify-center rounded-xl bg-white/[0.02] px-4 text-[13px] text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-zinc-200"
-        >
-          {t("workspace.home.create_first_space")}
-        </button>
+        onNew ? (
+          <button
+            type="button"
+            onClick={onNew}
+            className="flex min-h-[86px] w-full items-center justify-center rounded-xl bg-white/[0.02] px-4 text-[13px] text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-zinc-200"
+          >
+            {t("workspace.home.create_first_space")}
+          </button>
+        ) : (
+          <div className="flex min-h-[86px] w-full items-center justify-center rounded-xl bg-white/[0.02] px-4 text-center text-[13px] text-zinc-500">
+            Scan a class QR or open your class link to create a space.
+          </div>
+        )
       ) : (
         <div className="grid min-w-0 grid-cols-1 gap-2.5 sm:grid-cols-3">
           {spaces.map((ws) => (
@@ -1830,7 +1903,14 @@ const AcademyVideoTile = ({ video }: { video: AcademyVideo }) => (
 /** Build minimap-friendly data for a single workspace. Reused by both
  *  HomeView (recent carousel) and SpacesView (full grid). */
 function buildSpaceCardData(
-  ws: { id: string; ownerId?: string | null; name: string; updatedAt: number },
+  ws: {
+    id: string;
+    ownerId?: string | null;
+    classId?: string | null;
+    educationStatus?: WorkspaceMeta["educationStatus"];
+    name: string;
+    updatedAt: number;
+  },
   canvasIndex: Map<string, PreviewCanvasMeta[]>,
   graphs: Record<string, { nodes?: unknown[]; edges?: unknown[] } | undefined>,
 ): SpaceCardData {
@@ -1943,6 +2023,8 @@ function buildSpaceCardData(
   return {
     id: ws.id,
     ownerId: ws.ownerId ?? null,
+    classId: ws.classId ?? null,
+    educationStatus: ws.educationStatus ?? null,
     name: ws.name,
     updatedAt: ws.updatedAt,
     previewCacheKey: `${previewCanvasId ?? ws.id}:${graphVersion}:${nodes.length}:${edges.length}`,
@@ -1960,6 +2042,7 @@ const ProjectsManagerView = ({
   onCreateProject,
   onDeleteProject,
   onOpenSidebar,
+  educationLockedStudent = false,
 }: {
   projects: ProjectMeta[];
   activeProjectId: string | null;
@@ -1967,6 +2050,7 @@ const ProjectsManagerView = ({
   onCreateProject: () => void;
   onDeleteProject: (id: string) => void;
   onOpenSidebar?: () => void;
+  educationLockedStudent?: boolean;
 }) => {
   const navigate = useNavigate();
   const { t } = useLanguage();
@@ -1979,7 +2063,7 @@ const ProjectsManagerView = ({
   const renameWorkspace = useWorkspaceStore((s) => s.renameWorkspace);
   const deleteWorkspace = useWorkspaceStore((s) => s.deleteWorkspace);
   const duplicateWorkspace = useWorkspaceStore((s) => s.duplicateWorkspace);
-  const selectedProjectId = activeProjectId ?? projects[0]?.id ?? null;
+  const selectedProjectId = educationLockedStudent ? null : activeProjectId ?? projects[0]?.id ?? null;
   const selectedProject =
     projects.find((project) => project.id === selectedProjectId) ?? projects[0] ?? null;
   const [filter, setFilter] = useState<"all" | "mine" | "team">("all");
@@ -2152,6 +2236,9 @@ const ProjectsManagerView = ({
         rightSlot={<UserMenu />}
         onOpenSidebar={onOpenSidebar}
       />
+      {educationLockedStudent ? (
+        <EducationLockedToolView onOpenSpaces={() => onSelectProject(activeProjectId)} onOpenSidebar={onOpenSidebar} />
+      ) : (
       <div className="ws-scroll-hide flex-1 overflow-y-auto overflow-x-hidden">
         <div className="grid w-full gap-4 px-4 pb-16 pt-5 md:px-6 lg:grid-cols-[218px_minmax(0,1fr)] lg:px-7">
           <aside className="min-w-0 self-start rounded-md bg-[hsl(0_0%_8.5%)] p-1.5">
@@ -2311,6 +2398,7 @@ const ProjectsManagerView = ({
           </section>
         </div>
       </div>
+      )}
     </>
   );
 };
@@ -2320,11 +2408,13 @@ const SpacesView = ({
   projects,
   onSelectProject,
   onOpenSidebar,
+  educationLockedStudent = false,
 }: {
   activeProjectId: string | null;
   projects: ProjectMeta[];
   onSelectProject: (id: string | null) => void;
   onOpenSidebar?: () => void;
+  educationLockedStudent?: boolean;
 }) => {
   const navigate = useNavigate();
   const { t } = useLanguage();
@@ -2367,6 +2457,7 @@ const SpacesView = ({
       const tombstones = useWorkspaceStore.getState().deletedWorkspaceIds;
       const localOnly = localBefore.filter(
         (w) =>
+          !educationLockedStudent &&
           (!w.ownerId || w.ownerId === user.id) &&
           !serverIds.has(w.id) &&
           !(w.id in tombstones) &&
@@ -2399,9 +2490,13 @@ const SpacesView = ({
     return () => {
       cancelled = true;
     };
-  }, [user?.id, authLoading, mergeServerWorkspaces]);
+  }, [user?.id, authLoading, educationLockedStudent, mergeServerWorkspaces]);
 
   const handleNew = () => {
+    if (educationLockedStudent) {
+      toast.error("Scan a class QR or open a class link to create a student class space.");
+      return;
+    }
     const { workspaceId } = createWorkspace(t("workspace.spaces.untitled_space"), activeProjectId);
     if (user?.id) {
       const state = useWorkspaceStore.getState();
@@ -2428,9 +2523,11 @@ const SpacesView = ({
     return [...workspaces]
       .filter(
         (ws) =>
-          !activeProjectId ||
-          !ws.projectId ||
-          ws.projectId === activeProjectId,
+          (!educationLockedStudent || Boolean(ws.classId)) &&
+          (educationLockedStudent ||
+            !activeProjectId ||
+            !ws.projectId ||
+            ws.projectId === activeProjectId),
       )
       .filter((ws) =>
         tab === "shared"
@@ -2440,7 +2537,7 @@ const SpacesView = ({
             : false,
       )
       .map((ws) => ws.id);
-  }, [activeProjectId, tab, user?.id, workspaces]);
+  }, [activeProjectId, educationLockedStudent, tab, user?.id, workspaces]);
 
   useHydrateSpacePreviewGraphs(visibleWorkspaceIds, user?.id, authLoading);
 
@@ -2449,9 +2546,11 @@ const SpacesView = ({
       [...workspaces]
         .filter(
           (ws) =>
-            !activeProjectId ||
-            !ws.projectId ||
-            ws.projectId === activeProjectId,
+            (!educationLockedStudent || Boolean(ws.classId)) &&
+            (educationLockedStudent ||
+              !activeProjectId ||
+              !ws.projectId ||
+              ws.projectId === activeProjectId),
         )
         .filter((ws) =>
           tab === "shared"
@@ -2462,7 +2561,7 @@ const SpacesView = ({
         )
         .map((ws) => buildSpaceCardData(ws, canvasIndex, graphs)),
     );
-  }, [activeProjectId, tab, user?.id, workspaces, canvasIndex, graphs]);
+  }, [activeProjectId, educationLockedStudent, tab, user?.id, workspaces, canvasIndex, graphs]);
 
   const handleRename = (id: string, currentName: string) => {
     const next = prompt(t("workspace.spaces.rename_prompt"), currentName);
@@ -2589,25 +2688,29 @@ const SpacesView = ({
               <h1 className="mr-2 text-[40px] font-bold leading-none tracking-tight text-zinc-50 md:text-[48px] lg:text-[56px]">
               {t("workspace.spaces.title")}
               </h1>
-              <ProjectQuickSwitch
-                projects={projects}
-                workspaces={workspaces}
-                activeProjectId={activeProjectId}
-                onSelectProject={onSelectProject}
-              />
+              {!educationLockedStudent && (
+                <ProjectQuickSwitch
+                  projects={projects}
+                  workspaces={workspaces}
+                  activeProjectId={activeProjectId}
+                  onSelectProject={onSelectProject}
+                />
+              )}
             </div>
 
             {/* ── Filter/action row — compact by design ────────── */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <SpacesTabs tab={tab} onChange={setTab} />
               <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={handleNew}
-                  className="flex h-[34px] items-center gap-1.5 rounded-lg bg-white/[0.06] px-3 text-[14px] font-medium text-zinc-100 transition-colors hover:bg-white/[0.12]"
-                >
-                  <Plus className="h-3.5 w-3.5" /> {t("workspace.spaces.new_space")}
-                </button>
+                {!educationLockedStudent && (
+                  <button
+                    type="button"
+                    onClick={handleNew}
+                    className="flex h-[34px] items-center gap-1.5 rounded-lg bg-white/[0.06] px-3 text-[14px] font-medium text-zinc-100 transition-colors hover:bg-white/[0.12]"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> {t("workspace.spaces.new_space")}
+                  </button>
+                )}
                 <SpacesIconBtn icon={Heart} title={t("workspace.spaces.favorites")} />
                 <SpacesIconBtn icon={SlidersHorizontal} title={t("workspace.spaces.filter")} />
                 <SpacesIconBtn icon={Search} title={t("workspace.spaces.search")} />
@@ -2636,7 +2739,7 @@ const SpacesView = ({
                   : t("workspace.spaces.empty_no_spaces_hint")
               }
               cta={
-                tab === "mine"
+                tab === "mine" && !educationLockedStudent
                   ? { label: t("workspace.spaces.new_space"), onClick: handleNew }
                   : undefined
               }
@@ -2650,7 +2753,7 @@ const SpacesView = ({
                     <SpaceCard
                       key={ws.id}
                       ws={ws}
-                      canManage={!ws.ownerId || ws.ownerId === user?.id}
+                      canManage={!educationLockedStudent && (!ws.ownerId || ws.ownerId === user?.id)}
                       onOpen={() => handleOpen(ws.id)}
                       onRename={() => handleRename(ws.id, ws.name)}
                       onDuplicate={() => handleDuplicate(ws.id)}
@@ -2833,6 +2936,7 @@ const SpaceCard = memo(function SpaceCard({
   const { t } = useLanguage();
   const cardRef = useRef<HTMLLIElement | null>(null);
   const [renderPreview, setRenderPreview] = useState(false);
+  const canDuplicate = canManage && !ws.classId;
 
   useEffect(() => {
     if (renderPreview) return;
@@ -2880,6 +2984,11 @@ const SpaceCard = memo(function SpaceCard({
                 Team
               </span>
             )}
+            {ws.educationStatus && ws.educationStatus !== "active" && (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded bg-emerald-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
+                {ws.educationStatus === "passed" ? "Pass" : ws.educationStatus}
+              </span>
+            )}
           </div>
           <div className="mt-0.5 text-[14.5px] text-zinc-500">
             {timeAgo(ws.updatedAt)}
@@ -2891,7 +3000,9 @@ const SpaceCard = memo(function SpaceCard({
         {canManage && (
           <ActionButton title={t("workspace.spaces.action_rename")} onClick={(e) => { e.stopPropagation(); onRename(); }} icon={Pencil} />
         )}
-        <ActionButton title={t("workspace.spaces.action_duplicate")} onClick={(e) => { e.stopPropagation(); onDuplicate(); }} icon={Copy} />
+        {canDuplicate && (
+          <ActionButton title={t("workspace.spaces.action_duplicate")} onClick={(e) => { e.stopPropagation(); onDuplicate(); }} icon={Copy} />
+        )}
         {canManage && (
           <ActionButton title={t("workspace.spaces.action_delete")} danger onClick={(e) => { e.stopPropagation(); onDelete(); }} icon={Trash2} />
         )}

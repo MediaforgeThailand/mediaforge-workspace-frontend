@@ -206,6 +206,9 @@ export async function enrollInClass(code: string, studentCode?: string): Promise
   credit_policy?: string;
   starting_balance?: number;
   org_id?: string;
+  workspace_id?: string;
+  project_id?: string;
+  canvas_id?: string;
 }> {
   const { data: sess } = await supabase.auth.getSession();
   const token = sess?.session?.access_token;

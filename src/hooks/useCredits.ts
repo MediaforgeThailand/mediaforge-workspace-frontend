@@ -17,7 +17,7 @@ interface CreditBalance {
   organization_id?: string | null;
   organization_name?: string | null;
   organization_type?: string | null;
-  credit_scope?: "user" | "organization" | "team";
+  credit_scope?: "user" | "organization" | "team" | "education_space";
   team_id?: string | null;
   team_name?: string | null;
   personal_balance?: number;

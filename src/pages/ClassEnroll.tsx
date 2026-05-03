@@ -43,7 +43,7 @@ export default function ClassEnroll() {
   const [status, setStatus] = useState<
     | { phase: "idle" }
     | { phase: "redeeming" }
-    | { phase: "ok"; class_name: string; balance: number; class_id: string }
+    | { phase: "ok"; class_name: string; balance: number; class_id: string; workspace_id?: string }
     | { phase: "error"; error: string }
   >({ phase: "idle" });
 
@@ -64,12 +64,15 @@ export default function ClassEnroll() {
         class_name: res.class_name ?? "your class",
         balance: res.starting_balance ?? 0,
         class_id: res.class_id ?? "",
+        workspace_id: res.workspace_id,
       });
       // Make this class the active one + refresh caches
       if (res.class_id) setActiveClassId(res.class_id);
       qc.invalidateQueries({ queryKey: ["mf-um-class-memberships"] });
+      qc.invalidateQueries({ queryKey: ["class-memberships"] });
       await refreshProfile();
-      setTimeout(() => navigate("/app/workspace", { replace: true }), 4000);
+      const nextPath = res.workspace_id ? `/app/workspace/${res.workspace_id}` : "/app/workspace";
+      setTimeout(() => navigate(nextPath, { replace: true }), 2500);
     } else {
       setStatus({ phase: "error", error: res.error ?? "unknown_error" });
     }
@@ -121,10 +124,10 @@ export default function ClassEnroll() {
             </div>
             <h1 className="text-2xl font-bold">Welcome to {status.class_name}</h1>
             <p className="text-muted-foreground">
-              You received <span className="font-mono font-semibold text-foreground">{status.balance.toLocaleString()}</span> starting credits.
+              You received <span className="font-mono font-semibold text-foreground">{status.balance.toLocaleString()}</span> credits for this class space.
             </p>
             <p className="text-xs text-muted-foreground">Redirecting to workspace…</p>
-            <Button onClick={() => navigate("/app/workspace", { replace: true })}>
+            <Button onClick={() => navigate(status.workspace_id ? `/app/workspace/${status.workspace_id}` : "/app/workspace", { replace: true })}>
               <Workflow className="h-4 w-4 mr-2" /> Go to workspace now
             </Button>
           </>
