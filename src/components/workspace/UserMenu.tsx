@@ -22,6 +22,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCredits } from "@/hooks/useCredits";
+import { supabase } from "@/integrations/supabase/client";
 
 const numberCompact = new Intl.NumberFormat("en-US", {
   notation: "compact",
@@ -179,14 +180,29 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
     // `text-[12.5px]` etc — those are caught by the `.mf-readable`
     // Thai-readability bump in index.css and forced up to 17.25px,
     // which breaks the proportions of a small pill button.
+    const handleSignInClick = async () => {
+      // Some users see Auth.tsx auto-redirect them BACK to the
+      // dashboard the instant they land on /auth. That happens when
+      // a stale Supabase session is sitting in localStorage but
+      // hasn't propagated into AuthContext at the moment UserMenu
+      // first rendered (so we showed the guest pill), then becomes
+      // visible by the time /auth's `if (user) navigate(home)`
+      // effect fires. Defensive `signOut()` clears any such ghost
+      // before we navigate — guests are unaffected (signOut is a
+      // no-op without a session).
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        // best effort — proceed to /auth either way
+      }
+      navigate("/auth", {
+        state: { from: { pathname: window.location.pathname, search: window.location.search } },
+      });
+    };
     return (
       <button
         type="button"
-        onClick={() =>
-          navigate("/auth", {
-            state: { from: { pathname: window.location.pathname, search: window.location.search } },
-          })
-        }
+        onClick={handleSignInClick}
         className="inline-flex h-[32px] items-center rounded-full bg-white px-[14px] text-[14px] font-semibold leading-none text-zinc-950 transition hover:bg-zinc-200"
       >
         {t("authSignInButton")}
