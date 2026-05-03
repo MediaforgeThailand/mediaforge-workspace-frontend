@@ -1,13 +1,14 @@
 // Multi-tenant branding hook.
 //
-// At app boot we read window.location.hostname and look it up in
-// public.org_domains. If we find a row, the workspace chrome (sidebar
-// brand row, login screen logo) swaps to that org's logo + short name.
-// Otherwise we fall back to the default PSC brand.
+// At app boot we first use the signed-in user's profile.organization_id when
+// available, then fall back to window.location.hostname -> public.org_domains
+// for public/custom-domain visits. If we find an org, the workspace chrome
+// swaps to that org's logo + short name. Otherwise we fall back to the
+// default workspace brand.
 //
 // The query is read-public — it works for unauthenticated visitors
-// landing on /auth, which is the whole point: the user has to see
-// "DMD" branding BEFORE they sign in.
+// Domain fallback is read-public, so unauthenticated visitors landing on
+// /auth can still see tenant branding BEFORE they sign in.
 //
 // We use react-query so the lookup is cached process-wide and shared
 // between the sidebar, the login screen, and any other surface that
@@ -18,6 +19,7 @@
 // Localhost and IP-only hosts skip the network call entirely.
 
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface OrgBranding {
@@ -44,19 +46,38 @@ function isDevOrIpHost(host: string): boolean {
   return false;
 }
 
-async function fetchOrgBranding(): Promise<OrgBranding | null> {
-  const host = window.location.hostname.toLowerCase();
-  if (isDevOrIpHost(host)) return null;
-
-  const { data: domainRow } = await supabase
-    .from("org_domains" as any)
-    .select("org_id, hostname")
-    .eq("hostname", host)
+async function readOrgBrandingById(orgId: string, hostname: string): Promise<OrgBranding | null> {
+  const { data: directOrg } = await supabase
+    .from("organizations" as any)
+    .select("id, name, display_name, logo_url, brand_color, settings, status")
+    .eq("id", orgId)
     .maybeSingle();
 
-  if (!domainRow) return null;
+  if (directOrg) {
+    if ((directOrg as any).status === "suspended") return null;
 
-  const orgId = (domainRow as any).org_id as string;
+    const settings = ((directOrg as any).settings && typeof (directOrg as any).settings === "object")
+      ? ((directOrg as any).settings as Record<string, unknown>)
+      : {};
+    const displayName =
+      ((directOrg as any).display_name as string | null) ??
+      ((directOrg as any).name as string | null) ??
+      "Workspace";
+    const shortName =
+      (settings.display_name_short as string | undefined) ||
+      (settings.brand_short_name as string | undefined) ||
+      displayName;
+
+    return {
+      orgId,
+      shortName,
+      displayName,
+      logoUrl: ((directOrg as any).logo_url as string | null) ?? null,
+      brandColor: ((directOrg as any).brand_color as string | null) ?? null,
+      hostname,
+    };
+  }
+
   let { data: orgRow, error: orgError } = await supabase
     .from("sso_organizations" as any)
     .select("id, display_name, display_name_short, logo_url, brand_color, status")
@@ -81,7 +102,7 @@ async function fetchOrgBranding(): Promise<OrgBranding | null> {
   // showing the brand to phish users after access is revoked.
   if ((orgRow as any).status === "suspended") return null;
 
-  const displayName = (orgRow as any).display_name as string;
+  const displayName = ((orgRow as any).display_name as string | null) ?? "Workspace";
   const shortName = ((orgRow as any).display_name_short as string | null) ?? displayName;
 
   return {
@@ -90,8 +111,33 @@ async function fetchOrgBranding(): Promise<OrgBranding | null> {
     displayName,
     logoUrl: ((orgRow as any).logo_url as string | null) ?? null,
     brandColor: ((orgRow as any).brand_color as string | null) ?? null,
-    hostname: (domainRow as any).hostname as string,
+    hostname,
   };
+}
+
+async function fetchOrgBranding(profileOrgId?: string | null): Promise<OrgBranding | null> {
+  const host = window.location.hostname.toLowerCase();
+
+  // Logged-in org users should see their organization branding even on
+  // workspace.mediaforge.co or localhost. Domain branding is only the public
+  // fallback for unauthenticated / custom-host visits.
+  if (profileOrgId) {
+    const orgBranding = await readOrgBrandingById(profileOrgId, host);
+    if (orgBranding) return orgBranding;
+  }
+
+  if (isDevOrIpHost(host)) return null;
+
+  const { data: domainRow } = await supabase
+    .from("org_domains" as any)
+    .select("org_id, hostname")
+    .eq("hostname", host)
+    .maybeSingle();
+
+  if (!domainRow) return null;
+
+  const orgId = (domainRow as any).org_id as string;
+  return readOrgBrandingById(orgId, (domainRow as any).hostname as string);
 }
 
 /**
@@ -102,9 +148,12 @@ async function fetchOrgBranding(): Promise<OrgBranding | null> {
  * flicker an empty row for unauthenticated visitors.
  */
 export function useOrgBranding(): OrgBranding | null {
+  const { profile } = useAuth();
+  const profileOrgId = ((profile as any)?.organization_id ?? (profile as any)?.org_id ?? null) as string | null;
+
   const { data } = useQuery({
-    queryKey: ["org-branding", window.location.hostname.toLowerCase()],
-    queryFn: fetchOrgBranding,
+    queryKey: ["org-branding", window.location.hostname.toLowerCase(), profileOrgId],
+    queryFn: () => fetchOrgBranding(profileOrgId),
     staleTime: Infinity,
     gcTime: Infinity,
     retry: 1,
