@@ -154,9 +154,17 @@ function UsageRow({
 
 export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
   const navigate = useNavigate();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, loading: authLoading } = useAuth();
   const { t, language, setLanguage } = useLanguage();
   const { credits, loading: creditsLoading } = useCredits();
+
+  // While auth is still resolving, render an invisible placeholder so
+  // we don't show the guest Sign-in pill and then snap to the avatar
+  // (or vice-versa). The placeholder reserves the trigger's pixel
+  // footprint so the header doesn't reflow either way.
+  if (authLoading) {
+    return <div className="h-[32px] w-[32px]" aria-hidden />;
+  }
 
   // Guest fallback — when no user is signed in (the dashboard / home
   // is public per Workspace V2), render a compact "Sign in" pill in
