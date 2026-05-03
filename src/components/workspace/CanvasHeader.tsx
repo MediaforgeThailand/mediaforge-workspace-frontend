@@ -72,40 +72,40 @@ const CanvasHeader = () => {
 
   return (
     <div
-      className="relative z-[80] flex h-[53px] shrink-0 items-center justify-between gap-[14px] bg-[hsl(0_0%_4%)] px-[18px]"
+      className="relative z-[80] flex h-[42px] shrink-0 items-center justify-between gap-[11px] bg-[hsl(0_0%_4%)] px-[14px]"
       style={{ fontFamily: "var(--font-sans)" }}
     >
       {/* Left — back arrow + breadcrumb */}
-      <div className="flex min-w-0 flex-1 items-center gap-[10px]">
+      <div className="flex min-w-0 flex-1 items-center gap-[8px]">
         <Link
           to="/app/workspace"
-          className="flex h-[37px] w-[37px] shrink-0 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-100"
+          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-100"
           title={t("workspace.canvas.back_dashboard")}
           aria-label={t("workspace.canvas.back_dashboard")}
         >
-          <ChevronLeft className="h-[20px] w-[20px]" />
+          <ChevronLeft className="h-[16px] w-[16px]" />
         </Link>
 
         {/* Project chip — coloured square + label */}
         <button
           type="button"
-          className="flex h-[40px] shrink-0 items-center gap-[8px] rounded-md px-[10px] text-[16px] leading-[21px] text-zinc-200 transition-colors hover:bg-white/[0.04]"
+          className="flex h-[32px] shrink-0 items-center gap-[6px] rounded-md px-[8px] text-[13px] leading-[17px] text-zinc-200 transition-colors hover:bg-white/[0.04]"
           title={t("workspace.canvas.project_tooltip", { name: projectLabel })}
         >
           <span
-            className="flex h-[29px] w-[29px] items-center justify-center rounded-[7px]"
+            className="flex h-[23px] w-[23px] items-center justify-center rounded-[6px]"
             style={{ background: projectAccent }}
           >
-            <Layers className="h-[17px] w-[17px] text-zinc-950" />
+            <Layers className="h-[14px] w-[14px] text-zinc-950" />
           </span>
           <span className="font-medium">{projectLabel}</span>
         </button>
 
-        <ChevronRight className="h-[17px] w-[17px] shrink-0 text-zinc-600" />
+        <ChevronRight className="h-[14px] w-[14px] shrink-0 text-zinc-600" />
 
         {/* Workspace name — slightly italic + soft glyph to read as
          *  "the document title", consistent with Figma/Notion patterns. */}
-        <span className="min-w-0 truncate text-[16px] leading-[21px] italic text-zinc-300">
+        <span className="min-w-0 truncate text-[13px] leading-[17px] italic text-zinc-300">
           {workspace?.name || t("workspace.canvas.untitled_space")}
         </span>
       </div>
