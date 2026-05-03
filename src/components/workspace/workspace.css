@@ -598,19 +598,6 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   border-color: hsl(0 0% 55%);
 }
 
-/* Credit-cost badge that sits inside the floating title row. */
-.ws-compact-header-badge {
-  font-size: 13px;
-  line-height: 18px;
-  font-weight: 700;
-  color: hsl(258 90% 78%);
-  background: hsl(258 90% 50% / 0.15);
-  border: 1px solid hsl(258 90% 50% / 0.3);
-  border-radius: 999px;
-  padding: 1px 7px;
-  flex-shrink: 0;
-}
-
 /* Preview area — wraps the image/video and the bottom toolbar
  * overlay. Uses aspect-ratio fit by letting <img>/<video> set
  * their natural height while the parent stretches to match. */
@@ -723,25 +710,26 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   height: 28px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: hsl(199 89% 48%);
+  background: linear-gradient(135deg, hsl(262 87% 62%) 0%, hsl(263 86% 58%) 100%);
   color: hsl(0 0% 100%);
   border: none;
   cursor: pointer;
   box-shadow:
-    0 8px 18px hsl(199 89% 48% / 0.28),
-    0 0 0 1px hsl(199 89% 58% / 0.35);
+    0 8px 18px hsl(263 86% 58% / 0.32),
+    0 0 0 1px hsl(262 87% 72% / 0.36);
   transition:
     transform 120ms var(--ws-ease),
-    background 120ms var(--ws-ease);
+    filter 120ms var(--ws-ease);
 }
 .ws-compact-run:hover {
-  background: hsl(199 89% 56%);
+  filter: brightness(1.08);
   transform: scale(1.05);
 }
 .ws-compact-run:disabled {
   cursor: wait;
   background: hsl(0 0% 22%);
   color: hsl(0 0% 60%);
+  filter: none;
   transform: none;
 }
 .ws-compact-run.is-error {
@@ -911,14 +899,11 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   -webkit-font-smoothing: antialiased;
   text-rendering: geometricPrecision;
   /* Resting state — fixed 3-line box so:
-   *   1. The placeholder ::before (anchored at `bottom: 0`)
-   *      ALWAYS has 3 lines of room above the baseline. The
-   *      previous `min-height: 22px` left the contenteditable
-   *      only 1 line tall when empty; combined with
-   *      `overflow: hidden` it clipped every placeholder line
-   *      except the very bottom one. User reported only seeing
-   *      "generate…" — that was the tail of a 3-line wrap with
-   *      the top 2 lines invisible.
+   *   1. The placeholder and the real caret share the same first
+   *      editable line. Keep the placeholder in normal flow; if it
+   *      is absolutely anchored to the bottom, the sample text sits
+   *      on one baseline while the browser's empty-contenteditable
+   *      caret appears on another.
    *   2. Long typed prompts still clamp at 3 lines and don't
    *      grow up into the toolbar. Same value used for both
    *      min and max so the box doesn't visibly resize between
@@ -1053,26 +1038,16 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
 }
 .ws-compact-prompt-overlay .prompt-editable.is-empty::before {
   content: attr(data-placeholder);
+  display: block;
   color: hsl(0 0% 70%);
   pointer-events: none;
-  /* Anchor to the bottom of the editable so the hint reads as
-   * "type here" not as a header. The contenteditable already
-   * gets `position: relative` from the workspace prompt overlay
-   * styles — no extra positioning needed on the host. */
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
   white-space: pre-wrap;
   text-shadow:
     0 1px 2px hsl(0 0% 0% / 0.85),
     0 0 6px hsl(0 0% 0% / 0.55);
 }
-/* Make the contenteditable a positioning context so the absolutely-
- * positioned pseudo above pins to it (instead of the closest non-
- * static ancestor, which would be the whole node card). */
-.ws-compact-prompt-overlay .prompt-editable {
-  position: relative;
+.ws-compact-prompt-overlay .prompt-editable.is-empty > br {
+  display: none;
 }
 
 /* Blur the preview's media (img / video) while the prompt is

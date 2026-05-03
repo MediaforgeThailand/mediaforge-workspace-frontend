@@ -2378,15 +2378,6 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             className="ws-clean-title-input nodrag"
             placeholder={schema.displayName}
           />
-          {nodeCost != null && !creditCostsLoading && (
-            <span
-              className="ws-compact-header-badge"
-              style={{ pointerEvents: "auto" }}
-            >
-              {nodeCost}
-              {costSuffix ?? ""}
-            </span>
-          )}
         </div>
 
         {/* Body card — single rounded container holding the preview

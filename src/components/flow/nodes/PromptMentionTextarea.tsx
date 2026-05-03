@@ -522,8 +522,20 @@ const PromptMentionTextarea = memo(({
     const editor = editorRef.current;
     if (!editor) return;
     const raw = normalizePromptTokens(domToRaw(editor));
+    const nextRaw = raw.trim() ? raw : "";
     const normalizedValue = normalizePromptTokens(value);
-    if (raw !== normalizedValue) {
+    if (!nextRaw && editor.childNodes.length > 0) {
+      editor.textContent = "";
+      if (document.activeElement === editor) {
+        const range = document.createRange();
+        range.setStart(editor, 0);
+        range.collapse(true);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      }
+    }
+    if (nextRaw !== normalizedValue) {
       suppressSync.current = true;
       /* Push the previous value onto the undo stack before swapping
        *  it out — but only for genuine user edits. When we're
@@ -532,7 +544,7 @@ const PromptMentionTextarea = memo(({
        *  on a long editing session. */
       if (!suppressHistory.current) {
         const prev = lastCommittedValueRef.current;
-        if (prev !== raw) {
+        if (prev !== nextRaw) {
           historyRef.current.push(prev);
           if (historyRef.current.length > 200) historyRef.current.shift();
           /* A fresh edit invalidates any pending redo branch — same
@@ -540,8 +552,8 @@ const PromptMentionTextarea = memo(({
           redoRef.current = [];
         }
       }
-      lastCommittedValueRef.current = raw;
-      onChange(raw);
+      lastCommittedValueRef.current = nextRaw;
+      onChange(nextRaw);
     }
   }, [onChange, value]);
 
