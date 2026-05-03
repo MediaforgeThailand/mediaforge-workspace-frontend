@@ -47,7 +47,6 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useIsClassTeacher, useIsOrgAdmin } from "@/hooks/useIsOrgUser";
 import { useOrgBranding } from "@/hooks/useOrgBranding";
@@ -132,9 +131,7 @@ export default function WorkspaceSidebar({
   onCreate,
 }: WorkspaceSidebarProps) {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { t, language, setLanguage } = useLanguage();
-  const isPscDemoUser = user?.email?.toLowerCase() === "dmd@psc.com";
   // Tenant branding override (e.g. dmd.mediaforge.co → DMD logo +
   // "DMD" short name). Returns null on the bare workspace.mediaforge.co
   // host or while the lookup is in flight; we render the default
@@ -258,20 +255,6 @@ export default function WorkspaceSidebar({
         <OrgCreditBadge variant="card" />
       </div>
 
-      {isPscDemoUser && (
-        <div className="px-[12px] pt-[8px]">
-          <button
-            type="button"
-            onClick={() => navigate("/app/university")}
-            className="flex h-[32px] w-full items-center gap-[8px] rounded-md border border-fuchsia-400/25 bg-fuchsia-500/10 px-[8px] text-[14px] font-semibold text-fuchsia-100 transition-colors hover:bg-fuchsia-500/18 hover:text-white"
-            title={t("workspace.sidebar.psc_demo_tip")}
-          >
-            <School className="h-[14px] w-[14px]" />
-            PSC
-          </button>
-        </div>
-      )}
-
       {/* Org admin / class teacher entry to the management surface. */}
       <OrgAdminLink />
 
@@ -312,10 +295,10 @@ const OrgAdminLink = () => {
 
   const primaryLabel = isEnterprise
     ? t("workspace.sidebar.manage_team")
-    : t("workspace.sidebar.manage_institution");
+    : t("workspace.sidebar.university");
   const primaryTip = isEnterprise
     ? t("workspace.sidebar.manage_team_tip")
-    : t("workspace.sidebar.manage_institution_tip");
+    : t("workspace.sidebar.university_tip");
   const PrimaryIcon = isEnterprise ? UsersRound : School;
   const primaryTarget = isEnterprise ? "/app/settings?tab=team" : "/app/org-admin";
 
