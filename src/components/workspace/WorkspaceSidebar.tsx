@@ -47,7 +47,6 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useIsClassTeacher, useIsOrgAdmin } from "@/hooks/useIsOrgUser";
 import { useOrgBranding } from "@/hooks/useOrgBranding";
@@ -132,9 +131,7 @@ export default function WorkspaceSidebar({
   onCreate,
 }: WorkspaceSidebarProps) {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { t, language, setLanguage } = useLanguage();
-  const isPscDemoUser = user?.email?.toLowerCase() === "dmd@psc.com";
   // Tenant branding override (e.g. dmd.mediaforge.co → DMD logo +
   // "DMD" short name). Returns null on the bare workspace.mediaforge.co
   // host or while the lookup is in flight; we render the default
@@ -164,17 +161,17 @@ export default function WorkspaceSidebar({
   //   • Width tightened 198 → 192 keeps the visual rhythm.
   return (
     <div className="ws-scroll-hide h-full shrink-0 bg-[hsl(var(--surface-0))] py-[8px] pl-[8px]">
-      <aside className="mf-readable ws-scroll-hide flex h-full w-[192px] flex-col overflow-y-auto rounded-xl bg-[hsl(var(--surface-1))]">
+      <aside className="mf-readable ws-scroll-hide flex h-full w-[221px] flex-col overflow-y-auto rounded-xl bg-[hsl(var(--surface-1))]">
       {/* ── Brand row — PSC : Digital Media ──────────────────────
        *  Logo lives at /public/psc-logo.png. Save the orange
        *  Digital Media wordmark there; the full lockup is wide
        *  so we use object-contain to fit the 34px square slot
        *  without distorting the trefoil + wordmark proportions. */}
-      <div className="flex h-[48px] shrink-0 items-center px-[12px]">
+      <div className="flex h-[55px] shrink-0 items-center px-[14px]">
         <button
           type="button"
           onClick={() => navigate("/app/workspace")}
-          className="flex items-center gap-[8px] text-[14px] font-semibold text-zinc-50 transition-colors hover:text-white"
+          className="flex items-center gap-[9px] text-[16px] font-semibold text-zinc-50 transition-colors hover:text-white"
         >
           {/* Brand logo — defaults to the workspace mascot, swapped
            *  to the tenant org logo when the user is on a claimed
@@ -184,7 +181,7 @@ export default function WorkspaceSidebar({
           <img
             src={brandLogo}
             alt={brandName}
-            className="h-[28px] w-[28px] shrink-0 select-none object-contain"
+            className="h-[32px] w-[32px] shrink-0 select-none object-contain"
             draggable={false}
           />
           <span className="leading-tight">{brandName}</span>
@@ -192,23 +189,23 @@ export default function WorkspaceSidebar({
       </div>
 
       {/* ── Create button (primary action) ─────────────────────── */}
-      <div className="px-[12px] pb-[8px] pt-[2px]">
+      <div className="px-[14px] pb-[9px] pt-[2px]">
         <button
           type="button"
           onClick={handleCreate}
           className={cn(
-            "flex h-[36px] w-full items-center justify-center gap-[6px] rounded-lg px-[12px] text-[14px] font-semibold text-white",
+            "flex h-[41px] w-full items-center justify-center gap-[7px] rounded-lg px-[14px] text-[16px] font-semibold text-white",
             "bg-gradient-to-b from-[#ff3d8e] to-[#e8327f] shadow-[0_2px_8px_-2px_rgba(255,61,142,0.45)]",
             "transition-[transform,box-shadow] hover:from-[#ff4da0] hover:to-[#ef3a8c] hover:shadow-[0_4px_12px_-2px_rgba(255,61,142,0.55)]",
             "active:scale-[0.98]",
           )}
         >
-          <Plus className="h-[14px] w-[14px]" /> {t("workspace.sidebar.create")}
+          <Plus className="h-[16px] w-[16px]" /> {t("workspace.sidebar.create")}
         </button>
       </div>
 
       {/* ── Top nav group ──────────────────────────────────────── */}
-      <nav className="flex flex-col gap-[2px] px-[12px] pb-[8px] pt-[4px]">
+      <nav className="flex flex-col gap-[3px] px-[14px] pb-[9px] pt-[5px]">
         {NAV_TOP.map((it) => (
           <NavLink
             key={it.id}
@@ -221,14 +218,14 @@ export default function WorkspaceSidebar({
       </nav>
 
       {/* ── Section divider with label ─────────────────────────── */}
-      <div className="px-[16px] pb-[4px] pt-[12px]">
-        <div className="text-[12.75px] font-semibold uppercase text-zinc-400">
+      <div className="px-[18px] pb-[5px] pt-[14px]">
+        <div className="text-[14.5px] font-semibold uppercase text-zinc-400">
           {t("workspace.sidebar.all_tools")}
         </div>
       </div>
 
       {/* ── Tools nav group ────────────────────────────────────── */}
-      <nav className="flex flex-col gap-[2px] px-[12px]">
+      <nav className="flex flex-col gap-[3px] px-[14px]">
         {NAV_TOOLS.map((it) => (
           <NavLink
             key={it.id}
@@ -248,29 +245,15 @@ export default function WorkspaceSidebar({
 
       {/* Active class switcher — only renders when student is in 2+
        *  classes; consumers/single-class students see nothing. */}
-      <div className="mt-auto px-[12px]">
+      <div className="mt-auto px-[14px]">
         <ActiveClassPicker variant="compact" className="w-full" />
       </div>
 
       {/* Org credit badge — visible to org members so they can see
        *  their balance at a glance. Returns null for consumer/guests. */}
-      <div className="px-[12px] py-[6px]">
+      <div className="px-[14px] py-[7px]">
         <OrgCreditBadge variant="card" />
       </div>
-
-      {isPscDemoUser && (
-        <div className="px-[12px] pt-[8px]">
-          <button
-            type="button"
-            onClick={() => navigate("/app/university")}
-            className="flex h-[32px] w-full items-center gap-[8px] rounded-md border border-fuchsia-400/25 bg-fuchsia-500/10 px-[8px] text-[14px] font-semibold text-fuchsia-100 transition-colors hover:bg-fuchsia-500/18 hover:text-white"
-            title={t("workspace.sidebar.psc_demo_tip")}
-          >
-            <School className="h-[14px] w-[14px]" />
-            PSC
-          </button>
-        </div>
-      )}
 
       {/* Org admin / class teacher entry to the management surface. */}
       <OrgAdminLink />
@@ -281,7 +264,7 @@ export default function WorkspaceSidebar({
        *  parallel UtilityBtn — same visual weight, no special
        *  treatment beyond label rendering the TARGET language in its
        *  own script (universal language-switcher convention). */}
-      <div className="flex items-center gap-[4px] px-[12px] pb-[12px] pt-[12px]">
+      <div className="flex items-center gap-[5px] px-[14px] pb-[14px] pt-[14px]">
         <UtilityBtn icon={SettingsIcon} title={t("workspace.sidebar.settings")} onClick={() => navigate("/app/settings")} />
         <UtilityBtn
           icon={Languages}
@@ -312,10 +295,10 @@ const OrgAdminLink = () => {
 
   const primaryLabel = isEnterprise
     ? t("workspace.sidebar.manage_team")
-    : t("workspace.sidebar.manage_institution");
+    : t("workspace.sidebar.university");
   const primaryTip = isEnterprise
     ? t("workspace.sidebar.manage_team_tip")
-    : t("workspace.sidebar.manage_institution_tip");
+    : t("workspace.sidebar.university_tip");
   const PrimaryIcon = isEnterprise ? UsersRound : School;
   const primaryTarget = isEnterprise ? "/app/settings?tab=team" : "/app/org-admin";
 
@@ -362,13 +345,13 @@ const NavLink = ({
     className={cn(
       /* 2026-05: drop the inset 1px stroke on active — bg lift alone
        *  is enough now that the sidebar is a Layer-1 panel. */
-      "flex h-[32px] items-center gap-[8px] rounded-md px-[8px] text-[14px] font-medium transition-colors",
+      "flex h-[37px] items-center gap-[9px] rounded-md px-[9px] text-[16px] font-medium transition-colors",
       active
         ? "bg-white/[0.08] text-zinc-50"
         : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100",
     )}
   >
-    <Icon className="h-[15px] w-[15px] shrink-0" />
+    <Icon className="h-[17px] w-[17px] shrink-0" />
     {label}
   </button>
 );
@@ -395,9 +378,9 @@ const UtilityBtn = ({
     title={title}
     aria-label={title}
     onClick={onClick}
-    className="relative flex h-[32px] w-[32px] items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-100"
+    className="relative flex h-[37px] w-[37px] items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-100"
   >
-    <Icon className="h-[15px] w-[15px]" />
+    <Icon className="h-[17px] w-[17px]" />
     {badge && (
       <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-rose-400 ring-2 ring-[hsl(0_0%_4%)]" />
     )}

@@ -79,6 +79,9 @@ const PORT_COLOR: Record<AssetNodeData["fieldType"], string> = {
   model3d: "hsl(43 96% 56%)",
 };
 
+const WORKSPACE_NODE_UI_SCALE = 1.15;
+const DEFAULT_ASSET_NODE_WIDTH = 219;
+
 const AssetNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as unknown as AssetNodeData;
   const { setNodes } = useReactFlow();
@@ -92,7 +95,17 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
   // don't need useMirroredTripoUrl on this path.
   const imagePreviewTransform = useMemo(
     () => ({
-      width: Math.max(512, Math.min(1280, Math.ceil(((d.compactWidth ?? 219) as number) * 2))),
+      width: Math.max(
+        512,
+        Math.min(
+          1280,
+          Math.ceil(
+            ((d.compactWidth ?? DEFAULT_ASSET_NODE_WIDTH) as number) *
+              WORKSPACE_NODE_UI_SCALE *
+              2,
+          ),
+        ),
+      ),
       quality: 82,
       resize: "contain" as const,
     }),
@@ -139,9 +152,10 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
       e.preventDefault();
       e.stopPropagation();
       const startX = e.clientX;
-      const startWidth = (d.compactWidth as number | undefined) ?? 219;
+      const startWidth =
+        (d.compactWidth as number | undefined) ?? DEFAULT_ASSET_NODE_WIDTH;
       const onMove = (ev: PointerEvent) => {
-        const delta = ev.clientX - startX;
+        const delta = (ev.clientX - startX) / WORKSPACE_NODE_UI_SCALE;
         const next = Math.max(
           160,
           Math.min(640, Math.round(startWidth + delta)),
@@ -194,7 +208,11 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
       // across re-mounts. Inner text (label input, role picker
       // chip) stays at fixed pixel sizes so the gesture only
       // enlarges the visual tile.
-      style={{ width: d.compactWidth ?? 219 }}
+      style={{
+        width:
+          ((d.compactWidth as number | undefined) ??
+            DEFAULT_ASSET_NODE_WIDTH) * WORKSPACE_NODE_UI_SCALE,
+      }}
     >
       {/* Floating title — icon + editable name. */}
       <div className="ws-clean-title">

@@ -508,6 +508,8 @@ const ICONS: Record<string, LucideIcon> = {
 };
 
 const OMNI_MODELS = new Set(["kling-v3-omni"]);
+const WORKSPACE_NODE_UI_SCALE = 1.15;
+const DEFAULT_COMPACT_WIDTH = 437;
 
 interface NodeData {
   label?: string;
@@ -2116,7 +2118,17 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     : null;
   const imagePreviewTransform = useMemo(
     () => ({
-      width: Math.max(768, Math.min(1600, Math.ceil(((d.compactWidth ?? 437) as number) * 2))),
+      width: Math.max(
+        768,
+        Math.min(
+          1600,
+          Math.ceil(
+            ((d.compactWidth ?? DEFAULT_COMPACT_WIDTH) as number) *
+              WORKSPACE_NODE_UI_SCALE *
+              2,
+          ),
+        ),
+      ),
       quality: 82,
       resize: "contain" as const,
     }),
@@ -2314,9 +2326,9 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       e.preventDefault();
       e.stopPropagation();
       const startX = e.clientX;
-      const startWidth = (d.compactWidth as number | undefined) ?? 437;
+      const startWidth = (d.compactWidth as number | undefined) ?? DEFAULT_COMPACT_WIDTH;
       const onMove = (ev: PointerEvent) => {
-        const delta = ev.clientX - startX;
+        const delta = (ev.clientX - startX) / WORKSPACE_NODE_UI_SCALE;
         const next = Math.max(
           320,
           Math.min(1200, Math.round(startWidth + delta)),
@@ -2358,7 +2370,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         data-status={runStatus}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        style={{ width: d.compactWidth ?? 437 }}
+        style={{
+          width:
+            ((d.compactWidth as number | undefined) ?? DEFAULT_COMPACT_WIDTH) *
+            WORKSPACE_NODE_UI_SCALE,
+        }}
       >
         {/* ── Floating title — sits ABOVE the body, no border. ── */}
         {/* Title icon stays neutral grey across every node type. The
