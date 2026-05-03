@@ -2267,7 +2267,7 @@ function CreationFeed({
           <CreationRow
             key={job.id}
             job={job}
-            onPreviewModel={setPreview}
+            onPreview={setPreview}
           />
         ))}
       </div>
@@ -2328,10 +2328,10 @@ function getStandalonePosterUrl(
 
 function CreationRow({
   job,
-  onPreviewModel,
+  onPreview,
 }: {
   job: StandaloneJobRow;
-  onPreviewModel: (preview: PreviewPayload) => void;
+  onPreview: (preview: PreviewPayload) => void;
 }) {
   const [cancelling, setCancelling] = useState(false);
   const result = job.result;
@@ -2397,9 +2397,11 @@ function CreationRow({
       : null;
   const isActive = job.status === "queued" || job.status === "running";
   const isFailed = job.status === "failed" || job.status === "permanent_failed";
+  const canPreviewImage =
+    resultType === "image" && !!displayPreviewUrl && !isActive && !isFailed;
   const openModelPreview = () => {
     if (!modelUrl) return;
-    onPreviewModel({
+    onPreview({
       type: "model3d",
       model_url: modelUrl,
       poster: displayPreviewUrl,
@@ -2407,6 +2409,21 @@ function CreationRow({
       caption: "Drag to rotate / scroll to zoom",
     });
   };
+  const openMediaPreview = () => {
+    if (modelUrl) {
+      openModelPreview();
+      return;
+    }
+    if (canPreviewImage && displayPreviewUrl) {
+      onPreview({
+        type: "image",
+        url: displayPreviewUrl,
+        label: title,
+        caption: modelName,
+      });
+    }
+  };
+  const canOpenPreview = !!modelUrl || canPreviewImage;
   return (
     <article className="rounded-xl bg-[#222222] px-3 py-3">
       <div className="mb-2 flex items-start justify-between gap-3">
@@ -2428,22 +2445,29 @@ function CreationRow({
         <div
           className={cn(
             "relative aspect-video w-full overflow-hidden rounded-xl bg-black md:w-[265px]",
-            modelUrl && "cursor-zoom-in",
+            canOpenPreview && "cursor-zoom-in",
           )}
-          role={modelUrl ? "button" : undefined}
-          tabIndex={modelUrl ? 0 : undefined}
-          onClick={modelUrl ? openModelPreview : undefined}
+          role={canOpenPreview ? "button" : undefined}
+          tabIndex={canOpenPreview ? 0 : undefined}
+          onClick={canOpenPreview ? openMediaPreview : undefined}
           onKeyDown={
-            modelUrl
+            canOpenPreview
               ? (event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
-                    openModelPreview();
+                    openMediaPreview();
                   }
                 }
               : undefined
           }
-          aria-label={modelUrl ? "Preview 3D model" : undefined}
+          aria-label={
+            modelUrl
+              ? "Preview 3D model"
+              : canPreviewImage
+                ? "Preview image"
+                : undefined
+          }
+          data-testid={canOpenPreview ? "standalone-preview-tile" : undefined}
         >
           {isActive && (
             <div className="absolute inset-0 grid place-items-center">
