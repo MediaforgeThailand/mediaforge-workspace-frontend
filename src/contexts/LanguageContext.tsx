@@ -1784,7 +1784,7 @@ const translations = {
     "workspace.sidebar.manage_team_tip": "Manage team members and shared credits",
     "workspace.sidebar.manage_institution_tip": "Manage classes, students, and institution credits",
     "workspace.sidebar.university_tip": "Manage classes, students, and university credits",
-    "workspace.sidebar.branding_tip": "Logo, short name, and subdomains",
+    "workspace.sidebar.branding_tip": "Logo and short name",
     "workspace.sidebar.settings_tip": "Settings",
 
     // User menu
@@ -4221,7 +4221,7 @@ const translations = {
     "workspace.sidebar.manage_team_tip": "จัดการสมาชิก ทีม และเครดิตรวม",
     "workspace.sidebar.manage_institution_tip": "จัดการคลาส นักเรียน และเครดิตของสถาบัน",
     "workspace.sidebar.university_tip": "จัดการคลาส นักเรียน และเครดิตของมหาวิทยาลัย",
-    "workspace.sidebar.branding_tip": "โลโก้, ชื่อย่อ และโดเมนย่อย",
+    "workspace.sidebar.branding_tip": "โลโก้และชื่อย่อ",
     "workspace.sidebar.settings_tip": "ตั้งค่า",
 
     // User menu

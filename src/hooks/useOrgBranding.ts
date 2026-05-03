@@ -1,22 +1,12 @@
 // Multi-tenant branding hook.
 //
-// At app boot we first use the signed-in user's profile.organization_id when
-// available, then fall back to window.location.hostname -> public.org_domains
-// for public/custom-domain visits. If we find an org, the workspace chrome
-// swaps to that org's logo + short name. Otherwise we fall back to the
-// default workspace brand.
-//
-// The query is read-public — it works for unauthenticated visitors
-// Domain fallback is read-public, so unauthenticated visitors landing on
-// /auth can still see tenant branding BEFORE they sign in.
+// At app boot we use the signed-in user's profile.organization_id or active
+// organization membership. If we find an org, the workspace chrome swaps to
+// that org's logo + short name. Otherwise we fall back to the default
+// workspace brand.
 //
 // We use react-query so the lookup is cached process-wide and shared
-// between the sidebar, the login screen, and any other surface that
-// asks. Hostname doesn't change inside a tab session, so we set
-// staleTime to Infinity — invalidation happens on hard reload, which
-// is exactly what we want.
-//
-// Localhost and IP-only hosts skip the network call entirely.
+// between the sidebar, the login screen, and any other surface that asks.
 
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,15 +25,6 @@ export interface OrgBranding {
   brandColor: string | null;
   /** The hostname that resolved to this org. */
   hostname: string;
-}
-
-/** Hostnames that should never hit the network — they can't possibly
- *  be tenant subdomains. */
-function isDevOrIpHost(host: string): boolean {
-  if (host === "localhost" || host === "127.0.0.1" || host === "::1") return true;
-  // Bare IPv4 (e.g. 192.168.1.5) — no tenant routing.
-  if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return true;
-  return false;
 }
 
 async function readOrgBrandingById(orgId: string, hostname: string): Promise<OrgBranding | null> {
@@ -132,26 +113,14 @@ async function fetchOrgBranding(profileOrgId?: string | null, userId?: string | 
   const host = window.location.hostname.toLowerCase();
 
   // Logged-in org users should see their organization branding even on
-  // workspace.mediaforge.co or localhost. Domain branding is only the public
-  // fallback for unauthenticated / custom-host visits.
+  // workspace.mediaforge.co or localhost.
   const signedInOrgId = profileOrgId || await resolveMembershipOrgId(userId);
   if (signedInOrgId) {
     const orgBranding = await readOrgBrandingById(signedInOrgId, host);
     if (orgBranding) return orgBranding;
   }
 
-  if (isDevOrIpHost(host)) return null;
-
-  const { data: domainRow } = await supabase
-    .from("org_domains" as any)
-    .select("org_id, hostname")
-    .eq("hostname", host)
-    .maybeSingle();
-
-  if (!domainRow) return null;
-
-  const orgId = (domainRow as any).org_id as string;
-  return readOrgBrandingById(orgId, (domainRow as any).hostname as string);
+  return null;
 }
 
 /**

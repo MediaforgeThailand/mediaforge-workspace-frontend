@@ -1,6 +1,6 @@
 /**
- * Org branding admin — upload logo, set short name, manage subdomain
- * mappings. Lives at /app/org-admin/branding.
+ * Org branding admin — upload logo and set the short name shown in the
+ * workspace chrome. Lives at /app/org-admin/branding.
  *
  * Auth gate matches the rest of org-admin: signed-in + has an org
  * affiliation. We let the existing isOrgAdmin check decide who can
@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, ArrowLeft, Upload, Trash2, Plus, Star, Globe, ImageIcon } from "lucide-react";
+import { Loader2, ArrowLeft, Upload, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
   DEFAULT_BRAND_LOGO,
@@ -40,15 +40,8 @@ interface OrgRow {
   settings?: Record<string, unknown> | null;
 }
 
-interface DomainRow {
-  id: string;
-  hostname: string;
-  is_primary: boolean;
-}
-
 interface BrandingPayload {
   org: OrgRow | null;
-  domains: DomainRow[];
 }
 
 async function orgConsole<T>(body: Record<string, unknown>): Promise<T> {
@@ -118,12 +111,10 @@ function BrandingForm({ orgId }: { orgId: string }) {
   });
 
   const org = brandingQ.data?.org ?? null;
-  const domains = brandingQ.data?.domains ?? [];
 
   // Local form state — populated from the query then edited freely.
   const [shortName, setShortName] = useState("");
   const [brandColor, setBrandColor] = useState("");
-  const [newHostname, setNewHostname] = useState("");
 
   useEffect(() => {
     if (org) {
@@ -169,64 +160,6 @@ function BrandingForm({ orgId }: { orgId: string }) {
     onError: (e: any) => toast.error(e?.message ?? "Upload failed"),
   });
 
-  const addDomainMut = useMutation({
-    mutationFn: async (host: string) => {
-      const lower = host.trim().toLowerCase();
-      if (!lower) throw new Error("Hostname is required");
-      // Reject obvious bad input client-side; the unique index does the
-      // last-mile dedupe across orgs.
-      if (!/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/.test(lower)) {
-        throw new Error("Hostname must be a valid DNS name");
-      }
-      await orgConsole<BrandingPayload>({
-        action: "add_branding_domain",
-        organization_id: orgId,
-        hostname: lower,
-        is_primary: domains.length === 0,
-      });
-    },
-    onSuccess: () => {
-      setNewHostname("");
-      qc.invalidateQueries({ queryKey: ["org-branding-admin", orgId] });
-      toast.success("Domain added");
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Add failed"),
-  });
-
-  const removeDomainMut = useMutation({
-    mutationFn: async (id: string) => {
-      await orgConsole<BrandingPayload>({
-        action: "remove_branding_domain",
-        organization_id: orgId,
-        domain_id: id,
-      });
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["org-branding-admin", orgId] });
-      toast.success("Domain removed");
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Remove failed"),
-  });
-
-  const setPrimaryMut = useMutation({
-    mutationFn: async (id: string) => {
-      // The unique partial index forbids two primaries — clear all
-      // first, then set the chosen one. Two round-trips, but this
-      // page mutates rarely enough that batching isn't worth a stored
-      // procedure.
-      await orgConsole<BrandingPayload>({
-        action: "set_primary_branding_domain",
-        organization_id: orgId,
-        domain_id: id,
-      });
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["org-branding-admin", orgId] });
-      toast.success("Primary domain updated");
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Update failed"),
-  });
-
   const previewLogo = org?.logo_url ?? DEFAULT_BRAND_LOGO;
   const previewName = shortName || org?.display_name_short || org?.display_name || org?.name || DEFAULT_BRAND_NAME;
 
@@ -246,7 +179,7 @@ function BrandingForm({ orgId }: { orgId: string }) {
         </Button>
         <h1 className="text-3xl font-bold">Org Branding</h1>
         <p className="text-sm text-muted-foreground">
-          Logo, short name, and subdomains for {org?.display_name ?? org?.name ?? "your organisation"}.
+          Logo and short name for {org?.display_name ?? org?.name ?? "your organisation"}.
         </p>
       </div>
 
@@ -352,76 +285,6 @@ function BrandingForm({ orgId }: { orgId: string }) {
         </CardContent>
       </Card>
 
-      {/* Domain manager */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Subdomains</CardTitle>
-          <CardDescription>
-            Hostnames that should show this org&rsquo;s branding (e.g. <code>dmd.mediaforge.co</code>).
-            DNS still has to point at the workspace app — adding it here only registers the brand swap.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              value={newHostname}
-              onChange={(e) => setNewHostname(e.target.value)}
-              placeholder="dmd.mediaforge.co"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && newHostname.trim()) addDomainMut.mutate(newHostname);
-              }}
-            />
-            <Button
-              onClick={() => addDomainMut.mutate(newHostname)}
-              disabled={addDomainMut.isPending || !newHostname.trim()}
-            >
-              {addDomainMut.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4 mr-2" />
-              )}
-              Add
-            </Button>
-          </div>
-
-          <div className="rounded-md border divide-y">
-            {domains.length === 0 ? (
-              <div className="p-4 text-sm text-muted-foreground text-center">
-                No subdomains registered yet.
-              </div>
-            ) : (
-              domains.map((d) => (
-                <div key={d.id} className="flex items-center gap-3 p-3">
-                  <Globe className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-mono text-sm flex-1">{d.hostname}</span>
-                  {d.is_primary ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs text-amber-300">
-                      <Star className="h-3 w-3" /> Primary
-                    </span>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setPrimaryMut.mutate(d.id)}
-                      disabled={setPrimaryMut.isPending}
-                    >
-                      Set primary
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeDomainMut.mutate(d.id)}
-                    disabled={removeDomainMut.isPending}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

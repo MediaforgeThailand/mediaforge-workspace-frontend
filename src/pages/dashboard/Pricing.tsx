@@ -154,6 +154,8 @@ const FEATURE_ROWS: { en: string; th: string; plans: Record<string, boolean> }[]
 
 // Annual = 20% off.
 const ANNUAL_DISCOUNT = 0.2;
+const TEAM_SEAT_PRICE_USD = 10;
+const TEAM_SEAT_PRICE_THB = 290;
 
 const Pricing = () => {
   useDocumentTitle("Pricing — MediaForge");
@@ -451,6 +453,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
       ? Math.round(plan.annual_price_thb / 12)
       : Math.round(monthlyPrice * (1 - ANNUAL_DISCOUNT));
   const showAnnual = cycle === "annual" && !isTeam;
+  const teamSeatPrice = language === "th" ? `฿${TEAM_SEAT_PRICE_THB}` : `$${TEAM_SEAT_PRICE_USD}`;
 
   const credits =
     cycle === "annual" && plan.annual_credits
@@ -506,12 +509,12 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
         {isTeam ? (
           <>
             <span className="text-2xl font-semibold text-white sm:text-3xl">
-              {language === "th" ? "ตามการใช้งาน" : "Pay as you go"}
+              {teamSeatPrice}
             </span>
             <p className="text-neutral-500 text-xs">
               {language === "th"
-                ? "ติดต่อทีมขายเพื่อดูราคาตามการใช้งาน"
-                : "Contact sales for usage-based pricing"}
+                ? "ต่อ seat / เดือน เครดิตเติมเพิ่มตามการใช้งาน"
+                : "per seat / month. Credits are topped up by usage."}
             </p>
           </>
         ) : showAnnual ? (

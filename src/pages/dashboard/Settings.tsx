@@ -36,6 +36,9 @@ import PlanBilling from "@/components/settings/PlanBilling";
 import { DeleteAccountDialog } from "@/components/settings/DeleteAccountDialog";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
 
+const TEAM_SEAT_PRICE_USD = 10;
+const TEAM_SEAT_PRICE_THB = 290;
+
 /**
  * Settings — multi-section surface backed by an in-page state-driven
  * left rail. Routes other than `/app/settings` are not introduced;
@@ -445,6 +448,7 @@ interface TeamConsoleOverview {
     generation_credits_30d?: number;
   };
   seat_price_usd?: number;
+  seat_price_thb?: number;
 }
 
 async function functionErrorMessage(error: unknown): Promise<string> {
@@ -461,6 +465,7 @@ async function functionErrorMessage(error: unknown): Promise<string> {
 
 function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
   const { user, refreshProfile } = useAuth();
+  const { language } = useLanguage();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [memberships, setMemberships] = useState<TeamStatusMembership[]>([]);
@@ -588,6 +593,9 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
   });
   const organizationCredits = overview?.organization?.credit_available ?? active?.organization?.credit_available ?? active?.organization?.credit_pool ?? 0;
   const generationCredits30d = overview?.usage_summary?.generation_credits_30d ?? 0;
+  const seatPriceUsd = overview?.seat_price_usd ?? TEAM_SEAT_PRICE_USD;
+  const seatPriceThb = overview?.seat_price_thb ?? TEAM_SEAT_PRICE_THB;
+  const seatPriceLabel = language === "th" ? `${seatPriceThb} บาท / seat` : `$${seatPriceUsd} / seat`;
   const allocationTransactions = (overview?.pool_transactions ?? [])
     .filter((tx) => ["class_pool_allocation", "class_pool_revoked", "org_pool_allocation", "org_pool_revoked", "org_pool_topup"].includes(String(tx.reason ?? "")))
     .slice(0, 8);
@@ -622,7 +630,7 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
       <div className="max-w-2xl rounded-[16px] bg-zinc-900/60 p-[20px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         <h2 className="text-[20px] font-semibold leading-[26px] text-zinc-50">Create a team workspace</h2>
         <p className="mt-[8px] text-[14px] leading-[22px] text-zinc-400">
-          Team accounts include a company Admin Console, member approvals, shared team credits, and seat billing at $5 per active seat. Credits are topped up separately based on real usage.
+          Team accounts include a company Admin Console, member approvals, shared team credits, and seat billing at {seatPriceLabel} for each active seat. Credits are topped up separately based on real usage.
         </p>
         <Button className="mt-[20px] h-[36px] px-[14px] text-[14px]" onClick={onRegister}>
           <Users className="mr-[8px] h-[16px] w-[16px]" />

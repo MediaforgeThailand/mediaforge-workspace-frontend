@@ -10,6 +10,8 @@ import useDocumentTitle from "@/hooks/useDocumentTitle";
 const ADMIN_CONSOLE_URL =
   (import.meta.env.VITE_ADMIN_CONSOLE_URL as string | undefined) ||
   "https://mediaforge-admin-hub.vercel.app/org/console";
+const TEAM_SEAT_PRICE_USD = 10;
+const TEAM_SEAT_PRICE_THB = 290;
 
 export default function TeamRegister() {
   useDocumentTitle("Team registration - MediaForge");
@@ -34,7 +36,7 @@ export default function TeamRegister() {
             </div>
             <h1 className="text-2xl font-semibold">Create a Team workspace</h1>
             <p className="mt-2 max-w-2xl text-sm text-zinc-400">
-              Team is for companies that want member approvals, shared credit pools, per-team budgets, and a company Admin Console. Seat billing is $5 per active member. Credits are top-up based on actual usage.
+              {`Team is for companies that want member approvals, shared credit pools, per-team budgets, and a company Admin Console. Seat billing is $${TEAM_SEAT_PRICE_USD} or THB ${TEAM_SEAT_PRICE_THB} per active member. Credits are top-up based on actual usage.`}
             </p>
 
             <div className="mt-6 grid gap-4">
@@ -71,7 +73,7 @@ export default function TeamRegister() {
 
           <aside className="space-y-3">
             <Feature icon={<ShieldCheck className="h-4 w-4" />} title="Admin approval" body="Same-domain users create pending requests until an admin approves them." />
-            <Feature icon={<Users className="h-4 w-4" />} title="$5 seats" body="Only active approved members count toward seat billing." />
+            <Feature icon={<Users className="h-4 w-4" />} title={`$${TEAM_SEAT_PRICE_USD} / THB ${TEAM_SEAT_PRICE_THB} seats`} body="Only active approved members count toward seat billing." />
             <Feature icon={<CheckCircle2 className="h-4 w-4" />} title="Team credit pools" body="Company credits stay central, then admins allocate budgets into teams." />
           </aside>
         </div>
