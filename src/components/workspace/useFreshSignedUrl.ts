@@ -106,6 +106,25 @@ export function useFreshSignedUrl(
           // Re-sign failed — leave the caller's URL in place. Worst
           // case the image still 403s (same as today), no regression.
           if (error) console.warn("[useFreshSignedUrl]", error);
+          void supabase.functions
+            .invoke("workspace-run-node", {
+              body: { action: "refresh_storage_url", url: initial },
+            })
+            .then(({ data: refreshed, error: refreshError }) => {
+              if (cancelled) return;
+              const signedUrl =
+                typeof refreshed?.signed_url === "string"
+                  ? refreshed.signed_url
+                  : typeof refreshed?.url === "string"
+                    ? refreshed.url
+                    : null;
+              if (refreshError || !signedUrl) {
+                if (refreshError) console.warn("[useFreshSignedUrl:fallback]", refreshError);
+                return;
+              }
+              CACHE.set(cacheKey, { url: signedUrl, signedAt: Date.now() });
+              setUrl(signedUrl);
+            });
           return;
         }
         CACHE.set(cacheKey, { url: data.signedUrl, signedAt: Date.now() });
