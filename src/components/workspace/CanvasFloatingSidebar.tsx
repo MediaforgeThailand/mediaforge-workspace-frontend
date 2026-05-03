@@ -180,7 +180,7 @@ const CanvasFloatingSidebar = ({ onAddNode, onOpenSettings }: Props) => {
     <div
       className="pointer-events-none fixed left-2 top-1/2 z-40 -translate-y-1/2 lg:left-1.5"
     >
-      <div className="pointer-events-auto flex flex-col items-center gap-[3px] rounded-full bg-zinc-950/85 p-[3px] shadow-md shadow-black/35 backdrop-blur">
+      <div className="pointer-events-auto flex flex-col items-center gap-[3px] rounded-full border border-fuchsia-200/15 bg-[linear-gradient(180deg,rgba(112,36,170,0.22),rgba(20,12,30,0.78))] p-[3px] shadow-[0_0_0_1px_rgba(255,61,190,0.08),0_18px_46px_rgba(123,54,205,0.16),0_8px_20px_rgba(0,0,0,0.36)] backdrop-blur-xl">
         {BUTTONS.map((b, i) => (
           <SidebarButton
             key={b.id}
@@ -224,7 +224,7 @@ function SidebarButton({
   return (
     <div className="group relative">
       {button.divider && !isFirst && (
-        <div className="my-px h-px w-[24px] self-center bg-zinc-800" />
+        <div className="my-px h-px w-[24px] self-center bg-fuchsia-100/12" />
       )}
       <button
         type="button"
@@ -236,8 +236,8 @@ function SidebarButton({
         className={cn(
           "flex h-[43px] w-[43px] items-center justify-center rounded-full transition-colors lg:h-[38px] lg:w-[38px]",
           isActive
-            ? "bg-zinc-200 text-zinc-900"
-            : "text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100",
+            ? "bg-zinc-200 text-zinc-900 shadow-[0_0_18px_rgba(217,70,239,0.16)]"
+            : "text-zinc-300 hover:bg-fuchsia-200/10 hover:text-zinc-100",
         )}
       >
         <Icon className="h-[14.5px] w-[14.5px]" />
@@ -281,7 +281,7 @@ function LanguageToggleButton({
         onMouseEnter={() => setShowTip(true)}
         onMouseLeave={() => setShowTip(false)}
         aria-label={targetLabel}
-        className="flex h-[43px] w-[43px] items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100 lg:h-[38px] lg:w-[38px]"
+        className="flex h-[43px] w-[43px] items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-fuchsia-200/10 hover:text-zinc-100 lg:h-[38px] lg:w-[38px]"
       >
         <Languages className="h-[14.5px] w-[14.5px]" />
       </button>
