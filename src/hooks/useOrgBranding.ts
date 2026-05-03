@@ -115,14 +115,28 @@ async function readOrgBrandingById(orgId: string, hostname: string): Promise<Org
   };
 }
 
-async function fetchOrgBranding(profileOrgId?: string | null): Promise<OrgBranding | null> {
+async function resolveMembershipOrgId(userId?: string | null): Promise<string | null> {
+  if (!userId) return null;
+  const { data } = await supabase
+    .from("organization_memberships" as any)
+    .select("organization_id")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .order("role", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return ((data as any)?.organization_id as string | undefined) ?? null;
+}
+
+async function fetchOrgBranding(profileOrgId?: string | null, userId?: string | null): Promise<OrgBranding | null> {
   const host = window.location.hostname.toLowerCase();
 
   // Logged-in org users should see their organization branding even on
   // workspace.mediaforge.co or localhost. Domain branding is only the public
   // fallback for unauthenticated / custom-host visits.
-  if (profileOrgId) {
-    const orgBranding = await readOrgBrandingById(profileOrgId, host);
+  const signedInOrgId = profileOrgId || await resolveMembershipOrgId(userId);
+  if (signedInOrgId) {
+    const orgBranding = await readOrgBrandingById(signedInOrgId, host);
     if (orgBranding) return orgBranding;
   }
 
@@ -148,12 +162,12 @@ async function fetchOrgBranding(profileOrgId?: string | null): Promise<OrgBrandi
  * flicker an empty row for unauthenticated visitors.
  */
 export function useOrgBranding(): OrgBranding | null {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const profileOrgId = ((profile as any)?.organization_id ?? (profile as any)?.org_id ?? null) as string | null;
 
   const { data } = useQuery({
-    queryKey: ["org-branding", window.location.hostname.toLowerCase(), profileOrgId],
-    queryFn: () => fetchOrgBranding(profileOrgId),
+    queryKey: ["org-branding", window.location.hostname.toLowerCase(), profileOrgId, user?.id ?? null],
+    queryFn: () => fetchOrgBranding(profileOrgId, user?.id ?? null),
     staleTime: Infinity,
     gcTime: Infinity,
     retry: 1,
