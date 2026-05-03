@@ -164,6 +164,13 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
   // with the current path remembered so the user lands back here
   // after authenticating.
   if (!user) {
+    // Pin to absolute pixel values rather than `h-8` / `text-sm` —
+    // the workspace shell scales the document root font-size to
+    // ~23px for the global "+10% UI" theme, which would inflate any
+    // rem-based size to ~47px tall. Avoid `text-[13px]` /
+    // `text-[12.5px]` etc — those are caught by the `.mf-readable`
+    // Thai-readability bump in index.css and forced up to 17.25px,
+    // which breaks the proportions of a small pill button.
     return (
       <button
         type="button"
@@ -172,7 +179,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
             state: { from: { pathname: window.location.pathname, search: window.location.search } },
           })
         }
-        className="inline-flex h-9 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-semibold text-zinc-950 transition hover:bg-zinc-200"
+        className="inline-flex h-[32px] items-center rounded-full bg-white px-[14px] text-[14px] font-semibold leading-none text-zinc-950 transition hover:bg-zinc-200"
       >
         {t("authSignInButton")}
       </button>
