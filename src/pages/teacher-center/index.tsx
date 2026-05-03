@@ -18,8 +18,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsOrgAdmin } from "@/hooks/useIsOrgUser";
+import {
+  consumerOrgAdminApi,
+  type ClassEnrollmentCode,
+  type ClassStudentSpace,
+} from "@/lib/orgAdminApi";
 import {
   useManageableClasses,
   useClassMembers,
@@ -36,21 +42,29 @@ import {
 import { getModelMeta, getCategoryColor, type ModelCategory } from "./modelMeta";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 
 import {
   Users, Coins, Activity, AlertCircle, ChevronRight, Crown,
   GraduationCap, BookOpen, Sparkles, ArrowLeft,
   PlayCircle, QrCode, BarChart3, Plus, RefreshCw,
+  Copy, Trash2, Loader2, CheckCircle2, Ban,
 } from "lucide-react";
+import { toast } from "sonner";
+import { QRCodeSVG } from "qrcode.react";
 
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip as RTooltip,
@@ -387,14 +401,7 @@ function ClassDetail({ classId, classes }: { classId: string; classes: TeacherCl
         </TabsContent>
 
         <TabsContent value="codes" className="flex-1 m-0 p-7">
-          <Card>
-            <CardContent className="p-10 text-center">
-              <QrCode className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-              <div className="text-sm text-muted-foreground">
-                QR Code management coming soon — for the demo, use the existing org-admin panel.
-              </div>
-            </CardContent>
-          </Card>
+          <CodesPanel classId={classId} creditPoolRemaining={remaining} />
         </TabsContent>
 
         <TabsContent value="activity" className="flex-1 m-0 p-7">
@@ -870,6 +877,16 @@ function AIUsagePanel({
 // Members panel (table + drill-down sheet)
 // ─────────────────────────────────────────────────────────────────────
 
+function getPrimaryStudentSpace(member: ClassMember): ClassStudentSpace | null {
+  const spaces = member.spaces ?? [];
+  return (
+    spaces.find((space) => space.status === "active") ??
+    spaces.find((space) => space.status === "submitted") ??
+    spaces[0] ??
+    null
+  );
+}
+
 function MembersPanel({
   members,
   classId,
@@ -914,6 +931,7 @@ function MembersPanel({
               <tr className="text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
                 <th className="text-left font-medium px-4 py-2.5">Student</th>
                 <th className="text-left font-medium px-4 py-2.5">Status</th>
+                <th className="text-left font-medium px-4 py-2.5">Space</th>
                 <th className="text-right font-medium px-4 py-2.5">Balance</th>
                 <th className="text-right font-medium px-4 py-2.5">Used</th>
                 <th className="w-10"></th>
@@ -921,7 +939,8 @@ function MembersPanel({
             </thead>
             <tbody>
               {members.map((m) => {
-                const cap = m.credits_lifetime_received || 200;
+                const space = getPrimaryStudentSpace(m);
+                const cap = m.credits_lifetime_received || space?.credits_lifetime_received || 200;
                 const percent = cap > 0 ? Math.min(Math.round((m.credits_balance / cap) * 100), 100) : 0;
                 return (
                   <tr
@@ -952,6 +971,20 @@ function MembersPanel({
                         {m.status}
                       </Badge>
                     </td>
+                    <td className="px-4 py-3">
+                      {space ? (
+                        <div className="space-y-1">
+                          <Badge variant={space.status === "active" ? "outline" : "secondary"} className="text-[10px]">
+                            {space.status}
+                          </Badge>
+                          <div className="max-w-[180px] truncate text-[11px] text-muted-foreground">
+                            {space.workspace_name ?? space.workspace_id}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No class space</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <div className="text-sm font-semibold tabular-nums">
                         {m.credits_balance}/{cap}
@@ -969,7 +1002,7 @@ function MembersPanel({
               })}
               {members.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">
                     No students yet. Generate a QR code to invite the class.
                   </td>
                 </tr>
@@ -1018,8 +1051,64 @@ function MembersPanel({
 
 function MemberDetail({ member, classId }: { member: ClassMember; classId: string }) {
   const { data: breakdown } = useMemberModelBreakdown(classId, member.user_id, 30);
-  const cap = member.credits_lifetime_received || 200;
+  const queryClient = useQueryClient();
+  const activeSpace = getPrimaryStudentSpace(member);
+  const [creditAmount, setCreditAmount] = useState("250");
+  const [creditReason, setCreditReason] = useState("");
+  const cap = member.credits_lifetime_received || activeSpace?.credits_lifetime_received || 200;
   const percent = cap > 0 ? Math.min(Math.round((member.credits_balance / cap) * 100), 100) : 0;
+  const refreshMemberData = () => {
+    queryClient.invalidateQueries({ queryKey: ["class-members-detailed", classId] });
+    queryClient.invalidateQueries({ queryKey: ["class-member-summary", classId] });
+    queryClient.invalidateQueries({ queryKey: ["class-top-spenders", classId] });
+    queryClient.invalidateQueries({ queryKey: ["teacher-classes"] });
+    queryClient.invalidateQueries({ queryKey: ["class-activity", classId] });
+  };
+  const grantCredits = useMutation({
+    mutationFn: async () => {
+      const amount = parseInt(creditAmount, 10);
+      if (!Number.isInteger(amount) || amount <= 0) {
+        throw new Error("amount_must_be_positive");
+      }
+      if (activeSpace?.workspace_id) {
+        return consumerOrgAdminApi.grantCredits(
+          classId,
+          member.user_id,
+          activeSpace.workspace_id,
+          amount,
+          creditReason || "teacher_center_space_grant",
+        );
+      }
+      return consumerOrgAdminApi.ensureStudentSpace(
+        classId,
+        member.user_id,
+        amount,
+        creditReason || "teacher_center_space_create_and_grant",
+      );
+    },
+    onSuccess: () => {
+      toast.success("Space credits updated");
+      setCreditAmount("250");
+      setCreditReason("");
+      refreshMemberData();
+    },
+    onError: (error: any) => {
+      toast.error(error?.message === "class_budget_exhausted"
+        ? "Class credit pool is not enough"
+        : error?.message ?? "Could not update credits");
+    },
+  });
+  const setSpaceStatus = useMutation({
+    mutationFn: async (status: "active" | "submitted" | "passed" | "ended") => {
+      if (!activeSpace?.workspace_id) throw new Error("student_space_not_found");
+      return consumerOrgAdminApi.setSpaceStatus(classId, activeSpace.workspace_id, status);
+    },
+    onSuccess: (_, status) => {
+      toast.success(status === "passed" ? "Space marked as passed" : `Space status set to ${status}`);
+      refreshMemberData();
+    },
+    onError: (error: any) => toast.error(error?.message ?? "Could not update space"),
+  });
 
   return (
     <div className="space-y-5">
@@ -1042,6 +1131,17 @@ function MemberDetail({ member, classId }: { member: ClassMember; classId: strin
       <Card>
         <CardContent className="p-4 space-y-2">
           <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Class space</span>
+            <Badge variant={activeSpace?.status === "active" ? "outline" : "secondary"} className="text-[10px]">
+              {activeSpace?.status ?? "not created"}
+            </Badge>
+          </div>
+          {activeSpace && (
+            <div className="text-xs text-muted-foreground break-all">
+              {activeSpace.workspace_name ?? activeSpace.workspace_id}
+            </div>
+          )}
+          <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Current balance</span>
             <span className="font-semibold tabular-nums">{member.credits_balance}/{cap}</span>
           </div>
@@ -1055,6 +1155,69 @@ function MemberDetail({ member, classId }: { member: ClassMember; classId: strin
               <div className="text-xs text-muted-foreground">Lifetime used</div>
               <div className="font-semibold tabular-nums">{member.credits_lifetime_used}</div>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Space management</CardTitle>
+          <CardDescription>
+            Credits apply only to this student's class space.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-[120px_1fr] gap-2">
+            <div>
+              <Label className="text-xs">Credits</Label>
+              <Input
+                type="number"
+                min="1"
+                value={creditAmount}
+                onChange={(event) => setCreditAmount(event.target.value)}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Reason</Label>
+              <Input
+                value={creditReason}
+                onChange={(event) => setCreditReason(event.target.value)}
+                placeholder="Manual class-space grant"
+              />
+            </div>
+          </div>
+          <Button
+            size="sm"
+            className="w-full"
+            disabled={grantCredits.isPending}
+            onClick={() => grantCredits.mutate()}
+          >
+            {grantCredits.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+            ) : (
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+            )}
+            Add credits to space
+          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!activeSpace || setSpaceStatus.isPending}
+              onClick={() => setSpaceStatus.mutate("passed")}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+              Mark passed
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!activeSpace || setSpaceStatus.isPending}
+              onClick={() => setSpaceStatus.mutate("ended")}
+            >
+              <Ban className="h-3.5 w-3.5 mr-1.5" />
+              End space
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -1090,15 +1253,6 @@ function MemberDetail({ member, classId }: { member: ClassMember; classId: strin
         )}
       </div>
 
-      <div className="flex gap-2 pt-3">
-        <Button size="sm" className="flex-1">
-          <Plus className="h-3.5 w-3.5 mr-1.5" />
-          Grant credits
-        </Button>
-        <Button size="sm" variant="outline">
-          Suspend
-        </Button>
-      </div>
     </div>
   );
 }
@@ -1106,6 +1260,266 @@ function MemberDetail({ member, classId }: { member: ClassMember; classId: strin
 // ─────────────────────────────────────────────────────────────────────
 // Activity panel (event feed)
 // ─────────────────────────────────────────────────────────────────────
+
+function CodesPanel({
+  classId,
+  creditPoolRemaining,
+}: {
+  classId: string;
+  creditPoolRemaining: number;
+}) {
+  const [createOpen, setCreateOpen] = useState(false);
+  const [showQR, setShowQR] = useState<ClassEnrollmentCode | null>(null);
+  const codesQuery = useQuery({
+    queryKey: ["teacher-enrollment-codes", classId],
+    enabled: !!classId,
+    queryFn: () => consumerOrgAdminApi.listCodes(classId),
+  });
+  const revokeCode = useMutation({
+    mutationFn: (codeId: string) => consumerOrgAdminApi.revokeCode(classId, codeId),
+    onSuccess: () => {
+      toast.success("QR code revoked");
+      codesQuery.refetch();
+    },
+    onError: (error: any) => toast.error(error?.message ?? "Could not revoke code"),
+  });
+  const codes = codesQuery.data?.codes ?? [];
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+        <div>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <QrCode className="h-4 w-4" />
+            Enrollment QR codes
+          </CardTitle>
+          <CardDescription>
+            Each scan creates a student class space and grants credits only to that space.
+          </CardDescription>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => codesQuery.refetch()} disabled={codesQuery.isFetching}>
+            <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", codesQuery.isFetching && "animate-spin")} />
+            Refresh
+          </Button>
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            New QR
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        {codesQuery.isLoading ? (
+          <div className="py-10 flex items-center justify-center text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        ) : codes.length === 0 ? (
+          <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+            No active QR codes yet.
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
+                <th className="text-left font-medium px-4 py-2.5">Code</th>
+                <th className="text-right font-medium px-4 py-2.5">Credits</th>
+                <th className="text-right font-medium px-4 py-2.5">Uses</th>
+                <th className="text-left font-medium px-4 py-2.5">Expires</th>
+                <th className="text-left font-medium px-4 py-2.5">Description</th>
+                <th className="w-24"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {codes.map((code) => (
+                <tr key={code.id} className="border-b border-border/40 hover:bg-accent/40">
+                  <td className="px-4 py-3 font-mono">{code.code}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {Number(code.credit_amount ?? 0).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {code.uses_count}{code.max_uses ? ` / ${code.max_uses}` : " / unlimited"}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">
+                    {code.expires_at ? new Date(code.expires_at).toLocaleString() : "No expiry"}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">
+                    {code.description ?? "-"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Button size="icon" variant="ghost" onClick={() => setShowQR(code)}>
+                      <QrCode className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      disabled={revokeCode.isPending}
+                      onClick={() => revokeCode.mutate(code.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </CardContent>
+
+      <CreateCodeDialog
+        open={createOpen}
+        classId={classId}
+        creditPoolRemaining={creditPoolRemaining}
+        onOpenChange={setCreateOpen}
+        onCreated={(code) => {
+          setCreateOpen(false);
+          codesQuery.refetch();
+          setShowQR(code);
+        }}
+      />
+      <QRDialog code={showQR} onClose={() => setShowQR(null)} />
+    </Card>
+  );
+}
+
+function CreateCodeDialog({
+  open,
+  classId,
+  creditPoolRemaining,
+  onOpenChange,
+  onCreated,
+}: {
+  open: boolean;
+  classId: string;
+  creditPoolRemaining: number;
+  onOpenChange: (open: boolean) => void;
+  onCreated: (code: ClassEnrollmentCode) => void;
+}) {
+  const [creditAmount, setCreditAmount] = useState("250");
+  const [maxUses, setMaxUses] = useState("");
+  const [expiresMinutes, setExpiresMinutes] = useState("");
+  const [description, setDescription] = useState("");
+  const parsedCredits = Math.max(0, parseInt(creditAmount, 10) || 0);
+  const tooMuch = parsedCredits > creditPoolRemaining;
+  const createCode = useMutation({
+    mutationFn: () => consumerOrgAdminApi.createCode(classId, {
+      credit_amount: parsedCredits,
+      max_uses: maxUses ? Math.max(1, parseInt(maxUses, 10) || 1) : null,
+      expires_at: expiresMinutes
+        ? new Date(Date.now() + (parseInt(expiresMinutes, 10) || 0) * 60_000).toISOString()
+        : null,
+      description: description || undefined,
+    }),
+    onSuccess: ({ code }) => {
+      toast.success("QR code created");
+      setCreditAmount("250");
+      setMaxUses("");
+      setExpiresMinutes("");
+      setDescription("");
+      onCreated(code);
+    },
+    onError: (error: any) => toast.error(error?.message ?? "Could not create QR code"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create enrollment QR</DialogTitle>
+          <DialogDescription>
+            Students receive these credits in a new class space after scanning.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label>Credits per student space</Label>
+            <Input
+              type="number"
+              min="0"
+              value={creditAmount}
+              onChange={(event) => setCreditAmount(event.target.value)}
+            />
+            <div className={cn("mt-1 text-xs", tooMuch ? "text-destructive" : "text-muted-foreground")}>
+              {creditPoolRemaining.toLocaleString()} credits remaining in this class pool.
+            </div>
+          </div>
+          <div>
+            <Label>Max scans</Label>
+            <Input
+              type="number"
+              min="1"
+              value={maxUses}
+              onChange={(event) => setMaxUses(event.target.value)}
+              placeholder="Blank = unlimited"
+            />
+          </div>
+          <div>
+            <Label>Expires after</Label>
+            <select
+              value={expiresMinutes}
+              onChange={(event) => setExpiresMinutes(event.target.value)}
+              className="flex h-9 w-full rounded-md bg-muted px-3 py-2 text-sm"
+            >
+              <option value="">No expiry</option>
+              <option value="15">15 minutes</option>
+              <option value="30">30 minutes</option>
+              <option value="60">1 hour</option>
+              <option value="1440">1 day</option>
+            </select>
+          </div>
+          <div>
+            <Label>Description</Label>
+            <Input
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="Week 1 class entry"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={() => createCode.mutate()} disabled={createCode.isPending || tooMuch}>
+            {createCode.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Generate QR
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function QRDialog({ code, onClose }: { code: ClassEnrollmentCode | null; onClose: () => void }) {
+  if (!code) return null;
+  const url = `${window.location.origin}/enroll-class/${code.code}`;
+  const copyLink = () => {
+    navigator.clipboard.writeText(url);
+    toast.success("Enrollment link copied");
+  };
+
+  return (
+    <Dialog open={!!code} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Project this QR for students</DialogTitle>
+          <DialogDescription>
+            <span className="font-mono">{code.code}</span>
+            {code.max_uses ? ` - ${Math.max(code.max_uses - code.uses_count, 0)} scans left` : " - unlimited"}
+            {` - ${Number(code.credit_amount ?? 0).toLocaleString()} credits / space`}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col items-center gap-4 py-4">
+          <div className="rounded-lg bg-white p-4">
+            <QRCodeSVG value={url} size={240} level="M" />
+          </div>
+          <p className="max-w-full break-all text-center text-xs text-muted-foreground">{url}</p>
+          <Button size="sm" variant="outline" onClick={copyLink}>
+            <Copy className="h-4 w-4 mr-2" />
+            Copy link
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function ActivityPanel({ events }: { events: import("./useTeacherData").ActivityEvent[] }) {
   return (

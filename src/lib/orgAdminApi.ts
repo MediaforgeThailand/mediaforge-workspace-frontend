@@ -75,6 +75,27 @@ export interface ClassMember {
   email: string | null;
   last_activity_at: string | null;
   model_uses_30d: number;
+  spaces?: ClassStudentSpace[];
+}
+
+export interface ClassStudentSpace {
+  id: string;
+  class_id: string;
+  user_id: string;
+  project_id?: string | null;
+  workspace_id: string;
+  workspace_name?: string | null;
+  status: "active" | "submitted" | "passed" | "ended" | string;
+  credits_balance: number;
+  credits_lifetime_received: number;
+  credits_lifetime_used: number;
+  generation_count_30d?: number;
+  credits_used_30d?: number;
+  last_activity_at?: string | null;
+  display_name?: string | null;
+  email?: string | null;
+  is_online?: boolean;
+  is_locked?: boolean;
 }
 
 export interface ClassEnrollmentCode {
@@ -83,6 +104,7 @@ export interface ClassEnrollmentCode {
   code: string;
   max_uses: number | null;
   uses_count: number;
+  credit_amount?: number | null;
   expires_at: string | null;
   description: string | null;
   created_at: string;
@@ -152,11 +174,35 @@ export const consumerOrgAdminApi = {
   removeMember: (classId: string, userId: string) =>
     call<{ ok: boolean }>("DELETE", `/classes/${classId}/members/${userId}`),
 
-  grantCredits: (classId: string, userId: string, amount: number, reason?: string) =>
+  grantCredits: (classId: string, userId: string, workspaceId: string, amount: number, reason?: string) =>
     call<{ new_balance: number; granted?: number; revoked?: number }>(
       "POST",
       `/classes/${classId}/members/${userId}/credits`,
+      { workspace_id: workspaceId, amount, reason },
+    ),
+
+  ensureStudentSpace: (classId: string, userId: string, initialCredits = 0, reason?: string) =>
+    call<{ space: unknown; new_balance: number }>(
+      "POST",
+      `/classes/${classId}/members/${userId}/space`,
+      { initial_credits: initialCredits, reason },
+    ),
+
+  listSpaces: (classId: string) =>
+    call<{ spaces: ClassStudentSpace[] }>("GET", `/classes/${classId}/spaces`),
+
+  adjustSpaceCredits: (classId: string, workspaceId: string, amount: number, reason?: string) =>
+    call<{ new_balance: number; granted?: number; revoked?: number; workspace_id: string }>(
+      "POST",
+      `/classes/${classId}/spaces/${encodeURIComponent(workspaceId)}/credits`,
       { amount, reason },
+    ),
+
+  setSpaceStatus: (classId: string, workspaceId: string, status: "active" | "submitted" | "passed" | "ended") =>
+    call<{ space: ClassStudentSpace; workspace_id: string; status: string }>(
+      "POST",
+      `/classes/${classId}/spaces/${encodeURIComponent(workspaceId)}/status`,
+      { status },
     ),
 
   // Enrollment codes
@@ -165,6 +211,7 @@ export const consumerOrgAdminApi = {
 
   createCode: (classId: string, input: {
     max_uses?: number | null;
+    credit_amount?: number | null;
     expires_at?: string | null;
     description?: string;
   }) => call<{ code: ClassEnrollmentCode }>("POST", `/classes/${classId}/codes`, input),

@@ -4,7 +4,7 @@
  *   - Class list (default): every class the user can manage
  *   - Class detail (when ?class=:id): pool, members, QR codes, requests, allocate
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,6 +14,7 @@ import {
   type ClassRow,
   type ClassMember,
   type ClassEnrollmentCode,
+  type ClassStudentSpace,
 } from "@/lib/orgAdminApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -40,9 +41,10 @@ export default function OrgAdminPanel() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const selectedClassId = params.get("class");
+  const orgId = ((profile as any)?.organization_id ?? profile?.org_id ?? null) as string | null;
 
   if (!user) return <Navigate to="/auth" replace />;
-  if (!profile?.org_id) return <Navigate to="/app/workspace" replace />;
+  if (!orgId) return <Navigate to="/app/workspace" replace />;
   if (!isTeacher) return <Navigate to="/app/workspace" replace />;
 
   if (selectedClassId) {
@@ -67,7 +69,7 @@ export default function OrgAdminPanel() {
           </h1>
           <p className="text-sm text-muted-foreground">Classes you teach. Click one to manage.</p>
         </div>
-        <CreateClassButton orgId={profile.org_id} />
+        <CreateClassButton orgId={orgId} />
       </div>
 
       <Card>
@@ -113,12 +115,13 @@ function CreateClassButton({ orgId }: { orgId: string }) {
   const [term, setTerm] = useState("1");
   const [year, setYear] = useState(String(new Date().getFullYear() + 543)); // พ.ศ.
   const [maxStudents, setMaxStudents] = useState("42");
-  const [policy, setPolicy] = useState<"manual" | "monthly_reset" | "weekly_drip">("monthly_reset");
+  const [policy, setPolicy] = useState<"manual" | "monthly_reset" | "weekly_drip">("manual");
   const [creditAmount, setCreditAmount] = useState("200");
 
   const navigate = useNavigate();
   const [, setParams] = useSearchParams();
   const { user } = useAuth();
+  const usesRecurringCredits = policy !== "manual";
 
   const create = useMutation({
     mutationFn: () => consumerOrgAdminApi.createClass(orgId, {
@@ -127,7 +130,7 @@ function CreateClassButton({ orgId }: { orgId: string }) {
       year: parseInt(year, 10) || null as any,
       max_students: parseInt(maxStudents, 10) || null as any,
       credit_policy: policy,
-      credit_amount: parseInt(creditAmount, 10) || 0,
+      credit_amount: usesRecurringCredits ? parseInt(creditAmount, 10) || 0 : 0,
       primary_instructor_id: user?.id ?? null,
     } as any),
     onSuccess: ({ class: cls }) => {
@@ -173,7 +176,7 @@ function CreateClassButton({ orgId }: { orgId: string }) {
               <Label>Max students</Label>
               <Input type="number" value={maxStudents} onChange={(e) => setMaxStudents(e.target.value)} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className={usesRecurringCredits ? "grid grid-cols-2 gap-3" : "space-y-3"}>
               <div>
                 <Label>Credit policy</Label>
                 <select
@@ -186,10 +189,12 @@ function CreateClassButton({ orgId }: { orgId: string }) {
                   <option value="manual">Manual (teacher grants only)</option>
                 </select>
               </div>
-              <div>
-                <Label>Credits per cycle</Label>
-                <Input type="number" value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} />
-              </div>
+              {usesRecurringCredits && (
+                <div>
+                  <Label>{policy === "monthly_reset" ? "Monthly credits" : "Weekly credits"}</Label>
+                  <Input type="number" value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} />
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -226,12 +231,17 @@ function ClassDetail({ classId, onBack }: { classId: string; onBack: () => void 
     queryKey: ["class-requests", classId],
     queryFn: () => consumerOrgAdminApi.listCreditRequests(classId),
   });
+  const spaces = useQuery({
+    queryKey: ["class-spaces", classId],
+    queryFn: () => consumerOrgAdminApi.listSpaces(classId),
+  });
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["class-detail", classId] });
     qc.invalidateQueries({ queryKey: ["class-members", classId] });
     qc.invalidateQueries({ queryKey: ["class-codes", classId] });
     qc.invalidateQueries({ queryKey: ["class-requests", classId] });
+    qc.invalidateQueries({ queryKey: ["class-spaces", classId] });
   };
 
   if (detail.isLoading) {
@@ -288,6 +298,7 @@ function ClassDetail({ classId, onBack }: { classId: string; onBack: () => void 
             classId={classId}
             members={members.data?.members ?? []}
             isLoading={members.isLoading}
+            spaces={spaces.data?.spaces ?? members.data?.members.flatMap((member) => member.spaces ?? []) ?? []}
             poolRemaining={remaining}
             onChange={refresh}
           />
@@ -343,12 +354,22 @@ function SummaryCard({
 // ─── Members panel ──────────────────────────────────────────────────────────
 
 function MembersPanel({
-  classId, members, isLoading, poolRemaining, onChange,
+  classId, members, isLoading, spaces, poolRemaining, onChange,
 }: {
   classId: string; members: ClassMember[]; isLoading: boolean;
+  spaces: ClassStudentSpace[];
   poolRemaining: number; onChange: () => void;
 }) {
   const [grantTarget, setGrantTarget] = useState<ClassMember | null>(null);
+  const spacesByUser = useMemo(() => {
+    const map = new Map<string, ClassStudentSpace[]>();
+    for (const space of spaces) {
+      const list = map.get(space.user_id) ?? [];
+      list.push(space);
+      map.set(space.user_id, list);
+    }
+    return map;
+  }, [spaces]);
 
   if (isLoading) {
     return <div className="py-10 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
@@ -367,7 +388,7 @@ function MembersPanel({
             <tr>
               <th className="py-2 px-3">Member</th>
               <th className="py-2 px-3">Student ID</th>
-              <th className="py-2 px-3 text-right">Balance</th>
+              <th className="py-2 px-3 text-right">Space balance</th>
               <th className="py-2 px-3 text-right">Used</th>
               <th className="py-2 px-3 text-right">Runs (30d)</th>
               <th className="py-2 px-3">Last active</th>
@@ -375,32 +396,45 @@ function MembersPanel({
             </tr>
           </thead>
           <tbody>
-            {members.map((m) => (
+            {members.map((m) => {
+              const userSpaces = spacesByUser.get(m.user_id) ?? m.spaces ?? [];
+              const primarySpace = userSpaces.find((space) => space.status === "active" || space.status === "submitted")
+                ?? userSpaces[0]
+                ?? null;
+              const lastActivity = primarySpace?.last_activity_at ?? m.last_activity_at;
+              return (
               <tr key={m.id} className="border-t hover:bg-muted/30">
                 <td className="py-2 px-3">
                   <div className="font-medium">{m.display_name ?? "—"}</div>
                   <div className="text-xs text-muted-foreground">{m.email ?? "—"}</div>
                 </td>
                 <td className="py-2 px-3 font-mono text-xs">{m.student_code ?? "—"}</td>
-                <td className="py-2 px-3 text-right font-mono">{m.credits_balance.toLocaleString()}</td>
-                <td className="py-2 px-3 text-right font-mono text-muted-foreground">{m.credits_lifetime_used.toLocaleString()}</td>
-                <td className="py-2 px-3 text-right">{m.model_uses_30d}</td>
+                <td className="py-2 px-3 text-right font-mono">
+                  {(primarySpace?.credits_balance ?? m.credits_balance).toLocaleString()}
+                  {primarySpace && <div className="text-[11px] font-normal text-muted-foreground">{primarySpace.status}</div>}
+                </td>
+                <td className="py-2 px-3 text-right font-mono text-muted-foreground">
+                  {(primarySpace?.credits_lifetime_used ?? m.credits_lifetime_used).toLocaleString()}
+                </td>
+                <td className="py-2 px-3 text-right">{primarySpace?.generation_count_30d ?? m.model_uses_30d}</td>
                 <td className="py-2 px-3 text-xs text-muted-foreground">
-                  {m.last_activity_at ? new Date(m.last_activity_at).toLocaleString() : "—"}
+                  {lastActivity ? new Date(lastActivity).toLocaleString() : "—"}
                 </td>
                 <td className="py-2 px-3 text-right">
                   <Button variant="ghost" size="sm" onClick={() => setGrantTarget(m)}>
-                    <Coins className="h-4 w-4 mr-1" /> Credits
+                    <Coins className="h-4 w-4 mr-1" /> Space credits
                   </Button>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </CardContent>
       <GrantDialog
         target={grantTarget}
         classId={classId}
+        spaces={grantTarget ? spacesByUser.get(grantTarget.user_id) ?? grantTarget.spaces ?? [] : []}
         poolRemaining={poolRemaining}
         onClose={() => setGrantTarget(null)}
         onDone={() => { setGrantTarget(null); onChange(); }}
@@ -410,10 +444,11 @@ function MembersPanel({
 }
 
 function GrantDialog({
-  target, classId, poolRemaining, onClose, onDone,
+  target, classId, spaces, poolRemaining, onClose, onDone,
 }: {
   target: ClassMember | null;
   classId: string;
+  spaces: ClassStudentSpace[];
   poolRemaining: number;
   onClose: () => void;
   onDone: () => void;
@@ -421,13 +456,25 @@ function GrantDialog({
   const [amount, setAmount] = useState("");
   const [mode, setMode] = useState<"grant" | "revoke">("grant");
   const [reason, setReason] = useState("");
+  const [selectedSpaceId, setSelectedSpaceId] = useState("");
+  useEffect(() => {
+    setSelectedSpaceId((current) =>
+      current && spaces.some((space) => space.workspace_id === current)
+        ? current
+        : spaces.find((space) => space.status === "active" || space.status === "submitted")?.workspace_id ?? spaces[0]?.workspace_id ?? "",
+    );
+  }, [spaces, target?.user_id]);
   const mut = useMutation({
     mutationFn: () => {
       if (!target) throw new Error("no target");
       const n = parseInt(amount, 10);
       if (!Number.isFinite(n) || n === 0) throw new Error("Amount must be a positive integer");
       const signed = mode === "grant" ? n : -n;
-      return consumerOrgAdminApi.grantCredits(classId, target.user_id, signed, reason || undefined);
+      if (!selectedSpaceId) {
+        if (mode === "revoke") throw new Error("No class space to revoke from yet.");
+        return consumerOrgAdminApi.ensureStudentSpace(classId, target.user_id, n, reason || undefined);
+      }
+      return consumerOrgAdminApi.grantCredits(classId, target.user_id, selectedSpaceId, signed, reason || undefined);
     },
     onSuccess: (res) => {
       toast.success(
@@ -442,6 +489,7 @@ function GrantDialog({
   });
 
   if (!target) return null;
+  const selectedSpace = spaces.find((space) => space.workspace_id === selectedSpaceId) ?? null;
   const numericAmount = parseInt(amount, 10);
   const tooMuch = mode === "grant" && Number.isFinite(numericAmount) && numericAmount > poolRemaining;
 
@@ -452,10 +500,30 @@ function GrantDialog({
           <DialogTitle>{mode === "grant" ? "Grant credits" : "Revoke credits"}</DialogTitle>
           <DialogDescription>
             <span className="font-medium">{target.display_name ?? target.email}</span>
-            {" — current: "}<span className="font-mono">{target.credits_balance.toLocaleString()}</span>
+            {" — current space: "}<span className="font-mono">{(selectedSpace?.credits_balance ?? target.credits_balance).toLocaleString()}</span>
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
+          {spaces.length > 0 ? (
+            <div>
+              <Label>Class space</Label>
+              <select
+                value={selectedSpaceId}
+                onChange={(e) => setSelectedSpaceId(e.target.value)}
+                className="w-full h-10 px-3 rounded-md border border-input bg-background"
+              >
+                {spaces.map((space) => (
+                  <option key={space.workspace_id} value={space.workspace_id}>
+                    {space.workspace_name ?? space.workspace_id} · {space.credits_balance.toLocaleString()} credits · {space.status}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <p className="rounded-md border border-dashed border-muted-foreground/30 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+              This student has no class space yet. The first grant will create one and lock the credits to that space.
+            </p>
+          )}
           <div className="flex gap-2">
             <Button variant={mode === "grant" ? "default" : "outline"} size="sm" className="flex-1" onClick={() => setMode("grant")}>
               <Plus className="h-3 w-3 mr-1" /> Grant
@@ -558,11 +626,13 @@ function CreateCodeDialog({
   open, classId, onOpenChange, onCreated,
 }: { open: boolean; classId: string; onOpenChange: (b: boolean) => void; onCreated: (c: ClassEnrollmentCode) => void }) {
   const [maxUses, setMaxUses] = useState("");
+  const [creditAmount, setCreditAmount] = useState("250");
   const [expiresMinutes, setExpiresMinutes] = useState<string>("");
   const [description, setDescription] = useState("");
   const create = useMutation({
     mutationFn: () => consumerOrgAdminApi.createCode(classId, {
       max_uses: maxUses ? parseInt(maxUses, 10) : null,
+      credit_amount: Math.max(0, parseInt(creditAmount, 10) || 0),
       expires_at: expiresMinutes
         ? new Date(Date.now() + parseInt(expiresMinutes, 10) * 60_000).toISOString()
         : null,
@@ -570,7 +640,7 @@ function CreateCodeDialog({
     }),
     onSuccess: ({ code }) => {
       toast.success(`Code ${code.code} created`);
-      setMaxUses(""); setExpiresMinutes(""); setDescription("");
+      setMaxUses(""); setCreditAmount("250"); setExpiresMinutes(""); setDescription("");
       onCreated(code);
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed"),
@@ -586,6 +656,10 @@ function CreateCodeDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
+          <div>
+            <Label>Credits per student space</Label>
+            <Input type="number" min="0" value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} placeholder="250" />
+          </div>
           <div>
             <Label>Max enrolments <span className="text-muted-foreground">(blank = unlimited up to class capacity)</span></Label>
             <Input type="number" min="1" value={maxUses} onChange={(e) => setMaxUses(e.target.value)} placeholder="e.g. 42" />
@@ -634,6 +708,7 @@ function QRDialog({ code, onClose }: { code: ClassEnrollmentCode | null; onClose
           <DialogDescription>
             <span className="font-mono">{code.code}</span>
             {code.max_uses ? ` · ${code.max_uses - code.uses_count} of ${code.max_uses} left` : " · unlimited"}
+            {` · ${Number(code.credit_amount ?? 0).toLocaleString()} credits / student space`}
             {code.expires_at && ` · expires ${new Date(code.expires_at).toLocaleTimeString()}`}
           </DialogDescription>
         </DialogHeader>

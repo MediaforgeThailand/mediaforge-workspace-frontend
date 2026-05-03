@@ -63,67 +63,24 @@ export function useUserClassMemberships() {
     enabled,
     queryFn: async () => {
       if (!user) return [];
-
-      // All rows from class_members for this user, joined with class meta
-      const { data: rows } = await supabase
-        .from("class_members" as any)
-        .select(`
-          class_id, role, status, joined_at,
-          credits_balance, credits_lifetime_received, credits_lifetime_used,
-          classes:class_id (id, name, code, status, organization_id, primary_instructor_id)
-        `)
-        .eq("user_id", user.id);
-
-      // Fallback: classes where user is primary_instructor but no class_members row yet
-      const { data: primaryFor } = await supabase
-        .from("classes" as any)
-        .select("id, name, code, status, organization_id, primary_instructor_id")
-        .eq("primary_instructor_id", user.id)
-        .is("deleted_at", null);
-
-      const out: ClassMembershipInfo[] = [];
-
-      for (const r of (rows ?? []) as any[]) {
-        if (!r.classes) continue;
-        const isPrimary = r.classes.primary_instructor_id === user.id;
-        const role: ClassMembershipInfo["role"] =
-          r.role === "student" ? "member" : (isPrimary ? "primary" : "co");
-        out.push({
-          class_id: r.class_id,
-          class_name: r.classes.name,
-          class_code: r.classes.code,
-          class_status: r.classes.status,
-          org_id: r.classes.organization_id,
-          role,
-          student_code: null,
-          credits_balance: r.credits_balance ?? 0,
-          credits_lifetime_received: r.credits_lifetime_received ?? 0,
-          credits_lifetime_used: r.credits_lifetime_used ?? 0,
-          status: r.status,
-          enrolled_at: r.joined_at ?? "",
-        });
-      }
-
-      // Primary instructors not yet mirrored into class_members
-      for (const c of (primaryFor ?? []) as any[]) {
-        if (out.some((m) => m.class_id === c.id)) continue;
-        out.push({
-          class_id: c.id,
-          class_name: c.name,
-          class_code: c.code,
-          class_status: c.status,
-          org_id: c.organization_id,
-          role: "primary",
-          student_code: null,
-          credits_balance: 0,
-          credits_lifetime_received: 0,
-          credits_lifetime_used: 0,
-          status: "active",
-          enrolled_at: "",
-        });
-      }
-
-      return out;
+      const { data, error } = await supabase.rpc("workspace_education_credit_scope" as any, {
+        p_user_id: user.id,
+      });
+      if (error) return [];
+      return ((data ?? []) as any[]).map((row) => ({
+        class_id: row.class_id,
+        class_name: row.class_name,
+        class_code: row.class_code,
+        class_status: "active",
+        org_id: row.organization_id,
+        role: row.class_role === "student" ? "member" : "co",
+        student_code: null,
+        credits_balance: row.credit_balance ?? 0,
+        credits_lifetime_received: row.credits_lifetime_received ?? 0,
+        credits_lifetime_used: row.credits_lifetime_used ?? 0,
+        status: "active",
+        enrolled_at: "",
+      }));
     },
     staleTime: 30_000,
   });
@@ -151,7 +108,6 @@ export function useIsClassTeacher(): boolean {
  */
 export function useIsOrgAdmin(): boolean {
   const { user } = useAuth();
-  const isTeacher = useIsClassTeacher();
 
   const { data: isOrgAdminRow } = useQuery<boolean>({
     queryKey: ["org-admin-membership", user?.id],
@@ -170,7 +126,7 @@ export function useIsOrgAdmin(): boolean {
     staleTime: 30_000,
   });
 
-  return isTeacher || !!isOrgAdminRow;
+  return !!isOrgAdminRow;
 }
 
 // ─── Active class selection (persisted in localStorage) ──────────────────

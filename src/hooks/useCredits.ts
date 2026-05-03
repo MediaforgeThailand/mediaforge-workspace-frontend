@@ -20,6 +20,7 @@ interface CreditBalance {
   credit_scope?: "user" | "organization" | "team" | "education_space";
   team_id?: string | null;
   team_name?: string | null;
+  workspace_id?: string | null;
   personal_balance?: number;
   personal_total_purchased?: number;
   personal_total_used?: number;
@@ -44,6 +45,7 @@ function unwrapCreditBalance(payload: unknown): CreditBalance | null {
     credit_scope: row.credit_scope ?? (row.is_shared_pool ? "organization" : "user"),
     team_id: row.team_id ?? null,
     team_name: row.team_name ?? null,
+    workspace_id: row.workspace_id ?? null,
     personal_balance: Number(row.personal_balance ?? row.balance ?? 0),
     personal_total_purchased: Number(row.personal_total_purchased ?? row.total_purchased ?? 0),
     personal_total_used: Number(row.personal_total_used ?? row.total_used ?? 0),
@@ -63,10 +65,11 @@ function unwrapCreditBalance(payload: unknown): CreditBalance | null {
  * Realtime: subscribes to `user_credits` row updates and invalidates the
  * query so the balance stays in sync after a run / top-up.
  */
-export const useCredits = () => {
+export const useCredits = (workspaceId?: string | null) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const queryKey = ["user-credits", user?.id] as const;
+  const scopedWorkspaceId = workspaceId ?? null;
+  const queryKey = ["user-credits", user?.id, scopedWorkspaceId] as const;
 
   const { data: credits, isLoading: loading, refetch } = useQuery<CreditBalance | null>({
     queryKey,
@@ -75,7 +78,7 @@ export const useCredits = () => {
       if (!user) return null;
       const { data: functionData, error: functionError } = await supabase.functions.invoke(
         "admin_workspace_pricing",
-        { body: { action: "get_workspace_credit_balance" } },
+        { body: { action: "get_workspace_credit_balance", workspace_id: scopedWorkspaceId } },
       );
       if (!functionError) {
         return unwrapCreditBalance(functionData);
@@ -117,6 +120,11 @@ export const useCredits = () => {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "user_credits", filter: `user_id=eq.${userId}` },
+        () => queryClient.invalidateQueries({ queryKey: ["user-credits", userId] }),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "education_student_spaces", filter: `user_id=eq.${userId}` },
         () => queryClient.invalidateQueries({ queryKey: ["user-credits", userId] }),
       )
       .subscribe();

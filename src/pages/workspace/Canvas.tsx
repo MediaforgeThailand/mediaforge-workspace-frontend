@@ -354,7 +354,7 @@ const WorkspaceCanvasPage = () => {
           (no membership), so the consumer flow is unaffected. */}
       <div className="pointer-events-none fixed right-[178px] top-[11px] z-[70]">
         <div className="pointer-events-auto">
-          <OrgCreditBadge variant="pill" />
+          <OrgCreditBadge variant="pill" workspaceId={routeId ?? null} />
         </div>
       </div>
       {/* Wrap the entire workspace in an error boundary so an uncaught

@@ -7,21 +7,25 @@
  */
 import { Coins } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCredits } from "@/hooks/useCredits";
 import { useActiveClass } from "@/hooks/useIsOrgUser";
 
 interface Props {
   variant?: "pill" | "card";
   className?: string;
+  workspaceId?: string | null;
 }
 
-export default function OrgCreditBadge({ variant = "pill", className }: Props) {
+export default function OrgCreditBadge({ variant = "pill", className, workspaceId = null }: Props) {
+  const { credits } = useCredits(workspaceId);
   const active = useActiveClass();
-  if (!active) return null;
+  if (!active && credits?.credit_scope !== "education_space") return null;
 
   const label = "Credits";
-  const value = active.credits_balance.toLocaleString();
-  const lifetimeUsed = active.credits_lifetime_used;
-  const lifetimeReceived = active.credits_lifetime_received;
+  const value = Number(credits?.credit_scope === "education_space" ? credits.balance : active?.credits_balance ?? 0).toLocaleString();
+  const lifetimeUsed = Number(credits?.credit_scope === "education_space" ? credits.total_used : active?.credits_lifetime_used ?? 0);
+  const lifetimeReceived = Number(credits?.credit_scope === "education_space" ? credits.total_purchased : active?.credits_lifetime_received ?? 0);
+  const scopeName = credits?.credit_scope === "education_space" ? credits.team_name : active?.class_name;
 
   if (variant === "card") {
     return (
@@ -37,8 +41,8 @@ export default function OrgCreditBadge({ variant = "pill", className }: Props) {
         <div className="text-2xl font-bold mt-1 text-amber-100 font-mono">
           {value}
         </div>
-        <div className="text-xs text-amber-200/60 mt-1 truncate" title={active.class_name}>
-          {active.class_name}
+        <div className="text-xs text-amber-200/60 mt-1 truncate" title={scopeName ?? ""}>
+          {scopeName}
         </div>
         {lifetimeReceived > 0 && (
           <div className="text-xs text-amber-200/50 mt-1">
@@ -55,7 +59,7 @@ export default function OrgCreditBadge({ variant = "pill", className }: Props) {
         "inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs",
         className,
       )}
-      title={`${active.class_name} · received ${lifetimeReceived.toLocaleString()} · used ${lifetimeUsed.toLocaleString()}`}
+      title={`${scopeName ?? "Class space"} · received ${lifetimeReceived.toLocaleString()} · used ${lifetimeUsed.toLocaleString()}`}
     >
       <Coins className="h-3 w-3 text-amber-300" />
       <span className="text-amber-200/80">{label}</span>
