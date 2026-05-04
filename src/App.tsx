@@ -94,7 +94,6 @@ function lazyWithRetry(factory: () => Promise<{ default: React.ComponentType<any
 // ── Auth shell ────────────────────────────────────────────────
 const Auth = lazyWithRetry(() => import("./pages/Auth"));
 const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
-const Landing = lazyWithRetry(() => import("./pages/marketing/Landing"));
 const BlogPage = lazyWithRetry(() => import("./pages/marketing/Blog"));
 
 // ── Workspace surfaces ────────────────────────────────────────
@@ -147,7 +146,7 @@ const App = () => (
                  *  allow-list, redirecting any other path → /app/workspace. */}
                 <OrgUserBlockGate>
                 <Routes>
-                  <Route path="/" element={<Landing />} />
+                  <Route path="/" element={<Navigate to="/app/workspace" replace />} />
                   <Route path="/blog" element={<BlogPage />} />
 
                   {/* Auth + legal — public */}
