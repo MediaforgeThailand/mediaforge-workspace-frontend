@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, Check, X, Loader2, Sparkles, Minus, Plus, Users } from "lucide-react";
+import { ArrowLeft, Check, X, Loader2, Minus, Plus, Users } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCredits } from "@/hooks/useCredits";
@@ -774,15 +774,7 @@ const ModelAvailabilityRow = ({
   language: string;
 }) => (
   <div className="flex min-h-[18px] items-center justify-between gap-2 text-[12px] font-semibold leading-[18px] text-zinc-100">
-    <span className="inline-flex items-center gap-[6px]">
-      <Sparkles
-        className={cn(
-          "h-[11px] w-[11px]",
-          accent === "purple" ? "text-[#a855f7]" : "text-[#4f6cff]",
-        )}
-      />
-      {label}
-    </span>
+    <span>{label}</span>
     <span
       className={cn(
         "text-[9px] font-black uppercase leading-none",

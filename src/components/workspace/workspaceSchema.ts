@@ -439,7 +439,8 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         // honoured per-model by the canvas validator.
         required: true,
         supportedModels: [
-          "kling-v2-6-pro", "kling-v3-pro", "kling-v3-omni",
+          "kling-v2-6-pro", "kling-v2-6-motion-pro",
+          "kling-v3-pro", "kling-v3-motion-pro", "kling-v3-omni",
           ...SEEDANCE_MODELS,
         ],
       },
@@ -463,7 +464,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         id: "ref_image",
         label: "ref_image",
         color: "cyan",
-        supportedModels: ["kling-v2-6-motion-pro", "kling-v3-motion-pro", "kling-v3-omni"],
+        supportedModels: ["kling-v3-omni"],
       },
       {
         id: "reference_image",

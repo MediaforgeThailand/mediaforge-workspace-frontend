@@ -137,6 +137,17 @@ interface UploadedRef {
   storagePath?: string;
 }
 
+type PanelReferenceAsset = {
+  id: string;
+  url: string;
+  mime?: string;
+  name?: string;
+  source?: "generation" | "user_asset" | "upload";
+  assetId?: string;
+  storageBucket?: "ai-media" | "user_assets";
+  storagePath?: string;
+};
+
 type DeletableReference = Pick<
   UploadedRef,
   "id" | "url" | "mime" | "name" | "source" | "assetId" | "storageBucket" | "storagePath"
@@ -1042,12 +1053,15 @@ export default function StandaloneGenerator({
     });
   };
 
-  const uploadPanelReferenceFiles = async (files: File[]) => {
+  const uploadPanelReferenceFiles = async (
+    files: File[],
+    slotOverride?: UploadSlot,
+  ) => {
     if (!activeProject?.id) {
       toast.error(t("workspace.toast.create_project_first_upload"));
       return;
     }
-    const slot = getPanelReferenceSlot();
+    const slot = slotOverride ?? getPanelReferenceSlot();
     if (!slot) return;
     const candidates =
       activeTool === "image_gen" || activeTool === "image_to_3d"
@@ -1077,17 +1091,11 @@ export default function StandaloneGenerator({
     }
   };
 
-  const selectPanelReferenceAsset = (reference: {
-    id: string;
-    url: string;
-    mime?: string;
-    name?: string;
-    source?: "generation" | "user_asset" | "upload";
-    assetId?: string;
-    storageBucket?: "ai-media" | "user_assets";
-    storagePath?: string;
-  }) => {
-    const slot = getPanelReferenceSlot();
+  const selectPanelReferenceAsset = (
+    reference: PanelReferenceAsset,
+    slotOverride?: UploadSlot,
+  ) => {
+    const slot = slotOverride ?? getPanelReferenceSlot();
     if (!slot) return;
     const referenceMime = reference.mime ?? "image/jpeg";
     if (slot === "video-ref-video" && !referenceMime.startsWith("video/")) {
@@ -1277,6 +1285,10 @@ export default function StandaloneGenerator({
         : t("workspace.standalone.references");
 
   const panelReferenceAssets = useMemo(() => {
+    const usesDedicatedMotionSlots =
+      activeTool === "video_gen" &&
+      videoPanelMode === "reference" &&
+      isKlingMotionVideoModel(form.model);
     const wantsVideoAssets =
       activeTool === "video_gen" &&
       videoPanelMode === "reference" &&
@@ -1286,11 +1298,14 @@ export default function StandaloneGenerator({
       ...(jobsQuery.data ?? []).map(referenceFromGenerationJob),
       ...(projectReferencesQuery.data ?? []),
     ])
-      .filter((ref) =>
-        wantsVideoAssets
+      .filter((ref) => {
+        if (usesDedicatedMotionSlots) {
+          return ref.mime.startsWith("image/") || ref.mime.startsWith("video/");
+        }
+        return wantsVideoAssets
           ? ref.mime.startsWith("video/")
-          : ref.mime.startsWith("image/"),
-      )
+          : ref.mime.startsWith("image/");
+      })
       .slice(0, 120);
   }, [
     activeTool,
@@ -1342,6 +1357,37 @@ export default function StandaloneGenerator({
                 },
               ]
             : []),
+        ]
+      : [];
+  const videoReferenceSlots =
+    activeTool === "video_gen" &&
+    videoPanelMode === "reference" &&
+    isKlingMotionVideoModel(form.model)
+      ? [
+          {
+            id: "motion-start-image",
+            label: t("workspace.standalone.start_image"),
+            accept: "image" as const,
+            refItem: form.videoRefImage,
+            uploading: uploading === "video-ref-image",
+            onFiles: (files: File[]) =>
+              void uploadPanelReferenceFiles(files, "video-ref-image"),
+            onSelectAsset: (reference: PanelReferenceAsset) =>
+              selectPanelReferenceAsset(reference, "video-ref-image"),
+            onRemove: () => updateForm({ videoRefImage: null }),
+          },
+          {
+            id: "motion-video",
+            label: t("workspace.standalone.motion_video"),
+            accept: "video" as const,
+            refItem: form.videoRefVideo,
+            uploading: uploading === "video-ref-video",
+            onFiles: (files: File[]) =>
+              void uploadPanelReferenceFiles(files, "video-ref-video"),
+            onSelectAsset: (reference: PanelReferenceAsset) =>
+              selectPanelReferenceAsset(reference, "video-ref-video"),
+            onRemove: () => updateForm({ videoRefVideo: null }),
+          },
         ]
       : [];
   const videoReferenceAccept =
@@ -1599,6 +1645,7 @@ export default function StandaloneGenerator({
               supportsFrameMode={videoSupportsFrames}
               supportsReferenceMode={videoSupportsReferenceMode}
               frameSlots={videoFrameSlots}
+              referenceSlots={videoReferenceSlots}
               references={panelReferences}
               maxReferences={panelMaxReferences}
               referenceTitle="Add visual references"
@@ -5074,7 +5121,11 @@ function mergeStandaloneMentionInputs(
 
     if (useReferenceMode) {
       if (videoSupportsReferenceImage(form.model) && imageUrls.length > 0) {
-        const imageKey = isSeedanceVideoModel(form.model) ? "reference_image" : "ref_image";
+        const imageKey = isKlingMotionVideoModel(form.model)
+          ? "start_frame"
+          : isSeedanceVideoModel(form.model)
+            ? "reference_image"
+            : "ref_image";
         if (!nextInputs[imageKey]) {
           nextInputs[imageKey] = imageUrls[0];
         }
@@ -5194,6 +5245,11 @@ function buildCurrentInputs(
       if (videoSupportsEndFrame(form.model) && form.videoEnd) {
         inputs.end_frame = form.videoEnd.url;
       }
+    }
+    if (useReferenceMode && isKlingMotionVideoModel(form.model)) {
+      if (form.videoRefImage) inputs.start_frame = form.videoRefImage.url;
+      if (form.videoRefVideo) inputs.ref_video = form.videoRefVideo.url;
+      return inputs;
     }
     if (useReferenceMode && videoSupportsReferenceImage(form.model) && form.videoRefImage) {
       inputs[isSeedanceVideoModel(form.model) ? "reference_image" : "ref_image"] =
