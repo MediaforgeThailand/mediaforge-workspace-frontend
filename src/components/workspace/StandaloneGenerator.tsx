@@ -535,7 +535,7 @@ function standaloneCreateButtonLabel(
     estimatedCost > 0
   ) {
     const base = language === "th" ? "สร้าง" : "Generate";
-    return `${base} ✨ ${new Intl.NumberFormat("en-US", {
+    return `${base} ${new Intl.NumberFormat("en-US", {
       maximumFractionDigits: 0,
     }).format(Math.ceil(estimatedCost))}`;
   }
