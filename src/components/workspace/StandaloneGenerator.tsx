@@ -594,6 +594,105 @@ function standaloneOptionLabel(option: string, t: TranslationFn) {
   return key ? t(key) : option;
 }
 
+type StandaloneInlineLabelKey =
+  | "addVisualReferences"
+  | "audio"
+  | "aspect"
+  | "background"
+  | "duration"
+  | "followImage"
+  | "followVideo"
+  | "format"
+  | "instructions"
+  | "keep"
+  | "lastFrame"
+  | "liveVoices"
+  | "multiShot"
+  | "multiShots"
+  | "mute"
+  | "negativePrompt"
+  | "off"
+  | "on"
+  | "originalSound"
+  | "people"
+  | "quality"
+  | "reference"
+  | "resolution"
+  | "return"
+  | "shotListJson"
+  | "startEnd"
+  | "startFrame"
+  | "style"
+  | "texture"
+  | "textToVideo"
+  | "frameToVideo"
+  | "videoAvoidPlaceholder"
+  | "videoPromptPlaceholder"
+  | "adultsOnly"
+  | "allowChildren"
+  | "director"
+  | "addStartFrame"
+  | "addEndFrame"
+  | "history";
+
+const STANDALONE_INLINE_LABELS: Record<
+  StandaloneInlineLabelKey,
+  Record<"en" | "th", string>
+> = {
+  addVisualReferences: { en: "Add visual references", th: "เพิ่มภาพอ้างอิง" },
+  audio: { en: "Audio", th: "เสียง" },
+  aspect: { en: "Aspect", th: "สัดส่วน" },
+  background: { en: "Background", th: "พื้นหลัง" },
+  duration: { en: "Duration", th: "ความยาว" },
+  followImage: { en: "Follow Image", th: "ตามภาพ" },
+  followVideo: { en: "Follow Video", th: "ตามวิดีโอ" },
+  format: { en: "Format", th: "รูปแบบไฟล์" },
+  instructions: { en: "Instructions", th: "คำสั่ง" },
+  keep: { en: "Keep", th: "คงไว้" },
+  lastFrame: { en: "Last frame", th: "เฟรมสุดท้าย" },
+  liveVoices: { en: "Live voices", th: "เสียงจากบัญชี" },
+  multiShot: { en: "Multi-shot", th: "หลายช็อต" },
+  multiShots: { en: "Multi-shots", th: "หลายช็อต" },
+  mute: { en: "Mute", th: "ปิดเสียง" },
+  negativePrompt: { en: "Negative prompt", th: "คำสั่งที่ไม่ต้องการ" },
+  off: { en: "Off", th: "ปิด" },
+  on: { en: "On", th: "เปิด" },
+  originalSound: { en: "Original sound", th: "เสียงต้นฉบับ" },
+  people: { en: "People", th: "บุคคล" },
+  quality: { en: "Quality", th: "คุณภาพ" },
+  reference: { en: "Reference", th: "อ้างอิง" },
+  resolution: { en: "Resolution", th: "ความละเอียด" },
+  return: { en: "Return", th: "ส่งคืน" },
+  shotListJson: { en: "Shot list (JSON)", th: "รายการช็อต (JSON)" },
+  startEnd: { en: "Start/End", th: "เริ่ม/จบ" },
+  startFrame: { en: "Start Frame", th: "เฟรมเริ่มต้น" },
+  style: { en: "Style", th: "สไตล์" },
+  texture: { en: "Texture", th: "พื้นผิว" },
+  textToVideo: { en: "Text to Video", th: "ข้อความเป็นวิดีโอ" },
+  frameToVideo: { en: "Frame to Video", th: "เฟรมเป็นวิดีโอ" },
+  videoAvoidPlaceholder: {
+    en: "What should the video avoid?",
+    th: "อยากให้วิดีโอหลีกเลี่ยงอะไร?",
+  },
+  videoPromptPlaceholder: {
+    en: "Describe scene transitions, camera movement trajectories, or character actions with text to precisely control the entire video.",
+    th: "อธิบายฉาก การเคลื่อนกล้อง หรือการกระทำของตัวละคร เพื่อควบคุมวิดีโอให้ตรงตามต้องการ",
+  },
+  adultsOnly: { en: "Adults only", th: "ผู้ใหญ่เท่านั้น" },
+  allowChildren: { en: "Allow children", th: "อนุญาตเด็ก" },
+  director: { en: "Director", th: "โหมดกำกับ" },
+  addStartFrame: { en: "Add a start frame", th: "เพิ่มเฟรมเริ่มต้น" },
+  addEndFrame: { en: "Add an end frame", th: "เพิ่มเฟรมจบ" },
+  history: { en: "History", th: "ประวัติ" },
+};
+
+function standaloneInlineLabel(
+  key: StandaloneInlineLabelKey,
+  language: "en" | "th",
+) {
+  return STANDALONE_INLINE_LABELS[key][language];
+}
+
 function standaloneStatusLabel(status: StandaloneJobRow["status"], t: TranslationFn) {
   return t(STATUS_LABEL_KEYS[status]);
 }
@@ -1250,10 +1349,14 @@ export default function StandaloneGenerator({
         }),
       ]);
       setDeleteReferenceTarget(null);
-      toast.success("Asset deleted");
+      toast.success(language === "th" ? "ลบไฟล์แล้ว" : "Asset deleted");
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      toast.error(`Could not delete asset: ${message}`);
+      toast.error(
+        language === "th"
+          ? `ลบไฟล์ไม่สำเร็จ: ${message}`
+          : `Could not delete asset: ${message}`,
+      );
     } finally {
       setDeletingReference(false);
     }
@@ -1329,8 +1432,8 @@ export default function StandaloneGenerator({
       ? [
           {
             id: "start" as const,
-            label: "Add a start frame",
-            historyLabel: "History",
+            label: standaloneInlineLabel("addStartFrame", language),
+            historyLabel: standaloneInlineLabel("history", language),
             refItem: form.videoStart,
             uploading: uploading === "video-start",
             onUpload: () => openUpload("video-start"),
@@ -1344,8 +1447,8 @@ export default function StandaloneGenerator({
             ? [
                 {
                   id: "end" as const,
-                  label: "Add an end frame",
-                  historyLabel: "History",
+                  label: standaloneInlineLabel("addEndFrame", language),
+                  historyLabel: standaloneInlineLabel("history", language),
                   refItem: form.videoEnd,
                   uploading: uploading === "video-end",
                   onUpload: () => openUpload("video-end"),
@@ -1414,6 +1517,7 @@ export default function StandaloneGenerator({
           resolutionOptions: videoResolutionOptions,
           durationOptions: videoDurationOptions,
           onChange: updateForm,
+          language,
         })
       : [];
   const imagePanelSettings =
@@ -1423,11 +1527,12 @@ export default function StandaloneGenerator({
           resolutionOptions: imageResolutionOptionsFor(form),
           onChange: updateForm,
           t,
+          language,
         })
       : [];
   const threeDPanelSettings =
     activeTool === "image_to_3d"
-      ? buildThreeDPanelSettings({ form, onChange: updateForm, t })
+      ? buildThreeDPanelSettings({ form, onChange: updateForm, t, language })
       : [];
   const videoTextControls =
     activeTool === "video_gen"
@@ -1436,9 +1541,12 @@ export default function StandaloneGenerator({
             ? [
                 {
                   id: "negative-prompt",
-                  label: "Negative prompt",
+                  label: standaloneInlineLabel("negativePrompt", language),
                   value: form.videoNegativePrompt,
-                  placeholder: "What should the video avoid?",
+                  placeholder: standaloneInlineLabel(
+                    "videoAvoidPlaceholder",
+                    language,
+                  ),
                   rows: 1,
                   onChange: (videoNegativePrompt: string) =>
                     updateForm({ videoNegativePrompt }),
@@ -1449,7 +1557,7 @@ export default function StandaloneGenerator({
             ? [
                 {
                   id: "multi-prompt",
-                  label: "Shot list (JSON)",
+                  label: standaloneInlineLabel("shotListJson", language),
                   value: form.videoMultiPrompt,
                   placeholder: '[{"prompt":"Scene 1","duration":3}]',
                   rows: 3,
@@ -1461,7 +1569,9 @@ export default function StandaloneGenerator({
         ]
       : [];
   const videoPanelTitle =
-    videoPanelMode === "reference" ? "Text to Video" : "Frame to Video";
+    videoPanelMode === "reference"
+      ? standaloneInlineLabel("textToVideo", language)
+      : standaloneInlineLabel("frameToVideo", language);
 
   const onFileSelected = async (file: File | undefined) => {
     if (!file) return;
@@ -1629,7 +1739,10 @@ export default function StandaloneGenerator({
               modelCaption={t("workspace.standalone.model")}
               prompt={form.prompt}
               promptLabel={t("workspace.standalone.describe_video")}
-              promptPlaceholder="Describe scene transitions, camera movement trajectories, or character actions with text to precisely control the entire video."
+              promptPlaceholder={standaloneInlineLabel(
+                "videoPromptPlaceholder",
+                language,
+              )}
               onPromptChange={(prompt) => updateForm({ prompt })}
               modelLabel={selectedModel?.label ?? "SeedDance 2.0 Pro"}
               modelInitial={selectedModelVisual?.initial ?? "S"}
@@ -1637,7 +1750,7 @@ export default function StandaloneGenerator({
               modelOptions={activeDef.models.map((model) => ({
                 id: model.id,
                 label: model.label,
-                settings: videoModelSettingTags(model.id),
+                settings: videoModelSettingTags(model.id, language),
               }))}
               onModelChange={setToolModel}
               mode={videoPanelMode}
@@ -1648,7 +1761,10 @@ export default function StandaloneGenerator({
               referenceSlots={videoReferenceSlots}
               references={panelReferences}
               maxReferences={panelMaxReferences}
-              referenceTitle="Add visual references"
+              referenceTitle={standaloneInlineLabel(
+                "addVisualReferences",
+                language,
+              )}
               referenceBadge={language === "th" ? "ไม่บังคับ" : "Optional"}
               referenceHint={videoReferenceHint}
               referenceAccept={videoReferenceAccept}
@@ -1696,11 +1812,11 @@ export default function StandaloneGenerator({
                 label: model.label,
                 settings:
                   activeTool === "image_gen"
-                    ? imageModelSettingTags(model.id)
+                    ? imageModelSettingTags(model.id, language)
                     : activeTool === "image_to_3d"
-                      ? threeDModelSettingTags(model.id)
+                      ? threeDModelSettingTags(model.id, language)
                       : activeTool === "voice_gen"
-                        ? audioModelSettingTags(model.id)
+                        ? audioModelSettingTags(model.id, language)
                         : [],
               }))}
               onModelChange={setToolModel}
@@ -2811,7 +2927,7 @@ function ImageOutputSettings({
     : ["Auto", "1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"];
   const copy =
     language === "th"
-      ? { output: "Output", quality: "Quality", standard: "Standard" }
+      ? { output: "ผลลัพธ์", quality: "คุณภาพ", standard: "มาตรฐาน" }
       : { output: "Output", quality: "Quality", standard: "Standard" };
   const outputLabel = isSeedream
     ? form.imageResolution
@@ -5382,7 +5498,7 @@ function compactRangeLabel(values: string[]): string | null {
   return `${firstPrefix}-${last}`;
 }
 
-function videoModelSettingTags(model: string): Array<{
+function videoModelSettingTags(model: string, language: "en" | "th"): Array<{
   label: string;
   icon?: "reference" | "frames" | "audio" | "resolution" | "duration" | "multi";
 }> {
@@ -5394,22 +5510,30 @@ function videoModelSettingTags(model: string): Array<{
   const isVeo = isVeoVideoModel(model);
 
   if (videoSupportsReferenceImage(model) || videoSupportsReferenceVideo(model)) {
-    tags.push({ label: "Reference", icon: "reference" });
+    tags.push({
+      label: standaloneInlineLabel("reference", language),
+      icon: "reference",
+    });
   }
 
   if (videoSupportsStartEndFrames(model)) {
     tags.push({
-      label: videoSupportsEndFrame(model) ? "Start/End" : "Start Frame",
+      label: videoSupportsEndFrame(model)
+        ? standaloneInlineLabel("startEnd", language)
+        : standaloneInlineLabel("startFrame", language),
       icon: "frames",
     });
   }
 
   if (model === "kling-v3-omni") {
-    tags.push({ label: "Multi-shots", icon: "multi" });
+    tags.push({
+      label: standaloneInlineLabel("multiShots", language),
+      icon: "multi",
+    });
   }
 
   if (isVeo || (!isMotion && (model.startsWith("kling") || isSeedanceVideoModel(model)))) {
-    tags.push({ label: "Audio", icon: "audio" });
+    tags.push({ label: standaloneInlineLabel("audio", language), icon: "audio" });
   }
 
   const resolution = compactRangeLabel(videoResolutionOptionsForModel(model));
@@ -5432,12 +5556,14 @@ function buildVideoPanelSettings({
   resolutionOptions,
   durationOptions,
   onChange,
+  language,
 }: {
   form: StandaloneFormState;
   ratioOptions: string[];
   resolutionOptions: string[];
   durationOptions: string[];
   onChange: (patch: Partial<StandaloneFormState>) => void;
+  language: "en" | "th";
 }) {
   const settings: Array<{
     id: string;
@@ -5456,15 +5582,17 @@ function buildVideoPanelSettings({
   if (isVeo) {
     settings.push({
       id: "audio",
-      label: "Audio",
-      value: "On",
+      label: standaloneInlineLabel("audio", language),
+      value: standaloneInlineLabel("on", language),
       kind: "readonly",
     });
   } else if (!isMotion) {
     settings.push({
       id: "audio",
-      label: "Audio",
-      value: form.videoWithAudio ? "On" : "Off",
+      label: standaloneInlineLabel("audio", language),
+      value: form.videoWithAudio
+        ? standaloneInlineLabel("on", language)
+        : standaloneInlineLabel("off", language),
       kind: "toggle",
       checked: form.videoWithAudio,
       onToggle: (videoWithAudio) => onChange({ videoWithAudio }),
@@ -5474,7 +5602,7 @@ function buildVideoPanelSettings({
   if (ratioOptions.length > 0) {
     settings.push({
       id: "ratio",
-      label: "Aspect",
+      label: standaloneInlineLabel("aspect", language),
       value: form.videoRatio,
       kind: "select",
       options: ratioOptions.map((value) => ({ value, label: value })),
@@ -5485,7 +5613,7 @@ function buildVideoPanelSettings({
   if (resolutionOptions.length > 0) {
     settings.push({
       id: "resolution",
-      label: "Resolution",
+      label: standaloneInlineLabel("resolution", language),
       value: form.videoResolution,
       kind: "select",
       options: resolutionOptions.map((value) => ({ value, label: value })),
@@ -5496,7 +5624,7 @@ function buildVideoPanelSettings({
   if (!isMotion && durationOptions.length > 0) {
     settings.push({
       id: "duration",
-      label: "Duration",
+      label: standaloneInlineLabel("duration", language),
       value: String(form.videoDuration),
       kind: "select",
       options: durationOptions.map((value) => ({ value, label: `${value}s` })),
@@ -5508,12 +5636,12 @@ function buildVideoPanelSettings({
   if (isMotion) {
     settings.push({
       id: "orientation",
-      label: "Orientation",
+      label: standaloneInlineLabel("orientation", language),
       value: form.videoCharacterOrientation,
       kind: "select",
       options: [
-        { value: "image", label: "Follow Image" },
-        { value: "video", label: "Follow Video" },
+        { value: "image", label: standaloneInlineLabel("followImage", language) },
+        { value: "video", label: standaloneInlineLabel("followVideo", language) },
       ],
       onChange: (videoCharacterOrientation) =>
         onChange({
@@ -5526,8 +5654,10 @@ function buildVideoPanelSettings({
   if ((isMotion || form.model === "kling-v3-omni") && videoSupportsReferenceVideo(form.model)) {
     settings.push({
       id: "keep-sound",
-      label: "Original sound",
-      value: form.videoKeepOriginalSound ? "Keep" : "Mute",
+      label: standaloneInlineLabel("originalSound", language),
+      value: form.videoKeepOriginalSound
+        ? standaloneInlineLabel("keep", language)
+        : standaloneInlineLabel("mute", language),
       kind: "toggle",
       checked: form.videoKeepOriginalSound,
       onToggle: (videoKeepOriginalSound) =>
@@ -5538,12 +5668,12 @@ function buildVideoPanelSettings({
   if (isVeo) {
     settings.push({
       id: "people",
-      label: "People",
+      label: standaloneInlineLabel("people", language),
       value: form.videoPersonGeneration,
       kind: "select",
       options: [
-        { value: "allow_adult", label: "Adults only" },
-        { value: "allow_all", label: "Allow children" },
+        { value: "allow_adult", label: standaloneInlineLabel("adultsOnly", language) },
+        { value: "allow_all", label: standaloneInlineLabel("allowChildren", language) },
       ],
       onChange: (videoPersonGeneration) =>
         onChange({
@@ -5556,8 +5686,10 @@ function buildVideoPanelSettings({
   if (isSeedance) {
     settings.push({
       id: "last-frame",
-      label: "Last frame",
-      value: form.videoReturnLastFrame ? "Return" : "Off",
+      label: standaloneInlineLabel("lastFrame", language),
+      value: form.videoReturnLastFrame
+        ? standaloneInlineLabel("return", language)
+        : standaloneInlineLabel("off", language),
       kind: "toggle",
       checked: form.videoReturnLastFrame,
       onToggle: (videoReturnLastFrame) =>
@@ -5568,8 +5700,10 @@ function buildVideoPanelSettings({
   if (form.model === "kling-v3-omni") {
     settings.push({
       id: "multi-shot",
-      label: "Multi-shot",
-      value: form.videoMultiShot ? "Director" : "Off",
+      label: standaloneInlineLabel("multiShot", language),
+      value: form.videoMultiShot
+        ? standaloneInlineLabel("director", language)
+        : standaloneInlineLabel("off", language),
       kind: "toggle",
       checked: form.videoMultiShot,
       onToggle: (videoMultiShot) => onChange({ videoMultiShot }),
@@ -5584,11 +5718,13 @@ function buildImagePanelSettings({
   resolutionOptions,
   onChange,
   t,
+  language,
 }: {
   form: StandaloneFormState;
   resolutionOptions: string[];
   onChange: (patch: Partial<StandaloneFormState>) => void;
   t: TranslationFn;
+  language: "en" | "th";
 }): CreateVideoPanelSetting[] {
   const isGpt = form.model === "gpt-image-2";
   const isSeedream = isSeedreamImageModel(form.model);
@@ -5600,7 +5736,7 @@ function buildImagePanelSettings({
   if (!isSeedream) {
     settings.push({
       id: "image-aspect",
-      label: "Aspect",
+      label: standaloneInlineLabel("aspect", language),
       value: form.aspectRatio,
       kind: "select",
       options: aspectOptions.map((value) => ({ value, label: value })),
@@ -5620,7 +5756,7 @@ function buildImagePanelSettings({
 
   settings.push({
     id: "image-resolution",
-    label: "Resolution",
+    label: standaloneInlineLabel("resolution", language),
     value: form.imageResolution,
     kind: "select",
     options: resolutionOptions.map((value) => ({ value, label: value })),
@@ -5631,7 +5767,7 @@ function buildImagePanelSettings({
     settings.push(
       {
         id: "image-quality",
-        label: "Quality",
+        label: standaloneInlineLabel("quality", language),
         value: form.quality,
         kind: "select",
         options: ["low", "medium", "high", "auto"].map((value) => ({
@@ -5642,7 +5778,7 @@ function buildImagePanelSettings({
       },
       {
         id: "image-format",
-        label: "Format",
+        label: standaloneInlineLabel("format", language),
         value: form.outputFormat,
         kind: "select",
         options: ["png", "jpeg", "webp"].map((value) => ({
@@ -5660,7 +5796,7 @@ function buildImagePanelSettings({
     if (form.outputFormat !== "jpeg") {
       settings.push({
         id: "image-background",
-        label: "Background",
+        label: standaloneInlineLabel("background", language),
         value: form.background,
         kind: "select",
         options: ["auto", "transparent", "opaque"].map((value) => ({
@@ -5679,16 +5815,20 @@ function buildThreeDPanelSettings({
   form,
   onChange,
   t,
+  language,
 }: {
   form: StandaloneFormState;
   onChange: (patch: Partial<StandaloneFormState>) => void;
   t: TranslationFn;
+  language: "en" | "th";
 }): CreateVideoPanelSetting[] {
   return [
     {
       id: "texture",
       label: t("workspace.standalone.texture"),
-      value: form.texture ? "On" : "Off",
+      value: form.texture
+        ? standaloneInlineLabel("on", language)
+        : standaloneInlineLabel("off", language),
       kind: "toggle",
       checked: form.texture,
       onToggle: (texture) => onChange({ texture }),
@@ -5696,7 +5836,9 @@ function buildThreeDPanelSettings({
     {
       id: "pbr",
       label: t("workspace.standalone.pbr_materials"),
-      value: form.pbr ? "On" : "Off",
+      value: form.pbr
+        ? standaloneInlineLabel("on", language)
+        : standaloneInlineLabel("off", language),
       kind: "toggle",
       checked: form.pbr,
       onToggle: (pbr) => onChange({ pbr }),
@@ -5704,51 +5846,55 @@ function buildThreeDPanelSettings({
   ];
 }
 
-function imageModelSettingTags(model: string): Array<{
+function imageModelSettingTags(model: string, language: "en" | "th"): Array<{
   label: string;
   icon?: "reference" | "resolution";
 }> {
   const maxRefs = model === "gpt-image-2" ? 16 : 14;
+  const referenceLabel = standaloneInlineLabel("reference", language);
   if (model === "gpt-image-2") {
     return [
-      { label: `Reference ${maxRefs}`, icon: "reference" },
+      { label: `${referenceLabel} ${maxRefs}`, icon: "reference" },
       { label: "1K-4K", icon: "resolution" },
     ];
   }
   if (isSeedreamImageModel(model)) {
     return [
-      { label: `Reference ${maxRefs}`, icon: "reference" },
+      { label: `${referenceLabel} ${maxRefs}`, icon: "reference" },
       { label: "2K-3K", icon: "resolution" },
     ];
   }
   return [
-    { label: `Reference ${maxRefs}`, icon: "reference" },
+    { label: `${referenceLabel} ${maxRefs}`, icon: "reference" },
     { label: model === "nano-banana-pro" ? "1K-4K" : "1K-2K", icon: "resolution" },
   ];
 }
 
-function threeDModelSettingTags(model: string): Array<{
+function threeDModelSettingTags(model: string, language: "en" | "th"): Array<{
   label: string;
   icon?: "reference" | "resolution";
 }> {
   return [
-    { label: `Reference ${max3dRefsForModel(model)}`, icon: "reference" },
-    { label: "Texture", icon: "resolution" },
+    {
+      label: `${standaloneInlineLabel("reference", language)} ${max3dRefsForModel(model)}`,
+      icon: "reference",
+    },
+    { label: standaloneInlineLabel("texture", language), icon: "resolution" },
   ];
 }
 
-function audioModelSettingTags(model: string): Array<{
+function audioModelSettingTags(model: string, language: "en" | "th"): Array<{
   label: string;
   icon?: "audio" | "multi";
 }> {
   if (model.startsWith("elevenlabs-") || model.startsWith("eleven_")) {
     return [
-      { label: "Live voices", icon: "audio" },
-      { label: "Style", icon: "multi" },
+      { label: standaloneInlineLabel("liveVoices", language), icon: "audio" },
+      { label: standaloneInlineLabel("style", language), icon: "multi" },
     ];
   }
   return [
-    { label: "Instructions", icon: "multi" },
+    { label: standaloneInlineLabel("instructions", language), icon: "multi" },
   ];
 }
 

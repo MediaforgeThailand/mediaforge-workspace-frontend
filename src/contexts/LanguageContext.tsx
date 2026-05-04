@@ -4381,7 +4381,7 @@ const translations = {
     "workspace.standalone.tool.image_to_3d.title": "แปลงรูปเป็น 3D",
     "workspace.standalone.generate": "สร้าง",
     "workspace.standalone.credits": "เครดิต",
-    "workspace.standalone.model": "โมเดล",
+    "workspace.standalone.model": "Model",
     "workspace.standalone.prompt": "คำสั่ง",
     "workspace.standalone.aspect": "สัดส่วน",
     "workspace.standalone.resolution": "ความละเอียด",

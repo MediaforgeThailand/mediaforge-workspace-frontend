@@ -10,6 +10,7 @@ import { ReactFlowProvider, useReactFlow, type Node } from "@xyflow/react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
 import PromptMentionTextarea from "@/components/flow/nodes/PromptMentionTextarea";
+import { useLanguage } from "@/contexts/LanguageContext";
 import sampleRefOne from "@/assets/showcase-cat-astronaut.jpg";
 import sampleRefTwo from "@/assets/mock-packshot-perfume.jpg";
 import sampleRefThree from "@/assets/pro-trend-space-cat.jpg";
@@ -20,6 +21,87 @@ import {
 } from "./modelDisplay";
 
 type BottomTab = "video" | "image" | "3d" | "audio";
+
+const PANEL_COPY = {
+  en: {
+    video: "Video",
+    image: "Image",
+    audio: "Audio",
+    models: "Models",
+    recommended: "Recommended",
+    allModels: "All models",
+    all: "All",
+    startEndFrame: "Start/End Frame",
+    textWithReference: "Text with Reference",
+    imageHistory: "Image History",
+    setStartEndFrame: "Set start & end frame",
+    setStartFrame: "Set start frame",
+    startFrame: "Start frame",
+    endFrame: "End frame",
+    addVisualReference: "Add visual reference",
+    creations: "Creations",
+    uploads: "Uploads",
+    uploadImages: "Upload Images",
+    uploadVideos: "Upload Videos",
+    uploadAssets: "Upload Assets",
+    dropFiles: "Drop files here or Ctrl+V",
+    noAssets: "No compatible assets yet.",
+    autoModel: "Auto-select the best model based on the prompt",
+    gptModel: "OpenAI's next-gen image model",
+    googleVideoModel: "Google video generation model",
+    seedanceModel: "Seedance video generation model",
+    klingModel: "Kling AI video generation model",
+    threeDModel: "3D generation model",
+    voiceModel: "Voice generation model",
+    googlePremiumImage: "Google's premium image model",
+    googleImage: "Google's Gemini image model",
+    byteDanceImage: "ByteDance image generation model",
+    fluxImage: "Black Forest Labs image model",
+    recraftImage: "Recraft image and SVG generation model",
+    imageModel: "Image generation model",
+  },
+  th: {
+    video: "วิดีโอ",
+    image: "รูปภาพ",
+    audio: "เสียง",
+    models: "Models",
+    recommended: "แนะนำ",
+    allModels: "Model ทั้งหมด",
+    all: "ทั้งหมด",
+    startEndFrame: "เฟรมเริ่ม/จบ",
+    textWithReference: "ข้อความพร้อมอ้างอิง",
+    imageHistory: "ประวัติรูปภาพ",
+    setStartEndFrame: "ตั้งเฟรมเริ่มและจบ",
+    setStartFrame: "ตั้งเฟรมเริ่ม",
+    startFrame: "เฟรมเริ่มต้น",
+    endFrame: "เฟรมจบ",
+    addVisualReference: "เพิ่มภาพอ้างอิง",
+    creations: "งานที่สร้าง",
+    uploads: "อัปโหลด",
+    uploadImages: "อัปโหลดรูปภาพ",
+    uploadVideos: "อัปโหลดวิดีโอ",
+    uploadAssets: "อัปโหลดไฟล์",
+    dropFiles: "วางไฟล์ที่นี่หรือกด Ctrl+V",
+    noAssets: "ยังไม่มีไฟล์ที่ใช้ได้",
+    autoModel: "เลือก Model ที่เหมาะสมให้อัตโนมัติจาก prompt",
+    gptModel: "Model รูปภาพรุ่นใหม่จาก OpenAI",
+    googleVideoModel: "Model สร้างวิดีโอจาก Google",
+    seedanceModel: "Model สร้างวิดีโอจาก Seedance",
+    klingModel: "Model สร้างวิดีโอจาก Kling AI",
+    threeDModel: "Model สร้าง 3D",
+    voiceModel: "Model สร้างเสียง",
+    googlePremiumImage: "Model รูปภาพระดับพรีเมียมจาก Google",
+    googleImage: "Model รูปภาพ Gemini จาก Google",
+    byteDanceImage: "Model สร้างรูปภาพจาก ByteDance",
+    fluxImage: "Model รูปภาพจาก Black Forest Labs",
+    recraftImage: "Model รูปภาพและ SVG จาก Recraft",
+    imageModel: "Model สร้างรูปภาพ",
+  },
+} as const;
+
+function panelCopy(language: "en" | "th") {
+  return PANEL_COPY[language];
+}
 
 interface CreateImagePanelReference {
   id: string;
@@ -217,6 +299,8 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   bottom: controlledBottom,
   onBottomChange,
 }) => {
+  const { language } = useLanguage();
+  const copy = panelCopy(language);
   const [bottomState, setBottomState] = useState<BottomTab>("image");
   const [modelOpen, setModelOpen] = useState(false);
   const [referenceOpen, setReferenceOpen] = useState(false);
@@ -304,7 +388,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
         <ModelsPopover
           open={modelOpen}
           onClose={() => setModelOpen(false)}
-          models={buildModels(modelOptions, modelLabel, selectedModelId)}
+          models={buildModels(modelOptions, modelLabel, selectedModelId, language)}
           selectedIds={[selectedModelId]}
           onToggle={(id) => {
             onModelChange?.(id);
@@ -480,10 +564,10 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
       {/* ===== BOTTOM NAV ===== */}
       <div className="hidden items-center justify-around border-t border-white/[0.04] px-[18px] py-[6px] md:flex">
         {[
-          { id: "video", icon: Video, label: "Video" },
-          { id: "image", icon: ImageIcon, label: "Image" },
+          { id: "video", icon: Video, label: copy.video },
+          { id: "image", icon: ImageIcon, label: copy.image },
           { id: "3d", icon: Box, label: "3D" },
-          { id: "audio", icon: Music, label: "Audio" },
+          { id: "audio", icon: Music, label: copy.audio },
         ].map(({ id, icon: Icon, label }) => {
           const active = bottom === id;
           return (
@@ -549,6 +633,8 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
   bottom: controlledBottom,
   onBottomChange,
 }) => {
+  const { language } = useLanguage();
+  const copy = panelCopy(language);
   const [modelOpen, setModelOpen] = useState(false);
   const [referenceOpen, setReferenceOpen] = useState(false);
   const [referenceSlotId, setReferenceSlotId] = useState<string | null>(null);
@@ -662,14 +748,14 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           <VideoModeCard
             active={activeMode === "frames"}
             mode="frames"
-            label="Start/End Frame"
+            label={copy.startEndFrame}
             disabled={!supportsFrameMode}
             onClick={() => updateMode("frames")}
           />
           <VideoModeCard
             active={activeMode === "reference"}
             mode="reference"
-            label="Text with Reference"
+            label={copy.textWithReference}
             disabled={!supportsReferenceMode}
             onClick={() => updateMode("reference")}
           />
@@ -693,7 +779,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
         <ModelsPopover
           open={modelOpen}
           onClose={() => setModelOpen(false)}
-          models={buildModels(modelOptions, modelLabel, selectedModelId)}
+          models={buildModels(modelOptions, modelLabel, selectedModelId, language)}
           selectedIds={[selectedModelId]}
           onToggle={(id) => {
             onModelChange?.(id);
@@ -713,7 +799,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
         <ReferencePicker
           open={!!activeReferenceSlot}
           onClose={() => setReferenceSlotId(null)}
-          title={activeReferenceSlot?.label ?? "Add visual reference"}
+          title={activeReferenceSlot?.label ?? copy.addVisualReference}
           references={activeReferenceSlot?.refItem ? [activeReferenceSlot.refItem] : []}
           assets={referenceAssets.filter((asset) =>
             activeReferenceSlot?.accept === "video"
@@ -729,7 +815,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
         <ReferencePicker
           open={!!historySlot}
           onClose={() => setHistorySlot(null)}
-          title="Image History"
+          title={copy.imageHistory}
           references={historySlot?.refItem ? [historySlot.refItem] : []}
           assets={referenceAssets.filter((asset) => !asset.mime?.startsWith("video/"))}
           accept="image/*"
@@ -742,7 +828,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
         {activeMode === "frames" && visibleFrameSlots.length > 0 && (
           <section className="shrink-0 rounded-[16px] border border-white/[0.035] bg-[#151719] p-[9px] shadow-[inset_0_1px_0_rgba(255,255,255,.035)]">
             <h2 className="mb-[8px] text-[13px] font-semibold leading-[18px] text-white">
-              {visibleFrameSlots.length > 1 ? "Set start & end frame" : "Set start frame"}
+              {visibleFrameSlots.length > 1 ? copy.setStartEndFrame : copy.setStartFrame}
             </h2>
             <div className={clsx("grid gap-[8px]", visibleFrameSlots.length > 1 ? "grid-cols-2" : "grid-cols-1")}>
               {visibleFrameSlots.map((slot) => (
@@ -927,10 +1013,10 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
 
       <div className="hidden items-center justify-around border-t border-white/[0.04] px-[18px] py-[6px] md:flex">
         {[
-          { id: "video", icon: Video, label: "Video" },
-          { id: "image", icon: ImageIcon, label: "Image" },
+          { id: "video", icon: Video, label: copy.video },
+          { id: "image", icon: ImageIcon, label: copy.image },
           { id: "3d", icon: Box, label: "3D" },
-          { id: "audio", icon: Music, label: "Audio" },
+          { id: "audio", icon: Music, label: copy.audio },
         ].map(({ id, icon: Icon, label }) => {
           const active = bottom === id;
           return (
@@ -1030,9 +1116,11 @@ function FrameReferenceSlot({
   slot: CreateVideoPanelFrameSlot;
   onHistory?: () => void;
 }) {
+  const { language } = useLanguage();
+  const copy = panelCopy(language);
   const refItem = slot.refItem;
   const isVideo = refItem?.mime?.startsWith("video/");
-  const frameLabel = slot.id === "start" ? "Start frame" : "End frame";
+  const frameLabel = slot.id === "start" ? copy.startFrame : copy.endFrame;
   const canUpload = Boolean(slot.onUpload);
   const addFrameFiles = (files: FileList | File[] | null | undefined) => {
     const list = Array.from(files ?? []);
@@ -1096,7 +1184,9 @@ function FrameReferenceSlot({
               <span className="block truncate text-[12px] font-semibold leading-[16px] text-white">
                 {refItem.name ?? slot.label}
               </span>
-              <span className="mt-[1px] block text-[10px] leading-[13px] text-neutral-500">Click to replace</span>
+              <span className="mt-[1px] block text-[10px] leading-[13px] text-neutral-500">
+                {language === "th" ? "คลิกเพื่อเปลี่ยน" : "Click to replace"}
+              </span>
             </span>
             {slot.onRemove && (
               <span
@@ -1657,6 +1747,8 @@ function ReferencePicker({
   onDeleteAsset?: (reference: CreateImagePanelReference) => void;
   closeOnSelect?: boolean;
 }) {
+  const { language } = useLanguage();
+  const copy = panelCopy(language);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const localUploadUrlsRef = useRef<string[]>([]);
@@ -1694,10 +1786,10 @@ function ReferencePicker({
   }, [acceptsImages, acceptsVideos, pickerAssets, tab]);
   const uploadLabel =
     acceptsVideos && !acceptsImages
-      ? "Upload Videos"
+      ? copy.uploadVideos
       : acceptsVideos && acceptsImages
-        ? "Upload Files"
-        : "Upload Images";
+        ? copy.uploadAssets
+        : copy.uploadImages;
 
   useEffect(() => {
     if (!open) return;
@@ -1804,7 +1896,7 @@ function ReferencePicker({
                 : "bg-white/[0.08] text-neutral-400 hover:text-white",
             )}
           >
-            {item === "creations" ? "Creations" : "Uploads"}
+            {item === "creations" ? copy.creations : copy.uploads}
           </button>
         ))}
       </div>
@@ -1822,7 +1914,7 @@ function ReferencePicker({
               </span>
               <span className="text-[13px] font-semibold">{uploadLabel}</span>
               <span className="px-3 text-center text-[11px] leading-[14px] text-neutral-500">
-                Drop files here or Ctrl+V
+                {copy.dropFiles}
               </span>
             </button>
           )}
@@ -1921,9 +2013,7 @@ function ReferencePicker({
 
         {visibleAssets.length === 0 && (
           <div className="mt-[14px] rounded-[12px] border border-dashed border-white/[0.08] px-[14px] py-[16px] text-[13px] text-neutral-400">
-            {tab === "creations"
-              ? "No compatible generated assets yet."
-              : "No uploaded assets yet. Upload, drag files here, or paste with Ctrl+V."}
+            {copy.noAssets}
           </div>
         )}
       </div>
@@ -1957,42 +2047,48 @@ const buildModels = (
   options: CreateImagePanelModel[],
   fallbackLabel: string,
   fallbackId: string,
+  language: "en" | "th",
 ): Model[] => {
   const source =
     options.length > 0 ? options : [{ id: fallbackId, label: fallbackLabel }];
+  const copy = panelCopy(language);
   return orderModelsByRecommendation(source).map((model) => ({
     id: model.id,
     name: cleanModelDisplayName(model.label),
-    description: modelDescriptionFor(model.id, model.label),
+    description: modelDescriptionFor(model.id, model.label, copy),
     badge: modelBadgeFor(model.id, model.label),
     settings: model.settings ?? [],
     recommended: recommendationRankForModel(model.id) !== null,
   }));
 };
 
-const modelDescriptionFor = (id: string, name: string) => {
+const modelDescriptionFor = (
+  id: string,
+  name: string,
+  copy: ReturnType<typeof panelCopy>,
+) => {
   const haystack = `${id} ${name}`.toLowerCase();
-  if (haystack.includes("auto")) return "Auto-select the best model based on the prompt";
-  if (haystack.includes("gpt")) return "OpenAI's next-gen image model";
-  if (haystack.includes("veo")) return "Google video generation model";
-  if (haystack.includes("seedance")) return "SeedDance video generation model";
-  if (haystack.includes("kling")) return "Kling AI video generation model";
+  if (haystack.includes("auto")) return copy.autoModel;
+  if (haystack.includes("gpt")) return copy.gptModel;
+  if (haystack.includes("veo")) return copy.googleVideoModel;
+  if (haystack.includes("seedance")) return copy.seedanceModel;
+  if (haystack.includes("kling")) return copy.klingModel;
   if (haystack.includes("tripo") || haystack.includes("hyper3d")) {
-    return "3D generation model";
+    return copy.threeDModel;
   }
   if (haystack.includes("tts") || haystack.includes("elevenlabs")) {
-    return "Voice generation model";
+    return copy.voiceModel;
   }
-  if (haystack.includes("google cloud")) return "Voice generation model";
+  if (haystack.includes("google cloud")) return copy.voiceModel;
   if (haystack.includes("nano") || haystack.includes("banana")) {
     return haystack.includes("pro")
-      ? "Google's premium image model"
-      : "Google's Gemini image model";
+      ? copy.googlePremiumImage
+      : copy.googleImage;
   }
-  if (haystack.includes("seedream")) return "ByteDance image generation model";
-  if (haystack.includes("flux")) return "Black Forest Labs image model";
-  if (haystack.includes("recraft")) return "Recraft image and SVG generation model";
-  return "Image generation model";
+  if (haystack.includes("seedream")) return copy.byteDanceImage;
+  if (haystack.includes("flux")) return copy.fluxImage;
+  if (haystack.includes("recraft")) return copy.recraftImage;
+  return copy.imageModel;
 };
 
 const modelBadgeFor = (id: string, name: string) => {
@@ -2010,6 +2106,8 @@ export const ModelsPopover: React.FC<ModelsPopoverProps> = ({
   selectedIds,
   onToggle,
 }) => {
+  const { language } = useLanguage();
+  const copy = panelCopy(language);
   const [filter, setFilter] = useState<Filter>("all-models");
   const recommendedModels = models.filter((model) => model.recommended);
   const recommended = recommendedModels.length > 0
@@ -2037,7 +2135,7 @@ export const ModelsPopover: React.FC<ModelsPopoverProps> = ({
       )}
     >
       <div className="flex h-[44px] shrink-0 items-center justify-between gap-[12px] px-[16px]">
-        <h3 className="text-[15px] font-semibold leading-5 text-white">Models</h3>
+        <h3 className="text-[15px] font-semibold leading-5 text-white">{copy.models}</h3>
         <button
           type="button"
           onClick={onClose}
@@ -2052,7 +2150,7 @@ export const ModelsPopover: React.FC<ModelsPopoverProps> = ({
         {recommended.length > 0 && (
           <div className="px-[16px]">
             <p className="mb-[6px] text-[11px] font-medium uppercase tracking-wide text-neutral-400">
-              Recommended
+              {copy.recommended}
             </p>
             <div className="ws-scroll-hide flex gap-[8px] overflow-x-auto pb-[4px]">
               {recommended.map((model, index) => (
@@ -2076,7 +2174,7 @@ export const ModelsPopover: React.FC<ModelsPopoverProps> = ({
             onClick={() => setFilter("all-models")}
             className="flex h-[30px] cursor-pointer items-center justify-center rounded-full px-[12px] text-[12px] transition-colors data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-[#111113] data-[state=inactive]:bg-transparent data-[state=inactive]:font-medium data-[state=inactive]:text-neutral-400 data-[state=inactive]:hover:opacity-80"
           >
-            All models
+            {copy.allModels}
           </button>
 
           <button
@@ -2085,7 +2183,7 @@ export const ModelsPopover: React.FC<ModelsPopoverProps> = ({
             onClick={() => setFilter("all")}
             className="flex h-[30px] items-center gap-[4px] rounded-full px-[12px] text-[12px] font-medium text-neutral-400 hover:opacity-80"
           >
-            All <ChevronDown className="h-3 w-3" />
+            {copy.all} <ChevronDown className="h-3 w-3" />
           </button>
         </div>
 
