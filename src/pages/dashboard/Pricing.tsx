@@ -474,8 +474,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
   return (
     <div
       className={cn(
-        "relative flex flex-col gap-[8px] overflow-hidden rounded-[20px] border bg-[#202020] px-[14px] pb-[14px] pt-[20px] transition-all",
-        (isPro || isTeam) && "pt-[40px]",
+        "relative flex flex-col gap-[6px] overflow-hidden rounded-[20px] border bg-[#202020] px-[14px] pb-[14px] pt-[40px] transition-all",
         borderClass
       )}
     >
@@ -491,17 +490,17 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
       ) : null}
 
       {/* Plan name */}
-      <h3 className="text-[23px] font-semibold leading-none tracking-[-0.01em] text-white">
+      <h3 className="text-[23px] font-semibold leading-[24px] tracking-[-0.01em] text-white">
         {plan.name}
       </h3>
 
       {/* Subtitle */}
-      <p className="mt-[-1px] min-h-[30px] text-[12px] font-medium leading-[14px] text-zinc-300/80">
+      <p className="h-[48px] overflow-hidden text-[12px] font-medium leading-[15px] text-zinc-300/80">
         {subtitle}
       </p>
 
       {/* Price block */}
-      <div className="mt-[3px] flex min-h-[48px] flex-col gap-0">
+      <div className="flex h-[64px] flex-col gap-0">
         {isTeam ? (
           <>
             {showAnnual ? (
@@ -526,7 +525,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
                 </span>
               </div>
             )}
-            <p className="text-[11px] font-medium leading-[14px] text-zinc-400">
+            <p className="mt-[7px] text-[11px] font-medium leading-[15px] text-zinc-400">
               {showAnnual
                 ? language === "th"
                   ? "ชำระรายปี เครดิตเติมเพิ่มตามการใช้งาน"
@@ -549,7 +548,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
                 /{language === "th" ? "เดือน" : "month"}
               </span>
             </div>
-            <p className="text-[11px] font-medium leading-[14px] text-zinc-400">
+            <p className="mt-[7px] text-[11px] font-medium leading-[15px] text-zinc-400">
               {language === "th" ? "ชำระรายปี" : "Billed annually"}
             </p>
           </>
@@ -563,7 +562,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
                 /{language === "th" ? "เดือน" : "month"}
               </span>
             </div>
-            <p className="text-[11px] font-medium leading-[14px] text-zinc-400">
+            <p className="mt-[7px] text-[11px] font-medium leading-[15px] text-zinc-400">
               {language === "th" ? "ชำระรายเดือน" : "Billed monthly"}
             </p>
           </>
@@ -575,7 +574,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
         onClick={onSubscribe}
         disabled={(!isTeam && isCurrent) || submitting}
         className={cn(
-          "mt-[7px] inline-flex h-[36px] w-full items-center justify-center gap-2 rounded-full text-[13px] font-semibold transition-colors",
+          "mt-[8px] inline-flex h-[36px] w-full items-center justify-center gap-2 rounded-full text-[13px] font-semibold transition-colors",
           ctaClass
         )}
       >
@@ -664,42 +663,52 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
 
       {/* Pro discount line / Team discount line */}
       {isPro && (
-        <div className="mt-0 grid grid-cols-[12px_minmax(0,1fr)] gap-[5px] text-[12px] font-medium leading-[12px] text-emerald-300">
-          <Check className="mt-[1px] h-[10px] w-[10px]" />
+        <div className="flex min-h-[16px] items-center gap-[6px] text-[12px] font-medium leading-[16px] text-emerald-300">
+          <span className="flex h-[16px] w-[13px] shrink-0 items-center justify-center">
+            <Check className="h-[11px] w-[11px]" />
+          </span>
           <span>{language === "th" ? "ลดค่าเครดิต 10%" : "10% discount on credit usage"}</span>
         </div>
       )}
       {isTeam && (
-        <div className="mt-0 grid grid-cols-[12px_minmax(0,1fr)] gap-[5px] text-[12px] font-medium leading-[12px] text-emerald-300">
-          <Check className="mt-[1px] h-[10px] w-[10px]" />
+        <div className="flex min-h-[16px] items-center gap-[6px] text-[12px] font-medium leading-[16px] text-emerald-300">
+          <span className="flex h-[16px] w-[13px] shrink-0 items-center justify-center">
+            <Check className="h-[11px] w-[11px]" />
+          </span>
           <span>{language === "th" ? "ค่าเครดิตถูกกว่า 20%" : "20% cheaper cost per credit"}</span>
         </div>
       )}
 
       {/* Generator quota line */}
       {plan.generator_quota_label && (
-        <div className="grid grid-cols-[12px_minmax(0,1fr)] gap-[5px] text-[12px] font-medium leading-[12px] text-zinc-300">
-          <Check className="mt-[1px] h-[10px] w-[10px] text-emerald-400" />
+        <div className="flex min-h-[16px] items-center gap-[6px] text-[12px] font-medium leading-[16px] text-zinc-300">
+          <span className="flex h-[16px] w-[13px] shrink-0 items-center justify-center">
+            <Check className="h-[11px] w-[11px] text-emerald-400" />
+          </span>
           <span>{plan.generator_quota_label}</span>
         </div>
       )}
 
       {/* Feature list */}
-      <ul className="mt-[1px] flex flex-col gap-0">
+      <ul className="mt-[1px] flex flex-col gap-[1px]">
         {FEATURE_ROWS.map((row) => {
           const has = row.plans[plan.name] ?? false;
           return (
             <li
               key={row.en}
               className={cn(
-                "grid-cols-[12px_minmax(0,1fr)] gap-[5px] py-[1px] text-[12px] font-medium leading-[12px]",
-                has ? "grid text-zinc-100" : "hidden text-zinc-600 sm:grid"
+                "min-h-[16px] items-center gap-[6px] py-0 text-[12px] font-medium leading-[16px]",
+                has ? "flex text-zinc-100" : "hidden text-zinc-600 sm:flex"
               )}
             >
               {has ? (
-                <Check className="mt-[1px] h-[10px] w-[10px] text-[#4f6cff]" />
+                <span className="flex h-[16px] w-[13px] shrink-0 items-center justify-center">
+                  <Check className="h-[11px] w-[11px] text-[#4f6cff]" />
+                </span>
               ) : (
-                <X className="mt-[1px] h-[10px] w-[10px] text-zinc-600" />
+                <span className="flex h-[16px] w-[13px] shrink-0 items-center justify-center">
+                  <X className="h-[11px] w-[11px] text-zinc-600" />
+                </span>
               )}
               <span>{language === "th" ? row.th : row.en}</span>
             </li>
@@ -713,8 +722,10 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
       {/* 250M+ Premium assets — only Creator/Pro/Team (Starter excluded) */}
       {plan.name !== "Starter" && (
         <div className="mt-auto pt-[4px]">
-          <div className="grid grid-cols-[12px_minmax(0,1fr)] gap-[5px] text-[12px] font-semibold leading-[12px] text-zinc-100">
-            <Check className="mt-[1px] h-[10px] w-[10px] text-[#4f6cff]" />
+          <div className="flex min-h-[16px] items-center gap-[6px] text-[12px] font-semibold leading-[16px] text-zinc-100">
+            <span className="flex h-[16px] w-[13px] shrink-0 items-center justify-center">
+              <Check className="h-[11px] w-[11px] text-[#4f6cff]" />
+            </span>
             <span>
               {language === "th" ? "สต็อก 250M+ ภาพและวิดีโอ" : "250M+ Premium assets"}
             </span>
@@ -734,11 +745,11 @@ const ModelAvailabilityRow = ({
   accent: "blue" | "purple" | "neutral";
   language: string;
 }) => (
-  <div className="flex items-center justify-between gap-2 text-[12px] font-semibold leading-none text-zinc-100">
+  <div className="flex min-h-[18px] items-center justify-between gap-2 text-[12px] font-semibold leading-[18px] text-zinc-100">
     <span className="inline-flex items-center gap-[6px]">
       <Sparkles
         className={cn(
-          "h-[12px] w-[12px]",
+          "h-[11px] w-[11px]",
           accent === "purple" ? "text-[#a855f7]" : "text-[#4f6cff]",
         )}
       />
@@ -746,8 +757,8 @@ const ModelAvailabilityRow = ({
     </span>
     <span
       className={cn(
-        "rounded-[4px] px-[6px] py-[3px] text-[9px] font-black uppercase leading-none text-white",
-        accent === "purple" ? "bg-[#6532c8]" : "bg-[#244dbd]",
+        "text-[9px] font-black uppercase leading-none",
+        accent === "purple" ? "text-[#a855f7]" : "text-[#4f6cff]",
       )}
     >
       {language === "th" ? "พร้อมใช้" : "NOW AVAILABLE"}

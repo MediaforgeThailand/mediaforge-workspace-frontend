@@ -201,31 +201,9 @@ const App = () => (
                     element={<Navigate to="/app/workspace" replace />}
                   />
 
-                  {/* Account pages — same workspace sidebar as the
-                   *  dashboard, but content area shows Settings /
-                   *  Usage tab content. Sidebar items navigate back
-                   *  to /app/workspace?section=…. */}
-                  <Route
-                    path="/app"
-                    element={
-                      <ProtectedRoute>
-                        <AccountShell />
-                      </ProtectedRoute>
-                    }
-                  >
-                    <Route path="settings" element={<Settings />} />
-                    <Route path="usage" element={<Transactions />} />
-                    {/* Unknown /app/<x> sub-route → bounce back to the
-                     *  dashboard. Without this AccountShell would
-                     *  render with an empty content area. */}
-                    <Route path="*" element={<Navigate to="/app/workspace" replace />} />
-                  </Route>
-
                   {/* Pricing page — workspace sidebar but no Account
-                   *  breadcrumb header / max-width wrapper. The page
-                   *  owns its full content area (hero + plan cards +
-                   *  comparison table) and reads better edge-to-edge
-                   *  on wide screens. */}
+                   *  breadcrumb header / max-width wrapper. Keep these
+                   *  explicit /app routes before the AccountShell catch-all. */}
                   <Route
                     path="/app/team-register"
                     element={
@@ -247,6 +225,26 @@ const App = () => (
                       </ProtectedRoute>
                     }
                   />
+
+                  {/* Account pages — same workspace sidebar as the
+                   *  dashboard, but content area shows Settings /
+                   *  Usage tab content. Sidebar items navigate back
+                   *  to /app/workspace?section=…. */}
+                  <Route
+                    path="/app"
+                    element={
+                      <ProtectedRoute>
+                        <AccountShell />
+                      </ProtectedRoute>
+                    }
+                  >
+                    <Route path="settings" element={<Settings />} />
+                    <Route path="usage" element={<Transactions />} />
+                    {/* Unknown /app/<x> sub-route → bounce back to the
+                     *  dashboard. Without this AccountShell would
+                     *  render with an empty content area. */}
+                    <Route path="*" element={<Navigate to="/app/workspace" replace />} />
+                  </Route>
 
                   {/* Canvas page — top-level so it gets the full
                    *  viewport without DashboardLayout chrome */}
