@@ -1071,7 +1071,7 @@ export default function AssetsView({
               type="button"
               disabled={deletingAsset}
               onClick={() => setDeleteTarget(null)}
-              className="h-9 rounded-[10px] border border-white/[0.08] px-4 text-[13px] font-semibold text-zinc-200 transition hover:bg-white/[0.06] disabled:opacity-60"
+              className="inline-flex h-8 items-center justify-center rounded-[9px] border border-white/[0.08] px-3 text-[12px] font-semibold text-zinc-200 transition hover:bg-white/[0.06] disabled:opacity-60"
             >
               Cancel
             </button>
@@ -1079,9 +1079,9 @@ export default function AssetsView({
               type="button"
               disabled={deletingAsset}
               onClick={() => void confirmDeleteAsset()}
-              className="inline-flex h-9 min-w-[96px] items-center justify-center gap-2 rounded-[10px] bg-gradient-to-r from-[#ff2f92] to-[#8b5cf6] px-4 text-[13px] font-bold text-white shadow-[0_12px_28px_rgba(236,72,153,.32)] transition hover:brightness-110 disabled:opacity-60"
+              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-[9px] bg-red-500 px-3 text-[12px] font-bold text-white shadow-[0_10px_22px_rgba(239,68,68,.28)] transition hover:bg-red-400 disabled:opacity-60"
             >
-              {deletingAsset ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              {deletingAsset ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
               Delete
             </button>
           </div>
