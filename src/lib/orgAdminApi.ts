@@ -245,7 +245,7 @@ export const consumerOrgAdminApi = {
 };
 
 // ─── Class enrolment (student-facing QR scan) ───────────────────────────
-export async function enrollInClass(code: string, studentCode?: string): Promise<{
+export async function enrollInClass(code: string, studentCode: string): Promise<{
   ok: boolean;
   error?: string;
   class_id?: string;

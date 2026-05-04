@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, Check, X, Loader2, Sparkles, ExternalLink } from "lucide-react";
+import { ArrowLeft, Check, X, Loader2, Sparkles, Minus, Plus, Users } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCredits } from "@/hooks/useCredits";
@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
+import { UserMenu } from "@/components/workspace/UserMenu";
 // TopupSection import removed — workspace doesn't sell standalone
 // credit top-ups (the consumer product does, this surface doesn't).
 
@@ -154,14 +155,19 @@ const FEATURE_ROWS: { en: string; th: string; plans: Record<string, boolean> }[]
 
 // Annual = 20% off.
 const ANNUAL_DISCOUNT = 0.2;
-const TEAM_SEAT_PRICE_USD = 10;
-const TEAM_SEAT_PRICE_THB = 290;
+const TEAM_SEAT_PRICE_THB = 1600;
+const TEAM_SEAT_PLATFORM_FEE_THB = 300;
+const TEAM_BASE_CREDITS_PER_SEAT_MONTH = (TEAM_SEAT_PRICE_THB - TEAM_SEAT_PLATFORM_FEE_THB) * 50;
+const TEAM_PROMO_CREDITS_PER_SEAT_MONTH = 25_000;
+const TEAM_CREDITS_PER_SEAT_MONTH = TEAM_BASE_CREDITS_PER_SEAT_MONTH + TEAM_PROMO_CREDITS_PER_SEAT_MONTH;
+const TEAM_MIN_SEATS = 2;
+const TEAM_MAX_SEATS = 500;
 
 const Pricing = () => {
   useDocumentTitle("Pricing — MediaForge");
   const navigate = useNavigate();
   const { language, t } = useLanguage();
-  const { credits, refetch } = useCredits();
+  const { refetch } = useCredits();
   const { profile, refreshProfile } = useAuth();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
@@ -171,8 +177,10 @@ const Pricing = () => {
   const [loading, setLoading] = useState(true);
   const [cycle, setCycle] = useState<CycleTab>("monthly");
   const [submittingPlanId, setSubmittingPlanId] = useState<string | null>(null);
-  const [openingPortal, setOpeningPortal] = useState(false);
+  const [, setOpeningPortal] = useState(false);
   const [checkoutPlan, setCheckoutPlan] = useState<SubscriptionPlan | null>(null);
+  const [teamSeats, setTeamSeats] = useState(TEAM_MIN_SEATS);
+  const [teamCheckoutOpen, setTeamCheckoutOpen] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -210,9 +218,9 @@ const Pricing = () => {
   );
 
   const handleSubscribe = (plan: SubscriptionPlan) => {
-    // Team is contact-sales / metered.
     if (plan.target === "team") {
-      window.location.href = "mailto:sales@mediaforge.co?subject=Team plan inquiry";
+      setSubmittingPlanId(plan.id);
+      setTeamCheckoutOpen(true);
       return;
     }
 
@@ -263,7 +271,7 @@ const Pricing = () => {
   // Decide CTA copy based on the user's current plan vs the card.
   const ctaLabelFor = (plan: SubscriptionPlan): string => {
     if (plan.target === "team") {
-      return language === "th" ? "ติดต่อฝ่ายขาย" : "Contact sales";
+      return language === "th" ? "เริ่มทีม" : "Start team";
     }
     if (currentPlan && currentPlan.id === plan.id) {
       return language === "th" ? "แพ็กเกจปัจจุบัน" : "Your current plan";
@@ -274,138 +282,101 @@ const Pricing = () => {
       if (currentPlan.sort_order > plan.sort_order)
         return language === "th" ? "ดาวน์เกรด" : "Downgrade";
     }
-    return language === "th" ? "สมัครสมาชิก" : "Subscribe";
+    return language === "th" ? "อัปเกรด" : "Upgrade";
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
+    <div className="relative min-h-screen overflow-x-hidden bg-[#151515] text-white">
+      <div className="fixed right-[18px] top-[18px] z-30">
+        <UserMenu compact />
+      </div>
+
       {/* Hero */}
-      <section className="relative w-full px-4 pb-4 pt-16 text-center sm:pb-6 md:pt-16">
+      <section className="relative w-full px-4 pb-[76px] pt-[86px] text-center">
         <button
           onClick={() => navigate("/app/workspace")}
-          className="absolute left-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/5 transition-colors hover:bg-white/10 md:left-8"
+          className="absolute left-5 top-5 flex h-[44px] w-[44px] items-center justify-center rounded-full bg-white/[0.055] text-zinc-300 transition-colors hover:bg-white/[0.09] hover:text-white md:left-8"
           aria-label="Back to workspace"
         >
           <ArrowLeft className="h-5 w-5 text-neutral-300" />
         </button>
 
-        <h1 className="mx-auto max-w-[22rem] text-2xl font-black uppercase leading-tight tracking-tight text-white sm:max-w-2xl sm:text-3xl md:text-5xl">
-          {language === "th" ? "ปลดล็อกพลังของ MEDIAFORGE" : "Unlock the power of MediaForge"}
+        <h1 className="mx-auto max-w-[860px] text-[38px] font-black leading-[0.96] tracking-[-0.02em] text-white sm:text-[50px] md:text-[58px]">
+          Let's become professionals together
         </h1>
-        <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-neutral-400 sm:max-w-2xl md:mt-4 md:text-lg">
-          {language === "th"
-            ? "เลือกแพ็กเกจที่เหมาะกับคุณ คิดราคาตามจำนวนเครดิตที่ใช้จริง"
-            : "Pick the plan that matches your output. Pricing is strictly credit-based."}
-        </p>
-
-        {/* Credit balance widget */}
-        {credits && (
-          <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-white/[0.06] px-4 py-2 text-xs text-neutral-300 md:mt-6">
-            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-            <span>
-              {credits.balance.toLocaleString()}{" "}
-              {language === "th" ? "เครดิตคงเหลือ" : "credits remaining"}
-            </span>
-          </div>
-        )}
-
-        {/* Manage subscription button when user has a plan */}
-        {currentPlan && currentPlan.target === "user" && (
-          <div className="mt-4">
-            <button
-              onClick={handleManageSubscription}
-              disabled={openingPortal}
-              className="inline-flex items-center gap-2 text-sm text-neutral-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.10] rounded-full px-4 py-1.5 transition-colors disabled:opacity-60"
-            >
-              {openingPortal ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <ExternalLink className="w-3.5 h-3.5" />
-              )}
-              {language === "th" ? "จัดการการสมัครสมาชิก" : "Manage subscription"}
-            </button>
-          </div>
-        )}
-
-        {/* Monthly / Annual toggle */}
-        <div className="mt-6 flex justify-center md:mt-8">
-          <div className="inline-flex w-full max-w-sm rounded-full bg-white/10 p-1">
-            <button
-              onClick={() => setCycle("monthly")}
-              className={cn(
-                "flex-1 rounded-full px-4 py-2.5 text-sm font-medium transition-all",
-                cycle === "monthly"
-                  ? "bg-white/15 text-white"
-                  : "text-neutral-400 hover:text-neutral-200"
-              )}
-            >
-              {language === "th" ? "รายเดือน" : "Monthly"}
-            </button>
-            <button
-              onClick={() => setCycle("annual")}
-              className={cn(
-                "inline-flex flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-medium transition-all sm:gap-2",
-                cycle === "annual"
-                  ? "bg-white/15 text-white"
-                  : "text-neutral-400 hover:text-neutral-200"
-              )}
-            >
-              {language === "th" ? "รายปี" : "Annual"}
-              <span className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300 sm:px-2 sm:text-[10px]">
-                −20%
-              </span>
-            </button>
-          </div>
-        </div>
-
-        {/* One-time-purchase disclosure — keeps the user honest about
-         *  how the plan works on Thai PromptPay. The audit found that
-         *  Stripe Checkout creates `mode: "payment"` (one-off) rather
-         *  than `mode: "subscription"`, so plans DON'T auto-renew.
-         *  Without this banner, users assume "Pro Monthly" auto-charges
-         *  next month and feel cheated when nothing happens.  */}
-        <div className="mx-auto mt-4 flex max-w-2xl items-start justify-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/[0.07] px-4 py-3 text-center text-xs text-amber-200 md:mt-5 md:text-sm">
-          <span className="text-base leading-none">ⓘ</span>
-          <span>
-            {language === "th"
-              ? "แพ็กเครดิตจ่ายครั้งเดียว — ไม่หักบัตรอัตโนมัติ ครบกำหนดต้องเติมใหม่เอง รองรับ PromptPay QR (แนะนำ) และบัตรเครดิต"
-              : "One-time credit pack — no auto-renew. Top up manually each cycle. Pay with PromptPay QR (recommended) or credit card."}
-          </span>
-        </div>
       </section>
 
-      {/* Cards */}
-      <div className="mx-auto max-w-[1400px] px-4 pb-14 pt-3 sm:px-5 sm:pt-6 md:pb-16">
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+      {/* Pricing board */}
+      <section className="rounded-t-[28px] bg-[#1b1b1b] px-4 pb-[48px] pt-[22px] shadow-[0_-18px_50px_rgba(0,0,0,0.18)] sm:px-6 md:rounded-t-[34px]">
+        <div className="mx-auto max-w-[1360px]">
+          <div className="flex justify-center">
+            <div className="inline-flex h-[42px] rounded-full border border-white/10 bg-[#252525] p-[4px] shadow-[0_8px_20px_rgba(0,0,0,0.18)]">
+              <button
+                type="button"
+                onClick={() => setCycle("monthly")}
+                className={cn(
+                  "h-[34px] min-w-[128px] rounded-full px-[18px] text-[12.5px] font-semibold transition-colors",
+                  cycle === "monthly"
+                    ? "bg-white text-zinc-950"
+                    : "text-zinc-300 hover:bg-white/[0.06] hover:text-white",
+                )}
+              >
+                {language === "th" ? "รายเดือน" : "Monthly"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCycle("annual")}
+                className={cn(
+                  "flex h-[34px] min-w-[128px] items-center justify-center gap-[7px] rounded-full px-[18px] text-[12.5px] font-semibold transition-colors",
+                  cycle === "annual"
+                    ? "bg-white text-zinc-950"
+                    : "text-zinc-300 hover:bg-white/[0.06] hover:text-white",
+                )}
+              >
+                {language === "th" ? "รายปี" : "Annual"}
+                <span className={cn(
+                  "rounded-full px-[7px] py-[2px] text-[10px] font-black",
+                  cycle === "annual" ? "bg-emerald-500/15 text-emerald-700" : "bg-emerald-500/15 text-emerald-300",
+                )}>
+                  -20%
+                </span>
+              </button>
+            </div>
           </div>
-        ) : orderedPlans.length === 0 ? (
-          <p className="text-center text-neutral-500 py-12">
-            {language === "th" ? "ไม่มีแพ็กเกจ" : "No plans available"}
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 pt-4 sm:grid-cols-2 sm:gap-5 sm:pt-6 lg:grid-cols-4">
-            {orderedPlans.map((plan) => (
-              <PlanCard
-                key={plan.id}
-                plan={plan}
-                cycle={cycle}
-                language={language}
-                ctaLabel={ctaLabelFor(plan)}
-                isCurrent={currentPlan?.id === plan.id}
-                submitting={submittingPlanId === plan.id}
-                onSubscribe={() => handleSubscribe(plan)}
-              />
-            ))}
-          </div>
-        )}
 
-        {/* Top-up section removed — workspace pricing doesn't sell
-            standalone credit top-ups. The package list / handler
-            stay populated upstream so other surfaces (admin, etc.)
-            can still read them, they just don't render here. */}
-      </div>
+          {loading ? (
+            <div className="flex justify-center py-24">
+              <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
+            </div>
+          ) : orderedPlans.length === 0 ? (
+            <p className="py-16 text-center text-neutral-500">
+              {language === "th" ? "ไม่มีแพ็กเกจ" : "No plans available"}
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 items-start gap-[14px] pt-[26px] sm:grid-cols-2 lg:grid-cols-4">
+              {orderedPlans.map((plan) => (
+                <PlanCard
+                  key={plan.id}
+                  plan={plan}
+                  cycle={cycle}
+                  language={language}
+                  ctaLabel={plan.target === "team" ? (language === "th" ? "เริ่มทีม" : "Start team") : ctaLabelFor(plan)}
+                  isCurrent={currentPlan?.id === plan.id}
+                  submitting={submittingPlanId === plan.id}
+                  onSubscribe={() => handleSubscribe(plan)}
+                  teamSeats={teamSeats}
+                  onTeamSeatsChange={setTeamSeats}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Top-up section removed — workspace pricing doesn't sell
+              standalone credit top-ups. The package list / handler
+              stay populated upstream so other surfaces (admin, etc.)
+              can still read them, they just don't render here. */}
+        </div>
+      </section>
       <EmbeddedCheckoutModal
         open={!!checkoutPlan}
         onOpenChange={(open) => {
@@ -417,6 +388,21 @@ const Pricing = () => {
         mode="subscription"
         packageId={checkoutPlan?.id ?? ""}
         billingInterval={cycle}
+        onSuccess={() => {
+          void refetch();
+          void refreshProfile();
+          setSubmittingPlanId(null);
+        }}
+      />
+      <EmbeddedCheckoutModal
+        open={teamCheckoutOpen}
+        onOpenChange={(open) => {
+          setTeamCheckoutOpen(open);
+          if (!open) setSubmittingPlanId(null);
+        }}
+        mode="team_seats"
+        billingInterval={cycle}
+        teamSeats={teamSeats}
         onSuccess={() => {
           void refetch();
           void refreshProfile();
@@ -436,9 +422,11 @@ interface PlanCardProps {
   isCurrent: boolean;
   submitting: boolean;
   onSubscribe: () => void;
+  teamSeats: number;
+  onTeamSeatsChange: (seats: number) => void;
 }
 
-const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSubscribe }: PlanCardProps) => {
+const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSubscribe, teamSeats, onTeamSeatsChange }: PlanCardProps) => {
   const isTeam = plan.target === "team";
   const isPro = plan.is_featured === true; // Phase 1 seeded Pro as is_featured.
   const subtitle =
@@ -452,99 +440,130 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
     plan.annual_price_thb != null
       ? Math.round(plan.annual_price_thb / 12)
       : Math.round(monthlyPrice * (1 - ANNUAL_DISCOUNT));
-  const showAnnual = cycle === "annual" && !isTeam;
-  const teamSeatPrice = language === "th" ? `฿${TEAM_SEAT_PRICE_THB}` : `$${TEAM_SEAT_PRICE_USD}`;
+  const showAnnual = cycle === "annual";
+  const teamSeatPrice = `฿${TEAM_SEAT_PRICE_THB.toLocaleString()}`;
+  const teamAnnualSeatPrice = `฿${Math.round(TEAM_SEAT_PRICE_THB * (1 - ANNUAL_DISCOUNT)).toLocaleString()}`;
+  const teamCycleMonths = cycle === "annual" ? 12 : 1;
+  const teamCreditsForSelectedSeats = teamSeats * TEAM_CREDITS_PER_SEAT_MONTH * teamCycleMonths;
+  const incrementSeats = () => onTeamSeatsChange(Math.min(TEAM_MAX_SEATS, teamSeats + 1));
+  const decrementSeats = () => onTeamSeatsChange(Math.max(TEAM_MIN_SEATS, teamSeats - 1));
 
   const credits =
     cycle === "annual" && plan.annual_credits
       ? plan.annual_credits
       : plan.upfront_credits;
 
-  // Border + ribbon styling per tier
+  const accent = isTeam ? "purple" : isPro ? "blue" : "neutral";
   const borderClass = isPro
-    ? "ring-2 ring-blue-400 shadow-[0_0_24px_rgba(59,130,246,0.35)]"
+    ? "border-blue-400/85 shadow-[0_0_22px_rgba(59,130,246,0.22)]"
     : isTeam
-      ? "ring-2 ring-purple-400 shadow-[0_0_24px_rgba(168,85,247,0.3)]"
+      ? "border-purple-400/85 shadow-[0_0_22px_rgba(168,85,247,0.22)]"
       : isCurrent
-        ? "ring-2 ring-white/30"
-        : "ring-1 ring-white/10";
+        ? "border-white/18"
+        : "border-white/[0.055]";
 
   // CTA visual style
-  const ctaClass = isCurrent
-    ? "bg-neutral-700 cursor-default opacity-70"
+  const ctaClass = isCurrent && !isTeam
+    ? "bg-white text-zinc-950 cursor-default opacity-80"
     : isPro
-      ? "bg-blue-600 hover:bg-blue-500"
+      ? "bg-[#4f6cff] text-white hover:bg-[#6680ff]"
       : isTeam
-        ? "bg-purple-600 hover:bg-purple-500"
-        : "bg-neutral-800 hover:bg-neutral-700";
+        ? "bg-[#7b49d8] text-white hover:bg-[#8f5def]"
+        : "bg-white text-zinc-950 hover:bg-zinc-200";
 
   return (
     <div
       className={cn(
-        "relative flex flex-col gap-3 rounded-2xl bg-[#171717] px-4 pb-4 pt-6 transition-all sm:gap-4 sm:rounded-3xl sm:px-5 sm:pb-5 sm:pt-7",
+        "relative flex flex-col gap-[8px] overflow-hidden rounded-[20px] border bg-[#202020] px-[14px] pb-[14px] pt-[20px] transition-all",
+        (isPro || isTeam) && "pt-[40px]",
         borderClass
       )}
     >
       {/* Ribbon */}
       {isPro ? (
-        <div className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-blue-500 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white">
+        <div className="absolute left-0 right-0 top-0 flex h-[24px] items-center justify-center bg-[#4f6cff] text-[10px] font-black uppercase tracking-[0.02em] text-white">
           {language === "th" ? "คุ้มที่สุด" : "BEST VALUE"}
         </div>
       ) : isTeam ? (
-        <div className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-purple-500 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white">
+        <div className="absolute left-0 right-0 top-0 flex h-[24px] items-center justify-center bg-[#7b49d8] text-[10px] font-black uppercase tracking-[0.02em] text-white">
           {language === "th" ? "ตัวเลือกผู้เชี่ยวชาญ" : "EXPERT CHOICE"}
         </div>
       ) : null}
 
       {/* Plan name */}
-      <h3 className="text-2xl font-black text-white sm:text-3xl">{plan.name}</h3>
+      <h3 className="text-[23px] font-semibold leading-none tracking-[-0.01em] text-white">
+        {plan.name}
+      </h3>
 
       {/* Subtitle */}
-      <p className="min-h-0 text-sm leading-6 text-neutral-400 sm:min-h-[44px] sm:leading-snug">
+      <p className="mt-[-1px] min-h-[30px] text-[12px] font-medium leading-[14px] text-zinc-300/80">
         {subtitle}
       </p>
 
       {/* Price block */}
-      <div className="flex flex-col gap-0.5">
+      <div className="mt-[3px] flex min-h-[48px] flex-col gap-0">
         {isTeam ? (
           <>
-            <span className="text-2xl font-semibold text-white sm:text-3xl">
-              {teamSeatPrice}
-            </span>
-            <p className="text-neutral-500 text-xs">
-              {language === "th"
-                ? "ต่อ seat / เดือน เครดิตเติมเพิ่มตามการใช้งาน"
-                : "per seat / month. Credits are topped up by usage."}
+            {showAnnual ? (
+              <div className="flex flex-wrap items-baseline gap-x-[6px] gap-y-1">
+                <span className="text-[22px] font-medium text-zinc-500 line-through">
+                  {teamSeatPrice}
+                </span>
+                <span className="text-[27px] font-semibold leading-none text-white">
+                  {teamAnnualSeatPrice}
+                </span>
+                <span className="text-[12px] font-medium text-zinc-300">
+                  / seat / {language === "th" ? "เดือน" : "month"}
+                </span>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-baseline gap-x-[6px] gap-y-1">
+                <span className="text-[31px] font-semibold leading-none text-white">
+                  {teamSeatPrice}
+                </span>
+                <span className="text-[12px] font-medium text-zinc-300">
+                  / seat / {language === "th" ? "เดือน" : "month"}
+                </span>
+              </div>
+            )}
+            <p className="text-[11px] font-medium leading-[14px] text-zinc-400">
+              {showAnnual
+                ? language === "th"
+                  ? "ชำระรายปี เครดิตเติมเพิ่มตามการใช้งาน"
+                  : "Billed annually. Credits are topped up by usage."
+                : language === "th"
+                  ? "เครดิตเติมเพิ่มตามการใช้งาน"
+                  : "Credits are topped up by usage."}
             </p>
           </>
         ) : showAnnual ? (
           <>
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-              <span className="text-neutral-500 text-base line-through">
+            <div className="flex flex-wrap items-baseline gap-x-[6px] gap-y-1">
+              <span className="text-[22px] font-medium text-zinc-500 line-through">
                 ฿{monthlyPrice.toLocaleString()}
               </span>
-              <span className="text-3xl font-bold text-white sm:text-4xl">
+              <span className="text-[27px] font-semibold leading-none text-white">
                 ฿{annualPerMonth.toLocaleString()}
               </span>
-              <span className="text-neutral-400 text-sm">
+              <span className="text-[13px] font-medium text-zinc-300">
                 /{language === "th" ? "เดือน" : "month"}
               </span>
             </div>
-            <p className="text-neutral-500 text-xs">
+            <p className="text-[11px] font-medium leading-[14px] text-zinc-400">
               {language === "th" ? "ชำระรายปี" : "Billed annually"}
             </p>
           </>
         ) : (
           <>
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-              <span className="text-3xl font-bold text-white sm:text-4xl">
+            <div className="flex flex-wrap items-baseline gap-x-[6px] gap-y-1">
+              <span className="text-[31px] font-semibold leading-none text-white">
                 ฿{monthlyPrice.toLocaleString()}
               </span>
-              <span className="text-neutral-400 text-sm">
+              <span className="text-[13px] font-medium text-zinc-300">
                 /{language === "th" ? "เดือน" : "month"}
               </span>
             </div>
-            <p className="text-neutral-500 text-xs">
+            <p className="text-[11px] font-medium leading-[14px] text-zinc-400">
               {language === "th" ? "ชำระรายเดือน" : "Billed monthly"}
             </p>
           </>
@@ -554,9 +573,9 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
       {/* CTA */}
       <button
         onClick={onSubscribe}
-        disabled={isCurrent || submitting}
+        disabled={(!isTeam && isCurrent) || submitting}
         className={cn(
-          "inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl py-3 font-semibold text-white transition-colors",
+          "mt-[7px] inline-flex h-[36px] w-full items-center justify-center gap-2 rounded-full text-[13px] font-semibold transition-colors",
           ctaClass
         )}
       >
@@ -572,10 +591,15 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
 
       {/* Credits pill */}
       {!isTeam && (
-        <div className="rounded-xl bg-neutral-800/80 px-3 py-3 text-center">
-          <span className="text-sm font-semibold text-white sm:text-base">
+        <div className="mt-[3px] px-[2px] text-[12.5px] font-semibold leading-[13px]">
+          <span
+            className={cn(
+              "font-semibold",
+              accent === "blue" ? "text-[#4f6cff]" : accent === "purple" ? "text-[#a855f7]" : "text-white"
+            )}
+          >
             {credits.toLocaleString()}{" "}
-            <span className="text-neutral-400 font-normal">
+            <span className="font-medium text-zinc-300">
               {cycle === "annual"
                 ? language === "th"
                   ? "เครดิต/ปี"
@@ -588,52 +612,94 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
         </div>
       )}
 
-      {/* NEW AVAILABLE highlight */}
-      <div className="flex items-center justify-between gap-2 rounded-lg border border-blue-400/30 bg-blue-500/10 px-3 py-2">
-        <span className="text-blue-200 text-xs font-medium">Seedance 2.0</span>
-        <span className="rounded bg-blue-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-300">
-          {language === "th" ? "พร้อมใช้แล้ว" : "NOW AVAILABLE"}
-        </span>
+      {isTeam && (
+        <div className="mt-[3px] grid gap-[5px] px-[2px]">
+          <div className="flex items-center justify-between gap-[10px]">
+            <div className="flex items-center gap-[6px] text-[12px] font-semibold leading-[13px] text-zinc-100">
+              <Users className="h-[13px] w-[13px] text-purple-300" />
+              Seats
+            </div>
+            <div className="flex h-[28px] items-center overflow-hidden rounded-full bg-white/[0.07]">
+              <button
+                type="button"
+                onClick={decrementSeats}
+                disabled={teamSeats <= TEAM_MIN_SEATS}
+                className="grid h-[28px] w-[28px] place-items-center text-zinc-300 transition-colors hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-35"
+                aria-label="Decrease seats"
+              >
+                <Minus className="h-[12px] w-[12px]" />
+              </button>
+              <span className="min-w-[32px] text-center text-[12.5px] font-semibold text-white">{teamSeats}</span>
+              <button
+                type="button"
+                onClick={incrementSeats}
+                className="grid h-[28px] w-[28px] place-items-center text-zinc-300 transition-colors hover:bg-white/[0.08]"
+                aria-label="Increase seats"
+              >
+                <Plus className="h-[12px] w-[12px]" />
+              </button>
+            </div>
+          </div>
+          <div className="grid gap-[2px] text-[11.5px] font-medium leading-[13px] text-zinc-400">
+            <div className="flex justify-between gap-2">
+              <span>Base credits</span>
+              <span>{TEAM_BASE_CREDITS_PER_SEAT_MONTH.toLocaleString()} / seat</span>
+            </div>
+            <div className="flex justify-between gap-2 text-emerald-300">
+              <span>Promotion</span>
+              <span>+{TEAM_PROMO_CREDITS_PER_SEAT_MONTH.toLocaleString()} / seat</span>
+            </div>
+            <div className="flex justify-between gap-2 pt-[1px] text-[12px] font-semibold leading-[13px] text-white">
+              <span>{teamSeats} seats total</span>
+              <span>{teamCreditsForSelectedSeats.toLocaleString()} credits</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-[2px] flex flex-col gap-[2px]">
+        <ModelAvailabilityRow label="Seedance 2.0" accent={accent} language={language} />
+        <ModelAvailabilityRow label="GPT Image 2" accent={accent} language={language} />
       </div>
 
       {/* Pro discount line / Team discount line */}
       {isPro && (
-        <div className="flex items-center gap-2 text-emerald-300 text-xs">
-          <Check className="w-3.5 h-3.5" />
+        <div className="mt-0 grid grid-cols-[12px_minmax(0,1fr)] gap-[5px] text-[12px] font-medium leading-[12px] text-emerald-300">
+          <Check className="mt-[1px] h-[10px] w-[10px]" />
           <span>{language === "th" ? "ลดค่าเครดิต 10%" : "10% discount on credit usage"}</span>
         </div>
       )}
       {isTeam && (
-        <div className="flex items-center gap-2 text-emerald-300 text-xs">
-          <Check className="w-3.5 h-3.5" />
+        <div className="mt-0 grid grid-cols-[12px_minmax(0,1fr)] gap-[5px] text-[12px] font-medium leading-[12px] text-emerald-300">
+          <Check className="mt-[1px] h-[10px] w-[10px]" />
           <span>{language === "th" ? "ค่าเครดิตถูกกว่า 20%" : "20% cheaper cost per credit"}</span>
         </div>
       )}
 
       {/* Generator quota line */}
       {plan.generator_quota_label && (
-        <div className="flex items-center gap-2 text-neutral-300 text-xs">
-          <Check className="w-3.5 h-3.5 text-emerald-400" />
+        <div className="grid grid-cols-[12px_minmax(0,1fr)] gap-[5px] text-[12px] font-medium leading-[12px] text-zinc-300">
+          <Check className="mt-[1px] h-[10px] w-[10px] text-emerald-400" />
           <span>{plan.generator_quota_label}</span>
         </div>
       )}
 
       {/* Feature list */}
-      <ul className="mt-1 flex flex-col gap-2">
+      <ul className="mt-[1px] flex flex-col gap-0">
         {FEATURE_ROWS.map((row) => {
           const has = row.plans[plan.name] ?? false;
           return (
             <li
               key={row.en}
               className={cn(
-                "items-start gap-2 text-xs leading-5",
-                has ? "flex text-neutral-200" : "hidden text-neutral-600 sm:flex"
+                "grid-cols-[12px_minmax(0,1fr)] gap-[5px] py-[1px] text-[12px] font-medium leading-[12px]",
+                has ? "grid text-zinc-100" : "hidden text-zinc-600 sm:grid"
               )}
             >
               {has ? (
-                <Check className="w-3.5 h-3.5 mt-0.5 text-emerald-400 flex-shrink-0" />
+                <Check className="mt-[1px] h-[10px] w-[10px] text-[#4f6cff]" />
               ) : (
-                <X className="w-3.5 h-3.5 mt-0.5 text-neutral-700 flex-shrink-0" />
+                <X className="mt-[1px] h-[10px] w-[10px] text-zinc-600" />
               )}
               <span>{language === "th" ? row.th : row.en}</span>
             </li>
@@ -646,10 +712,10 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
 
       {/* 250M+ Premium assets — only Creator/Pro/Team (Starter excluded) */}
       {plan.name !== "Starter" && (
-        <div className="mt-2 pt-3">
-          <div className="flex items-center gap-2 text-neutral-200 text-xs">
-            <Check className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-            <span className="font-medium">
+        <div className="mt-auto pt-[4px]">
+          <div className="grid grid-cols-[12px_minmax(0,1fr)] gap-[5px] text-[12px] font-semibold leading-[12px] text-zinc-100">
+            <Check className="mt-[1px] h-[10px] w-[10px] text-[#4f6cff]" />
+            <span>
               {language === "th" ? "สต็อก 250M+ ภาพและวิดีโอ" : "250M+ Premium assets"}
             </span>
           </div>
@@ -658,5 +724,35 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
     </div>
   );
 };
+
+const ModelAvailabilityRow = ({
+  label,
+  accent,
+  language,
+}: {
+  label: string;
+  accent: "blue" | "purple" | "neutral";
+  language: string;
+}) => (
+  <div className="flex items-center justify-between gap-2 text-[12px] font-semibold leading-none text-zinc-100">
+    <span className="inline-flex items-center gap-[6px]">
+      <Sparkles
+        className={cn(
+          "h-[12px] w-[12px]",
+          accent === "purple" ? "text-[#a855f7]" : "text-[#4f6cff]",
+        )}
+      />
+      {label}
+    </span>
+    <span
+      className={cn(
+        "rounded-[4px] px-[6px] py-[3px] text-[9px] font-black uppercase leading-none text-white",
+        accent === "purple" ? "bg-[#6532c8]" : "bg-[#244dbd]",
+      )}
+    >
+      {language === "th" ? "พร้อมใช้" : "NOW AVAILABLE"}
+    </span>
+  </div>
+);
 
 export default Pricing;

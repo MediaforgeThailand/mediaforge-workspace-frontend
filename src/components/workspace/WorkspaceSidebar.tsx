@@ -5,11 +5,9 @@
  *
  * Layout:
  *   1. Brand row — workspace mascot + wordmark
- *   2. "Create" button (primary action, pink/magenta solid pill)
- *   3. Top nav group — Home
- *   4. Section divider with "ALL TOOLS" label
- *   5. Tools nav group — Spaces, Image / Video / Voice / 3D gen
- *   6. Bottom utility cluster — Settings
+ *   2. Top nav group — Home
+ *   3. Section groups — Create, Assets, Inspire
+ *   4. Bottom utility cluster — Settings
  *
  * Behaviour notes:
  *   • If `onNavigate` is provided, clicks drive parent state without
@@ -25,18 +23,17 @@
  *   • Active pill       white/[0.07] + ring  — soft white on hover
  *   • Hover pill        white/[0.04]
  *   • Section header    zinc-500, 11px, uppercase, 4px letter-spacing
- *   • Create button     #FF3D8E → #FF4DA0 gradient (workspace pink)
  */
 import {
+  BookOpen,
   Home as HomeIcon,
   History as HistoryIcon,
-  FolderKanban,
   Workflow,
   Image as ImageIcon,
   Images,
   Video,
   Mic2,
-  Plus,
+  PanelLeftClose,
   Settings as SettingsIcon,
   Languages,
   Palette,
@@ -93,25 +90,51 @@ type NavItem = {
     | "workspace.sidebar.voice_gen"
     | "workspace.sidebar.threed_gen";
   icon: LucideIcon;
+  width?: "full" | "half";
+};
+
+type SidebarSection = {
+  labelKey:
+    | "workspace.sidebar.create"
+    | "workspace.sidebar.assets"
+    | "workspace.sidebar.inspire";
+  variant: "tool" | "list";
+  rows: NavItem[][];
 };
 
 const NAV_TOP: NavItem[] = [
   { id: "home",   labelKey: "workspace.sidebar.home",       icon: HomeIcon },
-  { id: "projects", labelKey: "workspace.sidebar.projects", icon: FolderKanban },
-  // Sidebar entry points to AssetsView (the Magnific-style asset
-  // library that replaced the old HistoryView). The legacy
-  // `?section=history` URL still resolves to this view because the
-  // dashboard router treats both keys the same.
-  { id: "assets", labelKey: "workspace.sidebar.all_assets", icon: HistoryIcon },
 ];
 
-const NAV_TOOLS: NavItem[] = [
-  { id: "spaces",     labelKey: "workspace.sidebar.spaces",      icon: Workflow },
-  { id: "stock",      labelKey: "workspace.sidebar.stock",       icon: Images },
-  { id: "image_gen",  labelKey: "workspace.sidebar.image_gen",   icon: ImageIcon },
-  { id: "video_gen",  labelKey: "workspace.sidebar.video_gen",   icon: Video },
-  { id: "voice_gen",  labelKey: "workspace.sidebar.voice_gen",   icon: Mic2 },
-  { id: "image_to_3d", labelKey: "workspace.sidebar.threed_gen", icon: Box },
+const NAV_SECTIONS: SidebarSection[] = [
+  {
+    labelKey: "workspace.sidebar.create",
+    variant: "tool",
+    rows: [
+      [{ id: "video_gen", labelKey: "workspace.sidebar.video_gen", icon: Video, width: "full" }],
+      [
+        { id: "image_gen", labelKey: "workspace.sidebar.image_gen", icon: ImageIcon },
+        { id: "voice_gen", labelKey: "workspace.sidebar.voice_gen", icon: Mic2 },
+      ],
+      [{ id: "image_to_3d", labelKey: "workspace.sidebar.threed_gen", icon: Box, width: "half" }],
+    ],
+  },
+  {
+    labelKey: "workspace.sidebar.assets",
+    variant: "list",
+    rows: [
+      [{ id: "spaces", labelKey: "workspace.sidebar.spaces", icon: Workflow }],
+      [{ id: "stock", labelKey: "workspace.sidebar.stock", icon: Images }],
+      [{ id: "assets", labelKey: "workspace.sidebar.all_assets", icon: HistoryIcon }],
+    ],
+  },
+  {
+    labelKey: "workspace.sidebar.inspire",
+    variant: "list",
+    rows: [
+      [{ id: "projects", labelKey: "workspace.sidebar.projects", icon: BookOpen }],
+    ],
+  },
 ];
 
 const DEFAULT_ADMIN_HUB_URL = "https://mediaforge-admin-hub.vercel.app";
@@ -154,15 +177,13 @@ export interface WorkspaceSidebarProps {
   /** When provided, sidebar clicks call this instead of router-
    *  navigating. The dashboard uses this to drive internal state. */
   onNavigate?: (s: SectionKey) => void;
-  /** Click handler for the prominent "Create" button at the top of
-   *  the sidebar. Defaults to opening a new space when omitted. */
+  /** Reserved for shells that still pass the legacy sidebar create action. */
   onCreate?: () => void;
 }
 
 export default function WorkspaceSidebar({
   active,
   onNavigate,
-  onCreate,
 }: WorkspaceSidebarProps) {
   const navigate = useNavigate();
   const { t, language, setLanguage } = useLanguage();
@@ -179,14 +200,6 @@ export default function WorkspaceSidebar({
     else navigate(`/app/workspace?section=${s}`);
   };
 
-  const handleCreate = () => {
-    if (onCreate) onCreate();
-    // Default — jump to spaces and let the user kick off "+ New space"
-    // there. The dashboard SpacesView's New-space button is the
-    // canonical create action; this just gets them in front of it.
-    else handleClick("spaces");
-  };
-
   // 2026-05 redesign: sidebar floats as a Layer-1 panel.
   //   • Outer wrapper carries the page-bg padding (8px around).
   //   • aside itself is a rounded card sitting inside.
@@ -194,18 +207,26 @@ export default function WorkspaceSidebar({
   //     panel from the main content (different elevation).
   //   • Width tightened 198 → 192 keeps the visual rhythm.
   return (
-    <div className="ws-scroll-hide h-full shrink-0 bg-[hsl(var(--surface-0))] py-[8px] pl-[8px]">
-      <aside className="mf-readable ws-scroll-hide flex h-full w-[221px] flex-col overflow-y-auto rounded-xl bg-[hsl(var(--surface-1))]">
+    <div className="ws-scroll-hide h-full shrink-0 bg-[hsl(var(--surface-0))] py-[12px] pl-[12px]">
+      <aside
+        className="mf-readable ws-scroll-hide flex h-full w-[230px] flex-col gap-[4px] overflow-y-auto rounded-[20px] border border-transparent px-[4px] py-[12px] text-[#b0b4ba]"
+        style={{
+          background:
+            "linear-gradient(#121314, #121314) padding-box, linear-gradient(145deg, rgba(255,255,255,.42), rgba(144,80,160,.32) 34%, rgba(96,48,128,.28) 68%, rgba(160,80,160,.16)) border-box",
+          boxShadow:
+            "inset 0 1px 0 rgba(255,255,255,.08), inset 0 -1px 0 rgba(144,80,160,.09), 0 0 24px -18px rgba(144,80,160,.9), 0 0 38px -30px rgba(96,48,128,.95)",
+        }}
+      >
       {/* ── Brand row — PSC : Digital Media ──────────────────────
        *  Logo lives at /public/psc-logo.png. Save the orange
        *  Digital Media wordmark there; the full lockup is wide
        *  so we use object-contain to fit the 34px square slot
        *  without distorting the trefoil + wordmark proportions. */}
-      <div className="flex h-[55px] shrink-0 items-center px-[14px]">
+      <div className="flex shrink-0 items-center justify-between px-[12px] pb-[12px] pt-[4px]">
         <button
           type="button"
           onClick={() => navigate("/app/workspace")}
-          className="flex items-center gap-[9px] text-[16px] font-semibold text-zinc-50 transition-colors hover:text-white"
+          className="flex min-w-0 items-center gap-[8px] text-[18px] font-bold text-white transition-colors hover:text-white"
         >
           {/* Brand logo — defaults to the workspace mascot, swapped
            *  to the tenant org logo when the user is on a claimed
@@ -215,31 +236,23 @@ export default function WorkspaceSidebar({
           <img
             src={brandLogo}
             alt={brandName}
-            className="h-[32px] w-[32px] shrink-0 select-none object-contain"
+            className="h-[26px] w-[26px] shrink-0 select-none rounded-full bg-white object-contain"
             draggable={false}
           />
-          <span className="leading-tight">{brandName}</span>
+          <span className="truncate leading-tight">{brandName}</span>
         </button>
-      </div>
-
-      {/* ── Create button (primary action) ─────────────────────── */}
-      <div className="px-[14px] pb-[9px] pt-[2px]">
         <button
           type="button"
-          onClick={handleCreate}
-          className={cn(
-            "flex h-[41px] w-full items-center justify-center gap-[7px] rounded-lg px-[14px] text-[16px] font-semibold text-white",
-            "bg-gradient-to-b from-[#ff3d8e] to-[#e8327f] shadow-[0_2px_8px_-2px_rgba(255,61,142,0.45)]",
-            "transition-[transform,box-shadow] hover:from-[#ff4da0] hover:to-[#ef3a8c] hover:shadow-[0_4px_12px_-2px_rgba(255,61,142,0.55)]",
-            "active:scale-[0.98]",
-          )}
+          className="grid h-[28px] w-[28px] shrink-0 place-items-center rounded-md text-[#b0b4ba] transition-colors hover:bg-white/20 hover:text-white"
+          title={t("workspace.sidebar.collapse")}
+          aria-label={t("workspace.sidebar.collapse")}
         >
-          <Plus className="h-[16px] w-[16px]" /> {t("workspace.sidebar.create")}
+          <PanelLeftClose className="h-4 w-4" />
         </button>
       </div>
 
       {/* ── Top nav group ──────────────────────────────────────── */}
-      <nav className="flex flex-col gap-[3px] px-[14px] pb-[9px] pt-[5px]">
+      <nav className="flex flex-col gap-[4px]">
         {NAV_TOP.map((it) => (
           <NavLink
             key={it.id}
@@ -247,29 +260,24 @@ export default function WorkspaceSidebar({
             icon={it.icon}
             active={active === it.id}
             onClick={() => handleClick(it.id)}
+            variant="list"
           />
         ))}
       </nav>
 
       {/* ── Section divider with label ─────────────────────────── */}
-      <div className="px-[18px] pb-[5px] pt-[14px]">
-        <div className="text-[14.5px] font-semibold uppercase text-zinc-400">
-          {t("workspace.sidebar.all_tools")}
-        </div>
-      </div>
-
       {/* ── Tools nav group ────────────────────────────────────── */}
-      <nav className="flex flex-col gap-[3px] px-[14px]">
-        {NAV_TOOLS.map((it) => (
-          <NavLink
-            key={it.id}
-            label={t(it.labelKey)}
-            icon={it.icon}
-            active={active === it.id}
-            onClick={() => handleClick(it.id)}
-          />
-        ))}
-      </nav>
+      {NAV_SECTIONS.map((section) => (
+        <SidebarNavSection
+          key={section.labelKey}
+          label={t(section.labelKey)}
+          rows={section.rows}
+          variant={section.variant}
+          active={active}
+          onSelect={handleClick}
+          translate={t}
+        />
+      ))}
 
       {/* ── Org / class extras (SSO branch) ────────────────────────
        *  These slots sit above the bottom utility row so the chrome
@@ -279,13 +287,13 @@ export default function WorkspaceSidebar({
 
       {/* Active class switcher — only renders when student is in 2+
        *  classes; consumers/single-class students see nothing. */}
-      <div className="mt-auto px-[14px]">
+      <div className="mt-auto px-[8px] pt-[10px]">
         <ActiveClassPicker variant="compact" className="w-full" />
       </div>
 
       {/* Org credit badge — visible to org members so they can see
        *  their balance at a glance. Returns null for consumer/guests. */}
-      <div className="px-[14px] py-[7px]">
+      <div className="px-[8px] py-[6px]">
         <OrgCreditBadge variant="card" />
       </div>
 
@@ -298,7 +306,7 @@ export default function WorkspaceSidebar({
        *  parallel UtilityBtn — same visual weight, no special
        *  treatment beyond label rendering the TARGET language in its
        *  own script (universal language-switcher convention). */}
-      <div className="flex items-center gap-[5px] px-[14px] pb-[14px] pt-[14px]">
+      <div className="flex items-center gap-[4px] px-[8px] pb-[2px] pt-[8px]">
         <UtilityBtn icon={SettingsIcon} title={t("workspace.sidebar.settings")} onClick={() => navigate("/app/settings")} />
         <UtilityBtn
           icon={Languages}
@@ -363,39 +371,92 @@ const OrgAdminLink = () => {
   return (
     /* 2026-05: drop the divider line — we use a small mt gap instead
      *  to keep the floating-panel surface clean. */
-    <div className="mt-[12px] space-y-[4px] px-[12px] pb-[8px] pt-[4px]">
+    <div className="mt-[8px] space-y-[4px] px-[8px] pb-[6px] pt-[2px]">
       <button
         type="button"
         onClick={() => void handlePrimaryClick()}
-        className="flex h-[32px] w-full items-center gap-[8px] rounded-md px-[8px] text-[14px] text-amber-200/90 transition-colors hover:bg-amber-300/10 hover:text-amber-100"
+        className="relative flex h-[32px] w-full items-center gap-[8px] rounded-md px-[4px] text-[12px] text-amber-200/90 transition-colors hover:text-amber-100"
         title={primaryTip}
       >
-        <PrimaryIcon className="h-[14px] w-[14px]" />
+        <PrimaryIcon className="h-[16px] w-[16px] shrink-0" />
         {primaryLabel}
       </button>
       <button
         type="button"
         onClick={() => navigate("/app/org-admin/branding")}
-        className="flex h-[32px] w-full items-center gap-[8px] rounded-md px-[8px] text-[14px] text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-100"
+        className="relative flex h-[32px] w-full items-center gap-[8px] rounded-md px-[4px] text-[12px] text-[#b0b4ba] transition-colors hover:text-white"
         title={t("workspace.sidebar.branding_tip")}
       >
-        <Palette className="h-[14px] w-[14px]" />
+        <Palette className="h-[16px] w-[16px] shrink-0" />
         {t("workspace.sidebar.branding")}
       </button>
     </div>
   );
 };
 
+const SidebarNavSection = ({
+  label,
+  rows,
+  variant,
+  active,
+  onSelect,
+  translate,
+}: {
+  label: string;
+  rows: NavItem[][];
+  variant: "tool" | "list";
+  active?: SectionKey;
+  onSelect: (s: SectionKey) => void;
+  translate: (key: NavItem["labelKey"]) => string;
+}) => (
+  <div className="pt-[16px]">
+    <div className="px-[16px] pb-[6px] text-[12px] font-semibold uppercase tracking-[0.05px] text-[#43484e]">
+      {label}
+    </div>
+    <div className="flex flex-col gap-[4px]">
+      {rows.map((row, rowIndex) => {
+        const splitToolRow =
+          variant === "tool" && row.some((item) => item.width === "half");
+        const compactToolRow = variant === "tool" && (row.length > 1 || splitToolRow);
+
+        return (
+          <div
+            key={`${label}-${rowIndex}`}
+            className={cn((row.length > 1 || splitToolRow) && "flex gap-[4px] px-[4px]")}
+          >
+            {row.map((item) => (
+              <NavLink
+                key={item.id}
+                label={translate(item.labelKey)}
+                icon={item.icon}
+                active={active === item.id}
+                onClick={() => onSelect(item.id)}
+                compact={compactToolRow || row.length > 1}
+                variant={variant}
+              />
+            ))}
+            {splitToolRow && row.length === 1 && <span className="flex-1" aria-hidden />}
+          </div>
+        );
+      })}
+    </div>
+  </div>
+);
+
 const NavLink = ({
   label,
   icon: Icon,
   active,
   onClick,
+  compact = false,
+  variant = "list",
 }: {
   label: string;
   icon: LucideIcon;
   active: boolean;
   onClick: () => void;
+  compact?: boolean;
+  variant?: "tool" | "list";
 }) => (
   <button
     type="button"
@@ -403,14 +464,30 @@ const NavLink = ({
     className={cn(
       /* 2026-05: drop the inset 1px stroke on active — bg lift alone
        *  is enough now that the sidebar is a Layer-1 panel. */
-      "flex h-[37px] items-center gap-[9px] rounded-md px-[9px] text-[16px] font-medium transition-colors",
-      active
-        ? "bg-white/[0.08] text-zinc-50"
-        : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100",
+      "group relative flex h-[32px] min-w-0 items-center gap-[10px] text-left text-[12px] font-medium transition-colors",
+      variant === "tool"
+        ? "mx-[8px] overflow-hidden rounded-lg bg-[rgba(216,244,246,.04)] px-[8px]"
+        : "mx-[12px] rounded-md bg-transparent px-[4px]",
+      variant === "tool" && !compact && "w-[calc(100%-16px)]",
+      compact && variant === "tool" && "mx-0 flex-1 gap-[6px] px-[6px] text-[11px]",
+      compact && variant === "list" && "mx-[12px]",
+      active && variant === "tool"
+        ? "rounded-[10px] border border-[#b98ccc] bg-[#0b0c0d] text-white"
+        : active
+          ? "text-white"
+          : variant === "tool"
+            ? "text-[#d8dce2] hover:bg-white/12 hover:text-white"
+            : "text-[#b0b4ba] hover:text-white",
     )}
   >
-    <Icon className="h-[17px] w-[17px] shrink-0" />
-    {label}
+    {variant === "tool" && !active && (
+      <span className="pointer-events-none absolute inset-0 rounded-lg bg-[linear-gradient(170deg,rgba(211,237,248,.18)_0%,rgba(211,237,248,0)_20%,rgba(211,237,248,0)_80%,rgba(211,237,248,.14)_100%)] transition-opacity group-hover:opacity-0" />
+    )}
+    {variant === "tool" && active && (
+      <span className="pointer-events-none absolute inset-[-1px] rounded-[10px] shadow-[inset_0_-3px_8px_0_#9050a0,inset_0_2px_8px_0_rgba(255,255,255,.32),0_0_12px_rgba(96,48,128,.62)]" />
+    )}
+    <Icon className="relative h-[16px] w-[16px] shrink-0" />
+    <span className="relative min-w-0 truncate">{label}</span>
   </button>
 );
 
@@ -436,9 +513,9 @@ const UtilityBtn = ({
     title={title}
     aria-label={title}
     onClick={onClick}
-    className="relative flex h-[37px] w-[37px] items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-100"
+    className="relative flex h-[32px] w-[32px] items-center justify-center rounded-md text-[#b0b4ba] transition-colors hover:bg-white/20 hover:text-white"
   >
-    <Icon className="h-[17px] w-[17px]" />
+    <Icon className="h-[16px] w-[16px]" />
     {badge && (
       <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-rose-400 ring-2 ring-[hsl(0_0%_4%)]" />
     )}

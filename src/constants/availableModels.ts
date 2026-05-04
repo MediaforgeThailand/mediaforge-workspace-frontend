@@ -54,7 +54,7 @@ const videoModels: ModelEntry[] = [
     return [base];
   }),
   // Google Veo (Standard tier only — Lite/Fast not yet wired in).
-  { slug: "veo-3.1-generate-preview", label: "Google Veo 3.1" },
+  { slug: "veo-3.1-generate-001", label: "Google Veo 3.1" },
 ];
 
 export const AVAILABLE_MODELS: FeatureModels[] = [

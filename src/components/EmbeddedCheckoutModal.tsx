@@ -21,9 +21,10 @@ interface EmbeddedCheckoutModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
-  mode: "subscription" | "topup";
-  packageId: string;
+  mode: "subscription" | "topup" | "team_seats";
+  packageId?: string;
   billingInterval?: "monthly" | "annual";
+  teamSeats?: number;
 }
 
 // Singleton — load once per app lifetime
@@ -121,6 +122,7 @@ const EmbeddedCheckoutModal = ({
   mode,
   packageId,
   billingInterval = "monthly",
+  teamSeats,
 }: EmbeddedCheckoutModalProps) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -142,7 +144,7 @@ const EmbeddedCheckoutModal = ({
       return;
     }
 
-    if (requestStartedRef.current || !packageId) return;
+    if (requestStartedRef.current || (mode !== "team_seats" && !packageId)) return;
     requestStartedRef.current = true;
 
     const init = async () => {
@@ -162,7 +164,9 @@ const EmbeddedCheckoutModal = ({
         const body =
           mode === "topup"
             ? { packageId, intent: true }
-            : { packageId, billingInterval, intent: true };
+            : mode === "team_seats"
+              ? { checkoutType: "team_seats", teamSeats, billingInterval, intent: true }
+              : { packageId, billingInterval, intent: true };
 
         const { data, error: invokeErr } = await supabase.functions.invoke(fnName, { body });
         if (invokeErr || !data?.clientSecret) {
@@ -180,7 +184,7 @@ const EmbeddedCheckoutModal = ({
     };
 
     void init();
-  }, [open, mode, packageId, billingInterval]);
+  }, [open, mode, packageId, billingInterval, teamSeats]);
 
   const stripeInstance = useMemo(
     () => (publishableKey ? getStripe(publishableKey) : null),

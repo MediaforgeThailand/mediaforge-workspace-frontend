@@ -546,6 +546,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   // Used by friendlyError() to localize jargon errors before they
   // reach the user. Raw text still lands in console.error.
   const { language } = useLanguage();
+  const currentWorkspaceId = useWorkspaceStore((s) => s.current?.workspaceId ?? null);
 
   // Refs + ResizeObserver for the dynamic prompt-lift logic. The
   // prompt overlay sits above the settings toolbar and used to lift
@@ -2199,8 +2200,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
       // Voice picker for audio gen was removed — see audioGenNode in
       // workspaceSchema.ts for context. Voice id falls back to the
-      // backend's per-provider default; users who need to override
-      // do it from the standalone /app voice gen tool.
+      // backend's per-provider default.
 
       // GPT Image 2 — Aspect Ratio + Resolution split (UI-only).
       // The OpenAI gpt-image API takes a single `size` field, but
@@ -2758,6 +2758,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           open={insufficientOpen}
           onOpenChange={setInsufficientOpen}
           requiredCredits={nodeCost ?? undefined}
+          workspaceId={currentWorkspaceId}
         />
       )}
     </>
@@ -2818,5 +2819,5 @@ function MultiGenStepper({
 
 /* VoicePickerButton + VoicePickerDialog were removed when the
  * hardcoded voice preset lists were deleted. Audio gen on the canvas
- * is select-only at the model level; voice id is whatever the
- * backend's per-provider default is. */
+ * is select-only at the model level; voice id uses the backend's
+ * per-provider default. */

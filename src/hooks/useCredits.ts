@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface CreditBalance {
-  /** Current available credits (source of truth from user_credits table) */
+  /** Current available credits for the resolved scope. */
   balance: number;
   /** Lifetime total credits ever received */
   total_purchased: number;
@@ -66,10 +66,11 @@ function unwrapCreditBalance(payload: unknown): CreditBalance | null {
  * query so the balance stays in sync after a run / top-up.
  */
 export const useCredits = (workspaceId?: string | null) => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const scopedWorkspaceId = workspaceId ?? null;
-  const queryKey = ["user-credits", user?.id, scopedWorkspaceId] as const;
+  const orgId = ((profile as any)?.organization_id ?? profile?.org_id ?? null) as string | null;
+  const queryKey = ["user-credits", user?.id, scopedWorkspaceId, orgId] as const;
 
   const { data: credits, isLoading: loading, refetch } = useQuery<CreditBalance | null>({
     queryKey,
@@ -83,6 +84,7 @@ export const useCredits = (workspaceId?: string | null) => {
       if (!functionError) {
         return unwrapCreditBalance(functionData);
       }
+      if (orgId) return null;
 
       const { data } = await supabase
         .from("user_credits")

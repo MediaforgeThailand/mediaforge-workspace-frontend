@@ -412,6 +412,18 @@ export default function AssetsView({
         poster: asset.source === "generation" ? asset.thumbnailUrl : undefined,
         label,
         caption,
+        prompt: asset.source === "generation" ? asset.prompt : undefined,
+        settings:
+          asset.source === "generation"
+            ? [
+                asset.modelLabel ? { label: asset.modelLabel } : null,
+                asset.durationSec ? { label: "Duration", value: `${asset.durationSec}s` } : null,
+                asset.width && asset.height
+                  ? { label: "Size", value: `${asset.width}x${asset.height}` }
+                  : null,
+                { label: "Created", value: formatRelative(asset.createdAt, t) },
+              ].filter(Boolean) as Array<{ label: string; value?: string }>
+            : [{ label: "Uploaded", value: formatRelative(asset.createdAt, t) }],
       });
       return;
     }
@@ -421,6 +433,18 @@ export default function AssetsView({
       url: asset.url,
       label,
       caption,
+      prompt: asset.source === "generation" ? asset.prompt : undefined,
+      settings:
+        asset.source === "generation"
+          ? [
+              asset.modelLabel ? { label: asset.modelLabel } : null,
+              asset.durationSec ? { label: "Duration", value: `${asset.durationSec}s` } : null,
+              asset.width && asset.height
+                ? { label: "Size", value: `${asset.width}x${asset.height}` }
+                : null,
+              { label: "Created", value: formatRelative(asset.createdAt, t) },
+            ].filter(Boolean) as Array<{ label: string; value?: string }>
+          : [{ label: "Uploaded", value: formatRelative(asset.createdAt, t) }],
     });
   }, []);
 

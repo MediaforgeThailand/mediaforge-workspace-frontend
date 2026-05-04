@@ -169,6 +169,10 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
 
   if (schemaKey === "klingVideoNode" || schemaKey === "videoGenNode") {
     const model = modelName || "kling-v2-6-pro";
+    const modelAliases =
+      model === "veo-3.1-generate-001"
+        ? [model, "veo-3.1-generate-preview"]
+        : [model];
     const isMotion = model.includes("motion");
     const isOmni = OMNI_MODELS.has(model);
 
@@ -286,7 +290,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
       const resolutionExact = creditCosts.find(
         (r) =>
           r.feature === "generate_freepik_video" &&
-          r.model === `${model}:${resolution}` &&
+          modelAliases.some((alias) => r.model === `${alias}:${resolution}`) &&
           r.pricing_type === "per_second" &&
           (r.has_audio ?? false) === hasAudio,
       );
@@ -296,7 +300,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
         const noAudioResolution = creditCosts.find(
           (r) =>
             r.feature === "generate_freepik_video" &&
-            r.model === `${model}:${resolution}` &&
+            modelAliases.some((alias) => r.model === `${alias}:${resolution}`) &&
             r.pricing_type === "per_second" &&
             (r.has_audio ?? false) === false,
         );
@@ -308,7 +312,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
     const exactMatch = creditCosts.find(
       (r) =>
         r.feature === "generate_freepik_video" &&
-        r.model === model &&
+        modelAliases.includes(r.model) &&
         r.pricing_type === "fixed" &&
         r.duration_seconds === duration &&
         (r.has_audio ?? false) === hasAudio,
@@ -319,7 +323,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
     const durationMatch = creditCosts.find(
       (r) =>
         r.feature === "generate_freepik_video" &&
-        r.model === model &&
+        modelAliases.includes(r.model) &&
         r.pricing_type === "fixed" &&
         r.duration_seconds === duration,
     );
@@ -329,7 +333,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
     let stdPerSecondMatch = creditCosts.find(
       (r) =>
         r.feature === "generate_freepik_video" &&
-        r.model === model &&
+        modelAliases.includes(r.model) &&
         r.pricing_type === "per_second" &&
         (r.has_audio ?? false) === hasAudio,
     );
@@ -338,7 +342,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
       const basePerSec = creditCosts.find(
         (r) =>
           r.feature === "generate_freepik_video" &&
-          r.model === model &&
+          modelAliases.includes(r.model) &&
           r.pricing_type === "per_second" &&
           (r.has_audio ?? false) === false,
       );
@@ -348,7 +352,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
 
     // 4. Any match for this model
     const anyMatch = creditCosts.find(
-      (r) => r.feature === "generate_freepik_video" && r.model === model,
+      (r) => r.feature === "generate_freepik_video" && modelAliases.includes(r.model),
     );
     return anyMatch?.cost ?? null;
   }

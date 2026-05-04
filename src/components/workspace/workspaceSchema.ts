@@ -26,10 +26,8 @@ import {
 } from "@/components/flow/nodes/nodeApiSchema";
 // Voice catalog imports were removed when the hardcoded "preset"
 // voice lists were deleted. Audio gen now relies on backend defaults
-// for the voice id (Gemini → "Charon", Google → "en-US-Studio-O",
-// ElevenLabs → an account-specific voice picked by the standalone
-// tool's live /v1/voices fetch). The canvas audio node no longer
-// surfaces a voice picker.
+// for the voice id; the current UI only exposes script and style
+// instructions.
 
 /** Kling model value → display label. Rebuilt locally so we never need
  *  a new export from the shared schema file. */
@@ -58,7 +56,7 @@ const SEEDANCE_VIDEO_REF_MODELS = [
  *  endpoint. Real spec verified against
  *  https://ai.google.dev/gemini-api/docs/video — see backend
  *  `_shared/veo.ts` for the param contract. */
-const VEO_MODELS = ["veo-3.1-generate-preview"] as const;
+const VEO_MODELS = ["veo-3.1-generate-001"] as const;
 const BANANA_MODELS = ["nano-banana-2", "nano-banana-pro"] as const;
 /** Backend dispatches anything starting with "gpt-image" to OpenAI's
  *  /v1/images/edits or /v1/images/generations endpoint. */
@@ -66,6 +64,18 @@ const OPENAI_IMAGE_MODELS = ["gpt-image-2"] as const;
 const ELEVENLABS_TTS_MODELS = ["elevenlabs-multilingual-v2", "elevenlabs-turbo-v2-5"] as const;
 const GEMINI_TTS_MODELS = ["gemini-2.5-pro-preview-tts"] as const;
 const GOOGLE_TTS_MODELS = ["google-tts-studio"] as const;
+const TRIPO_MULTIVIEW_3D_MODELS = [
+  "tripo3d-v3.1",
+  "tripo3d-v3.0",
+  "tripo3d-v2.5",
+  "tripo3d-v2.0",
+] as const;
+const SINGLE_IMAGE_3D_MODELS = [
+  "tripo3d-p1",
+  "tripo3d-turbo",
+  "tripo3d-v1.4",
+  "hyper3d-gen2-260112",
+] as const;
 
 export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
   /**
@@ -456,6 +466,12 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         supportedModels: ["kling-v2-6-motion-pro", "kling-v3-motion-pro", "kling-v3-omni"],
       },
       {
+        id: "reference_image",
+        label: "reference_image",
+        color: "cyan",
+        supportedModels: [...SEEDANCE_VIDEO_REF_MODELS],
+      },
+      {
         id: "ref_video",
         label: "ref_video",
         color: "rose",
@@ -520,7 +536,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           "seedance-1-5-pro-251215": "SeedDance 1.5 Pro (Latest)",
           "seedance-2-0-lite": "SeedDance 2.0 Fast",
           "seedance-2-0-pro": "SeedDance 2.0 Pro",
-          "veo-3.1-generate-preview": "Google Veo 3.1",
+          "veo-3.1-generate-001": "Google Veo 3.1",
         },
         default: "kling-v2-6-pro",
         required: true,
@@ -798,20 +814,14 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
   /**
    * Audio Generator (Gemini TTS).
    *
-   * Wraps Google's prebuilt voice catalogue (30 named voices —
-   * Achernar, Aoede, Charon, … — see `geminiVoices.ts`). The user
-   * picks a voice via the VoicePickerDialog (opened by clicking the
-   * "Voice" param row in the node body) and writes a script. Output
-   * is a single MP3 / WAV asset suitable for downstream Merge A/V
-   * nodes or a direct download.
+   * Wraps the production TTS providers and writes a script. Voice ids
+   * are intentionally not exposed in the current UI; the backend uses
+   * the provider default voice for each model. Output is a single MP3 /
+   * WAV asset suitable for downstream Merge A/V nodes or a direct download.
    *
    * Param notes:
    *   - `model_name` defaults to gemini-2.5-flash-preview-tts.
    *     Gemini 2.5 Pro remains available for higher quality.
-   *   - `voice` stores the Gemini voice id (e.g. "Charon"). A select
-   *     widget is provided as a fallback, but the picker dialog is
-   *     the intended UX. The default is "Charon" (Informative —
-   *     reads as a neutral baseline for most copy).
    *   - `style_prompt` is an OPTIONAL per-clip directive that
    *     Gemini's TTS supports — it lets the user say things like
    *     "Read this with a calm, gentle tone" without needing to
@@ -865,25 +875,6 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         },
         default: "gemini-2.5-pro-preview-tts",
         required: true,
-      },
-      /* Voice — optional text input. Audit found a confusing drift
-       * between standalone (which had a voice picker) and canvas
-       * (which had no voice param at all) — running the same model
-       * in both surfaces produced different audio because the
-       * backend default kicked in on canvas. We restore parity here
-       * via a single optional voice-id text input. Empty string =
-       * use the backend's per-provider default
-       * (gemini→"Charon", google→"en-US-Studio-O", elevenlabs→first
-       * available account voice). The standalone tool keeps its
-       * richer ElevenLabs grid for users who want to browse — the
-       * canvas just exposes the override knob. */
-      {
-        key: "voice",
-        label: "Voice ID (optional)",
-        type: "text",
-        default: "",
-        placeholder:
-          "Leave blank for default (gemini→Charon · google→en-US-Studio-O · elevenlabs→account default)",
       },
       {
         key: "prompt",
@@ -1022,7 +1013,16 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         label: "image",
         color: "emerald",
         required: true,
+        maxConnections: 4,
+        supportedModels: [...TRIPO_MULTIVIEW_3D_MODELS],
+      },
+      {
+        id: "image",
+        label: "image",
+        color: "emerald",
+        required: true,
         maxConnections: 1,
+        supportedModels: [...SINGLE_IMAGE_3D_MODELS],
       },
     ],
     // No output ports — a generated 3D model isn't wireable into any
@@ -1112,6 +1112,7 @@ const TEXT_HANDLE_IDS = new Set([
 const IMAGE_HANDLE_IDS = new Set([
   "image",
   "ref_image",
+  "reference_image",
   "image_input",
   "start_frame",
   "end_frame",

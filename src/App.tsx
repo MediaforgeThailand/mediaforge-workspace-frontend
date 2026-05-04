@@ -34,6 +34,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthModalProvider } from "@/contexts/AuthModalContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { lazy, Suspense } from "react";
@@ -93,6 +94,8 @@ function lazyWithRetry(factory: () => Promise<{ default: React.ComponentType<any
 // ── Auth shell ────────────────────────────────────────────────
 const Auth = lazyWithRetry(() => import("./pages/Auth"));
 const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
+const Landing = lazyWithRetry(() => import("./pages/marketing/Landing"));
+const BlogPage = lazyWithRetry(() => import("./pages/marketing/Blog"));
 
 // ── Workspace surfaces ────────────────────────────────────────
 // Dashboard (list of spaces) lives inside DashboardLayout chrome.
@@ -137,16 +140,15 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter>
+              <AuthModalProvider>
               <Suspense fallback={<PageLoader />}>
                 {/* OrgUserBlockGate is a no-op for non-org users; for org
                  *  users (profile.org_id != null) it gates routes via an
                  *  allow-list, redirecting any other path → /app/workspace. */}
                 <OrgUserBlockGate>
                 <Routes>
-                  {/* Root → redirect to workspace dashboard. The
-                   *  consumer landing page was removed in Wave 1
-                   *  (this repo is now workspace-only). */}
-                  <Route path="/" element={<Navigate to="/app/workspace" replace />} />
+                  <Route path="/" element={<Landing />} />
+                  <Route path="/blog" element={<BlogPage />} />
 
                   {/* Auth + legal — public */}
                   <Route path="/auth" element={<Auth />} />
@@ -270,6 +272,7 @@ const App = () => (
                 </OrgUserBlockGate>
               </Suspense>
               <CookieConsent />
+              </AuthModalProvider>
             </BrowserRouter>
           </TooltipProvider>
         </AuthProvider>

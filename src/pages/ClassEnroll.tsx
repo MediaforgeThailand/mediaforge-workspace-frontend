@@ -30,6 +30,7 @@ const ERROR_LABELS: Record<string, string> = {
   already_redeemed: "You've already enrolled in this class with this code.",
   not_signed_in: "Please sign in first.",
   invalid_code: "That code looks malformed.",
+  student_code_required: "Enter your student ID so the class space can be assigned correctly.",
 };
 
 export default function ClassEnroll() {
@@ -56,8 +57,13 @@ export default function ClassEnroll() {
 
   const submit = async () => {
     setHasSubmitted(true);
+    const trimmedStudentCode = studentCode.trim();
+    if (!trimmedStudentCode) {
+      setStatus({ phase: "error", error: "student_code_required" });
+      return;
+    }
     setStatus({ phase: "redeeming" });
-    const res = await enrollInClass(code, studentCode.trim() || undefined);
+    const res = await enrollInClass(code, trimmedStudentCode);
     if (res.ok) {
       setStatus({
         phase: "ok",
@@ -92,19 +98,20 @@ export default function ClassEnroll() {
             </div>
 
             <div className="text-left space-y-2 max-w-sm mx-auto">
-              <Label htmlFor="student-code">Student ID <span className="text-muted-foreground">(optional)</span></Label>
+              <Label htmlFor="student-code">Student ID</Label>
               <Input
                 id="student-code"
                 value={studentCode}
                 onChange={(e) => setStudentCode(e.target.value)}
                 placeholder="e.g. 6612345"
+                required
               />
               <p className="text-xs text-muted-foreground">
-                Your teacher may ask to record this so they can match you to the class roster.
+                This is used to name and lock your class space.
               </p>
             </div>
 
-            <Button onClick={submit} size="lg" className="w-full max-w-sm">
+            <Button onClick={submit} size="lg" className="w-full max-w-sm" disabled={!studentCode.trim()}>
               Join class
             </Button>
           </>

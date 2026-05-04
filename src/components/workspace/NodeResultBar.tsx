@@ -11,6 +11,7 @@
 import { memo, useState } from "react";
 import { Maximize2 } from "lucide-react";
 import NodeResultDialog from "./NodeResultDialog";
+import { AudioPlayButton } from "./AudioPlayButton";
 
 export interface Generation {
   id: string;
@@ -84,14 +85,11 @@ const NodeResultBar = memo(
                 // click propagation on the controls so the lightbox
                 // expand-on-click doesn't fire when the user just
                 // wants to scrub or pause.
-                <div className="flex items-center justify-center bg-black/60 p-3">
-                  <audio
+                <div className="grid min-h-[140px] place-items-center bg-black/60 p-3">
+                  <AudioPlayButton
                     src={current.url}
-                    controls
-                    preload="metadata"
-                    className="w-full max-w-[260px]"
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
+                    label="Play audio"
+                    buttonClassName="h-11 w-11"
                   />
                 </div>
               )}

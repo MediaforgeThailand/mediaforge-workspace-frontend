@@ -189,7 +189,7 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
     icon: Film,
     outputType: "video",
     accent: "hsl(156 72% 42%)",
-    defaultModel: "kling-v2-6-pro",
+    defaultModel: "seedance-2-0-pro",
     // Keep in sync with KLING_MODELS + SEEDANCE_MODELS in
     // nodeApiSchema.ts / workspaceSchema.ts. The canvas video node
     // accepts all 5 Kling SKUs + all 5 Seedance SKUs — the standalone
@@ -270,7 +270,7 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
       },
       // ── Google Veo family (Standard tier only) ─────────────
       {
-        id: "veo-3.1-generate-preview",
+        id: "veo-3.1-generate-001",
         label: "Google Veo 3.1",
         provider: "Google",
         badge: "Standard",
@@ -400,10 +400,10 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
 };
 
 export const STANDALONE_TOOL_ORDER: StandaloneToolKey[] = [
-  "image_gen",
   "video_gen",
-  "voice_gen",
+  "image_gen",
   "image_to_3d",
+  "voice_gen",
 ];
 
 export const GPT_IMAGE_ASPECT_RATIOS = GPT_IMAGE_2_ASPECT_RATIOS;
@@ -438,8 +438,17 @@ export function videoSupportsStartEndFrames(model: string): boolean {
   );
 }
 
+export function videoSupportsEndFrame(model: string): boolean {
+  return videoSupportsStartEndFrames(model);
+}
+
 export function videoSupportsReferenceImage(model: string): boolean {
-  return isKlingMotionVideoModel(model) || model === "kling-v3-omni";
+  return (
+    isKlingMotionVideoModel(model) ||
+    model === "kling-v3-omni" ||
+    model === "seedance-2-0-lite" ||
+    model === "seedance-2-0-pro"
+  );
 }
 
 export function videoSupportsReferenceVideo(model: string): boolean {
@@ -606,6 +615,11 @@ export function buildVideoParams(args: {
   characterOrientation?: string;
   keepOriginalSound?: boolean;
   hasReferenceVideo?: boolean;
+  negativePrompt?: string;
+  personGeneration?: string;
+  returnLastFrame?: boolean;
+  multiShot?: boolean;
+  multiPrompt?: string;
 }): Record<string, unknown> {
   const hasReferenceVideo = !!args.hasReferenceVideo;
   if (isVeoVideoModel(args.model)) {
@@ -623,7 +637,8 @@ export function buildVideoParams(args: {
       resolution: res,
       duration: String(dur),
       // Audio is always-on for Veo (no toggle); withAudio arg ignored.
-      person_generation: "allow_adult",
+      person_generation:
+        args.personGeneration === "allow_all" ? "allow_all" : "allow_adult",
     };
   }
   if (isSeedanceVideoModel(args.model)) {
@@ -634,18 +649,22 @@ export function buildVideoParams(args: {
       resolution: args.resolution,
       duration: args.duration,
       generate_audio: String(args.withAudio),
-      return_last_frame: "true",
+      return_last_frame: String(!!args.returnLastFrame),
       _has_ref_video: hasReferenceVideo,
     };
   }
   if (isKlingMotionVideoModel(args.model)) {
-    return {
+    const motionParams: Record<string, unknown> = {
       model_name: args.model,
       prompt: args.prompt.trim(),
       character_orientation: args.characterOrientation ?? "image",
       keep_original_sound: args.keepOriginalSound ? "yes" : "no",
       _has_ref_video: hasReferenceVideo,
     };
+    if (args.negativePrompt?.trim()) {
+      motionParams.negative_prompt = args.negativePrompt.trim();
+    }
+    return motionParams;
   }
   const klingParams: Record<string, unknown> = {
     model_name: args.model,
@@ -655,8 +674,15 @@ export function buildVideoParams(args: {
     has_audio: String(args.withAudio),
     _has_ref_video: hasReferenceVideo,
   };
+  if (args.negativePrompt?.trim()) {
+    klingParams.negative_prompt = args.negativePrompt.trim();
+  }
   if (args.model === "kling-v3-omni") {
     klingParams.keep_original_sound = args.keepOriginalSound ? "yes" : "no";
+    klingParams.multi_shot = args.multiShot ? "true" : "false";
+    if (args.multiShot && args.multiPrompt?.trim()) {
+      klingParams.multi_prompt = args.multiPrompt.trim();
+    }
   }
   return klingParams;
 }

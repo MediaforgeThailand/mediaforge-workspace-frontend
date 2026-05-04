@@ -24,6 +24,8 @@ import {
   CreditCard,
   ReceiptText,
   Wallet,
+  Mail,
+  Plus,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -36,8 +38,11 @@ import PlanBilling from "@/components/settings/PlanBilling";
 import { DeleteAccountDialog } from "@/components/settings/DeleteAccountDialog";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
 
-const TEAM_SEAT_PRICE_USD = 10;
-const TEAM_SEAT_PRICE_THB = 290;
+const TEAM_SEAT_PRICE_THB = 1600;
+const TEAM_SEAT_PLATFORM_FEE_THB = 300;
+const TEAM_BASE_CREDITS_PER_SEAT_MONTH = (TEAM_SEAT_PRICE_THB - TEAM_SEAT_PLATFORM_FEE_THB) * 50;
+const TEAM_PROMO_CREDITS_PER_SEAT_MONTH = 25_000;
+const TEAM_CREDITS_PER_SEAT_MONTH = TEAM_BASE_CREDITS_PER_SEAT_MONTH + TEAM_PROMO_CREDITS_PER_SEAT_MONTH;
 
 /**
  * Settings — multi-section surface backed by an in-page state-driven
@@ -277,9 +282,7 @@ const Settings = () => {
   );
 
   const renderTeamSettings = () => (
-    <TeamSettingsPanel
-      onRegister={() => navigate("/app/team-register")}
-    />
+    <TeamSettingsPanel />
   );
 
   const renderActiveSection = () => {
@@ -369,6 +372,7 @@ interface TeamStatusMembership {
     credit_pool: number;
     credit_pool_allocated: number;
     credit_available?: number;
+    settings?: Record<string, unknown> | null;
   } | null;
   team?: {
     id: string;
@@ -447,8 +451,15 @@ interface TeamConsoleOverview {
     generation_credits_total?: number;
     generation_credits_30d?: number;
   };
-  seat_price_usd?: number;
   seat_price_thb?: number;
+  seat_platform_fee_thb?: number;
+  team_base_credits_per_seat_month?: number;
+  team_promo_credits_per_seat_month?: number;
+  team_credits_per_seat_month?: number;
+  team_seats_purchased?: number;
+  team_seats_used?: number;
+  team_seats_reserved?: number;
+  team_seats_available?: number;
 }
 
 async function functionErrorMessage(error: unknown): Promise<string> {
@@ -463,15 +474,21 @@ async function functionErrorMessage(error: unknown): Promise<string> {
   }
 }
 
-function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
+function TeamSettingsPanel() {
   const { user, refreshProfile } = useAuth();
   const { language } = useLanguage();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [memberships, setMemberships] = useState<TeamStatusMembership[]>([]);
   const [overview, setOverview] = useState<TeamConsoleOverview | null>(null);
   const [canOpenConsole, setCanOpenConsole] = useState(false);
   const [openingConsole, setOpeningConsole] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteTeamId, setInviteTeamId] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [newTeamName, setNewTeamName] = useState("");
+  const [creatingTeam, setCreatingTeam] = useState(false);
   const adminConsoleUrl =
     (import.meta.env.VITE_ADMIN_CONSOLE_URL as string | undefined) ||
     "https://mediaforge-admin-hub.vercel.app/org/console";
@@ -552,6 +569,53 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
     window.location.assign(payload.url);
   };
 
+  const createSubTeam = async () => {
+    const name = newTeamName.trim();
+    if (!name) {
+      toast({ title: "Team name is required", variant: "destructive" });
+      return;
+    }
+    setCreatingTeam(true);
+    const { error } = await supabase.functions.invoke("workspace_org_console", {
+      body: { action: "create_team", name },
+    });
+    if (error) {
+      const description = await functionErrorMessage(error);
+      toast({ title: "Could not create team", description, variant: "destructive" });
+    } else {
+      setNewTeamName("");
+      toast({ title: "Team created" });
+      await loadStatus();
+    }
+    setCreatingTeam(false);
+  };
+
+  const inviteTeamMember = async () => {
+    const email = inviteEmail.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      toast({ title: "Enter a valid email", variant: "destructive" });
+      return;
+    }
+    setInviting(true);
+    const { error } = await supabase.functions.invoke("workspace_org_console", {
+      body: {
+        action: "invite_member",
+        email,
+        role: "member",
+        team_id: inviteTeamId || null,
+      },
+    });
+    if (error) {
+      const description = await functionErrorMessage(error);
+      toast({ title: "Could not invite member", description, variant: "destructive" });
+    } else {
+      setInviteEmail("");
+      toast({ title: "Invitation ready", description: `${email} can join this team workspace.` });
+      await loadStatus();
+    }
+    setInviting(false);
+  };
+
   useEffect(() => {
     void loadStatus();
   }, [user?.id]);
@@ -593,9 +657,17 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
   });
   const organizationCredits = overview?.organization?.credit_available ?? active?.organization?.credit_available ?? active?.organization?.credit_pool ?? 0;
   const generationCredits30d = overview?.usage_summary?.generation_credits_30d ?? 0;
-  const seatPriceUsd = overview?.seat_price_usd ?? TEAM_SEAT_PRICE_USD;
   const seatPriceThb = overview?.seat_price_thb ?? TEAM_SEAT_PRICE_THB;
-  const seatPriceLabel = language === "th" ? `${seatPriceThb} บาท / seat` : `$${seatPriceUsd} / seat`;
+  const seatBaseCredits = overview?.team_base_credits_per_seat_month ?? TEAM_BASE_CREDITS_PER_SEAT_MONTH;
+  const seatPromoCredits = overview?.team_promo_credits_per_seat_month ?? TEAM_PROMO_CREDITS_PER_SEAT_MONTH;
+  const seatTotalCredits = overview?.team_credits_per_seat_month ?? TEAM_CREDITS_PER_SEAT_MONTH;
+  const orgType = overview?.organization?.type || active?.organization?.type || "";
+  const isSelfServeTeam = orgType === "team";
+  const seatsPurchased = overview?.team_seats_purchased ?? Number(active?.organization?.settings?.team_seats_purchased ?? 0);
+  const seatsUsed = overview?.team_seats_used ?? activeMembers.length;
+  const seatsReserved = overview?.team_seats_reserved ?? 0;
+  const seatsAvailable = overview?.team_seats_available ?? Math.max(0, seatsPurchased - seatsUsed - seatsReserved);
+  const seatPriceLabel = `${Number(seatPriceThb).toLocaleString()} THB / seat / month`;
   const allocationTransactions = (overview?.pool_transactions ?? [])
     .filter((tx) => ["class_pool_allocation", "class_pool_revoked", "org_pool_allocation", "org_pool_revoked", "org_pool_topup"].includes(String(tx.reason ?? "")))
     .slice(0, 8);
@@ -630,11 +702,11 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
       <div className="max-w-2xl rounded-[16px] bg-zinc-900/60 p-[20px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         <h2 className="text-[20px] font-semibold leading-[26px] text-zinc-50">Create a team workspace</h2>
         <p className="mt-[8px] text-[14px] leading-[22px] text-zinc-400">
-          Team accounts include a company Admin Console, member approvals, shared team credits, and seat billing at {seatPriceLabel} for each active seat. Credits are topped up separately based on real usage.
+          Team starts at 2 seats. Each seat is {seatPriceLabel} and adds {seatTotalCredits.toLocaleString()} shared credits per month, including the current {seatPromoCredits.toLocaleString()} credit promotion.
         </p>
-        <Button className="mt-[20px] h-[36px] px-[14px] text-[14px]" onClick={onRegister}>
+        <Button className="mt-[20px] h-[36px] px-[14px] text-[14px]" onClick={() => navigate("/app/pricing")}>
           <Users className="mr-[8px] h-[16px] w-[16px]" />
-          Start team registration
+          Buy team seats
         </Button>
       </div>
     );
@@ -652,7 +724,7 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
           <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Team</p>
           <h2 className="mt-[4px] text-[28px] font-semibold leading-[34px] text-zinc-50">{orgName}</h2>
         </div>
-        {canOpenConsole ? (
+        {canOpenConsole && !isSelfServeTeam ? (
           <Button className="h-[38px] w-fit rounded-full bg-white/[0.08] px-[14px] text-[14px] hover:bg-white/[0.14]" onClick={openAdminConsole} disabled={openingConsole}>
             {openingConsole ? (
               <Loader2 className="mr-[8px] h-[16px] w-[16px] animate-spin" />
@@ -663,6 +735,105 @@ function TeamSettingsPanel({ onRegister }: { onRegister: () => void }) {
           </Button>
         ) : null}
       </div>
+
+      {isSelfServeTeam ? (
+        <section className="grid gap-[10px] xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)]">
+          <div className="rounded-[16px] bg-zinc-900/55 p-[13px] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
+            <div className="flex items-center justify-between gap-[12px]">
+              <div>
+                <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Seat plan</p>
+                <h3 className="mt-[3px] text-[18px] font-semibold leading-[23px] text-zinc-50">
+                  {seatsUsed}/{seatsPurchased} active seats
+                </h3>
+              </div>
+              <Button className="h-[34px] rounded-full bg-purple-500 px-[12px] text-[13px] hover:bg-purple-400" onClick={() => navigate("/app/pricing")}>
+                <Plus className="mr-[6px] h-[14px] w-[14px]" />
+                Buy seats
+              </Button>
+            </div>
+            <div className="mt-[10px] h-[6px] overflow-hidden rounded-full bg-zinc-800">
+              <motion.div
+                className="h-full rounded-full bg-purple-400"
+                initial={{ width: 0 }}
+                animate={{ width: `${seatsPurchased > 0 ? Math.min(100, Math.round((seatsUsed / seatsPurchased) * 100)) : 0}%` }}
+                transition={{ duration: 0.45, ease: "easeOut" }}
+              />
+            </div>
+            <div className="mt-[10px] grid grid-cols-3 gap-[7px] text-[12px] leading-[16px]">
+              <div className="rounded-[10px] bg-black/22 p-[8px]">
+                <div className="text-zinc-500">Available</div>
+                <div className="mt-[3px] font-semibold text-zinc-50">{seatsAvailable}</div>
+                {seatsReserved > 0 ? <div className="mt-[2px] text-[11px] text-zinc-500">{seatsReserved} reserved</div> : null}
+              </div>
+              <div className="rounded-[10px] bg-black/22 p-[8px]">
+                <div className="text-zinc-500">Credits / seat</div>
+                <div className="mt-[3px] font-semibold text-zinc-50">{seatBaseCredits.toLocaleString()}</div>
+              </div>
+              <div className="rounded-[10px] bg-black/22 p-[8px]">
+                <div className="text-zinc-500">Promo / seat</div>
+                <div className="mt-[3px] font-semibold text-emerald-300">+{seatPromoCredits.toLocaleString()}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[16px] bg-zinc-900/55 p-[13px] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
+            <div className="grid gap-[10px] lg:grid-cols-[minmax(0,1.45fr)_minmax(220px,0.9fr)]">
+              <div>
+                <div className="mb-[7px] flex items-center gap-[7px] text-[13px] font-semibold text-zinc-200">
+                  <Mail className="h-[15px] w-[15px] text-purple-300" />
+                  Invite member
+                </div>
+                <div className="flex flex-col gap-[8px] sm:flex-row">
+                  <Input
+                    value={inviteEmail}
+                    onChange={(event) => setInviteEmail(event.target.value)}
+                    placeholder="member@company.com"
+                    className="h-[36px] bg-black/28 text-[13px]"
+                    disabled={seatsAvailable <= 0 || inviting}
+                  />
+                  <select
+                    value={inviteTeamId}
+                    onChange={(event) => setInviteTeamId(event.target.value)}
+                    className="h-[36px] rounded-[10px] bg-black/28 px-[10px] text-[13px] text-zinc-100 outline-none"
+                    disabled={inviting}
+                  >
+                    <option value="">Company pool</option>
+                    {teams.map((team) => (
+                      <option key={team.id} value={team.id}>{team.name}</option>
+                    ))}
+                  </select>
+                  <Button className="h-[36px] px-[12px] text-[13px]" onClick={inviteTeamMember} disabled={seatsAvailable <= 0 || inviting}>
+                    {inviting ? <Loader2 className="mr-[7px] h-[14px] w-[14px] animate-spin" /> : <UserPlus className="mr-[7px] h-[14px] w-[14px]" />}
+                    Invite
+                  </Button>
+                </div>
+                {seatsAvailable <= 0 ? (
+                  <p className="mt-[6px] text-[12px] text-amber-300">No empty seats. Buy more seats before inviting another active member.</p>
+                ) : null}
+              </div>
+
+              <div>
+                <div className="mb-[7px] flex items-center gap-[7px] text-[13px] font-semibold text-zinc-200">
+                  <Users className="h-[15px] w-[15px] text-sky-300" />
+                  Add sub-team
+                </div>
+                <div className="flex gap-[8px]">
+                  <Input
+                    value={newTeamName}
+                    onChange={(event) => setNewTeamName(event.target.value)}
+                    placeholder="Marketing"
+                    className="h-[36px] bg-black/28 text-[13px]"
+                    disabled={creatingTeam}
+                  />
+                  <Button className="h-[36px] px-[12px] text-[13px]" onClick={createSubTeam} disabled={creatingTeam}>
+                    {creatingTeam ? <Loader2 className="h-[14px] w-[14px] animate-spin" /> : <Plus className="h-[14px] w-[14px]" />}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <div className="grid gap-[10px] md:grid-cols-2 xl:grid-cols-4">
         <motion.div className="relative overflow-hidden rounded-[14px] bg-zinc-900/70 px-[14px] py-[12px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}>

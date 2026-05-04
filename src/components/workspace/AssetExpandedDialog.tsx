@@ -8,12 +8,13 @@
  */
 
 import { useMemo } from "react";
-import { Scissors, Film, Sparkles, Image as ImageIcon, type LucideIcon } from "lucide-react";
+import { Scissors, Film, Sparkles, Image as ImageIcon, Music, type LucideIcon } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import type { AssetNodeData } from "./AssetNode";
+import { AudioPlayButton } from "./AudioPlayButton";
 
 interface ToolOption {
   id: string;
@@ -98,7 +99,10 @@ const AssetExpandedDialog = ({ open, onOpenChange, nodeId, data }: Props) => {
     onOpenChange(false);
   };
 
-  const Icon = data.fieldType === "video" ? Film : ImageIcon;
+  const Icon =
+    data.fieldType === "video" ? Film
+      : data.fieldType === "audio" ? Music
+      : ImageIcon;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -127,6 +131,17 @@ const AssetExpandedDialog = ({ open, onOpenChange, nodeId, data }: Props) => {
                   controls
                   className="max-h-[75vh] max-w-full object-contain"
                 />
+              ) : data.fieldType === "audio" ? (
+                <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-zinc-900/80 p-8">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                    Audio
+                  </div>
+                  <AudioPlayButton
+                    src={data.previewUrl}
+                    label={data.label || data.fileName || "Play audio"}
+                    buttonClassName="h-14 w-14"
+                  />
+                </div>
               ) : (
                 <img
                   src={data.previewUrl}

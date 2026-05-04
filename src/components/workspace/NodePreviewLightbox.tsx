@@ -22,7 +22,9 @@ import {
   X,
   ImageOff,
   Download,
+  Copy,
   Crop as CropIcon,
+  Maximize2,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -32,6 +34,7 @@ import { downloadFromUrl } from "./downloadAsset";
 import { loadModelViewer } from "@/lib/loadModelViewer";
 import { ImageCropTool } from "./ImageCropTool";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { AudioPlayButton } from "./AudioPlayButton";
 
 export interface PreviewPayload {
   type: "image" | "video" | "audio" | "text" | "grid" | "model3d";
@@ -49,7 +52,18 @@ export interface PreviewPayload {
   poster?: string;
   label?: string;
   caption?: string;
+  /** Prompt or source instruction to show in the inspector sidebar. */
+  prompt?: string;
+  /** Compact settings chips shown in the inspector sidebar. */
+  settings?: PreviewSetting[];
 }
+
+export type PreviewSetting =
+  | string
+  | {
+      label: string;
+      value?: string | number | null;
+    };
 
 interface Props {
   preview: PreviewPayload;
@@ -63,7 +77,7 @@ interface Props {
 }
 
 const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   // Crop-tool toggle. When true the lightbox renders the
   // ImageCropTool overlay on top of the preview. Esc / Cancel
   // bubbles back here to close the tool without closing the
@@ -183,6 +197,29 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
       ? (mirroredModelUrl ?? preview.model_url)
       : undefined;
   const canDownloadModel = preview.type === "model3d" && !!modelDownloadUrl;
+  const isMediaInspector =
+    (preview.type === "image" || preview.type === "video") && !!preview.url;
+  const inspectorPrompt =
+    preview.prompt?.trim() ||
+    (preview.label && preview.label !== "asset" ? preview.label : "") ||
+    "";
+  const inspectorSettings = normalizePreviewSettings(preview);
+  const copyPrompt = async () => {
+    if (!inspectorPrompt) return;
+    try {
+      await navigator.clipboard.writeText(inspectorPrompt);
+    } catch (err) {
+      console.warn("[NodePreviewLightbox] copy prompt failed:", err);
+    }
+  };
+  const copyUrl = async () => {
+    if (!preview.url) return;
+    try {
+      await navigator.clipboard.writeText(preview.url);
+    } catch (err) {
+      console.warn("[NodePreviewLightbox] copy URL failed:", err);
+    }
+  };
 
   const previewTools = (mobile = false) => (
     <div
@@ -233,6 +270,195 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
       />
     </div>
   );
+
+  if (isMediaInspector && preview.url) {
+    const actionRows =
+      preview.type === "image"
+        ? [
+            {
+              icon: Download,
+              label: language === "th" ? "ดาวน์โหลด" : "Download",
+              onClick: () => void downloadFromUrl(preview.url!, preview.label),
+            },
+          ]
+        : [
+            {
+              icon: Download,
+              label: language === "th" ? "ดาวน์โหลดวิดีโอ" : "Download video",
+              onClick: () => void downloadFromUrl(preview.url!, preview.label),
+            },
+          ];
+
+    return createPortal(
+      <div
+        className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/78 p-5 backdrop-blur-md"
+        onClick={onClose}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div
+          className="relative flex h-[min(90vh,820px)] w-[min(94vw,1580px)] overflow-hidden rounded-[18px] border border-white/12 bg-[#0f1012] shadow-[0_24px_90px_rgba(0,0,0,.72)]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="min-w-0 flex-1 bg-black">
+            {preview.type === "image" ? (
+              <img
+                src={preview.url}
+                alt={preview.label ?? t("workspace.lightbox.alt_preview")}
+                className="h-full w-full object-contain"
+                draggable={false}
+              />
+            ) : (
+              <video
+                src={preview.url}
+                controls
+                autoPlay
+                className="h-full w-full bg-black object-contain"
+              />
+            )}
+          </div>
+
+          <aside className="flex w-[344px] shrink-0 flex-col border-l border-white/8 bg-[#101113] px-4 py-4 text-white">
+            <div className="flex items-center justify-end gap-1">
+              <InspectorIconButton
+                icon={Maximize2}
+                label={language === "th" ? "เต็มจอ" : "Fullscreen"}
+                onClick={() => {
+                  if (document.fullscreenElement) {
+                    void document.exitFullscreen();
+                  } else {
+                    void document.documentElement.requestFullscreen();
+                  }
+                }}
+              />
+              {canCrop && (
+                <InspectorIconButton
+                  icon={CropIcon}
+                  label={language === "th" ? "ครอป" : "Crop"}
+                  onClick={() => setCropOpen(true)}
+                />
+              )}
+              <InspectorIconButton
+                icon={Copy}
+                label={language === "th" ? "คัดลอก URL" : "Copy URL"}
+                onClick={copyUrl}
+              />
+              <InspectorIconButton
+                icon={Download}
+                label={language === "th" ? "ดาวน์โหลด" : "Download"}
+                onClick={() => void downloadFromUrl(preview.url!, preview.label)}
+              />
+            </div>
+
+            <div className="mt-7">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                  Prompt
+                </p>
+                {inspectorPrompt && (
+                  <button
+                    type="button"
+                    onClick={copyPrompt}
+                    className="grid h-6 w-6 place-items-center rounded-md text-zinc-400 transition hover:bg-white/[0.06] hover:text-white"
+                    aria-label={language === "th" ? "คัดลอก prompt" : "Copy prompt"}
+                    title={language === "th" ? "คัดลอก prompt" : "Copy prompt"}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              <div className="mt-4 text-[13px] font-semibold leading-relaxed text-white">
+                {inspectorPrompt || (
+                  <span className="font-medium text-zinc-500">
+                    {language === "th" ? "ไม่มี prompt" : "No prompt"}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-7">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                Settings
+              </p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {inspectorSettings.length > 0 ? (
+                  inspectorSettings.map((setting) => (
+                    <span
+                      key={`${setting.label}:${setting.value ?? ""}`}
+                      className="max-w-full truncate rounded-md bg-white/[0.08] px-2 py-1 text-[10px] font-semibold leading-none text-zinc-200"
+                    >
+                      {setting.value == null || setting.value === ""
+                        ? setting.label
+                        : `${setting.label}: ${setting.value}`}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-[12px] text-zinc-500">
+                    {language === "th" ? "ไม่มีข้อมูล setting" : "No settings"}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-auto space-y-2 pb-1">
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                {language === "th" ? "เครื่องมือ" : "Tools"}
+              </p>
+              {actionRows.map((action) => (
+                <button
+                  key={action.label}
+                  type="button"
+                  onClick={action.onClick}
+                  className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-[12px] font-medium text-zinc-300 transition hover:bg-white/[0.07] hover:text-white"
+                >
+                  <action.icon className="h-4 w-4 shrink-0 text-zinc-400" />
+                  <span>{action.label}</span>
+                </button>
+              ))}
+              {preview.type === "image" && (
+                <button
+                  type="button"
+                  onClick={canCrop ? () => setCropOpen(true) : undefined}
+                  disabled={!canCrop}
+                  className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-white text-[12px] font-semibold text-zinc-950 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <CropIcon className="h-4 w-4" />
+                  {language === "th" ? "แก้ไขรูปภาพ" : "Edit Image"}
+                </button>
+              )}
+            </div>
+          </aside>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t("workspace.lightbox.close_preview")}
+          className="absolute right-6 top-6 grid h-9 w-9 place-items-center rounded-full bg-zinc-700 text-white shadow-xl transition hover:bg-zinc-500"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        {cropOpen && preview.type === "image" && preview.url && onCropConfirmed && (
+          <ImageCropTool
+            src={preview.url}
+            suggestedFilename={`${preview.label ?? "image"}.png`}
+            onCancel={() => setCropOpen(false)}
+            onCropConfirmed={async (blob, filename) => {
+              try {
+                await onCropConfirmed(blob, filename);
+                setCropOpen(false);
+                onClose();
+              } catch (err) {
+                console.error("[NodePreviewLightbox] crop save failed:", err);
+              }
+            }}
+          />
+        )}
+      </div>,
+      document.body,
+    );
+  }
 
   return createPortal(
     <div
@@ -332,11 +558,16 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
         )}
 
         {preview.type === "audio" && preview.url && (
-          <div className="flex flex-col items-center gap-3 rounded-md bg-zinc-900 p-6">
+          <div className="flex min-h-[220px] min-w-[280px] flex-col items-center justify-center gap-4 rounded-md bg-zinc-900 p-6">
             <div className="text-xs uppercase tracking-wide text-zinc-500">
               Audio
             </div>
-            <audio src={preview.url} controls autoPlay className="w-[480px] max-w-[calc(90vw-88px)]" />
+            <AudioPlayButton
+              src={preview.url}
+              autoPlay
+              label={preview.label ?? "Play audio"}
+              buttonClassName="h-14 w-14"
+            />
           </div>
         )}
 
@@ -516,6 +747,50 @@ function PreviewToolButton({
   );
 }
 
+function InspectorIconButton({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className="grid h-7 w-7 place-items-center rounded-md text-zinc-400 transition hover:bg-white/[0.07] hover:text-white"
+    >
+      <Icon className="h-3.5 w-3.5" />
+    </button>
+  );
+}
+
+function normalizePreviewSettings(preview: PreviewPayload) {
+  const settings: Array<{ label: string; value?: string | number | null }> = [];
+  for (const setting of preview.settings ?? []) {
+    if (typeof setting === "string") {
+      if (setting.trim()) settings.push({ label: setting.trim() });
+      continue;
+    }
+    if (setting.label?.trim()) {
+      settings.push({
+        label: setting.label.trim(),
+        value: setting.value,
+      });
+    }
+  }
+  if (settings.length === 0 && preview.caption?.trim()) {
+    for (const part of preview.caption.split(/[·|]/).map((item) => item.trim())) {
+      if (part) settings.push({ label: part });
+    }
+  }
+  return settings.slice(0, 8);
+}
+
 export default NodePreviewLightbox;
 
 /* ── Helper: pull a downloadable URL + label from any node ────
@@ -568,6 +843,47 @@ export function getNodeDownloadable(
 
 /* ── Helper: build a PreviewPayload from any node ─────────────── */
 
+function cleanPreviewText(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function getNodePromptMeta(
+  data: Record<string, unknown>,
+  generation?: Record<string, unknown>,
+) {
+  const params = data.params as Record<string, unknown> | undefined;
+  return cleanPreviewText(params?.prompt) ??
+    cleanPreviewText(data.prompt) ??
+    cleanPreviewText(generation?.prompt_used) ??
+    cleanPreviewText(generation?.prompt);
+}
+
+function getNodePreviewSettings(
+  data: Record<string, unknown>,
+  generation?: Record<string, unknown>,
+): PreviewSetting[] {
+  const params = data.params as Record<string, unknown> | undefined;
+  const settings: PreviewSetting[] = [];
+  const add = (label: string, value?: unknown) => {
+    const cleanValue =
+      typeof value === "number" || typeof value === "string" ? value : undefined;
+    if (cleanValue == null || cleanValue === "") return;
+    settings.push({ label, value: cleanValue });
+  };
+
+  const model =
+    cleanPreviewText(params?.model_name) ??
+    cleanPreviewText(data.model) ??
+    cleanPreviewText(generation?.model);
+  if (model) settings.push({ label: model });
+  add("Aspect", params?.ratio ?? params?.aspect_ratio ?? params?.size);
+  add("Duration", params?.duration ? `${params.duration}s` : undefined);
+  add("Quality", params?.quality ?? params?.resolution);
+  add("Format", params?.output_format);
+  add("Created", generation?.created_at ?? data.created_at);
+  return settings;
+}
+
 export function getNodePreview(
   node: Node,
   allNodes: ReadonlyArray<Node>,
@@ -612,6 +928,8 @@ export function getNodePreview(
       url,
       label: labelOf("asset"),
       caption: (d.fileName as string | undefined) ?? undefined,
+      prompt: getNodePromptMeta(d),
+      settings: getNodePreviewSettings(d),
     };
   }
 
@@ -628,7 +946,13 @@ export function getNodePreview(
       (u): u is string => typeof u === "string" && !!u,
     );
     if (all.length === 1) {
-      return { type: "image", url: all[0], label: labelOf("element") };
+      return {
+        type: "image",
+        url: all[0],
+        label: labelOf("element"),
+        prompt: getNodePromptMeta(d),
+        settings: getNodePreviewSettings(d),
+      };
     }
     if (all.length > 1) {
       return {
@@ -690,6 +1014,8 @@ export function getNodePreview(
         : 0;
     const g = gens[idx] ?? gens[0];
     const gType = (g.type as string | undefined) ?? "image";
+    const prompt = getNodePromptMeta(d, g);
+    const settings = getNodePreviewSettings(d, g);
     // 3D model output (Tripo3D) — render fullscreen viewer rather
     // than the still preview image. `model_url` is set alongside the
     // rendered_image `url` whenever a GLB is available.
@@ -700,6 +1026,8 @@ export function getNodePreview(
         model_url: modelUrl,
         poster: g.url as string | undefined,
         label: labelOf(),
+        prompt,
+        settings,
         caption: `Generation ${idx + 1} / ${gens.length} · drag to rotate`,
       };
     }
@@ -718,6 +1046,8 @@ export function getNodePreview(
       url,
       label: labelOf(),
       caption: `Generation ${idx + 1} / ${gens.length}`,
+      prompt,
+      settings,
     };
   }
 

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { Generation } from "./NodeResultBar";
+import { AudioPlayButton } from "./AudioPlayButton";
 
 interface Props {
   open: boolean;
@@ -66,11 +67,10 @@ const NodeResultDialog = memo(
                 <div className="text-[11px] uppercase tracking-wide text-zinc-500">
                   Audio output
                 </div>
-                <audio
+                <AudioPlayButton
                   src={current.url}
-                  controls
-                  autoPlay={false}
-                  className="w-[420px] max-w-[80vw]"
+                  label="Play audio"
+                  buttonClassName="h-14 w-14"
                 />
               </div>
             )}

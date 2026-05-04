@@ -7,11 +7,9 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, MailCheck, ArrowLeft, Phone } from "lucide-react";
-import logo from "@/assets/logo-white.png";
+import { Loader2, MailCheck, ArrowLeft, Phone, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrgBranding } from "@/hooks/useOrgBranding";
-import { useIsMobile } from "@/hooks/use-mobile";
 import PhoneOtpLogin from "@/components/auth/PhoneOtpLogin";
 import OrgLoginPanel from "@/components/auth/OrgLoginPanel";
 import { resolveOrgLogin, type OrgLoginResolution } from "@/lib/orgLoginResolver";
@@ -30,13 +28,19 @@ const normalizePostAuthPath = (path: string) => {
   return path;
 };
 
-const Auth = () => {
+type AuthProps = {
+  mode?: "page" | "modal";
+  onClose?: () => void;
+  redirectPath?: string | null;
+};
+
+const Auth = ({ mode = "page", onClose, redirectPath }: AuthProps) => {
   useDocumentTitle("Sign in — MediaForge");
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { t } = useLanguage();
-  const isMobile = useIsMobile();
+  const isModal = mode === "modal";
   // Tenant subdomain branding (e.g. dmd.mediaforge.co). When the user
   // lands on a claimed host we swap the MediaForge logo for the tenant
   // logo so they see "their" brand on sign-in. Falls back to MediaForge
@@ -92,9 +96,13 @@ const Auth = () => {
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
-    const redirectParam = searchParams.get("redirect");
-    const callbackUrl = redirectParam
-      ? `${window.location.origin}/auth?redirect=${encodeURIComponent(redirectParam)}`
+    const redirectTarget = redirectPath ?? searchParams.get("redirect");
+    const safeRedirectTarget =
+      redirectTarget && redirectTarget.startsWith("/") && !redirectTarget.startsWith("//")
+        ? normalizePostAuthPath(redirectTarget)
+        : null;
+    const callbackUrl = safeRedirectTarget
+      ? `${window.location.origin}/auth?redirect=${encodeURIComponent(safeRedirectTarget)}`
       : `${window.location.origin}/auth`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -146,6 +154,9 @@ const Auth = () => {
    * product doesn't grant credits via shareable links.
    */
   const resolveRedirect = () => {
+    if (redirectPath && redirectPath.startsWith("/") && !redirectPath.startsWith("//")) {
+      return normalizePostAuthPath(redirectPath);
+    }
     const fromState = (location.state as { from?: { pathname?: string; search?: string } } | null)?.from;
     if (fromState?.pathname && fromState.pathname.startsWith("/") && !fromState.pathname.startsWith("//")) {
       return normalizePostAuthPath(`${fromState.pathname}${fromState.search ?? ""}`);
@@ -156,16 +167,19 @@ const Auth = () => {
   };
 
   const handlePostAuthSuccess = () => {
+    if (isModal) onClose?.();
     navigate(resolveRedirect(), { replace: true });
   };
 
   useEffect(() => {
     if (!user) return;
-    navigate(resolveRedirect(), { replace: true });
+    const target = resolveRedirect();
+    if (isModal) onClose?.();
+    navigate(target, { replace: true });
     // resolveRedirect is stable for our purposes — only depends on
     // searchParams which the URL controls.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate, user]);
+  }, [isModal, navigate, onClose, user]);
 
   if (user) return null;
 
@@ -215,60 +229,8 @@ const Auth = () => {
       setIsLoading(false);
     }
   };
-  return <div className="min-h-screen flex">
-      {/* Left Side - Logo with Animated Gradient */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden items-center justify-center">
-        {/* Animated gradient background */}
-        <div className="absolute inset-0 bg-[length:400%_400%] animate-[gradient-move_8s_ease_infinite]" style={{
-        backgroundImage: 'linear-gradient(135deg, hsl(257 61% 47%), hsl(283 47% 45%), hsl(257 61% 55%), hsl(240 50% 35%), hsl(283 47% 45%))'
-      }} />
-        {/* Floating orbs */}
-        <div className="absolute w-72 h-72 rounded-full bg-white/10 blur-3xl animate-[float1_6s_ease-in-out_infinite] top-[10%] left-[10%]" />
-        <div className="absolute w-56 h-56 rounded-full bg-fuchsia-400/15 blur-3xl animate-[float2_8s_ease-in-out_infinite] bottom-[15%] right-[10%]" />
-        <div className="absolute w-40 h-40 rounded-full bg-violet-300/10 blur-2xl animate-[float3_7s_ease-in-out_infinite] top-[50%] left-[50%]" />
-        {/* Logo — swaps to tenant brand on claimed subdomains. */}
-        {branding?.logoUrl ? (
-          <div className="relative z-10 flex flex-col items-center gap-4">
-            <img
-              src={branding.logoUrl}
-              alt={branding.displayName}
-              className="max-w-[45%] h-auto drop-shadow-2xl object-contain"
-            />
-            <div className="text-white/90 text-2xl font-semibold tracking-tight">
-              {branding.shortName}
-            </div>
-          </div>
-        ) : (
-          <img src={logo} alt="MediaForge" className="relative z-10 max-w-[45%] h-auto drop-shadow-2xl" />
-        )}
-      </div>
-
-      {/* Right Side - Auth Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 relative overflow-hidden bg-background">
-        {/* Mobile/Tablet gradient background */}
-        <div className="lg:hidden absolute inset-0 bg-[length:400%_400%] opacity-40 animate-[gradient-move_8s_ease_infinite]" style={{
-          backgroundImage: 'linear-gradient(135deg, hsl(257 61% 47%), hsl(283 47% 45%), hsl(257 61% 55%), hsl(240 50% 35%), hsl(283 47% 45%))'
-        }} />
-        <div className="lg:hidden absolute w-72 h-72 rounded-full bg-white/10 blur-3xl animate-[float1_6s_ease-in-out_infinite] top-[10%] left-[10%]" />
-        <div className="lg:hidden absolute w-56 h-56 rounded-full bg-fuchsia-400/15 blur-3xl animate-[float2_8s_ease-in-out_infinite] bottom-[15%] right-[10%]" />
-        <div className="relative z-10 w-full max-w-md space-y-8">
-          {/* Mobile Logo — same tenant override as the desktop hero. */}
-          <div className="lg:hidden flex flex-col items-center mb-8">
-            {branding?.logoUrl ? (
-              <>
-                <img
-                  src={branding.logoUrl}
-                  alt={branding.displayName}
-                  className="max-w-[120px] h-auto mb-2 object-contain"
-                />
-                <div className="text-foreground text-lg font-semibold tracking-tight">
-                  {branding.shortName}
-                </div>
-              </>
-            ) : (
-              <img src={logo} alt="MediaForge" className="max-w-[160px] h-auto mb-4" />
-            )}
-          </div>
+  const authContent = (
+    <div className="w-full space-y-6">
 
           {/* Email Verification Screen */}
           {emailSent ? (
@@ -312,7 +274,7 @@ const Auth = () => {
              <OrgLoginPanel
                email={orgEmail}
                resolution={orgResolution}
-               redirectPath={searchParams.get("redirect")}
+               redirectPath={redirectPath ?? searchParams.get("redirect")}
                onBack={exitOrgPanel}
              />
            ) : (
@@ -449,24 +411,75 @@ const Auth = () => {
           </>
            )}
 
+          {!isModal && (
           <p className="text-center text-sm text-muted-foreground">
             {t("authTermsText")}{" "}
-            <Link to="/terms" className="text-primary hover:underline">
+            <Link to="/terms" onClick={isModal ? onClose : undefined} className="text-primary hover:underline">
               {t("authTermsOfService")}
             </Link>{" "}
             {t("authAnd")}{" "}
-            <Link to="/privacy" className="text-primary hover:underline">
+            <Link to="/privacy" onClick={isModal ? onClose : undefined} className="text-primary hover:underline">
               {t("authPrivacyPolicy")}
             </Link>{" "}
             {t("authAnd")}{" "}
-            <Link to="/refund" className="text-primary hover:underline">
+            <Link to="/refund" onClick={isModal ? onClose : undefined} className="text-primary hover:underline">
               {t("authRefundPolicy" as any)}
             </Link>
           </p>
+          )}
           </>
           )}
+    </div>
+  );
+
+  const brandName = branding?.shortName || "MediaForge";
+  const authDialog = (
+    <div
+      role="dialog"
+      aria-modal={isModal}
+      aria-labelledby="auth-dialog-title"
+      className="relative max-h-[calc(100vh-32px)] w-full max-w-[460px] overflow-y-auto rounded-[20px] border border-[var(--border-overlay)] bg-[var(--bg-overlay)] p-6 text-white shadow-[0_24px_80px_rgba(0,0,0,.58)]"
+    >
+      <div className="pointer-events-none absolute inset-x-0 -top-24 h-44 bg-[radial-gradient(70%_70%_at_50%_0%,rgba(199,125,255,.28),rgba(155,77,224,.08)_52%,transparent_100%)]" />
+      <div className="relative mb-6 flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 id="auth-dialog-title" className="text-[24px] font-semibold leading-tight text-white">
+            {t("authModalWelcome", { brand: brandName })}
+          </h1>
+          <p className="mt-1 text-[14px] leading-5 text-white/55">
+            {t("authModalSubtitle")}
+          </p>
         </div>
+        {isModal && (
+          <button
+            type="button"
+            aria-label={t("authModalClose")}
+            onClick={onClose}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/45 transition hover:bg-white/10 hover:text-white"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
-    </div>;
+      <div className="relative [&_.bg-background]:bg-[var(--bg-overlay)] [&_.bg-muted]:bg-white/[0.06] [&_.border-border]:border-white/[0.12] [&_input]:h-11 [&_input]:rounded-[10px] [&_input]:border-white/[0.12] [&_input]:bg-[#111315] [&_input]:text-white [&_input]:placeholder:text-white/30 [&_label]:text-white/60">
+        {authContent}
+      </div>
+    </div>
+  );
+
+  if (isModal) {
+    return (
+      <div className="fixed inset-0 z-[1000] flex items-center justify-center overflow-y-auto bg-black/72 p-4 backdrop-blur-[3px]">
+        {authDialog}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--bg-app)] p-4">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[300px] bg-gradient-to-b from-[var(--brand-primary)]/18 via-[var(--brand-deep)]/8 to-transparent" />
+      {authDialog}
+    </div>
+  );
 };
 export default Auth;

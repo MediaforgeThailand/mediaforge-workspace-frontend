@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +21,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAuthModal } from "@/contexts/AuthModalContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useEducationStudentLock, useIsClassTeacher, useIsOrgAdmin } from "@/hooks/useIsOrgUser";
@@ -157,7 +158,9 @@ function UsageRow({
 
 export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, profile, signOut, loading: authLoading } = useAuth();
+  const { openAuthModal } = useAuthModal();
   const { t, language, setLanguage } = useLanguage();
   const { credits, loading: creditsLoading } = useCredits();
   const isOrgAdmin = useIsOrgAdmin();
@@ -174,8 +177,8 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
 
   // Guest fallback — when no user is signed in (the dashboard / home
   // is public per Workspace V2), render a compact "Sign in" pill in
-  // place of the credit-ring avatar. Clicking it deep-links to /auth
-  // with the current path remembered so the user lands back here
+  // place of the credit-ring avatar. Clicking it opens the shared auth
+  // modal with the current path remembered so the user lands back here
   // after authenticating.
   if (!user) {
     // Pin to absolute pixel values rather than `h-8` / `text-sm` —
@@ -200,8 +203,8 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
       } catch {
         // best effort — proceed to /auth either way
       }
-      navigate("/auth", {
-        state: { from: { pathname: window.location.pathname, search: window.location.search } },
+      openAuthModal({
+        redirectPath: `${location.pathname}${location.search}`,
       });
     };
     return (

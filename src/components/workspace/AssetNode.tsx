@@ -17,6 +17,7 @@ import { useFreshSignedUrl } from "./useFreshSignedUrl";
 import { PortIcon } from "./PortIcon";
 import { MiniSelect } from "./CompactParamWidgets";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { AudioPlayButton } from "./AudioPlayButton";
 
 export interface AssetNodeData {
   /** Editable label — this is what @-mentions reference. */
@@ -335,24 +336,17 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
           ) : d.fieldType === "audio" ? (
             <div
               className={cn(
-                "flex flex-col items-stretch gap-2 px-3 py-3",
+                "grid min-h-[104px] place-items-center px-3 py-3",
                 d.uploading && "opacity-50",
               )}
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center gap-2 text-[10px] text-zinc-400">
-                <Music className="h-3 w-3 shrink-0 text-amber-400" />
-                <span className="truncate font-mono">
-                  {d.fileName ?? "audio"}
-                </span>
-              </div>
-              <audio
+              <AudioPlayButton
                 src={livePreviewUrl}
-                controls
-                preload="metadata"
-                className="nodrag h-8 w-full"
+                label={d.fileName ?? "Play audio"}
+                buttonClassName="h-11 w-11"
               />
             </div>
           ) : (

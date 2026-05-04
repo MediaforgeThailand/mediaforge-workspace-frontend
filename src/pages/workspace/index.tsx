@@ -1875,20 +1875,20 @@ const SpacesShowcaseCard = ({
           </div>
         )
       ) : (
-        <div className="grid min-w-0 grid-cols-1 gap-2.5 sm:grid-cols-3">
+        <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3">
           {spaces.map((ws) => (
             <button
               key={ws.id}
               type="button"
               onClick={() => onOpen(ws.id)}
-              className="group/space flex min-w-0 flex-col gap-1.5 rounded-xl bg-[hsl(0_0%_4%)] p-1.5 transition-all hover:bg-white/[0.04]"
+              className="group/space flex min-w-0 flex-col gap-1 rounded-xl bg-[hsl(0_0%_4%)] p-1 transition-all hover:bg-white/[0.04]"
             >
-              <div className="aspect-video overflow-hidden rounded-lg bg-[hsl(0_0%_2%)]">
+              <div className="aspect-[5/4] overflow-hidden rounded-lg bg-[hsl(0_0%_2%)]">
                 <SpaceMediaPreview media={ws.previewMedia} />
               </div>
-              <div className="px-1 pb-0 text-left">
+              <div className="px-0.5 pb-0 text-left">
                 <div className="flex min-w-0 items-center gap-1.5">
-                  <div className="truncate text-[14.5px] font-medium text-zinc-100">
+                  <div className="truncate text-[12px] font-medium leading-[15px] text-zinc-100">
                     {ws.name}
                   </div>
                   {ws.educationStatus && ws.educationStatus !== "active" && (
@@ -1896,9 +1896,6 @@ const SpacesShowcaseCard = ({
                       {getEducationStatusLabel(ws.educationStatus)}
                     </span>
                   )}
-                </div>
-                <div className="text-[13.5px] text-zinc-500">
-                  {timeAgo(ws.updatedAt)}
                 </div>
               </div>
             </button>

@@ -50,6 +50,16 @@ interface PromptMentionTextareaProps {
    *  when the mouse leaves, so local component state alone is not
    *  enough to preserve the user's place in a long prompt. */
   scrollRestoreKey?: string | null;
+  /** Direct @mention options for non-ReactFlow surfaces such as the
+   *  standalone generator. When omitted, options still come from the
+   *  current ReactFlow graph exactly as before. */
+  mentionOptionsOverride?: Array<{
+    nodeId: string;
+    label: string;
+    type?: string;
+    icon?: MentionOption["icon"];
+    previewUrl?: string;
+  }> | null;
 }
 
 interface MentionOption {
@@ -57,6 +67,7 @@ interface MentionOption {
   label: string;
   type: string;
   icon: "image" | "video" | "text" | "ai" | "textvar";
+  previewUrl?: string;
   /** Whether this is a text variable (# trigger) or image/media mention (@ trigger) */
   isTextVar?: boolean;
 }
@@ -146,6 +157,83 @@ function getNodeDisplayLabel(data: Record<string, unknown>): string {
     if (typeof c === "string" && c.trim()) return c;
   }
   return "Untitled";
+}
+
+function getNodePreviewUrl(data: Record<string, unknown>): string | undefined {
+  const params = data.params as Record<string, unknown> | undefined;
+  const candidates = [
+    data.previewUrl,
+    data.preview_url,
+    data.thumbnailUrl,
+    data.thumbnail_url,
+    data.imageUrl,
+    data.image_url,
+    data.url,
+    data.fileUrl,
+    data.file_url,
+    params?.previewUrl,
+    params?.preview_url,
+    params?.thumbnailUrl,
+    params?.thumbnail_url,
+    params?.imageUrl,
+    params?.image_url,
+    params?.url,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) return candidate;
+  }
+
+  const generations = Array.isArray(data.generations)
+    ? (data.generations as Array<Record<string, unknown>>)
+    : [];
+  for (const generation of generations) {
+    const generatedCandidates = [
+      generation.previewUrl,
+      generation.preview_url,
+      generation.thumbnailUrl,
+      generation.thumbnail_url,
+      generation.imageUrl,
+      generation.image_url,
+      generation.url,
+      generation.outputUrl,
+      generation.output_url,
+    ];
+    for (const candidate of generatedCandidates) {
+      if (typeof candidate === "string" && candidate.trim()) return candidate;
+    }
+  }
+
+  return undefined;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function escapeAttr(value: string): string {
+  return escapeHtml(value).replace(/`/g, "&#096;");
+}
+
+function getMentionIconText(icon: MentionOption["icon"] | undefined): string {
+  if (icon === "image") return "🖼";
+  if (icon === "video") return "🎬";
+  if (icon === "textvar") return "📝";
+  if (icon === "text") return "💬";
+  return "✨";
+}
+
+function renderMentionPillHtml(option: MentionOption | undefined, fallbackLabel: string, isTextVar: boolean): string {
+  const label = option?.label ?? fallbackLabel;
+  const previewUrl = !isTextVar ? option?.previewUrl : undefined;
+  const visual = previewUrl
+    ? `<span class="mention-pill-preview"><img src="${escapeAttr(previewUrl)}" alt="" /></span>`
+    : `<span class="${isTextVar ? "textvar-pill-icon" : "mention-pill-icon"}">${escapeHtml(getMentionIconText(option?.icon ?? (isTextVar ? "textvar" : "ai")))}</span>`;
+  return `${visual}${escapeHtml(label)}`;
 }
 
 /**
@@ -299,6 +387,7 @@ const PromptMentionTextarea = memo(({
   allowedNodeIds = null,
   maxHeightPx = null,
   scrollRestoreKey = null,
+  mentionOptionsOverride = null,
 }: PromptMentionTextareaProps) => {
   const { t } = useLanguage();
   const { getNodes } = useReactFlow();
@@ -372,6 +461,15 @@ const PromptMentionTextarea = memo(({
    * the allowed types is mentionable" behaviour — used by TextNode
    * which doesn't have input ports. */
   const mentionOptions = useMemo((): MentionOption[] => {
+    if (mentionOptionsOverride) {
+      return mentionOptionsOverride.map((option) => ({
+        nodeId: option.nodeId,
+        label: option.label,
+        type: option.type ?? "assetNode",
+        icon: option.icon ?? "image",
+        previewUrl: option.previewUrl,
+      }));
+    }
     const nodes = getNodes();
     return nodes
       .filter((n) => {
@@ -387,9 +485,10 @@ const PromptMentionTextarea = memo(({
           label: getNodeDisplayLabel(data),
           type: n.type || "unknown",
           icon: getNodeIcon(n.type || "", data),
+          previewUrl: getNodePreviewUrl(data),
         };
       });
-  }, [getNodes, excludeNodeId, allowedNodeTypes, allowedNodeIds]);
+  }, [getNodes, excludeNodeId, allowedNodeTypes, allowedNodeIds, mentionOptionsOverride]);
 
   /* ── Text var options (# trigger — textInputNode) ──
    * Same connection-aware filter as @ mentions: a #variable that
@@ -488,9 +587,7 @@ const PromptMentionTextarea = memo(({
         span.className = isTextVar ? "textvar-pill" : "mention-pill";
         const allOpts = [...mentionOptions, ...textVarOptions];
         const option = allOpts.find((o) => o.nodeId === seg.nodeId);
-        const iconName = option?.icon ?? (isTextVar ? "textvar" : "ai");
-        const iconText = iconName === "image" ? "🖼" : iconName === "video" ? "🎬" : iconName === "textvar" ? "📝" : iconName === "text" ? "💬" : "✨";
-        span.innerHTML = `<span class="${isTextVar ? "textvar-pill-icon" : "mention-pill-icon"}">${iconText}</span>${option?.label ?? seg.label}`;
+        span.innerHTML = renderMentionPillHtml(option, seg.label, isTextVar);
         frag.appendChild(span);
       }
     });
@@ -636,6 +733,12 @@ const PromptMentionTextarea = memo(({
     setMentionCaretRect({ top: rect.top, left: rect.left });
   }, [mentionOptions, textVarOptions]);
 
+  useEffect(() => {
+    if (showMentions || document.activeElement !== editorRef.current) return;
+    if (mentionOptions.length === 0 && textVarOptions.length === 0) return;
+    checkForMentionTrigger();
+  }, [checkForMentionTrigger, mentionOptions.length, showMentions, textVarOptions.length]);
+
   const handleInput = useCallback(() => {
     syncFromDom();
     // Save range on every input as failsafe
@@ -690,8 +793,7 @@ const PromptMentionTextarea = memo(({
     span.setAttribute("data-mention-id", option.nodeId);
     span.setAttribute("data-mention-label", option.label);
     span.className = isTextVar ? "textvar-pill" : "mention-pill";
-    const iconText = option.icon === "image" ? "🖼" : option.icon === "video" ? "🎬" : option.icon === "textvar" ? "📝" : option.icon === "text" ? "💬" : "✨";
-    span.innerHTML = `<span class="${isTextVar ? "textvar-pill-icon" : "mention-pill-icon"}">${iconText}</span>${option.label}`;
+    span.innerHTML = renderMentionPillHtml(option, option.label, isTextVar);
 
     // Step 4: Insert span + trailing space at the collapsed range position
     savedRange.insertNode(span);
@@ -837,9 +939,7 @@ const PromptMentionTextarea = memo(({
         span.className = isTextVar ? "textvar-pill" : "mention-pill";
         const allOpts = [...mentionOptions, ...textVarOptions];
         const option = allOpts.find((o) => o.nodeId === seg.nodeId);
-        const iconName = option?.icon ?? (isTextVar ? "textvar" : "ai");
-        const iconText = iconName === "image" ? "🖼" : iconName === "video" ? "🎬" : iconName === "textvar" ? "📝" : iconName === "text" ? "💬" : "✨";
-        span.innerHTML = `<span class="${isTextVar ? "textvar-pill-icon" : "mention-pill-icon"}">${iconText}</span>${option?.label ?? seg.label}`;
+        span.innerHTML = renderMentionPillHtml(option, seg.label, isTextVar);
         frag.appendChild(span);
         lastNode = span;
       }
@@ -1048,14 +1148,25 @@ const PromptMentionTextarea = memo(({
                 }}
                 onMouseDown={(e) => e.preventDefault()}
                 className={cn(
-                  "flex items-center gap-2 w-full text-left px-2 py-1.5 text-[11px] transition-colors",
+                  "flex items-center gap-2.5 w-full text-left px-2 py-2 text-[11px] transition-colors",
                   idx === selectedIndex
                     ? "bg-white/[0.08] text-white/90"
                     : "text-white/60 hover:bg-white/[0.05] hover:text-white/80",
                 )}
               >
-                <Icon className="w-3.5 h-3.5 shrink-0 text-white/40" />
-                <span className="truncate font-medium">{option.label}</span>
+                {option.previewUrl ? (
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-white/[0.04]">
+                    <img
+                      src={option.previewUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      draggable={false}
+                    />
+                  </span>
+                ) : (
+                  <Icon className="w-3.5 h-3.5 shrink-0 text-white/40" />
+                )}
+                <span className="min-w-0 flex-1 truncate font-medium">{option.label}</span>
                 <span className="ml-auto text-[9px] text-white/20 font-mono shrink-0">
                   {option.type.replace("Node", "")}
                 </span>
