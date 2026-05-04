@@ -107,6 +107,7 @@ export function CollaborationPresencePill() {
   );
 
   if (!isCanvasCollaborationEnabled()) return null;
+  if (members.length === 0 && status !== "connected") return null;
 
   return (
     <div

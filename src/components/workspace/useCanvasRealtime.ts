@@ -183,7 +183,7 @@ export function useCanvasRealtime() {
   const current = useWorkspaceStore((state) => state.current);
   const applyRemoteCanvasPatch = useWorkspaceStore((state) => state.applyRemoteCanvasPatch);
   const replaceCanvasGraph = useWorkspaceStore((state) => state.replaceCanvasGraph);
-  const channelRef = useRef<RealtimeChannel | null>(null);
+  const collaborationChannelRef = useRef<RealtimeChannel | null>(null);
   const lastGraphRef = useRef<CanvasGraph | null>(null);
   const remoteApplyingRef = useRef(false);
   const pendingTimerRef = useRef<number | null>(null);
@@ -198,16 +198,51 @@ export function useCanvasRealtime() {
     if (!canvasId || !user?.id) return;
     const collaborationEnabled = isCanvasCollaborationEnabled() && localCollaborator != null;
 
-    const channel = supabase.channel(`workspace-canvas:${canvasId}`, {
-      config: {
-        private: true,
-        broadcast: { self: false, ack: false },
-        presence: { key: clientId },
+    // Keep durable canvas sync independent from private presence/broadcast.
+    // Private Realtime can fail if realtime.messages policies are missing or
+    // temporarily unavailable; row updates should still flow through the
+    // workspace_canvases RLS-protected postgres_changes channel.
+    const dbChannel = supabase.channel(`workspace-canvas-db:${canvasId}`);
+
+    dbChannel.on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "workspace_canvases",
+        filter: `id=eq.${canvasId}`,
       },
+      (payload) => {
+        const row = payload.new as Record<string, unknown>;
+        if (row.updated_by === user.id) return;
+        const graph = toGraph(row);
+        if (!graph) return;
+        const currentGraph = useWorkspaceStore.getState().graphs[canvasId];
+        if (currentGraph && graphFingerprint(currentGraph) === graphFingerprint(graph)) return;
+        remoteApplyingRef.current = true;
+        replaceCanvasGraph(graph);
+      },
+    );
+
+    dbChannel.subscribe((status) => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        console.warn("[canvas-realtime] canvas row subscription disconnected", status);
+      }
     });
-    channelRef.current = channel;
+
+    let collaborationChannel: RealtimeChannel | null = null;
+    let heartbeat: number | null = null;
 
     if (collaborationEnabled && localCollaborator) {
+      const liveChannel = supabase.channel(`workspace-canvas:${canvasId}`, {
+        config: {
+          private: true,
+          broadcast: { self: false, ack: false },
+          presence: { key: clientId },
+        },
+      });
+      collaborationChannel = liveChannel;
+      collaborationChannelRef.current = liveChannel;
       const collaboration = useCanvasCollaborationStore.getState();
       collaboration.setLocalUser(localCollaborator);
       collaboration.setStatus("connecting");
@@ -215,7 +250,7 @@ export function useCanvasRealtime() {
       const trackPresence = () => {
         const state = useCanvasCollaborationStore.getState();
         if (!state.localUser) return;
-        void channel.track({
+        void liveChannel.track({
           ...state.localUser,
           onlineAt: Date.now(),
           cursorEnabled: state.cursorEnabled,
@@ -237,7 +272,7 @@ export function useCanvasRealtime() {
             avatarUrl: state.localUser.avatarUrl,
             color: state.localUser.color,
           };
-          void channel.send({
+          void liveChannel.send({
             type: "broadcast",
             event: CURSOR_EVENT,
             payload,
@@ -248,7 +283,7 @@ export function useCanvasRealtime() {
           if (!state.localUser) return;
           const localUser = { ...state.localUser, selectedNodeId };
           state.setLocalUser(localUser);
-          void channel.track({
+          void liveChannel.track({
             ...localUser,
             onlineAt: Date.now(),
             cursorEnabled: state.cursorEnabled,
@@ -256,55 +291,33 @@ export function useCanvasRealtime() {
         },
       });
 
-      channel.on("presence", { event: "sync" }, () => {
+      liveChannel.on("presence", { event: "sync" }, () => {
         useCanvasCollaborationStore
           .getState()
-          .setMembers(flattenPresenceState(channel.presenceState() as Record<string, unknown[]>));
+          .setMembers(flattenPresenceState(liveChannel.presenceState() as Record<string, unknown[]>));
       });
-    }
 
-    channel.on("broadcast", { event: BROADCAST_EVENT }, ({ payload }) => {
-      const patch = payload as PatchPayload | undefined;
-      if (!patch || patch.canvasId !== canvasId || patch.clientId === clientId) return;
+      liveChannel.on("broadcast", { event: BROADCAST_EVENT }, ({ payload }) => {
+        const patch = payload as PatchPayload | undefined;
+        if (!patch || patch.canvasId !== canvasId || patch.clientId === clientId) return;
 
-      remoteApplyingRef.current = true;
-      if (patch.kind === "node_positions") {
-        applyRemoteCanvasPatch(canvasId, {
-          nodePositions: patch.nodePositions,
-          updatedAt: patch.sentAt,
-        });
-      } else {
-        applyRemoteCanvasPatch(canvasId, {
-          nodes: patch.nodes,
-          edges: patch.edges,
-          viewport: patch.viewport,
-          updatedAt: patch.sentAt,
-        });
-      }
-    });
-
-    channel.on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "workspace_canvases",
-        filter: `id=eq.${canvasId}`,
-      },
-      (payload) => {
-        const row = payload.new as Record<string, unknown>;
-        if (row.updated_by === user.id) return;
-        const graph = toGraph(row);
-        if (!graph) return;
-        const currentGraph = useWorkspaceStore.getState().graphs[canvasId];
-        if (currentGraph && graphFingerprint(currentGraph) === graphFingerprint(graph)) return;
         remoteApplyingRef.current = true;
-        replaceCanvasGraph(graph);
-      },
-    );
+        if (patch.kind === "node_positions") {
+          applyRemoteCanvasPatch(canvasId, {
+            nodePositions: patch.nodePositions,
+            updatedAt: patch.sentAt,
+          });
+        } else {
+          applyRemoteCanvasPatch(canvasId, {
+            nodes: patch.nodes,
+            edges: patch.edges,
+            viewport: patch.viewport,
+            updatedAt: patch.sentAt,
+          });
+        }
+      });
 
-    if (collaborationEnabled) {
-      channel.on("broadcast", { event: CURSOR_EVENT }, ({ payload }) => {
+      liveChannel.on("broadcast", { event: CURSOR_EVENT }, ({ payload }) => {
         const message = payload as CursorPayload | undefined;
         if (!message || message.canvasId !== canvasId || message.clientId === clientId) return;
         useCanvasCollaborationStore.getState().upsertMember({
@@ -326,34 +339,33 @@ export function useCanvasRealtime() {
             : null,
         });
       });
+
+      liveChannel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          const state = useCanvasCollaborationStore.getState();
+          state.setStatus("connected");
+          state.senders.trackPresence?.();
+        }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          useCanvasCollaborationStore.getState().setStatus("error");
+          console.warn("[canvas-realtime] collaboration channel disconnected", status);
+        }
+      });
+
+      heartbeat = window.setInterval(() => {
+        useCanvasCollaborationStore.getState().senders.trackPresence?.();
+      }, 15_000);
     }
-
-    channel.subscribe((status) => {
-      if (status === "SUBSCRIBED" && collaborationEnabled) {
-        const state = useCanvasCollaborationStore.getState();
-        state.setStatus("connected");
-        state.senders.trackPresence?.();
-      }
-      if (status === "CHANNEL_ERROR") {
-        if (collaborationEnabled) useCanvasCollaborationStore.getState().setStatus("error");
-        console.warn("[canvas-realtime] channel authorization failed or disconnected");
-      }
-    });
-
-    const heartbeat = collaborationEnabled
-      ? window.setInterval(() => {
-          useCanvasCollaborationStore.getState().senders.trackPresence?.();
-        }, 15_000)
-      : null;
 
     return () => {
       if (pendingTimerRef.current) window.clearTimeout(pendingTimerRef.current);
       if (heartbeat) window.clearInterval(heartbeat);
+      void supabase.removeChannel(dbChannel);
       if (collaborationEnabled) {
         useCanvasCollaborationStore.getState().clearMembers();
       }
-      channelRef.current = null;
-      void supabase.removeChannel(channel);
+      collaborationChannelRef.current = null;
+      if (collaborationChannel) void supabase.removeChannel(collaborationChannel);
     };
   }, [applyRemoteCanvasPatch, clientId, current?.id, localCollaborator, replaceCanvasGraph, user?.id]);
 
@@ -375,7 +387,7 @@ export function useCanvasRealtime() {
       return;
     }
 
-    const channel = channelRef.current;
+    const channel = collaborationChannelRef.current;
     if (!channel || !canMutate || !user?.id) {
       lastGraphRef.current = current;
       return;
