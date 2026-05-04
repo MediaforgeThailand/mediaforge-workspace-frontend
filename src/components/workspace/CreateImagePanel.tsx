@@ -99,6 +99,17 @@ interface CreateVideoPanelFrameSlot {
   onRemove?: () => void;
 }
 
+interface CreateVideoPanelReferenceSlot {
+  id: string;
+  label: string;
+  accept: "image" | "video";
+  refItem?: CreateImagePanelReference | null;
+  uploading?: boolean;
+  onFiles?: (files: File[]) => void;
+  onSelectAsset?: (reference: CreateImagePanelReference) => void;
+  onRemove?: () => void;
+}
+
 export interface CreateVideoPanelSetting {
   id: string;
   label: string;
@@ -136,6 +147,7 @@ interface CreateVideoPanelProps {
   supportsFrameMode?: boolean;
   supportsReferenceMode?: boolean;
   frameSlots?: CreateVideoPanelFrameSlot[];
+  referenceSlots?: CreateVideoPanelReferenceSlot[];
   references?: CreateImagePanelReference[];
   maxReferences?: number;
   referenceTitle?: string;
@@ -513,6 +525,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
   supportsFrameMode = true,
   supportsReferenceMode = true,
   frameSlots = [],
+  referenceSlots = [],
   references = [],
   maxReferences = 4,
   referenceTitle = "Add visual references",
@@ -538,6 +551,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
 }) => {
   const [modelOpen, setModelOpen] = useState(false);
   const [referenceOpen, setReferenceOpen] = useState(false);
+  const [referenceSlotId, setReferenceSlotId] = useState<string | null>(null);
   const [historySlot, setHistorySlot] = useState<CreateVideoPanelFrameSlot | null>(null);
   const [modeState, setModeState] = useState<VideoInputMode>("frames");
   const [bottomState, setBottomState] = useState<BottomTab>("video");
@@ -561,6 +575,9 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           ? "reference"
           : "frames";
   const visibleFrameSlots = frameSlots.filter(Boolean);
+  const visibleReferenceSlots = referenceSlots.filter(Boolean);
+  const activeReferenceSlot =
+    visibleReferenceSlots.find((slot) => slot.id === referenceSlotId) ?? null;
   const referenceAcceptsImage = referenceAccept.includes("image");
   const referenceAcceptsVideo = referenceAccept.includes("video");
 
@@ -592,6 +609,18 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
     if (!onReferenceFiles && !onSelectReferenceAsset) {
       onAddReferences?.();
     }
+  };
+
+  const openReferenceSlotPicker = (slot: CreateVideoPanelReferenceSlot) => {
+    setReferenceSlotId(slot.id);
+  };
+
+  const addReferenceSlotFiles = (
+    slot: CreateVideoPanelReferenceSlot,
+    files: FileList | File[] | null | undefined,
+  ) => {
+    const list = Array.from(files ?? []);
+    if (list.length > 0) slot.onFiles?.(list);
   };
 
   const addDroppedReferenceFiles = (files: FileList | File[] | null | undefined) => {
@@ -682,6 +711,22 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           onDeleteAsset={onDeleteReferenceAsset}
         />
         <ReferencePicker
+          open={!!activeReferenceSlot}
+          onClose={() => setReferenceSlotId(null)}
+          title={activeReferenceSlot?.label ?? "Add visual reference"}
+          references={activeReferenceSlot?.refItem ? [activeReferenceSlot.refItem] : []}
+          assets={referenceAssets.filter((asset) =>
+            activeReferenceSlot?.accept === "video"
+              ? asset.mime?.startsWith("video/")
+              : !asset.mime?.startsWith("video/"),
+          )}
+          accept={activeReferenceSlot?.accept === "video" ? "video/*" : "image/*"}
+          onFiles={activeReferenceSlot?.onFiles}
+          onSelectAsset={activeReferenceSlot?.onSelectAsset}
+          onDeleteAsset={onDeleteReferenceAsset}
+          closeOnSelect
+        />
+        <ReferencePicker
           open={!!historySlot}
           onClose={() => setHistorySlot(null)}
           title="Image History"
@@ -718,80 +763,93 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
 
           {activeMode === "reference" && (
             <>
-              <div className="relative overflow-hidden rounded-[8px]">
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={openReferencePicker}
-                  onKeyDown={(event) => {
-                    if (event.key !== "Enter" && event.key !== " ") return;
-                    event.preventDefault();
-                    openReferencePicker();
-                  }}
-                  onPaste={handleReferencePaste}
-                  onDragEnter={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                  }}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                  }}
-                  onDrop={handleReferenceDrop}
-                  className={clsx(
-                    "flex items-center gap-[12px] rounded-[8px] border border-[#ff24c5]/95 bg-[#f8008d]/[0.08] px-[12px] py-[8px] shadow-[inset_0_-8px_24px_0_rgba(255,26,198,0.18),inset_0_2px_6px_0_rgba(255,26,198,0.18),inset_0_-4px_8px_0_rgba(255,26,198,0.3)] transition-all outline-none focus:ring-1 focus:ring-[#ff24c5]/70",
-                    onAddReferences || onReferenceFiles || onSelectReferenceAsset ? "cursor-pointer" : "cursor-default",
-                  )}
-                >
-                  <div className="flex -space-x-[8px]">
-                    {references.length > 0 ? (
-                      references.slice(0, 3).map((reference) => (
-                        reference.mime?.startsWith("video/") ? (
-                          <div
-                            key={reference.id}
-                            className="grid h-[40px] w-[40px] place-items-center rounded-[4px] bg-[#16181a] ring-2 ring-[#121314]"
-                          >
-                            <Video className="h-[18px] w-[18px] text-white/80" />
-                          </div>
-                        ) : (
+              {visibleReferenceSlots.length > 0 ? (
+                <div className="grid grid-cols-2 gap-[8px]">
+                  {visibleReferenceSlots.map((slot) => (
+                    <MotionReferenceSlot
+                      key={slot.id}
+                      slot={slot}
+                      onOpen={() => openReferenceSlotPicker(slot)}
+                      onFiles={(files) => addReferenceSlotFiles(slot, files)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="relative overflow-hidden rounded-[8px]">
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={openReferencePicker}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      openReferencePicker();
+                    }}
+                    onPaste={handleReferencePaste}
+                    onDragEnter={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    onDrop={handleReferenceDrop}
+                    className={clsx(
+                      "flex items-center gap-[12px] rounded-[8px] border border-[#ff24c5]/95 bg-[#f8008d]/[0.08] px-[12px] py-[8px] shadow-[inset_0_-8px_24px_0_rgba(255,26,198,0.18),inset_0_2px_6px_0_rgba(255,26,198,0.18),inset_0_-4px_8px_0_rgba(255,26,198,0.3)] transition-all outline-none focus:ring-1 focus:ring-[#ff24c5]/70",
+                      onAddReferences || onReferenceFiles || onSelectReferenceAsset ? "cursor-pointer" : "cursor-default",
+                    )}
+                  >
+                    <div className="flex -space-x-[8px]">
+                      {references.length > 0 ? (
+                        references.slice(0, 3).map((reference) => (
+                          reference.mime?.startsWith("video/") ? (
+                            <div
+                              key={reference.id}
+                              className="grid h-[40px] w-[40px] place-items-center rounded-[4px] bg-[#16181a] ring-2 ring-[#121314]"
+                            >
+                              <Video className="h-[18px] w-[18px] text-white/80" />
+                            </div>
+                          ) : (
+                            <img
+                              key={reference.id}
+                              src={reference.url}
+                              alt=""
+                              className="h-[40px] w-[40px] rounded-[4px] object-cover ring-2 ring-[#121314]"
+                            />
+                          )
+                        ))
+                      ) : referenceAcceptsImage ? (
+                        DEFAULT_REFERENCE_THUMBS.map((src) => (
                           <img
-                            key={reference.id}
-                            src={reference.url}
+                            key={src}
+                            src={src}
                             alt=""
                             className="h-[40px] w-[40px] rounded-[4px] object-cover ring-2 ring-[#121314]"
                           />
-                        )
-                      ))
-                    ) : referenceAcceptsImage ? (
-                      DEFAULT_REFERENCE_THUMBS.map((src) => (
-                        <img
-                          key={src}
-                          src={src}
-                          alt=""
-                          className="h-[40px] w-[40px] rounded-[4px] object-cover ring-2 ring-[#121314]"
-                        />
-                      ))
-                    ) : referenceAcceptsVideo ? (
-                      <div className="grid h-[40px] w-[40px] place-items-center rounded-[4px] bg-[#16181a] ring-2 ring-[#121314]">
-                        <Video className="h-[18px] w-[18px] text-white/80" />
-                      </div>
-                    ) : (
-                      <div className="h-[40px] w-[40px] rounded-[4px] bg-white/[0.06] ring-2 ring-[#121314]" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 items-center gap-[8px]">
-                      <span className="truncate text-[14px] font-semibold leading-[20px] text-white">{referenceTitle}</span>
+                        ))
+                      ) : referenceAcceptsVideo ? (
+                        <div className="grid h-[40px] w-[40px] place-items-center rounded-[4px] bg-[#16181a] ring-2 ring-[#121314]">
+                          <Video className="h-[18px] w-[18px] text-white/80" />
+                        </div>
+                      ) : (
+                        <div className="h-[40px] w-[40px] rounded-[4px] bg-white/[0.06] ring-2 ring-[#121314]" />
+                      )}
                     </div>
-                    <p className="mt-[2px] truncate text-[12px] leading-[16px] text-neutral-400">{referenceHint}</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center gap-[8px]">
+                        <span className="truncate text-[14px] font-semibold leading-[20px] text-white">{referenceTitle}</span>
+                      </div>
+                      <p className="mt-[2px] truncate text-[12px] leading-[16px] text-neutral-400">{referenceHint}</p>
+                    </div>
+                    <span className="self-start text-[12px] leading-[16px] text-neutral-300">
+                      {references.length}/{maxReferences}
+                    </span>
                   </div>
-                  <span className="self-start text-[12px] leading-[16px] text-neutral-300">
-                    {references.length}/{maxReferences}
-                  </span>
                 </div>
-              </div>
+              )}
 
-              {references.length > 0 && (
+              {visibleReferenceSlots.length === 0 && references.length > 0 && (
                 <div className="mt-[8px] flex flex-wrap gap-[8px]">
                   {references.map((reference, index) => (
                     <SelectedReferenceThumb
@@ -1087,6 +1145,86 @@ function FrameReferenceSlot({
           className="mx-auto mt-[4px] inline-flex h-[21px] min-w-[58px] items-center justify-center rounded-full border border-white/[0.06] bg-black/[0.18] px-[10px] text-center text-[10px] font-semibold leading-none text-neutral-400 transition hover:border-[#c77dff]/35 hover:bg-[#c77dff]/10 hover:text-white"
         >
           {slot.historyLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function MotionReferenceSlot({
+  slot,
+  onOpen,
+  onFiles,
+}: {
+  slot: CreateVideoPanelReferenceSlot;
+  onOpen: () => void;
+  onFiles: (files: FileList | File[] | null | undefined) => void;
+}) {
+  const refItem = slot.refItem;
+  const isVideo = slot.accept === "video";
+  const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    const files = Array.from(event.clipboardData.files ?? []);
+    if (files.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onFiles(files);
+  };
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onFiles(event.dataTransfer.files);
+  };
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onOpen();
+      }}
+      onPaste={handlePaste}
+      onDragEnter={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+      onDragOver={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+      onDrop={handleDrop}
+      className="group relative flex min-h-[76px] items-center gap-[10px] overflow-hidden rounded-[12px] border border-[#ff24c5]/55 bg-[#f8008d]/[0.06] p-[8px] outline-none shadow-[inset_0_-8px_22px_rgba(255,26,198,0.12),inset_0_1px_6px_rgba(255,255,255,0.04)] transition hover:border-[#ff24c5]/80 hover:bg-[#f8008d]/[0.1] focus:ring-1 focus:ring-[#ff24c5]/60"
+    >
+      <div className="grid h-[56px] w-[64px] shrink-0 place-items-center overflow-hidden rounded-[10px] bg-black/35 ring-1 ring-white/[0.08]">
+        {refItem ? (
+          refItem.mime?.startsWith("video/") ? (
+            <Video className="h-[20px] w-[20px] text-white/85" />
+          ) : (
+            <img src={refItem.url} alt="" className="h-full w-full object-cover" />
+          )
+        ) : slot.uploading ? (
+          <span className="h-[18px] w-[18px] animate-spin rounded-full border-2 border-white/70 border-t-transparent" />
+        ) : isVideo ? (
+          <Video className="h-[20px] w-[20px] text-white/70" />
+        ) : (
+          <ImageIcon className="h-[20px] w-[20px] text-white/70" />
+        )}
+      </div>
+      <span className="min-w-0 flex-1 truncate text-[14px] font-semibold leading-[20px] text-white">
+        {slot.label}
+      </span>
+      {slot.onRemove && refItem && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            slot.onRemove?.();
+          }}
+          className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full bg-black/45 text-white opacity-0 ring-1 ring-white/[0.08] backdrop-blur transition hover:bg-white hover:text-black group-hover:opacity-100"
+        >
+          <Trash2 className="h-[13px] w-[13px]" />
         </button>
       )}
     </div>
