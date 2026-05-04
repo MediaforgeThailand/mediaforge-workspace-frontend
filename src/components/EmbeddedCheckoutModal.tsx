@@ -16,6 +16,11 @@ import {
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
+import {
+  formatWorkspaceMoneyFromMinor,
+  normalizeWorkspaceCurrency,
+  type SupportedWorkspaceCurrency,
+} from "@/lib/workspaceCurrency";
 
 interface EmbeddedCheckoutModalProps {
   open: boolean;
@@ -25,6 +30,7 @@ interface EmbeddedCheckoutModalProps {
   packageId?: string;
   billingInterval?: "monthly" | "annual";
   teamSeats?: number;
+  currency?: SupportedWorkspaceCurrency;
 }
 
 // Singleton — load once per app lifetime
@@ -146,14 +152,17 @@ const EmbeddedCheckoutModal = ({
   packageId,
   billingInterval = "monthly",
   teamSeats,
+  currency = "thb",
 }: EmbeddedCheckoutModalProps) => {
+  const normalizedCurrency = normalizeWorkspaceCurrency(currency);
+  const isThaiCheckout = normalizedCurrency === "thb";
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [amount, setAmount] = useState<number>(0);
   const [success, setSuccess] = useState(false);
   const [publishableKey, setPublishableKey] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>("promptpay");
+  const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>(isThaiCheckout ? "promptpay" : "card");
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
@@ -168,7 +177,7 @@ const EmbeddedCheckoutModal = ({
       setClientSecret(null);
       setAmount(0);
       setSuccess(false);
-      setPaymentMethod("promptpay");
+      setPaymentMethod(isThaiCheckout ? "promptpay" : "card");
       setQrCodeUrl(null);
       setExpiresAt(null);
       setCheckoutUrl(null);
@@ -187,8 +196,8 @@ const EmbeddedCheckoutModal = ({
       setCheckoutUrl(null);
 
       try {
-        let useHostedCardCheckout = false;
-        if (paymentMethod === "card") {
+        let useHostedCardCheckout = !isThaiCheckout;
+        if (paymentMethod === "card" && isThaiCheckout) {
           const { data: keyData, error: keyErr } = await supabase.functions.invoke("get-stripe-key");
           if (!keyErr && keyData?.publishableKey) {
             setPublishableKey(keyData.publishableKey);
@@ -201,13 +210,13 @@ const EmbeddedCheckoutModal = ({
         }
 
         const fnName = mode === "topup" ? "create-topup" : "create-checkout";
-        const usePaymentIntent = paymentMethod === "promptpay" || !useHostedCardCheckout;
+        const usePaymentIntent = isThaiCheckout && (paymentMethod === "promptpay" || !useHostedCardCheckout);
         const body =
           mode === "topup"
-            ? { packageId, intent: usePaymentIntent, paymentMethod }
+            ? { packageId, intent: usePaymentIntent, paymentMethod, currency: normalizedCurrency }
             : mode === "team_seats"
-              ? { checkoutType: "team_seats", teamSeats, billingInterval, intent: usePaymentIntent, paymentMethod }
-              : { packageId, billingInterval, intent: usePaymentIntent, paymentMethod };
+              ? { checkoutType: "team_seats", teamSeats, billingInterval, intent: usePaymentIntent, paymentMethod, currency: normalizedCurrency }
+              : { packageId, billingInterval, intent: usePaymentIntent, paymentMethod, currency: normalizedCurrency };
 
         const { data, error: invokeErr } = await supabase.functions.invoke(fnName, { body });
         if (useHostedCardCheckout) {
@@ -238,14 +247,14 @@ const EmbeddedCheckoutModal = ({
     };
 
     void init();
-  }, [open, mode, packageId, billingInterval, teamSeats, paymentMethod]);
+  }, [open, mode, packageId, billingInterval, teamSeats, paymentMethod, normalizedCurrency, isThaiCheckout]);
 
   const stripeInstance = useMemo(
     () => (publishableKey ? getStripe(publishableKey) : null),
     [publishableKey]
   );
 
-  const amountLabel = amount ? `฿${(amount / 100).toLocaleString()}` : "";
+  const amountLabel = amount ? formatWorkspaceMoneyFromMinor(amount, normalizedCurrency) : "";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -266,13 +275,15 @@ const EmbeddedCheckoutModal = ({
               ชำระเงิน{amountLabel ? ` · ${amountLabel}` : ""}
             </DialogTitle>
             <DialogDescription className="text-xs text-violet-200/80">
-              เลือก PromptPay QR หรือบัตรเครดิต/เดบิต — ทำรายการในแอปได้ทันที
+              {isThaiCheckout
+                ? "เลือก PromptPay QR หรือบัตรเครดิต/เดบิต — ทำรายการในแอปได้ทันที"
+                : "Card-first Stripe subscription. Local card wallets may appear when your bank and country support them."}
             </DialogDescription>
           </DialogHeader>
         </div>
 
         <div className="relative px-6 pb-6">
-          {!success && (
+          {!success && isThaiCheckout && (
             <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-black/20 p-1">
               {(["promptpay", "card"] as const).map((method) => {
                 const selected = paymentMethod === method;

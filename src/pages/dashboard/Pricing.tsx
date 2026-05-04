@@ -10,6 +10,12 @@ import { cn } from "@/lib/utils";
 import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
 import { UserMenu } from "@/components/workspace/UserMenu";
+import {
+  WORKSPACE_CURRENCIES,
+  detectWorkspaceCurrency,
+  formatWorkspaceMoneyFromThb,
+  type SupportedWorkspaceCurrency,
+} from "@/lib/workspaceCurrency";
 // TopupSection import removed — workspace doesn't sell standalone
 // credit top-ups (the consumer product does, this surface doesn't).
 
@@ -176,6 +182,7 @@ const Pricing = () => {
   const [topupPackages, setTopupPackages] = useState<TopupPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [cycle, setCycle] = useState<CycleTab>("monthly");
+  const [currency, setCurrency] = useState<SupportedWorkspaceCurrency>(() => detectWorkspaceCurrency());
   const [submittingPlanId, setSubmittingPlanId] = useState<string | null>(null);
   const [, setOpeningPortal] = useState(false);
   const [checkoutPlan, setCheckoutPlan] = useState<SubscriptionPlan | null>(null);
@@ -196,6 +203,14 @@ const Pricing = () => {
       setLoading(false);
     });
   }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("workspace_currency", currency);
+    } catch {
+      // Ignore private browsing / disabled storage.
+    }
+  }, [currency]);
 
   // Toast on Stripe success redirect.
   useEffect(() => {
@@ -227,7 +242,7 @@ const Pricing = () => {
     // Need a Stripe price for the chosen cycle.
     const priceId =
       cycle === "annual" ? plan.stripe_price_id_annual : plan.stripe_price_id_monthly;
-    if (!priceId) {
+    if (false && !priceId) {
       toast({
         title: language === "th" ? "ยังไม่พร้อม" : "Not available",
         description:
@@ -310,6 +325,7 @@ const Pricing = () => {
       <section className="rounded-t-[28px] bg-[#1b1b1b] px-4 pb-[48px] pt-[22px] shadow-[0_-18px_50px_rgba(0,0,0,0.18)] sm:px-6 md:rounded-t-[34px]">
         <div className="mx-auto max-w-[1360px]">
           <div className="flex justify-center">
+            <div className="flex flex-wrap items-center justify-center gap-3">
             <div className="inline-flex h-[42px] rounded-full border border-white/10 bg-[#252525] p-[4px] shadow-[0_8px_20px_rgba(0,0,0,0.18)]">
               <button
                 type="button"
@@ -342,6 +358,20 @@ const Pricing = () => {
                 </span>
               </button>
             </div>
+              <label className="sr-only" htmlFor="workspace-currency">Currency</label>
+              <select
+                id="workspace-currency"
+                value={currency}
+                onChange={(event) => setCurrency(event.target.value as SupportedWorkspaceCurrency)}
+                className="h-[38px] rounded-full border border-white/10 bg-[#252525] px-4 text-[12.5px] font-semibold text-white outline-none transition-colors hover:bg-white/[0.08] focus:border-violet-400/70"
+              >
+                {WORKSPACE_CURRENCIES.map((item) => (
+                  <option key={item.currency} value={item.currency} className="bg-[#1b1b1b] text-white">
+                    {item.currency.toUpperCase()} {item.currency === "thb" ? "PromptPay" : "Card subscription"}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {loading ? (
@@ -366,6 +396,7 @@ const Pricing = () => {
                   onSubscribe={() => handleSubscribe(plan)}
                   teamSeats={teamSeats}
                   onTeamSeatsChange={setTeamSeats}
+                  currency={currency}
                 />
               ))}
             </div>
@@ -388,6 +419,7 @@ const Pricing = () => {
         mode="subscription"
         packageId={checkoutPlan?.id ?? ""}
         billingInterval={cycle}
+        currency={currency}
         onSuccess={() => {
           void refetch();
           void refreshProfile();
@@ -403,6 +435,7 @@ const Pricing = () => {
         mode="team_seats"
         billingInterval={cycle}
         teamSeats={teamSeats}
+        currency={currency}
         onSuccess={() => {
           void refetch();
           void refreshProfile();
@@ -424,9 +457,10 @@ interface PlanCardProps {
   onSubscribe: () => void;
   teamSeats: number;
   onTeamSeatsChange: (seats: number) => void;
+  currency: SupportedWorkspaceCurrency;
 }
 
-const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSubscribe, teamSeats, onTeamSeatsChange }: PlanCardProps) => {
+const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSubscribe, teamSeats, onTeamSeatsChange, currency }: PlanCardProps) => {
   const isTeam = plan.target === "team";
   const isPro = plan.is_featured === true; // Phase 1 seeded Pro as is_featured.
   const subtitle =
@@ -441,8 +475,10 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
       ? Math.round(plan.annual_price_thb / 12)
       : Math.round(monthlyPrice * (1 - ANNUAL_DISCOUNT));
   const showAnnual = cycle === "annual";
-  const teamSeatPrice = `฿${TEAM_SEAT_PRICE_THB.toLocaleString()}`;
-  const teamAnnualSeatPrice = `฿${Math.round(TEAM_SEAT_PRICE_THB * (1 - ANNUAL_DISCOUNT)).toLocaleString()}`;
+  const displayMonthlyPrice = formatWorkspaceMoneyFromThb(monthlyPrice, currency);
+  const displayAnnualPerMonth = formatWorkspaceMoneyFromThb(annualPerMonth, currency);
+  const displayTeamSeatPrice = formatWorkspaceMoneyFromThb(TEAM_SEAT_PRICE_THB, currency);
+  const displayTeamAnnualSeatPrice = formatWorkspaceMoneyFromThb(Math.round(TEAM_SEAT_PRICE_THB * (1 - ANNUAL_DISCOUNT)), currency);
   const teamCycleMonths = cycle === "annual" ? 12 : 1;
   const teamCreditsForSelectedSeats = teamSeats * TEAM_CREDITS_PER_SEAT_MONTH * teamCycleMonths;
   const incrementSeats = () => onTeamSeatsChange(Math.min(TEAM_MAX_SEATS, teamSeats + 1));
@@ -506,10 +542,10 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
             {showAnnual ? (
               <div className="flex flex-wrap items-baseline gap-x-[6px] gap-y-1">
                 <span className="text-[22px] font-medium text-zinc-500 line-through">
-                  {teamSeatPrice}
+                  {displayTeamSeatPrice}
                 </span>
                 <span className="text-[27px] font-semibold leading-none text-white">
-                  {teamAnnualSeatPrice}
+                  {displayTeamAnnualSeatPrice}
                 </span>
                 <span className="text-[12px] font-medium text-zinc-300">
                   / seat / {language === "th" ? "เดือน" : "month"}
@@ -518,7 +554,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
             ) : (
               <div className="flex flex-wrap items-baseline gap-x-[6px] gap-y-1">
                 <span className="text-[31px] font-semibold leading-none text-white">
-                  {teamSeatPrice}
+                  {displayTeamSeatPrice}
                 </span>
                 <span className="text-[12px] font-medium text-zinc-300">
                   / seat / {language === "th" ? "เดือน" : "month"}
@@ -539,10 +575,10 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
           <>
             <div className="flex flex-wrap items-baseline gap-x-[6px] gap-y-1">
               <span className="text-[22px] font-medium text-zinc-500 line-through">
-                ฿{monthlyPrice.toLocaleString()}
+                {displayMonthlyPrice}
               </span>
               <span className="text-[27px] font-semibold leading-none text-white">
-                ฿{annualPerMonth.toLocaleString()}
+                {displayAnnualPerMonth}
               </span>
               <span className="text-[13px] font-medium text-zinc-300">
                 /{language === "th" ? "เดือน" : "month"}
@@ -556,7 +592,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
           <>
             <div className="flex flex-wrap items-baseline gap-x-[6px] gap-y-1">
               <span className="text-[31px] font-semibold leading-none text-white">
-                ฿{monthlyPrice.toLocaleString()}
+                {displayMonthlyPrice}
               </span>
               <span className="text-[13px] font-medium text-zinc-300">
                 /{language === "th" ? "เดือน" : "month"}
