@@ -36,6 +36,7 @@ import {
   Settings as SettingsIcon,
   Languages,
   Palette,
+  Plus,
   School,
   Box,
   UsersRound,
@@ -176,6 +177,7 @@ export interface WorkspaceSidebarProps {
 export default function WorkspaceSidebar({
   active,
   onNavigate,
+  onCreate,
 }: WorkspaceSidebarProps) {
   const navigate = useNavigate();
   const { t, language, setLanguage } = useLanguage();
@@ -234,6 +236,18 @@ export default function WorkspaceSidebar({
           <span className="truncate leading-tight">{brandName}</span>
         </button>
       </div>
+
+      {onCreate && (
+        <button
+          type="button"
+          onClick={onCreate}
+          className="mx-[8px] mb-[6px] flex h-[36px] shrink-0 items-center justify-center gap-[8px] rounded-xl bg-[linear-gradient(135deg,rgba(155,77,224,.92),rgba(199,125,255,.7),rgba(91,42,140,.92))] px-[12px] text-[12px] font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,.22),inset_0_-5px_12px_rgba(91,42,140,.45),0_10px_24px_-18px_rgba(199,125,255,.95)] transition hover:brightness-110 active:translate-y-px"
+          title={t("workspace.standalone.create_project")}
+        >
+          <Plus className="h-[15px] w-[15px] shrink-0" strokeWidth={2.2} />
+          <span className="truncate">{t("workspace.standalone.create_project")}</span>
+        </button>
+      )}
 
       {/* ── Top nav group ──────────────────────────────────────── */}
       <nav className="flex flex-col gap-[4px]">
