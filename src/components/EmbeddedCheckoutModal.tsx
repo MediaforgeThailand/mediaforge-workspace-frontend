@@ -21,6 +21,7 @@ import {
   normalizeWorkspaceCurrency,
   type SupportedWorkspaceCurrency,
 } from "@/lib/workspaceCurrency";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface EmbeddedCheckoutModalProps {
   open: boolean;
@@ -31,6 +32,7 @@ interface EmbeddedCheckoutModalProps {
   billingInterval?: "monthly" | "annual";
   teamSeats?: number;
   currency?: SupportedWorkspaceCurrency;
+  uiLanguage?: "en" | "th";
 }
 
 // Singleton — load once per app lifetime
@@ -41,6 +43,105 @@ const getStripe = (publishableKey: string) => {
 };
 
 type CheckoutPaymentMethod = "promptpay" | "card";
+type CheckoutLanguage = "en" | "th";
+
+const CHECKOUT_COPY = {
+  en: {
+    title: "Payment",
+    thaiDescription: "Choose PromptPay QR or credit/debit card. Complete payment in MediaForge.",
+    cardDescription: "Card-first subscription. Local card wallets may appear when your bank and country support them.",
+    promptPay: "PromptPay QR",
+    card: "Card",
+    loading: "Preparing payment...",
+    openFailed: "Could not open payment",
+    close: "Close",
+    successTitle: "Payment successful!",
+    successDescription: "Credits will be added to your account shortly.",
+    done: "Done",
+    scanPay: "Scan to pay",
+    qrDescription: "After your bank confirms the payment, credits will be added automatically.",
+    qrExpires: "QR expires",
+    refreshCredits: "I paid, refresh credits",
+    cardTitle: "Pay by credit/debit card",
+    cardDescriptionBody: "We will open a secure checkout page, then return you to MediaForge after payment.",
+    cardButton: "Open card checkout",
+    processing: "Processing...",
+    payPrefix: "Pay",
+    secure: "Secure payment powered by Stripe",
+    paymentFailed: "Payment failed. Please try again.",
+    paymentIncomplete: "Payment did not complete. Please try again.",
+    startFailed: "Could not start checkout",
+    qrMissing: "PromptPay QR could not be created. Please try again.",
+    authRequired: "Please sign in again before payment.",
+    genericFailed: "Could not start checkout. Please try again.",
+  },
+  th: {
+    title: "ชำระเงิน",
+    thaiDescription: "เลือก PromptPay QR หรือบัตรเครดิต/เดบิต — ทำรายการในแอปได้ทันที",
+    cardDescription: "ชำระผ่านบัตรเป็นหลัก ระบบจะแสดงวิธีจ่ายที่รองรับตามประเทศและธนาคารของคุณ",
+    promptPay: "PromptPay QR",
+    card: "บัตร",
+    loading: "กำลังเตรียมหน้าชำระเงิน...",
+    openFailed: "เปิดหน้าชำระเงินไม่สำเร็จ",
+    close: "ปิด",
+    successTitle: "ชำระเงินสำเร็จ!",
+    successDescription: "เครดิตจะเข้าบัญชีภายในไม่กี่วินาที",
+    done: "เสร็จสิ้น",
+    scanPay: "สแกนจ่าย",
+    qrDescription: "หลังธนาคารยืนยัน ระบบจะเติมเครดิตให้อัตโนมัติ",
+    qrExpires: "QR หมดอายุ",
+    refreshCredits: "ชำระแล้ว รีเฟรชเครดิต",
+    cardTitle: "ชำระผ่านบัตรเครดิต/เดบิต",
+    cardDescriptionBody: "ระบบจะเปิดหน้าชำระเงินที่ปลอดภัย แล้วกลับมาที่ MediaForge หลังชำระสำเร็จ",
+    cardButton: "ไปหน้าชำระด้วยบัตร",
+    processing: "กำลังประมวลผล...",
+    payPrefix: "ชำระเงิน",
+    secure: "ชำระเงินอย่างปลอดภัยผ่าน Stripe",
+    paymentFailed: "ชำระเงินไม่สำเร็จ กรุณาลองอีกครั้ง",
+    paymentIncomplete: "การชำระเงินยังไม่สมบูรณ์ กรุณาลองอีกครั้ง",
+    startFailed: "เปิดหน้าชำระเงินไม่สำเร็จ",
+    qrMissing: "สร้าง PromptPay QR ไม่สำเร็จ กรุณาลองอีกครั้ง",
+    authRequired: "กรุณาเข้าสู่ระบบอีกครั้งก่อนชำระเงิน",
+    genericFailed: "เปิดหน้าชำระเงินไม่สำเร็จ กรุณาลองอีกครั้ง",
+  },
+} as const;
+
+type CheckoutCopy = (typeof CHECKOUT_COPY)[keyof typeof CHECKOUT_COPY];
+
+const localizeCheckoutError = (message: string, copy: CheckoutCopy) => {
+  const normalized = message.trim().toLowerCase();
+  if (!normalized) return copy.genericFailed;
+  if (normalized.includes("user not authenticated") || normalized.includes("auth session missing")) {
+    return copy.authRequired;
+  }
+  if (normalized.includes("promptpay qr could not be created")) return copy.qrMissing;
+  if (
+    normalized.includes("checkout failed") ||
+    normalized.includes("could not start checkout") ||
+    normalized.includes("edge function returned")
+  ) {
+    return copy.genericFailed;
+  }
+  return message;
+};
+
+const readPersistedCheckoutLanguage = (): CheckoutLanguage | null => {
+  if (typeof localStorage !== "undefined") {
+    const saved = localStorage.getItem("mf-lang");
+    if (saved === "en" || saved === "th") return saved;
+  }
+  if (typeof document !== "undefined") {
+    const htmlLang = document.documentElement.lang?.toLowerCase();
+    if (htmlLang?.startsWith("en")) return "en";
+    if (htmlLang?.startsWith("th")) return "th";
+  }
+  return null;
+};
+
+const resolveCheckoutLanguage = (
+  preferred: CheckoutLanguage | undefined,
+  contextLanguage: CheckoutLanguage,
+): CheckoutLanguage => preferred ?? readPersistedCheckoutLanguage() ?? contextLanguage;
 
 const getFunctionErrorMessage = async (invokeErr: unknown, data?: unknown) => {
   const payload = data as { message?: unknown; error?: unknown } | null | undefined;
@@ -67,10 +168,12 @@ const PaymentForm = ({
   onSuccess,
   onError,
   amountLabel,
+  copy,
 }: {
   onSuccess: () => void;
   onError: (msg: string) => void;
   amountLabel: string;
+  copy: CheckoutCopy;
 }) => {
   const stripe = useStripe();
   const elements = useElements();
@@ -94,7 +197,7 @@ const PaymentForm = ({
     });
 
     if (error) {
-      const msg = error.message || "Payment failed. Please try again.";
+      const msg = error.message || copy.paymentFailed;
       setLocalError(msg);
       onError(msg);
       setSubmitting(false);
@@ -104,7 +207,7 @@ const PaymentForm = ({
     if (paymentIntent?.status === "succeeded" || paymentIntent?.status === "processing") {
       onSuccess();
     } else {
-      setLocalError("Payment did not complete. Please try again.");
+      setLocalError(copy.paymentIncomplete);
     }
     setSubmitting(false);
   };
@@ -131,14 +234,14 @@ const PaymentForm = ({
         {submitting ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            กำลังประมวลผล…
+            {copy.processing}
           </>
         ) : (
-          `ชำระเงิน ${amountLabel}`
+          `${copy.payPrefix} ${amountLabel}`
         )}
       </Button>
       <p className="text-center text-[10px] text-muted-foreground">
-        🔒 ปลอดภัยด้วย Stripe · รองรับ PromptPay QR และบัตรเครดิต/เดบิต
+        🔒 {copy.secure}
       </p>
     </form>
   );
@@ -153,7 +256,11 @@ const EmbeddedCheckoutModal = ({
   billingInterval = "monthly",
   teamSeats,
   currency = "thb",
+  uiLanguage,
 }: EmbeddedCheckoutModalProps) => {
+  const { language: contextLanguage } = useLanguage();
+  const checkoutLanguage = resolveCheckoutLanguage(uiLanguage, contextLanguage);
+  const copy = checkoutLanguage === "th" ? CHECKOUT_COPY.th : CHECKOUT_COPY.en;
   const normalizedCurrency = normalizeWorkspaceCurrency(currency);
   const isThaiCheckout = normalizedCurrency === "thb";
   const [loading, setLoading] = useState(false);
@@ -196,9 +303,16 @@ const EmbeddedCheckoutModal = ({
       setCheckoutUrl(null);
 
       try {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token;
+        if (sessionError || !accessToken) throw new Error("User not authenticated");
+        const authHeaders = { Authorization: `Bearer ${accessToken}` };
+
         let useHostedCardCheckout = !isThaiCheckout;
         if (paymentMethod === "card" && isThaiCheckout) {
-          const { data: keyData, error: keyErr } = await supabase.functions.invoke("get-stripe-key");
+          const { data: keyData, error: keyErr } = await supabase.functions.invoke("get-stripe-key", {
+            headers: authHeaders,
+          });
           if (!keyErr && keyData?.publishableKey) {
             setPublishableKey(keyData.publishableKey);
           } else {
@@ -218,7 +332,10 @@ const EmbeddedCheckoutModal = ({
               ? { checkoutType: "team_seats", teamSeats, billingInterval, intent: usePaymentIntent, paymentMethod, currency: normalizedCurrency }
               : { packageId, billingInterval, intent: usePaymentIntent, paymentMethod, currency: normalizedCurrency };
 
-        const { data, error: invokeErr } = await supabase.functions.invoke(fnName, { body });
+        const { data, error: invokeErr } = await supabase.functions.invoke(fnName, {
+          body,
+          headers: authHeaders,
+        });
         if (useHostedCardCheckout) {
           if (invokeErr || !data?.url) throw new Error(await getFunctionErrorMessage(invokeErr, data));
           setCheckoutUrl(data.url);
@@ -234,12 +351,13 @@ const EmbeddedCheckoutModal = ({
         setAmount(Number(data.amount ?? 0));
         if (paymentMethod === "promptpay") {
           const nextQr = data.qrCodeSvgUrl || data.qrCodePngUrl || null;
-          if (!nextQr) throw new Error("PromptPay QR could not be created. Please try again.");
+          if (!nextQr) throw new Error(copy.qrMissing);
           setQrCodeUrl(nextQr);
           setExpiresAt(typeof data.expiresAt === "number" ? data.expiresAt : null);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not start checkout");
+        const message = err instanceof Error ? err.message : copy.startFailed;
+        setError(localizeCheckoutError(message, copy));
         requestStartedRef.current = false;
       } finally {
         setLoading(false);
@@ -247,7 +365,7 @@ const EmbeddedCheckoutModal = ({
     };
 
     void init();
-  }, [open, mode, packageId, billingInterval, teamSeats, paymentMethod, normalizedCurrency, isThaiCheckout]);
+  }, [open, mode, packageId, billingInterval, teamSeats, paymentMethod, normalizedCurrency, isThaiCheckout, copy]);
 
   const stripeInstance = useMemo(
     () => (publishableKey ? getStripe(publishableKey) : null),
@@ -272,12 +390,12 @@ const EmbeddedCheckoutModal = ({
         <div className="relative px-6 pt-6 pb-2">
           <DialogHeader>
             <DialogTitle className="text-base font-semibold text-white">
-              ชำระเงิน{amountLabel ? ` · ${amountLabel}` : ""}
+              {copy.title}{amountLabel ? ` · ${amountLabel}` : ""}
             </DialogTitle>
             <DialogDescription className="text-xs text-violet-200/80">
               {isThaiCheckout
-                ? "เลือก PromptPay QR หรือบัตรเครดิต/เดบิต — ทำรายการในแอปได้ทันที"
-                : "Card-first Stripe subscription. Local card wallets may appear when your bank and country support them."}
+                ? copy.thaiDescription
+                : copy.cardDescription}
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -305,7 +423,7 @@ const EmbeddedCheckoutModal = ({
                     ].join(" ")}
                   >
                     <Icon className="h-4 w-4" />
-                    {method === "promptpay" ? "PromptPay QR" : "Card"}
+                    {method === "promptpay" ? copy.promptPay : copy.card}
                   </button>
                 );
               })}
@@ -315,14 +433,14 @@ const EmbeddedCheckoutModal = ({
           {loading && (
             <div className="flex min-h-[180px] flex-col items-center justify-center gap-2">
               <Loader2 className="h-6 w-6 animate-spin text-violet-400" />
-              <p className="text-xs text-slate-400">กำลังเตรียมหน้าชำระเงิน…</p>
+              <p className="text-xs text-slate-400">{copy.loading}</p>
             </div>
           )}
 
           {error && !loading && (
             <div className="flex min-h-[180px] flex-col items-center justify-center gap-2 text-center">
               <AlertCircle className="h-7 w-7 text-destructive" />
-              <p className="text-sm font-medium text-white">เปิดหน้าชำระเงินไม่สำเร็จ</p>
+              <p className="text-sm font-medium text-white">{copy.openFailed}</p>
               <p className="text-xs text-slate-400">{error}</p>
               <Button
                 variant="outline"
@@ -330,7 +448,7 @@ const EmbeddedCheckoutModal = ({
                 className="mt-2"
                 onClick={() => onOpenChange(false)}
               >
-                ปิด
+                {copy.close}
               </Button>
             </div>
           )}
@@ -338,9 +456,9 @@ const EmbeddedCheckoutModal = ({
           {success && (
             <div className="flex min-h-[180px] flex-col items-center justify-center gap-2 text-center">
               <CheckCircle2 className="h-8 w-8 text-emerald-400" />
-              <p className="text-sm font-medium text-white">ชำระเงินสำเร็จ!</p>
+              <p className="text-sm font-medium text-white">{copy.successTitle}</p>
               <p className="text-xs text-slate-400">
-                เครดิตจะเข้าบัญชีภายในไม่กี่วินาที
+                {copy.successDescription}
               </p>
               <Button
                 size="sm"
@@ -351,7 +469,7 @@ const EmbeddedCheckoutModal = ({
                   setTimeout(() => window.location.reload(), 300);
                 }}
               >
-                เสร็จสิ้น
+                {copy.done}
               </Button>
             </div>
           )}
@@ -367,14 +485,14 @@ const EmbeddedCheckoutModal = ({
               </div>
               <div className="rounded-xl bg-black/20 p-3 text-center">
                 <p className="text-sm font-semibold text-white">
-                  สแกนจ่าย {amountLabel || ""}
+                  {copy.scanPay} {amountLabel || ""}
                 </p>
                 <p className="mt-1 text-[11px] leading-5 text-violet-100/75">
-                  หลังธนาคารยืนยัน ระบบจะเติมเครดิตให้อัตโนมัติผ่าน Stripe webhook
+                  {copy.qrDescription}
                 </p>
                 {expiresAt && (
                   <p className="mt-1 text-[10px] text-violet-200/60">
-                    QR expires {new Date(expiresAt * 1000).toLocaleTimeString()}
+                    {copy.qrExpires} {new Date(expiresAt * 1000).toLocaleTimeString()}
                   </p>
                 )}
               </div>
@@ -388,7 +506,7 @@ const EmbeddedCheckoutModal = ({
                 }}
               >
                 <RefreshCw className="mr-2 h-4 w-4" />
-                ชำระแล้ว รีเฟรชเครดิต
+                {copy.refreshCredits}
               </Button>
             </div>
           )}
@@ -397,9 +515,9 @@ const EmbeddedCheckoutModal = ({
             <div className="space-y-4">
               <div className="rounded-xl bg-black/20 p-4 text-center">
                 <CreditCard className="mx-auto h-8 w-8 text-violet-200" />
-                <p className="mt-3 text-sm font-semibold text-white">ชำระผ่านบัตรเครดิต/เดบิต</p>
+                <p className="mt-3 text-sm font-semibold text-white">{copy.cardTitle}</p>
                 <p className="mt-1 text-[11px] leading-5 text-violet-100/75">
-                  ระบบจะเปิดหน้า Stripe Checkout ที่ปลอดภัย แล้วกลับมาที่ MediaForge หลังชำระสำเร็จ
+                  {copy.cardDescriptionBody}
                 </p>
               </div>
               <Button
@@ -410,7 +528,7 @@ const EmbeddedCheckoutModal = ({
                 }}
               >
                 <ExternalLink className="mr-2 h-4 w-4" />
-                ไปหน้าชำระด้วยบัตร
+                {copy.cardButton}
               </Button>
             </div>
           )}
@@ -459,6 +577,7 @@ const EmbeddedCheckoutModal = ({
             >
               <PaymentForm
                 amountLabel={amountLabel}
+                copy={copy}
                 onSuccess={() => {
                   setSuccess(true);
                   onSuccess?.();

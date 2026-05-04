@@ -250,6 +250,7 @@ const QuickCheckoutModal = ({
         }}
         mode={checkoutMode}
         packageId={selectedPkgId}
+        uiLanguage={language === "th" ? "th" : "en"}
       />
     </>
   );

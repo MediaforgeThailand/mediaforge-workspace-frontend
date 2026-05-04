@@ -11,7 +11,6 @@ import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
 import { UserMenu } from "@/components/workspace/UserMenu";
 import {
-  WORKSPACE_CURRENCY_MAP,
   detectWorkspaceCurrency,
   formatWorkspaceMoneyFromThb,
   type SupportedWorkspaceCurrency,
@@ -174,7 +173,7 @@ const Pricing = () => {
   const navigate = useNavigate();
   const { language, t } = useLanguage();
   const { refetch } = useCredits();
-  const { profile, refreshProfile } = useAuth();
+  const { profile, refreshProfile, session, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
 
@@ -223,11 +222,20 @@ const Pricing = () => {
     () => [...plans].sort((a, b) => a.sort_order - b.sort_order),
     [plans]
   );
-  const currencyConfig = WORKSPACE_CURRENCY_MAP[currency];
-  const currencyBadgeText =
-    currency === "thb" ? "THB PromptPay" : `${currency.toUpperCase()} Card subscription`;
 
   const handleSubscribe = (plan: SubscriptionPlan) => {
+    if (authLoading) {
+      toast({
+        title: language === "th" ? "กำลังตรวจสอบบัญชี" : "Checking account",
+        description: language === "th" ? "กรุณารอสักครู่แล้วลองอีกครั้ง" : "Please wait a moment and try again.",
+      });
+      return;
+    }
+    if (!session?.access_token) {
+      navigate(`/auth?redirect=${encodeURIComponent("/app/pricing")}`);
+      return;
+    }
+
     if (plan.target === "team") {
       setSubmittingPlanId(plan.id);
       setTeamCheckoutOpen(true);
@@ -353,12 +361,6 @@ const Pricing = () => {
                 </span>
               </button>
             </div>
-              <div
-                className="inline-flex h-[38px] items-center rounded-full border border-white/10 bg-[#252525] px-4 text-[12.5px] font-semibold text-white"
-                title={`Detected from your browser region: ${currencyConfig.countryHint}`}
-              >
-                {currencyConfig.countryHint} · {currencyBadgeText}
-              </div>
             </div>
           </div>
 
@@ -408,6 +410,7 @@ const Pricing = () => {
         packageId={checkoutPlan?.id ?? ""}
         billingInterval={cycle}
         currency={currency}
+        uiLanguage={language === "th" ? "th" : "en"}
         onSuccess={() => {
           void refetch();
           void refreshProfile();
@@ -424,6 +427,7 @@ const Pricing = () => {
         billingInterval={cycle}
         teamSeats={teamSeats}
         currency={currency}
+        uiLanguage={language === "th" ? "th" : "en"}
         onSuccess={() => {
           void refetch();
           void refreshProfile();
