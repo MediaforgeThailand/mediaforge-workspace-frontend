@@ -583,11 +583,12 @@ const PromptMentionTextarea = memo(({
         const span = document.createElement("span");
         span.contentEditable = "false";
         span.setAttribute("data-mention-id", seg.nodeId);
-        span.setAttribute("data-mention-label", seg.label);
         span.className = isTextVar ? "textvar-pill" : "mention-pill";
         const allOpts = [...mentionOptions, ...textVarOptions];
         const option = allOpts.find((o) => o.nodeId === seg.nodeId);
-        span.innerHTML = renderMentionPillHtml(option, seg.label, isTextVar);
+        const label = option?.label ?? seg.label;
+        span.setAttribute("data-mention-label", label);
+        span.innerHTML = renderMentionPillHtml(option, label, isTextVar);
         frag.appendChild(span);
       }
     });
@@ -935,11 +936,12 @@ const PromptMentionTextarea = memo(({
         const span = document.createElement("span");
         span.contentEditable = "false";
         span.setAttribute("data-mention-id", seg.nodeId);
-        span.setAttribute("data-mention-label", seg.label);
         span.className = isTextVar ? "textvar-pill" : "mention-pill";
         const allOpts = [...mentionOptions, ...textVarOptions];
         const option = allOpts.find((o) => o.nodeId === seg.nodeId);
-        span.innerHTML = renderMentionPillHtml(option, seg.label, isTextVar);
+        const label = option?.label ?? seg.label;
+        span.setAttribute("data-mention-label", label);
+        span.innerHTML = renderMentionPillHtml(option, label, isTextVar);
         frag.appendChild(span);
         lastNode = span;
       }

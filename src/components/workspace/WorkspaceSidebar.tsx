@@ -6,7 +6,7 @@
  * Layout:
  *   1. Brand row — workspace mascot + wordmark
  *   2. Top nav group — Home
- *   3. Section groups — Create, Assets, Inspire
+ *   3. Section groups — Create, Assets
  *   4. Bottom utility cluster — Settings
  *
  * Behaviour notes:
@@ -96,8 +96,7 @@ type NavItem = {
 type SidebarSection = {
   labelKey:
     | "workspace.sidebar.create"
-    | "workspace.sidebar.assets"
-    | "workspace.sidebar.inspire";
+    | "workspace.sidebar.assets";
   variant: "tool" | "list";
   rows: NavItem[][];
 };
@@ -126,12 +125,6 @@ const NAV_SECTIONS: SidebarSection[] = [
       [{ id: "spaces", labelKey: "workspace.sidebar.spaces", icon: Workflow }],
       [{ id: "stock", labelKey: "workspace.sidebar.stock", icon: Images }],
       [{ id: "assets", labelKey: "workspace.sidebar.all_assets", icon: HistoryIcon }],
-    ],
-  },
-  {
-    labelKey: "workspace.sidebar.inspire",
-    variant: "list",
-    rows: [
       [{ id: "projects", labelKey: "workspace.sidebar.projects", icon: BookOpen }],
     ],
   },

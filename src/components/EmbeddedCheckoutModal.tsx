@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, CreditCard, QrCode, RefreshCw, ExternalLink } from "lucide-react";
 import { loadStripe, type Stripe as StripeJs } from "@stripe/stripe-js";
 import {
   Elements,
@@ -32,6 +32,29 @@ let stripePromise: Promise<StripeJs | null> | null = null;
 const getStripe = (publishableKey: string) => {
   if (!stripePromise) stripePromise = loadStripe(publishableKey);
   return stripePromise;
+};
+
+type CheckoutPaymentMethod = "promptpay" | "card";
+
+const getFunctionErrorMessage = async (invokeErr: unknown, data?: unknown) => {
+  const payload = data as { message?: unknown; error?: unknown } | null | undefined;
+  if (payload?.message || payload?.error) return String(payload.message || payload.error);
+  const err = invokeErr as { message?: string; context?: Response };
+  const response = err?.context;
+  if (response && typeof response.clone === "function") {
+    try {
+      const payload = await response.clone().json();
+      if (payload?.message || payload?.error) return String(payload.message || payload.error);
+    } catch {
+      try {
+        const text = await response.clone().text();
+        if (text) return text;
+      } catch {
+        // Fall through to the Supabase error message.
+      }
+    }
+  }
+  return err?.message || "Could not start checkout";
 };
 
 const PaymentForm = ({
@@ -130,6 +153,10 @@ const EmbeddedCheckoutModal = ({
   const [amount, setAmount] = useState<number>(0);
   const [success, setSuccess] = useState(false);
   const [publishableKey, setPublishableKey] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>("promptpay");
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState<number | null>(null);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const requestStartedRef = useRef(false);
 
   useEffect(() => {
@@ -141,6 +168,10 @@ const EmbeddedCheckoutModal = ({
       setClientSecret(null);
       setAmount(0);
       setSuccess(false);
+      setPaymentMethod("promptpay");
+      setQrCodeUrl(null);
+      setExpiresAt(null);
+      setCheckoutUrl(null);
       return;
     }
 
@@ -150,31 +181,54 @@ const EmbeddedCheckoutModal = ({
     const init = async () => {
       setLoading(true);
       setError("");
+      setClientSecret(null);
+      setQrCodeUrl(null);
+      setExpiresAt(null);
+      setCheckoutUrl(null);
 
       try {
-        // 1) Fetch publishable key
-        const { data: keyData, error: keyErr } = await supabase.functions.invoke("get-stripe-key");
-        if (keyErr || !keyData?.publishableKey) {
-          throw new Error(keyErr?.message || "Stripe key unavailable");
+        let useHostedCardCheckout = false;
+        if (paymentMethod === "card") {
+          const { data: keyData, error: keyErr } = await supabase.functions.invoke("get-stripe-key");
+          if (!keyErr && keyData?.publishableKey) {
+            setPublishableKey(keyData.publishableKey);
+          } else {
+            setPublishableKey(null);
+            useHostedCardCheckout = true;
+          }
+        } else {
+          setPublishableKey(null);
         }
-        setPublishableKey(keyData.publishableKey);
 
-        // 2) Create PaymentIntent
         const fnName = mode === "topup" ? "create-topup" : "create-checkout";
+        const usePaymentIntent = paymentMethod === "promptpay" || !useHostedCardCheckout;
         const body =
           mode === "topup"
-            ? { packageId, intent: true }
+            ? { packageId, intent: usePaymentIntent, paymentMethod }
             : mode === "team_seats"
-              ? { checkoutType: "team_seats", teamSeats, billingInterval, intent: true }
-              : { packageId, billingInterval, intent: true };
+              ? { checkoutType: "team_seats", teamSeats, billingInterval, intent: usePaymentIntent, paymentMethod }
+              : { packageId, billingInterval, intent: usePaymentIntent, paymentMethod };
 
         const { data, error: invokeErr } = await supabase.functions.invoke(fnName, { body });
+        if (useHostedCardCheckout) {
+          if (invokeErr || !data?.url) throw new Error(await getFunctionErrorMessage(invokeErr, data));
+          setCheckoutUrl(data.url);
+          setAmount(Number(data.amount ?? 0));
+          return;
+        }
+
         if (invokeErr || !data?.clientSecret) {
-          throw new Error(invokeErr?.message || data?.error || "Failed to start payment");
+          throw new Error(await getFunctionErrorMessage(invokeErr, data));
         }
 
         setClientSecret(data.clientSecret);
         setAmount(Number(data.amount ?? 0));
+        if (paymentMethod === "promptpay") {
+          const nextQr = data.qrCodeSvgUrl || data.qrCodePngUrl || null;
+          if (!nextQr) throw new Error("PromptPay QR could not be created. Please try again.");
+          setQrCodeUrl(nextQr);
+          setExpiresAt(typeof data.expiresAt === "number" ? data.expiresAt : null);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not start checkout");
         requestStartedRef.current = false;
@@ -184,7 +238,7 @@ const EmbeddedCheckoutModal = ({
     };
 
     void init();
-  }, [open, mode, packageId, billingInterval, teamSeats]);
+  }, [open, mode, packageId, billingInterval, teamSeats, paymentMethod]);
 
   const stripeInstance = useMemo(
     () => (publishableKey ? getStripe(publishableKey) : null),
@@ -218,6 +272,35 @@ const EmbeddedCheckoutModal = ({
         </div>
 
         <div className="relative px-6 pb-6">
+          {!success && (
+            <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-black/20 p-1">
+              {(["promptpay", "card"] as const).map((method) => {
+                const selected = paymentMethod === method;
+                const Icon = method === "promptpay" ? QrCode : CreditCard;
+                return (
+                  <button
+                    key={method}
+                    type="button"
+                    onClick={() => {
+                      if (paymentMethod === method) return;
+                      requestStartedRef.current = false;
+                      setPaymentMethod(method);
+                    }}
+                    className={[
+                      "inline-flex h-9 items-center justify-center gap-2 rounded-lg text-xs font-semibold transition",
+                      selected
+                        ? "bg-white text-zinc-950 shadow"
+                        : "text-violet-100/75 hover:bg-white/10 hover:text-white",
+                    ].join(" ")}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {method === "promptpay" ? "PromptPay QR" : "Card"}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {loading && (
             <div className="flex min-h-[180px] flex-col items-center justify-center gap-2">
               <Loader2 className="h-6 w-6 animate-spin text-violet-400" />
@@ -262,7 +345,66 @@ const EmbeddedCheckoutModal = ({
             </div>
           )}
 
-          {!loading && !error && !success && clientSecret && stripeInstance && (
+          {!loading && !error && !success && paymentMethod === "promptpay" && qrCodeUrl && (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-white/10 bg-white p-4 shadow-xl">
+                <img
+                  src={qrCodeUrl}
+                  alt="PromptPay QR"
+                  className="mx-auto aspect-square w-full max-w-[280px] rounded-xl object-contain"
+                />
+              </div>
+              <div className="rounded-xl bg-black/20 p-3 text-center">
+                <p className="text-sm font-semibold text-white">
+                  สแกนจ่าย {amountLabel || ""}
+                </p>
+                <p className="mt-1 text-[11px] leading-5 text-violet-100/75">
+                  หลังธนาคารยืนยัน ระบบจะเติมเครดิตให้อัตโนมัติผ่าน Stripe webhook
+                </p>
+                {expiresAt && (
+                  <p className="mt-1 text-[10px] text-violet-200/60">
+                    QR expires {new Date(expiresAt * 1000).toLocaleTimeString()}
+                  </p>
+                )}
+              </div>
+              <Button
+                type="button"
+                className="w-full bg-gradient-to-r from-violet-600 to-purple-500 text-white font-bold"
+                onClick={() => {
+                  onSuccess?.();
+                  onOpenChange(false);
+                  setTimeout(() => window.location.reload(), 300);
+                }}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                ชำระแล้ว รีเฟรชเครดิต
+              </Button>
+            </div>
+          )}
+
+          {!loading && !error && !success && paymentMethod === "card" && checkoutUrl && (
+            <div className="space-y-4">
+              <div className="rounded-xl bg-black/20 p-4 text-center">
+                <CreditCard className="mx-auto h-8 w-8 text-violet-200" />
+                <p className="mt-3 text-sm font-semibold text-white">ชำระผ่านบัตรเครดิต/เดบิต</p>
+                <p className="mt-1 text-[11px] leading-5 text-violet-100/75">
+                  ระบบจะเปิดหน้า Stripe Checkout ที่ปลอดภัย แล้วกลับมาที่ MediaForge หลังชำระสำเร็จ
+                </p>
+              </div>
+              <Button
+                type="button"
+                className="w-full bg-white text-zinc-950 font-bold hover:bg-violet-50"
+                onClick={() => {
+                  window.location.assign(checkoutUrl);
+                }}
+              >
+                <ExternalLink className="mr-2 h-4 w-4" />
+                ไปหน้าชำระด้วยบัตร
+              </Button>
+            </div>
+          )}
+
+          {!loading && !error && !success && paymentMethod === "card" && clientSecret && stripeInstance && (
             <Elements
               stripe={stripeInstance}
               options={{

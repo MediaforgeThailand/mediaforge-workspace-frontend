@@ -21,6 +21,10 @@ interface CreateImagePanelReference {
   url: string;
   mime?: string;
   name?: string;
+  source?: "generation" | "user_asset" | "upload";
+  assetId?: string;
+  storageBucket?: "ai-media" | "user_assets";
+  storagePath?: string;
 }
 
 interface CreateImagePanelModel {
@@ -53,6 +57,7 @@ interface CreateImagePanelProps {
   onAddReferences?: () => void;
   onReferenceFiles?: (files: File[]) => void;
   onSelectReferenceAsset?: (reference: CreateImagePanelReference) => void;
+  onDeleteReferenceAsset?: (reference: CreateImagePanelReference) => void;
   onRemoveReference?: (id: string) => void;
   mentionOptions?: CreateImagePanelReference[];
   settings?: CreateVideoPanelSetting[];
@@ -130,6 +135,7 @@ interface CreateVideoPanelProps {
   onAddReferences?: () => void;
   onReferenceFiles?: (files: File[]) => void;
   onSelectReferenceAsset?: (reference: CreateImagePanelReference) => void;
+  onDeleteReferenceAsset?: (reference: CreateImagePanelReference) => void;
   onRemoveReference?: (id: string) => void;
   mentionOptions?: CreateImagePanelReference[];
   settings?: CreateVideoPanelSetting[];
@@ -173,6 +179,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   onAddReferences,
   onReferenceFiles,
   onSelectReferenceAsset,
+  onDeleteReferenceAsset,
   onRemoveReference,
   mentionOptions = [],
   settings = [],
@@ -268,6 +275,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
           accept={referenceAccept}
           onFiles={onReferenceFiles}
           onSelectAsset={onSelectReferenceAsset}
+          onDeleteAsset={onDeleteReferenceAsset}
         />
 
         {/* Describe your image */}
@@ -472,6 +480,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
   onAddReferences,
   onReferenceFiles,
   onSelectReferenceAsset,
+  onDeleteReferenceAsset,
   onRemoveReference,
   mentionOptions = [],
   settings = [],
@@ -609,6 +618,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           accept={referenceAccept}
           onFiles={onReferenceFiles}
           onSelectAsset={onSelectReferenceAsset}
+          onDeleteAsset={onDeleteReferenceAsset}
         />
         <ReferencePicker
           open={!!historySlot}
@@ -619,6 +629,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           accept="image/*"
           onFiles={historySlot?.onHistoryFiles}
           onSelectAsset={historySlot?.onSelectHistoryAsset}
+          onDeleteAsset={onDeleteReferenceAsset}
           closeOnSelect
         />
 
@@ -1180,13 +1191,54 @@ function VideoTextControlCard({ control }: { control: CreateVideoPanelTextContro
 
 const DEFAULT_REFERENCE_THUMBS = [sampleRefOne, sampleRefTwo, sampleRefThree];
 
-function standaloneMentionLabel(reference: CreateImagePanelReference, index: number): string {
-  const cleaned = (reference.name ?? "")
+const REFERENCE_MEDIA_EXT_RE = /\.(png|jpe?g|webp|gif|mp4|mov|webm|m4v)$/i;
+
+function cleanReferenceFileName(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const cleaned = value
+    .split(/[?#]/)[0]
+    .split(/[\\/]/)
+    .filter(Boolean)
+    .pop()
+    ?.replace(/^[0-9]{10,}[-_]/, "")
     .replace(/[\[\]()]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  if (cleaned) return cleaned.length > 42 ? `${cleaned.slice(0, 42)}...` : cleaned;
-  return `image${index + 1}`;
+  return cleaned || undefined;
+}
+
+function referenceFileNameFromUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url);
+    return cleanReferenceFileName(decodeURIComponent(parsed.pathname));
+  } catch {
+    return cleanReferenceFileName(decodeURIComponent(url));
+  }
+}
+
+function referenceBaseName(reference: CreateImagePanelReference, index: number): string {
+  const explicit = cleanReferenceFileName(reference.name);
+  if (explicit && REFERENCE_MEDIA_EXT_RE.test(explicit)) return explicit;
+  const urlName = referenceFileNameFromUrl(reference.url);
+  if (urlName && REFERENCE_MEDIA_EXT_RE.test(urlName)) return urlName;
+  if (explicit && explicit.length <= 28) return explicit;
+  if (urlName) return urlName;
+  return `image-${index + 1}`;
+}
+
+function shortenReferenceName(name: string, maxChars = 10): string {
+  const chars = Array.from(name);
+  if (chars.length <= maxChars) return name;
+  return `${chars.slice(0, maxChars).join("")}...`;
+}
+
+function referenceDisplayLabel(reference: CreateImagePanelReference, index: number, maxChars = 10): string {
+  return shortenReferenceName(referenceBaseName(reference, index), maxChars);
+}
+
+function standaloneMentionLabel(reference: CreateImagePanelReference, index: number): string {
+  return referenceDisplayLabel(reference, index, 10);
 }
 
 function StandalonePromptMentionTextarea({
@@ -1289,8 +1341,13 @@ function SelectedReferenceThumb({
   onRemove?: (id: string) => void;
 }) {
   const isVideo = reference.mime?.startsWith("video/");
+  const label = referenceDisplayLabel(reference, index, 10);
+  const fullLabel = referenceBaseName(reference, index);
   return (
-    <div className="group relative h-[82px] w-[82px] overflow-hidden rounded-[8px] bg-black ring-1 ring-white/10">
+    <div
+      className="group relative h-[82px] w-[82px] overflow-hidden rounded-[8px] bg-black ring-1 ring-white/10"
+      title={fullLabel}
+    >
       {isVideo ? (
         <div className="grid h-full w-full place-items-center bg-[#16181a]">
           <Video className="h-[22px] w-[22px] text-white/80" />
@@ -1299,8 +1356,8 @@ function SelectedReferenceThumb({
         <img src={reference.url} alt="" className="h-full w-full object-cover" />
       )}
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-[6px] pb-[5px] pt-[22px]">
-        <span className="text-[11px] font-semibold leading-none text-white">
-          @image{index + 1}
+        <span className="block truncate text-[10px] font-semibold leading-none text-white">
+          {label}
         </span>
       </div>
       {onRemove && (
@@ -1329,6 +1386,7 @@ function ReferencePicker({
   accept,
   onFiles,
   onSelectAsset,
+  onDeleteAsset,
   closeOnSelect = false,
 }: {
   open: boolean;
@@ -1339,6 +1397,7 @@ function ReferencePicker({
   accept: string;
   onFiles?: (files: File[]) => void;
   onSelectAsset?: (reference: CreateImagePanelReference) => void;
+  onDeleteAsset?: (reference: CreateImagePanelReference) => void;
   closeOnSelect?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -1450,10 +1509,13 @@ function ReferencePicker({
 
           {assets.map((asset, index) => {
             const selected = selectedUrls.has(asset.url);
+            const label = referenceDisplayLabel(asset, index, 10);
+            const fullLabel = referenceBaseName(asset, index);
             return (
               <button
                 key={asset.id}
                 type="button"
+                title={fullLabel}
                 onClick={() => {
                   onSelectAsset?.(asset);
                   if (closeOnSelect) onClose();
@@ -1477,11 +1539,33 @@ function ReferencePicker({
                   <img src={asset.url} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
                 )}
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-[8px] pb-[7px] pt-[30px]">
-                  <span className="text-[11px] font-semibold text-white">@image{index + 1}</span>
+                  <span className="block truncate text-[10px] font-semibold text-white">{label}</span>
                 </div>
                 {selected && (
                   <span className="absolute left-[6px] top-[6px] grid h-[20px] w-[20px] place-items-center rounded-full bg-[#ff24c5] text-black">
                     <Check className="h-[13px] w-[13px]" />
+                  </span>
+                )}
+                {onDeleteAsset && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onDeleteAsset(asset);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onDeleteAsset(asset);
+                    }}
+                    className="absolute right-[6px] top-[6px] grid h-[26px] w-[26px] place-items-center rounded-full bg-black/72 text-white opacity-0 shadow-lg backdrop-blur transition hover:bg-rose-500 group-hover:opacity-100"
+                    aria-label="Delete asset"
+                    title="Delete asset"
+                  >
+                    <Trash2 className="h-[13px] w-[13px]" />
                   </span>
                 )}
               </button>

@@ -9,9 +9,7 @@
  *   │ All projects │ All assets                                   │
  *   │ All assets ✓ │  [All|Image|Video|Audio|3D]    [filters]    │
  *   │ All spaces   │                                              │
- *   │ Favorites    │  ── April 2026 ───────────────────────────   │
  *   │ Uploads      │  [card] [card] [card] [card] [card]          │
- *   │ Trash        │  [card] [card] [card] [card] [card]          │
  *   │              │                                              │
  *   │ PROJECTS     │  ── March 2026 ───────────────────────────   │
  *   │ ▸ Project A  │  [card] [card] [card]                        │
@@ -45,9 +43,7 @@ import {
   Music,
   Box,
   Folder,
-  Star,
   UploadCloud,
-  Trash2,
   LayoutGrid,
   Search as SearchIcon,
   SlidersHorizontal,
@@ -64,6 +60,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import { getSignedUrl } from "@/hooks/useSignedUrl";
 import { cn } from "@/lib/utils";
 import NodePreviewLightbox, { type PreviewPayload } from "./NodePreviewLightbox";
 
@@ -97,13 +94,16 @@ type UploadAsset = {
   projectId: string | null;
   createdAt: string;
   size?: number;
+  rowId?: string;
+  storageBucket?: "ai-media" | "user_assets";
+  storagePath?: string;
 };
 
 type Asset = GenerationAsset | UploadAsset;
 
 type FilterKind = "all" | AssetKind;
 
-type SectionKind = "all" | "spaces" | "favorites" | "uploads" | "trash";
+type SectionKind = "all" | "spaces" | "uploads";
 
 const KIND_ICON: Record<AssetKind, LucideIcon> = {
   image: ImageIcon,
@@ -121,9 +121,7 @@ type FilterLabelKey =
 type SideLabelKey =
   | "workspace.assets.all_assets"
   | "workspace.assets.spaces"
-  | "workspace.assets.favorites"
-  | "workspace.assets.uploads"
-  | "workspace.assets.trash";
+  | "workspace.assets.uploads";
 
 const FILTER_BUTTONS: Array<{ key: FilterKind; labelKey: FilterLabelKey; icon: LucideIcon }> = [
   { key: "all",   labelKey: "workspace.assets.filter_all",   icon: LayoutGrid },
@@ -136,10 +134,92 @@ const FILTER_BUTTONS: Array<{ key: FilterKind; labelKey: FilterLabelKey; icon: L
 const SIDE_NAV: Array<{ key: SectionKind; labelKey: SideLabelKey; icon: LucideIcon }> = [
   { key: "all",       labelKey: "workspace.assets.all_assets", icon: LayoutGrid },
   { key: "spaces",    labelKey: "workspace.assets.spaces",     icon: Folder },
-  { key: "favorites", labelKey: "workspace.assets.favorites",  icon: Star },
   { key: "uploads",   labelKey: "workspace.assets.uploads",    icon: UploadCloud },
-  { key: "trash",     labelKey: "workspace.assets.trash",      icon: Trash2 },
 ];
+
+function firstText(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (trimmed) return trimmed;
+  }
+  return undefined;
+}
+
+function inferAssetKind(url: string, typeHint?: string, hasModelUrl = false): AssetKind {
+  const type = (typeHint ?? "").toLowerCase();
+  const cleanUrl = url.split("?")[0].toLowerCase();
+  if (hasModelUrl || type.includes("3d") || /\.(glb|gltf|obj|fbx|usdz)$/.test(cleanUrl)) {
+    return "3d";
+  }
+  if (type.includes("video") || /\.(mp4|webm|mov|m4v)$/.test(cleanUrl)) return "video";
+  if (type.includes("audio") || /\.(mp3|wav|m4a|ogg|aac)$/.test(cleanUrl)) return "audio";
+  return "image";
+}
+
+function cleanAssetName(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const cleaned = value
+    .split(/[?#]/)[0]
+    .split(/[\\/]/)
+    .filter(Boolean)
+    .pop()
+    ?.replace(/^[0-9]{10,}[-_]/, "")
+    .trim();
+  return cleaned || undefined;
+}
+
+function isRemoteUrl(value: string) {
+  return /^https?:\/\//i.test(value);
+}
+
+async function resolveAiMediaUrl(rawUrl: string): Promise<string | null> {
+  if (!rawUrl) return null;
+  const normalized = rawUrl.trim().replace(/^\/+/, "");
+  if (!normalized) return null;
+  if (isRemoteUrl(normalized)) return getSignedUrl(normalized);
+
+  const signFromBucket = async (bucket: "ai-media" | "user_assets", path: string) => {
+    const { data } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(path.replace(/^\/+/, ""), 60 * 60 * 24);
+    return data?.signedUrl ?? null;
+  };
+
+  const aiMediaMatch = normalized.match(/^ai-media\/(.+)$/i);
+  if (aiMediaMatch) return signFromBucket("ai-media", aiMediaMatch[1]);
+
+  const userAssetMatch = normalized.match(/^user_assets\/(.+)$/i);
+  if (userAssetMatch) return signFromBucket("user_assets", userAssetMatch[1]);
+
+  return (await signFromBucket("user_assets", normalized)) ?? signFromBucket("ai-media", normalized);
+}
+
+function storagePointerFromRawUrl(rawUrl: string): Pick<UploadAsset, "storageBucket" | "storagePath"> {
+  const normalized = rawUrl.trim().replace(/^\/+/, "").split("?")[0];
+  const direct = normalized.match(/^(ai-media|user_assets)\/(.+)$/i);
+  if (direct) {
+    return {
+      storageBucket: direct[1].toLowerCase() as "ai-media" | "user_assets",
+      storagePath: decodeURIComponent(direct[2]),
+    };
+  }
+  if (/^https?:\/\//i.test(rawUrl)) {
+    try {
+      const url = new URL(rawUrl);
+      const match = url.pathname.match(/\/storage\/v1\/object\/(?:sign|public)\/([^/]+)\/(.+)$/);
+      if (match && (match[1] === "ai-media" || match[1] === "user_assets")) {
+        return {
+          storageBucket: match[1] as "ai-media" | "user_assets",
+          storagePath: decodeURIComponent(match[2]),
+        };
+      }
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
 
 export default function AssetsView({
   onOpenSidebar,
@@ -154,6 +234,10 @@ export default function AssetsView({
   const { t } = useLanguage();
   const navigate = useNavigate();
   const projects = useWorkspaceStore((s) => s.projects);
+  const projectIds = useMemo(
+    () => projects.map((project) => project.id).filter(Boolean),
+    [projects],
+  );
 
   // Right-panel state.
   const [section, setSection] = useState<SectionKind>("all");
@@ -179,15 +263,27 @@ export default function AssetsView({
   const fetchGenPage = useCallback(
     async (offset: number) => {
       if (!user) return;
-      const { data, error } = await supabase
-        .from("workspace_generation_jobs")
-        .select(
-          "id, status, node_type, provider, model, request, result, created_at, project_id, workspace_id, canvas_id, node_id",
-        )
-        .eq("user_id", user.id)
-        .eq("status", "completed")
-        .order("created_at", { ascending: false })
-        .range(offset, offset + PAGE - 1);
+      const select =
+        "id, status, node_type, provider, model, request, result, created_at, project_id, workspace_id, canvas_id, node_id";
+      const runQuery = (scope: "projects" | "user") => {
+        let query = supabase
+          .from("workspace_generation_jobs")
+          .select(select)
+          .eq("status", "completed")
+          .order("created_at", { ascending: false });
+        query =
+          scope === "projects" && projectIds.length > 0
+            ? query.in("project_id", projectIds)
+            : query.eq("user_id", user.id);
+        return query.range(offset, offset + PAGE - 1);
+      };
+
+      let { data, error } = await runQuery(projectIds.length > 0 ? "projects" : "user");
+      if (!error && offset === 0 && projectIds.length > 0 && (data ?? []).length === 0) {
+        const fallback = await runQuery("user");
+        data = fallback.data;
+        error = fallback.error;
+      }
 
       if (error) {
         toast.error(t("workspace.assets.load_failed", { error: error.message }));
@@ -199,20 +295,58 @@ export default function AssetsView({
             url?: string;
             type?: string;
             text?: string;
-            provider_meta?: { model_url?: string };
+            outputs?: Record<string, unknown>;
+            provider_meta?: Record<string, unknown>;
           };
-          // 3D wins over image: a hyper3d / tripo3d job stores the
-          // GLB url under provider_meta.model_url and a poster image
-          // under result.url. Treat the row as a 3D asset whenever
-          // model_url is present.
-          const modelUrl = result?.provider_meta?.model_url;
-          const url = modelUrl ?? result.url;
+          const resultRecord = result as Record<string, unknown>;
+          const outputs = result.outputs ?? {};
+          const providerMeta = result.provider_meta ?? {};
+          const modelUrl = firstText(
+            resultRecord.model_url,
+            providerMeta.model_url,
+            outputs.model_url,
+            outputs.glb_url,
+            outputs.gltf_url,
+            outputs.mesh_url,
+            outputs.model,
+          );
+          const mediaUrl = firstText(
+            resultRecord.url,
+            resultRecord.image_url,
+            resultRecord.video_url,
+            resultRecord.audio_url,
+            outputs.url,
+            outputs.asset_url,
+            outputs.image_url,
+            outputs.video_url,
+            outputs.audio_url,
+            outputs.output_url,
+            outputs.output_image,
+            outputs.output_video,
+            outputs.output_audio,
+            outputs.playback_url,
+          );
+          const url = modelUrl ?? mediaUrl;
           if (!url) return null;
-          let kind: AssetKind = "image";
-          if (modelUrl) kind = "3d";
-          else if (result.type === "video") kind = "video";
-          else if (result.type === "audio") kind = "audio";
-          else kind = "image";
+          const kind = inferAssetKind(
+            url,
+            firstText(result.type, row.node_type, row.provider),
+            Boolean(modelUrl),
+          );
+          const posterUrl =
+            kind === "3d"
+              ? firstText(
+                  providerMeta.rendered_image,
+                  resultRecord.rendered_image,
+                  resultRecord.preview_image,
+                  outputs.rendered_image,
+                  outputs.preview_image,
+                  outputs.thumbnail_url,
+                  outputs.poster,
+                  outputs.output_image,
+                  mediaUrl,
+                )
+              : undefined;
 
           const params =
             (row.request as { params?: Record<string, unknown> } | null)?.params ?? {};
@@ -228,7 +362,7 @@ export default function AssetsView({
             id: row.id as string,
             kind,
             url,
-            thumbnailUrl: kind === "3d" ? result.url : undefined,
+            thumbnailUrl: posterUrl && posterUrl !== url ? posterUrl : undefined,
             modelLabel: (row.model as string | null) ?? (row.node_type as string),
             prompt: promptText,
             projectId: (row.project_id as string | null) ?? null,
@@ -249,14 +383,19 @@ export default function AssetsView({
       setGenAssets((prev) => (offset === 0 ? next : [...prev, ...next]));
       setGenHasMore(next.length === PAGE);
     },
-    [user],
+    [user, t, projectIds],
   );
 
-  /** First-load + when user switches to All / Spaces / Favorites
+  /** First-load + when user switches to All / All spaces
    *  (i.e. anything that consumes the generation feed). */
   useEffect(() => {
-    if (!user) return;
-    if (section === "uploads" || section === "trash") return;
+    if (!user) {
+      setGenLoading(false);
+      setGenAssets([]);
+      setGenHasMore(false);
+      return;
+    }
+    if (section === "uploads") return;
     setGenLoading(true);
     setGenAssets([]);
     setGenHasMore(true);
@@ -267,8 +406,26 @@ export default function AssetsView({
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel("workspace-assets-feed")
-      .on(
+      .channel("workspace-assets-feed");
+    const handleChange = () => {
+      void fetchGenPage(0);
+    };
+
+    if (projectIds.length > 0) {
+      for (const projectId of projectIds) {
+        channel.on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "workspace_generation_jobs",
+            filter: `project_id=eq.${projectId}`,
+          },
+          handleChange,
+        );
+      }
+    } else {
+      channel.on(
         "postgres_changes",
         {
           event: "*",
@@ -276,66 +433,155 @@ export default function AssetsView({
           table: "workspace_generation_jobs",
           filter: `user_id=eq.${user.id}`,
         },
-        (payload) => {
-          // Tear it down to a single replay path: just refetch the
-          // first page when anything in the user's stream changes.
-          // Cheap, correct, beats trying to merge insert/update/
-          // delete events into a paged list by hand.
-          void fetchGenPage(0);
-        },
-      )
-      .subscribe();
+        handleChange,
+      );
+    }
+
+    channel.subscribe();
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [user, fetchGenPage]);
+  }, [user, projectIds, fetchGenPage]);
 
   /** Lazy-load uploads when the user opens the Uploads tab. */
   useEffect(() => {
-    if (section !== "uploads" || !user) return;
+    if ((section !== "uploads" && section !== "all") || !user) {
+      if (!user) {
+        setUploadLoading(false);
+        setUploadAssets([]);
+      }
+      return;
+    }
     setUploadLoading(true);
     void (async () => {
       try {
+        const items: UploadAsset[] = [];
+        const seenUrls = new Set<string>();
+        const pushUpload = (asset: UploadAsset) => {
+          const key = asset.url.split("?")[0];
+          if (seenUrls.has(key)) return;
+          seenUrls.add(key);
+          items.push(asset);
+        };
+
+        const { data: userAssetRows, error: userAssetError } = await (supabase as any)
+          .from("user_assets")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(240);
+
+        if (userAssetError) {
+          console.warn("[AssetsView] user_assets load failed:", userAssetError.message);
+        } else {
+          for (const row of (userAssetRows ?? []) as Array<Record<string, unknown>>) {
+            const metadata =
+              row.metadata && typeof row.metadata === "object"
+                ? (row.metadata as Record<string, unknown>)
+                : {};
+            const rawUrl = firstText(
+              row.file_url,
+              row.url,
+              row.public_url,
+              row.thumbnail_url,
+              metadata.file_url,
+              metadata.url,
+              metadata.storage_path,
+            );
+            if (!rawUrl) continue;
+            const url = await resolveAiMediaUrl(rawUrl);
+            if (!url) continue;
+            const storagePointer = storagePointerFromRawUrl(rawUrl);
+            const fileType = firstText(
+              row.file_type,
+              row.mime_type,
+              row.type,
+              metadata.mime_type,
+              metadata.content_type,
+            );
+            pushUpload({
+              source: "upload",
+              id: `user-asset-${String(row.id ?? rawUrl)}`,
+              rowId: typeof row.id === "string" ? row.id : row.id != null ? String(row.id) : undefined,
+              ...storagePointer,
+              kind: inferAssetKind(url, fileType),
+              url,
+              name:
+                cleanAssetName(
+                  firstText(
+                    row.name,
+                    row.file_name,
+                    row.filename,
+                    metadata.name,
+                    metadata.file_name,
+                    metadata.filename,
+                  ),
+                ) ??
+                cleanAssetName(rawUrl) ??
+                t("workspace.assets.gen_fallback"),
+              projectId:
+                typeof row.project_id === "string"
+                  ? row.project_id
+                  : typeof metadata.project_id === "string"
+                    ? metadata.project_id
+                    : null,
+              createdAt:
+                typeof row.created_at === "string"
+                  ? row.created_at
+                  : new Date().toISOString(),
+              size:
+                typeof metadata.size === "number"
+                  ? metadata.size
+                  : typeof row.size === "number"
+                    ? row.size
+                    : undefined,
+            });
+          }
+        }
+
         // List the user's own folder in `ai-media`. Storage RLS
         // already restricts us to `(storage.foldername(name))[1] =
         // auth.uid()`, so we can pass `userId` as the prefix and
         // get back only files we own.
-        const { data, error } = await supabase.storage
-          .from("ai-media")
-          .list(user.id, {
-            limit: 200,
-            sortBy: { column: "created_at", order: "desc" },
-          });
-        if (error) throw error;
-        const items: UploadAsset[] = [];
-        for (const obj of data ?? []) {
-          // `list()` at the user's root returns folders too — skip
-          // those. A file row has a non-null `id` and a name with an
-          // extension; folders come back with id=null.
-          if (!obj.id) continue;
-          const path = `${user.id}/${obj.name}`;
-          const { data: signed } = await supabase.storage
+        const collectAiMediaPrefix = async (prefix: string, depth = 0): Promise<void> => {
+          const { data, error } = await supabase.storage
             .from("ai-media")
-            .createSignedUrl(path, 60 * 60 * 24);
-          const url = signed?.signedUrl;
-          if (!url) continue;
-          const lower = obj.name.toLowerCase();
-          let kind: AssetKind = "image";
-          if (/\.(mp4|webm|mov|m4v)$/i.test(lower)) kind = "video";
-          else if (/\.(mp3|wav|m4a|ogg|aac)$/i.test(lower)) kind = "audio";
-          else if (/\.(glb|gltf|obj|fbx|usdz)$/i.test(lower)) kind = "3d";
-          items.push({
-            source: "upload",
-            id: path,
-            kind,
-            url,
-            name: obj.name,
-            projectId: null,
-            createdAt: obj.created_at ?? new Date().toISOString(),
-            size: (obj.metadata as { size?: number } | null)?.size,
-          });
-        }
-        setUploadAssets(items);
+            .list(prefix, {
+              limit: 200,
+              sortBy: { column: "created_at", order: "desc" },
+            });
+          if (error) throw error;
+
+          for (const obj of data ?? []) {
+            const path = `${prefix}/${obj.name}`;
+            if (!obj.id) {
+              if (depth < 2) await collectAiMediaPrefix(path, depth + 1);
+              continue;
+            }
+            const url = await resolveAiMediaUrl(`ai-media/${path}`);
+            if (!url) continue;
+            pushUpload({
+              source: "upload",
+              id: path,
+              kind: inferAssetKind(path),
+              url,
+              name: obj.name,
+              projectId: null,
+              createdAt: obj.created_at ?? new Date().toISOString(),
+              size: (obj.metadata as { size?: number } | null)?.size,
+              storageBucket: "ai-media",
+              storagePath: path,
+            });
+          }
+        };
+
+        await collectAiMediaPrefix(user.id);
+        setUploadAssets(
+          items.sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          ),
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         toast.error(t("workspace.assets.upload_list_failed", { error: msg }));
@@ -343,17 +589,18 @@ export default function AssetsView({
         setUploadLoading(false);
       }
     })();
-  }, [section, user]);
+  }, [section, user, t]);
 
   /** Resolve the active dataset based on the current section. */
   const baseAssets: Asset[] = useMemo(() => {
     if (section === "uploads") return uploadAssets;
-    if (section === "trash" || section === "favorites" || section === "spaces") {
-      // Phase-1 placeholder — these tabs need extra DB tables
-      // (favorites flag / soft-delete flag) we don't have yet.
-      return [];
+    if (section === "spaces") {
+      const spaceAssets = genAssets.filter((asset) => Boolean(asset.workspaceId));
+      return spaceAssets.length > 0 ? spaceAssets : genAssets;
     }
-    return genAssets;
+    return [...genAssets, ...uploadAssets].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
   }, [section, genAssets, uploadAssets]);
 
   /** Filter pipeline — kind → project → search. */
@@ -394,6 +641,8 @@ export default function AssetsView({
     }
     return out;
   }, [filteredAssets]);
+
+  const loading = section === "uploads" ? uploadLoading : genLoading;
 
   const openAssetPreview = useCallback((asset: Asset) => {
     const label =
@@ -446,7 +695,7 @@ export default function AssetsView({
             ].filter(Boolean) as Array<{ label: string; value?: string }>
           : [{ label: "Uploaded", value: formatRelative(asset.createdAt, t) }],
     });
-  }, []);
+  }, [t]);
 
   return (
     <div className="flex h-full min-h-0 w-full overflow-hidden text-zinc-100">
@@ -648,29 +897,22 @@ export default function AssetsView({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-          {(section === "favorites" || section === "trash" || section === "spaces") ? (
-            <PlaceholderTab section={section} onGoTo={() => setSection("all")} />
-          ) : genLoading || (section === "uploads" && uploadLoading) ? (
+          {loading ? (
             <CenterLoader />
           ) : filteredAssets.length === 0 ? (
             <EmptyState section={section} hasFilter={filter !== "all" || !!searchQuery || !!activeProject} />
           ) : (
             <div className="flex flex-col gap-7 pb-12">
               {grouped.map((g) => (
-                <section key={g.label} className="flex flex-col gap-3">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      className="h-3.5 w-3.5 rounded border-white/20 bg-white/[0.04] accent-violet-500"
-                      aria-label={`Select all in ${g.label}`}
-                      onChange={() => undefined}
-                    />
-                    <h2 className="text-[12px] font-medium text-zinc-300">
+                <section key={g.label} className="flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2 px-0.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-zinc-600" />
+                    <h2 className="text-[11px] font-medium uppercase tracking-[0.12em] text-zinc-500">
                       {g.label}
                     </h2>
                     <span className="text-[11px] text-zinc-600">· {g.items.length}</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
                     {g.items.map((a) => (
                       <AssetCard
                         key={`${a.source}-${a.id}`}
@@ -850,26 +1092,30 @@ function AssetCard({
     }
   }, [hovered, asset.kind]);
 
-  const overlayLabel =
-    asset.kind === "video"
-      ? asset.source === "generation" && asset.durationSec
-        ? `${Math.round(asset.durationSec)}s`
-        : t("workspace.assets.kind_video")
-      : asset.kind === "audio"
-        ? t("workspace.assets.kind_audio")
-        : asset.kind === "3d"
-          ? t("workspace.assets.kind_3d")
-          : null;
+  const displayUrl =
+    asset.kind === "3d" && asset.source === "generation" && asset.thumbnailUrl
+      ? asset.thumbnailUrl
+      : asset.url;
+  const modelLabel =
+    asset.source === "generation"
+      ? asset.modelLabel || t("workspace.assets.gen_fallback")
+      : asset.name;
+  const durationLabel =
+    asset.source === "generation" && asset.durationSec
+      ? `${Math.round(asset.durationSec)}s`
+      : null;
+  const dateLabel = formatRelative(asset.createdAt, t);
 
   return (
     <div
-      className="group relative flex flex-col overflow-hidden rounded-lg bg-zinc-900/60 transition-colors hover:bg-white/[0.04]"
+      data-testid="asset-card"
+      className="group relative h-[230px] overflow-hidden rounded-[10px] bg-black/40 shadow-[inset_0_0_0_1px_rgba(255,255,255,.035)] transition-transform duration-150 hover:-translate-y-0.5"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onTouchStart={() => setHovered(true)}
     >
       <div
-        className="relative aspect-video w-full cursor-zoom-in overflow-hidden bg-black/40"
+        className="relative flex h-full w-full cursor-zoom-in items-center justify-center overflow-hidden"
         role="button"
         tabIndex={0}
         title={t("workspace.assets.open_download")}
@@ -884,23 +1130,25 @@ function AssetCard({
         {asset.kind === "video" ? (
           <video
             ref={videoRef}
-            src={asset.url}
-            className="h-full w-full object-cover pointer-events-none"
+            src={displayUrl}
+            className="pointer-events-none h-full w-auto max-w-full object-contain"
             muted
             loop
             playsInline
             preload="metadata"
           />
         ) : asset.kind === "audio" ? (
-          <div className="grid h-full w-full place-items-center text-zinc-700">
-            <Music className="h-10 w-10" />
+          <div className="grid h-full w-full place-items-center text-zinc-500">
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-white/[0.06]">
+              <Music className="h-6 w-6" />
+            </span>
           </div>
         ) : asset.kind === "3d" ? (
-          asset.source === "generation" && asset.thumbnailUrl ? (
+          displayUrl ? (
             <img
-              src={asset.thumbnailUrl}
+              src={displayUrl}
               alt=""
-              className="h-full w-full object-cover pointer-events-none"
+              className="pointer-events-none h-full w-auto max-w-full object-contain"
               loading="lazy"
             />
           ) : (
@@ -910,31 +1158,24 @@ function AssetCard({
           )
         ) : (
           <img
-            src={asset.url}
+            src={displayUrl}
             alt=""
-            className="h-full w-full object-cover pointer-events-none"
+            className="pointer-events-none h-full w-auto max-w-full object-contain"
             loading="lazy"
           />
         )}
 
-        {/* Bottom-left kind chip */}
-        {overlayLabel && (
-          <span className="absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-zinc-100 backdrop-blur-sm">
-            <Icon className="h-3 w-3" /> {overlayLabel}
-          </span>
-        )}
-
         {/* Hover actions */}
-        <div className="absolute right-1.5 top-1.5 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="absolute right-1.5 top-1.5 flex translate-y-1 items-center gap-1 opacity-0 transition-all duration-150 group-hover:translate-y-0 group-hover:opacity-100">
           <a
             href={asset.url}
             target="_blank"
             rel="noreferrer"
             onClick={(event) => event.stopPropagation()}
-            className="rounded-md bg-black/60 p-1.5 text-zinc-200 hover:bg-black/80 hover:text-white"
+            className="grid h-7 w-7 place-items-center rounded-full bg-black/62 text-white backdrop-blur transition hover:bg-white hover:text-zinc-950"
             title={t("workspace.assets.open_download")}
           >
-            <Download className="h-3 w-3" />
+            <Download className="h-3.5 w-3.5" />
           </a>
           {asset.source === "generation" && (asset.workspaceId || asset.canvasId) && (
             <button
@@ -943,31 +1184,23 @@ function AssetCard({
                 event.stopPropagation();
                 onOpenCanvas(asset);
               }}
-              className="rounded-md bg-black/60 p-1.5 text-zinc-200 hover:bg-black/80 hover:text-white"
+              className="grid h-7 w-7 place-items-center rounded-full bg-black/62 text-white backdrop-blur transition hover:bg-white hover:text-zinc-950"
               title={t("workspace.assets.open_in_space")}
             >
-              <ExternalLink className="h-3 w-3" />
+              <ExternalLink className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
       </div>
 
-      {/* Caption */}
-      <div className="flex flex-col gap-0.5 px-2 py-1.5">
-        <div
-          className="line-clamp-1 text-[11.5px] text-zinc-200"
-          title={asset.source === "generation" ? asset.prompt : asset.name}
-        >
-          {asset.source === "generation"
-            ? asset.prompt || asset.modelLabel || t("workspace.assets.gen_fallback")
-            : asset.name}
-        </div>
-        <div className="flex items-center gap-1 text-[10px] text-zinc-500">
-          {asset.source === "generation" && asset.modelLabel && (
-            <span className="truncate">{asset.modelLabel}</span>
-          )}
-          <span className="ml-auto whitespace-nowrap">
-            {formatRelative(asset.createdAt, t)}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-1 bg-gradient-to-t from-black/58 via-black/16 to-transparent px-2 pb-1.5 pt-10 opacity-0 transition-all duration-150 group-hover:translate-y-0 group-hover:opacity-100">
+        <div className="flex max-w-full flex-wrap items-end gap-x-2 gap-y-0.5 text-[8px] font-semibold leading-[10px] text-white/70 drop-shadow-[0_1px_2px_rgba(0,0,0,.85)]">
+          <span className="max-w-[120px] truncate">{modelLabel}</span>
+          {durationLabel && <span className="shrink-0">{durationLabel}</span>}
+          <span className="shrink-0">{dateLabel}</span>
+          <span className="inline-flex shrink-0 items-center gap-0.5">
+            <Icon className="h-2.5 w-2.5" />
+            {asset.kind === "3d" ? "3D" : asset.kind}
           </span>
         </div>
       </div>
@@ -1006,39 +1239,6 @@ function EmptyState({
   );
 }
 
-function PlaceholderTab({
-  section,
-  onGoTo,
-}: {
-  section: SectionKind;
-  onGoTo: () => void;
-}) {
-  const { t } = useLanguage();
-  const titles: Record<SectionKind, string> = {
-    all: t("workspace.assets.all_assets"),
-    spaces: t("workspace.assets.spaces"),
-    favorites: t("workspace.assets.favorites"),
-    uploads: t("workspace.assets.uploads"),
-    trash: t("workspace.assets.trash"),
-  };
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-zinc-500">
-      <SlidersHorizontal className="h-8 w-8 text-zinc-600" />
-      <div className="text-sm font-medium text-zinc-300">{titles[section]}</div>
-      <div className="max-w-xs text-xs text-zinc-600">
-        {t("workspace.assets.placeholder_hint")}
-      </div>
-      <button
-        type="button"
-        onClick={onGoTo}
-        className="rounded-md bg-white/[0.06] px-3 py-1.5 text-xs text-zinc-200 hover:bg-white/[0.08]"
-      >
-        {t("workspace.assets.go_to_all")}
-      </button>
-    </div>
-  );
-}
-
 function sectionTitle(
   section: SectionKind,
   projects: Array<{ id: string; name: string }>,
@@ -1051,9 +1251,7 @@ function sectionTitle(
   switch (section) {
     case "all":       return t("workspace.assets.all_assets");
     case "spaces":    return t("workspace.assets.spaces");
-    case "favorites": return t("workspace.assets.favorites");
     case "uploads":   return t("workspace.assets.uploads");
-    case "trash":     return t("workspace.assets.trash");
   }
 }
 

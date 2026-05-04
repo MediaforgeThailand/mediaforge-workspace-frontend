@@ -121,6 +121,10 @@ interface UploadedRef {
   url: string;
   mime: string;
   role?: "character" | "general";
+  source?: "generation" | "user_asset" | "upload";
+  assetId?: string;
+  storageBucket?: "ai-media" | "user_assets";
+  storagePath?: string;
 }
 
 interface StandaloneJobRow {
@@ -1004,6 +1008,10 @@ export default function StandaloneGenerator({
     url: string;
     mime?: string;
     name?: string;
+    source?: "generation" | "user_asset" | "upload";
+    assetId?: string;
+    storageBucket?: "ai-media" | "user_assets";
+    storagePath?: string;
   }) => {
     const slot = getPanelReferenceSlot();
     if (!slot) return;
@@ -1021,6 +1029,10 @@ export default function StandaloneGenerator({
       name: reference.name ?? "asset-reference",
       url: reference.url,
       mime: referenceMime,
+      source: reference.source,
+      assetId: reference.assetId,
+      storageBucket: reference.storageBucket,
+      storagePath: reference.storagePath,
     });
   };
 
@@ -1057,6 +1069,10 @@ export default function StandaloneGenerator({
       url: string;
       mime?: string;
       name?: string;
+      source?: "generation" | "user_asset" | "upload";
+      assetId?: string;
+      storageBucket?: "ai-media" | "user_assets";
+      storagePath?: string;
     },
   ) => {
     const referenceMime = reference.mime ?? "image/jpeg";
@@ -1069,6 +1085,10 @@ export default function StandaloneGenerator({
       name: reference.name ?? "asset-reference",
       url: reference.url,
       mime: referenceMime,
+      source: reference.source,
+      assetId: reference.assetId,
+      storageBucket: reference.storageBucket,
+      storagePath: reference.storagePath,
     });
   };
 
@@ -1093,6 +1113,63 @@ export default function StandaloneGenerator({
         [activeTool]: { ...current, ...patch },
       };
     });
+  };
+
+  const deletePanelReferenceAsset = async (reference: Pick<
+    UploadedRef,
+    "id" | "url" | "mime" | "name" | "source" | "assetId" | "storageBucket" | "storagePath"
+  >) => {
+    if (!user?.id) return;
+    const ok = window.confirm("Delete this asset? This removes it from your library.");
+    if (!ok) return;
+
+    try {
+      const source = reference.source ?? (reference.id.startsWith("job-") ? "generation" : "user_asset");
+      const assetId =
+        reference.assetId ??
+        (reference.id.startsWith("job-") || reference.id.startsWith("user-asset-")
+          ? reference.id.replace(/^job-/, "").replace(/^user-asset-/, "")
+          : reference.id);
+
+      if (source === "generation") {
+        const { error } = await (supabase as any)
+          .from("workspace_generation_jobs")
+          .delete()
+          .eq("id", assetId)
+          .eq("user_id", user.id);
+        if (error) throw error;
+      } else {
+        let deletedRow = false;
+        if (source !== "upload" && assetId) {
+          const { error } = await (supabase as any)
+            .from("user_assets")
+            .delete()
+            .eq("id", assetId)
+            .eq("user_id", user.id);
+          if (!error) deletedRow = true;
+        }
+        if (reference.storageBucket && reference.storagePath) {
+          const { error } = await supabase.storage
+            .from(reference.storageBucket)
+            .remove([reference.storagePath]);
+          if (error && !deletedRow) throw error;
+        }
+      }
+
+      removePanelReference(reference.id);
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["standalone-project-reference-assets", user.id, activeProject?.id],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["standalone-generation-jobs", user.id, activeProject?.id],
+        }),
+      ]);
+      toast.success("Asset deleted");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(`Could not delete asset: ${message}`);
+    }
   };
 
   const panelPromptLabel =
@@ -1452,6 +1529,7 @@ export default function StandaloneGenerator({
               onAddReferences={openPanelReferenceUpload}
               onReferenceFiles={uploadPanelReferenceFiles}
               onSelectReferenceAsset={selectPanelReferenceAsset}
+              onDeleteReferenceAsset={deletePanelReferenceAsset}
               onRemoveReference={removePanelReference}
               mentionOptions={panelMentionOptions}
               settings={videoSettings}
@@ -1521,6 +1599,9 @@ export default function StandaloneGenerator({
               }
               onSelectReferenceAsset={
                 activeTool === "voice_gen" ? undefined : selectPanelReferenceAsset
+              }
+              onDeleteReferenceAsset={
+                activeTool === "voice_gen" ? undefined : deletePanelReferenceAsset
               }
               onRemoveReference={removePanelReference}
               mentionOptions={panelMentionOptions}
@@ -3820,6 +3901,7 @@ function creationStatusMatches(job: StandaloneJobRow, filter: CreationStatusFilt
 }
 
 const MODEL_FILE_RE = /\.(glb|gltf|usdz|obj|fbx)(?:[?#].*)?$/i;
+const REFERENCE_MEDIA_FILE_RE = /\.(png|jpe?g|webp|gif|mp4|mov|webm|m4v)(?:[?#].*)?$/i;
 
 const firstText = (...values: Array<unknown>): string | undefined => {
   for (const value of values) {
@@ -3827,6 +3909,39 @@ const firstText = (...values: Array<unknown>): string | undefined => {
   }
   return undefined;
 };
+
+function cleanReferenceFileName(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const cleaned = value
+    .split(/[?#]/)[0]
+    .split(/[\\/]/)
+    .filter(Boolean)
+    .pop()
+    ?.replace(/^[0-9]{10,}[-_]/, "")
+    .replace(/[\[\]()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || undefined;
+}
+
+function referenceFileNameFromUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url);
+    return cleanReferenceFileName(decodeURIComponent(parsed.pathname));
+  } catch {
+    return cleanReferenceFileName(decodeURIComponent(url));
+  }
+}
+
+function uploadedReferenceName(rawName: string | undefined, url: string, fallback: string): string {
+  const explicit = cleanReferenceFileName(rawName);
+  if (explicit && REFERENCE_MEDIA_FILE_RE.test(explicit)) return explicit;
+  const fromUrl = referenceFileNameFromUrl(url);
+  if (fromUrl && REFERENCE_MEDIA_FILE_RE.test(fromUrl)) return fromUrl;
+  if (explicit && explicit.length <= 28) return explicit;
+  return fromUrl ?? fallback;
+}
 
 function getStandaloneModelUrl(result: StandaloneResult | null | undefined) {
   if (!result) return undefined;
@@ -3902,10 +4017,42 @@ function referenceFromGenerationJob(job: StandaloneJobRow): UploadedRef | null {
   const params = job.request?.params ?? {};
   return {
     id: `job-${job.id}`,
-    name: String(params.prompt ?? params.nodeName ?? job.model ?? "asset"),
+    source: "generation",
+    assetId: job.id,
+    name: uploadedReferenceName(
+      firstText(outputs.file_name, outputs.filename, result.url),
+      url,
+      String(params.nodeName ?? job.model ?? "asset"),
+    ),
     url,
     mime: videoUrl ? "video/mp4" : "image/jpeg",
   };
+}
+
+function storagePointerFromReferenceUrl(rawUrl: string): Pick<UploadedRef, "storageBucket" | "storagePath"> {
+  const normalized = rawUrl.trim().replace(/^\/+/, "").split("?")[0];
+  const direct = normalized.match(/^(ai-media|user_assets)\/(.+)$/i);
+  if (direct?.[1] && direct[2]) {
+    return {
+      storageBucket: direct[1].toLowerCase() as "ai-media" | "user_assets",
+      storagePath: decodeURIComponent(direct[2]),
+    };
+  }
+
+  try {
+    const parsed = new URL(rawUrl);
+    const match = parsed.pathname.match(/\/storage\/v1\/object\/(?:sign|public)\/([^/]+)\/(.+)$/);
+    if (match?.[1] && match[2] && /^(ai-media|user_assets)$/i.test(match[1])) {
+      return {
+        storageBucket: match[1].toLowerCase() as "ai-media" | "user_assets",
+        storagePath: decodeURIComponent(match[2]),
+      };
+    }
+  } catch {
+    // Non-URL values can still be plain storage paths and are handled above.
+  }
+
+  return {};
 }
 
 async function fetchProjectUserAssets(
@@ -3957,6 +4104,7 @@ async function referenceFromUserAsset(
     metadata.storage_path,
   );
   if (!rawUrl || MODEL_FILE_RE.test(rawUrl)) return null;
+  const storagePointer = storagePointerFromReferenceUrl(rawUrl);
   const mime = inferReferenceMime(
     rawUrl,
     firstText(row.file_type, row.mime_type, row.type, metadata.mime_type, metadata.content_type),
@@ -3965,7 +4113,21 @@ async function referenceFromUserAsset(
   const signedUrl = await getSignedUrl(rawUrl);
   return {
     id: `user-asset-${String(row.id ?? rawUrl)}`,
-    name: String(row.name ?? row.file_name ?? "asset"),
+    source: "user_asset",
+    assetId: row.id != null ? String(row.id) : undefined,
+    ...storagePointer,
+    name: uploadedReferenceName(
+      firstText(
+        row.file_name,
+        row.filename,
+        metadata.file_name,
+        metadata.filename,
+        row.name,
+        metadata.name,
+      ),
+      rawUrl,
+      "asset",
+    ),
     url: signedUrl,
     mime,
   };
@@ -4760,6 +4922,9 @@ async function uploadReference(
   }
   return {
     id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`,
+    source: "upload",
+    storageBucket: STORAGE_BUCKET,
+    storagePath,
     name: file.name,
     url: data.signedUrl,
     mime: file.type,
