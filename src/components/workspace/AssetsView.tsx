@@ -52,6 +52,8 @@ import {
   RefreshCcw,
   ExternalLink,
   Download,
+  Trash2,
+  AlertTriangle,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -63,6 +65,13 @@ import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { getSignedUrl } from "@/hooks/useSignedUrl";
 import { cn } from "@/lib/utils";
 import NodePreviewLightbox, { type PreviewPayload } from "./NodePreviewLightbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 type AssetKind = "image" | "video" | "audio" | "3d";
 
@@ -247,6 +256,8 @@ export default function AssetsView({
   const [searchOpen, setSearchOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [preview, setPreview] = useState<PreviewPayload | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Asset | null>(null);
+  const [deletingAsset, setDeletingAsset] = useState(false);
 
   // Generation assets — live-paged from workspace_generation_jobs.
   const [genAssets, setGenAssets] = useState<GenerationAsset[]>([]);
@@ -697,6 +708,57 @@ export default function AssetsView({
     });
   }, [t]);
 
+  const requestDeleteAsset = useCallback((asset: Asset) => {
+    setDeleteTarget(asset);
+  }, []);
+
+  const confirmDeleteAsset = useCallback(async () => {
+    if (!deleteTarget || !user) return;
+    setDeletingAsset(true);
+    try {
+      const source =
+        deleteTarget.source === "generation"
+          ? "generation"
+          : deleteTarget.rowId
+            ? "user_asset"
+            : "upload";
+      const assetId =
+        deleteTarget.source === "generation"
+          ? deleteTarget.id
+          : deleteTarget.rowId ?? deleteTarget.id.replace(/^user-asset-/, "");
+      const { error, data } = await supabase.functions.invoke("workspace-run-node", {
+        body: {
+          action: "delete_workspace_asset",
+          asset_source: source,
+          asset_id: assetId,
+          job_id: source === "generation" ? assetId : undefined,
+          storage_bucket: deleteTarget.source === "upload" ? deleteTarget.storageBucket : undefined,
+          storage_path: deleteTarget.source === "upload" ? deleteTarget.storagePath : undefined,
+          url: deleteTarget.url,
+        },
+      });
+      if (error) throw error;
+      const result = (data ?? {}) as { error?: string };
+      if (result.error) throw new Error(result.error);
+
+      if (deleteTarget.source === "generation") {
+        setGenAssets((items) => items.filter((item) => item.id !== deleteTarget.id));
+      } else {
+        setUploadAssets((items) => items.filter((item) => item.id !== deleteTarget.id));
+      }
+      if (preview?.url === deleteTarget.url || preview?.model_url === deleteTarget.url) {
+        setPreview(null);
+      }
+      setDeleteTarget(null);
+      toast.success("Asset deleted");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(`Could not delete asset: ${message}`);
+    } finally {
+      setDeletingAsset(false);
+    }
+  }, [deleteTarget, preview, user]);
+
   return (
     <div className="flex h-full min-h-0 w-full overflow-hidden text-zinc-100">
       {/* ── Left sub-sidebar (≥ md) ─────────────────────────── */}
@@ -918,6 +980,7 @@ export default function AssetsView({
                         key={`${a.source}-${a.id}`}
                         asset={a}
                         onPreview={openAssetPreview}
+                        onDelete={requestDeleteAsset}
                         onOpenCanvas={(asset) => {
                           const qp = new URLSearchParams();
                           if (asset.canvasId) qp.set("canvas", asset.canvasId);
@@ -985,6 +1048,45 @@ export default function AssetsView({
           }}
         />
       )}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && !deletingAsset && setDeleteTarget(null)}>
+        <DialogContent className="w-[360px] gap-0 overflow-hidden rounded-[18px] border border-white/[0.08] bg-[#101113] p-0 text-white shadow-[0_24px_80px_rgba(0,0,0,.64)]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-[#ff2fb3] via-[#8b5cf6] to-[#14b8ff]" />
+          <div className="px-5 pb-4 pt-5">
+            <DialogHeader className="space-y-2 pr-5">
+              <div className="flex items-center gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-rose-300/20 bg-rose-500/12 text-rose-200">
+                  <AlertTriangle className="h-4 w-4" />
+                </span>
+                <DialogTitle className="text-[16px] font-bold leading-tight text-white">
+                  Delete asset?
+                </DialogTitle>
+              </div>
+              <DialogDescription className="text-[13px] leading-relaxed text-zinc-400">
+                This removes the asset from your library and deletes the stored file when it belongs to your account.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="flex items-center justify-end gap-2 border-t border-white/[0.06] bg-white/[0.025] px-4 py-3">
+            <button
+              type="button"
+              disabled={deletingAsset}
+              onClick={() => setDeleteTarget(null)}
+              className="h-9 rounded-[10px] border border-white/[0.08] px-4 text-[13px] font-semibold text-zinc-200 transition hover:bg-white/[0.06] disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={deletingAsset}
+              onClick={() => void confirmDeleteAsset()}
+              className="inline-flex h-9 min-w-[96px] items-center justify-center gap-2 rounded-[10px] bg-gradient-to-r from-[#ff2f92] to-[#8b5cf6] px-4 text-[13px] font-bold text-white shadow-[0_12px_28px_rgba(236,72,153,.32)] transition hover:brightness-110 disabled:opacity-60"
+            >
+              {deletingAsset ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Delete
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1069,10 +1171,12 @@ function SubNav({
 function AssetCard({
   asset,
   onPreview,
+  onDelete,
   onOpenCanvas,
 }: {
   asset: Asset;
   onPreview: (asset: Asset) => void;
+  onDelete: (asset: Asset) => void;
   onOpenCanvas: (asset: GenerationAsset) => void;
 }) {
   const { t } = useLanguage();
@@ -1167,6 +1271,18 @@ function AssetCard({
 
         {/* Hover actions */}
         <div className="absolute right-1.5 top-1.5 flex translate-y-1 items-center gap-1 opacity-0 transition-all duration-150 group-hover:translate-y-0 group-hover:opacity-100">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete(asset);
+            }}
+            className="grid h-7 w-7 place-items-center rounded-full border border-white/[0.10] bg-black/62 text-white shadow-[0_8px_20px_rgba(0,0,0,.35)] backdrop-blur transition hover:border-rose-300/40 hover:bg-rose-500 hover:text-white"
+            title="Delete asset"
+            aria-label="Delete asset"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
           <a
             href={asset.url}
             target="_blank"

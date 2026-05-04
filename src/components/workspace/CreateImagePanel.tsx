@@ -1561,7 +1561,7 @@ function ReferencePicker({
                       event.stopPropagation();
                       onDeleteAsset(asset);
                     }}
-                    className="absolute right-[6px] top-[6px] grid h-[26px] w-[26px] place-items-center rounded-full bg-black/72 text-white opacity-0 shadow-lg backdrop-blur transition hover:bg-rose-500 group-hover:opacity-100"
+                    className="absolute right-[6px] top-[6px] grid h-[26px] w-[26px] place-items-center rounded-full border border-white/[0.10] bg-black/70 text-white opacity-0 shadow-[0_8px_20px_rgba(0,0,0,.35)] backdrop-blur transition hover:border-rose-300/40 hover:bg-gradient-to-br hover:from-[#ff2f92] hover:to-[#8b5cf6] hover:text-white group-hover:opacity-100"
                     aria-label="Delete asset"
                     title="Delete asset"
                   >

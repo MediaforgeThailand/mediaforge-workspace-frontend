@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
+  AlertTriangle,
   Box,
   BookOpen,
   ChevronDown,
@@ -43,6 +44,13 @@ import {
   downloadFromUrl,
   triggerBlobDownload,
 } from "./downloadAsset";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import NodePreviewLightbox, { type PreviewPayload } from "./NodePreviewLightbox";
 import { useFreshSignedUrl } from "./useFreshSignedUrl";
 import { getSignedUrl } from "@/hooks/useSignedUrl";
@@ -126,6 +134,11 @@ interface UploadedRef {
   storageBucket?: "ai-media" | "user_assets";
   storagePath?: string;
 }
+
+type DeletableReference = Pick<
+  UploadedRef,
+  "id" | "url" | "mime" | "name" | "source" | "assetId" | "storageBucket" | "storagePath"
+>;
 
 interface StandaloneJobRow {
   id: string;
@@ -595,6 +608,9 @@ export default function StandaloneGenerator({
   const [insufficientOpen, setInsufficientOpen] = useState(false);
   const [insufficientRequiredCredits, setInsufficientRequiredCredits] =
     useState<number | undefined>();
+  const [deleteReferenceTarget, setDeleteReferenceTarget] =
+    useState<DeletableReference | null>(null);
+  const [deletingReference, setDeletingReference] = useState(false);
 
   const activeDef = STANDALONE_TOOLS[activeTool];
   const form = forms[activeTool];
@@ -1115,14 +1131,15 @@ export default function StandaloneGenerator({
     });
   };
 
-  const deletePanelReferenceAsset = async (reference: Pick<
-    UploadedRef,
-    "id" | "url" | "mime" | "name" | "source" | "assetId" | "storageBucket" | "storagePath"
-  >) => {
-    if (!user?.id) return;
-    const ok = window.confirm("Delete this asset? This removes it from your library.");
-    if (!ok) return;
+  const deletePanelReferenceAsset = (reference: DeletableReference) => {
+    setDeleteReferenceTarget(reference);
+  };
 
+  const confirmDeletePanelReferenceAsset = async () => {
+    const reference = deleteReferenceTarget;
+    if (!user?.id) return;
+
+    setDeletingReference(true);
     try {
       const source = reference.source ?? (reference.id.startsWith("job-") ? "generation" : "user_asset");
       const assetId =
@@ -1131,32 +1148,33 @@ export default function StandaloneGenerator({
           ? reference.id.replace(/^job-/, "").replace(/^user-asset-/, "")
           : reference.id);
 
-      if (source === "generation") {
-        const { error } = await (supabase as any)
-          .from("workspace_generation_jobs")
-          .delete()
-          .eq("id", assetId)
-          .eq("user_id", user.id);
-        if (error) throw error;
-      } else {
-        let deletedRow = false;
-        if (source !== "upload" && assetId) {
-          const { error } = await (supabase as any)
-            .from("user_assets")
-            .delete()
-            .eq("id", assetId)
-            .eq("user_id", user.id);
-          if (!error) deletedRow = true;
-        }
-        if (reference.storageBucket && reference.storagePath) {
-          const { error } = await supabase.storage
-            .from(reference.storageBucket)
-            .remove([reference.storagePath]);
-          if (error && !deletedRow) throw error;
-        }
-      }
+      const { data, error } = await supabase.functions.invoke(RUN_EDGE_FUNCTION, {
+        body: {
+          action: "delete_workspace_asset",
+          asset_source: source,
+          asset_id: assetId,
+          job_id: source === "generation" ? assetId : undefined,
+          storage_bucket: reference.storageBucket,
+          storage_path: reference.storagePath,
+          url: reference.url,
+        },
+      });
+      if (error) throw error;
+      const result = (data ?? {}) as { error?: string };
+      if (result.error) throw new Error(result.error);
 
       removePanelReference(reference.id);
+      queryClient.setQueryData<UploadedRef[]>(
+        ["standalone-project-reference-assets", user.id, activeProject?.id],
+        (items) =>
+          (items ?? []).filter(
+            (item) => item.id !== reference.id && item.assetId !== assetId,
+          ),
+      );
+      queryClient.setQueryData<StandaloneJobRow[]>(
+        ["standalone-generation-jobs", user.id, activeProject?.id],
+        (items) => (items ?? []).filter((item) => item.id !== assetId),
+      );
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: ["standalone-project-reference-assets", user.id, activeProject?.id],
@@ -1165,10 +1183,13 @@ export default function StandaloneGenerator({
           queryKey: ["standalone-generation-jobs", user.id, activeProject?.id],
         }),
       ]);
+      setDeleteReferenceTarget(null);
       toast.success("Asset deleted");
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       toast.error(`Could not delete asset: ${message}`);
+    } finally {
+      setDeletingReference(false);
     }
   };
 
@@ -1765,6 +1786,48 @@ export default function StandaloneGenerator({
         onOpenChange={setInsufficientOpen}
         requiredCredits={insufficientRequiredCredits}
       />
+      <Dialog
+        open={!!deleteReferenceTarget}
+        onOpenChange={(open) => !open && !deletingReference && setDeleteReferenceTarget(null)}
+      >
+        <DialogContent className="w-[360px] gap-0 overflow-hidden rounded-[18px] border border-white/[0.08] bg-[#101113] p-0 text-white shadow-[0_24px_80px_rgba(0,0,0,.64)]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-[#ff2fb3] via-[#8b5cf6] to-[#14b8ff]" />
+          <div className="px-5 pb-4 pt-5">
+            <DialogHeader className="space-y-2 pr-5">
+              <div className="flex items-center gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-rose-300/20 bg-rose-500/12 text-rose-200">
+                  <AlertTriangle className="h-4 w-4" />
+                </span>
+                <DialogTitle className="text-[16px] font-bold leading-tight text-white">
+                  Delete asset?
+                </DialogTitle>
+              </div>
+              <DialogDescription className="text-[13px] leading-relaxed text-zinc-400">
+                This removes the image from your reference library. Files stored in your MediaForge storage are deleted too.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="flex items-center justify-end gap-2 border-t border-white/[0.06] bg-white/[0.025] px-4 py-3">
+            <button
+              type="button"
+              disabled={deletingReference}
+              onClick={() => setDeleteReferenceTarget(null)}
+              className="h-9 rounded-[10px] border border-white/[0.08] px-4 text-[13px] font-semibold text-zinc-200 transition hover:bg-white/[0.06] disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={deletingReference}
+              onClick={() => void confirmDeletePanelReferenceAsset()}
+              className="inline-flex h-9 min-w-[96px] items-center justify-center gap-2 rounded-[10px] bg-gradient-to-r from-[#ff2f92] to-[#8b5cf6] px-4 text-[13px] font-bold text-white shadow-[0_12px_28px_rgba(236,72,153,.32)] transition hover:brightness-110 disabled:opacity-60"
+            >
+              {deletingReference ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Delete
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
