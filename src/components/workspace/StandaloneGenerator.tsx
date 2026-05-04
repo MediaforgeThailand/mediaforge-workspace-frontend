@@ -95,6 +95,7 @@ const STORAGE_BUCKET = "ai-media";
 const SIGNED_URL_TTL_SEC = 60 * 60 * 24 * 365;
 const STANDALONE_JOB_SELECT =
   "id,node_type,provider,model,request,status,attempts,result,error,last_error,created_at,completed_at,run_after,deadline_at,locked_by,lock_expires_at,credits_charged,credits_refunded";
+const DEFAULT_WORKSPACE_INFRASTRUCTURE_BUFFER_PERCENT = 40;
 
 const isInsufficientCreditsError = (message: string) =>
   /insufficient|not enough|credit/i.test(message) &&
@@ -515,11 +516,34 @@ function standaloneCreateActionTitle(
 function standaloneCreateButtonLabel(
   tool: StandaloneToolKey,
   language: "en" | "th",
+  estimatedCost?: number | null,
 ) {
+  if (
+    estimatedCost != null &&
+    Number.isFinite(estimatedCost) &&
+    estimatedCost > 0
+  ) {
+    const base = language === "th" ? "สร้าง" : "Generate";
+    return `${base} ✨ ${new Intl.NumberFormat("en-US", {
+      maximumFractionDigits: 0,
+    }).format(Math.ceil(estimatedCost))}`;
+  }
   if (tool === "image_gen") {
     return language === "th" ? "สร้างฟรี" : "Create for Free";
   }
   return language === "th" ? "สร้าง" : "Generate";
+}
+
+function workspaceCostMultiplierForTool(
+  tool: StandaloneToolKey,
+  model: string,
+  workspaceMultiplier: number,
+) {
+  // Gemini TTS proxies through the legacy text-to-speech edge function.
+  // That function owns its own credit deduction and does not apply the
+  // workspace infrastructure multiplier, so keep the preview in sync.
+  if (tool === "voice_gen" && model.startsWith("gemini-")) return 1;
+  return workspaceMultiplier;
 }
 
 function standaloneModelDescription(
@@ -601,6 +625,25 @@ export default function StandaloneGenerator({
   const { credits } = useCredits();
   const { data: creditCosts = [], isLoading: creditCostsLoading } =
     useNodeCreditCosts();
+  const { data: workspaceCreditMultiplier = 1 + DEFAULT_WORKSPACE_INFRASTRUCTURE_BUFFER_PERCENT / 100 } =
+    useQuery({
+      queryKey: ["workspace-credit-multiplier"],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from("subscription_settings")
+          .select("value")
+          .eq("key", "workspace_infrastructure_buffer_percent")
+          .maybeSingle();
+        if (error) throw new Error(error.message);
+        const parsed = Number(data?.value);
+        const bufferPercent =
+          Number.isFinite(parsed) && parsed >= 0
+            ? parsed
+            : DEFAULT_WORKSPACE_INFRASTRUCTURE_BUFFER_PERCENT;
+        return 1 + bufferPercent / 100;
+      },
+      staleTime: 1000 * 60 * 5,
+    });
   const [forms, setForms] =
     useState<Record<StandaloneToolKey, StandaloneFormState>>(INITIAL_FORMS);
   const [running, setRunning] = useState(false);
@@ -812,14 +855,28 @@ export default function StandaloneGenerator({
       creditCosts,
     });
     if (baseCost == null) return null;
-    const imageBatchCount =
+    const runCount =
       activeTool === "image_gen"
         ? Math.min(4, Math.max(1, Number(form.imageCount) || 1))
         : activeTool === "video_gen"
           ? Math.min(4, Math.max(1, Number(form.videoCount) || 1))
         : 1;
-    return baseCost * imageBatchCount;
-  }, [activeDef.nodeType, activeTool, creditCosts, creditCostsLoading, form]);
+    if (baseCost <= 0) return 0;
+    const multiplier = workspaceCostMultiplierForTool(
+      activeTool,
+      form.model,
+      workspaceCreditMultiplier,
+    );
+    const perRunCost = Math.max(1, Math.ceil(baseCost * multiplier));
+    return perRunCost * runCount;
+  }, [
+    activeDef.nodeType,
+    activeTool,
+    creditCosts,
+    creditCostsLoading,
+    form,
+    workspaceCreditMultiplier,
+  ]);
 
   const openUpload = (slot: UploadSlot) => {
     pendingSlotRef.current = slot;
@@ -1558,7 +1615,11 @@ export default function StandaloneGenerator({
               settings={videoSettings}
               textControls={videoTextControls}
               onCreate={() => void run()}
-              createLabel={standaloneCreateButtonLabel(activeTool, language)}
+              createLabel={standaloneCreateButtonLabel(
+                activeTool,
+                language,
+                estimatedCost,
+              )}
               runningLabel={t("workspace.standalone.loading")}
               running={running || !!uploading}
               quantity={form.videoCount}
@@ -1641,7 +1702,11 @@ export default function StandaloneGenerator({
                 ) : undefined
               }
               onCreate={() => void run()}
-              createLabel={standaloneCreateButtonLabel(activeTool, language)}
+              createLabel={standaloneCreateButtonLabel(
+                activeTool,
+                language,
+                estimatedCost,
+              )}
               runningLabel={t("workspace.standalone.loading")}
               running={running || !!uploading}
               showQuantity={activeTool === "image_gen"}
@@ -1757,7 +1822,7 @@ export default function StandaloneGenerator({
                   ) : (
                     <Sparkles className="h-4 w-4" />
                   )}
-                  {standaloneCreateButtonLabel(activeTool, language)}
+                  {standaloneCreateButtonLabel(activeTool, language, estimatedCost)}
                 </button>
               </div>
               </div>
