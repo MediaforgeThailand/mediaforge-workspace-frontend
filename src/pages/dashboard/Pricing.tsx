@@ -11,7 +11,7 @@ import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
 import { UserMenu } from "@/components/workspace/UserMenu";
 import {
-  WORKSPACE_CURRENCIES,
+  WORKSPACE_CURRENCY_MAP,
   detectWorkspaceCurrency,
   formatWorkspaceMoneyFromThb,
   type SupportedWorkspaceCurrency,
@@ -182,7 +182,7 @@ const Pricing = () => {
   const [topupPackages, setTopupPackages] = useState<TopupPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [cycle, setCycle] = useState<CycleTab>("monthly");
-  const [currency, setCurrency] = useState<SupportedWorkspaceCurrency>(() => detectWorkspaceCurrency());
+  const currency = useMemo<SupportedWorkspaceCurrency>(() => detectWorkspaceCurrency(), []);
   const [submittingPlanId, setSubmittingPlanId] = useState<string | null>(null);
   const [, setOpeningPortal] = useState(false);
   const [checkoutPlan, setCheckoutPlan] = useState<SubscriptionPlan | null>(null);
@@ -204,14 +204,6 @@ const Pricing = () => {
     });
   }, []);
 
-  useEffect(() => {
-    try {
-      window.localStorage.setItem("workspace_currency", currency);
-    } catch {
-      // Ignore private browsing / disabled storage.
-    }
-  }, [currency]);
-
   // Toast on Stripe success redirect.
   useEffect(() => {
     if (searchParams.get("payment") === "success" || searchParams.get("topup") === "success") {
@@ -231,6 +223,9 @@ const Pricing = () => {
     () => [...plans].sort((a, b) => a.sort_order - b.sort_order),
     [plans]
   );
+  const currencyConfig = WORKSPACE_CURRENCY_MAP[currency];
+  const currencyBadgeText =
+    currency === "thb" ? "THB PromptPay" : `${currency.toUpperCase()} Card subscription`;
 
   const handleSubscribe = (plan: SubscriptionPlan) => {
     if (plan.target === "team") {
@@ -358,19 +353,12 @@ const Pricing = () => {
                 </span>
               </button>
             </div>
-              <label className="sr-only" htmlFor="workspace-currency">Currency</label>
-              <select
-                id="workspace-currency"
-                value={currency}
-                onChange={(event) => setCurrency(event.target.value as SupportedWorkspaceCurrency)}
-                className="h-[38px] rounded-full border border-white/10 bg-[#252525] px-4 text-[12.5px] font-semibold text-white outline-none transition-colors hover:bg-white/[0.08] focus:border-violet-400/70"
+              <div
+                className="inline-flex h-[38px] items-center rounded-full border border-white/10 bg-[#252525] px-4 text-[12.5px] font-semibold text-white"
+                title={`Detected from your browser region: ${currencyConfig.countryHint}`}
               >
-                {WORKSPACE_CURRENCIES.map((item) => (
-                  <option key={item.currency} value={item.currency} className="bg-[#1b1b1b] text-white">
-                    {item.currency.toUpperCase()} {item.currency === "thb" ? "PromptPay" : "Card subscription"}
-                  </option>
-                ))}
-              </select>
+                {currencyConfig.countryHint} · {currencyBadgeText}
+              </div>
             </div>
           </div>
 

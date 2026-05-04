@@ -7,10 +7,9 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, MailCheck, ArrowLeft, Phone, X } from "lucide-react";
+import { Loader2, MailCheck, ArrowLeft, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrgBranding } from "@/hooks/useOrgBranding";
-import PhoneOtpLogin from "@/components/auth/PhoneOtpLogin";
 import OrgLoginPanel from "@/components/auth/OrgLoginPanel";
 import { resolveOrgLogin, type OrgLoginResolution } from "@/lib/orgLoginResolver";
 import { useSearchParams } from "react-router-dom";
@@ -56,7 +55,6 @@ const Auth = ({ mode = "page", onClose, redirectPath }: AuthProps) => {
   } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
-  const [showPhoneLogin, setShowPhoneLogin] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [sentEmail, setSentEmail] = useState("");
   // Form states
@@ -292,13 +290,7 @@ const Auth = ({ mode = "page", onClose, redirectPath }: AuthProps) => {
             </TabsList>
 
             <TabsContent value="login" className="space-y-6 mt-6">
-              {showPhoneLogin ? (
-                <PhoneOtpLogin
-                  onSuccess={handlePostAuthSuccess}
-                  onBack={() => setShowPhoneLogin(false)}
-                />
-              ) : (
-                <>
+              <>
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="email-login">{t("authEmailLabel")}</Label>
@@ -340,23 +332,12 @@ const Auth = ({ mode = "page", onClose, redirectPath }: AuthProps) => {
                       </svg>}
                       {t("authContinueWithGoogle")}
                     </Button>
-                    <Button type="button" variant="outline" className="w-full" onClick={() => setShowPhoneLogin(true)}>
-                      <Phone className="mr-2 h-4 w-4" />
-                      {t("authContinueWithPhone")}
-                    </Button>
                   </div>
-                </>
-              )}
+              </>
             </TabsContent>
 
             <TabsContent value="signup" className="space-y-6 mt-6">
-              {showPhoneLogin ? (
-                <PhoneOtpLogin
-                  onSuccess={handlePostAuthSuccess}
-                  onBack={() => setShowPhoneLogin(false)}
-                />
-              ) : (
-                <>
+              <>
                   <form onSubmit={handleSignup} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="name-signup">{t("authFullNameLabel")}</Label>
@@ -399,13 +380,8 @@ const Auth = ({ mode = "page", onClose, redirectPath }: AuthProps) => {
                       </svg>}
                       {t("authContinueWithGoogle")}
                     </Button>
-                    <Button type="button" variant="outline" className="w-full" onClick={() => setShowPhoneLogin(true)}>
-                      <Phone className="mr-2 h-4 w-4" />
-                      {t("authContinueWithPhone")}
-                    </Button>
                   </div>
-                </>
-              )}
+              </>
             </TabsContent>
           </Tabs>
           </>

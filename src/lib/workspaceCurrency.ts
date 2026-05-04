@@ -42,6 +42,63 @@ export const WORKSPACE_CURRENCY_MAP = WORKSPACE_CURRENCIES.reduce(
   {} as Record<SupportedWorkspaceCurrency, WorkspaceCurrencyConfig>,
 );
 
+const COUNTRY_TO_CURRENCY: Partial<Record<string, SupportedWorkspaceCurrency>> = {
+  TH: "thb",
+  US: "usd",
+  GB: "gbp",
+  JP: "jpy",
+  CA: "cad",
+  CN: "cny",
+  HK: "hkd",
+  AU: "aud",
+  SG: "sgd",
+};
+
+const EURO_COUNTRIES = new Set([
+  "AT",
+  "BE",
+  "CY",
+  "DE",
+  "EE",
+  "ES",
+  "FI",
+  "FR",
+  "GR",
+  "HR",
+  "IE",
+  "IT",
+  "LT",
+  "LU",
+  "LV",
+  "MT",
+  "NL",
+  "PT",
+  "SI",
+  "SK",
+]);
+
+const TIMEZONE_TO_CURRENCY: Partial<Record<string, SupportedWorkspaceCurrency>> = {
+  "Asia/Bangkok": "thb",
+  "America/New_York": "usd",
+  "America/Chicago": "usd",
+  "America/Denver": "usd",
+  "America/Los_Angeles": "usd",
+  "America/Toronto": "cad",
+  "America/Vancouver": "cad",
+  "Europe/London": "gbp",
+  "Europe/Paris": "eur",
+  "Europe/Berlin": "eur",
+  "Europe/Madrid": "eur",
+  "Europe/Rome": "eur",
+  "Europe/Amsterdam": "eur",
+  "Asia/Tokyo": "jpy",
+  "Asia/Shanghai": "cny",
+  "Asia/Hong_Kong": "hkd",
+  "Asia/Singapore": "sgd",
+  "Australia/Sydney": "aud",
+  "Australia/Melbourne": "aud",
+};
+
 export function normalizeWorkspaceCurrency(value: unknown): SupportedWorkspaceCurrency {
   const next = String(value ?? "thb").toLowerCase() as SupportedWorkspaceCurrency;
   return WORKSPACE_CURRENCY_MAP[next] ? next : "thb";
@@ -49,22 +106,45 @@ export function normalizeWorkspaceCurrency(value: unknown): SupportedWorkspaceCu
 
 export function detectWorkspaceCurrency(): SupportedWorkspaceCurrency {
   try {
-    const stored = window.localStorage.getItem("workspace_currency");
-    if (stored) return normalizeWorkspaceCurrency(stored);
-    const locale = navigator.language.toLowerCase();
-    if (locale.includes("th")) return "thb";
-    if (locale.includes("ja")) return "jpy";
-    if (locale.includes("en-gb")) return "gbp";
-    if (locale.includes("en-ca") || locale.includes("fr-ca")) return "cad";
-    if (locale.includes("zh-hk")) return "hkd";
-    if (locale.includes("zh")) return "cny";
-    if (locale.includes("en-au")) return "aud";
-    if (locale.includes("en-sg") || locale.includes("zh-sg")) return "sgd";
-    if (locale.includes("fr") || locale.includes("de") || locale.includes("es") || locale.includes("it") || locale.includes("nl")) return "eur";
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (timezone && TIMEZONE_TO_CURRENCY[timezone]) {
+      return TIMEZONE_TO_CURRENCY[timezone];
+    }
+
+    const locales = navigator.languages?.length ? navigator.languages : [navigator.language];
+    for (const locale of locales) {
+      const region = getLocaleRegion(locale);
+      if (!region) continue;
+      if (EURO_COUNTRIES.has(region)) return "eur";
+      if (COUNTRY_TO_CURRENCY[region]) return COUNTRY_TO_CURRENCY[region];
+    }
+
+    const localeText = locales.join(" ").toLowerCase();
+    if (localeText.includes("th")) return "thb";
+    if (localeText.includes("ja")) return "jpy";
+    if (localeText.includes("en-gb")) return "gbp";
+    if (localeText.includes("en-ca") || localeText.includes("fr-ca")) return "cad";
+    if (localeText.includes("zh-hk")) return "hkd";
+    if (localeText.includes("zh")) return "cny";
+    if (localeText.includes("en-au")) return "aud";
+    if (localeText.includes("en-sg") || localeText.includes("zh-sg")) return "sgd";
+    if (localeText.includes("fr") || localeText.includes("de") || localeText.includes("es") || localeText.includes("it") || localeText.includes("nl")) return "eur";
   } catch {
-    // SSR/tests or storage disabled.
+    // SSR/tests or restricted browser APIs.
   }
   return "usd";
+}
+
+function getLocaleRegion(locale: string | undefined): string | null {
+  if (!locale) return null;
+  try {
+    const parsed = new Intl.Locale(locale);
+    if (parsed.region) return parsed.region.toUpperCase();
+  } catch {
+    // Older browsers can still be handled by the fallback below.
+  }
+  const match = locale.match(/[-_]([A-Za-z]{2}|\d{3})\b/);
+  return match?.[1]?.toUpperCase() ?? null;
 }
 
 export function amountMinorFromThb(thb: number, currency: SupportedWorkspaceCurrency): number {
