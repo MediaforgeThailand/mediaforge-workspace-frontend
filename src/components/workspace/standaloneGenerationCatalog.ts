@@ -138,14 +138,14 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
     models: [
       {
         id: "nano-banana-2",
-        label: "Nano Banana 2 (Standard)",
+        label: "Nano Banana 2",
         provider: "Google",
         badge: "Fast",
         description: "Fast general image generation with up to 14 reference images.",
       },
       {
         id: "nano-banana-pro",
-        label: "Nano Banana Pro (Flex)",
+        label: "Nano Banana Pro",
         provider: "Google",
         badge: "Flex",
         description: "Higher quality Banana with 4K support and Flex tier control.",
@@ -173,7 +173,7 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
       },
       {
         id: "gpt-image-2",
-        label: "GPT Image 2 (OpenAI)",
+        label: "GPT Image 2",
         provider: "OpenAI",
         badge: "4K",
         description: "Best for precise style and quality control.",
@@ -227,7 +227,7 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
       },
       {
         id: "kling-v3-omni",
-        label: "Kling 3.0 Omni Pro",
+        label: "Kling 3.0 Omni",
         provider: "Kling",
         badge: "Omni",
         description: "Multi-input Kling 3 with audio and video reference.",
@@ -242,14 +242,14 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
       },
       {
         id: "seedance-1-0-pro-fast-251015",
-        label: "SeedDance 1.0 Pro Fast (3x)",
+        label: "SeedDance 1.0 Pro Fast",
         provider: "BytePlus",
         badge: "Fast",
         description: "Faster Seedance 1.0 for drafts and social clips.",
       },
       {
         id: "seedance-1-5-pro-251215",
-        label: "SeedDance 1.5 Pro (Latest)",
+        label: "SeedDance 1.5 Pro",
         provider: "BytePlus",
         badge: "I2V",
         description: "Reliable text or start-frame video generation.",
@@ -263,7 +263,7 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
       },
       {
         id: "seedance-2-0-pro",
-        label: "SeedDance 2.0 Pro",
+        label: "SeedDance 2.0",
         provider: "BytePlus",
         badge: "v2 Pro",
         description: "Latest Seedance 2.0 — premium quality.",
@@ -308,7 +308,7 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
       },
       {
         id: "gemini-2.5-pro-preview-tts",
-        label: "Gemini 2.5 Pro TTS",
+        label: "Gemini 2.5 ProTTS",
         provider: "Google Gemini",
         badge: "Pro",
         description: "Gemini Pro voices — 30 official preset speakers.",
@@ -340,14 +340,14 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
       // ── Tripo3D family ────────────────────────────────────
       {
         id: "tripo3d-p1",
-        label: "Tripo P1 (Newest, preview)",
+        label: "Tripo P1",
         provider: "Tripo3D",
         badge: "Preview",
         description: "Newest preview model for high detail.",
       },
       {
         id: "tripo3d-v3.1",
-        label: "Tripo v3.1 (Gold standard)",
+        label: "Tripo v3.1",
         provider: "Tripo3D",
         badge: "GLB",
         description: "Detailed image-to-3D model output — the default.",
@@ -361,7 +361,7 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
       },
       {
         id: "tripo3d-turbo",
-        label: "Tripo Turbo v1.0 (Fast)",
+        label: "Tripo Turbo v1.0",
         provider: "Tripo3D",
         badge: "Fast",
         description: "Faster drafts for 3D concept checks.",
@@ -382,7 +382,7 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
       },
       {
         id: "tripo3d-v1.4",
-        label: "Tripo v1.4 (Legacy)",
+        label: "Tripo v1.4",
         provider: "Tripo3D",
         badge: "v1",
         description: "Oldest Tripo model kept for compatibility.",

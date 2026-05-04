@@ -30,7 +30,7 @@ describe("KLING_MODELS constant", () => {
     expect(KLING_MODELS[0].label).toBe("Kling 2.6 Pro");
     expect(KLING_MODELS[2].label).toBe("Kling 3.0 Pro");
     expect(KLING_MODELS[4].label).toBe("Kling Video O1");
-    expect(KLING_MODELS[5].label).toBe("Kling 3.0 Omni Pro");
+    expect(KLING_MODELS[5].label).toBe("Kling 3.0 Omni");
   });
 
   it("KLING_MODEL_LOOKUP maps values to api_model + mode", () => {
@@ -52,7 +52,7 @@ describe("NODE_API_SCHEMA.klingVideoNode", () => {
     const modelParam = schema.params.find((p) => p.key === "model_name")!;
     expect(modelParam.optionLabels).toBeDefined();
     expect(modelParam.optionLabels!["kling-v2-6-pro"]).toBe("Kling 2.6 Pro");
-    expect(modelParam.optionLabels!["kling-v3-omni"]).toBe("Kling 3.0 Omni Pro");
+    expect(modelParam.optionLabels!["kling-v3-omni"]).toBe("Kling 3.0 Omni");
   });
 
   it("has exactly 6 model options", () => {

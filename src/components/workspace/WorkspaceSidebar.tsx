@@ -33,7 +33,6 @@ import {
   Images,
   Video,
   Mic2,
-  PanelLeftClose,
   Settings as SettingsIcon,
   Languages,
   Palette,
@@ -215,7 +214,7 @@ export default function WorkspaceSidebar({
        *  Digital Media wordmark there; the full lockup is wide
        *  so we use object-contain to fit the 34px square slot
        *  without distorting the trefoil + wordmark proportions. */}
-      <div className="flex shrink-0 items-center justify-between px-[12px] pb-[12px] pt-[4px]">
+      <div className="flex shrink-0 items-center px-[12px] pb-[12px] pt-[4px]">
         <button
           type="button"
           onClick={() => navigate("/app/workspace")}
@@ -233,14 +232,6 @@ export default function WorkspaceSidebar({
             draggable={false}
           />
           <span className="truncate leading-tight">{brandName}</span>
-        </button>
-        <button
-          type="button"
-          className="grid h-[28px] w-[28px] shrink-0 place-items-center rounded-md text-[#b0b4ba] transition-colors hover:bg-white/20 hover:text-white"
-          title={t("workspace.sidebar.collapse")}
-          aria-label={t("workspace.sidebar.collapse")}
-        >
-          <PanelLeftClose className="h-4 w-4" />
         </button>
       </div>
 

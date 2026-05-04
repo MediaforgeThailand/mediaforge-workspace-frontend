@@ -97,7 +97,7 @@ export const KLING_MODELS: KlingModelDef[] = [
   { label: "Kling 3.0 Pro", value: "kling-v3-pro", api_model: "kling-v3", mode: "pro" },
   { label: "Kling 3.0 Motion Pro", value: "kling-v3-motion-pro", api_model: "kling-v3-motion", mode: "pro" },
   
-  { label: "Kling 3.0 Omni Pro", value: "kling-v3-omni", api_model: "kling-v3-omni", mode: "pro" },
+  { label: "Kling 3.0 Omni", value: "kling-v3-omni", api_model: "kling-v3-omni", mode: "pro" },
 ];
 
 /** Lookup map: value → { api_model, mode } for backend payload construction */
@@ -246,8 +246,8 @@ export const NODE_API_SCHEMA: Record<string, NodeApiDef> = {
         type: "select",
         options: ["nano-banana-2", "nano-banana-pro"],
         optionLabels: {
-          "nano-banana-2": "Nano Banana 2 (Standard)",
-          "nano-banana-pro": "Nano Banana Pro (Flex)",
+          "nano-banana-2": "Nano Banana 2",
+          "nano-banana-pro": "Nano Banana Pro",
         },
         default: "nano-banana-2",
         required: true,
@@ -519,8 +519,8 @@ export const NODE_API_SCHEMA: Record<string, NodeApiDef> = {
         ],
         optionLabels: {
           "seedance-1-0-pro-250528": "SeedDance 1.0 Pro",
-          "seedance-1-0-pro-fast-251015": "SeedDance 1.0 Pro Fast (3x)",
-          "seedance-1-5-pro-251215": "SeedDance 1.5 Pro (Latest)",
+          "seedance-1-0-pro-fast-251015": "SeedDance 1.0 Pro Fast",
+          "seedance-1-5-pro-251215": "SeedDance 1.5 Pro",
         },
         default: "seedance-1-5-pro-251215",
         required: true,

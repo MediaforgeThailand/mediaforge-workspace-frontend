@@ -79,6 +79,7 @@ import {
   portTypeFromHandleId,
   splitGptImageSize,
 } from "./workspaceSchema";
+import { cleanModelLabelMap } from "./modelDisplay";
 
 const RUN_EDGE_FUNCTION = "workspace-run-node";
 const MAX_VISIBLE_RUN_MS = 30 * 60_000;
@@ -1605,64 +1606,6 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     return () => window.clearInterval(timer);
   }, [d.activeRunId, d.runStartedAt, id, isRunning, setNodes]);
 
-  /**
-   * User-initiated cancel for the currently-running background job.
-   *
-   * Calls `cancel_workspace_job` RPC which marks the row failed and
-   * refunds unused credits. The realtime subscription set up in
-   * `runNode` will receive the resulting UPDATE event (status='failed',
-   * error='Cancelled by user') and resolve the inner pollJob promise
-   * with a rejection — the existing outer catch then transitions the
-   * node into the error state, so we don't need to mutate node state
-   * here ourselves.
-   *
-   * We also flip `activeRunId` to null as a belt-and-braces cleanup in
-   * case realtime is delayed (e.g. on a slow connection) — the
-   * cancel-watch interval inside pollJob will detect it within ~1s
-   * and reject with __RUN_CANCELLED__.
-   */
-  const cancelRun = useCallback(async () => {
-    const cur = getNodes().find((node) => node.id === id) as Node | undefined;
-    const jobId = (cur?.data as NodeData | undefined)?.backgroundJobId;
-    if (!jobId) return;
-    try {
-      const { error } = await supabase.rpc("cancel_workspace_job", { p_job_id: jobId });
-      if (error) {
-        console.error("[cancel_workspace_job] error", error);
-        toast.error(`Cancel failed: ${error.message}`);
-        return;
-      }
-      toast.success("Generation cancelled — credits refunded");
-      useDebugLogStore.getState().push({
-        level: "info",
-        nodeId: id,
-        title: `Cancelled job ${jobId.slice(0, 8)}`,
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`Cancel failed: ${msg}`);
-    } finally {
-      // Force-clear local active run so pollJob's cancel-watch
-      // unwinds without waiting for the realtime UPDATE to land.
-      setNodes((ns) =>
-        ns.map((n) =>
-          n.id === id
-            ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  status: "error",
-                  runStartedAt: null,
-                  activeRunId: null,
-                  lastRunError: "Cancelled by user",
-                },
-              }
-            : n,
-        ),
-      );
-    }
-  }, [getNodes, id, setNodes]);
-
   const updateMultiGenCount = useCallback(
     (next: number) => {
       const clamped = Math.min(MULTI_GEN_MAX, Math.max(1, next));
@@ -2195,7 +2138,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         : null;
       const effectiveType = resolved?.type ?? param.type;
       const effectiveOptions = resolved?.options ?? param.options ?? [];
-      const effectiveLabels = resolved?.optionLabels ?? param.optionLabels;
+      const rawEffectiveLabels = resolved?.optionLabels ?? param.optionLabels;
+      const effectiveLabels =
+        param.key === "model_name"
+          ? cleanModelLabelMap(rawEffectiveLabels)
+          : rawEffectiveLabels;
       const value = params[param.key] ?? resolved?.default ?? param.default;
 
       // Voice picker for audio gen was removed — see audioGenNode in
@@ -2658,28 +2605,6 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                 <RunTimer
                   startedAt={(d.runStartedAt as number | null | undefined) ?? null}
                 />
-              )}
-              {isRunning && d.backgroundJobId && (
-                <Tooltip delayDuration={150}>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void cancelRun();
-                      }}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      className="ws-compact-cancel nodrag"
-                      aria-label="Cancel generation"
-                    >
-                      <span className="block leading-none">×</span>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" align="end">
-                    <div className="text-xs">Cancel · refunds credits</div>
-                  </TooltipContent>
-                </Tooltip>
               )}
             </div>
           )}

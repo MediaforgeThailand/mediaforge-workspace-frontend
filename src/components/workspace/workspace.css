@@ -741,39 +741,6 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   height: 12px;
 }
 
-/* Cancel pill — small "×" button shown next to the spinner while a
- * background generation is in flight. Lets the user kill a stuck or
- * unwanted gen and get their credits refunded immediately, without
- * waiting for the 5-min sweep. Visually paired with .ws-compact-run
- * (same neutral chip), but tinted red on hover so the destructive
- * action reads. Sits inside .ws-compact-run-anchor so it inherits
- * the same hover/select reveal as the Run button. */
-.ws-compact-cancel {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  margin-left: 4px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: hsl(0 0% 22%);
-  color: hsl(0 0% 90%);
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    background 120ms var(--ws-ease),
-    color 120ms var(--ws-ease),
-    transform 120ms var(--ws-ease);
-}
-.ws-compact-cancel:hover {
-  background: hsl(0 84% 55%);
-  color: hsl(0 0% 100%);
-  transform: scale(1.08);
-}
-
 /* Run button anchor — pinned at the bottom-right corner of the
  * preview. Fades in on hover / select / focus-within (mirroring
  * the settings overlay) so the controls "reveal as a set". The

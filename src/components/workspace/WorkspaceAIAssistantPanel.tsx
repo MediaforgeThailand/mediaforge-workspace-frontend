@@ -117,7 +117,7 @@ const SYSTEM_PROMPT = `คุณคือ "Max" ผู้ช่วยมือ�
 - **Format**: aspect ratio (16:9, 9:16, 1:1, 4:3), resolution (1K / 2K / 4K), duration (3–15s for video)
 
 # โมเดลใน workspace (แนะนำได้)
-- **Image**: Nano Banana 2 / Pro (Gemini), GPT Image 2 (OpenAI), SeedDream 4.5 / 5.0 / 5.0 Lite
+- **Image**: Nano Banana 2 / Pro, GPT Image 2, SeedDream 4.5 / 5.0 / 5.0 Lite
 - **Video**: Kling 2.6 Pro / Motion Pro, Kling 3.0 Pro / Motion / Omni v3, SeedDance 1.0 / 1.0 Fast / 1.5
 - **Utility**: Background Remove, Merge Audio + Video, Video → Prompt
 - **Element refs (Kling Omni)**: เก็บ character / object ไว้ใช้ซ้ำข้าม scene

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ChevronLeft, Maximize2, Minus, Plus,
+  Minus, Plus,
   Video, Image as ImageIcon, Box, Music, ChevronRight,
   FileText,
   X, ChevronDown, Layers, Check, Upload, Clipboard,
@@ -13,6 +13,11 @@ import PromptMentionTextarea from "@/components/flow/nodes/PromptMentionTextarea
 import sampleRefOne from "@/assets/showcase-cat-astronaut.jpg";
 import sampleRefTwo from "@/assets/mock-packshot-perfume.jpg";
 import sampleRefThree from "@/assets/pro-trend-space-cat.jpg";
+import {
+  cleanModelDisplayName,
+  orderModelsByRecommendation,
+  recommendationRankForModel,
+} from "./modelDisplay";
 
 type BottomTab = "video" | "image" | "3d" | "audio";
 
@@ -25,6 +30,12 @@ interface CreateImagePanelReference {
   assetId?: string;
   storageBucket?: "ai-media" | "user_assets";
   storagePath?: string;
+}
+
+interface LocalPickerUpload extends CreateImagePanelReference {
+  file: File;
+  localObjectUrl: string;
+  source: "upload";
 }
 
 interface CreateImagePanelModel {
@@ -172,7 +183,6 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   maxReferences = 10,
   showReferences = true,
   referenceTitle = "Add visual references",
-  referenceBadge = "Optional",
   referenceHint = "JPEG/PNG/WEBP/GIF, 20 MB max",
   referenceAccept = "image/*",
   referenceAssets = [],
@@ -228,14 +238,36 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
     }
   };
 
+  const addDroppedReferenceFiles = (files: FileList | File[] | null | undefined) => {
+    const list = Array.from(files ?? []);
+    if (list.length > 0) onReferenceFiles?.(list);
+  };
+
+  const handleReferencePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    const files = Array.from(event.clipboardData.files ?? []);
+    if (files.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    addDroppedReferenceFiles(files);
+  };
+
+  const handleReferenceDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    addDroppedReferenceFiles(event.dataTransfer.files);
+  };
+
+  const handleCreate = () => {
+    setReferenceOpen(false);
+    setModelOpen(false);
+    onCreate?.();
+  };
+
   return (
     <div className="standalone-create-panel flex h-full w-full max-w-[480px] flex-col overflow-hidden bg-[#121314] rounded-[20px] border border-white/[0.02]">
       {/* ===== HEADER ===== */}
-      <header className="flex h-[56px] shrink-0 items-center px-[8px] gap-[4px]">
-        <button className="flex h-[40px] w-[40px] items-center justify-center rounded-[8px] hover:bg-white/[0.04] transition-colors">
-          <ChevronLeft className="h-[20px] w-[20px] text-neutral-300" />
-        </button>
-        <h1 className="ml-[8px] flex flex-1 items-center text-[16px] font-semibold leading-[24px] tracking-[-0.12px] text-white min-w-0">
+      <header className="flex h-[56px] shrink-0 items-center px-[20px]">
+        <h1 className="flex min-w-0 flex-1 items-center text-[16px] font-semibold leading-[24px] tracking-[-0.12px] text-white">
           <span className="line-clamp-1">{title}</span>
         </h1>
       </header>
@@ -253,7 +285,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
           </div>
           <div className="flex-1 flex flex-col items-start min-w-0">
             <span className="text-[12px] leading-[16px] text-neutral-400">{modelCaption}</span>
-            <span className="text-[14px] leading-[20px] font-semibold text-white">{modelLabel}</span>
+            <span className="text-[14px] leading-[20px] font-semibold text-white">{cleanModelDisplayName(modelLabel)}</span>
           </div>
           <ChevronRight className="h-[16px] w-[16px] text-neutral-500" />
         </button>
@@ -278,22 +310,36 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
           onDeleteAsset={onDeleteReferenceAsset}
         />
 
-        {/* Describe your image */}
-        <div className="flex flex-col gap-[4px] px-[12px] py-[8px] rounded-[18px]">
-          <div className="flex items-center justify-between">
-            <span className="text-[14px] leading-[20px] font-medium text-white">{promptLabel}</span>
-            <button className="h-[24px] w-[24px] flex items-center justify-center rounded-[4px] hover:bg-white/[0.06]">
-              <Maximize2 className="h-[16px] w-[16px] text-neutral-400" />
-            </button>
+        {/* Prompt box */}
+        <section className="shrink-0 rounded-[16px] border border-white/[0.02] bg-[#16181a] p-[7px]">
+          <div className="mb-[6px] flex items-center px-[2px]">
+            <span className="text-[14px] font-semibold leading-[20px] text-white">{promptLabel}</span>
           </div>
 
           {/* Visual references box (PINK glow border) */}
           {showReferences && (
           <div className="relative rounded-[8px] overflow-hidden mt-[4px]">
             <div
+              role="button"
+              tabIndex={0}
               onClick={openReferencePicker}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                openReferencePicker();
+              }}
+              onPaste={handleReferencePaste}
+              onDragEnter={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onDrop={handleReferenceDrop}
               className={clsx(
-                "flex items-center gap-[12px] px-[12px] py-[8px] rounded-[8px] border border-[#ff24c5]/95 bg-[#f8008d]/[0.08] shadow-[inset_0_-8px_24px_0_rgba(255,26,198,0.18),inset_0_2px_6px_0_rgba(255,26,198,0.18),inset_0_-4px_8px_0_rgba(255,26,198,0.3)] transition-all",
+                "flex items-center gap-[12px] px-[12px] py-[8px] rounded-[8px] border border-[#ff24c5]/95 bg-[#f8008d]/[0.08] shadow-[inset_0_-8px_24px_0_rgba(255,26,198,0.18),inset_0_2px_6px_0_rgba(255,26,198,0.18),inset_0_-4px_8px_0_rgba(255,26,198,0.3)] transition-all outline-none focus:ring-1 focus:ring-[#ff24c5]/70",
                 onAddReferences || onReferenceFiles || onSelectReferenceAsset ? "cursor-pointer" : "cursor-default",
               )}
             >
@@ -330,9 +376,6 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
               <div className="flex-1 min-w-0">
                 <div className="flex min-w-0 items-center gap-[8px]">
                   <span className="truncate text-[14px] leading-[20px] font-semibold text-white">{referenceTitle}</span>
-                  <span className="shrink-0 text-[10px] leading-[12px] uppercase tracking-wide text-neutral-400 px-[6px] py-[2px] rounded-[4px] bg-white/[0.06]">
-                    {referenceBadge}
-                  </span>
                 </div>
                 <p className="text-[12px] leading-[16px] text-neutral-400 mt-[2px]">{referenceHint}</p>
               </div>
@@ -362,10 +405,10 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
               onChange={updatePrompt}
               placeholder={promptPlaceholder}
               mentionOptions={mentionOptions}
-              className="mt-[8px] min-h-[72px] max-h-[180px] border-0 bg-transparent px-0 py-0 text-[14px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-0"
+              className="mt-[7px] min-h-[70px] max-h-[190px] rounded-[10px] border-white/[0.06] bg-[#121314] px-[10px] py-[8px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-[#ff24c5]/50"
             />
           )}
-        </div>
+        </section>
 
         {settings.length > 0 && (
           <div className="grid shrink-0 grid-cols-2 gap-[6px]">
@@ -407,7 +450,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
 
         {/* Create for Free */}
         <button
-          onClick={onCreate}
+          onClick={handleCreate}
           disabled={running}
           className="standalone-generate-button group relative flex h-[48px] flex-1 items-center justify-center gap-[6px] overflow-hidden rounded-[12px] px-[8px] text-[15px] font-semibold leading-[20px] text-white transition-all hover:brightness-110 active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
           style={{
@@ -473,7 +516,6 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
   references = [],
   maxReferences = 4,
   referenceTitle = "Add visual references",
-  referenceBadge = "Optional",
   referenceHint = "JPEG/PNG/WEBP/MP4, 20 MB max",
   referenceAccept = "image/*,video/*",
   referenceAssets = [],
@@ -552,17 +594,36 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
     }
   };
 
+  const addDroppedReferenceFiles = (files: FileList | File[] | null | undefined) => {
+    const list = Array.from(files ?? []);
+    if (list.length > 0) onReferenceFiles?.(list);
+  };
+
+  const handleReferencePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    const files = Array.from(event.clipboardData.files ?? []);
+    if (files.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    addDroppedReferenceFiles(files);
+  };
+
+  const handleReferenceDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    addDroppedReferenceFiles(event.dataTransfer.files);
+  };
+
+  const handleCreate = () => {
+    setReferenceOpen(false);
+    setHistorySlot(null);
+    setModelOpen(false);
+    onCreate?.();
+  };
+
   return (
     <div className="standalone-create-panel flex h-full w-full max-w-[480px] flex-col overflow-hidden rounded-[20px] border border-white/[0.02] bg-[#121314]">
-      <header className="flex h-[56px] shrink-0 items-center gap-[4px] px-[8px]">
-        <button
-          type="button"
-          className="flex h-[40px] w-[40px] items-center justify-center rounded-[8px] transition-colors hover:bg-white/[0.04]"
-          aria-label={title}
-        >
-          <ChevronLeft className="h-[20px] w-[20px] text-neutral-300" />
-        </button>
-        <h1 className="ml-[8px] flex min-w-0 flex-1 items-center text-[16px] font-semibold leading-[24px] tracking-[-0.12px] text-white">
+      <header className="flex h-[56px] shrink-0 items-center px-[20px]">
+        <h1 className="flex min-w-0 flex-1 items-center text-[16px] font-semibold leading-[24px] tracking-[-0.12px] text-white">
           <span className="line-clamp-1">{title}</span>
         </h1>
       </header>
@@ -595,7 +656,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           </div>
           <div className="flex min-w-0 flex-1 flex-col items-start">
             <span className="text-[12px] leading-[16px] text-neutral-400">{modelCaption}</span>
-            <span className="truncate text-[14px] font-semibold leading-[20px] text-white">{modelLabel}</span>
+            <span className="truncate text-[14px] font-semibold leading-[20px] text-white">{cleanModelDisplayName(modelLabel)}</span>
           </div>
           <ChevronRight className="h-[16px] w-[16px] text-neutral-500" />
         </button>
@@ -634,11 +695,11 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
         />
 
         {activeMode === "frames" && visibleFrameSlots.length > 0 && (
-          <section className="shrink-0 rounded-[14px] border border-white/[0.02] bg-[#16181a] p-[8px]">
+          <section className="shrink-0 rounded-[16px] border border-white/[0.035] bg-[#151719] p-[9px] shadow-[inset_0_1px_0_rgba(255,255,255,.035)]">
             <h2 className="mb-[8px] text-[13px] font-semibold leading-[18px] text-white">
               {visibleFrameSlots.length > 1 ? "Set start & end frame" : "Set start frame"}
             </h2>
-            <div className={clsx("grid gap-[6px]", visibleFrameSlots.length > 1 ? "grid-cols-2" : "grid-cols-1")}>
+            <div className={clsx("grid gap-[8px]", visibleFrameSlots.length > 1 ? "grid-cols-2" : "grid-cols-1")}>
               {visibleFrameSlots.map((slot) => (
                 <FrameReferenceSlot
                   key={slot.id}
@@ -650,25 +711,35 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           </section>
         )}
 
-        <section className="shrink-0 rounded-[16px] border border-white/[0.02] bg-[#16181a] p-[10px]">
-          <div className="mb-[10px] flex items-center justify-between">
+        <section className="shrink-0 rounded-[16px] border border-white/[0.02] bg-[#16181a] p-[7px]">
+          <div className="mb-[6px] flex items-center px-[2px]">
             <span className="text-[14px] font-semibold leading-[20px] text-white">{promptLabel}</span>
-            <button
-              type="button"
-              className="grid h-[24px] w-[24px] place-items-center rounded-[4px] transition hover:bg-white/[0.06]"
-              aria-label={promptLabel}
-            >
-              <Maximize2 className="h-[16px] w-[16px] text-neutral-400" />
-            </button>
           </div>
 
           {activeMode === "reference" && (
             <>
               <div className="relative overflow-hidden rounded-[8px]">
                 <div
+                  role="button"
+                  tabIndex={0}
                   onClick={openReferencePicker}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    openReferencePicker();
+                  }}
+                  onPaste={handleReferencePaste}
+                  onDragEnter={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onDrop={handleReferenceDrop}
                   className={clsx(
-                    "flex items-center gap-[12px] rounded-[8px] border border-[#ff24c5]/95 bg-[#f8008d]/[0.08] px-[12px] py-[8px] shadow-[inset_0_-8px_24px_0_rgba(255,26,198,0.18),inset_0_2px_6px_0_rgba(255,26,198,0.18),inset_0_-4px_8px_0_rgba(255,26,198,0.3)] transition-all",
+                    "flex items-center gap-[12px] rounded-[8px] border border-[#ff24c5]/95 bg-[#f8008d]/[0.08] px-[12px] py-[8px] shadow-[inset_0_-8px_24px_0_rgba(255,26,198,0.18),inset_0_2px_6px_0_rgba(255,26,198,0.18),inset_0_-4px_8px_0_rgba(255,26,198,0.3)] transition-all outline-none focus:ring-1 focus:ring-[#ff24c5]/70",
                     onAddReferences || onReferenceFiles || onSelectReferenceAsset ? "cursor-pointer" : "cursor-default",
                   )}
                 >
@@ -711,9 +782,6 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-[8px]">
                       <span className="truncate text-[14px] font-semibold leading-[20px] text-white">{referenceTitle}</span>
-                      <span className="shrink-0 rounded-[4px] bg-white/[0.06] px-[6px] py-[2px] text-[10px] uppercase leading-[12px] tracking-wide text-neutral-400">
-                        {referenceBadge}
-                      </span>
                     </div>
                     <p className="mt-[2px] truncate text-[12px] leading-[16px] text-neutral-400">{referenceHint}</p>
                   </div>
@@ -743,7 +811,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
             onChange={updatePrompt}
             placeholder={promptPlaceholder}
             mentionOptions={mentionOptions}
-            className="mt-[10px] min-h-[72px] max-h-[190px] rounded-[10px] border-white/[0.06] bg-[#121314] px-[12px] py-[10px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-[#ff24c5]/50"
+            className="mt-[7px] min-h-[70px] max-h-[190px] rounded-[10px] border-white/[0.06] bg-[#121314] px-[10px] py-[8px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-[#ff24c5]/50"
           />
         </section>
 
@@ -783,7 +851,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
 
         <button
           type="button"
-          onClick={onCreate}
+          onClick={handleCreate}
           disabled={running}
           className="standalone-generate-button group relative flex h-[42px] flex-1 items-center justify-center gap-[6px] overflow-hidden rounded-[12px] px-[8px] text-[14px] font-semibold leading-[20px] text-white transition-all hover:brightness-110 active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
           style={{
@@ -906,25 +974,71 @@ function FrameReferenceSlot({
 }) {
   const refItem = slot.refItem;
   const isVideo = refItem?.mime?.startsWith("video/");
+  const frameLabel = slot.id === "start" ? "Start frame" : "End frame";
+  const canUpload = Boolean(slot.onUpload);
+  const addFrameFiles = (files: FileList | File[] | null | undefined) => {
+    const list = Array.from(files ?? []);
+    if (list.length > 0) slot.onHistoryFiles?.(list);
+  };
+  const handleFramePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    const files = Array.from(event.clipboardData.files ?? []);
+    if (files.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    addFrameFiles(files);
+  };
+  const handleFrameDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    addFrameFiles(event.dataTransfer.files);
+  };
   return (
-    <div className="group relative flex min-h-[104px] flex-col overflow-hidden rounded-[11px] border border-dashed border-white/[0.08] bg-[#101112] p-[6px] text-center transition hover:border-[#ff24c5]/60 hover:bg-[#151217]">
+    <div
+      tabIndex={0}
+      onPaste={handleFramePaste}
+      onDragEnter={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+      onDragOver={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+      onDrop={handleFrameDrop}
+      className="group relative flex min-h-[82px] flex-col overflow-hidden rounded-[12px] border border-white/[0.055] bg-[linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012))] p-[6px] shadow-[inset_0_1px_0_rgba(255,255,255,.04),0_8px_22px_-18px_rgba(0,0,0,.9)] outline-none transition hover:border-[#c77dff]/45 hover:bg-[linear-gradient(180deg,rgba(199,125,255,.055),rgba(255,255,255,.012))] focus:border-[#c77dff]/45"
+    >
+      <div className="pointer-events-none absolute inset-x-[10px] top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent opacity-70" />
       <button
         type="button"
         onClick={slot.onUpload}
-        className="relative flex min-h-[70px] flex-1 flex-col items-center justify-center overflow-hidden rounded-[8px] outline-none"
+        disabled={!canUpload}
+        className={clsx(
+          "relative flex min-h-[54px] flex-1 overflow-hidden rounded-[10px] outline-none transition",
+          refItem
+            ? "items-center gap-[9px] px-[8px] text-left"
+            : "flex-col items-center justify-center gap-[8px] px-[6px] text-center",
+          canUpload
+            ? "cursor-pointer hover:bg-white/[0.035]"
+            : "cursor-default",
+        )}
       >
         {refItem ? (
           <>
             {isVideo ? (
-              <div className="grid h-full min-h-[70px] w-full place-items-center rounded-[8px] bg-black/50">
-                <Video className="h-[24px] w-[24px] text-white/80" />
+              <div className="grid h-[46px] w-[54px] shrink-0 place-items-center rounded-[9px] bg-black/55 ring-1 ring-white/[0.08]">
+                <Video className="h-[18px] w-[18px] text-white/80" />
               </div>
             ) : (
-              <img src={refItem.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <img src={refItem.url} alt="" className="h-[46px] w-[54px] shrink-0 rounded-[9px] object-cover ring-1 ring-white/[0.08]" />
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/10" />
-            <span className="absolute bottom-[8px] left-[8px] right-[8px] truncate text-[11px] font-semibold text-white">
-              {refItem.name ?? slot.label}
+            <span className="min-w-0 flex-1">
+              <span className="block text-[10px] font-medium uppercase leading-[13px] tracking-[0.04em] text-[#c77dff]">
+                {frameLabel}
+              </span>
+              <span className="block truncate text-[12px] font-semibold leading-[16px] text-white">
+                {refItem.name ?? slot.label}
+              </span>
+              <span className="mt-[1px] block text-[10px] leading-[13px] text-neutral-500">Click to replace</span>
             </span>
             {slot.onRemove && (
               <span
@@ -934,7 +1048,7 @@ function FrameReferenceSlot({
                   event.stopPropagation();
                   slot.onRemove?.();
                 }}
-                className="absolute right-[6px] top-[6px] grid h-[22px] w-[22px] place-items-center rounded-full bg-black/70 text-white opacity-0 backdrop-blur transition hover:bg-white hover:text-black group-hover:opacity-100"
+                className="grid h-[24px] w-[24px] shrink-0 place-items-center rounded-full bg-black/45 text-white opacity-0 ring-1 ring-white/[0.08] backdrop-blur transition hover:bg-white hover:text-black group-hover:opacity-100"
               >
                 <Trash2 className="h-[12px] w-[12px]" />
               </span>
@@ -942,15 +1056,23 @@ function FrameReferenceSlot({
           </>
         ) : (
           <>
-            <span className="grid h-[28px] w-[28px] place-items-center rounded-full bg-white/[0.06] text-neutral-300">
+            <span className="relative grid h-[34px] w-[34px] shrink-0 place-items-center rounded-[10px] bg-[radial-gradient(circle_at_30%_15%,rgba(255,255,255,.2),transparent_42%),linear-gradient(135deg,rgba(155,77,224,.34),rgba(255,75,207,.16))] text-white ring-1 ring-[#c77dff]/25">
               {slot.uploading ? (
-                <span className="h-[12px] w-[12px] animate-spin rounded-full border-2 border-white/60 border-t-transparent" />
+                <span className="h-[14px] w-[14px] animate-spin rounded-full border-2 border-white/70 border-t-transparent" />
               ) : (
-                <ImageIcon className="h-[15px] w-[15px]" />
+                <>
+                  <ImageIcon className="h-[16px] w-[16px]" />
+                  <span className="absolute -bottom-[4px] -right-[4px] grid h-[15px] w-[15px] place-items-center rounded-full bg-[#16181a] text-white ring-1 ring-white/[0.12]">
+                    <Plus className="h-[10px] w-[10px]" />
+                  </span>
+                </>
               )}
             </span>
-            <Plus className="mt-[1px] h-[13px] w-[13px] text-neutral-300" />
-            <span className="mt-[2px] text-[12px] font-semibold leading-[16px] text-white">{slot.label}</span>
+            <span className="min-w-0">
+              <span className="block text-[10px] font-medium uppercase leading-[13px] tracking-[0.04em] text-[#c77dff]">
+                {frameLabel}
+              </span>
+            </span>
           </>
         )}
       </button>
@@ -962,7 +1084,7 @@ function FrameReferenceSlot({
             event.stopPropagation();
             onHistory?.();
           }}
-          className="mt-[5px] h-[24px] rounded-[8px] bg-white/[0.055] px-[10px] text-[11px] font-semibold leading-[14px] text-neutral-300 transition hover:bg-white/[0.1] hover:text-white"
+          className="mx-auto mt-[4px] inline-flex h-[21px] min-w-[58px] items-center justify-center rounded-full border border-white/[0.06] bg-black/[0.18] px-[10px] text-center text-[10px] font-semibold leading-none text-neutral-400 transition hover:border-[#c77dff]/35 hover:bg-[#c77dff]/10 hover:text-white"
         >
           {slot.historyLabel}
         </button>
@@ -1281,7 +1403,6 @@ function StandalonePromptMentionTextareaInner({
   className?: string;
 }) {
   const { setNodes } = useReactFlow();
-  const [nodesVersion, setNodesVersion] = useState(0);
   const mentionNodes = useMemo<Node[]>(
     () =>
       mentionOptions.map((reference, index) => {
@@ -1307,13 +1428,11 @@ function StandalonePromptMentionTextareaInner({
 
   useEffect(() => {
     setNodes(mentionNodes);
-    setNodesVersion((version) => version + 1);
     return () => setNodes([]);
   }, [mentionNodes, setNodes]);
 
   return (
     <PromptMentionTextarea
-      key={nodesVersion}
       value={value}
       onChange={onChange}
       placeholder={placeholder}
@@ -1402,10 +1521,39 @@ function ReferencePicker({
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
-  const [tab, setTab] = useState<"creations" | "uploads" | "favorites">("creations");
+  const localUploadUrlsRef = useRef<string[]>([]);
+  const [tab, setTab] = useState<"creations" | "uploads">("creations");
+  const [localUploads, setLocalUploads] = useState<LocalPickerUpload[]>([]);
   const selectedUrls = new Set(references.map((reference) => reference.url));
   const acceptsImages = accept.includes("image");
   const acceptsVideos = accept.includes("video");
+  const pickerAssets = useMemo(() => {
+    const seen = new Set<string>();
+    return [...references, ...localUploads, ...assets].filter((asset) => {
+      const key = asset.url?.split("?")[0] || asset.id;
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [assets, localUploads, references]);
+  const visibleAssets = useMemo(() => {
+    const isCompatible = (asset: CreateImagePanelReference) => {
+      const mime = asset.mime ?? "";
+      if (acceptsImages && mime.startsWith("image/")) return true;
+      if (acceptsVideos && mime.startsWith("video/")) return true;
+      // Older rows can be missing a MIME type. Keep them usable for image-only
+      // references because those rows are image assets in the existing data model.
+      return acceptsImages && !mime;
+    };
+    const isCreation = (asset: CreateImagePanelReference) =>
+      asset.source === "generation" || !asset.source;
+    const isUpload = (asset: CreateImagePanelReference) =>
+      asset.source === "upload" || asset.source === "user_asset";
+
+    return pickerAssets.filter(
+      (asset) => isCompatible(asset) && (tab === "creations" ? isCreation(asset) : isUpload(asset)),
+    );
+  }, [acceptsImages, acceptsVideos, pickerAssets, tab]);
   const uploadLabel =
     acceptsVideos && !acceptsImages
       ? "Upload Videos"
@@ -1418,6 +1566,14 @@ function ReferencePicker({
     window.setTimeout(() => panelRef.current?.focus(), 0);
   }, [open]);
 
+  useEffect(
+    () => () => {
+      localUploadUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      localUploadUrlsRef.current = [];
+    },
+    [],
+  );
+
   if (!open) return null;
 
   const addFiles = (files: FileList | File[] | null | undefined) => {
@@ -1425,19 +1581,36 @@ function ReferencePicker({
       (acceptsImages && file.type.startsWith("image/")) ||
       (acceptsVideos && file.type.startsWith("video/")),
     );
-    if (list.length > 0) onFiles?.(list);
+    if (list.length === 0) return;
+    const nextUploads = list.map((file) => {
+      const url = URL.createObjectURL(file);
+      localUploadUrlsRef.current.push(url);
+      return {
+        id: `local-${Date.now()}-${file.name}-${Math.random().toString(36).slice(2)}`,
+        name: file.name,
+        url,
+        mime: file.type,
+        source: "upload" as const,
+        file,
+        localObjectUrl: url,
+      };
+    });
+    setLocalUploads((prev) => [...nextUploads, ...prev].slice(0, 80));
+    setTab("uploads");
   };
 
   const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
     const files = Array.from(event.clipboardData.files ?? []);
     if (files.length > 0) {
       event.preventDefault();
+      event.stopPropagation();
       addFiles(files);
     }
   };
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
+    event.stopPropagation();
     addFiles(event.dataTransfer.files);
   };
 
@@ -1446,7 +1619,14 @@ function ReferencePicker({
       ref={panelRef}
       tabIndex={-1}
       onPaste={handlePaste}
-      onDragOver={(event) => event.preventDefault()}
+      onDragEnter={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+      onDragOver={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
       onDrop={handleDrop}
       className="fixed left-3 right-3 top-16 bottom-4 z-50 flex flex-col overflow-hidden rounded-[20px] border border-white/[0.06] bg-[#1b1d1f] shadow-[0_8px_64px_0_rgba(0,0,0,0.6)] outline-none lg:left-[742px] lg:right-3 lg:top-[66px] lg:bottom-0"
     >
@@ -1474,7 +1654,7 @@ function ReferencePicker({
       </header>
 
       <div className="flex items-center gap-[6px] px-[16px] pb-[16px]">
-        {(["creations", "uploads", "favorites"] as const).map((item) => (
+        {(["creations", "uploads"] as const).map((item) => (
           <button
             key={item}
             type="button"
@@ -1486,28 +1666,31 @@ function ReferencePicker({
                 : "bg-white/[0.08] text-neutral-400 hover:text-white",
             )}
           >
-            {item === "creations" ? "Creations" : item === "uploads" ? "Uploads" : "Favorites"}
+            {item === "creations" ? "Creations" : "Uploads"}
           </button>
         ))}
       </div>
 
       <div className="ws-scroll-hide min-h-0 flex-1 overflow-y-auto px-[16px] pb-[18px]">
         <div className="grid grid-cols-[repeat(auto-fill,minmax(118px,1fr))] gap-[8px]">
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className="flex h-[126px] flex-col items-center justify-center gap-[10px] rounded-[10px] bg-white/[0.08] text-neutral-300 ring-1 ring-white/[0.04] transition hover:bg-white/[0.12] hover:text-white"
-          >
-            <span className="grid h-[38px] w-[38px] place-items-center rounded-full bg-white/[0.08] shadow-[0_0_24px_rgba(255,255,255,.12)]">
-              <Upload className="h-[18px] w-[18px]" />
-            </span>
-            <span className="text-[13px] font-semibold">{uploadLabel}</span>
-            <span className="px-3 text-center text-[11px] leading-[14px] text-neutral-500">
-              Drop files here or Ctrl+V
-            </span>
-          </button>
+          {tab === "uploads" && (
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="flex h-[126px] flex-col items-center justify-center gap-[10px] rounded-[10px] bg-white/[0.08] text-neutral-300 ring-1 ring-white/[0.04] transition hover:bg-white/[0.12] hover:text-white"
+            >
+              <span className="grid h-[38px] w-[38px] place-items-center rounded-full bg-white/[0.08] shadow-[0_0_24px_rgba(255,255,255,.12)]">
+                <Upload className="h-[18px] w-[18px]" />
+              </span>
+              <span className="text-[13px] font-semibold">{uploadLabel}</span>
+              <span className="px-3 text-center text-[11px] leading-[14px] text-neutral-500">
+                Drop files here or Ctrl+V
+              </span>
+            </button>
+          )}
 
-          {assets.map((asset, index) => {
+          {visibleAssets.map((asset, index) => {
+            const localUpload = "file" in asset ? (asset as LocalPickerUpload) : null;
             const selected = selectedUrls.has(asset.url);
             const label = referenceDisplayLabel(asset, index, 10);
             const fullLabel = referenceBaseName(asset, index);
@@ -1517,6 +1700,11 @@ function ReferencePicker({
                 type="button"
                 title={fullLabel}
                 onClick={() => {
+                  if (localUpload) {
+                    onFiles?.([localUpload.file]);
+                    if (closeOnSelect) onClose();
+                    return;
+                  }
                   onSelectAsset?.(asset);
                   if (closeOnSelect) onClose();
                 }}
@@ -1546,20 +1734,40 @@ function ReferencePicker({
                     <Check className="h-[13px] w-[13px]" />
                   </span>
                 )}
-                {onDeleteAsset && (
+                {(onDeleteAsset || localUpload) && (
                   <span
                     role="button"
                     tabIndex={0}
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
-                      onDeleteAsset(asset);
+                      if (localUpload) {
+                        URL.revokeObjectURL(localUpload.localObjectUrl);
+                        localUploadUrlsRef.current = localUploadUrlsRef.current.filter(
+                          (url) => url !== localUpload.localObjectUrl,
+                        );
+                        setLocalUploads((prev) =>
+                          prev.filter((upload) => upload.id !== localUpload.id),
+                        );
+                        return;
+                      }
+                      onDeleteAsset?.(asset);
                     }}
                     onKeyDown={(event) => {
                       if (event.key !== "Enter" && event.key !== " ") return;
                       event.preventDefault();
                       event.stopPropagation();
-                      onDeleteAsset(asset);
+                      if (localUpload) {
+                        URL.revokeObjectURL(localUpload.localObjectUrl);
+                        localUploadUrlsRef.current = localUploadUrlsRef.current.filter(
+                          (url) => url !== localUpload.localObjectUrl,
+                        );
+                        setLocalUploads((prev) =>
+                          prev.filter((upload) => upload.id !== localUpload.id),
+                        );
+                        return;
+                      }
+                      onDeleteAsset?.(asset);
                     }}
                     className="absolute right-[6px] top-[6px] grid h-[26px] w-[26px] place-items-center rounded-full border border-white/[0.10] bg-black/70 text-white opacity-0 shadow-[0_8px_20px_rgba(0,0,0,.35)] backdrop-blur transition hover:border-rose-300/40 hover:bg-gradient-to-br hover:from-[#ff2f92] hover:to-[#8b5cf6] hover:text-white group-hover:opacity-100"
                     aria-label="Delete asset"
@@ -1573,9 +1781,11 @@ function ReferencePicker({
           })}
         </div>
 
-        {assets.length === 0 && (
+        {visibleAssets.length === 0 && (
           <div className="mt-[14px] rounded-[12px] border border-dashed border-white/[0.08] px-[14px] py-[16px] text-[13px] text-neutral-400">
-            ยังไม่มีรูปใน asset ตอนนี้ อัปโหลดจากเครื่องหรือลากรูปมาวางได้เลย
+            {tab === "creations"
+              ? "No compatible generated assets yet."
+              : "No uploaded assets yet. Upload, drag files here, or paste with Ctrl+V."}
           </div>
         )}
       </div>
@@ -1592,6 +1802,7 @@ interface Model {
   coverSrc?: string;
   badge?: string;
   settings?: ModelSettingTag[];
+  recommended?: boolean;
 }
 
 type Filter = "all-models" | "all";
@@ -1611,12 +1822,13 @@ const buildModels = (
 ): Model[] => {
   const source =
     options.length > 0 ? options : [{ id: fallbackId, label: fallbackLabel }];
-  return source.map((model) => ({
+  return orderModelsByRecommendation(source).map((model) => ({
     id: model.id,
-    name: model.label,
+    name: cleanModelDisplayName(model.label),
     description: modelDescriptionFor(model.id, model.label),
     badge: modelBadgeFor(model.id, model.label),
     settings: model.settings ?? [],
+    recommended: recommendationRankForModel(model.id) !== null,
   }));
 };
 
@@ -1627,6 +1839,13 @@ const modelDescriptionFor = (id: string, name: string) => {
   if (haystack.includes("veo")) return "Google video generation model";
   if (haystack.includes("seedance")) return "SeedDance video generation model";
   if (haystack.includes("kling")) return "Kling AI video generation model";
+  if (haystack.includes("tripo") || haystack.includes("hyper3d")) {
+    return "3D generation model";
+  }
+  if (haystack.includes("tts") || haystack.includes("elevenlabs")) {
+    return "Voice generation model";
+  }
+  if (haystack.includes("google cloud")) return "Voice generation model";
   if (haystack.includes("nano") || haystack.includes("banana")) {
     return haystack.includes("pro")
       ? "Google's premium image model"
@@ -1654,7 +1873,10 @@ export const ModelsPopover: React.FC<ModelsPopoverProps> = ({
   onToggle,
 }) => {
   const [filter, setFilter] = useState<Filter>("all-models");
-  const recommended = models.slice(0, Math.min(3, models.length));
+  const recommendedModels = models.filter((model) => model.recommended);
+  const recommended = recommendedModels.length > 0
+    ? recommendedModels
+    : models.slice(0, Math.min(3, models.length));
 
   if (!open || models.length === 0) return null;
 

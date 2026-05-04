@@ -76,6 +76,7 @@ import {
   videoSupportsReferenceVideo,
   videoSupportsStartEndFrames,
 } from "./standaloneGenerationCatalog";
+import { orderModelsByRecommendation } from "./modelDisplay";
 // Hardcoded voice catalogs (Gemini star names, Google Studio
 // labels, ElevenLabs default presets) were deleted in the
 // preset-purge cleanup. ElevenLabs voices come from a live
@@ -1233,7 +1234,7 @@ export default function StandaloneGenerator({
           ? ref.mime.startsWith("video/")
           : ref.mime.startsWith("image/"),
       )
-      .slice(0, 48);
+      .slice(0, 120);
   }, [
     activeTool,
     form.model,
@@ -2156,7 +2157,10 @@ function ModelPicker({
       providerFilter === "all" || model.provider === providerFilter;
     return matchesQuery && matchesProvider;
   });
-  const recommendedModels = models.slice(0, Math.min(3, models.length));
+  const recommendedModels = orderModelsByRecommendation(models).slice(
+    0,
+    Math.min(3, models.length),
+  );
   const selectedVisual = modelVisualFor(selected);
   const uiText = {
     recommended: language === "th" ? "แนะนำ" : "Recommended",
@@ -4220,7 +4224,6 @@ function CreationTile({
   job: StandaloneJobRow;
   onPreview: (preview: PreviewPayload) => void;
 }) {
-  const [cancelling, setCancelling] = useState(false);
   const { language, t } = useLanguage();
   const result = job.result;
   const params = job.request?.params ?? {};
@@ -4325,29 +4328,6 @@ function CreationTile({
       });
     }
   };
-  const handleCancel = async () => {
-    if (!job.id || cancelling) return;
-    setCancelling(true);
-    try {
-      const { error } = await supabase.rpc("cancel_workspace_job", { p_job_id: job.id });
-      if (error) {
-        toast.error(
-          t("workspace.standalone.cancel_failed", { message: error.message }),
-        );
-        return;
-      }
-      toast.success(t("workspace.standalone.cancelled_refunded"));
-    } catch (err) {
-      toast.error(
-        t("workspace.standalone.cancel_failed", {
-          message: err instanceof Error ? err.message : String(err),
-        }),
-      );
-    } finally {
-      setCancelling(false);
-    }
-  };
-
   return (
     <article className="group relative flex h-[230px] max-w-full overflow-hidden rounded-[10px] bg-black/40 shadow-[inset_0_0_0_1px_rgba(255,255,255,.04)]">
       <div
@@ -4479,22 +4459,6 @@ function CreationTile({
           </div>
         </div>
       )}
-      {isActive && (
-        <button
-          type="button"
-          onClick={handleCancel}
-          disabled={cancelling}
-          className="absolute bottom-2 left-2 grid h-8 w-8 place-items-center rounded-full bg-red-500/20 text-red-200 ring-1 ring-inset ring-red-500/35 backdrop-blur transition-colors hover:bg-red-500/30 disabled:cursor-not-allowed disabled:opacity-60"
-          aria-label={t("workspace.standalone.cancel_generation")}
-          title={t("workspace.standalone.cancel_title")}
-        >
-          {cancelling ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <X className="h-4 w-4" />
-          )}
-        </button>
-      )}
     </article>
   );
 }
@@ -4506,7 +4470,6 @@ function CreationRow({
   job: StandaloneJobRow;
   onPreview: (preview: PreviewPayload) => void;
 }) {
-  const [cancelling, setCancelling] = useState(false);
   const { language, t } = useLanguage();
   const result = job.result;
   const params = job.request?.params ?? {};
@@ -4520,38 +4483,6 @@ function CreationRow({
         t("workspace.standalone.generation_fallback"),
     );
 
-  /* User-initiated cancel for an in-flight standalone gen.
-   *
-   * The audit flagged this gap explicitly: the canvas had cancel
-   * but the standalone tool didn't, so a user who started a 5-min
-   * Kling Motion Pro and changed their mind had to wait it out
-   * (or close the tab and lose visibility on the credits).
-   *
-   * Same RPC the canvas uses (`cancel_workspace_job`) — marks the
-   * row failed, refunds unused credits, the polling loop in the
-   * parent will pick up the new status on the next tick. */
-  const handleCancel = async () => {
-    if (!job.id || cancelling) return;
-    setCancelling(true);
-    try {
-      const { error } = await supabase.rpc("cancel_workspace_job", { p_job_id: job.id });
-      if (error) {
-        toast.error(
-          t("workspace.standalone.cancel_failed", { message: error.message }),
-        );
-        return;
-      }
-      toast.success(t("workspace.standalone.cancelled_refunded"));
-    } catch (err) {
-      toast.error(
-        t("workspace.standalone.cancel_failed", {
-          message: err instanceof Error ? err.message : String(err),
-        }),
-      );
-    } finally {
-      setCancelling(false);
-    }
-  };
   const statusTone =
     job.status === "completed"
       ? "text-emerald-300"
@@ -4769,26 +4700,6 @@ function CreationRow({
         </div>
 
         <div className="flex shrink-0 gap-2 md:flex-col">
-          {/* Cancel button — visible only when the job is in-flight.
-           *  Confirmation is implicit (one tap = real cancel) because
-           *  the in-flight state is short-lived and credits are
-           *  auto-refunded; no destructive ambiguity. */}
-          {isActive && (
-            <button
-              type="button"
-              onClick={handleCancel}
-              disabled={cancelling}
-              className="grid h-9 w-9 place-items-center rounded-lg bg-red-500/15 text-red-300 ring-1 ring-inset ring-red-500/30 transition-colors hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-60"
-              aria-label={t("workspace.standalone.cancel_generation")}
-              title={t("workspace.standalone.cancel_title")}
-            >
-              {cancelling ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <X className="h-4 w-4" />
-              )}
-            </button>
-          )}
           {downloadUrl && (
             <>
               <button

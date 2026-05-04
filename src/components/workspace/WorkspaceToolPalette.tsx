@@ -42,7 +42,7 @@ const ITEMS: PaletteItem[] = [
     label: "Image Gen",
     category: "AI · Image",
     description:
-      "Generate or edit images. Pick a model: Banana (Gemini), SeedDream (BytePlus), or GPT Image 2 (OpenAI). Up to 14–16 ref images depending on model.",
+      "Generate or edit images. Pick a model: Banana, SeedDream, or GPT Image 2. Up to 14–16 ref images depending on model.",
     icon: Sparkles,
   },
   {

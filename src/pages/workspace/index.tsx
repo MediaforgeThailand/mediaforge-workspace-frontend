@@ -109,6 +109,20 @@ import {
   type ClassMembershipInfo,
 } from "@/hooks/useIsOrgUser";
 import ActiveClassPicker from "@/components/ActiveClassPicker";
+import featureImageGen from "@/assets/feature-image-gen.jpg";
+import featureVideoGen from "@/assets/feature-video-gen.jpg";
+import proTrendFantasyWarrior from "@/assets/pro-trend-fantasy-warrior.jpg";
+import proTrendProduct from "@/assets/pro-trend-product.jpg";
+import proTrendSpaceCat from "@/assets/pro-trend-space-cat.jpg";
+import proTrendSynthwave from "@/assets/pro-trend-synthwave.jpg";
+import showcaseCommercial from "@/assets/showcase-commercial.jpg";
+import showcaseCouple from "@/assets/showcase-couple.jpg";
+import showcaseFashionWinter from "@/assets/showcase-fashion-winter.jpg";
+import showcaseGownStairs from "@/assets/showcase-gown-stairs.jpg";
+import showcaseMiniature from "@/assets/showcase-miniature.jpg";
+import showcasePartyGirls from "@/assets/showcase-party-girls.jpg";
+import tplCinematic from "@/assets/tpl-cinematic.jpg";
+import tplCyberpunk from "@/assets/tpl-cyberpunk.jpg";
 
 /* ════════════════════════════════════════════════════════════
  * Types + helpers
@@ -958,6 +972,121 @@ const HOME_TOOLS: HomeTool[] = STANDALONE_TOOL_ORDER.map((key) => {
   };
 });
 
+interface LatestAIModelCard {
+  id: string;
+  title: string;
+  titleAccent?: string;
+  subtitle: string;
+  image: string;
+  section: Section;
+}
+
+const LATEST_AI_MODELS: LatestAIModelCard[] = [
+  {
+    id: "smart-shot",
+    title: "Smart Shot - One Prompt. Full Shot Plan. Cinematic Video.",
+    subtitle: "Storyboard-ready video generation",
+    image: showcaseCommercial,
+    section: "video_gen",
+  },
+  {
+    id: "gpt-image-2",
+    title: "GPT Image 2.0 - A New Era of Image Generation",
+    subtitle: "Advanced image generation with precise text",
+    image: featureImageGen,
+    section: "image_gen",
+  },
+  {
+    id: "seedance-2",
+    title: "Seedance 2.0 - The World's Most Powerful Video Model",
+    subtitle: "Multi-modal AI video generation",
+    image: featureVideoGen,
+    section: "video_gen",
+  },
+];
+
+interface HomeInspiration {
+  id: string;
+  title: string;
+  image: string;
+  kind: "image" | "video";
+}
+
+const HOME_INSPIRATIONS: HomeInspiration[] = [
+  {
+    id: "shadow-hero",
+    title: "Shadow Hero",
+    image: tplCinematic,
+    kind: "video",
+  },
+  {
+    id: "rune-veil",
+    title: "Rune Veil",
+    image: proTrendFantasyWarrior,
+    kind: "image",
+  },
+  {
+    id: "love-shot",
+    title: "Love Shot",
+    image: showcaseCouple,
+    kind: "video",
+  },
+  {
+    id: "blade-waltz",
+    title: "Blade Waltz",
+    image: showcaseGownStairs,
+    kind: "video",
+  },
+  {
+    id: "garden-echo",
+    title: "Garden Echo",
+    image: showcaseFashionWinter,
+    kind: "image",
+  },
+  {
+    id: "neon-stand",
+    title: "Neon Stand",
+    image: proTrendSynthwave,
+    kind: "image",
+  },
+  {
+    id: "product-noir",
+    title: "Product Noir",
+    image: proTrendProduct,
+    kind: "image",
+  },
+  {
+    id: "dream-engine",
+    title: "Dream Engine",
+    image: tplCyberpunk,
+    kind: "video",
+  },
+  {
+    id: "studio-cut",
+    title: "Studio Cut",
+    image: showcaseCommercial,
+    kind: "video",
+  },
+  {
+    id: "miniature-world",
+    title: "Miniature World",
+    image: showcaseMiniature,
+    kind: "image",
+  },
+  {
+    id: "future-companion",
+    title: "Future Companion",
+    image: proTrendSpaceCat,
+    kind: "image",
+  },
+  {
+    id: "party-frame",
+    title: "Party Frame",
+    image: showcasePartyGirls,
+    kind: "video",
+  },
+];
+
 interface AcademyVideo {
   id: string;
   title: string;
@@ -1250,40 +1379,65 @@ const HomeView = ({
     navigate(`/app/workspace/${workspaceId}`);
   };
 
-  const [newsTab, setNewsTab] = useState<"news" | "templates" | "academy">(
-    "news",
+  const [inspirationKind, setInspirationKind] = useState<"image" | "video">(
+    "image",
   );
   const activeClass = useActiveClass();
   const { data: classMemberships } = useUserClassMemberships();
   const studentClasses = (classMemberships ?? []).filter(
     (membership) => membership.role === "member" && membership.status === "active",
   );
+  const visibleInspirations = HOME_INSPIRATIONS.filter(
+    (item) => item.kind === inspirationKind,
+  ).slice(0, 9);
 
   return (
     <>
       <PageHeader title={t("workspace.home.title")} rightSlot={<UserMenu />} onOpenSidebar={onOpenSidebar} />
 
       <div className="ws-scroll-hide flex-1 overflow-y-auto overflow-x-hidden">
-        <div className="mx-auto min-w-0 w-full max-w-[1400px] px-4 pb-16 pt-5 md:px-6 lg:px-8 lg:pt-6">
-          {/* ── Top trio: Projects · Spaces · Tools ───────────── */}
-          <section className="workspace-home-compact grid min-w-0 items-start grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)]">
-            {!educationLockedStudent && (
-              <ProjectsCard
-                projects={projectCards}
-                activeProjectId={activeProjectId}
-                userId={user?.id ?? null}
-                onSelect={onSelectProject}
-                onCreate={onCreateProject}
-                onDelete={onDeleteProject}
-              />
-            )}
-            <SpacesShowcaseCard
-              spaces={recentSpaces}
-              onOpen={(id) => navigate(`/app/workspace/${id}`)}
-              onNew={educationLockedStudent ? undefined : handleNew}
-              onSeeAll={() => onSection("spaces")}
-            />
-            {!educationLockedStudent && <ToolsCard tools={HOME_TOOLS} onOpen={(tool) => onSection(tool)} />}
+        <div className="mx-auto min-w-0 w-full max-w-[1680px] px-4 pb-16 pt-5 md:px-7 lg:px-10 lg:pt-6">
+          <section
+            aria-label="MediaForge hero statement"
+            className="flex min-h-[150px] items-start justify-center px-2 pt-4 text-center md:min-h-[176px] md:pt-5 lg:min-h-[188px] lg:pt-6"
+          >
+            <h2 className="workspace-home-hero-heading max-w-[860px] text-[42px] font-semibold leading-[0.98] tracking-[0px] text-white md:text-[64px] lg:text-[76px]">
+              <span className="block">Every idea</span>
+              <span className="block">
+                deserve to{" "}
+                <span className="workspace-home-hero-accent bg-gradient-to-r from-[#c77dff] via-[#9b4de0] to-[#5b2a8c] bg-clip-text text-transparent">
+                  exist
+                </span>
+              </span>
+            </h2>
+          </section>
+
+          <section className="mt-4" aria-label="Featured AI examples">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              {LATEST_AI_MODELS.map((model) => (
+                <button
+                  key={model.id}
+                  type="button"
+                  onClick={() => onSection(model.section)}
+                  className="group min-w-0 text-left"
+                >
+                  <div className="relative aspect-[2.85/1] overflow-hidden rounded-[13px] bg-black">
+                    <img
+                      src={model.image}
+                      alt={model.title}
+                      className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.035]"
+                      loading="lazy"
+                    />
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/12 to-transparent" />
+                    <div className="absolute inset-x-3 bottom-3 min-w-0">
+                      <div className="truncate text-[14px] font-semibold leading-5 text-white drop-shadow md:text-[15px]">
+                        {model.title}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
           </section>
 
           {activeClass && (
@@ -1294,29 +1448,57 @@ const HomeView = ({
             />
           )}
 
-          {/* ── My work jump-link ─────────────────────────────── */}
-          <div className="mt-10 flex items-center justify-center">
-            <button
-              type="button"
-              onClick={() => onSection("spaces")}
-              className="flex min-h-11 items-center gap-1.5 text-[14.5px] font-medium text-zinc-300 transition-colors hover:text-white lg:min-h-0"
-            >
-              {t("workspace.home.my_work")}
-              <ChevronRight className="h-3.5 w-3.5 text-zinc-500" />
-            </button>
-          </div>
-
-          <section className="mt-6">
-            <div className="flex items-center justify-center">
-              <div className="relative h-11 px-3 text-[15.5px] font-medium text-zinc-50 lg:h-9">
-                {t("workspace.home.academy")}
-                <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-t-sm bg-zinc-100" />
+          <section className="mt-14">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-[26px] font-semibold leading-tight text-white md:text-[30px]">
+                Inspirations
+              </h2>
+              <div className="inline-flex h-10 items-center rounded-full bg-[#151719] p-1 ring-1 ring-white/[0.04]">
+                {(["image", "video"] as const).map((kind) => {
+                  const active = inspirationKind === kind;
+                  return (
+                    <button
+                      key={kind}
+                      type="button"
+                      onClick={() => setInspirationKind(kind)}
+                      className={cn(
+                        "h-8 rounded-full px-4 text-[12px] font-semibold capitalize transition",
+                        active
+                          ? "bg-white text-black shadow-[0_6px_18px_rgba(255,255,255,0.14)]"
+                          : "text-zinc-400 hover:text-white",
+                      )}
+                    >
+                      {kind}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <ul className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {ACADEMY_VIDEOS.map((video) => (
-                <AcademyVideoTile key={video.id} video={video} />
+            <ul className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {visibleInspirations.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => onSection(item.kind === "video" ? "video_gen" : "image_gen")}
+                    className="group block w-full text-left"
+                  >
+                    <div className="relative aspect-[16/9] overflow-hidden rounded-[13px] bg-black">
+                      <img
+                        src={item.image}
+                        alt={item.title}
+                        className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.035]"
+                        loading="lazy"
+                      />
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 to-transparent" />
+                      <div className="absolute bottom-3 left-3 right-3">
+                        <span className="truncate text-[13px] font-semibold text-white">
+                          {item.title}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                </li>
               ))}
             </ul>
           </section>
@@ -3068,9 +3250,9 @@ const SpaceCard = memo(function SpaceCard({
           )}
         </div>
 
-        <div className="px-3.5 py-2.5">
-          <div className="flex items-center gap-2">
-            <div className="min-w-0 flex-1 truncate text-[14.5px] font-semibold leading-tight text-zinc-50">
+        <div className="flex h-[54px] flex-col justify-center gap-1 px-3.5">
+          <div className="flex min-h-0 items-center gap-2">
+            <div className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-[16px] text-zinc-50">
               {ws.name}
             </div>
             {!canManage && (
@@ -3085,7 +3267,7 @@ const SpaceCard = memo(function SpaceCard({
               </span>
             )}
           </div>
-          <div className="mt-0.5 text-[14.5px] text-zinc-500">
+          <div className="truncate text-[12px] leading-[15px] text-zinc-500">
             {timeAgo(ws.updatedAt)}
           </div>
         </div>
