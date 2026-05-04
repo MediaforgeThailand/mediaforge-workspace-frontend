@@ -35,7 +35,6 @@ import {
   Mic2,
   Plus,
   Settings as SettingsIcon,
-  Crown,
   Palette,
   School,
   Box,
@@ -43,9 +42,9 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
 import { useIsOrgAdmin } from "@/hooks/useIsOrgUser";
 import { useOrgBranding } from "@/hooks/useOrgBranding";
+import { supabase } from "@/integrations/supabase/client";
 import OrgCreditBadge from "@/components/OrgCreditBadge";
 import ActiveClassPicker from "@/components/ActiveClassPicker";
 
@@ -80,6 +79,39 @@ const NAV_TOOLS: Array<{ id: SectionKey; label: string; icon: LucideIcon }> = [
   { id: "image_to_3d", label: "3D Generator",    icon: Box },
 ];
 
+const DEFAULT_ADMIN_HUB_URL = "https://mediaforge-admin-hub.vercel.app";
+
+function normalizeUniversityHandoffUrl(rawUrl: string): string {
+  try {
+    const url = new URL(rawUrl, window.location.origin);
+    if (url.pathname === "/" || url.pathname === "/school/center") {
+      url.pathname = "/school/session-handoff";
+    }
+    return url.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
+function getUniversityHandoffUrl(): string {
+  const env = import.meta.env as Record<string, string | undefined>;
+  const explicit =
+    env.VITE_ERP_SCHOOL_HANDOFF_URL ||
+    env.VITE_ERP_SCHOOL_CENTER_URL ||
+    env.VITE_UNIVERSITY_PORTAL_URL;
+
+  if (explicit) return normalizeUniversityHandoffUrl(explicit);
+
+  const adminConsoleUrl = env.VITE_ADMIN_CONSOLE_URL;
+  if (!adminConsoleUrl) return `${DEFAULT_ADMIN_HUB_URL}/school/session-handoff`;
+
+  try {
+    return `${new URL(adminConsoleUrl).origin}/school/session-handoff`;
+  } catch {
+    return `${DEFAULT_ADMIN_HUB_URL}/school/session-handoff`;
+  }
+}
+
 export interface WorkspaceSidebarProps {
   /** Highlighted section. Pass undefined when the current surface
    *  isn't one of the sidebar sections (e.g. /app/pricing). */
@@ -98,8 +130,6 @@ export default function WorkspaceSidebar({
   onCreate,
 }: WorkspaceSidebarProps) {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const isPscDemoUser = user?.email?.toLowerCase() === "dmd@psc.com";
   // Tenant branding override (e.g. dmd.mediaforge.co → DMD logo +
   // "DMD" short name). Returns null on the bare workspace.mediaforge.co
   // host or while the lookup is in flight; we render the default
@@ -216,20 +246,6 @@ export default function WorkspaceSidebar({
         <OrgCreditBadge variant="card" />
       </div>
 
-      {isPscDemoUser && (
-        <div className="px-3 pt-2">
-          <button
-            type="button"
-            onClick={() => navigate("/app/university")}
-            className="flex h-11 w-full items-center gap-2.5 rounded-md border border-fuchsia-400/25 bg-fuchsia-500/10 px-2.5 text-[12.5px] font-semibold text-fuchsia-100 transition-colors hover:bg-fuchsia-500/18 hover:text-white lg:h-9"
-            title="PSC college demo"
-          >
-            <School className="h-3.5 w-3.5" />
-            PSC
-          </button>
-        </div>
-      )}
-
       {/* Org admin / class teacher entry to the management surface. */}
       <OrgAdminLink />
 
@@ -252,16 +268,37 @@ const OrgAdminLink = () => {
   const isOrgAdmin = useIsOrgAdmin();
   const navigate = useNavigate();
   if (!isOrgAdmin) return null;
+
+  const handleUniversityClick = async () => {
+    const { data, error } = await supabase.auth.getSession();
+    const session = data.session;
+    if (error || !session?.access_token || !session.refresh_token) {
+      navigate("/auth");
+      return;
+    }
+
+    const target = new URL(getUniversityHandoffUrl(), window.location.origin);
+    const handoff = new URLSearchParams({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+      token_type: session.token_type || "bearer",
+      type: "workspace_handoff",
+    });
+    if (session.expires_at) handoff.set("expires_at", String(session.expires_at));
+    target.hash = handoff.toString();
+    window.location.assign(target.toString());
+  };
+
   return (
     <div className="px-3 pt-3 pb-2 border-t border-white/5 mt-3 space-y-1">
       <button
         type="button"
-        onClick={() => navigate("/app/org-admin")}
+        onClick={() => void handleUniversityClick()}
         className="flex h-11 w-full items-center gap-2.5 rounded-md px-2.5 text-[12.5px] text-amber-200/90 transition-colors hover:bg-amber-300/10 hover:text-amber-100 lg:h-9"
-        title="Manage organisation members and credits"
+        title="Manage classes, students, and university credits"
       >
-        <Crown className="h-3.5 w-3.5" />
-        Manage Org
+        <School className="h-3.5 w-3.5" />
+        University
       </button>
       <button
         type="button"

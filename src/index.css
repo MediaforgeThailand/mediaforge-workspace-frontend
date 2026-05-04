@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'DB Adman X';
+  src: url('/fonts/hinted-DBAdmanX.woff2') format('woff2');
+  font-weight: 300 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DB Adman X';
+  src: url('/fonts/hinted-DBAdmanX-Bold.woff2') format('woff2');
+  font-weight: 600 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* MediaForge "Midnight Neon" Design System
    Background: Deep Navy (#0a0e1a)
    Card: Slightly lighter navy (#141827)
@@ -14,6 +30,17 @@
 
 @layer base {
   :root {
+    --font-sans: 'DB Adman X', 'Adman X', 'ADMAN X', 'Prompt', 'Noto Sans Thai', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --brand-primary: #9B4DE0;
+    --brand-hover: #7E35C9;
+    --brand-deep: #5B2A8C;
+    --brand-soft: #C77DFF;
+    --brand-glow: #A855F7;
+    --bg-app: #0a0a0b;
+    --bg-section: #111114;
+    --bg-card: #16181a;
+    --border-subtle: rgba(255,255,255,.08);
+    --text-default: #b0b4ba;
     --background: 150 50% 1%;
     --foreground: 0 0% 100%;
 
@@ -77,6 +104,10 @@
     --text-faint: 240 8% 52%;
     --text-2: 240 20% 78%;
   }
+
+  html {
+    font-size: 20.57px;
+  }
 }
 
 @layer base {
@@ -86,11 +117,98 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Prompt', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: var(--font-sans);
   }
 }
 
 @layer utilities {
+  .marketing-page {
+    font-family: Inter, var(--font-sans);
+    letter-spacing: 0;
+  }
+
+  .reveal,
+  .reveal-scale,
+  .reveal-slide,
+  [data-stagger] > * {
+    opacity: 0;
+  }
+
+  .reveal.in {
+    animation: mf-fade-up .8s cubic-bezier(.2,.7,.2,1) both;
+  }
+
+  .reveal-scale.in {
+    animation: mf-scale-in .9s cubic-bezier(.2,.7,.2,1) both;
+  }
+
+  .reveal-slide.in {
+    animation: mf-slide-right .8s cubic-bezier(.2,.7,.2,1) both;
+  }
+
+  [data-stagger].in > *:nth-child(1) { animation: mf-fade-up .7s .05s both; }
+  [data-stagger].in > *:nth-child(2) { animation: mf-fade-up .7s .15s both; }
+  [data-stagger].in > *:nth-child(3) { animation: mf-fade-up .7s .25s both; }
+  [data-stagger].in > *:nth-child(4) { animation: mf-fade-up .7s .35s both; }
+  [data-stagger].in > *:nth-child(5) { animation: mf-fade-up .7s .45s both; }
+  [data-stagger].in > *:nth-child(6) { animation: mf-fade-up .7s .55s both; }
+  [data-stagger].in > *:nth-child(7) { animation: mf-fade-up .7s .65s both; }
+  [data-stagger].in > *:nth-child(8) { animation: mf-fade-up .7s .75s both; }
+
+  .marketing-marquee-track {
+    animation: mf-marquee 28s linear infinite;
+  }
+
+  @keyframes mf-fade-up {
+    from { opacity: 0; transform: translateY(40px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  @keyframes mf-scale-in {
+    from { opacity: 0; transform: scale(.92); }
+    to { opacity: 1; transform: none; }
+  }
+
+  @keyframes mf-slide-right {
+    from { opacity: 0; transform: translateX(-40px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  @keyframes mf-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+  }
+
+  @keyframes mf-shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  @keyframes mf-marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal,
+    .reveal-scale,
+    .reveal-slide,
+    [data-stagger] > * {
+      opacity: 1;
+    }
+
+    .reveal.in,
+    .reveal-scale.in,
+    .reveal-slide.in,
+    [data-stagger].in > * {
+      animation: none;
+    }
+
+    .marketing-marquee-track {
+      animation: none;
+    }
+  }
+
   /* Stronger border for surfaces that need clearer separation than the default --border (which is intentionally subtle). */
   .border-strong {
     border-color: hsl(220 18% 26%);

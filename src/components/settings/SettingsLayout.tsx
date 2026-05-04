@@ -104,7 +104,7 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
   const currentLabel = allSections.find((s) => s.key === activeKey)?.label ?? "Settings";
 
   return (
-    <div className="-mx-6 -my-8">
+    <div className="min-h-full">
       {/* Mobile horizontal scroller — the rail collapses to a tab bar
           on narrow screens. */}
       <div className="md:hidden border-b border-white/5 bg-[hsl(0_0%_5%)] sticky top-0 z-10">
@@ -131,15 +131,17 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
         </div>
       </div>
 
-      <div className="flex">
+      <div className="flex min-h-full">
         {/* Desktop left rail */}
-        <aside className="hidden md:block w-56 shrink-0 border-r border-white/5 bg-[hsl(0_0%_4%)] min-h-[calc(100vh-3rem)] py-6 px-3 space-y-6">
+        <aside className="hidden min-h-[calc(100vh-3rem)] w-56 shrink-0 border-r border-white/5 bg-[hsl(0_0%_4%)] px-3 py-6 md:block">
+          <div className="space-y-6">
           {renderGroup("Account", ACCOUNT_SECTIONS)}
           {renderGroup("Organization", ORG_SECTIONS)}
+          </div>
         </aside>
 
         {/* Content */}
-        <div className="flex-1 min-w-0 px-6 py-8 md:px-10 md:py-10">
+        <div className="min-w-0 flex-1 px-6 py-8 md:px-10 md:py-10">
           <div className="md:hidden text-xs text-zinc-500 mb-3">{currentLabel}</div>
           {children}
         </div>

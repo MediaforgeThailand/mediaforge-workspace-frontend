@@ -283,7 +283,7 @@ const WorkspaceCanvasPage = () => {
     <div
       className="flex h-screen w-screen flex-col bg-zinc-950 text-zinc-100"
       style={{
-        fontFamily: "'Prompt', system-ui, -apple-system, 'Segoe UI', sans-serif",
+        fontFamily: "var(--font-sans)",
       }}
     >
       {/* Floating credit pill — top-right of the canvas, above tabs and

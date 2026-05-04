@@ -45,6 +45,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import OrgUserBlockGate from "./components/OrgUserBlockGate";
 import AccountShell from "./components/workspace/AccountShell";
 import WorkspacePageShell from "./components/workspace/WorkspacePageShell";
+import MobileSpaceBlockGate from "./components/workspace/MobileSpaceBlockGate";
 import PageLoadingAnim from "./components/ui/PageLoadingAnim";
 
 /**
@@ -89,6 +90,7 @@ function lazyWithRetry(factory: () => Promise<{ default: React.ComponentType<any
 // ── Auth shell ────────────────────────────────────────────────
 const Auth = lazyWithRetry(() => import("./pages/Auth"));
 const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
+const BlogPage = lazyWithRetry(() => import("./pages/marketing/Blog"));
 
 // ── Workspace surfaces ────────────────────────────────────────
 // Dashboard (list of spaces) lives inside DashboardLayout chrome.
@@ -135,10 +137,8 @@ const App = () => (
                  *  allow-list, redirecting any other path → /app/workspace. */}
                 <OrgUserBlockGate>
                 <Routes>
-                  {/* Root → redirect to workspace dashboard. The
-                   *  consumer landing page was removed in Wave 1
-                   *  (this repo is now workspace-only). */}
                   <Route path="/" element={<Navigate to="/app/workspace" replace />} />
+                  <Route path="/blog" element={<BlogPage />} />
 
                   {/* Auth + legal — public */}
                   <Route path="/auth" element={<Auth />} />
@@ -222,7 +222,7 @@ const App = () => (
                     path="/app/pricing"
                     element={
                       <ProtectedRoute>
-                        <WorkspacePageShell>
+                        <WorkspacePageShell hideSidebarBelowLg>
                           <Pricing />
                         </WorkspacePageShell>
                       </ProtectedRoute>
@@ -234,9 +234,11 @@ const App = () => (
                   <Route
                     path="/app/workspace/:workspaceId"
                     element={
-                      <ProtectedRoute>
-                        <WorkspaceCanvasPage />
-                      </ProtectedRoute>
+                      <MobileSpaceBlockGate>
+                        <ProtectedRoute>
+                          <WorkspaceCanvasPage />
+                        </ProtectedRoute>
+                      </MobileSpaceBlockGate>
                     }
                   />
 

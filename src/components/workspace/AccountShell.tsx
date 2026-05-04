@@ -54,11 +54,12 @@ const ACCOUNT_TABS: Array<{
 export default function AccountShell({ children }: { children?: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const isSettingsRoute = location.pathname.startsWith("/app/settings");
 
   return (
     <div
       className="flex h-screen w-screen overflow-hidden bg-[hsl(0_0%_5%)] text-zinc-100"
-      style={{ fontFamily: "'Prompt', system-ui, sans-serif" }}
+      style={{ fontFamily: "var(--font-sans)" }}
     >
       {/* ── Workspace sidebar (shared with the dashboard) ───────── */}
       <WorkspaceSidebar />
@@ -109,7 +110,14 @@ export default function AccountShell({ children }: { children?: ReactNode }) {
         </header>
 
         <div className="ws-scroll-hide flex-1 overflow-y-auto bg-[hsl(0_0%_5%)]">
-          <div className="mx-auto w-full max-w-5xl px-4 py-6 text-zinc-200 md:px-6 md:py-8">
+          <div
+            className={cn(
+              "w-full text-zinc-200",
+              isSettingsRoute
+                ? "min-h-full"
+                : "mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-8",
+            )}
+          >
             {children ?? <Outlet />}
           </div>
         </div>

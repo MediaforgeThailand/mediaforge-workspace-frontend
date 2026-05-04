@@ -98,7 +98,7 @@ const WorkspaceRightSidebar = () => {
         // with the expanded panel (which is also zoomed). The canvas
         // and tab bar stay at native scale; only the sidebar chrome
         // shrinks.
-        style={{ fontFamily: "'Prompt', system-ui, sans-serif", zoom: 0.8 }}
+        style={{ fontFamily: "var(--font-sans)", zoom: 0.8 }}
       >
         <RailButton
           title="Expand assets"
@@ -162,7 +162,7 @@ const WorkspaceRightSidebar = () => {
         // without us having to recompute the calc() height.
         top: 85,
         bottom: 16,
-        fontFamily: "'Prompt', system-ui, sans-serif",
+        fontFamily: "var(--font-sans)",
         // `zoom: 0.8` — shrinks JUST this sidebar to ~80% of native
         // size. The canvas, tab bar, and floating left rail stay at
         // their normal scale; only the asset / AI chrome scales

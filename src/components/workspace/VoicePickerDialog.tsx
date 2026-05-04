@@ -218,7 +218,7 @@ const VoicePickerDialog = ({ open, value, onClose, onSelect }: Props) => {
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      style={{ fontFamily: "'Prompt', system-ui, sans-serif" }}
+      style={{ fontFamily: "var(--font-sans)" }}
     >
       <div
         className={cn(

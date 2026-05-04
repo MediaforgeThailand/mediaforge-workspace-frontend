@@ -8,6 +8,8 @@ interface Props {
 // Routes that org users CAN access. Anything else → redirected to workspace.
 // Order matters: check most specific first if patterns overlap.
 const ALLOWED_FOR_ORG_USER: RegExp[] = [
+  /^\/$/,
+  /^\/blog(\/|$)/,
   /^\/app\/workspace(\/|$)/,    // the only feature
   /^\/app\/org-admin(\/|$)/,    // org_admin panel (members + analytics)
   /^\/app\/university(\/|$)/,   // PSC/DMD education demo mockup

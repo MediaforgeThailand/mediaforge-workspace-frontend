@@ -56,7 +56,7 @@ const CanvasHeader = () => {
   return (
     <div
       className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-white/[0.04] bg-[hsl(0_0%_4%)] px-3 lg:h-12"
-      style={{ fontFamily: "'Prompt', system-ui, sans-serif" }}
+      style={{ fontFamily: "var(--font-sans)" }}
     >
       {/* Left — back arrow + breadcrumb */}
       <div className="flex min-w-0 flex-1 items-center gap-2">

@@ -18,14 +18,14 @@ interface NodeCostParams {
 /** Omni model slugs that use the /omni-video endpoint */
 const OMNI_MODELS = new Set(["kling-v3-omni"]);
 
-function resolutionTier(size: unknown): "1k" | "2k" | "3k" | "4k" | "auto" {
+function resolutionTier(size: unknown): "1k" | "2k" | "4k" | "auto" {
   const s = String(size ?? "1024x1024").toLowerCase();
   if (s === "auto") return "auto";
   const m = s.match(/^(\d+)x(\d+)$/);
-  if (!m) return s.includes("4k") ? "4k" : s.includes("3k") ? "3k" : s.includes("2k") ? "2k" : "1k";
+  if (!m) return s.includes("4k") || s.includes("3k") ? "4k" : s.includes("2k") ? "2k" : "1k";
   const maxEdge = Math.max(Number(m[1]), Number(m[2]));
   if (maxEdge >= 3600) return "4k";
-  if (maxEdge >= 2800) return "3k";
+  if (maxEdge >= 2800) return "4k";
   if (maxEdge >= 1900) return "2k";
   return "1k";
 }
