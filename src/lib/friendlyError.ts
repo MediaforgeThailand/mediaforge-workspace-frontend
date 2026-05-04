@@ -104,6 +104,11 @@ const MAPPINGS: ErrorMapping[] = [
     th: "ใช้งานถี่เกินไป รอสักครู่แล้วลองใหม่",
     en: "Too many requests — please wait a moment and try again.",
   },
+  {
+    match: /Veo image input was rejected|inlineData.*isn'?t supported|imageBytes|models\/veo.*not found/i,
+    th: "Veo 3.1 ยังรับรูปอ้างอิงไม่ได้ในตอนนี้ ลองสร้างแบบ Text to Video ก่อนครับ",
+    en: "Veo 3.1 image input is unavailable right now. Try Text to Video first.",
+  },
 
   // ── Network / timeouts ─────────────────────────────────────
   {
@@ -175,4 +180,22 @@ export function friendlyError(err: unknown, lang: Lang = "en"): string {
 export function friendlyErrorOr(err: unknown, lang: Lang, fallback: string): string {
   const friendly = friendlyError(err, lang);
   return friendly === GENERIC[lang] ? fallback : friendly;
+}
+
+export async function functionErrorMessage(error: unknown): Promise<string> {
+  const fallback = error instanceof Error ? error.message : String(error || "Request failed");
+  const response = (error as { context?: Response } | null)?.context;
+  if (!response || typeof response.clone !== "function") return fallback;
+  try {
+    const text = await response.clone().text();
+    if (!text) return fallback;
+    try {
+      const body = JSON.parse(text) as { error?: unknown; message?: unknown };
+      return String(body?.error || body?.message || text || fallback);
+    } catch {
+      return text;
+    }
+  } catch {
+    return fallback;
+  }
 }

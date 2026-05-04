@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { friendlyError } from "@/lib/friendlyError";
+import { friendlyError, functionErrorMessage } from "@/lib/friendlyError";
 import { UserMenu } from "@/components/workspace/UserMenu";
 import {
   CreateImagePanel,
@@ -1462,9 +1462,10 @@ export default function StandaloneGenerator({
         );
         const resp = data as { job_id?: string; error?: string } | null;
         if (error || resp?.error || !resp?.job_id) {
+          const serverMessage = error ? await functionErrorMessage(error) : undefined;
           throw new Error(
             resp?.error ??
-              (error as { message?: string } | null)?.message ??
+              serverMessage ??
               t("workspace.standalone.error_failed_queue"),
           );
         }
