@@ -29,6 +29,7 @@
  */
 
 import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -68,6 +69,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -100,6 +102,7 @@ import {
 import { useEducationPresence } from "@/hooks/useEducationPresence";
 import {
   useActiveClass,
+  useEducationStudentLock,
   useIsOrgAdmin,
   useIsOrgUser,
   useUserClassMemberships,
@@ -515,7 +518,12 @@ const WorkspaceDashboardInner = () => {
   const { user, loading: authLoading } = useAuth();
   const isOrgUser = useIsOrgUser();
   const isOrgAdmin = useIsOrgAdmin();
-  const educationLockedStudent = isOrgUser && !isOrgAdmin;
+  const educationStudentLock = useEducationStudentLock();
+  const educationLockedStudent = !isOrgAdmin && (
+    isOrgUser ||
+    educationStudentLock.locked ||
+    educationStudentLock.loading
+  );
   const navigate = useNavigate();
   const projects = useWorkspaceStore((s) => s.projects);
   const activeProjectId = useWorkspaceStore((s) => s.activeProjectId);
@@ -1090,6 +1098,8 @@ const HomeView = ({
   const mergeServerWorkspaces = useWorkspaceStore(
     (s) => s.mergeServerWorkspaces,
   );
+  const { data: educationSpaceStatuses = EMPTY_EDUCATION_SPACE_STATUS_MAP } =
+    useEducationSpaceStatusMap(user?.id, educationLockedStudent);
 
   /* Same one-shot cross-device sync as SpacesView — Home is the
    * landing surface so most users hit it first; the dashboard sync
@@ -1206,8 +1216,13 @@ const HomeView = ({
     return [...workspaces]
       .filter((ws) => recentIds.has(ws.id))
       .sort((a, b) => b.updatedAt - a.updatedAt)
-      .map((ws) => buildSpaceCardData(ws, canvasIndex, graphs));
-  }, [recentWorkspaceIds, workspaces, canvasIndex, graphs]);
+      .map((ws) =>
+        applyEducationSpaceStatus(
+          buildSpaceCardData(ws, canvasIndex, graphs),
+          educationSpaceStatuses,
+        ),
+      );
+  }, [recentWorkspaceIds, workspaces, canvasIndex, graphs, educationSpaceStatuses]);
 
   const handleNew = () => {
     if (educationLockedStudent) {
@@ -1674,6 +1689,75 @@ interface SpaceCardData {
   edges: MiniEdge[];
 }
 
+type EducationSpaceStatusMap = Record<
+  string,
+  {
+    status: WorkspaceMeta["educationStatus"];
+    completedAt: string | null;
+  }
+>;
+
+const EMPTY_EDUCATION_SPACE_STATUS_MAP: EducationSpaceStatusMap = {};
+const EDUCATION_SPACE_STATUSES = new Set(["active", "submitted", "passed", "ended"]);
+
+function normalizeEducationStatus(value: unknown): WorkspaceMeta["educationStatus"] {
+  const status = typeof value === "string" ? value : "";
+  return EDUCATION_SPACE_STATUSES.has(status)
+    ? (status as WorkspaceMeta["educationStatus"])
+    : null;
+}
+
+function getEducationStatusLabel(status: WorkspaceMeta["educationStatus"]) {
+  if (status === "passed") return "Pass";
+  if (status === "ended") return "Ended";
+  if (status === "submitted") return "Submitted";
+  return status;
+}
+
+function applyEducationSpaceStatus(
+  card: SpaceCardData,
+  statuses: EducationSpaceStatusMap,
+): SpaceCardData {
+  const status = statuses[card.id]?.status;
+  return status ? { ...card, educationStatus: status } : card;
+}
+
+function useEducationSpaceStatusMap(
+  userId: string | null | undefined,
+  enabled: boolean,
+) {
+  return useQuery<EducationSpaceStatusMap>({
+    queryKey: ["education-space-status-map", userId],
+    enabled: Boolean(enabled && userId),
+    staleTime: 5_000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    queryFn: async () => {
+      if (!userId) return EMPTY_EDUCATION_SPACE_STATUS_MAP;
+      const { data, error } = await (supabase as any)
+        .from("education_student_spaces")
+        .select("workspace_id,status,completed_at")
+        .eq("user_id", userId);
+      if (error) {
+        console.warn("[workspace-dashboard] education space statuses failed:", error.message);
+        return EMPTY_EDUCATION_SPACE_STATUS_MAP;
+      }
+
+      const map: EducationSpaceStatusMap = {};
+      for (const row of data ?? []) {
+        const workspaceId = typeof row?.workspace_id === "string" ? row.workspace_id : null;
+        const status = normalizeEducationStatus(row?.status);
+        if (!workspaceId || !status) continue;
+        map[workspaceId] = {
+          status,
+          completedAt: typeof row?.completed_at === "string" ? row.completed_at : null,
+        };
+      }
+      return map;
+    },
+  });
+}
+
 const ProjectQuickSwitch = ({
   projects,
   workspaces,
@@ -1803,8 +1887,15 @@ const SpacesShowcaseCard = ({
                 <SpaceMediaPreview media={ws.previewMedia} />
               </div>
               <div className="px-1 pb-0 text-left">
-                <div className="truncate text-[14.5px] font-medium text-zinc-100">
-                  {ws.name}
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <div className="truncate text-[14.5px] font-medium text-zinc-100">
+                    {ws.name}
+                  </div>
+                  {ws.educationStatus && ws.educationStatus !== "active" && (
+                    <span className="inline-flex shrink-0 rounded bg-emerald-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-emerald-200">
+                      {getEducationStatusLabel(ws.educationStatus)}
+                    </span>
+                  )}
                 </div>
                 <div className="text-[13.5px] text-zinc-500">
                   {timeAgo(ws.updatedAt)}
@@ -2430,6 +2521,8 @@ const SpacesView = ({
   const mergeServerWorkspaces = useWorkspaceStore(
     (s) => s.mergeServerWorkspaces,
   );
+  const { data: educationSpaceStatuses = EMPTY_EDUCATION_SPACE_STATUS_MAP } =
+    useEducationSpaceStatusMap(user?.id, educationLockedStudent);
 
   /* Cross-device sync — same one-shot pattern used elsewhere on the
    * dashboard. Ref-guard avoids HMR / re-mount duplicates. The
@@ -2559,9 +2652,14 @@ const SpacesView = ({
               ? !ws.ownerId || ws.ownerId === user?.id
               : false,
         )
-        .map((ws) => buildSpaceCardData(ws, canvasIndex, graphs)),
+        .map((ws) =>
+          applyEducationSpaceStatus(
+            buildSpaceCardData(ws, canvasIndex, graphs),
+            educationSpaceStatuses,
+          ),
+        ),
     );
-  }, [activeProjectId, educationLockedStudent, tab, user?.id, workspaces, canvasIndex, graphs]);
+  }, [activeProjectId, educationLockedStudent, tab, user?.id, workspaces, canvasIndex, graphs, educationSpaceStatuses]);
 
   const handleRename = (id: string, currentName: string) => {
     const next = prompt(t("workspace.spaces.rename_prompt"), currentName);
@@ -2986,7 +3084,7 @@ const SpaceCard = memo(function SpaceCard({
             )}
             {ws.educationStatus && ws.educationStatus !== "active" && (
               <span className="inline-flex shrink-0 items-center gap-1 rounded bg-emerald-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
-                {ws.educationStatus === "passed" ? "Pass" : ws.educationStatus}
+                {getEducationStatusLabel(ws.educationStatus)}
               </span>
             )}
           </div>

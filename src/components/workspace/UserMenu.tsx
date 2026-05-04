@@ -16,12 +16,14 @@ import {
   Sparkles,
   Building2,
   Crown,
+  GraduationCap,
   Gauge,
   UserPlus,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCredits } from "@/hooks/useCredits";
+import { useEducationStudentLock, useIsClassTeacher, useIsOrgAdmin } from "@/hooks/useIsOrgUser";
 import { supabase } from "@/integrations/supabase/client";
 
 const numberCompact = new Intl.NumberFormat("en-US", {
@@ -158,6 +160,9 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
   const { user, profile, signOut, loading: authLoading } = useAuth();
   const { t, language, setLanguage } = useLanguage();
   const { credits, loading: creditsLoading } = useCredits();
+  const isOrgAdmin = useIsOrgAdmin();
+  const isClassTeacher = useIsClassTeacher();
+  const educationStudentLock = useEducationStudentLock();
 
   // While auth is still resolving, render an invisible placeholder so
   // we don't show the guest Sign-in pill and then snap to the avatar
@@ -213,6 +218,13 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
     (import.meta.env.VITE_ADMIN_CONSOLE_URL as string | undefined) ||
     "https://mediaforge-admin-hub.vercel.app/org/console";
   const hasTeamContext = Boolean(credits?.is_shared_pool || credits?.organization_id);
+  const isEducationOrg =
+    credits?.credit_scope === "education_space" ||
+    credits?.organization_type === "school" ||
+    credits?.organization_type === "university" ||
+    educationStudentLock.locked ||
+    educationStudentLock.loading;
+  const canManageEducation = isEducationOrg && (isOrgAdmin || isClassTeacher);
 
   const initial =
     (profile?.display_name?.[0] ?? user?.email?.[0] ?? "U").toUpperCase();
@@ -233,7 +245,9 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
   const personalPercent = percentOf(personalUsed, personalTotal);
   const sharedPercent = percentOf(sharedUsed, sharedTotal);
   const creditScopeLabel =
-    credits?.credit_scope === "team" && credits.team_name
+    credits?.credit_scope === "education_space"
+      ? `Class space - ${credits.team_name ?? credits.pool_domain ?? "Education"}`
+      : credits?.credit_scope === "team" && credits.team_name
       ? `${t("workspace.usermenu.shared_pool")} - ${credits.team_name}`
       : credits?.is_shared_pool
       ? `${t("workspace.usermenu.shared_pool")} - ${credits.organization_name ?? credits.pool_domain}`
@@ -288,7 +302,11 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
                   <div className="truncate text-[15px] font-semibold leading-5 text-white">
                     {profile?.display_name || t("workspace.usermenu.member_fallback")}
                   </div>
-                  {hasTeamContext && <Crown className="h-3.5 w-3.5 shrink-0 fill-yellow-400 text-yellow-400" />}
+                  {hasTeamContext && (
+                    isEducationOrg
+                      ? <GraduationCap className="h-3.5 w-3.5 shrink-0 text-emerald-300" />
+                      : <Crown className="h-3.5 w-3.5 shrink-0 fill-yellow-400 text-yellow-400" />
+                  )}
                 </div>
                 <div className="mt-0.5 truncate text-[13px] leading-5 text-white/75">
                   {user?.email}
@@ -296,30 +314,45 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
               </div>
             </div>
 
-            <div className="mt-2.5 space-y-1.5">
-              <button
-                type="button"
-                onClick={() => navigate("/app/pricing")}
-                className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-[#5367f5] px-3 text-[14px] font-semibold leading-5 text-white transition-colors hover:bg-[#6274ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                {t("workspace.usermenu.upgrade")}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (hasTeamContext) {
-                    window.location.href = adminConsoleUrl;
-                  } else {
-                    navigate("/app/team-register");
-                  }
-                }}
-                className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-white/[0.06] px-3 text-[14px] font-semibold leading-5 text-white transition-colors hover:bg-white/[0.10]"
-              >
-                {hasTeamContext ? <Building2 className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}
-                {hasTeamContext ? "Admin Console" : "Create your team"}
-              </button>
-            </div>
+            {isEducationOrg ? (
+              canManageEducation && (
+                <div className="mt-2.5 space-y-1.5">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/app/org-admin")}
+                    className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-emerald-500 px-3 text-[14px] font-semibold leading-5 text-white transition-colors hover:bg-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200/70"
+                  >
+                    <GraduationCap className="h-3.5 w-3.5" />
+                    University admin
+                  </button>
+                </div>
+              )
+            ) : (
+              <div className="mt-2.5 space-y-1.5">
+                <button
+                  type="button"
+                  onClick={() => navigate("/app/pricing")}
+                  className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-[#5367f5] px-3 text-[14px] font-semibold leading-5 text-white transition-colors hover:bg-[#6274ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {t("workspace.usermenu.upgrade")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (hasTeamContext) {
+                      window.location.href = adminConsoleUrl;
+                    } else {
+                      navigate("/app/team-register");
+                    }
+                  }}
+                  className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-white/[0.06] px-3 text-[14px] font-semibold leading-5 text-white transition-colors hover:bg-white/[0.10]"
+                >
+                  {hasTeamContext ? <Building2 className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}
+                  {hasTeamContext ? "Admin Console" : "Create your team"}
+                </button>
+              </div>
+            )}
           </div>
         </DropdownMenuLabel>
 
@@ -360,13 +393,15 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
 
         <DropdownMenuSeparator className="bg-white/[0.08]" />
 
-        <DropdownMenuItem
-          onSelect={() => navigate("/app/settings?tab=plan-billing")}
-          className="mx-2 my-1 h-9 cursor-pointer gap-3 rounded-md px-3 text-[14px] font-medium leading-5 text-white focus:bg-white/[0.06] focus:text-white"
-        >
-          <CreditCard className="h-3.5 w-3.5 text-white/[0.82]" />
-          {t("workspace.usermenu.plan_billing")}
-        </DropdownMenuItem>
+        {!hasTeamContext && !isEducationOrg && (
+          <DropdownMenuItem
+            onSelect={() => navigate("/app/settings?tab=plan-billing")}
+            className="mx-2 my-1 h-9 cursor-pointer gap-3 rounded-md px-3 text-[14px] font-medium leading-5 text-white focus:bg-white/[0.06] focus:text-white"
+          >
+            <CreditCard className="h-3.5 w-3.5 text-white/[0.82]" />
+            {t("workspace.usermenu.plan_billing")}
+          </DropdownMenuItem>
+        )}
 
         <DropdownMenuItem
           onSelect={() => navigate("/app/settings")}

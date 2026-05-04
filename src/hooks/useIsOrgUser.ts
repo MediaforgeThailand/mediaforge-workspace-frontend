@@ -24,6 +24,29 @@ export function useOrgId(): string | null {
   return ((profile as any)?.organization_id ?? profile?.org_id ?? null) as string | null;
 }
 
+export function useEducationStudentLock(): { locked: boolean; loading: boolean } {
+  const { user } = useAuth();
+
+  const { data, isLoading } = useQuery<boolean>({
+    queryKey: ["education-student-lock", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      if (!user) return false;
+      const { data: locked, error } = await supabase.rpc("is_education_locked_student" as any, {
+        p_user_id: user.id,
+      });
+      if (error) return false;
+      return Boolean(locked);
+    },
+    staleTime: 30_000,
+  });
+
+  return {
+    locked: Boolean(data),
+    loading: !!user && isLoading,
+  };
+}
+
 export interface ClassMembershipInfo {
   class_id: string;
   class_name: string;

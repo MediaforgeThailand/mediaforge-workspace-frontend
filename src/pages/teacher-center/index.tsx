@@ -620,6 +620,9 @@ function TopSpendersCard({ members }: { members: ClassMember[] }) {
                 <div className="text-sm font-medium truncate">
                   {m.display_name ?? "Unnamed"}
                 </div>
+                <div className="text-[11px] text-muted-foreground font-mono truncate">
+                  {m.student_code ? `ID ${m.student_code}` : m.email ?? m.user_id.slice(0, 8)}
+                </div>
                 <div className="mt-1 h-1 rounded-full bg-muted overflow-hidden">
                   <div className="h-1 rounded-full bg-primary" style={{ width: `${percent}%` }} />
                 </div>
@@ -960,8 +963,11 @@ function MembersPanel({
                           <div className="text-sm font-medium truncate">
                             {m.display_name ?? "Unnamed"}
                           </div>
-                          <div className="text-[11px] text-muted-foreground font-mono">
-                            {m.user_id.slice(0, 8)}…
+                          <div className="max-w-[220px] truncate text-[11px] text-muted-foreground">
+                            {m.email ?? "No email"}
+                          </div>
+                          <div className="max-w-[220px] truncate text-[11px] text-muted-foreground font-mono">
+                            {m.student_code ? `ID ${m.student_code}` : `${m.user_id.slice(0, 8)}...`}
                           </div>
                         </div>
                       </div>
@@ -1120,8 +1126,13 @@ function MemberDetail({ member, classId }: { member: ClassMember; classId: strin
           </Avatar>
           <div>
             <SheetTitle className="text-left">{member.display_name ?? "Unnamed"}</SheetTitle>
-            <SheetDescription className="text-left font-mono text-[11px]">
-              {member.user_id}
+            <SheetDescription className="text-left">
+              <span className="block text-xs text-muted-foreground">
+                {member.email ?? "No email"}
+              </span>
+              <span className="block font-mono text-[11px] text-muted-foreground">
+                {member.student_code ? `Student ID ${member.student_code}` : member.user_id}
+              </span>
             </SheetDescription>
           </div>
         </div>
@@ -1135,6 +1146,12 @@ function MemberDetail({ member, classId }: { member: ClassMember; classId: strin
             <Badge variant={activeSpace?.status === "active" ? "outline" : "secondary"} className="text-[10px]">
               {activeSpace?.status ?? "not created"}
             </Badge>
+          </div>
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-muted-foreground">Student ID</span>
+            <span className="max-w-[220px] truncate font-mono text-xs">
+              {member.student_code ?? "not set"}
+            </span>
           </div>
           {activeSpace && (
             <div className="text-xs text-muted-foreground break-all">
