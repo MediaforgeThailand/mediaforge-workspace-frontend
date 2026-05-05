@@ -229,6 +229,8 @@ export function ImageCropTool({
   };
 
   const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
     (e.target as Element).releasePointerCapture?.(e.pointerId);
     setDragMode({ kind: "none" });
   };
@@ -298,6 +300,8 @@ export function ImageCropTool({
       className="fixed inset-0 z-[2100] flex flex-col items-center justify-center bg-black/90 backdrop-blur-md"
       role="dialog"
       aria-modal="true"
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerLeave={onPointerUp}

@@ -22,8 +22,9 @@ import {
 import { Type, AtSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PromptMentionTextarea from "@/components/flow/nodes/PromptMentionTextarea";
-import { PortIcon } from "./PortIcon";
+import { CLEAN_NODE_BODY_TOP_PX, PortIcon } from "./PortIcon";
 import { useLanguage } from "@/contexts/LanguageContext";
+import NodeQuickActionRail from "./NodeQuickActionRail";
 
 interface TextNodeData {
   label: string;
@@ -52,6 +53,10 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
   );
 
   // Token count derived from serialised form — used by the footer chip.
+  const onDeleteNode = useCallback(() => {
+    setNodes((ns) => ns.filter((n) => n.id !== id));
+  }, [id, setNodes]);
+
   const mentionCount = useMemo(() => {
     const text = d.content ?? "";
     const matches = text.match(/@\[[^\]]+\]\([^)]+\)/g);
@@ -68,6 +73,14 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
     >
       {/* Floating title — icon + editable name, NO background, NO
        *  border, sits above the body (matches the design reference). */}
+      <NodeQuickActionRail
+        visible={selected}
+        onDelete={onDeleteNode}
+        nodeId={id}
+        mediaKind="text"
+        bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
+      />
+
       <div className="ws-clean-title">
         {/* Title icon is neutral grey across every node type — TEXT_COLOR
          *  still drives the output port + wire colour below. */}
@@ -118,6 +131,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
         portType="text"
         color={TEXT_COLOR}
         index={0}
+        bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
       />
     </div>
   );

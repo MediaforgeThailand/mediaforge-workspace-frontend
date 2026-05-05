@@ -72,7 +72,7 @@ const CanvasHeader = () => {
 
   return (
     <div
-      className="relative z-[80] flex h-[42px] shrink-0 items-center justify-between gap-[11px] bg-[hsl(0_0%_4%)] px-[14px]"
+      className="relative z-[80] flex h-[42px] shrink-0 items-center justify-between gap-[11px] bg-[#1b1c1c] px-[14px] shadow-[0_14px_34px_-22px_rgba(0,0,0,0.92)]"
       style={{ fontFamily: "var(--font-sans)" }}
     >
       {/* Left — back arrow + breadcrumb */}

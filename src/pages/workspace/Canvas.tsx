@@ -51,7 +51,6 @@ import WorkspaceCanvas from "@/components/workspace/WorkspaceCanvas";
 // the unused-import warning while the JSX is commented out.
 import _WorkspaceRightSidebar from "@/components/workspace/WorkspaceRightSidebar";
 import WorkspaceCanvasMediaBridges from "@/components/workspace/WorkspaceCanvasMediaBridges";
-import WorkspaceMascot from "@/components/workspace/WorkspaceMascot";
 // DebugPanel still gated — its persisted Zustand store hasn't been
 // audited end-to-end and we don't need it for the demo. Bring back
 // in a follow-up commit after a focused review.
@@ -345,7 +344,7 @@ const WorkspaceCanvasPage = () => {
     // the dashboard, even when portals or isolated canvas surfaces
     // would otherwise inherit a browser default.
     <div
-      className="mf-readable flex h-screen w-screen flex-col bg-zinc-950 text-zinc-100"
+      className="mf-readable flex h-screen w-screen flex-col bg-[#1b1c1c] text-zinc-100"
       style={{
         fontFamily: "var(--font-sans)",
       }}
@@ -405,7 +404,6 @@ const WorkspaceCanvasPage = () => {
         </div>
         {/* <WorkspaceDebugPanel /> — kept disabled until persist
          *   middleware is audited (not blocking demo). */}
-        <WorkspaceMascot />
         {/* Floating page switcher — bottom-left of the canvas.
          *  Replaced the old WorkspaceTabBar (top-row strip) so the
          *  canvas gets a full row of vertical space back. The pill

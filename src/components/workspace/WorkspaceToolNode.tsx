@@ -25,7 +25,7 @@ import {
   Maximize2, Box, Image as ImageIcon, Music,
   type LucideIcon,
 } from "lucide-react";
-import { PortIcon } from "./PortIcon";
+import { CLEAN_NODE_BODY_TOP_PX, PortIcon } from "./PortIcon";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -65,6 +65,7 @@ import type { Generation } from "./NodeResultBar";
 // picker on the canvas — backend uses its own per-provider default.
 import { cloneNodeFresh } from "./cloneNode";
 import { useFreshSignedUrl } from "./useFreshSignedUrl";
+import NodeQuickActionRail from "./NodeQuickActionRail";
 // Workspace-local schema + helpers — kept out of the shared file so
 // the main flow editor stays untouched.
 import {
@@ -2093,14 +2094,6 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       ? ` (${params.duration ?? 5}s)`
       : undefined;
 
-  if (!schema) {
-    return (
-      <div className="rounded-md border border-red-500 bg-red-950 px-3 py-2 text-xs text-red-200">
-        {t("workspace.toolNode.unknownNodeType", { nodeType: schemaKey })}
-      </div>
-    );
-  }
-
   const Icon = ICONS[schemaKey] ?? Sparkles;
 
   // ── Port colour palette ─────────────────────────────────────
@@ -2378,11 +2371,23 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     (i: number) => updateNodeField("selectedGenIndex", i),
     [updateNodeField],
   );
+  const onDeleteNode = useCallback(() => {
+    setEdges((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
+    setNodes((ns) => ns.filter((node) => node.id !== id));
+  }, [id, setEdges, setNodes]);
 
   // Multi-shot scenes (Kling VIDEO 3.0 / Omni when multi_shot=true).
   const multiShotScenes: SceneBlock[] = Array.isArray(params.multi_prompt)
     ? (params.multi_prompt as SceneBlock[])
     : [];
+
+  if (!schema) {
+    return (
+      <div className="rounded-md border border-red-500 bg-red-950 px-3 py-2 text-xs text-red-200">
+        {t("workspace.toolNode.unknownNodeType", { nodeType: schemaKey })}
+      </div>
+    );
+  }
 
   return (
     <>
@@ -2404,6 +2409,18 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
          *  colour for visual graph topology, but the title chrome
          *  itself reads as quiet greyscale to keep a busy canvas
          *  scannable. */}
+        <NodeQuickActionRail
+          visible={selected || isHovered}
+          onDelete={isViewer ? undefined : onDeleteNode}
+          nodeId={id}
+          mediaKind={
+            currentGen?.type === "image" || currentGen?.type === "video"
+              ? currentGen.type
+              : null
+          }
+          bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
+        />
+
         <div className="ws-clean-title">
           <Icon className="ws-clean-title-icon text-zinc-400" />
           <input
@@ -2751,6 +2768,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           portType={portTypeFromHandleId(out.id)}
           color={colorOf(out.color)}
           index={i}
+          bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
         />
       ))}
       {insufficientOpen && (

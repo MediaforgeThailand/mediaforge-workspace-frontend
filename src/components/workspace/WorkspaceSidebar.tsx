@@ -26,6 +26,7 @@
  */
 import {
   BookOpen,
+  FolderOpen,
   Home as HomeIcon,
   History as HistoryIcon,
   Workflow,
@@ -34,6 +35,7 @@ import {
   Video,
   Mic2,
   Settings as SettingsIcon,
+  Languages,
   Palette,
   Plus,
   School,
@@ -41,6 +43,7 @@ import {
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -50,6 +53,7 @@ import { useCredits } from "@/hooks/useCredits";
 import { supabase } from "@/integrations/supabase/client";
 import OrgCreditBadge from "@/components/OrgCreditBadge";
 import ActiveClassPicker from "@/components/ActiveClassPicker";
+import AllAssetsDialog from "@/components/workspace/AllAssetsDialog";
 
 // Default brand (no tenant subdomain match). Centralised so the
 // org-admin branding preview can re-use the exact same fallback.
@@ -179,7 +183,8 @@ export default function WorkspaceSidebar({
   onCreate,
 }: WorkspaceSidebarProps) {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language, setLanguage } = useLanguage();
+  const [libraryOpen, setLibraryOpen] = useState(false);
   // Tenant branding override (e.g. dmd.mediaforge.co → DMD logo +
   // "DMD" short name). Returns null on the bare workspace.mediaforge.co
   // host or while the lookup is in flight; we render the default
@@ -200,14 +205,14 @@ export default function WorkspaceSidebar({
   //     panel from the main content (different elevation).
   //   • Width tightened 198 → 192 keeps the visual rhythm.
   return (
-    <div className="ws-scroll-hide h-full shrink-0 bg-[hsl(var(--surface-0))] py-0 pl-0">
+    <div className="ws-scroll-hide h-full shrink-0 bg-black py-0 pl-0">
       <aside
         className="mf-readable ws-scroll-hide flex h-full w-[230px] flex-col gap-[4px] overflow-y-auto rounded-[20px] border border-transparent px-[4px] py-[12px] text-[#b0b4ba]"
         style={{
           background:
-            "linear-gradient(#121314, #121314) padding-box, linear-gradient(145deg, rgba(255,255,255,.42), rgba(144,80,160,.32) 34%, rgba(96,48,128,.28) 68%, rgba(160,80,160,.16)) border-box",
+            "linear-gradient(#000, #000) padding-box, linear-gradient(145deg, rgba(255,255,255,.28), rgba(155,77,224,.22) 36%, rgba(91,42,140,.16) 70%, rgba(0,0,0,.2)) border-box",
           boxShadow:
-            "inset 0 1px 0 rgba(255,255,255,.08), inset 0 -1px 0 rgba(144,80,160,.09), 0 0 24px -18px rgba(144,80,160,.9), 0 0 38px -30px rgba(96,48,128,.95)",
+            "inset 0 1px 0 rgba(255,255,255,.06), inset 0 -1px 0 rgba(155,77,224,.06), 0 0 24px -20px rgba(155,77,224,.8), 0 0 38px -32px rgba(91,42,140,.85)",
         }}
       >
       {/* ── Brand row — PSC : Digital Media ──────────────────────
@@ -260,6 +265,13 @@ export default function WorkspaceSidebar({
             variant="list"
           />
         ))}
+        <NavLink
+          label={t("workspace.sidebar.library")}
+          icon={FolderOpen}
+          active={false}
+          onClick={() => setLibraryOpen(true)}
+          variant="list"
+        />
       </nav>
 
       {/* ── Section divider with label ─────────────────────────── */}
@@ -298,9 +310,20 @@ export default function WorkspaceSidebar({
       <OrgAdminLink />
 
       {/* ── Bottom utility row ─────────────────────────────────── */}
+      {/* Settings + language toggle sit as a paired "preferences"
+       *  cluster at the bottom of the rail. The language icon is a
+       *  parallel UtilityBtn — same visual weight, no special
+       *  treatment beyond label rendering the TARGET language in its
+       *  own script (universal language-switcher convention). */}
       <div className="flex items-center gap-[4px] px-[8px] pb-[2px] pt-[8px]">
         <UtilityBtn icon={SettingsIcon} title={t("workspace.sidebar.settings")} onClick={() => navigate("/app/settings")} />
+        <UtilityBtn
+          icon={Languages}
+          title={language === "th" ? "English" : "ภาษาไทย"}
+          onClick={() => setLanguage(language === "th" ? "en" : "th")}
+        />
       </div>
+      <AllAssetsDialog open={libraryOpen} onClose={() => setLibraryOpen(false)} />
       </aside>
     </div>
   );
@@ -397,7 +420,7 @@ const SidebarNavSection = ({
   translate: (key: NavItem["labelKey"]) => string;
 }) => (
   <div className="pt-[16px]">
-    <div className="workspace-sidebar-section-label px-[16px] pb-[6px] text-[12px] font-semibold uppercase tracking-[0.05px] text-[#43484e]">
+    <div className="px-[16px] pb-[6px] text-[12px] font-semibold uppercase tracking-[0.05px] text-[#43484e]">
       {label}
     </div>
     <div className="flex flex-col gap-[4px]">
@@ -451,7 +474,7 @@ const NavLink = ({
     className={cn(
       /* 2026-05: drop the inset 1px stroke on active — bg lift alone
        *  is enough now that the sidebar is a Layer-1 panel. */
-      "workspace-sidebar-nav-link group relative flex h-[32px] min-w-0 items-center gap-[10px] text-left text-[12px] font-medium transition-colors",
+      "group relative flex h-[32px] min-w-0 items-center gap-[10px] text-left text-[12px] font-medium transition-colors",
       variant === "tool"
         ? "mx-[8px] overflow-hidden rounded-lg bg-[rgba(216,244,246,.04)] px-[8px]"
         : "mx-[12px] rounded-md bg-transparent px-[4px]",
@@ -474,7 +497,7 @@ const NavLink = ({
       <span className="pointer-events-none absolute inset-[-1px] rounded-[10px] shadow-[inset_0_-3px_8px_0_#9050a0,inset_0_2px_8px_0_rgba(255,255,255,.32),0_0_12px_rgba(96,48,128,.62)]" />
     )}
     <Icon className="relative h-[16px] w-[16px] shrink-0" />
-    <span className="workspace-sidebar-nav-label relative min-w-0 truncate">{label}</span>
+    <span className="relative min-w-0 truncate">{label}</span>
   </button>
 );
 

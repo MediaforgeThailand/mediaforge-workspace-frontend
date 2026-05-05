@@ -35,23 +35,8 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image:
-    radial-gradient(circle at 1px 1px,
-      rgba(180, 180, 180, 0.35) 0.55px,
-      transparent 0.7px);
-  background-size: 23px 23px;
-  -webkit-mask-image: radial-gradient(
-    circle at center,
-    black 0%,
-    rgba(0, 0, 0, 0.85) 30%,
-    transparent 70%
-  );
-          mask-image: radial-gradient(
-    circle at center,
-    black 0%,
-    rgba(0, 0, 0, 0.85) 30%,
-    transparent 70%
-  );
+  background-color: #1b1c1c;
+  background-image: none;
 }
 
 /* ── Handle: icon-button at corner, slides OUT on hover ────────
@@ -1736,6 +1721,7 @@ body.ws-resizing * {
 /*     (they have their own classes outside this list)          */
 /* ─────────────────────────────────────────────────────────── */
 body.ws-lightbox-open .ws-quick-toolbar,
+body.ws-lightbox-open .node-quick-action-rail,
 body.ws-lightbox-open .ws-compact-overlay,
 body.ws-lightbox-open .ws-compact-run-anchor,
 body.ws-lightbox-open .react-flow__node .ws-clean-title {
@@ -1759,4 +1745,133 @@ body.ws-lightbox-open .react-flow__node .ws-clean-title {
   margin-left: 6px;
   pointer-events: none;
   white-space: nowrap;
+}
+
+.node-quick-action-rail {
+  position: absolute;
+  left: -30px;
+  top: 8px;
+  z-index: 80;
+  opacity: 0;
+  transform: translateX(4px);
+  pointer-events: none;
+  transition:
+    opacity 120ms ease,
+    transform 140ms ease;
+}
+
+.node-quick-action-rail.is-visible,
+.react-flow__node:hover .node-quick-action-rail,
+.react-flow__node.selected .node-quick-action-rail {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.node-quick-action-stack {
+  display: flex;
+  width: 25px;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(15, 15, 16, 0.94);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(10px);
+}
+
+.node-quick-action-button {
+  display: grid;
+  height: 26px;
+  width: 100%;
+  place-items: center;
+  color: rgba(244, 244, 245, 0.72);
+  transition:
+    color 120ms ease,
+    background 120ms ease;
+}
+
+.node-quick-action-button:hover:not(:disabled),
+.node-quick-action-button[aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.node-quick-action-button.is-danger {
+  color: rgba(255, 59, 48, 0.88);
+}
+
+.node-quick-action-button.is-danger:hover:not(:disabled) {
+  background: rgba(255, 59, 48, 0.12);
+  color: rgb(255, 69, 58);
+}
+
+.node-quick-action-button.is-disabled {
+  cursor: default;
+  color: rgba(255, 255, 255, 0.36);
+}
+
+.node-quick-menu {
+  position: absolute;
+  left: 31px;
+  top: 0;
+  width: 178px;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(12, 12, 13, 0.97);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.46);
+  padding: 5px 0;
+  color: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(12px);
+}
+
+.node-quick-menu-item {
+  display: flex;
+  height: 29px;
+  width: 100%;
+  align-items: center;
+  gap: 9px;
+  padding: 0 10px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  color: rgba(244, 244, 245, 0.82);
+}
+
+.node-quick-menu-item:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+  color: white;
+}
+
+.node-quick-menu-item.is-disabled {
+  cursor: default;
+  color: rgba(244, 244, 245, 0.54);
+}
+
+.node-quick-menu-item.has-separator {
+  margin-top: 5px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 5px;
+  height: 34px;
+}
+
+.node-quick-menu-icon {
+  height: 15px;
+  width: 15px;
+  flex-shrink: 0;
+  color: currentColor;
+}
+
+.node-quick-menu-badge {
+  display: grid;
+  height: 22px;
+  width: 28px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(244, 244, 245, 0.72);
 }

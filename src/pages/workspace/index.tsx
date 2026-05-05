@@ -963,6 +963,9 @@ interface HomeInspiration {
   title: string;
   src: string;
   kind: "image" | "video";
+  previewSrc?: string;
+  posterSrc?: string;
+  previewVideoSrc?: string;
 }
 
 const HOME_INSPIRATIONS: HomeInspiration[] = [
@@ -970,60 +973,74 @@ const HOME_INSPIRATIONS: HomeInspiration[] = [
     id: "thumbnail-ui",
     title: "Thumbnail UI",
     src: "/inspire/thumbnail-ui.webm",
+    previewVideoSrc: "/inspire/previews/thumbnail-ui-preview.webm",
+    posterSrc: "/inspire/previews/thumbnail-ui-poster.webp",
     kind: "video",
   },
   {
     id: "full-screen",
     title: "Full Screen",
     src: "/inspire/full-screen.webm",
+    previewVideoSrc: "/inspire/previews/full-screen-preview.webm",
+    posterSrc: "/inspire/previews/full-screen-poster.webp",
     kind: "video",
   },
   {
     id: "magnific-2882506457",
     title: "Magnific Motion 1",
     src: "/inspire/magnific-2882506457.webm",
+    previewVideoSrc: "/inspire/previews/magnific-2882506457-preview.webm",
+    posterSrc: "/inspire/previews/magnific-2882506457-poster.webp",
     kind: "video",
   },
   {
     id: "magnific-2886588619",
     title: "Magnific Motion 2",
     src: "/inspire/magnific-2886588619.webm",
+    previewVideoSrc: "/inspire/previews/magnific-2886588619-preview.webm",
+    posterSrc: "/inspire/previews/magnific-2886588619-poster.webp",
     kind: "video",
   },
   {
     id: "sketch-3",
     title: "Sketch 3",
     src: "/inspire/sketch-3.png",
+    previewSrc: "/inspire/previews/sketch-3.webp",
     kind: "image",
   },
   {
     id: "sketch-1",
     title: "Sketch 1",
     src: "/inspire/sketch-1.png",
+    previewSrc: "/inspire/previews/sketch-1.webp",
     kind: "image",
   },
   {
     id: "concept-art-3-4",
     title: "Concept Art 3/4",
     src: "/inspire/concept-art-3-4.png",
+    previewSrc: "/inspire/previews/concept-art-3-4.webp",
     kind: "image",
   },
   {
     id: "concept-art",
     title: "Concept Art",
     src: "/inspire/concept-art.png",
+    previewSrc: "/inspire/previews/concept-art.webp",
     kind: "image",
   },
   {
     id: "collage",
     title: "Collage",
     src: "/inspire/collage.png",
+    previewSrc: "/inspire/previews/collage.webp",
     kind: "image",
   },
   {
     id: "character-sheet",
     title: "Character Sheet",
     src: "/inspire/character-sheet.png",
+    previewSrc: "/inspire/previews/character-sheet.webp",
     kind: "image",
   },
 ];
@@ -1365,26 +1382,28 @@ const HomeView = ({
             </div>
 
             <ul className="mt-5 columns-1 gap-3 md:columns-2 xl:columns-3">
-              {visibleInspirations.map((item) => (
+              {visibleInspirations.map((item, index) => (
                 <li key={item.id} className="mb-3 break-inside-avoid">
-                  <div className="group block w-full overflow-hidden rounded-[13px] bg-black">
-                    <div className="relative overflow-hidden rounded-[13px] bg-black">
+                  <div className="group block w-full overflow-hidden rounded-[13px] bg-[var(--bg-app)]">
+                    <div className="relative overflow-hidden rounded-[13px] bg-[var(--bg-app)]">
                       {item.kind === "video" ? (
                         <video
-                          src={item.src}
+                          src={item.previewVideoSrc ?? item.src}
+                          poster={item.posterSrc}
                           className="block h-auto w-full rounded-[13px] object-contain"
                           autoPlay
                           muted
                           loop
                           playsInline
-                          preload="metadata"
+                          preload="none"
                         />
                       ) : (
                         <img
-                          src={item.src}
+                          src={item.previewSrc ?? item.src}
                           alt={item.title}
                           className="block h-auto w-full rounded-[13px] object-contain transition duration-500 group-hover:scale-[1.012]"
-                          loading="lazy"
+                          loading={index < 3 ? "eager" : "lazy"}
+                          decoding="async"
                         />
                       )}
                     </div>
@@ -1807,7 +1826,7 @@ function useEducationSpaceStatusMap(
     refetchOnWindowFocus: true,
     queryFn: async () => {
       if (!userId) return EMPTY_EDUCATION_SPACE_STATUS_MAP;
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("education_student_spaces")
         .select("workspace_id,status,completed_at")
         .eq("user_id", userId);

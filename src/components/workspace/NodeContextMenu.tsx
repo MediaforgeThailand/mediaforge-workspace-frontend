@@ -29,7 +29,7 @@
  *     • Delete all
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { type LucideIcon } from "lucide-react";
 import type { Node as RFNode } from "@xyflow/react";
@@ -103,7 +103,7 @@ const NodeContextMenu = ({ position, items, onClose }: Props) => {
     };
   }, [onClose]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = panelRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -126,7 +126,7 @@ const NodeContextMenu = ({ position, items, onClose }: Props) => {
       role="menu"
       aria-label={t("workspace.nodemenu.aria")}
       className={cn(
-        "fixed z-[9999] min-w-[180px] overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 py-1 shadow-xl",
+        "fixed z-[9999] w-[176px] overflow-hidden rounded-[8px] border border-[#2d2d2d] bg-[#171717] py-[5px] shadow-[0_14px_30px_rgba(0,0,0,.48)]",
       )}
       style={{
         left: position.x,
@@ -146,7 +146,7 @@ const NodeContextMenu = ({ position, items, onClose }: Props) => {
         return (
           <div key={item.key}>
             {item.separatorBefore && (
-              <div className="my-1 border-t border-neutral-800" />
+              <div className="my-[5px] h-px bg-[#2a2a2a]" />
             )}
             <button
               type="button"
@@ -155,16 +155,22 @@ const NodeContextMenu = ({ position, items, onClose }: Props) => {
               onClick={() => fire(item)}
               title={item.label}
               className={cn(
-                "flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors",
+                "flex h-[31px] w-full items-center gap-[10px] px-[12px] text-left text-[13px] font-medium leading-none transition-colors",
                 item.disabled
-                  ? "cursor-not-allowed text-zinc-600"
+                  ? "cursor-default text-[#6f7175]"
                   : item.danger
-                    ? "text-neutral-300 hover:bg-red-600/20 hover:text-red-400"
-                    : "text-neutral-300 hover:bg-neutral-800 hover:text-neutral-100",
+                    ? "text-[#ff453a] hover:bg-[#261a1a]"
+                    : "text-[#d7d7d7] hover:bg-[#242424] hover:text-white",
               )}
             >
-              <span className={cn("flex-shrink-0", item.danger && "text-red-500")}>
-                <Icon size={14} />
+              <span
+                className={cn(
+                  "flex h-[14px] w-[14px] flex-shrink-0 items-center justify-center text-[#aeb2b7]",
+                  item.disabled && "text-[#62656a]",
+                  item.danger && "text-[#ff453a]",
+                )}
+              >
+                <Icon size={14} strokeWidth={2} />
               </span>
               <span className="truncate">{item.label}</span>
             </button>

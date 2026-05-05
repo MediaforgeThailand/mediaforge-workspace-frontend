@@ -58,7 +58,6 @@ import ElementNode from "./ElementNode";
 import TextNode from "./TextNode";
 import GroupNode from "./GroupNode";
 import StickyNoteNode from "./StickyNoteNode";
-import NodeQuickToolbar from "./NodeQuickToolbar";
 import { cloneNodeFresh } from "./cloneNode";
 import MultiSelectionFrame from "./MultiSelectionFrame";
 import NodePreviewLightbox, {
@@ -66,6 +65,7 @@ import NodePreviewLightbox, {
   getNodeDownloadable,
   type PreviewPayload,
 } from "./NodePreviewLightbox";
+import { ImageCropTool } from "./ImageCropTool";
 import { getWorkspaceSchema, portTypeFromHandleId } from "./workspaceSchema";
 import { inheritParamsFromSource } from "./inheritParams";
 import CanvasNodePicker, {
@@ -83,11 +83,17 @@ import {
   Copy as CtxCopyIcon,
   Download as CtxDownloadIcon,
   Eye as CtxEyeIcon,
-  Files as CtxFilesIcon,
   FileArchive as CtxFileArchiveIcon,
+  FolderOpen as CtxFolderOpenIcon,
   Trash2 as CtxTrash2Icon,
 } from "lucide-react";
 import { downloadFromUrl } from "./downloadAsset";
+import {
+  buildExtractedAudioFile,
+  buildMutedVideoFile,
+  extractAudioBlobFromVideo,
+  removeAudioFromVideoBlob,
+} from "./videoAudioActions";
 import { bundleNodesAsZip, harvestAssetsFromNode } from "./bundleNodes";
 import CanvasFloatingSidebar from "./CanvasFloatingSidebar";
 import ShortcutsDialog from "./ShortcutsDialog";
@@ -912,6 +918,10 @@ const Inner = () => {
   } | null>(null);
   const [picker, setPicker] = useState<CanvasNodePickerState | null>(null);
   const [preview, setPreview] = useState<PreviewPayload | null>(null);
+  const [quickCrop, setQuickCrop] = useState<{
+    src: string;
+    label: string;
+  } | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   // Right-click on a NODE (single or multi-selected) → small action
   // menu with Download / Download all generations / Copy / Delete (and
@@ -1057,40 +1067,84 @@ const Inner = () => {
     setPreview(p);
   }, []);
 
-  const onCtxDownloadAllGenerations = useCallback(async (node: Node) => {
-    const refs = harvestAssetsFromNode(node);
-    if (refs.length === 0) {
-      toast.error(t("workspace.toast.nothing_dl_no_gens"));
-      return;
-    }
-    if (refs.length === 1) {
-      // Avoid wrapping a single file in a ZIP (annoying UX) — fall
-      // back to a direct single-asset download.
-      void downloadFromUrl(refs[0].url, refs[0].filename);
-      return;
-    }
-    const id = toast.loading(t("workspace.toast.bundling", { count: refs.length }));
-    try {
-      const res = await bundleNodesAsZip([node]);
-      if (res.succeeded === 0) {
-        toast.error(
-          res.firstError ? t("workspace.toast.bundle_failed_reason", { reason: res.firstError }) : t("workspace.toast.bundle_failed"),
-          { id },
-        );
+  const uploadTransformedFile = useCallback(
+    async (file: File) => {
+      const centre = screenToFlowPosition({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      });
+      await uploadAsset(file, centre);
+    },
+    [screenToFlowPosition, uploadAsset],
+  );
+
+  const onQuickNodeAction = useCallback(
+    async (
+      action: "crop" | "export-audio" | "remove-audio",
+      nodeId: string,
+    ) => {
+      const all = useWorkspaceStore.getState().current?.nodes ?? [];
+      const node = all.find((n) => n.id === nodeId);
+      if (!node) return;
+      const p = getNodePreview(node, all);
+      const label =
+        (p?.label && p.label.trim()) ||
+        ((node.data as Record<string, unknown> | undefined)?.label as string | undefined) ||
+        "asset";
+
+      if (action === "crop") {
+        if (!p || p.type !== "image" || !p.url) {
+          toast.error("Crop is available for image nodes only.");
+          return;
+        }
+        setQuickCrop({ src: p.url, label });
         return;
       }
-      const partial =
-        res.failed > 0
-          ? t("workspace.toast.partial_suffix", { failed: res.failed, reason: res.firstError ?? "unknown" })
-          : "";
-      toast.success(t("workspace.toast.downloaded", { name: res.bundleName, partial }), { id });
-    } catch (err) {
-      toast.error(
-        t("workspace.toast.bundle_failed_reason", { reason: err instanceof Error ? err.message : String(err) }),
-        { id },
+
+      if (!p || p.type !== "video" || !p.url) {
+        toast.error("This action is available for video nodes only.");
+        return;
+      }
+
+      const toastId = toast.loading(
+        action === "export-audio" ? "Exporting audio..." : "Removing audio...",
       );
-    }
-  }, [t]);
+      try {
+        if (action === "export-audio") {
+          const audioBlob = await extractAudioBlobFromVideo(p.url);
+          await uploadTransformedFile(buildExtractedAudioFile(audioBlob, label));
+          toast.success("Audio asset added to canvas.", { id: toastId });
+          return;
+        }
+
+        const mutedVideoBlob = await removeAudioFromVideoBlob(p.url);
+        await uploadTransformedFile(buildMutedVideoFile(mutedVideoBlob, label));
+        toast.success("Muted video asset added to canvas.", { id: toastId });
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Could not process this video.",
+          { id: toastId },
+        );
+      }
+    },
+    [uploadTransformedFile],
+  );
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent).detail as
+        | {
+            nodeId?: string;
+            action?: "crop" | "export-audio" | "remove-audio";
+          }
+        | undefined;
+      if (!detail?.nodeId || !detail.action) return;
+      void onQuickNodeAction(detail.action, detail.nodeId);
+    };
+    window.addEventListener("workspace-node-quick-action", handler);
+    return () =>
+      window.removeEventListener("workspace-node-quick-action", handler);
+  }, [onQuickNodeAction]);
 
   const onCtxDownloadZip = useCallback(async (nodes: Node[]) => {
     // Aggregate harvest count up front so we can show an accurate
@@ -1185,10 +1239,6 @@ const Inner = () => {
       const allNodes = useWorkspaceStore.getState().current?.nodes ?? [];
       const previewPayload = getNodePreview(node, allNodes);
       const downloadable = getNodeDownloadable(node);
-      const data = (node.data ?? {}) as Record<string, unknown>;
-      const gens = Array.isArray(data.generations)
-        ? (data.generations as unknown[])
-        : [];
       const items: NodeContextMenuItem[] = [
         {
           key: "preview",
@@ -1201,35 +1251,39 @@ const Inner = () => {
           key: "download",
           label: t("workspace.nodemenu.download"),
           icon: CtxDownloadIcon,
-          separatorBefore: true,
           disabled: !downloadable,
           onSelect: () => onCtxDownloadSingle(node),
         },
-      ];
-      if (gens.length > 1) {
-        items.push({
-          key: "download-all-gens",
-          label: t("workspace.nodemenu.download_all_gens", { count: gens.length }),
-          icon: CtxFilesIcon,
-          onSelect: () => void onCtxDownloadAllGenerations(node),
-        });
-      }
-      items.push(
         {
           key: "duplicate",
           label: t("workspace.nodemenu.duplicate"),
           icon: CtxCopyIcon,
-          separatorBefore: true,
           onSelect: () => onCtxDuplicate([node]),
+        },
+        {
+          key: "move-board",
+          label: "Move to Board",
+          icon: CtxFolderOpenIcon,
+          separatorBefore: true,
+          disabled: true,
+          onSelect: () => undefined,
+        },
+        {
+          key: "copy-board",
+          label: "Copy to Board",
+          icon: CtxCopyIcon,
+          disabled: true,
+          onSelect: () => undefined,
         },
         {
           key: "delete",
           label: t("workspace.nodemenu.delete"),
           icon: CtxTrash2Icon,
+          separatorBefore: true,
           danger: true,
           onSelect: () => onCtxDelete([node]),
         },
-      );
+      ];
       return items;
     }
 
@@ -1265,7 +1319,6 @@ const Inner = () => {
     nodeContextMenu,
     onCtxDownloadSingle,
     onCtxPreview,
-    onCtxDownloadAllGenerations,
     onCtxDownloadZip,
     onCtxDuplicate,
     onCtxDelete,
@@ -2052,7 +2105,7 @@ const Inner = () => {
   return (
     <div
       ref={wrapperRef}
-      className="workspace-root relative h-full w-full bg-zinc-950"
+      className="workspace-root relative h-full w-full bg-[#1b1c1c]"
       onDragOver={onDragOver}
       onDrop={onDrop}
       onPointerMove={publishCanvasCursor}
@@ -2183,7 +2236,6 @@ const Inner = () => {
          *  inside the ReactFlow tree so it can subscribe to
          *  selection / viewport via useOnSelectionChange and
          *  useViewport hooks. */}
-        <NodeQuickToolbar />
         {/* Translucent bounding frame behind 2+ selected nodes.
          *  Mounts into `.react-flow__viewport` via portal so it
          *  inherits the viewport's pan/zoom transform. */}
@@ -2238,6 +2290,21 @@ const Inner = () => {
               y: window.innerHeight / 2,
             });
             await uploadAsset(file, centre);
+            toast.success(t("workspace.crop.toast_added_canvas"));
+          }}
+        />
+      )}
+      {quickCrop && (
+        <ImageCropTool
+          src={quickCrop.src}
+          suggestedFilename={`${quickCrop.label}.png`}
+          onCancel={() => setQuickCrop(null)}
+          onCropConfirmed={async (blob, filename) => {
+            const file = new File([blob], filename, {
+              type: blob.type || "image/png",
+            });
+            await uploadTransformedFile(file);
+            setQuickCrop(null);
             toast.success(t("workspace.crop.toast_added_canvas"));
           }}
         />

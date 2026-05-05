@@ -197,10 +197,10 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[min(calc(100vw-32px),520px)] overflow-hidden sm:max-w-[520px]">
-        <DialogHeader>
-          <DialogTitle>{t("workspace.share.title")}</DialogTitle>
-          <DialogDescription className="text-xs">
+      <DialogContent className="!w-[min(calc(100vw-24px),360px)] !max-w-[360px] gap-2 overflow-hidden rounded-[14px] p-3 shadow-xl shadow-black/40 [&>button.absolute]:right-3 [&>button.absolute]:top-3 [&>button.absolute_svg]:h-3.5 [&>button.absolute_svg]:w-3.5">
+        <DialogHeader className="space-y-0.5 pr-5">
+          <DialogTitle className="text-[15px] leading-5">{t("workspace.share.title")}</DialogTitle>
+          <DialogDescription className="text-[11px] leading-4">
             {t("workspace.share.description", {
               name: workspaceName || t("workspace.share.this_workspace_fallback"),
             })}
@@ -208,42 +208,42 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
         </DialogHeader>
 
         {/* ─── Segmented Viewer / Editor toggle ─── */}
-        <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
+        <div className="grid grid-cols-2 gap-0.5 rounded-lg bg-muted p-0.5">
           <button
             type="button"
             onClick={() => setRole("viewer")}
             className={cn(
-              "flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm transition-colors",
+              "flex h-7 items-center justify-center gap-1 rounded-md px-2 text-[12px] leading-none transition-colors",
               role === "viewer"
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            <Eye className="h-3.5 w-3.5" />
+            <Eye className="h-3 w-3" />
             {t("workspace.share.viewer")}
           </button>
           <button
             type="button"
             onClick={() => setRole("editor")}
             className={cn(
-              "flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm transition-colors",
+              "flex h-7 items-center justify-center gap-1 rounded-md px-2 text-[12px] leading-none transition-colors",
               role === "editor"
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <Pencil className="h-3 w-3" />
             {t("workspace.share.editor")}
           </button>
         </div>
 
-        <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
+        <p className="text-[11px] leading-4 text-muted-foreground">{description}</p>
 
         {/* ─── Generate link button ─── */}
-        <Button onClick={handleGenerate} disabled={generating} className="w-full">
+        <Button onClick={handleGenerate} disabled={generating} className="h-7 w-full rounded-lg text-[12px] leading-none">
           {generating ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
               {t("workspace.share.generating")}
             </>
           ) : (
@@ -258,15 +258,16 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
               readOnly
               value={latestUrl}
               onFocus={(e) => e.currentTarget.select()}
-              className="min-w-0 truncate font-mono text-xs"
+              className="h-7 min-w-0 truncate font-mono text-[11px]"
             />
             <Button
               type="button"
               variant="secondary"
               size="sm"
+              className="h-7 px-2 text-[11px]"
               onClick={() => handleCopy(latestUrl)}
             >
-              <Copy className="mr-1 h-3.5 w-3.5" />
+              <Copy className="mr-1 h-3 w-3" />
               {t("workspace.share.copy")}
             </Button>
           </div>
@@ -275,31 +276,31 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
         <Separator />
 
         {/* ─── Active shares list ─── */}
-        <div className="space-y-2">
+        <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-medium text-muted-foreground">
+            <h4 className="text-[11px] font-medium text-muted-foreground">
               {t("workspace.share.active_links")}
             </h4>
             {loadingList && (
-              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+              <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />
             )}
           </div>
 
           {!loadingList && shares.length === 0 && (
-            <p className="text-xs text-muted-foreground italic">
+            <p className="text-[11px] italic text-muted-foreground">
               {t("workspace.share.no_active_links")}
             </p>
           )}
 
-          <div className="max-h-64 min-w-0 space-y-1.5 overflow-y-auto overflow-x-hidden">
+          <div className="max-h-40 min-w-0 space-y-1 overflow-y-auto overflow-x-hidden">
             {shares.map((s) => (
               <div
                 key={s.id}
-                className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 rounded-md border bg-card/50 px-2.5 py-2 text-xs"
+                className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-1.5 rounded-md border bg-card/50 px-1.5 py-1 text-[11px]"
               >
                 <span
                   className={cn(
-                    "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                    "shrink-0 rounded-full px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-wide",
                     s.role === "viewer"
                       ? "bg-sky-500/15 text-sky-300"
                       : "bg-amber-500/15 text-amber-300",
@@ -308,32 +309,32 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
                   {s.role}
                 </span>
                 <div className="min-w-0 overflow-hidden">
-                  <div className="truncate font-mono text-[11px] text-muted-foreground">
+                  <div className="truncate font-mono text-[10.5px] text-muted-foreground">
                     {s.share_url}
                   </div>
-                  <div className="text-[10.5px] text-muted-foreground/70">
+                  <div className="text-[10px] text-muted-foreground/70">
                     {t("workspace.share.created_relative", { time: timeAgo(s.created_at) })}
                   </div>
                 </div>
                 <button
                   type="button"
-                  className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                  className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
                   title={t("workspace.share.copy_link")}
                   onClick={() => handleCopy(s.share_url)}
                 >
-                  <Copy className="h-3.5 w-3.5" />
+                  <Copy className="h-3 w-3" />
                 </button>
                 <button
                   type="button"
-                  className="rounded p-1 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-400 disabled:opacity-50"
+                  className="rounded p-0.5 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-400 disabled:opacity-50"
                   title={t("workspace.share.revoke_link")}
                   disabled={revokingId === s.id}
                   onClick={() => handleRevoke(s.id)}
                 >
                   {revokingId === s.id ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="h-3 w-3 animate-spin" />
                   ) : (
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-3 w-3" />
                   )}
                 </button>
               </div>

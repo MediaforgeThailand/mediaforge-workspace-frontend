@@ -165,6 +165,10 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
+        if (cropOpen) {
+          setCropOpen(false);
+          return;
+        }
         onClose();
         return;
       }
@@ -184,7 +188,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
+  }, [cropOpen, onClose]);
 
   const canCrop = preview.type === "image" && !!preview.url && !!onCropConfirmed;
   const canDownload =

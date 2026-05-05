@@ -224,6 +224,9 @@ const CATALOG: CatalogEntry[] = [
   },
 ];
 
+const HIDDEN_NODE_TYPES = new Set(["mergeAudioNode", "videoToPromptNode"]);
+const VISIBLE_CATALOG = CATALOG.filter((entry) => !HIDDEN_NODE_TYPES.has(entry.nodeType));
+
 /**
  * Build the picker options for a given drop. Each catalog entry
  * contributes one option per compatible port — so a single node type
@@ -234,7 +237,7 @@ export function getPickerOptions(state: CanvasNodePickerState): PickerOption[] {
   // once (use the first input port as the default newNodeHandle so
   // the picker still has something to wire into when adopted).
   if (!state.fromNode || !state.fromHandleId) {
-    return CATALOG.map((entry) => {
+    return VISIBLE_CATALOG.map((entry) => {
       const firstPort = entry.inputs[0] ?? entry.outputs[0];
       return {
         nodeType: entry.nodeType,
@@ -253,7 +256,7 @@ export function getPickerOptions(state: CanvasNodePickerState): PickerOption[] {
   if (!sourceType) return [];
 
   const opts: PickerOption[] = [];
-  for (const entry of CATALOG) {
+  for (const entry of VISIBLE_CATALOG) {
     const ports = state.fromIsOutput ? entry.inputs : entry.outputs;
     for (const p of ports) {
       if (p.type !== sourceType) continue;

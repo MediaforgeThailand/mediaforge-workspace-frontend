@@ -27,6 +27,7 @@ import {
   Undo2,
   Redo2,
   Settings,
+  Languages,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -84,6 +85,7 @@ const CanvasFloatingSidebar = ({ onAddNode, onOpenSettings }: Props) => {
   const setTool = useCanvasToolStore((s) => s.setTool);
   const undo = useWorkspaceStore((s) => s.undo);
   const redo = useWorkspaceStore((s) => s.redo);
+  const { language, setLanguage } = useLanguage();
 
   /* Spacebar = momentary hand tool.
    *
@@ -178,7 +180,7 @@ const CanvasFloatingSidebar = ({ onAddNode, onOpenSettings }: Props) => {
     <div
       className="pointer-events-none fixed left-2 top-1/2 z-40 -translate-y-1/2 lg:left-1.5"
     >
-      <div className="pointer-events-auto flex flex-col items-center gap-[3px] rounded-full border border-fuchsia-200/15 bg-[linear-gradient(180deg,rgba(112,36,170,0.22),rgba(20,12,30,0.78))] p-[3px] shadow-[0_0_0_1px_rgba(255,61,190,0.08),0_18px_46px_rgba(123,54,205,0.16),0_8px_20px_rgba(0,0,0,0.36)] backdrop-blur-xl">
+      <div className="pointer-events-auto flex flex-col items-center gap-[3px] rounded-full border border-white/[0.08] bg-[#101010]/95 p-[3px] shadow-[0_18px_46px_rgba(0,0,0,0.38),0_0_0_1px_rgba(255,255,255,0.03)] backdrop-blur-xl">
         {BUTTONS.map((b, i) => (
           <SidebarButton
             key={b.id}
@@ -188,6 +190,15 @@ const CanvasFloatingSidebar = ({ onAddNode, onOpenSettings }: Props) => {
             onClick={(e) => onClick(b, e)}
           />
         ))}
+        {/* Language toggle — sits next to Settings (no divider so the
+         *  two icons read as a paired "preferences" cluster). Label
+         *  shows the TARGET language in its own script, mirroring how
+         *  OS-level language switchers read ("English" while you're
+         *  in Thai → tap to go English). */}
+        <LanguageToggleButton
+          language={language}
+          onToggle={() => setLanguage(language === "th" ? "en" : "th")}
+        />
       </div>
     </div>
   );
@@ -213,7 +224,7 @@ function SidebarButton({
   return (
     <div className="group relative">
       {button.divider && !isFirst && (
-        <div className="my-px h-px w-[24px] self-center bg-fuchsia-100/12" />
+        <div className="my-px h-px w-[24px] self-center bg-white/10" />
       )}
       <button
         type="button"
@@ -225,8 +236,8 @@ function SidebarButton({
         className={cn(
           "flex h-[43px] w-[43px] items-center justify-center rounded-full transition-colors lg:h-[38px] lg:w-[38px]",
           isActive
-            ? "bg-zinc-200 text-zinc-900 shadow-[0_0_18px_rgba(217,70,239,0.16)]"
-            : "text-zinc-300 hover:bg-fuchsia-200/10 hover:text-zinc-100",
+            ? "bg-zinc-200 text-zinc-900 shadow-[0_10px_24px_rgba(0,0,0,0.26)]"
+            : "text-zinc-300 hover:bg-white/10 hover:text-zinc-50",
         )}
       >
         <Icon className="h-[14.5px] w-[14.5px]" />
@@ -239,6 +250,44 @@ function SidebarButton({
               {button.shortcut}
             </span>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * LanguageToggleButton — flips between English and Thai.
+ *
+ * Mirrors the SidebarButton visual but renders a literal target-language
+ * label in the tooltip ("English" / "ภาษาไทย") instead of going through
+ * t(). That way the user sees the destination language in its own script,
+ * which is the universal convention for language switchers.
+ */
+function LanguageToggleButton({
+  language,
+  onToggle,
+}: {
+  language: "en" | "th";
+  onToggle: () => void;
+}) {
+  const [showTip, setShowTip] = useState(false);
+  const targetLabel = language === "th" ? "English" : "ภาษาไทย";
+  return (
+    <div className="group relative">
+      <button
+        type="button"
+        onClick={onToggle}
+        onMouseEnter={() => setShowTip(true)}
+        onMouseLeave={() => setShowTip(false)}
+        aria-label={targetLabel}
+        className="flex h-[43px] w-[43px] items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-white/10 hover:text-zinc-50 lg:h-[38px] lg:w-[38px]"
+      >
+        <Languages className="h-[14.5px] w-[14.5px]" />
+      </button>
+      {showTip && (
+        <div className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded bg-zinc-900/95 px-2.5 py-1.5 text-[14.5px] text-zinc-200 shadow-lg backdrop-blur">
+          <span>{targetLabel}</span>
         </div>
       )}
     </div>

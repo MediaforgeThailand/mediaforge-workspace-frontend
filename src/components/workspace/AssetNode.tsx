@@ -17,7 +17,6 @@ import {
   Music,
   Box,
   Loader2,
-  Maximize2,
   Eye,
   Download,
   Copy,
@@ -26,14 +25,14 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFreshSignedUrl } from "./useFreshSignedUrl";
-import { PortIcon } from "./PortIcon";
-import { MiniSelect } from "./CompactParamWidgets";
+import { CLEAN_NODE_BODY_TOP_PX, PortIcon } from "./PortIcon";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { AudioPlayButton } from "./AudioPlayButton";
 import { downloadFromUrl } from "./downloadAsset";
 import MediaContextMenu, {
   type MediaContextMenuItem,
 } from "./MediaContextMenu";
+import NodeQuickActionRail from "./NodeQuickActionRail";
 
 export interface AssetNodeData {
   /** Editable label — this is what @-mentions reference. */
@@ -71,23 +70,6 @@ export type ReferenceRole =
   | "style"
   | "object"
   | "pose";
-
-type RoleLabelKey =
-  | "workspace.node.role_general"
-  | "workspace.node.role_subject"
-  | "workspace.node.role_scene"
-  | "workspace.node.role_style"
-  | "workspace.node.role_object"
-  | "workspace.node.role_pose";
-
-const REFERENCE_ROLE_OPTIONS: Array<{ value: ReferenceRole; labelKey: RoleLabelKey }> = [
-  { value: "general", labelKey: "workspace.node.role_general" },
-  { value: "subject", labelKey: "workspace.node.role_subject" },
-  { value: "scene", labelKey: "workspace.node.role_scene" },
-  { value: "style", labelKey: "workspace.node.role_style" },
-  { value: "object", labelKey: "workspace.node.role_object" },
-  { value: "pose", labelKey: "workspace.node.role_pose" },
-];
 
 const PORT_COLOR: Record<AssetNodeData["fieldType"], string> = {
   image: "hsl(160 84% 39%)",
@@ -149,22 +131,10 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
     [id, setNodes],
   );
 
-  const onRoleChange = useCallback(
-    (role: ReferenceRole) => {
-      setNodes((ns) =>
-        ns.map((n) =>
-          n.id === id ? { ...n, data: { ...n.data, referenceType: role } } : n,
-        ),
-      );
-    },
-    [id, setNodes],
-  );
-
   /* ── Manual resize via the bottom-right corner handle ──────
    * Same drag-to-scale gesture WorkspaceToolNode uses. Width
    * drives the layout; the inner image keeps its natural aspect
-   * ratio inside the new card width. Title input + role picker
-   * stay at fixed pixel sizes. */
+   * ratio inside the new card width. */
   const onResizeStart = useCallback(
     (e: React.PointerEvent) => {
       e.preventDefault();
@@ -305,9 +275,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
       // Default tile width — 219 (200 → 230 → 219). Now also
       // user-resizable via the corner handle below; persists in
       // `data.compactWidth` so the card keeps the chosen size
-      // across re-mounts. Inner text (label input, role picker
-      // chip) stays at fixed pixel sizes so the gesture only
-      // enlarges the visual tile.
+      // across re-mounts.
       style={{
         width:
           ((d.compactWidth as number | undefined) ??
@@ -315,6 +283,22 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
       }}
     >
       {/* Floating title — icon + editable name. */}
+      <NodeQuickActionRail
+        visible={selected || isHovered}
+        onDelete={onDeleteNode}
+        nodeId={id}
+        mediaKind={
+          d.uploading
+            ? null
+            : d.fieldType === "image" || d.fieldType === "video"
+              ? d.fieldType
+              : d.fieldType === "audio" || d.fieldType === "model3d"
+                ? d.fieldType
+                : null
+        }
+        bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
+      />
+
       <div className="ws-clean-title">
         <Icon
           className="ws-clean-title-icon text-zinc-400"
@@ -331,14 +315,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
         />
       </div>
 
-      {/* Body — single rounded card holding the preview. The role
-       *  picker used to sit at the TOP as a permanent select chip,
-       *  but team feedback was that it cluttered the asset card
-       *  and looked nothing like the AI-gen tool nodes (whose
-       *  settings live in a hover/select-floating overlay). Moved
-       *  to `.ws-compact-overlay` inside the preview wrapper below
-       *  so it now fades in only on hover/select — same affordance
-       *  as the gen-node settings strip. */}
+      {/* Body — single rounded card holding the preview. */}
       <div
         className={cn(
           "workspace-node-shell ws-clean-body overflow-hidden",
@@ -365,33 +342,6 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
             setContextMenu({ x: event.clientX, y: event.clientY });
           }}
         >
-        {/* Reference role picker — fades in on hover/select via the
-         *  shared `.ws-compact-overlay` rule (same affordance the
-         *  AI-gen tool nodes use for their settings strip). 3D
-         *  models still skip this — they aren't referenced as
-         *  image inputs and a "general / subject / scene" role
-         *  doesn't change downstream behaviour for them. */}
-        {d.fieldType !== "model3d" && (selected || isHovered) && (
-          <div className="ws-compact-overlay">
-            <div className="ws-compact-toolbar">
-              {/* Reference role picker — shares the Radix-based
-               *  MiniSelect with every AI-gen tool node so the look /
-               *  open animation / dropdown chrome match exactly.
-               *  (The native <select> here used to render with the
-               *  OS picker which felt out-of-place against the
-               *  custom-styled gen-node settings.) */}
-              <MiniSelect
-                value={d.referenceType ?? "general"}
-                options={REFERENCE_ROLE_OPTIONS.map((o) => o.value)}
-                optionLabels={Object.fromEntries(
-                  REFERENCE_ROLE_OPTIONS.map((o) => [o.value, t(o.labelKey)]),
-                )}
-                onChange={(v) => onRoleChange(v as ReferenceRole)}
-                truncateAt={28}
-              />
-            </div>
-          </div>
-        )}
         {livePreviewUrl ? (
           d.fieldType === "model3d" ? (
             // 3D models render as a STATIC poster on the canvas —
@@ -467,12 +417,6 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
             {i18n("workspace.assetNode.noPreview")}
           </div>
         )}
-        {/* Expand affordance on hover */}
-        {!d.uploading && d.previewUrl && (
-          <div className="pointer-events-none absolute right-1.5 top-1.5 rounded bg-black/60 p-1 opacity-0 transition-opacity group-hover:opacity-100">
-            <Maximize2 className="h-3 w-3 text-white/80" />
-          </div>
-        )}
         {d.uploading && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/40">
             <Loader2 className="h-4 w-4 animate-spin text-white/80" />
@@ -492,6 +436,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
         portType={d.fieldType}
         color={PORT_COLOR[d.fieldType]}
         index={0}
+        bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
       />
 
       {/* Bottom-right corner resize handle — drag to scale the

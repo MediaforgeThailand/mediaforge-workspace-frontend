@@ -56,6 +56,7 @@ import type { WirePortType } from "./workspaceSchema";
 
 export const PORT_GAP_PX = 36;
 export const PORT_INSET_PX = 16;
+export const CLEAN_NODE_BODY_TOP_PX = 36;
 
 const ICON_BY_TYPE: Record<WirePortType, LucideIcon> = {
   image: ImageIcon,
@@ -83,6 +84,8 @@ interface PortIconProps {
   index: number;
   /** Optional override (e.g. a different glyph for a special role). */
   icon?: LucideIcon;
+  /** Extra vertical offset for nodes with a floating title above the body. */
+  bodyTopOffsetPx?: number;
 }
 
 export function PortIcon({
@@ -93,6 +96,7 @@ export function PortIcon({
   color,
   index,
   icon,
+  bodyTopOffsetPx = 0,
 }: PortIconProps) {
   const Icon = icon ?? ICON_BY_TYPE[portType];
   const side = dir === "target" ? "left" : "right";
@@ -120,7 +124,7 @@ export function PortIcon({
     style.right = "0";
     style.left = "auto";
     style.bottom = "auto";
-    style.top = `${offset}px`;
+    style.top = `${offset + bodyTopOffsetPx}px`;
   }
 
   /* Detect whether THIS handle has a wire attached. Connected

@@ -148,7 +148,7 @@ const WorkspaceCanvasPagePill = () => {
 
   return (
     <div
-      className="fixed bottom-4 left-[116px] z-50"
+      className="fixed bottom-4 left-4 z-50"
       style={{
         fontFamily: "var(--font-sans)",
       }}
@@ -159,21 +159,21 @@ const WorkspaceCanvasPagePill = () => {
             type="button"
             aria-label={t("workspace.pill.aria_switch", { name: activeName })}
             className={cn(
-              "group flex h-11 items-center gap-2 rounded-full bg-zinc-900/85 px-4 text-[12px] text-zinc-100 shadow-lg shadow-black/40 backdrop-blur transition-all lg:h-9 lg:px-3",
+              "group flex h-8 items-center gap-1.5 rounded-full bg-zinc-900/88 px-3 text-[12px] leading-none text-zinc-100 shadow-lg shadow-black/40 backdrop-blur transition-all",
               "hover:-translate-y-0.5 hover:bg-zinc-800/90 hover:shadow-xl",
               open &&
                 "bg-zinc-800/90 -translate-y-0.5 shadow-xl",
             )}
           >
             <FolderOpen className="h-3.5 w-3.5 shrink-0 text-zinc-300" />
-            <span className="max-w-[140px] truncate">{activeName}</span>
+            <span className="max-w-[122px] truncate">{activeName}</span>
 
             {/* Page-count hint when there's more than one page so the
              *  user knows there's something to open. */}
             {totalPages > 1 && (
               <span
                 className={cn(
-                  "shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 font-mono text-[9px] tabular-nums text-zinc-300",
+                  "shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-zinc-300",
                 )}
                 aria-label={t("workspace.pill.aria_count", { count: totalPages })}
               >
@@ -200,16 +200,16 @@ const WorkspaceCanvasPagePill = () => {
           align="start"
           sideOffset={8}
           className={cn(
-            "w-72 border-zinc-800 bg-zinc-950/95 p-1 text-zinc-100 shadow-2xl shadow-black/50 backdrop-blur lg:w-64",
+            "w-[212px] border-zinc-800 bg-zinc-950/96 p-1 text-zinc-100 shadow-2xl shadow-black/50 backdrop-blur",
             "animate-in fade-in-0 slide-in-from-bottom-2 duration-150",
           )}
         >
-          <div className="px-2 pb-1 pt-1.5 text-[10px] uppercase tracking-wider text-zinc-500">
+          <div className="px-2 pb-1 pt-1.5 text-[11px] uppercase tracking-wide text-zinc-500">
             {t("workspace.pill.pages_in_workspace")}
           </div>
 
           {/* Page list — scrolls if there are many pages. */}
-          <div className="max-h-[min(320px,calc(100vh-9rem))] overflow-y-auto lg:max-h-[240px]">
+          <div className="max-h-[min(220px,calc(100vh-8rem))] overflow-y-auto">
             {canvases.map((c) => {
               const isActive = c.id === currentId;
               const isEditing = editingId === c.id;
@@ -222,7 +222,7 @@ const WorkspaceCanvasPagePill = () => {
                   onClick={() => !isEditing && openTab(c.id)}
                   onDoubleClick={(e) => canMutate && startRename(c.id, c.name, e)}
                   className={cn(
-                    "group relative flex min-h-11 cursor-pointer items-center gap-1.5 rounded px-2 text-[12px] transition-colors lg:min-h-8",
+                    "group relative flex min-h-7 cursor-pointer items-center gap-1.5 rounded px-2 text-[12px] leading-none transition-colors",
                     isActive
                       ? "bg-white/10 text-zinc-50"
                       : "text-zinc-300 hover:bg-white/5 hover:text-zinc-100",
@@ -253,7 +253,7 @@ const WorkspaceCanvasPagePill = () => {
                       }}
                       onClick={(e) => e.stopPropagation()}
                       onDoubleClick={(e) => e.stopPropagation()}
-                      className="min-w-0 flex-1 bg-transparent text-[12px] text-zinc-100 outline-none"
+                      className="min-w-0 flex-1 bg-transparent text-[12.5px] text-zinc-100 outline-none"
                     />
                   ) : (
                     <span className="min-w-0 flex-1 truncate">{c.name}</span>
@@ -278,7 +278,7 @@ const WorkspaceCanvasPagePill = () => {
                       <button
                         type="button"
                         onClick={(e) => startRename(c.id, c.name, e)}
-                        className="flex h-9 w-9 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 lg:h-auto lg:w-auto lg:p-1"
+                        className="flex h-7 w-7 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 lg:h-auto lg:w-auto lg:p-0.5"
                         title={t("workspace.pill.rename")}
                         aria-label={t("workspace.pill.rename")}
                       >
@@ -287,7 +287,7 @@ const WorkspaceCanvasPagePill = () => {
                       <button
                         type="button"
                         onClick={(e) => closeTab(c.id, e)}
-                        className="flex h-9 w-9 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-rose-300 lg:h-auto lg:w-auto lg:p-1"
+                        className="flex h-7 w-7 items-center justify-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-rose-300 lg:h-auto lg:w-auto lg:p-0.5"
                         title={t("workspace.pill.delete")}
                         aria-label={t("workspace.pill.delete")}
                       >
@@ -305,7 +305,7 @@ const WorkspaceCanvasPagePill = () => {
             <button
               type="button"
               onClick={newTab}
-              className="flex h-11 w-full items-center gap-1.5 rounded px-2 text-[12px] text-zinc-300 transition-colors hover:bg-white/5 hover:text-zinc-100 lg:h-8"
+              className="flex h-7 w-full items-center gap-1.5 rounded px-2 text-[12px] leading-none text-zinc-300 transition-colors hover:bg-white/5 hover:text-zinc-100"
             >
               <Plus className="h-3.5 w-3.5" />
               {t("workspace.pill.new_page")}

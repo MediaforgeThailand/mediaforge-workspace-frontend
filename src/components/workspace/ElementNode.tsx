@@ -35,7 +35,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useFreshSignedUrl } from "./useFreshSignedUrl";
-import { PortIcon } from "./PortIcon";
+import { CLEAN_NODE_BODY_TOP_PX, PortIcon } from "./PortIcon";
+import NodeQuickActionRail from "./NodeQuickActionRail";
 
 const IMAGE_COLOR = "hsl(160 84% 39%)";
 const ELEMENT_COLOR = "hsl(328 86% 70%)";
@@ -88,6 +89,9 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
     },
     [id, setNodes],
   );
+  const onDeleteNode = useCallback(() => {
+    setNodes((ns) => ns.filter((n) => n.id !== id));
+  }, [id, setNodes]);
 
   /** Gather ref URLs by walking incoming edges in creator mode. */
   const wiredRefs = useMemo(() => {
@@ -177,6 +181,14 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
       style={{ width }}
     >
       {/* Floating title — icon + name (+ saved-badge). */}
+      <NodeQuickActionRail
+        visible={selected}
+        onDelete={onDeleteNode}
+        nodeId={id}
+        mediaKind={null}
+        bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
+      />
+
       <div className="ws-clean-title">
         <Users className="ws-clean-title-icon text-zinc-400" />
         <input
@@ -336,6 +348,7 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
         portType="element"
         color={ELEMENT_COLOR}
         index={0}
+        bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
       />
     </div>
   );

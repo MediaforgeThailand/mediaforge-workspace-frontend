@@ -106,6 +106,9 @@ const ITEMS: PaletteItem[] = [
   },
 ];
 
+const HIDDEN_ITEM_TYPES = new Set(["mergeAudioNode", "videoToPromptNode"]);
+const VISIBLE_ITEMS = ITEMS.filter((item) => !HIDDEN_ITEM_TYPES.has(item.type));
+
 const onDragStart = (e: React.DragEvent, type: string, label: string) => {
   e.dataTransfer.setData("application/reactflow-type", type);
   e.dataTransfer.setData("application/reactflow-label", label);
@@ -115,7 +118,7 @@ const onDragStart = (e: React.DragEvent, type: string, label: string) => {
 const WorkspaceToolPalette = () => {
   return (
     <aside className="ws-tool-palette flex h-full w-[52px] shrink-0 flex-col items-center gap-1 bg-zinc-950 py-2">
-      {ITEMS.map((item) => (
+      {VISIBLE_ITEMS.map((item) => (
         <PaletteIcon key={item.type} item={item} />
       ))}
     </aside>
