@@ -51,6 +51,16 @@ const SEEDANCE_VIDEO_REF_MODELS = [
   "seedance-2-0-lite",
   "seedance-2-0-pro",
 ] as const;
+const SEEDANCE_AUDIO_MODELS = [
+  "seedance-1-5-pro-251215",
+  ...SEEDANCE_VIDEO_REF_MODELS,
+] as const;
+const SEEDANCE_1080P_MODELS = [
+  "seedance-1-0-pro-250528",
+  "seedance-1-0-pro-fast-251015",
+  "seedance-1-5-pro-251215",
+] as const;
+const SEEDANCE_720P_MAX_MODELS = [...SEEDANCE_VIDEO_REF_MODELS] as const;
 /** Google Veo (Standard tier only). Backend dispatches anything
  *  starting with "veo-" to the Gemini API `predictLongRunning`
  *  endpoint. Real spec verified against
@@ -588,7 +598,15 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         type: "select",
         options: ["480p", "720p", "1080p"],
         default: "720p",
-        supportedModels: [...SEEDANCE_MODELS],
+        supportedModels: [...SEEDANCE_1080P_MODELS],
+      },
+      {
+        key: "resolution",
+        label: "Resolution",
+        type: "select",
+        options: ["480p", "720p"],
+        default: "720p",
+        supportedModels: [...SEEDANCE_720P_MAX_MODELS],
       },
       {
         // Veo 3.1 supports 720p / 1080p (4k is gated). Picking 1080p
@@ -705,7 +723,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         options: ["false", "true"],
         optionLabels: { "false": "No Audio", "true": "With Audio" },
         default: "false",
-        supportedModels: [...SEEDANCE_MODELS],
+        supportedModels: [...SEEDANCE_AUDIO_MODELS],
       },
       {
         key: "character_orientation",

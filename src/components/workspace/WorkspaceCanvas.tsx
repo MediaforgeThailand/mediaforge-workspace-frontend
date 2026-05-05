@@ -258,6 +258,39 @@ const VIDEO_TARGETS = new Set([
 const AUDIO_TARGETS = new Set(["audio", "ref_audio"]);
 const ELEMENT_TARGETS = new Set(["elements", "element"]);
 const MODEL3D_TARGETS = new Set(["model3d", "model_3d", "ref_model"]);
+const SEEDANCE_V2_KEYFRAME_TARGETS = new Set(["start_frame", "end_frame"]);
+const SEEDANCE_V2_REFERENCE_TARGETS = new Set(["reference_image", "ref_video", "ref_image", "ref_audio"]);
+
+function isSeedanceV2VideoModel(model: string | undefined): boolean {
+  const m = String(model ?? "").toLowerCase();
+  return m.startsWith("seedance-2-0") || m.startsWith("dreamina-seedance-2-0");
+}
+
+function seedanceV2InputMode(handleId: string | null | undefined): "keyframe" | "reference" | null {
+  const h = String(handleId ?? "");
+  if (SEEDANCE_V2_KEYFRAME_TARGETS.has(h)) return "keyframe";
+  if (SEEDANCE_V2_REFERENCE_TARGETS.has(h)) return "reference";
+  return null;
+}
+
+function hasSeedanceV2ModeConflict(args: {
+  targetNode: Node | undefined;
+  selectedModel: string;
+  targetHandle: string | null | undefined;
+  edges: ReadonlyArray<Edge>;
+}): boolean {
+  if (args.targetNode?.type !== "videoGenNode" || !isSeedanceV2VideoModel(args.selectedModel)) {
+    return false;
+  }
+  const nextMode = seedanceV2InputMode(args.targetHandle);
+  if (!nextMode) return false;
+  const hasOppositeMode = args.edges.some((edge) => {
+    if (edge.target !== args.targetNode?.id) return false;
+    const mode = seedanceV2InputMode(edge.targetHandle);
+    return mode !== null && mode !== nextMode;
+  });
+  return hasOppositeMode;
+}
 
 /**
  * Module-level stable empty arrays. Zustand selectors return these
@@ -1743,7 +1776,17 @@ const Inner = () => {
               (e) => e.target === tgtNodeId && e.targetHandle === tgtHandle,
             ).length;
 
-            if (existing >= max) {
+            const seedanceConflict = hasSeedanceV2ModeConflict({
+              targetNode: tgt,
+              selectedModel,
+              targetHandle: tgtHandle,
+              edges: allEdges,
+            });
+
+            if (seedanceConflict) {
+              reason =
+                "Seedance 2.0 uses either start/end frames or reference media, not both. Remove the other Seedance input first.";
+            } else if (existing >= max) {
               reason = `Port "${portLabel}" is full — accepts max ${max} connection(s) for ${selectedModel}.`;
             } else if (src?.type === "groupNode") {
               // Group → count children of the dragged port's type and
@@ -1939,6 +1982,16 @@ const Inner = () => {
       const schema = tgt ? getWorkspaceSchema(tgt.type ?? "") : undefined;
       if (schema && tgt) {
         const selectedModel = nodeModelName(tgt, schema.defaultModel);
+        if (
+          hasSeedanceV2ModeConflict({
+            targetNode: tgt,
+            selectedModel,
+            targetHandle: conn.targetHandle,
+            edges: edgeList,
+          })
+        ) {
+          return false;
+        }
         // Find the visible variant of this handle for the active model
         // (handles can be split per provider, e.g. ref_image with
         // different maxConnections for Banana 14 vs OpenAI 16).

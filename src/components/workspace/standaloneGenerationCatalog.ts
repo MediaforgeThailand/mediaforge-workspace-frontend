@@ -420,6 +420,29 @@ export function isSeedanceVideoModel(model: string): boolean {
   return model.startsWith("seedance") || model.startsWith("dreamina-seedance");
 }
 
+export function isSeedance20VideoModel(model: string): boolean {
+  return (
+    model === "seedance-2-0-lite" ||
+    model === "seedance-2-0-pro" ||
+    model === "dreamina-seedance-2-0-fast-260128" ||
+    model === "dreamina-seedance-2-0-260128"
+  );
+}
+
+export function seedanceVideoSupportsAudio(model: string): boolean {
+  return (
+    model.startsWith("seedance-1-5") ||
+    model.startsWith("seedance-2-0") ||
+    model.startsWith("dreamina-seedance-2-0")
+  );
+}
+
+export function seedanceResolutionOptionsForModel(model: string): string[] {
+  if (isSeedance20VideoModel(model)) return ["480p", "720p"];
+  if (isSeedanceVideoModel(model)) return ["480p", "720p", "1080p"];
+  return [];
+}
+
 export function isKlingMotionVideoModel(model: string): boolean {
   return model === "kling-v2-6-motion-pro" || model === "kling-v3-motion-pro";
 }
@@ -642,13 +665,17 @@ export function buildVideoParams(args: {
     };
   }
   if (isSeedanceVideoModel(args.model)) {
+    const seedanceResOptions = seedanceResolutionOptionsForModel(args.model);
+    const resolution = seedanceResOptions.includes(args.resolution)
+      ? args.resolution
+      : (seedanceResOptions[seedanceResOptions.length - 1] ?? "720p");
     return {
       model_name: args.model,
       prompt: args.prompt.trim(),
       ratio: args.ratio === "Auto" ? "16:9" : args.ratio,
-      resolution: args.resolution,
+      resolution,
       duration: args.duration,
-      generate_audio: String(args.withAudio),
+      generate_audio: seedanceVideoSupportsAudio(args.model) ? String(args.withAudio) : "false",
       return_last_frame: String(!!args.returnLastFrame),
       _has_ref_video: hasReferenceVideo,
     };

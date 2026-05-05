@@ -64,6 +64,8 @@ import {
   GPT_IMAGE_ASPECT_RATIOS,
   IMAGE_STYLE_PRESETS,
   isKlingMotionVideoModel,
+  seedanceResolutionOptionsForModel,
+  seedanceVideoSupportsAudio,
   isSeedanceVideoModel,
   isSeedreamImageModel,
   isVeoVideoModel,
@@ -926,6 +928,10 @@ export default function StandaloneGenerator({
           ? 5
           : (durations[0] ?? 5);
       }
+      const resolutionOptions = videoResolutionOptionsForModel(model);
+      if (resolutionOptions.length > 0 && !resolutionOptions.includes(form.videoResolution)) {
+        nextPatch.videoResolution = resolutionOptions[resolutionOptions.length - 1] ?? "720p";
+      }
       if (!supportsFrames) {
         nextPatch.videoStart = null;
       }
@@ -942,6 +948,7 @@ export default function StandaloneGenerator({
       if (!model.startsWith("kling")) nextPatch.videoNegativePrompt = "";
       if (!isVeoVideoModel(model)) nextPatch.videoPersonGeneration = "allow_adult";
       if (!isSeedance) nextPatch.videoReturnLastFrame = false;
+      if (isSeedance && !seedanceVideoSupportsAudio(model)) nextPatch.videoWithAudio = false;
       if (model !== "kling-v3-omni") {
         nextPatch.videoMultiShot = false;
         nextPatch.videoMultiPrompt = "";
@@ -3076,6 +3083,10 @@ function VideoControls({
   const { t } = useLanguage();
   const isSeedance = isSeedanceVideoModel(form.model);
   const isMotion = isKlingMotionVideoModel(form.model);
+  const isVeo = isVeoVideoModel(form.model);
+  const supportsAudioToggle =
+    (isSeedance && seedanceVideoSupportsAudio(form.model)) ||
+    (!isSeedance && !isVeo && !isMotion);
   const supportsStartEnd = videoSupportsStartEndFrames(form.model);
   const supportsRefImage = videoSupportsReferenceImage(form.model);
   const supportsRefVideo = videoSupportsReferenceVideo(form.model);
@@ -3183,7 +3194,7 @@ function VideoControls({
             <SelectField
               label={t("workspace.standalone.resolution")}
               value={form.videoResolution}
-              options={["480p", "720p", "1080p"]}
+              options={videoResolutionOptionsForModel(form.model)}
               onChange={(videoResolution) => onChange({ videoResolution })}
             />
           )}
@@ -3203,7 +3214,7 @@ function VideoControls({
           />
         </div>
       )}
-      {!isMotion && (
+      {supportsAudioToggle && (
         <ToggleRow
           label={t("workspace.standalone.generate_audio")}
           checked={form.videoWithAudio}
@@ -5481,7 +5492,7 @@ function videoRatioOptionsForModel(model: string): string[] {
 }
 
 function videoResolutionOptionsForModel(model: string): string[] {
-  if (isSeedanceVideoModel(model)) return ["480p", "720p", "1080p"];
+  if (isSeedanceVideoModel(model)) return seedanceResolutionOptionsForModel(model);
   if (isVeoVideoModel(model)) return ["720p", "1080p"];
   return [];
 }
@@ -5532,7 +5543,12 @@ function videoModelSettingTags(model: string, language: "en" | "th"): Array<{
     });
   }
 
-  if (isVeo || (!isMotion && (model.startsWith("kling") || isSeedanceVideoModel(model)))) {
+  if (
+    isVeo ||
+    (!isMotion &&
+      (model.startsWith("kling") ||
+        (isSeedanceVideoModel(model) && seedanceVideoSupportsAudio(model))))
+  ) {
     tags.push({ label: standaloneInlineLabel("audio", language), icon: "audio" });
   }
 
@@ -5578,6 +5594,9 @@ function buildVideoPanelSettings({
   const isSeedance = isSeedanceVideoModel(form.model);
   const isMotion = isKlingMotionVideoModel(form.model);
   const isVeo = isVeoVideoModel(form.model);
+  const supportsAudioToggle =
+    (isSeedance && seedanceVideoSupportsAudio(form.model)) ||
+    (!isSeedance && !isVeo && !isMotion);
 
   if (isVeo) {
     settings.push({
@@ -5586,7 +5605,7 @@ function buildVideoPanelSettings({
       value: standaloneInlineLabel("on", language),
       kind: "readonly",
     });
-  } else if (!isMotion) {
+  } else if (supportsAudioToggle) {
     settings.push({
       id: "audio",
       label: standaloneInlineLabel("audio", language),

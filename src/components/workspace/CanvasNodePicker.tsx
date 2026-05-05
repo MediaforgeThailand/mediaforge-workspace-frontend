@@ -142,6 +142,7 @@ const CATALOG: CatalogEntry[] = [
       { id: "start_frame", type: "image", hint: "→ start frame" },
       { id: "end_frame", type: "image", hint: "→ end frame" },
       { id: "ref_image", type: "image", hint: "→ ref image" },
+      { id: "reference_image", type: "image", hint: "→ reference image" },
       { id: "ref_video", type: "video", hint: "→ ref video" },
       { id: "elements", type: "element", hint: "→ elements" },
     ],

@@ -100,6 +100,11 @@ const PROMPT_TOP_RESERVE_MIN = 52;
 const PROMPT_MIN_EDIT_H = 38;
 const PROMPT_MAX_EDIT_H = 240;
 
+function isSeedanceV2VideoModel(model: string | undefined): boolean {
+  const m = String(model ?? "").toLowerCase();
+  return m.startsWith("seedance-2-0") || m.startsWith("dreamina-seedance-2-0");
+}
+
 function computePromptMaxHeight(previewHeight: number, toolbarHeight: number): number {
   const liftedBottom = Math.ceil(toolbarHeight) + PROMPT_TOOLBAR_GAP;
   const topReserve = Math.max(
@@ -795,8 +800,15 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       const mentionedImage = mentioned.find(
         (m) => m.kind === "asset" && m.fieldType === "image" && m.url,
       );
-      if (mentionedImage && !inputs.ref_image) {
-        inputs.ref_image = mentionedImage.url;
+      if (mentionedImage) {
+        if (schemaKey === "videoGenNode" && isSeedanceV2VideoModel(selectedModel)) {
+          const alreadyInKeyframeMode = Boolean(inputs.start_frame || inputs.end_frame);
+          if (!alreadyInKeyframeMode && !inputs.reference_image) {
+            inputs.reference_image = mentionedImage.url;
+          }
+        } else if (!inputs.ref_image) {
+          inputs.ref_image = mentionedImage.url;
+        }
       }
 
       log({
