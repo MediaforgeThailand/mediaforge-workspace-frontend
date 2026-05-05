@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { ensureMediaForgeFilename } from "./downloadAsset";
 
 interface StockResource {
   id: number | string;
@@ -223,7 +224,7 @@ function userStockError(err: unknown, fallback: string): string {
 function triggerDownload(url: string, filename: string) {
   const link = document.createElement("a");
   link.href = url;
-  link.download = filename;
+  link.download = ensureMediaForgeFilename(filename, "bin");
   link.target = "_blank";
   link.rel = "noreferrer";
   document.body.appendChild(link);

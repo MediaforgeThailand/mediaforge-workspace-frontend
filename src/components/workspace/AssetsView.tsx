@@ -1227,7 +1227,13 @@ function AssetCard({
       key: "download",
       label: t("workspace.mediaMenu.download"),
       icon: Download,
-      onSelect: () => void downloadFromUrl(asset.url, modelLabel),
+      onSelect: () =>
+        void downloadFromUrl(
+          asset.url,
+          asset.source === "generation"
+            ? asset.prompt || t("workspace.assets.gen_fallback")
+            : asset.name,
+        ),
     },
     {
       key: "duplicate",

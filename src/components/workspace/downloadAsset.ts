@@ -89,6 +89,7 @@ export function buildDownloadFilename(
   ext: string,
   index?: number,
 ): string {
+  const cleanExt = (ext || "bin").replace(/^\.+/, "").replace(/[^a-z0-9]+/gi, "").toLowerCase() || "bin";
   const safe =
     rawName
       .normalize("NFKC")
@@ -97,7 +98,18 @@ export function buildDownloadFilename(
       .replace(/^-+|-+$/g, "")
       .slice(0, 60) || "asset";
   const idx = typeof index === "number" ? `-${index + 1}` : "";
-  return `mediaforge_${safe}${idx}.${ext}`;
+  return `mediaforge_${safe}${idx}.${cleanExt}`;
+}
+
+export function ensureMediaForgeFilename(filename: string, fallbackExt = "bin"): string {
+  const raw = (filename || "").trim();
+  const extMatch = raw.match(/\.([a-z0-9]{2,5})$/i);
+  const ext = extMatch?.[1] ?? fallbackExt;
+  const base = raw.replace(/\.[a-z0-9]{2,5}$/i, "");
+  if (/^mediaforge[_-]/i.test(base) && extMatch) {
+    return buildDownloadFilename(base.replace(/^mediaforge[_-]/i, ""), ext);
+  }
+  return buildDownloadFilename(base || "asset", ext);
 }
 
 /** Build the timestamped filename for the multi-download ZIP bundle.
@@ -165,7 +177,7 @@ export function triggerBlobDownload(blob: Blob, filename: string): void {
 function triggerAnchor(href: string, filename: string): void {
   const a = document.createElement("a");
   a.href = href;
-  a.download = filename;
+  a.download = ensureMediaForgeFilename(filename, extFromUrl(filename));
   a.rel = "noopener";
   // Some browsers (Safari) need the anchor in the DOM before .click().
   document.body.appendChild(a);

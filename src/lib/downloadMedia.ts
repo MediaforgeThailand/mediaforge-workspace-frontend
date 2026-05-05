@@ -34,6 +34,20 @@ function resolveExt(blob: Blob, url: string): string {
   return extFromUrl(url);
 }
 
+function mediaForgeName(filename: string, ext: string): string {
+  const base =
+    filename
+      .replace(/\.[^.]+$/, "")
+      .normalize("NFKC")
+      .replace(/^mediaforge[_-]/i, "")
+      .replace(/[^\p{L}\p{N}_-]+/gu, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "asset";
+  const cleanExt = (ext || "bin").replace(/^\.+/, "").replace(/[^a-z0-9]+/gi, "").toLowerCase() || "bin";
+  return `mediaforge_${base}.${cleanExt}`;
+}
+
 /**
  * Download a media file as a Blob with a strict filename extension.
  *
@@ -52,7 +66,7 @@ export async function downloadMedia(
 
     const blob = await res.blob();
     const ext = forceExt || resolveExt(blob, url);
-    const safeName = `${filename.replace(/\.[^.]+$/, "")}.${ext}`;
+    const safeName = mediaForgeName(filename, ext);
 
     const objectUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -105,7 +119,7 @@ export async function downloadImageAsPng(
 
             // 4. Trigger download with the real PNG blob
             const pngUrl = URL.createObjectURL(pngBlob);
-            const safeName = `${filename.replace(/\.[^.]+$/, "")}.png`;
+            const safeName = mediaForgeName(filename, "png");
             const a = document.createElement("a");
             a.href = pngUrl;
             a.download = safeName;
