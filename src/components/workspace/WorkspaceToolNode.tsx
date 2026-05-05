@@ -19,6 +19,7 @@ import {
   useReactFlow,
   useUpdateNodeInternals,
 } from "@xyflow/react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ChevronLeft, ChevronRight, Film, Loader2, Play, RotateCw, Sparkles, Scissors, Combine, FileVideo,
   Maximize2, Box, Image as ImageIcon, Music,
@@ -82,6 +83,7 @@ import {
 import { cleanModelLabelMap } from "./modelDisplay";
 
 const RUN_EDGE_FUNCTION = "workspace-run-node";
+const DEFAULT_WORKSPACE_INFRASTRUCTURE_BUFFER_PERCENT = 40;
 const MAX_VISIBLE_RUN_MS = 30 * 60_000;
 const STALE_RUN_GRACE_MS = 30_000;
 const MULTI_GEN_MAX = 3;
@@ -113,6 +115,18 @@ function computePromptMaxHeight(previewHeight: number, toolbarHeight: number): n
   );
   const available = Math.floor(previewHeight - liftedBottom - topReserve);
   return Math.max(PROMPT_MIN_EDIT_H, Math.min(available, PROMPT_MAX_EDIT_H));
+}
+
+function workspaceCostMultiplierForNode(
+  schemaKey: string,
+  model: string,
+  workspaceMultiplier: number,
+): number {
+  // Gemini TTS still routes through the legacy text-to-speech function, which
+  // owns its own credit deduction path. Keep the canvas estimate aligned with
+  // standalone tools until that backend path is moved under workspace pricing.
+  if (schemaKey === "audioGenNode" && model.startsWith("gemini-")) return 1;
+  return workspaceMultiplier;
 }
 
 const NEW_ID = (): string =>
@@ -2026,10 +2040,29 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   // visibleOutputs drive the bubbles directly.
 
   const { data: creditCosts, isLoading: creditCostsLoading } = useCreatorCreditCosts();
+  const { data: workspaceCreditMultiplier = 1 + DEFAULT_WORKSPACE_INFRASTRUCTURE_BUFFER_PERCENT / 100 } =
+    useQuery({
+      queryKey: ["workspace-credit-multiplier"],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from("subscription_settings")
+          .select("value")
+          .eq("key", "workspace_infrastructure_buffer_percent")
+          .maybeSingle();
+        if (error) throw new Error(error.message);
+        const parsed = Number(data?.value);
+        const bufferPercent =
+          Number.isFinite(parsed) && parsed >= 0
+            ? parsed
+            : DEFAULT_WORKSPACE_INFRASTRUCTURE_BUFFER_PERCENT;
+        return 1 + bufferPercent / 100;
+      },
+      staleTime: 1000 * 60 * 5,
+    });
   const isMotionModel = selectedModel.includes("motion");
   const showsDurationCost = DURATION_COST_MODELS.has(selectedModel);
 
-  const nodeCost = useMemo(() => {
+  const baseNodeCost = useMemo(() => {
     if (!creditCosts || !schema) return null;
     if (isMotionModel) {
       const perSecond = creditCosts.find(
@@ -2042,6 +2075,17 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     }
     return calculateNodeCost({ schemaKey, params, creditCosts });
   }, [creditCosts, isMotionModel, params, schema, schemaKey, selectedModel]);
+
+  const nodeCost = useMemo(() => {
+    if (baseNodeCost == null) return null;
+    if (baseNodeCost <= 0) return 0;
+    const multiplier = workspaceCostMultiplierForNode(
+      schemaKey,
+      selectedModel,
+      workspaceCreditMultiplier,
+    );
+    return Math.max(1, Math.ceil(baseNodeCost * multiplier));
+  }, [baseNodeCost, schemaKey, selectedModel, workspaceCreditMultiplier]);
 
   const costSuffix = isMotionModel
     ? "/s"

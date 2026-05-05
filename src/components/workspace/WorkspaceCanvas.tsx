@@ -82,6 +82,7 @@ import NodeContextMenu, {
 import {
   Copy as CtxCopyIcon,
   Download as CtxDownloadIcon,
+  Eye as CtxEyeIcon,
   Files as CtxFilesIcon,
   FileArchive as CtxFileArchiveIcon,
   Trash2 as CtxTrash2Icon,
@@ -1046,6 +1047,16 @@ const Inner = () => {
     void downloadFromUrl(downloadable.url, downloadable.label);
   }, [t]);
 
+  const onCtxPreview = useCallback((node: Node) => {
+    const all = useWorkspaceStore.getState().current?.nodes ?? [];
+    const p = getNodePreview(node, all);
+    if (!p) {
+      toast.error("No preview available");
+      return;
+    }
+    setPreview(p);
+  }, []);
+
   const onCtxDownloadAllGenerations = useCallback(async (node: Node) => {
     const refs = harvestAssetsFromNode(node);
     if (refs.length === 0) {
@@ -1171,6 +1182,8 @@ const Inner = () => {
 
     if (targets.length === 1) {
       const node = targets[0];
+      const allNodes = useWorkspaceStore.getState().current?.nodes ?? [];
+      const previewPayload = getNodePreview(node, allNodes);
       const downloadable = getNodeDownloadable(node);
       const data = (node.data ?? {}) as Record<string, unknown>;
       const gens = Array.isArray(data.generations)
@@ -1178,9 +1191,17 @@ const Inner = () => {
         : [];
       const items: NodeContextMenuItem[] = [
         {
+          key: "preview",
+          label: "Preview",
+          icon: CtxEyeIcon,
+          disabled: !previewPayload,
+          onSelect: () => onCtxPreview(node),
+        },
+        {
           key: "download",
           label: t("workspace.nodemenu.download"),
           icon: CtxDownloadIcon,
+          separatorBefore: true,
           disabled: !downloadable,
           onSelect: () => onCtxDownloadSingle(node),
         },
@@ -1243,6 +1264,7 @@ const Inner = () => {
   }, [
     nodeContextMenu,
     onCtxDownloadSingle,
+    onCtxPreview,
     onCtxDownloadAllGenerations,
     onCtxDownloadZip,
     onCtxDuplicate,

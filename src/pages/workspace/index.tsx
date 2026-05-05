@@ -109,20 +109,6 @@ import {
   type ClassMembershipInfo,
 } from "@/hooks/useIsOrgUser";
 import ActiveClassPicker from "@/components/ActiveClassPicker";
-import featureImageGen from "@/assets/feature-image-gen.jpg";
-import featureVideoGen from "@/assets/feature-video-gen.jpg";
-import proTrendFantasyWarrior from "@/assets/pro-trend-fantasy-warrior.jpg";
-import proTrendProduct from "@/assets/pro-trend-product.jpg";
-import proTrendSpaceCat from "@/assets/pro-trend-space-cat.jpg";
-import proTrendSynthwave from "@/assets/pro-trend-synthwave.jpg";
-import showcaseCommercial from "@/assets/showcase-commercial.jpg";
-import showcaseCouple from "@/assets/showcase-couple.jpg";
-import showcaseFashionWinter from "@/assets/showcase-fashion-winter.jpg";
-import showcaseGownStairs from "@/assets/showcase-gown-stairs.jpg";
-import showcaseMiniature from "@/assets/showcase-miniature.jpg";
-import showcasePartyGirls from "@/assets/showcase-party-girls.jpg";
-import tplCinematic from "@/assets/tpl-cinematic.jpg";
-import tplCyberpunk from "@/assets/tpl-cyberpunk.jpg";
 
 /* ════════════════════════════════════════════════════════════
  * Types + helpers
@@ -972,118 +958,73 @@ const HOME_TOOLS: HomeTool[] = STANDALONE_TOOL_ORDER.map((key) => {
   };
 });
 
-interface LatestAIModelCard {
-  id: string;
-  title: string;
-  titleAccent?: string;
-  subtitle: string;
-  image: string;
-  section: Section;
-}
-
-const LATEST_AI_MODELS: LatestAIModelCard[] = [
-  {
-    id: "smart-shot",
-    title: "Smart Shot - One Prompt. Full Shot Plan. Cinematic Video.",
-    subtitle: "Storyboard-ready video generation",
-    image: showcaseCommercial,
-    section: "video_gen",
-  },
-  {
-    id: "gpt-image-2",
-    title: "GPT Image 2.0 - A New Era of Image Generation",
-    subtitle: "Advanced image generation with precise text",
-    image: featureImageGen,
-    section: "image_gen",
-  },
-  {
-    id: "seedance-2",
-    title: "Seedance 2.0 - The World's Most Powerful Video Model",
-    subtitle: "Multi-modal AI video generation",
-    image: featureVideoGen,
-    section: "video_gen",
-  },
-];
-
 interface HomeInspiration {
   id: string;
   title: string;
-  image: string;
+  src: string;
   kind: "image" | "video";
 }
 
 const HOME_INSPIRATIONS: HomeInspiration[] = [
   {
-    id: "shadow-hero",
-    title: "Shadow Hero",
-    image: tplCinematic,
+    id: "thumbnail-ui",
+    title: "Thumbnail UI",
+    src: "/inspire/thumbnail-ui.webm",
     kind: "video",
   },
   {
-    id: "rune-veil",
-    title: "Rune Veil",
-    image: proTrendFantasyWarrior,
-    kind: "image",
-  },
-  {
-    id: "love-shot",
-    title: "Love Shot",
-    image: showcaseCouple,
+    id: "full-screen",
+    title: "Full Screen",
+    src: "/inspire/full-screen.webm",
     kind: "video",
   },
   {
-    id: "blade-waltz",
-    title: "Blade Waltz",
-    image: showcaseGownStairs,
+    id: "magnific-2882506457",
+    title: "Magnific Motion 1",
+    src: "/inspire/magnific-2882506457.webm",
     kind: "video",
   },
   {
-    id: "garden-echo",
-    title: "Garden Echo",
-    image: showcaseFashionWinter,
-    kind: "image",
-  },
-  {
-    id: "neon-stand",
-    title: "Neon Stand",
-    image: proTrendSynthwave,
-    kind: "image",
-  },
-  {
-    id: "product-noir",
-    title: "Product Noir",
-    image: proTrendProduct,
-    kind: "image",
-  },
-  {
-    id: "dream-engine",
-    title: "Dream Engine",
-    image: tplCyberpunk,
+    id: "magnific-2886588619",
+    title: "Magnific Motion 2",
+    src: "/inspire/magnific-2886588619.webm",
     kind: "video",
   },
   {
-    id: "studio-cut",
-    title: "Studio Cut",
-    image: showcaseCommercial,
-    kind: "video",
-  },
-  {
-    id: "miniature-world",
-    title: "Miniature World",
-    image: showcaseMiniature,
+    id: "sketch-3",
+    title: "Sketch 3",
+    src: "/inspire/sketch-3.png",
     kind: "image",
   },
   {
-    id: "future-companion",
-    title: "Future Companion",
-    image: proTrendSpaceCat,
+    id: "sketch-1",
+    title: "Sketch 1",
+    src: "/inspire/sketch-1.png",
     kind: "image",
   },
   {
-    id: "party-frame",
-    title: "Party Frame",
-    image: showcasePartyGirls,
-    kind: "video",
+    id: "concept-art-3-4",
+    title: "Concept Art 3/4",
+    src: "/inspire/concept-art-3-4.png",
+    kind: "image",
+  },
+  {
+    id: "concept-art",
+    title: "Concept Art",
+    src: "/inspire/concept-art.png",
+    kind: "image",
+  },
+  {
+    id: "collage",
+    title: "Collage",
+    src: "/inspire/collage.png",
+    kind: "image",
+  },
+  {
+    id: "character-sheet",
+    title: "Character Sheet",
+    src: "/inspire/character-sheet.png",
+    kind: "image",
   },
 ];
 
@@ -1379,67 +1320,35 @@ const HomeView = ({
     navigate(`/app/workspace/${workspaceId}`);
   };
 
-  const [inspirationKind, setInspirationKind] = useState<"image" | "video">(
-    "image",
-  );
   const activeClass = useActiveClass();
   const { data: classMemberships } = useUserClassMemberships();
   const studentClasses = (classMemberships ?? []).filter(
     (membership) => membership.role === "member" && membership.status === "active",
   );
-  const visibleInspirations = HOME_INSPIRATIONS.filter(
-    (item) => item.kind === inspirationKind,
-  ).slice(0, 9);
+  const visibleInspirations = HOME_INSPIRATIONS;
 
   return (
     <>
-      <PageHeader title={t("workspace.home.title")} rightSlot={<UserMenu />} onOpenSidebar={onOpenSidebar} />
-
       <div className="ws-scroll-hide flex-1 overflow-y-auto overflow-x-hidden">
-        <div className="mx-auto min-w-0 w-full max-w-[1680px] px-4 pb-16 pt-5 md:px-7 lg:px-10 lg:pt-6">
-          <section
-            aria-label="MediaForge hero statement"
-            className="flex min-h-[150px] items-start justify-center px-2 pt-4 text-center md:min-h-[176px] md:pt-5 lg:min-h-[188px] lg:pt-6"
-          >
-            <h2 className="workspace-home-hero-heading max-w-[860px] text-[42px] font-semibold leading-[0.98] tracking-[0px] text-white md:text-[64px] lg:text-[76px]">
-              <span className="block">{t("workspace.home.hero.line1")}</span>
-              <span className="block">
-                {t("workspace.home.hero.line2_prefix")}{" "}
-                <span className="workspace-home-hero-accent bg-gradient-to-r from-[#c77dff] via-[#9b4de0] to-[#5b2a8c] bg-clip-text text-transparent">
-                  {t("workspace.home.hero.line2_accent")}
-                </span>
-              </span>
-            </h2>
-          </section>
+        <section aria-label="MediaForge hero video" className="relative bg-[var(--bg-app)]">
+          <video
+            src="/inspire/to-bangkok.webm"
+            className="block h-[260px] w-full object-cover sm:h-[360px] lg:h-[clamp(430px,48vw,760px)]"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+          />
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[46%] bg-[linear-gradient(90deg,rgba(10,10,11,.9)_0%,rgba(10,10,11,.58)_18%,rgba(10,10,11,.24)_42%,rgba(10,10,11,0)_100%)]" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-28 bg-[linear-gradient(0deg,rgba(10,10,11,1)_0%,rgba(10,10,11,.72)_34%,rgba(10,10,11,.28)_68%,rgba(10,10,11,0)_100%)] md:h-32" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-[linear-gradient(180deg,rgba(10,10,11,.3)_0%,rgba(10,10,11,0)_100%)]" />
+          <div className="absolute inset-x-0 top-0 z-20">
+            <PageHeader title={t("workspace.home.title")} rightSlot={<UserMenu />} onOpenSidebar={onOpenSidebar} />
+          </div>
+        </section>
 
-          <section className="mt-4" aria-label="Featured AI examples">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              {LATEST_AI_MODELS.map((model) => (
-                <button
-                  key={model.id}
-                  type="button"
-                  onClick={() => onSection(model.section)}
-                  className="group min-w-0 text-left"
-                >
-                  <div className="relative aspect-[2.85/1] overflow-hidden rounded-[13px] bg-black">
-                    <img
-                      src={model.image}
-                      alt={model.title}
-                      className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.035]"
-                      loading="lazy"
-                    />
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/12 to-transparent" />
-                    <div className="absolute inset-x-3 bottom-3 min-w-0">
-                      <div className="truncate text-[14px] font-semibold leading-5 text-white drop-shadow md:text-[15px]">
-                        {model.title}
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </section>
-
+        <div className="mx-auto min-w-0 w-full max-w-[1680px] px-4 pb-16 pt-10 md:px-7 lg:px-10 lg:pt-12">
           {activeClass && (
             <EducationClassDashboard
               active={activeClass}
@@ -1453,51 +1362,33 @@ const HomeView = ({
               <h2 className="text-[26px] font-semibold leading-tight text-white md:text-[30px]">
                 {t("workspace.home.inspirations")}
               </h2>
-              <div className="inline-flex h-10 items-center rounded-full bg-[#151719] p-1 ring-1 ring-white/[0.04]">
-                {(["image", "video"] as const).map((kind) => {
-                  const active = inspirationKind === kind;
-                  return (
-                    <button
-                      key={kind}
-                      type="button"
-                      onClick={() => setInspirationKind(kind)}
-                      className={cn(
-                        "h-8 rounded-full px-4 text-[12px] font-semibold capitalize transition",
-                        active
-                          ? "bg-white text-black shadow-[0_6px_18px_rgba(255,255,255,0.14)]"
-                          : "text-zinc-400 hover:text-white",
-                      )}
-                    >
-                      {kind === "image" ? t("workspace.home.kind.image") : t("workspace.home.kind.video")}
-                    </button>
-                  );
-                })}
-              </div>
             </div>
 
-            <ul className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <ul className="mt-5 columns-1 gap-3 md:columns-2 xl:columns-3">
               {visibleInspirations.map((item) => (
-                <li key={item.id}>
-                  <button
-                    type="button"
-                    onClick={() => onSection(item.kind === "video" ? "video_gen" : "image_gen")}
-                    className="group block w-full text-left"
-                  >
-                    <div className="relative aspect-[16/9] overflow-hidden rounded-[13px] bg-black">
-                      <img
-                        src={item.image}
-                        alt={item.title}
-                        className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.035]"
-                        loading="lazy"
-                      />
-                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 to-transparent" />
-                      <div className="absolute bottom-3 left-3 right-3">
-                        <span className="truncate text-[13px] font-semibold text-white">
-                          {item.title}
-                        </span>
-                      </div>
+                <li key={item.id} className="mb-3 break-inside-avoid">
+                  <div className="group block w-full overflow-hidden rounded-[13px] bg-black">
+                    <div className="relative overflow-hidden rounded-[13px] bg-black">
+                      {item.kind === "video" ? (
+                        <video
+                          src={item.src}
+                          className="block h-auto w-full rounded-[13px] object-contain"
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                          preload="metadata"
+                        />
+                      ) : (
+                        <img
+                          src={item.src}
+                          alt={item.title}
+                          className="block h-auto w-full rounded-[13px] object-contain transition duration-500 group-hover:scale-[1.012]"
+                          loading="lazy"
+                        />
+                      )}
                     </div>
-                  </button>
+                  </div>
                 </li>
               ))}
             </ul>

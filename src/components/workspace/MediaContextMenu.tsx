@@ -19,9 +19,6 @@ interface MediaContextMenuProps {
   onClose: () => void;
 }
 
-const MENU_WIDTH = 184;
-const MENU_MAX_HEIGHT = 248;
-
 export default function MediaContextMenu({
   position,
   items,
@@ -55,14 +52,16 @@ export default function MediaContextMenu({
     };
   }, [onClose]);
 
-  const left = Math.min(
-    position.x,
-    Math.max(8, window.innerWidth - MENU_WIDTH - 8),
-  );
-  const top = Math.min(
-    position.y,
-    Math.max(8, window.innerHeight - MENU_MAX_HEIGHT - 8),
-  );
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const pad = 8;
+    const nextLeft = Math.min(position.x, window.innerWidth - rect.width - pad);
+    const nextTop = Math.min(position.y, window.innerHeight - rect.height - pad);
+    el.style.left = `${Math.max(pad, nextLeft)}px`;
+    el.style.top = `${Math.max(pad, nextTop)}px`;
+  }, [position.x, position.y, items.length]);
 
   const fire = (item: MediaContextMenuItem) => {
     if (item.disabled) return;
@@ -76,11 +75,9 @@ export default function MediaContextMenu({
       role="menu"
       data-testid="media-context-menu"
       className={cn(
-        "fixed z-[1600] overflow-hidden rounded-[10px] py-1",
-        "bg-[#151515]/98 text-zinc-100 backdrop-blur-xl",
-        "shadow-[0_20px_54px_-20px_rgba(0,0,0,.88),0_0_0_1px_rgba(255,255,255,.055)]",
+        "fixed z-[9999] min-w-[180px] overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 py-1 shadow-xl",
       )}
-      style={{ left, top, width: MENU_WIDTH }}
+      style={{ left: position.x, top: position.y }}
       onContextMenu={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -92,7 +89,7 @@ export default function MediaContextMenu({
         const Icon = item.icon;
         return (
           <div key={item.key}>
-            {item.separatorBefore && <div className="my-1 h-px bg-white/[0.07]" />}
+            {item.separatorBefore && <div className="my-1 border-t border-neutral-800" />}
             <button
               type="button"
               role="menuitem"
@@ -100,15 +97,17 @@ export default function MediaContextMenu({
               disabled={item.disabled}
               onClick={() => fire(item)}
               className={cn(
-                "flex h-[32px] w-full items-center gap-2.5 px-3 text-left text-[13px] font-medium leading-none transition-colors",
+                "flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors",
                 item.disabled
                   ? "cursor-not-allowed text-zinc-600"
                   : item.danger
-                    ? "text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                    : "text-zinc-300 hover:bg-white/[0.06] hover:text-white",
+                    ? "text-neutral-300 hover:bg-red-600/20 hover:text-red-400"
+                    : "text-neutral-300 hover:bg-neutral-800 hover:text-neutral-100",
               )}
             >
-              <Icon className="h-[15px] w-[15px] shrink-0" strokeWidth={2} />
+              <span className={cn("flex-shrink-0", item.danger && "text-red-500")}>
+                <Icon size={14} />
+              </span>
               <span className="truncate">{item.label}</span>
             </button>
           </div>
