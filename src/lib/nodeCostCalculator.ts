@@ -139,10 +139,16 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
 
   // ── Unified Video (Kling I2V / Extension / Motion / Omni) ──
   if (schemaKey === "audioGenNode") {
-    const apiModel = modelName || "gemini-2.5-flash-preview-tts";
-    const match = creditCosts.find(
-      (r) => r.feature === "text_to_speech" && r.model === apiModel,
-    );
+    const apiModel = modelName || "gemini-3.1-flash-tts-preview";
+    const aliases =
+      apiModel === "gemini-3.1-flash-tts-preview" ||
+      apiModel === "gemini-3.1-preview-flash-tts" ||
+      apiModel === "gemini-3.1-flash-preview-tts"
+        ? ["gemini-3.1-flash-tts-preview", "gemini-2.5-flash-preview-tts"]
+        : [apiModel];
+    const match = aliases
+      .map((model) => creditCosts.find((r) => r.feature === "text_to_speech" && r.model === model))
+      .find(Boolean);
     if (!match) return null;
     if (match.pricing_type === "per_1k_chars") {
       const text = String(params.prompt ?? params.text ?? "");

@@ -2,7 +2,7 @@ const MODEL_RECOMMENDATION_GROUPS = [
   ["gpt-image-2", "nano-banana-pro", "nano-banana-2"],
   ["seedance-2-0-pro", "kling-v3-omni", "kling-v3-pro"],
   ["tripo3d-v3.1", "tripo3d-v3.0"],
-  ["gemini-2.5-pro-preview-tts"],
+  ["gemini-3.1-flash-tts-preview", "gemini-2.5-pro-preview-tts"],
 ] as const;
 
 export function cleanModelDisplayName(label: string): string {

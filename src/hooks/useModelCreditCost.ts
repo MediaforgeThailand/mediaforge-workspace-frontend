@@ -39,7 +39,14 @@ export function useModelCreditCost() {
 
     if (model) {
       // Check pricing type for this model
-      const modelEntries = costs.filter(c => c.feature === feature && c.model === model);
+      const aliases =
+        model === "gemini-3.1-flash-tts-preview" ||
+        model === "gemini-3.1-preview-flash-tts" ||
+        model === "gemini-3.1-flash-preview-tts"
+          ? ["gemini-3.1-flash-tts-preview", "gemini-2.5-flash-preview-tts"]
+          : [model];
+      const modelEntries = aliases
+        .flatMap(alias => costs.filter(c => c.feature === feature && c.model === alias));
       if (!modelEntries.length) {
         // Fallback to default (no model)
         const def = costs.find(c => c.feature === feature && !c.model);

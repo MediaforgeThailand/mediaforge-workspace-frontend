@@ -72,8 +72,10 @@ const BANANA_MODELS = ["nano-banana-2", "nano-banana-pro"] as const;
  *  /v1/images/edits or /v1/images/generations endpoint. */
 const OPENAI_IMAGE_MODELS = ["gpt-image-2"] as const;
 const ELEVENLABS_TTS_MODELS = ["elevenlabs-multilingual-v2", "elevenlabs-turbo-v2-5"] as const;
-const GEMINI_TTS_MODELS = ["gemini-2.5-pro-preview-tts"] as const;
-const GOOGLE_TTS_MODELS = ["google-tts-studio"] as const;
+const GEMINI_TTS_MODELS = ["gemini-3.1-flash-tts-preview", "gemini-2.5-pro-preview-tts"] as const;
+// Backend still supports Google Cloud TTS, but the workspace project does not
+// currently have GOOGLE_TTS_API_KEY configured, so keep it hidden in the UI.
+const GOOGLE_TTS_MODELS = [] as const;
 const TRIPO_MULTIVIEW_3D_MODELS = [
   "tripo3d-v3.1",
   "tripo3d-v3.0",
@@ -871,7 +873,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
       ...GEMINI_TTS_MODELS,
       ...GOOGLE_TTS_MODELS,
     ],
-    defaultModel: "gemini-2.5-pro-preview-tts",
+    defaultModel: "gemini-3.1-flash-tts-preview",
     inputs: [
       { id: "text", label: "text (script)", color: "sky" },
     ],
@@ -889,10 +891,11 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         optionLabels: {
           "elevenlabs-multilingual-v2": "ElevenLabs v2 — Multilingual",
           "elevenlabs-turbo-v2-5":      "ElevenLabs Turbo v2.5",
+          "gemini-3.1-flash-tts-preview": "Gemini 3.1 Flash Preview TTS",
           "gemini-2.5-pro-preview-tts": "Gemini 2.5 ProTTS",
           "google-tts-studio":          "Google Cloud TTS — Studio",
         },
-        default: "gemini-2.5-pro-preview-tts",
+        default: "gemini-3.1-flash-tts-preview",
         required: true,
       },
       {

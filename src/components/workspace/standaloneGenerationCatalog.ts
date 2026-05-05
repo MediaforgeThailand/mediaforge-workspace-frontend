@@ -287,7 +287,7 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
     icon: Mic2,
     outputType: "audio",
     accent: "hsl(38 92% 56%)",
-    defaultModel: "gemini-2.5-pro-preview-tts",
+    defaultModel: "gemini-3.1-flash-tts-preview",
     // Synced with the audioGenNode supportedModels in workspaceSchema.
     // Production-quality models only — see schema audit comments for
     // which lower-tier ones we dropped.
@@ -305,6 +305,13 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
         provider: "ElevenLabs",
         badge: "Fast",
         description: "Half the latency of v2 with similar quality.",
+      },
+      {
+        id: "gemini-3.1-flash-tts-preview",
+        label: "Gemini 3.1 Flash Preview TTS",
+        provider: "Google Gemini",
+        badge: "New",
+        description: "Latest Gemini preview speech model with 30 official preset speakers.",
       },
       {
         id: "gemini-2.5-pro-preview-tts",

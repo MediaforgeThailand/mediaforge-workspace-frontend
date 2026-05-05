@@ -451,6 +451,7 @@ const STANDALONE_MODEL_DESCRIPTION_KEYS = {
   "seedance-2-0-pro": "workspace.standalone.model.seedance_2_0_pro.desc",
   "elevenlabs-multilingual-v2": "workspace.standalone.model.elevenlabs_multilingual_v2.desc",
   "elevenlabs-turbo-v2-5": "workspace.standalone.model.elevenlabs_turbo_v2_5.desc",
+  "gemini-3.1-flash-tts-preview": "workspace.standalone.model.gemini_3_1_flash_tts.desc",
   "gemini-2.5-pro-preview-tts": "workspace.standalone.model.gemini_2_5_pro_tts.desc",
   "google-tts-studio": "workspace.standalone.model.google_tts_studio.desc",
   "tripo3d-p1": "workspace.standalone.model.tripo3d_p1.desc",
@@ -1759,7 +1760,7 @@ export default function StandaloneGenerator({
               modelLabel={selectedModel?.label ?? "SeedDance 2.0 Pro"}
               modelInitial={selectedModelVisual?.initial ?? "S"}
               modelValue={form.model}
-              modelOptions={activeDef.models.map((model) => ({
+              modelOptions={activeDef.models.filter((model) => model.id !== "google-tts-studio").map((model) => ({
                 id: model.id,
                 label: model.label,
                 settings: videoModelSettingTags(model.id, language),
@@ -1819,7 +1820,7 @@ export default function StandaloneGenerator({
               modelLabel={selectedModel?.label ?? "Nano Banana Pro"}
               modelInitial={selectedModelVisual?.initial ?? "G"}
               modelValue={form.model}
-              modelOptions={activeDef.models.map((model) => ({
+              modelOptions={activeDef.models.filter((model) => model.id !== "google-tts-studio").map((model) => ({
                 id: model.id,
                 label: model.label,
                 settings:
@@ -1925,7 +1926,7 @@ export default function StandaloneGenerator({
                 {activeTool === "image_gen" && <ImageModeTabs />}
 
                 <ModelPicker
-                  models={activeDef.models}
+                  models={activeDef.models.filter((model) => model.id !== "google-tts-studio")}
                   value={form.model}
                   onChange={setToolModel}
                 />
