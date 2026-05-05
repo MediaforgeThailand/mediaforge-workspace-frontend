@@ -522,20 +522,20 @@ function standaloneToolNav(tool: StandaloneToolKey, t: TranslationFn) {
 
 function standaloneCreateActionTitle(
   tool: StandaloneToolKey,
-  language: Language,
+  t: TranslationFn,
 ) {
-  const labels: Record<StandaloneToolKey, { en: string; th: string }> = {
-    image_gen: { en: "Create Image", th: "สร้างรูปภาพ" },
-    video_gen: { en: "Create Video", th: "สร้างวิดีโอ" },
-    voice_gen: { en: "Create Audio", th: "สร้างเสียง" },
-    image_to_3d: { en: "Create 3D", th: "สร้าง 3D" },
-  };
-  return labels[tool][language === "th" ? "th" : "en"];
+  const keys = {
+    image_gen: "workspace.standalone.action.create_image",
+    video_gen: "workspace.standalone.action.create_video",
+    voice_gen: "workspace.standalone.action.create_audio",
+    image_to_3d: "workspace.standalone.action.create_3d",
+  } as const satisfies Record<StandaloneToolKey, TranslationKey>;
+  return t(keys[tool]);
 }
 
 function standaloneCreateButtonLabel(
   tool: StandaloneToolKey,
-  language: Language,
+  t: TranslationFn,
   estimatedCost?: number | null,
 ) {
   if (
@@ -543,15 +543,15 @@ function standaloneCreateButtonLabel(
     Number.isFinite(estimatedCost) &&
     estimatedCost > 0
   ) {
-    const base = language === "th" ? "สร้าง" : "Generate";
-    return `${base} ${new Intl.NumberFormat("en-US", {
+    const credits = new Intl.NumberFormat("en-US", {
       maximumFractionDigits: 0,
-    }).format(Math.ceil(estimatedCost))}`;
+    }).format(Math.ceil(estimatedCost));
+    return t("workspace.standalone.action.generate_with_credits", { credits });
   }
   if (tool === "image_gen") {
-    return language === "th" ? "สร้างฟรี" : "Create for Free";
+    return t("workspace.standalone.action.create_for_free");
   }
-  return language === "th" ? "สร้าง" : "Generate";
+  return t("workspace.standalone.generate");
 }
 
 function workspaceCostMultiplierForTool(
@@ -646,60 +646,54 @@ type StandaloneInlineLabelKey =
 
 const STANDALONE_INLINE_LABELS: Record<
   StandaloneInlineLabelKey,
-  Record<"en" | "th", string>
+  TranslationKey
 > = {
-  addVisualReferences: { en: "Add visual references", th: "เพิ่มภาพอ้างอิง" },
-  audio: { en: "Audio", th: "เสียง" },
-  aspect: { en: "Aspect", th: "สัดส่วน" },
-  background: { en: "Background", th: "พื้นหลัง" },
-  duration: { en: "Duration", th: "ความยาว" },
-  followImage: { en: "Follow Image", th: "ตามภาพ" },
-  followVideo: { en: "Follow Video", th: "ตามวิดีโอ" },
-  format: { en: "Format", th: "รูปแบบไฟล์" },
-  instructions: { en: "Instructions", th: "คำสั่ง" },
-  keep: { en: "Keep", th: "คงไว้" },
-  lastFrame: { en: "Last frame", th: "เฟรมสุดท้าย" },
-  liveVoices: { en: "Live voices", th: "เสียงจากบัญชี" },
-  multiShot: { en: "Multi-shot", th: "หลายช็อต" },
-  multiShots: { en: "Multi-shots", th: "หลายช็อต" },
-  mute: { en: "Mute", th: "ปิดเสียง" },
-  negativePrompt: { en: "Negative prompt", th: "คำสั่งที่ไม่ต้องการ" },
-  off: { en: "Off", th: "ปิด" },
-  on: { en: "On", th: "เปิด" },
-  originalSound: { en: "Original sound", th: "เสียงต้นฉบับ" },
-  people: { en: "People", th: "บุคคล" },
-  quality: { en: "Quality", th: "คุณภาพ" },
-  reference: { en: "Reference", th: "อ้างอิง" },
-  resolution: { en: "Resolution", th: "ความละเอียด" },
-  return: { en: "Return", th: "ส่งคืน" },
-  shotListJson: { en: "Shot list (JSON)", th: "รายการช็อต (JSON)" },
-  startEnd: { en: "Start/End", th: "เริ่ม/จบ" },
-  startFrame: { en: "Start Frame", th: "เฟรมเริ่มต้น" },
-  style: { en: "Style", th: "สไตล์" },
-  texture: { en: "Texture", th: "พื้นผิว" },
-  textToVideo: { en: "Text to Video", th: "ข้อความเป็นวิดีโอ" },
-  frameToVideo: { en: "Frame to Video", th: "เฟรมเป็นวิดีโอ" },
-  videoAvoidPlaceholder: {
-    en: "What should the video avoid?",
-    th: "อยากให้วิดีโอหลีกเลี่ยงอะไร?",
-  },
-  videoPromptPlaceholder: {
-    en: "Describe scene transitions, camera movement trajectories, or character actions with text to precisely control the entire video.",
-    th: "อธิบายฉาก การเคลื่อนกล้อง หรือการกระทำของตัวละคร เพื่อควบคุมวิดีโอให้ตรงตามต้องการ",
-  },
-  adultsOnly: { en: "Adults only", th: "ผู้ใหญ่เท่านั้น" },
-  allowChildren: { en: "Allow children", th: "อนุญาตเด็ก" },
-  director: { en: "Director", th: "โหมดกำกับ" },
-  addStartFrame: { en: "Add a start frame", th: "เพิ่มเฟรมเริ่มต้น" },
-  addEndFrame: { en: "Add an end frame", th: "เพิ่มเฟรมจบ" },
-  history: { en: "History", th: "ประวัติ" },
+  addVisualReferences: "workspace.standalone.inline.add_visual_references",
+  audio: "workspace.standalone.inline.audio",
+  aspect: "workspace.standalone.aspect",
+  background: "workspace.standalone.background",
+  duration: "workspace.standalone.duration",
+  followImage: "workspace.standalone.inline.follow_image",
+  followVideo: "workspace.standalone.inline.follow_video",
+  format: "workspace.standalone.format",
+  instructions: "workspace.standalone.inline.instructions",
+  keep: "workspace.standalone.inline.keep",
+  lastFrame: "workspace.standalone.inline.last_frame",
+  liveVoices: "workspace.standalone.inline.live_voices",
+  multiShot: "workspace.standalone.inline.multi_shot",
+  multiShots: "workspace.standalone.inline.multi_shots",
+  mute: "workspace.standalone.inline.mute",
+  negativePrompt: "workspace.standalone.inline.negative_prompt",
+  off: "workspace.standalone.inline.off",
+  on: "workspace.standalone.inline.on",
+  originalSound: "workspace.standalone.inline.original_sound",
+  people: "workspace.standalone.inline.people",
+  quality: "workspace.standalone.quality",
+  reference: "workspace.standalone.inline.reference",
+  resolution: "workspace.standalone.resolution",
+  return: "workspace.standalone.inline.return",
+  shotListJson: "workspace.standalone.inline.shot_list_json",
+  startEnd: "workspace.standalone.inline.start_end",
+  startFrame: "workspace.standalone.inline.start_frame",
+  style: "workspace.standalone.style",
+  texture: "workspace.standalone.texture",
+  textToVideo: "workspace.standalone.inline.text_to_video",
+  frameToVideo: "workspace.standalone.inline.frame_to_video",
+  videoAvoidPlaceholder: "workspace.standalone.inline.video_avoid_placeholder",
+  videoPromptPlaceholder: "workspace.standalone.inline.video_prompt_placeholder",
+  adultsOnly: "workspace.standalone.inline.adults_only",
+  allowChildren: "workspace.standalone.inline.allow_children",
+  director: "workspace.standalone.inline.director",
+  addStartFrame: "workspace.standalone.inline.add_start_frame",
+  addEndFrame: "workspace.standalone.inline.add_end_frame",
+  history: "workspace.standalone.inline.history",
 };
 
 function standaloneInlineLabel(
   key: StandaloneInlineLabelKey,
-  language: Language,
+  t: TranslationFn,
 ) {
-  return STANDALONE_INLINE_LABELS[key][language === "th" ? "th" : "en"];
+  return t(STANDALONE_INLINE_LABELS[key]);
 }
 
 function standaloneStatusLabel(status: StandaloneJobRow["status"], t: TranslationFn) {
@@ -1446,8 +1440,8 @@ export default function StandaloneGenerator({
       ? [
           {
             id: "start" as const,
-            label: standaloneInlineLabel("addStartFrame", language),
-            historyLabel: standaloneInlineLabel("history", language),
+            label: standaloneInlineLabel("addStartFrame", t),
+            historyLabel: standaloneInlineLabel("history", t),
             refItem: form.videoStart,
             uploading: uploading === "video-start",
             onUpload: () => openUpload("video-start"),
@@ -1461,8 +1455,8 @@ export default function StandaloneGenerator({
             ? [
                 {
                   id: "end" as const,
-                  label: standaloneInlineLabel("addEndFrame", language),
-                  historyLabel: standaloneInlineLabel("history", language),
+                  label: standaloneInlineLabel("addEndFrame", t),
+                  historyLabel: standaloneInlineLabel("history", t),
                   refItem: form.videoEnd,
                   uploading: uploading === "video-end",
                   onUpload: () => openUpload("video-end"),
@@ -1517,12 +1511,12 @@ export default function StandaloneGenerator({
           : "image/*";
   const videoReferenceHint =
     videoPanelMode === "frames"
-      ? "JPEG/PNG/WEBP, 20 MB max"
+      ? t("workspace.standalone.hint.video_frame_reference")
       : videoSupportsReferenceImage(form.model) && videoSupportsReferenceVideo(form.model)
-        ? "JPEG/PNG/WEBP/MP4, 20 MB max"
+        ? t("workspace.standalone.hint.video_visual_reference")
         : videoSupportsReferenceVideo(form.model)
-          ? "MP4/MOV/WEBM, 20 MB max"
-          : "JPEG/PNG/WEBP, 20 MB max";
+          ? t("workspace.standalone.hint.video_reference_video")
+          : t("workspace.standalone.hint.video_frame_reference");
   const videoSettings =
     activeTool === "video_gen"
       ? buildVideoPanelSettings({
@@ -1531,7 +1525,7 @@ export default function StandaloneGenerator({
           resolutionOptions: videoResolutionOptions,
           durationOptions: videoDurationOptions,
           onChange: updateForm,
-          language,
+          t,
         })
       : [];
   const imagePanelSettings =
@@ -1541,12 +1535,11 @@ export default function StandaloneGenerator({
           resolutionOptions: imageResolutionOptionsFor(form),
           onChange: updateForm,
           t,
-          language,
         })
       : [];
   const threeDPanelSettings =
     activeTool === "image_to_3d"
-      ? buildThreeDPanelSettings({ form, onChange: updateForm, t, language })
+      ? buildThreeDPanelSettings({ form, onChange: updateForm, t })
       : [];
   const videoTextControls =
     activeTool === "video_gen"
@@ -1555,11 +1548,11 @@ export default function StandaloneGenerator({
             ? [
                 {
                   id: "negative-prompt",
-                  label: standaloneInlineLabel("negativePrompt", language),
+                  label: standaloneInlineLabel("negativePrompt", t),
                   value: form.videoNegativePrompt,
                   placeholder: standaloneInlineLabel(
                     "videoAvoidPlaceholder",
-                    language,
+                    t,
                   ),
                   rows: 1,
                   onChange: (videoNegativePrompt: string) =>
@@ -1571,7 +1564,7 @@ export default function StandaloneGenerator({
             ? [
                 {
                   id: "multi-prompt",
-                  label: standaloneInlineLabel("shotListJson", language),
+                  label: standaloneInlineLabel("shotListJson", t),
                   value: form.videoMultiPrompt,
                   placeholder: '[{"prompt":"Scene 1","duration":3}]',
                   rows: 3,
@@ -1584,8 +1577,8 @@ export default function StandaloneGenerator({
       : [];
   const videoPanelTitle =
     videoPanelMode === "reference"
-      ? standaloneInlineLabel("textToVideo", language)
-      : standaloneInlineLabel("frameToVideo", language);
+      ? standaloneInlineLabel("textToVideo", t)
+      : standaloneInlineLabel("frameToVideo", t);
 
   const onFileSelected = async (file: File | undefined) => {
     if (!file) return;
@@ -1755,7 +1748,7 @@ export default function StandaloneGenerator({
               promptLabel={t("workspace.standalone.describe_video")}
               promptPlaceholder={standaloneInlineLabel(
                 "videoPromptPlaceholder",
-                language,
+                t,
               )}
               onPromptChange={(prompt) => updateForm({ prompt })}
               modelLabel={selectedModel?.label ?? "SeedDance 2.0 Pro"}
@@ -1764,7 +1757,7 @@ export default function StandaloneGenerator({
               modelOptions={activeDef.models.filter((model) => model.id !== "google-tts-studio").map((model) => ({
                 id: model.id,
                 label: model.label,
-                settings: videoModelSettingTags(model.id, language),
+                settings: videoModelSettingTags(model.id, t),
               }))}
               onModelChange={setToolModel}
               mode={videoPanelMode}
@@ -1777,9 +1770,9 @@ export default function StandaloneGenerator({
               maxReferences={panelMaxReferences}
               referenceTitle={standaloneInlineLabel(
                 "addVisualReferences",
-                language,
+                t,
               )}
-              referenceBadge={language === "th" ? "ไม่บังคับ" : "Optional"}
+              referenceBadge={t("workspace.standalone.optional")}
               referenceHint={videoReferenceHint}
               referenceAccept={videoReferenceAccept}
               referenceAssets={panelReferenceAssets}
@@ -1794,7 +1787,7 @@ export default function StandaloneGenerator({
               onCreate={() => void run()}
               createLabel={standaloneCreateButtonLabel(
                 activeTool,
-                language,
+                t,
                 estimatedCost,
               )}
               runningLabel={t("workspace.standalone.loading")}
@@ -1811,7 +1804,7 @@ export default function StandaloneGenerator({
             />
             ) : (
             <CreateImagePanel
-              title={standaloneCreateActionTitle(activeTool, language)}
+              title={standaloneCreateActionTitle(activeTool, t)}
               modelCaption={t("workspace.standalone.model")}
               prompt={panelPrompt}
               promptLabel={panelPromptLabel}
@@ -1826,11 +1819,11 @@ export default function StandaloneGenerator({
                 label: model.label,
                 settings:
                   activeTool === "image_gen"
-                    ? imageModelSettingTags(model.id, language)
+                    ? imageModelSettingTags(model.id, t)
                     : activeTool === "image_to_3d"
-                      ? threeDModelSettingTags(model.id, language)
+                      ? threeDModelSettingTags(model.id, t)
                       : activeTool === "voice_gen"
-                        ? audioModelSettingTags(model.id, language)
+                        ? audioModelSettingTags(model.id, t)
                         : [],
               }))}
               onModelChange={setToolModel}
@@ -1838,15 +1831,15 @@ export default function StandaloneGenerator({
               maxReferences={panelMaxReferences}
               showReferences={activeTool !== "voice_gen"}
               referenceTitle={panelReferenceTitle}
-              referenceBadge={language === "th" ? "ไม่บังคับ" : "Optional"}
+              referenceBadge={t("workspace.standalone.optional")}
               referenceHint={
                 activeTool === "video_gen"
-                  ? "JPEG/PNG/WEBP/MP4, 20 MB max"
+                  ? t("workspace.standalone.hint.video_visual_reference")
                   : activeTool === "image_to_3d"
                     ? panelMaxReferences > 1
-                      ? "Front first, then left/back/right. JPEG/PNG/WEBP, 20 MB max"
-                      : "JPEG/PNG/WEBP, 20 MB max"
-                    : "JPEG/PNG/WEBP/GIF, 20 MB max"
+                      ? t("workspace.standalone.hint.model_multiview_reference")
+                      : t("workspace.standalone.hint.model_image_reference")
+                    : t("workspace.standalone.hint.image_reference")
               }
               referenceAccept={
                 activeTool === "video_gen" ? "image/*,video/*" : "image/*"
@@ -1881,7 +1874,7 @@ export default function StandaloneGenerator({
               onCreate={() => void run()}
               createLabel={standaloneCreateButtonLabel(
                 activeTool,
-                language,
+                t,
                 estimatedCost,
               )}
               runningLabel={t("workspace.standalone.loading")}
@@ -1905,20 +1898,20 @@ export default function StandaloneGenerator({
                 <button
                   type="button"
                   className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--text-default)] transition hover:bg-white/10 hover:text-white"
-                  aria-label={standaloneCreateActionTitle(activeTool, language)}
+                  aria-label={standaloneCreateActionTitle(activeTool, t)}
                 >
                   <ChevronDown className="h-4 w-4 rotate-90" />
                 </button>
                 <h2 className="truncate text-[18px] font-bold text-white">
-                  {standaloneCreateActionTitle(activeTool, language)}
+                  {standaloneCreateActionTitle(activeTool, t)}
                 </h2>
               </div>
               <button
                 type="button"
                 className="flex h-9 shrink-0 items-center gap-2 rounded-lg bg-white/[0.08] px-3 text-[13px] font-semibold text-white transition hover:bg-white/[0.12]"
-              >
-                <BookOpen className="h-4 w-4" />
-                Tutorials
+                >
+                  <BookOpen className="h-4 w-4" />
+                {t("workspace.standalone.tutorials")}
               </button>
             </div>
 
@@ -1999,7 +1992,7 @@ export default function StandaloneGenerator({
                   ) : (
                     <Sparkles className="h-4 w-4" />
                   )}
-                  {standaloneCreateButtonLabel(activeTool, language, estimatedCost)}
+                  {standaloneCreateButtonLabel(activeTool, t, estimatedCost)}
                 </button>
               </div>
               </div>
@@ -2043,11 +2036,11 @@ export default function StandaloneGenerator({
                   <AlertTriangle className="h-4 w-4" />
                 </span>
                 <DialogTitle className="text-[16px] font-bold leading-tight text-white">
-                  Delete asset?
+                  {t("workspace.references.deleteTitle")}
                 </DialogTitle>
               </div>
               <DialogDescription className="text-[13px] leading-relaxed text-zinc-400">
-                This removes the image from your reference library. Files stored in your MediaForge storage are deleted too.
+                {t("workspace.references.deleteDescription")}
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -2058,7 +2051,7 @@ export default function StandaloneGenerator({
               onClick={() => setDeleteReferenceTarget(null)}
               className="inline-flex h-8 items-center justify-center rounded-[9px] border border-white/[0.08] px-3 text-[12px] font-semibold text-zinc-200 transition hover:bg-white/[0.06] disabled:opacity-60"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               type="button"
@@ -2067,7 +2060,7 @@ export default function StandaloneGenerator({
               className="inline-flex h-8 items-center justify-center gap-1.5 rounded-[9px] bg-red-500 px-3 text-[12px] font-bold text-white shadow-[0_10px_22px_rgba(239,68,68,.28)] transition hover:bg-red-400 disabled:opacity-60"
             >
               {deletingReference ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-              Delete
+              {t("workspace.references.deleteAction")}
             </button>
           </div>
         </DialogContent>
@@ -2380,7 +2373,7 @@ function ModelPicker({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [providerFilter, setProviderFilter] = useState("all");
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const selected =
     models.find((model) => model.id === value) ??
     models[0] ?? {
@@ -2406,13 +2399,13 @@ function ModelPicker({
   );
   const selectedVisual = modelVisualFor(selected);
   const uiText = {
-    recommended: language === "th" ? "แนะนำ" : "Recommended",
-    allModels: language === "th" ? "โมเดลทั้งหมด" : "All models",
-    allProviders: language === "th" ? "ผู้ให้บริการทั้งหมด" : "All providers",
-    search: language === "th" ? "ค้นหา" : "Search",
-    active: language === "th" ? "ใช้งานอยู่" : "Active",
-    noModels: language === "th" ? "ไม่พบโมเดล" : "No models found",
-    closeModels: language === "th" ? "ปิดรายการโมเดล" : "Close models",
+    recommended: t("createImagePanel.recommended"),
+    allModels: t("createImagePanel.allModels"),
+    allProviders: t("workspace.standalone.model.all_providers"),
+    search: t("workspace.assets.search"),
+    active: t("workspace.standalone.active"),
+    noModels: t("workspace.standalone.model.no_models"),
+    closeModels: t("createImagePanel.closeModels"),
   };
 
   return (
@@ -2730,25 +2723,18 @@ function ImagePromptPanel({
   placeholder: string;
   onChange: (value: string) => void;
 }) {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const [styleOpen, setStyleOpen] = useState(false);
   const selectedStyle =
     IMAGE_STYLE_PRESETS.find((preset) => preset.id === styleId) ??
     IMAGE_STYLE_PRESETS[0];
   const characterRef = refs.find((ref) => ref.role === "character");
-  const optionalText = language === "th" ? "ไม่บังคับ" : "Optional";
-  const copy =
-    language === "th"
-      ? {
-          describe: "อธิบายรูปภาพของคุณ",
-          addRefs: "เพิ่มภาพอ้างอิง",
-          autoPolish: "Auto Polish",
-        }
-      : {
-          describe: "Describe your image",
-          addRefs: "Add visual references",
-          autoPolish: "Auto Polish",
-        };
+  const optionalText = t("workspace.standalone.optional");
+  const copy = {
+    describe: t("workspace.standalone.describe_image"),
+    addRefs: t("workspace.standalone.inline.add_visual_references"),
+    autoPolish: t("workspace.standalone.auto_polish"),
+  };
 
   return (
     <div className="relative rounded-[16px] border border-[var(--border-faint)] bg-[var(--bg-panel)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,.035)]">
@@ -2794,7 +2780,7 @@ function ImagePromptPanel({
               </span>
             </div>
             <div className="mt-1 truncate text-[10px] leading-none text-[var(--text-default)]">
-              JPEG/PNG/WEBP/GIF, 50 MB max
+              {t("workspace.standalone.hint.image_reference_large")}
             </div>
           </div>
           <span className="absolute right-2 top-2 rounded-md bg-black/45 px-1.5 py-0.5 text-[11px] font-bold text-white">
@@ -3773,7 +3759,7 @@ function StyleReferenceTray({
    *  again replaces the current character with a new upload. */
   const characterRef = refs.find((ref) => ref.role === "character");
   const characterActive = Boolean(characterRef);
-  const optionalText = language === "th" ? "ไม่บังคับ" : "Optional";
+  const optionalText = t("workspace.standalone.optional");
 
   return (
     <div className="relative">
@@ -3789,7 +3775,7 @@ function StyleReferenceTray({
               </span>
             </div>
             <span className="mt-0.5 text-xs text-[var(--text-default)]">
-              JPEG/PNG/WEBP/GIF, 50 MB max
+              {t("workspace.standalone.hint.image_reference_large")}
             </span>
           </div>
           <span className="text-xs text-[var(--text-default)]">{refs.length}/{max}</span>
@@ -4114,7 +4100,7 @@ function CreationFeed({
 }) {
   const [preview, setPreview] = useState<PreviewPayload | null>(null);
   const [statusFilter, setStatusFilter] = useState<CreationStatusFilter>("all");
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
   const onStandaloneCropConfirmed = (blob: Blob, filename: string) => {
     const cleanName = filename.replace(/\.[a-z0-9]{2,5}$/i, "") || "crop";
     triggerBlobDownload(blob, buildDownloadFilename(cleanName, "png"));
@@ -4125,16 +4111,16 @@ function CreationFeed({
     [jobs, statusFilter],
   );
   const statusFilters: Array<{ id: CreationStatusFilter; label: string }> = [
-    { id: "all", label: language === "th" ? "ทั้งหมด" : "All" },
-    { id: "completed", label: language === "th" ? "สำเร็จ" : "Done" },
-    { id: "active", label: language === "th" ? "กำลังทำ" : "Active" },
-    { id: "failed", label: language === "th" ? "ล้มเหลว" : "Failed" },
+    { id: "all", label: t("workspace.standalone.filter.all") },
+    { id: "completed", label: t("workspace.standalone.filter.done") },
+    { id: "active", label: t("workspace.standalone.filter.active") },
+    { id: "failed", label: t("workspace.standalone.filter.failed") },
   ];
 
   return (
     <>
       <div className="mb-3 flex min-h-8 items-center justify-end gap-1.5">
-        <div className="flex items-center gap-1 rounded-full bg-white/[0.035] p-1 text-[11px] text-zinc-400">
+        <div className="standalone-status-filter flex items-center gap-1 rounded-full bg-white/[0.035] p-1 text-[11px] text-zinc-400">
           <span className="grid h-6 w-6 place-items-center rounded-full text-zinc-500">
             <SlidersHorizontal className="h-3.5 w-3.5" />
           </span>
@@ -4146,7 +4132,7 @@ function CreationFeed({
                 type="button"
                 onClick={() => setStatusFilter(filter.id)}
                 className={cn(
-                  "h-6 rounded-full px-2 text-[11px] font-semibold transition",
+                  "standalone-status-filter-button h-6 rounded-full px-2 text-[11px] font-semibold transition",
                   active
                     ? "bg-white text-zinc-950"
                     : "text-zinc-400 hover:bg-white/[0.07] hover:text-white",
@@ -4180,7 +4166,7 @@ function CreationFeed({
       ) : visibleJobs.length === 0 ? (
         <div className="grid min-h-[360px] place-items-center p-8 text-center">
           <div className="text-[13px] text-zinc-500">
-            {language === "th" ? "ไม่มีผลลัพธ์ในตัวกรองนี้" : "No results for this filter"}
+            {t("workspace.standalone.filter.no_results")}
           </div>
         </div>
       ) : (
@@ -4518,10 +4504,10 @@ function CreationTile({
     modelName ? { label: modelName } : null,
     ratio ? { label: ratio } : null,
     duration
-      ? { label: language === "th" ? "ระยะเวลา" : "Duration", value: `${duration}s` }
+      ? { label: t("workspace.standalone.duration"), value: `${duration}s` }
       : null,
     {
-      label: language === "th" ? "เวลาสร้าง" : "Creation time",
+      label: t("workspace.standalone.creation_time"),
       value: formatDate(job.created_at, language),
     },
   ].filter(Boolean) as Array<{ label: string; value?: string }>;
@@ -5590,7 +5576,7 @@ function compactRangeLabel(values: string[]): string | null {
   return `${firstPrefix}-${last}`;
 }
 
-function videoModelSettingTags(model: string, language: Language): Array<{
+function videoModelSettingTags(model: string, t: TranslationFn): Array<{
   label: string;
   icon?: "reference" | "frames" | "audio" | "resolution" | "duration" | "multi";
 }> {
@@ -5603,7 +5589,7 @@ function videoModelSettingTags(model: string, language: Language): Array<{
 
   if (videoSupportsReferenceImage(model) || videoSupportsReferenceVideo(model)) {
     tags.push({
-      label: standaloneInlineLabel("reference", language),
+      label: standaloneInlineLabel("reference", t),
       icon: "reference",
     });
   }
@@ -5611,15 +5597,15 @@ function videoModelSettingTags(model: string, language: Language): Array<{
   if (videoSupportsStartEndFrames(model)) {
     tags.push({
       label: videoSupportsEndFrame(model)
-        ? standaloneInlineLabel("startEnd", language)
-        : standaloneInlineLabel("startFrame", language),
+        ? standaloneInlineLabel("startEnd", t)
+        : standaloneInlineLabel("startFrame", t),
       icon: "frames",
     });
   }
 
   if (videoSupportsMultiShot(model)) {
     tags.push({
-      label: standaloneInlineLabel("multiShots", language),
+      label: standaloneInlineLabel("multiShots", t),
       icon: "multi",
     });
   }
@@ -5630,7 +5616,7 @@ function videoModelSettingTags(model: string, language: Language): Array<{
       (model.startsWith("kling") ||
         (isSeedanceVideoModel(model) && seedanceVideoSupportsAudio(model))))
   ) {
-    tags.push({ label: standaloneInlineLabel("audio", language), icon: "audio" });
+    tags.push({ label: standaloneInlineLabel("audio", t), icon: "audio" });
   }
 
   const resolution = compactRangeLabel(videoResolutionOptionsForModel(model));
@@ -5653,14 +5639,14 @@ function buildVideoPanelSettings({
   resolutionOptions,
   durationOptions,
   onChange,
-  language,
+  t,
 }: {
   form: StandaloneFormState;
   ratioOptions: string[];
   resolutionOptions: string[];
   durationOptions: string[];
   onChange: (patch: Partial<StandaloneFormState>) => void;
-  language: Language;
+  t: TranslationFn;
 }) {
   const settings: Array<{
     id: string;
@@ -5682,17 +5668,17 @@ function buildVideoPanelSettings({
   if (isVeo) {
     settings.push({
       id: "audio",
-      label: standaloneInlineLabel("audio", language),
-      value: standaloneInlineLabel("on", language),
+      label: standaloneInlineLabel("audio", t),
+      value: standaloneInlineLabel("on", t),
       kind: "readonly",
     });
   } else if (supportsAudioToggle) {
     settings.push({
       id: "audio",
-      label: standaloneInlineLabel("audio", language),
+      label: standaloneInlineLabel("audio", t),
       value: form.videoWithAudio
-        ? standaloneInlineLabel("on", language)
-        : standaloneInlineLabel("off", language),
+        ? standaloneInlineLabel("on", t)
+        : standaloneInlineLabel("off", t),
       kind: "toggle",
       checked: form.videoWithAudio,
       onToggle: (videoWithAudio) => onChange({ videoWithAudio }),
@@ -5702,7 +5688,7 @@ function buildVideoPanelSettings({
   if (ratioOptions.length > 0) {
     settings.push({
       id: "ratio",
-      label: standaloneInlineLabel("aspect", language),
+      label: standaloneInlineLabel("aspect", t),
       value: form.videoRatio,
       kind: "select",
       options: ratioOptions.map((value) => ({ value, label: value })),
@@ -5713,7 +5699,7 @@ function buildVideoPanelSettings({
   if (resolutionOptions.length > 0) {
     settings.push({
       id: "resolution",
-      label: standaloneInlineLabel("resolution", language),
+      label: standaloneInlineLabel("resolution", t),
       value: form.videoResolution,
       kind: "select",
       options: resolutionOptions.map((value) => ({ value, label: value })),
@@ -5724,7 +5710,7 @@ function buildVideoPanelSettings({
   if (!isMotion && durationOptions.length > 0) {
     settings.push({
       id: "duration",
-      label: standaloneInlineLabel("duration", language),
+      label: standaloneInlineLabel("duration", t),
       value: String(form.videoDuration),
       kind: "select",
       options: durationOptions.map((value) => ({ value, label: `${value}s` })),
@@ -5736,12 +5722,12 @@ function buildVideoPanelSettings({
   if (isMotion) {
     settings.push({
       id: "orientation",
-      label: standaloneInlineLabel("orientation", language),
+      label: standaloneInlineLabel("orientation", t),
       value: form.videoCharacterOrientation,
       kind: "select",
       options: [
-        { value: "image", label: standaloneInlineLabel("followImage", language) },
-        { value: "video", label: standaloneInlineLabel("followVideo", language) },
+        { value: "image", label: standaloneInlineLabel("followImage", t) },
+        { value: "video", label: standaloneInlineLabel("followVideo", t) },
       ],
       onChange: (videoCharacterOrientation) =>
         onChange({
@@ -5754,10 +5740,10 @@ function buildVideoPanelSettings({
   if ((isMotion || form.model === "kling-v3-omni") && videoSupportsReferenceVideo(form.model)) {
     settings.push({
       id: "keep-sound",
-      label: standaloneInlineLabel("originalSound", language),
+      label: standaloneInlineLabel("originalSound", t),
       value: form.videoKeepOriginalSound
-        ? standaloneInlineLabel("keep", language)
-        : standaloneInlineLabel("mute", language),
+        ? standaloneInlineLabel("keep", t)
+        : standaloneInlineLabel("mute", t),
       kind: "toggle",
       checked: form.videoKeepOriginalSound,
       onToggle: (videoKeepOriginalSound) =>
@@ -5768,12 +5754,12 @@ function buildVideoPanelSettings({
   if (isVeo) {
     settings.push({
       id: "people",
-      label: standaloneInlineLabel("people", language),
+      label: standaloneInlineLabel("people", t),
       value: form.videoPersonGeneration,
       kind: "select",
       options: [
-        { value: "allow_adult", label: standaloneInlineLabel("adultsOnly", language) },
-        { value: "allow_all", label: standaloneInlineLabel("allowChildren", language) },
+        { value: "allow_adult", label: standaloneInlineLabel("adultsOnly", t) },
+        { value: "allow_all", label: standaloneInlineLabel("allowChildren", t) },
       ],
       onChange: (videoPersonGeneration) =>
         onChange({
@@ -5786,10 +5772,10 @@ function buildVideoPanelSettings({
   if (isSeedance) {
     settings.push({
       id: "last-frame",
-      label: standaloneInlineLabel("lastFrame", language),
+      label: standaloneInlineLabel("lastFrame", t),
       value: form.videoReturnLastFrame
-        ? standaloneInlineLabel("return", language)
-        : standaloneInlineLabel("off", language),
+        ? standaloneInlineLabel("return", t)
+        : standaloneInlineLabel("off", t),
       kind: "toggle",
       checked: form.videoReturnLastFrame,
       onToggle: (videoReturnLastFrame) =>
@@ -5800,10 +5786,10 @@ function buildVideoPanelSettings({
   if (videoSupportsMultiShot(form.model)) {
     settings.push({
       id: "multi-shot",
-      label: standaloneInlineLabel("multiShot", language),
+      label: standaloneInlineLabel("multiShot", t),
       value: form.videoMultiShot
-        ? standaloneInlineLabel("director", language)
-        : standaloneInlineLabel("off", language),
+        ? standaloneInlineLabel("director", t)
+        : standaloneInlineLabel("off", t),
       kind: "toggle",
       checked: form.videoMultiShot,
       onToggle: (videoMultiShot) => onChange({ videoMultiShot }),
@@ -5818,13 +5804,11 @@ function buildImagePanelSettings({
   resolutionOptions,
   onChange,
   t,
-  language,
 }: {
   form: StandaloneFormState;
   resolutionOptions: string[];
   onChange: (patch: Partial<StandaloneFormState>) => void;
   t: TranslationFn;
-  language: Language;
 }): CreateVideoPanelSetting[] {
   const isGpt = form.model === "gpt-image-2";
   const isSeedream = isSeedreamImageModel(form.model);
@@ -5836,7 +5820,7 @@ function buildImagePanelSettings({
   if (!isSeedream) {
     settings.push({
       id: "image-aspect",
-      label: standaloneInlineLabel("aspect", language),
+      label: standaloneInlineLabel("aspect", t),
       value: form.aspectRatio,
       kind: "select",
       options: aspectOptions.map((value) => ({ value, label: value })),
@@ -5856,7 +5840,7 @@ function buildImagePanelSettings({
 
   settings.push({
     id: "image-resolution",
-    label: standaloneInlineLabel("resolution", language),
+    label: standaloneInlineLabel("resolution", t),
     value: form.imageResolution,
     kind: "select",
     options: resolutionOptions.map((value) => ({ value, label: value })),
@@ -5867,7 +5851,7 @@ function buildImagePanelSettings({
     settings.push(
       {
         id: "image-quality",
-        label: standaloneInlineLabel("quality", language),
+        label: standaloneInlineLabel("quality", t),
         value: form.quality,
         kind: "select",
         options: ["low", "medium", "high", "auto"].map((value) => ({
@@ -5878,7 +5862,7 @@ function buildImagePanelSettings({
       },
       {
         id: "image-format",
-        label: standaloneInlineLabel("format", language),
+        label: standaloneInlineLabel("format", t),
         value: form.outputFormat,
         kind: "select",
         options: ["png", "jpeg", "webp"].map((value) => ({
@@ -5896,7 +5880,7 @@ function buildImagePanelSettings({
     if (form.outputFormat !== "jpeg") {
       settings.push({
         id: "image-background",
-        label: standaloneInlineLabel("background", language),
+        label: standaloneInlineLabel("background", t),
         value: form.background,
         kind: "select",
         options: ["auto", "transparent", "opaque"].map((value) => ({
@@ -5915,20 +5899,18 @@ function buildThreeDPanelSettings({
   form,
   onChange,
   t,
-  language,
 }: {
   form: StandaloneFormState;
   onChange: (patch: Partial<StandaloneFormState>) => void;
   t: TranslationFn;
-  language: Language;
 }): CreateVideoPanelSetting[] {
   return [
     {
       id: "texture",
       label: t("workspace.standalone.texture"),
       value: form.texture
-        ? standaloneInlineLabel("on", language)
-        : standaloneInlineLabel("off", language),
+        ? standaloneInlineLabel("on", t)
+        : standaloneInlineLabel("off", t),
       kind: "toggle",
       checked: form.texture,
       onToggle: (texture) => onChange({ texture }),
@@ -5937,8 +5919,8 @@ function buildThreeDPanelSettings({
       id: "pbr",
       label: t("workspace.standalone.pbr_materials"),
       value: form.pbr
-        ? standaloneInlineLabel("on", language)
-        : standaloneInlineLabel("off", language),
+        ? standaloneInlineLabel("on", t)
+        : standaloneInlineLabel("off", t),
       kind: "toggle",
       checked: form.pbr,
       onToggle: (pbr) => onChange({ pbr }),
@@ -5946,12 +5928,12 @@ function buildThreeDPanelSettings({
   ];
 }
 
-function imageModelSettingTags(model: string, language: Language): Array<{
+function imageModelSettingTags(model: string, t: TranslationFn): Array<{
   label: string;
   icon?: "reference" | "resolution";
 }> {
   const maxRefs = model === "gpt-image-2" ? 16 : 14;
-  const referenceLabel = standaloneInlineLabel("reference", language);
+  const referenceLabel = standaloneInlineLabel("reference", t);
   if (model === "gpt-image-2") {
     return [
       { label: `${referenceLabel} ${maxRefs}`, icon: "reference" },
@@ -5970,31 +5952,31 @@ function imageModelSettingTags(model: string, language: Language): Array<{
   ];
 }
 
-function threeDModelSettingTags(model: string, language: Language): Array<{
+function threeDModelSettingTags(model: string, t: TranslationFn): Array<{
   label: string;
   icon?: "reference" | "resolution";
 }> {
   return [
     {
-      label: `${standaloneInlineLabel("reference", language)} ${max3dRefsForModel(model)}`,
+      label: `${standaloneInlineLabel("reference", t)} ${max3dRefsForModel(model)}`,
       icon: "reference",
     },
-    { label: standaloneInlineLabel("texture", language), icon: "resolution" },
+    { label: standaloneInlineLabel("texture", t), icon: "resolution" },
   ];
 }
 
-function audioModelSettingTags(model: string, language: Language): Array<{
+function audioModelSettingTags(model: string, t: TranslationFn): Array<{
   label: string;
   icon?: "audio" | "multi";
 }> {
   if (model.startsWith("elevenlabs-") || model.startsWith("eleven_")) {
     return [
-      { label: standaloneInlineLabel("liveVoices", language), icon: "audio" },
-      { label: standaloneInlineLabel("style", language), icon: "multi" },
+      { label: standaloneInlineLabel("liveVoices", t), icon: "audio" },
+      { label: standaloneInlineLabel("style", t), icon: "multi" },
     ];
   }
   return [
-    { label: standaloneInlineLabel("instructions", language), icon: "multi" },
+    { label: standaloneInlineLabel("instructions", t), icon: "multi" },
   ];
 }
 

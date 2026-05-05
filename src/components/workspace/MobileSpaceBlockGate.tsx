@@ -1,7 +1,7 @@
 import { ArrowLeft, Maximize2, Monitor, Smartphone } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { getLocalizedText, useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 function isPhoneViewport() {
   if (typeof window === "undefined") return false;
@@ -35,7 +35,7 @@ export default function MobileSpaceBlockGate({
 }: {
   children: ReactNode;
 }) {
-  const { language } = useLanguage();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [isPhone, setIsPhone] = useState(() => isPhoneViewport());
 
@@ -51,9 +51,6 @@ export default function MobileSpaceBlockGate({
   }, []);
 
   if (!isPhone) return <>{children}</>;
-
-  const txt = (values: Parameters<typeof getLocalizedText>[1]) =>
-    getLocalizedText(language, values);
 
   // Always send the user back to the dashboard rather than `history.back()`
   // — they often arrive at a Space via a direct link (share / push notif),
@@ -78,38 +75,28 @@ export default function MobileSpaceBlockGate({
               MediaForge Space
             </p>
             <h1 className="mt-1 text-xl font-semibold tracking-normal text-white">
-              {txt({ en: "Use a larger screen", th: "ต้องใช้หน้าจอที่ใหญ่กว่านี้", es: "Usa una pantalla más grande", ja: "より大きな画面で開いてください" })}
+              {t("mobileSpaceBlockGate.title")}
             </h1>
           </div>
         </div>
 
         <div className="space-y-3 text-sm leading-6 text-zinc-300">
           <p>
-            {txt({
-              en: "Space is not available on phones because the canvas, nodes, prompts, and drag controls need more room to work reliably.",
-              th: "ฟีเจอร์ Space ไม่รองรับการใช้งานบนมือถือ เพราะพื้นที่จอไม่พอสำหรับ canvas, node, prompt และการลากเชื่อมต่อให้แม่นยำ",
-              es: "Space no está disponible en teléfonos porque el canvas, los nodos, los prompts y los controles de arrastre necesitan más espacio para funcionar bien.",
-              ja: "Space はスマートフォンでは利用できません。canvas、node、prompt、ドラッグ操作を安定して使うには、より広い画面が必要です。",
-            })}
+            {t("mobileSpaceBlockGate.description")}
           </p>
           <p className="text-zinc-400">
-            {txt({
-              en: "Please open it on a desktop, laptop, iPad, or another larger screen.",
-              th: "กรุณาเปิดผ่าน Desktop, Laptop, iPad หรือหน้าจอที่กว้างกว่านี้",
-              es: "Ábrelo en desktop, laptop, iPad u otra pantalla más grande.",
-              ja: "Desktop、Laptop、iPad など、より大きな画面で開いてください。",
-            })}
+            {t("mobileSpaceBlockGate.openOnLargerScreen")}
           </p>
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-2 text-xs font-medium text-zinc-400">
           <div className="flex items-center gap-2 rounded-md bg-black/25 px-3 py-2">
             <Smartphone className="h-3.5 w-3.5 text-zinc-500" />
-            {txt({ en: "Phone blocked", th: "มือถือถูกบล็อก", es: "Teléfono bloqueado", ja: "スマホは非対応" })}
+            {t("mobileSpaceBlockGate.phoneBlocked")}
           </div>
           <div className="flex items-center gap-2 rounded-md bg-black/25 px-3 py-2">
             <Maximize2 className="h-3.5 w-3.5 text-zinc-500" />
-            {txt({ en: "Bigger screen", th: "ใช้จอใหญ่กว่า", es: "Pantalla más grande", ja: "大きな画面" })}
+            {t("mobileSpaceBlockGate.biggerScreen")}
           </div>
         </div>
 
@@ -119,7 +106,7 @@ export default function MobileSpaceBlockGate({
           className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-white text-sm font-semibold text-zinc-900 transition hover:bg-zinc-200"
         >
           <ArrowLeft className="h-4 w-4" />
-          {txt({ en: "Back to dashboard", th: "กลับหน้าหลัก", es: "Volver al panel", ja: "ダッシュボードに戻る" })}
+          {t("mobileSpaceBlockGate.backToDashboard")}
         </button>
       </section>
     </main>

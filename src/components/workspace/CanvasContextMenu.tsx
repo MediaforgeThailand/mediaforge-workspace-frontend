@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
+import type { TranslationKey } from "@/contexts/locales/en";
 
 export type ToolCategory =
   | "all"
@@ -44,15 +45,15 @@ export type ToolCategory =
 type ToolSection = "basics" | "media" | "references";
 
 const SECTION_ORDER: ToolSection[] = ["basics", "media", "references"];
-const SECTION_LABELS: Record<ToolSection, string> = {
-  basics: "BASICS",
-  media: "MEDIA",
-  references: "REFERENCES",
+const SECTION_LABEL_KEYS: Record<ToolSection, TranslationKey> = {
+  basics: "workspace.picker.section.basics",
+  media: "workspace.picker.section.media",
+  references: "workspace.picker.section.references",
 };
 
 const CATEGORY_TABS: Array<{
   id: ToolCategory;
-  labelKey: string;
+  labelKey: TranslationKey;
   icon: LucideIcon;
 }> = [
   { id: "all", labelKey: "workspace.picker.cat_all", icon: LayoutGrid },
@@ -68,9 +69,9 @@ const CATEGORY_TABS: Array<{
 export interface ToolItem {
   nodeType: string;
   action?: "upload" | "assets" | "stock";
-  labelKey?: string;
+  labelKey?: TranslationKey;
   labelText?: string;
-  descriptionKey?: string;
+  descriptionKey?: TranslationKey;
   descriptionText?: string;
   defaultLabel: string;
   section: ToolSection;
@@ -120,8 +121,8 @@ const CATALOG: ToolItem[] = [
   },
   {
     nodeType: "chatAiNode",
-    labelText: "Assistant",
-    descriptionText: "Reason about prompts, briefs, and connected context.",
+    labelKey: "workspace.toolnames.assistant",
+    descriptionKey: "workspace.toolnames.assistant_desc",
     defaultLabel: "Chat AI",
     section: "basics",
     category: "addon",
@@ -436,7 +437,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
             groupedItems.map((group) => (
               <div key={group.section} className="pb-1">
                 <div className="px-1 pb-0.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.03em] text-zinc-500">
-                  {SECTION_LABELS[group.section]}
+                  {t(SECTION_LABEL_KEYS[group.section])}
                 </div>
                 <ul className="space-y-px">
                   {group.items.map(({ item, index }) => {

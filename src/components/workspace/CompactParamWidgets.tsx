@@ -399,6 +399,7 @@ export function NumberStepper({
   onChange,
   prefix = "×",
 }: NumberStepperProps) {
+  const { t } = useLanguage();
   const dec = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -421,7 +422,7 @@ export function NumberStepper({
         onClick={dec}
         className="ws-stepper-btn"
         disabled={value <= min}
-        aria-label="Decrease"
+        aria-label={t("compactParamWidgets.decrease")}
       >
         <Minus />
       </button>
@@ -434,7 +435,7 @@ export function NumberStepper({
         onClick={inc}
         className="ws-stepper-btn"
         disabled={value >= max}
-        aria-label="Increase"
+        aria-label={t("compactParamWidgets.increase")}
       >
         <Plus />
       </button>

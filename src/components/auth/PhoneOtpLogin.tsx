@@ -6,7 +6,7 @@ import { Loader2, Phone, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { getLocalizedText, useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface PhoneOtpLoginProps {
   onSuccess?: () => void;
@@ -18,7 +18,7 @@ type Step = "phone" | "otp" | "success";
 
 const PhoneOtpLogin = ({ onSuccess, onBack, compact = false }: PhoneOtpLoginProps) => {
   const { toast } = useToast();
-  const { language } = useLanguage();
+  const { t } = useLanguage();
   const [step, setStep] = useState<Step>("phone");
   const [phone, setPhone] = useState("");
   const [normalizedPhone, setNormalizedPhone] = useState("");
@@ -26,9 +26,6 @@ const PhoneOtpLogin = ({ onSuccess, onBack, compact = false }: PhoneOtpLoginProp
   const [isLoading, setIsLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
-
-  const txt = (th: string, en: string, es = en, ja = en) =>
-    getLocalizedText(language, { en, th, es, ja });
 
   useEffect(() => {
     if (countdown > 0) {
@@ -48,7 +45,7 @@ const PhoneOtpLogin = ({ onSuccess, onBack, compact = false }: PhoneOtpLoginProp
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone || phone.length < 9) {
-      toast({ variant: "destructive", title: txt("กรุณากรอกเบอร์โทรที่ถูกต้อง", "Enter a valid phone number", "Ingresa un número de teléfono válido", "有効な電話番号を入力してください") });
+      toast({ variant: "destructive", title: t("phoneOtp.invalidPhone") });
       return;
     }
 
@@ -61,7 +58,7 @@ const PhoneOtpLogin = ({ onSuccess, onBack, compact = false }: PhoneOtpLoginProp
       if (error || data?.error) {
         toast({
           variant: "destructive",
-          title: txt("ส่ง OTP ไม่สำเร็จ", "Failed to send OTP", "No se pudo enviar el OTP", "OTP の送信に失敗しました"),
+          title: t("phoneOtp.sendFailed"),
           description: data?.error || error?.message,
         });
         setIsLoading(false);
@@ -72,7 +69,7 @@ const PhoneOtpLogin = ({ onSuccess, onBack, compact = false }: PhoneOtpLoginProp
       setStep("otp");
       setCountdown(60);
     } catch {
-      toast({ variant: "destructive", title: txt("เกิดข้อผิดพลาด", "Error", "Error", "エラー") });
+      toast({ variant: "destructive", title: t("phoneOtp.genericError") });
     } finally {
       setIsLoading(false);
     }
@@ -90,7 +87,7 @@ const PhoneOtpLogin = ({ onSuccess, onBack, compact = false }: PhoneOtpLoginProp
       if (error || data?.error) {
         toast({
           variant: "destructive",
-          title: txt("ยืนยัน OTP ไม่สำเร็จ", "OTP verification failed", "No se pudo verificar el OTP", "OTP 認証に失敗しました"),
+          title: t("phoneOtp.verifyFailed"),
           description: data?.error || error?.message,
         });
         setIsLoading(false);
@@ -112,7 +109,7 @@ const PhoneOtpLogin = ({ onSuccess, onBack, compact = false }: PhoneOtpLoginProp
             console.error("Session verify error:", verifyError);
             toast({
               variant: "destructive",
-              title: txt("เข้าสู่ระบบไม่สำเร็จ", "Login failed", "No se pudo iniciar sesión", "ログインに失敗しました"),
+              title: t("phoneOtp.loginFailed"),
               description: verifyError.message,
             });
             setIsLoading(false);
@@ -126,7 +123,7 @@ const PhoneOtpLogin = ({ onSuccess, onBack, compact = false }: PhoneOtpLoginProp
         }, 1500);
       }
     } catch {
-      toast({ variant: "destructive", title: txt("เกิดข้อผิดพลาด", "Error", "Error", "エラー") });
+      toast({ variant: "destructive", title: t("phoneOtp.genericError") });
     } finally {
       setIsLoading(false);
     }
@@ -144,15 +141,15 @@ const PhoneOtpLogin = ({ onSuccess, onBack, compact = false }: PhoneOtpLoginProp
       if (error || data?.error) {
         toast({
           variant: "destructive",
-          title: txt("ส่ง OTP ไม่สำเร็จ", "Failed to resend OTP", "No se pudo reenviar el OTP", "OTP の再送信に失敗しました"),
+          title: t("phoneOtp.resendFailed"),
           description: data?.error || error?.message,
         });
       } else {
         setCountdown(60);
-        toast({ title: txt("ส่ง OTP ใหม่แล้ว", "OTP resent", "OTP reenviado", "OTP を再送信しました") });
+        toast({ title: t("phoneOtp.resent") });
       }
     } catch {
-      toast({ variant: "destructive", title: txt("เกิดข้อผิดพลาด", "Error", "Error", "エラー") });
+      toast({ variant: "destructive", title: t("phoneOtp.genericError") });
     } finally {
       setIsLoading(false);
     }
@@ -172,7 +169,7 @@ const PhoneOtpLogin = ({ onSuccess, onBack, compact = false }: PhoneOtpLoginProp
           <CheckCircle2 className="w-8 h-8 text-green-500" />
         </div>
         <p className="text-sm font-semibold text-foreground">
-          {txt("เข้าสู่ระบบสำเร็จ!", "Login successful!", "¡Inicio de sesión correcto!", "ログインしました！")}
+          {t("phoneOtp.success")}
         </p>
       </div>
     );
@@ -183,7 +180,7 @@ const PhoneOtpLogin = ({ onSuccess, onBack, compact = false }: PhoneOtpLoginProp
       <div className="space-y-4">
         <div className="text-center space-y-1">
           <p className="text-sm text-muted-foreground">
-            {txt("ส่งรหัส OTP ไปที่", "OTP sent to", "OTP enviado a", "OTP の送信先")}
+            {t("phoneOtp.sentTo")}
           </p>
           <p className="text-sm font-semibold text-foreground">{normalizedPhone}</p>
         </div>
@@ -209,7 +206,7 @@ const PhoneOtpLogin = ({ onSuccess, onBack, compact = false }: PhoneOtpLoginProp
         {isLoading && (
           <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" />
-            {txt("กำลังตรวจสอบ...", "Verifying...", "Verificando...", "確認中...")}
+            {t("phoneOtp.verifying")}
           </div>
         )}
 
@@ -223,7 +220,7 @@ const PhoneOtpLogin = ({ onSuccess, onBack, compact = false }: PhoneOtpLoginProp
             className="text-muted-foreground hover:text-foreground flex items-center gap-1"
           >
             <ArrowLeft className="w-3 h-3" />
-            {txt("เปลี่ยนเบอร์", "Change number", "Cambiar número", "電話番号を変更")}
+            {t("phoneOtp.changeNumber")}
           </button>
 
           <button
@@ -233,8 +230,8 @@ const PhoneOtpLogin = ({ onSuccess, onBack, compact = false }: PhoneOtpLoginProp
             className="text-primary hover:underline disabled:text-muted-foreground disabled:no-underline"
           >
             {countdown > 0
-              ? txt(`ส่งใหม่ใน ${countdown}s`, `Resend in ${countdown}s`, `Reenviar en ${countdown}s`, `${countdown}s 後に再送信`)
-              : txt("ส่งรหัสใหม่", "Resend code", "Reenviar código", "コードを再送信")}
+              ? t("phoneOtp.resendIn", { seconds: countdown })
+              : t("phoneOtp.resendCode")}
           </button>
         </div>
       </div>
@@ -246,7 +243,7 @@ const PhoneOtpLogin = ({ onSuccess, onBack, compact = false }: PhoneOtpLoginProp
     <form onSubmit={handleSendOtp} className="space-y-3">
       <div className="space-y-1.5">
         <Label htmlFor="phone-input" className="text-xs">
-          {txt("เบอร์โทรศัพท์", "Phone Number", "Número de teléfono", "電話番号")}
+          {t("phoneOtp.phoneNumber")}
         </Label>
         <div className="relative">
           <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -263,7 +260,7 @@ const PhoneOtpLogin = ({ onSuccess, onBack, compact = false }: PhoneOtpLoginProp
           />
         </div>
         <p className="text-[10px] text-muted-foreground">
-          {txt("ระบบจะส่ง SMS พร้อมรหัส OTP 6 หลัก", "We'll send a 6-digit OTP via SMS", "Te enviaremos un OTP de 6 dígitos por SMS", "SMS で 6 桁の OTP を送信します")}
+          {t("phoneOtp.smsHelp")}
         </p>
       </div>
 
@@ -274,8 +271,8 @@ const PhoneOtpLogin = ({ onSuccess, onBack, compact = false }: PhoneOtpLoginProp
           <Phone className="mr-2 h-4 w-4" />
         )}
         {isLoading
-          ? txt("กำลังส่ง OTP...", "Sending OTP...", "Enviando OTP...", "OTP を送信中...")
-          : txt("ส่งรหัส OTP", "Send OTP", "Enviar OTP", "OTP を送信")}
+          ? t("phoneOtp.sending")
+          : t("phoneOtp.sendCode")}
       </Button>
 
       {onBack && (
@@ -284,7 +281,7 @@ const PhoneOtpLogin = ({ onSuccess, onBack, compact = false }: PhoneOtpLoginProp
           onClick={onBack}
           className="w-full text-xs text-muted-foreground hover:text-foreground text-center"
         >
-          {txt("เข้าสู่ระบบด้วย Email แทน", "Sign in with Email instead", "Iniciar sesión con Email", "Email でログイン")}
+          {t("phoneOtp.emailInstead")}
         </button>
       )}
     </form>

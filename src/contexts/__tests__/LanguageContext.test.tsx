@@ -204,7 +204,7 @@ describe("LanguageContext", () => {
     await waitFor(() => expect(getByTestId("translated").textContent).toBe("分析"));
   });
 
-  it("does not force Hindi from India IP when navigator language is unknown", async () => {
+  it("uses Hindi when IP country is India and navigator language is unknown", async () => {
     setNavigatorLanguage(["zz-ZZ"], "zz-ZZ");
     vi.stubGlobal(
       "fetch",
@@ -221,8 +221,8 @@ describe("LanguageContext", () => {
     );
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
-    expect(getByTestId("lang").textContent).toBe("en");
-    expect(getByTestId("translated").textContent).toBe("Analytics");
+    await waitFor(() => expect(getByTestId("lang").textContent).toBe("hi"));
+    expect(getByTestId("translated").textContent).toBe("एनालिटिक्स");
   });
 
   it("uses English when IP country is not mapped to a supported language", async () => {

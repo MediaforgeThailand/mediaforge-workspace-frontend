@@ -32,7 +32,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { getLocalizedText, useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
 
 export interface CreateProjectMeta {
@@ -67,9 +67,7 @@ export function CreateProjectDialog({
   defaultColor,
   onCreate,
 }: CreateProjectDialogProps) {
-  const { language } = useLanguage();
-  const txt = (values: Parameters<typeof getLocalizedText>[1]) =>
-    getLocalizedText(language, values);
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [isPrivate, setIsPrivate] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -97,12 +95,7 @@ export function CreateProjectDialog({
     setSubmitting(true);
     try {
       const trimmedName = name.trim();
-      const fallbackName = txt({
-        en: "Untitled project",
-        th: "โปรเจคไม่มีชื่อ",
-        es: "Proyecto sin título",
-        ja: "無題のプロジェクト",
-      });
+      const fallbackName = t("createProject.untitled");
       const finalName = (trimmedName || fallbackName).slice(0, 80);
       await onCreate({
         name: finalName,
@@ -138,17 +131,17 @@ export function CreateProjectDialog({
         <DialogHeader className="space-y-0.5">
           <DialogTitle className="flex items-center gap-2 text-[17px] font-semibold leading-6 text-zinc-50">
             <FolderPlus className="h-4 w-4 text-zinc-400" />
-            {txt({ en: "Create new project", th: "สร้างโปรเจคใหม่", es: "Crear nuevo proyecto", ja: "新しいプロジェクトを作成" })}
+            {t("createProject.title")}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            {txt({ en: "Pick a name and set privacy", th: "ตั้งชื่อโปรเจคและเลือกความเป็นส่วนตัว", es: "Elige un nombre y configura la privacidad", ja: "名前と公開範囲を設定" })}
+            {t("createProject.description")}
           </DialogDescription>
         </DialogHeader>
 
         {/* ── Name ─────────────────────────────────────────────── */}
         <div className="space-y-1.5">
           <label className="text-[13px] font-medium text-zinc-300">
-            {txt({ en: "Project name", th: "ชื่อโปรเจค", es: "Nombre del proyecto", ja: "プロジェクト名" })}
+            {t("createProject.nameLabel")}
           </label>
           <input
             type="text"
@@ -156,7 +149,7 @@ export function CreateProjectDialog({
             onChange={(e) => setName(e.target.value.slice(0, 80))}
             disabled={submitting}
             placeholder={
-              txt({ en: "e.g. Songkran Campaign 2026", th: "เช่น แคมเปญสงกรานต์ 2026", es: "por ej. Campaña Songkran 2026", ja: "例: Songkran Campaign 2026" })
+              t("createProject.namePlaceholder")
             }
             autoFocus
             spellCheck={false}
@@ -197,12 +190,12 @@ export function CreateProjectDialog({
             </span>
             <div className="min-w-0 leading-tight">
               <div className="text-[13px] font-medium text-zinc-100">
-                {txt({ en: "Private project", th: "โปรเจคส่วนตัว", es: "Proyecto privado", ja: "非公開プロジェクト" })}
+                {t("createProject.privateProject")}
               </div>
               <div className="mt-0.5 text-[12px] text-zinc-400">
                 {isPrivate
-                  ? txt({ en: "Only you can see", th: "เฉพาะคุณเท่านั้นที่เห็น", es: "Solo tú puedes verlo", ja: "自分だけが閲覧できます" })
-                  : txt({ en: "Team can see", th: "ทีมในองค์กรเดียวกันเห็นได้", es: "El equipo puede ver", ja: "チームが閲覧できます" })}
+                  ? t("createProject.onlyYouCanSee")
+                  : t("createProject.teamCanSee")}
               </div>
             </div>
           </div>
@@ -213,7 +206,7 @@ export function CreateProjectDialog({
             tabIndex={-1}
             className="pointer-events-none h-5 w-9 [&>span]:h-4 [&>span]:w-4 [&>span]:data-[state=checked]:translate-x-4"
             aria-label={
-              txt({ en: "Toggle private", th: "เปิด/ปิดโปรเจคส่วนตัว", es: "Alternar privado", ja: "非公開を切り替え" })
+              t("createProject.togglePrivate")
             }
           />
         </button>
@@ -231,7 +224,7 @@ export function CreateProjectDialog({
             disabled={submitting}
             className="inline-flex h-8 items-center justify-center rounded-md bg-white/[0.06] px-3.5 text-[13px] font-medium text-zinc-200 transition-colors hover:bg-white/[0.09] disabled:opacity-50"
           >
-            {txt({ en: "Cancel", th: "ยกเลิก", es: "Cancelar", ja: "キャンセル" })}
+            {t("createProject.cancel")}
           </button>
           <button
             type="button"
@@ -242,12 +235,12 @@ export function CreateProjectDialog({
             {submitting ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                {txt({ en: "Creating…", th: "กำลังสร้าง…", es: "Creando…", ja: "作成中…" })}
+                {t("createProject.creating")}
               </>
             ) : (
               <>
                 <FolderPlus className="h-3.5 w-3.5" />
-                {txt({ en: "Create", th: "สร้าง", es: "Crear", ja: "作成" })}
+                {t("createProject.create")}
               </>
             )}
           </button>

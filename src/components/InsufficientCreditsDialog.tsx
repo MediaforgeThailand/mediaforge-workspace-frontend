@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ArrowUpCircle, BookOpen, Coins, Zap } from "lucide-react";
 import { useCredits } from "@/hooks/useCredits";
-import { getLocalizedText, useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import BuyCreditsDialog from "@/components/settings/BuyCreditsDialog";
 
 interface InsufficientCreditsDialogProps {
@@ -28,11 +28,14 @@ const InsufficientCreditsDialog = ({
 }: InsufficientCreditsDialogProps) => {
   const navigate = useNavigate();
   const { credits, refetch } = useCredits(workspaceId);
-  const { language } = useLanguage();
+  const { t } = useLanguage();
   const [topupOpen, setTopupOpen] = useState(false);
 
   const balance = credits?.balance ?? 0;
   const shortage = requiredCredits ? Math.max(0, requiredCredits - balance) : 0;
+  const balanceText = balance.toLocaleString();
+  const requiredText = requiredCredits?.toLocaleString() ?? "";
+  const shortageText = shortage.toLocaleString();
   const isEducationSpace =
     credits?.credit_scope === "education_space" ||
     credits?.organization_type === "school" ||
@@ -42,8 +45,6 @@ const InsufficientCreditsDialog = ({
     onOpenChange(false);
     navigate("/app/pricing");
   };
-  const txt = (values: Parameters<typeof getLocalizedText>[1]) =>
-    getLocalizedText(language, values);
 
   return (
     <>
@@ -53,55 +54,25 @@ const InsufficientCreditsDialog = ({
             <DialogTitle className="flex items-center gap-2 text-white">
               <Coins className="h-5 w-5 text-sky-400" />
               {isEducationSpace
-                ? txt({ en: "Class space credits are low", th: "เครดิตใน class space ไม่พอ", es: "Los créditos de espacio de clase son bajos", ja: "クラススペースのクレジットが不足しています" })
-                : txt({ en: "Not enough credits", th: "เครดิตไม่เพียงพอ", es: "No hay suficientes créditos", ja: "クレジットが不足しています" })}
+                ? t("insufficientCredits.classSpaceLow")
+                : t("insufficientCredits.notEnough")}
             </DialogTitle>
             <DialogDescription className="text-zinc-300">
               {isEducationSpace
-                ? txt({
-                    en: `This class space has ${balance.toLocaleString()} credits. Ask your teacher to add credits to this space before continuing.`,
-                    th: `space นี้มี ${balance.toLocaleString()} credits ให้ขออาจารย์เติมเครดิตใน class space นี้ก่อนใช้งานต่อ`,
-                    es: `Este espacio de clase tiene ${balance.toLocaleString()} créditos. Pide a tu profesor que agregue créditos a este espacio antes de continuar.`,
-                    ja: `このクラススペースには ${balance.toLocaleString()} クレジットがあります。続ける前に先生にこのスペースへクレジットを追加してもらってください。`,
-                  })
+                ? t("insufficientCredits.classSpaceDescription", { balance: balanceText })
                 : requiredCredits
-                  ? txt({
-                      en: `This action needs ${requiredCredits.toLocaleString()} credits. Current balance: ${balance.toLocaleString()} credits.`,
-                      th: `ต้องใช้ ${requiredCredits.toLocaleString()} credits แต่ตอนนี้มี ${balance.toLocaleString()} credits`,
-                      es: `Esta acción necesita ${requiredCredits.toLocaleString()} créditos. Saldo actual: ${balance.toLocaleString()} créditos.`,
-                      ja: `この操作には ${requiredCredits.toLocaleString()} クレジットが必要です。現在の残高: ${balance.toLocaleString()} クレジット。`,
-                    })
-                  : txt({
-                      en: `Current balance: ${balance.toLocaleString()} credits.`,
-                      th: `ยอดคงเหลือปัจจุบัน ${balance.toLocaleString()} credits`,
-                      es: `Saldo actual: ${balance.toLocaleString()} créditos.`,
-                      ja: `現在の残高: ${balance.toLocaleString()} クレジット。`,
-                    })}
+                  ? t("insufficientCredits.requiredDescription", { required: requiredText, balance: balanceText })
+                  : t("insufficientCredits.balanceDescription", { balance: balanceText })}
             </DialogDescription>
           </DialogHeader>
 
           <div className="mt-2 space-y-3">
             <div className="rounded-xl border border-sky-400/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
               {isEducationSpace
-                ? txt({
-                    en: "Student credits are locked to each class space, so personal top-ups cannot be used here.",
-                    th: "เครดิตของนักเรียนถูกล็อกตาม class space จึงไม่สามารถเติมเงินส่วนตัวเพื่อใช้แทนได้",
-                    es: "Los créditos estudiantiles están bloqueados en cada espacio de clase, por lo que aquí no se pueden utilizar recargas personales.",
-                    ja: "学生のクレジットは各クラススペースに紐づいているため、ここでは個人のチャージを代わりに使えません。",
-                  })
+                ? t("insufficientCredits.classSpaceLocked")
                 : shortage > 0
-                  ? txt({
-                      en: `Short by ${shortage.toLocaleString()} credits.`,
-                      th: `ขาดอีก ${shortage.toLocaleString()} credits`,
-                      es: `Faltan ${shortage.toLocaleString()} créditos.`,
-                      ja: `${shortage.toLocaleString()} クレジット不足しています。`,
-                    })
-                  : txt({
-                      en: "Top up credits or choose a plan to continue.",
-                      th: "เติมเครดิตหรือเลือกแพ็กเกจใหม่เพื่อใช้งานต่อ",
-                      es: "Recarga créditos o elige un plan para continuar.",
-                      ja: "クレジットをチャージするか、プランを選んで続行してください。",
-                    })}
+                  ? t("insufficientCredits.shortBy", { shortage: shortageText })
+                  : t("insufficientCredits.topUpOrChoosePlan")}
             </div>
 
             {isEducationSpace ? (
@@ -110,7 +81,7 @@ const InsufficientCreditsDialog = ({
                 onClick={() => onOpenChange(false)}
               >
                 <BookOpen className="mr-2 h-4 w-4" />
-                {txt({ en: "Back to class space", th: "กลับไปที่ class space", es: "Volver al espacio de clase", ja: "クラススペースに戻る" })}
+                {t("insufficientCredits.backToClassSpace")}
               </Button>
             ) : (
               <>
@@ -119,7 +90,7 @@ const InsufficientCreditsDialog = ({
                   onClick={() => setTopupOpen(true)}
                 >
                   <Zap className="mr-2 h-4 w-4" />
-                  {txt({ en: "Quick top-up with PromptPay QR", th: "Top-up ด่วนด้วย PromptPay QR", es: "Recarga rápida con PromptPay QR", ja: "PromptPay QR でクイックチャージ" })}
+                  {t("insufficientCredits.quickTopUpPromptPay")}
                 </Button>
 
                 <Button
@@ -128,7 +99,7 @@ const InsufficientCreditsDialog = ({
                   onClick={handleGoToPricing}
                 >
                   <ArrowUpCircle className="mr-2 h-4 w-4" />
-                  {txt({ en: "Go to plans and pricing", th: "ไปหน้า Plan & Pricing", es: "Ir a planes y precios", ja: "プランと料金へ" })}
+                  {t("insufficientCredits.goToPlansPricing")}
                 </Button>
               </>
             )}

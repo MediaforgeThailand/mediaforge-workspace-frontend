@@ -8,6 +8,7 @@ import { Plus, Trash2, Film, GripVertical, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PromptMentionTextarea from "./PromptMentionTextarea";
 import { KLING_MULTISHOT_SCENE_LIMIT } from "@/lib/promptLimits";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export interface SceneBlock {
   prompt: string;
@@ -63,6 +64,7 @@ const SceneThumb = memo(({ index }: { index: number }) => (
 SceneThumb.displayName = "SceneThumb";
 
 const MultiShotBuilder = memo(({ scenes, onChange, excludeNodeId }: MultiShotBuilderProps) => {
+  const { t } = useLanguage();
   const effectiveScenes = scenes.length > 0 ? scenes : [{ prompt: "", duration: 3 }];
 
   const updateScene = useCallback(
@@ -114,15 +116,15 @@ const MultiShotBuilder = memo(({ scenes, onChange, excludeNodeId }: MultiShotBui
             <Film className="w-2.5 h-2.5" />
           </div>
           <div className="leading-tight">
-            <div className="text-[11px] font-semibold text-white">Director Mode</div>
+            <div className="text-[11px] font-semibold text-white">{t("multiShot.directorMode")}</div>
             <div className="text-[9.5px] font-mono text-white/45">
-              storyboard · {effectiveScenes.length}/{MAX_SCENES} scenes
+              {t("multiShot.storyboardScenes", { count: effectiveScenes.length, max: MAX_SCENES })}
             </div>
           </div>
         </div>
         <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-400/15 text-violet-200 font-mono font-semibold text-[10.5px] tracking-[0.04em]">
           <Clock className="w-2.5 h-2.5" />
-          {totalDuration}s total
+          {t("multiShot.totalDuration", { seconds: totalDuration })}
         </div>
       </div>
 
@@ -141,8 +143,8 @@ const MultiShotBuilder = memo(({ scenes, onChange, excludeNodeId }: MultiShotBui
           ))}
         </div>
         <div className="flex justify-between mt-1 font-mono text-[9px] text-white/30">
-          <span>0s</span>
-          <span>{totalDuration}s</span>
+          <span>{t("multiShot.zeroSeconds")}</span>
+          <span>{totalDuration}{t("multiShot.secondsSuffix")}</span>
         </div>
       </div>
 
@@ -159,7 +161,7 @@ const MultiShotBuilder = memo(({ scenes, onChange, excludeNodeId }: MultiShotBui
                   <div className="flex items-center gap-1.5">
                     <GripVertical className="w-2.5 h-2.5 text-white/30" />
                     <span className="font-mono text-[10px] font-semibold text-violet-300 tracking-[0.08em]">
-                      SCENE {String(idx + 1).padStart(2, "0")}
+                      {t("multiShot.sceneNumber", { number: String(idx + 1).padStart(2, "0") })}
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
@@ -181,7 +183,7 @@ const MultiShotBuilder = memo(({ scenes, onChange, excludeNodeId }: MultiShotBui
                         }}
                         className="w-5 bg-transparent border-0 text-right font-mono text-[10px] text-white/85 outline-none nodrag nopan nowheel"
                       />
-                      <span className="text-white/45">s</span>
+                      <span className="text-white/45">{t("multiShot.secondsSuffix")}</span>
                     </div>
                     {effectiveScenes.length > 1 && (
                       <button
@@ -189,7 +191,7 @@ const MultiShotBuilder = memo(({ scenes, onChange, excludeNodeId }: MultiShotBui
                         onMouseDown={stop}
                         onPointerDown={stop}
                         className="w-5 h-5 rounded-md flex items-center justify-center text-white/30 hover:text-red-300 hover:bg-red-500/10 transition-colors"
-                        title="Remove scene"
+                        title={t("multiShot.removeScene")}
                       >
                         <Trash2 className="w-2.5 h-2.5" />
                       </button>
@@ -199,7 +201,7 @@ const MultiShotBuilder = memo(({ scenes, onChange, excludeNodeId }: MultiShotBui
                 <PromptMentionTextarea
                   value={scene.prompt}
                   onChange={(val) => updateScene(idx, "prompt", val)}
-                  placeholder={`Scene ${idx + 1} prompt... (type @ for media · # for vars)`}
+                  placeholder={t("multiShot.scenePromptPlaceholder", { scene: idx + 1 })}
                   excludeNodeId={excludeNodeId}
                   allowedNodeTypes={["inputNode", "bananaProNode", "klingVideoNode", "chatAiNode"]}
                   allowedTextVarTypes={["textInputNode"]}
@@ -224,7 +226,7 @@ const MultiShotBuilder = memo(({ scenes, onChange, excludeNodeId }: MultiShotBui
           )}
         >
           <Plus className="w-3 h-3" />
-          Add Scene ({effectiveScenes.length}/{MAX_SCENES})
+          {t("multiShot.addScene", { count: effectiveScenes.length, max: MAX_SCENES })}
         </button>
       )}
     </div>

@@ -718,7 +718,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const runNode = useCallback(async () => {
     if (isRunning) return;
     if (isViewer) {
-      toast.info("View-only mode — runs are disabled.");
+      toast.info(t("workspace.toolNode.viewOnlyRunsDisabled"));
       return;
     }
     const storeState = useWorkspaceStore.getState();
@@ -1585,7 +1585,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         toast.error(friendlyError(errorMessage, language === "th" || language === "ja" ? language : "en"));
       }
     }
-  }, [getNodes, id, isRunning, isViewer, params, schemaKey, setNodes, selectedModel, schema, d.params?.nodeName, language]);
+  }, [getNodes, id, isRunning, isViewer, params, schemaKey, setNodes, selectedModel, schema, d.params?.nodeName, language, t]);
 
   useEffect(() => {
     if (!isRunning) return;
@@ -2096,7 +2096,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   if (!schema) {
     return (
       <div className="rounded-md border border-red-500 bg-red-950 px-3 py-2 text-xs text-red-200">
-        Unknown node type: {schemaKey}
+        {t("workspace.toolNode.unknownNodeType", { nodeType: schemaKey })}
       </div>
     );
   }
@@ -2279,7 +2279,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             // plain Radix Select. Keeps short dropdowns snappy.
             searchable={param.key === "model_name"}
             searchFooter={
-              param.key === "model_name" ? "All models" : undefined
+              param.key === "model_name" ? t("createImagePanel.allModels") : undefined
             }
           />
         );
@@ -2447,7 +2447,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               {currentGen.url ? (
                 <img
                   src={previewImageUrl ?? currentGen.url}
-                  alt="3D model preview"
+                  alt={t("workspace.toolNode.modelPreviewAlt")}
                   draggable={false}
                   loading="lazy"
                   decoding="async"
@@ -2469,11 +2469,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                   className="flex w-full items-center justify-center text-zinc-600"
                   style={{ aspectRatio: "1 / 1", background: "hsl(0 0% 6%)" }}
                 >
-                  <span className="text-xs">3D model</span>
+                  <span className="text-xs">{t("workspace.lightbox.alt_3d_model")}</span>
                 </div>
               )}
               <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wide text-amber-300">
-                3D · double-click to view
+                {t("workspace.toolNode.open3dPreviewHint")}
               </span>
             </div>
           ) : currentGen?.type === "image" && currentGen.url && (
@@ -2538,7 +2538,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               }}
               onMouseDown={(e) => e.stopPropagation()}
               className="ws-history-toggle absolute left-2 top-2 nodrag flex items-center gap-1 rounded bg-black/65 px-1.5 py-0.5 text-[10px] text-white/80 backdrop-blur-sm hover:bg-black/80"
-              title="Browse history"
+              title={t("workspace.toolNode.browseHistory")}
             >
               <Maximize2 className="h-2.5 w-2.5" />
               {selectedGenIndex + 1}/{generations.length}
@@ -2587,8 +2587,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                   maxHeightPx={promptMaxH}
                   placeholder={
                     schema.displayName.toLowerCase().includes("video")
-                      ? `Try "ocean waves at sunset, slow pan"`
-                      : `Try "happy dog wearing sunglasses, studio light"`
+                      ? t("workspace.toolNode.videoPromptPlaceholder")
+                      : t("workspace.toolNode.imagePromptPlaceholder")
                   }
                   excludeNodeId={id}
                   scrollRestoreKey={`workspace-tool-node:${id}:prompt`}
@@ -2614,7 +2614,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                 />
               ) : (
                 <span className="ws-compact-prompt-hint">
-                  Wire an image into the input port and press Run
+                  {t("workspace.toolNode.wireImageAndRun")}
                 </span>
               )}
             </div>
@@ -2713,8 +2713,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           className="ws-compact-resize-handle nodrag"
           onPointerDown={onResizeStart}
           onMouseDown={(e) => e.stopPropagation()}
-          title="Drag to resize"
-          aria-label="Resize node"
+          title={t("workspace.toolNode.dragToResize")}
+          aria-label={t("workspace.toolNode.resizeNode")}
         />
         </div> {/* end ws-compact-node body card */}
       </div>
@@ -2777,13 +2777,14 @@ function MultiGenStepper({
   disabled: boolean;
   onChange: (count: number) => void;
 }) {
+  const { t } = useLanguage();
   const decDisabled = disabled || count <= 1;
   const incDisabled = disabled || count >= MULTI_GEN_MAX;
 
   return (
     <div
       className="nodrag flex h-7 items-center gap-0.5 rounded-full bg-black/35 px-1 text-[11px] font-semibold text-zinc-100"
-      title="Generate multiple variations when Run is pressed"
+      title={t("workspace.toolNode.variationStepperTip")}
       onMouseDown={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
@@ -2796,7 +2797,7 @@ function MultiGenStepper({
           "grid h-5 w-5 place-items-center rounded-full transition-colors",
           decDisabled ? "cursor-not-allowed text-zinc-600" : "text-zinc-300 hover:bg-white/10 hover:text-white",
         )}
-        aria-label="Decrease variation count"
+        aria-label={t("workspace.toolNode.decreaseVariation")}
       >
         <ChevronLeft className="h-3.5 w-3.5" />
       </button>
@@ -2809,7 +2810,7 @@ function MultiGenStepper({
           "grid h-5 w-5 place-items-center rounded-full transition-colors",
           incDisabled ? "cursor-not-allowed text-zinc-600" : "text-zinc-300 hover:bg-white/10 hover:text-white",
         )}
-        aria-label="Increase variation count"
+        aria-label={t("workspace.toolNode.increaseVariation")}
       >
         <ChevronRight className="h-3.5 w-3.5" />
       </button>

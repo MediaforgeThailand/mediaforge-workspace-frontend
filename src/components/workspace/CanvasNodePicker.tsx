@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import type { Node } from "@xyflow/react";
 import { getWorkspaceSchema } from "./workspaceSchema";
 import { useLanguage } from "@/contexts/LanguageContext";
+import type { TranslationKey } from "@/contexts/locales/en";
 
 export type WirePortType = "text" | "image" | "video" | "audio" | "element";
 
@@ -25,6 +26,7 @@ export interface PickerOption {
   nodeType: string;
   /** Display label in the row */
   label: string;
+  labelKey: TranslationKey;
   /** lucide icon name */
   icon: string;
   /** Default `data.label` for the new node */
@@ -37,6 +39,7 @@ export interface PickerOption {
   newNodeHandle: string;
   /** One-line hint of which port the wire will land in (mono, muted) */
   portHint: string;
+  portHintKey: TranslationKey;
   /** Optional initial data overrides for the spawned node. */
   initialData?: Record<string, unknown>;
 }
@@ -104,104 +107,119 @@ export function portTypeOf(
 interface CatalogEntry {
   nodeType: string;
   label: string;
+  labelKey: TranslationKey;
   defaultLabel: string;
   icon: string;
   /** Handles on this node that can RECEIVE a wire (target side). */
-  inputs: Array<{ id: string; type: WirePortType; hint: string }>;
+  inputs: Array<{ id: string; type: WirePortType; hint: string; hintKey: TranslationKey }>;
   /** Handles on this node that can SEND a wire (source side). */
-  outputs: Array<{ id: string; type: WirePortType; hint: string }>;
+  outputs: Array<{ id: string; type: WirePortType; hint: string; hintKey: TranslationKey }>;
 }
+
+const lucideIcon = (name: string): Lucide.LucideIcon => {
+  const icons = Lucide as unknown as Record<string, Lucide.LucideIcon>;
+  return icons[name] ?? Lucide.Box;
+};
 
 const CATALOG: CatalogEntry[] = [
   {
     nodeType: "textNode",
     label: "Text",
+    labelKey: "workspace.toolnames.text",
     defaultLabel: "Text",
     icon: "Type",
     inputs: [],
-    outputs: [{ id: "default", type: "text", hint: "text" }],
+    outputs: [{ id: "default", type: "text", hint: "text", hintKey: "workspace.picker.port.text" }],
   },
   {
     nodeType: "imageGenNode",
     label: "Image Gen",
+    labelKey: "workspace.toolnames.image_gen",
     defaultLabel: "Image Generation",
     icon: "Sparkles",
     inputs: [
-      { id: "text", type: "text", hint: "→ prompt" },
-      { id: "ref_image", type: "image", hint: "→ ref image" },
+      { id: "text", type: "text", hint: "→ prompt", hintKey: "workspace.picker.port.to_prompt" },
+      { id: "ref_image", type: "image", hint: "→ ref image", hintKey: "workspace.picker.port.to_ref_image" },
     ],
-    outputs: [{ id: "image", type: "image", hint: "image" }],
+    outputs: [{ id: "image", type: "image", hint: "image", hintKey: "workspace.picker.port.image" }],
   },
   {
     nodeType: "videoGenNode",
     label: "Video Gen",
+    labelKey: "workspace.toolnames.video_gen",
     defaultLabel: "Video Generation",
     icon: "Film",
     inputs: [
-      { id: "text", type: "text", hint: "→ prompt" },
-      { id: "start_frame", type: "image", hint: "→ start frame" },
-      { id: "end_frame", type: "image", hint: "→ end frame" },
-      { id: "ref_image", type: "image", hint: "→ ref image" },
-      { id: "reference_image", type: "image", hint: "→ reference image" },
-      { id: "ref_video", type: "video", hint: "→ ref video" },
-      { id: "elements", type: "element", hint: "→ elements" },
+      { id: "text", type: "text", hint: "→ prompt", hintKey: "workspace.picker.port.to_prompt" },
+      { id: "start_frame", type: "image", hint: "→ start frame", hintKey: "workspace.picker.port.to_start_frame" },
+      { id: "end_frame", type: "image", hint: "→ end frame", hintKey: "workspace.picker.port.to_end_frame" },
+      { id: "ref_image", type: "image", hint: "→ ref image", hintKey: "workspace.picker.port.to_ref_image" },
+      { id: "reference_image", type: "image", hint: "→ reference image", hintKey: "workspace.picker.port.to_reference_image" },
+      { id: "ref_video", type: "video", hint: "→ ref video", hintKey: "workspace.picker.port.to_ref_video" },
+      { id: "elements", type: "element", hint: "→ elements", hintKey: "workspace.picker.port.to_elements" },
     ],
     outputs: [
-      { id: "output_video", type: "video", hint: "video" },
-      { id: "output_start_frame", type: "image", hint: "first frame" },
-      { id: "output_end_frame", type: "image", hint: "last frame" },
-      { id: "output_last_frame", type: "image", hint: "last frame" },
+      { id: "output_video", type: "video", hint: "video", hintKey: "workspace.picker.port.video" },
+      { id: "output_start_frame", type: "image", hint: "first frame", hintKey: "workspace.picker.port.first_frame" },
+      { id: "output_end_frame", type: "image", hint: "last frame", hintKey: "workspace.picker.port.last_frame" },
+      { id: "output_last_frame", type: "image", hint: "last frame", hintKey: "workspace.picker.port.last_frame" },
     ],
   },
   {
     nodeType: "removeBackgroundNode",
     label: "BG Remove",
+    labelKey: "workspace.toolnames.remove_bg",
     defaultLabel: "Remove Background",
     icon: "Scissors",
-    inputs: [{ id: "image", type: "image", hint: "→ image" }],
-    outputs: [{ id: "image", type: "image", hint: "cutout" }],
+    inputs: [{ id: "image", type: "image", hint: "→ image", hintKey: "workspace.picker.port.to_image" }],
+    outputs: [{ id: "image", type: "image", hint: "cutout", hintKey: "workspace.picker.port.cutout" }],
   },
   {
     nodeType: "mergeAudioNode",
     label: "Audio Merge",
+    labelKey: "workspace.toolnames.merge_av",
     defaultLabel: "Merge Audio + Video",
     icon: "Combine",
     inputs: [
-      { id: "video", type: "video", hint: "→ video" },
-      { id: "audio", type: "audio", hint: "→ audio" },
+      { id: "video", type: "video", hint: "→ video", hintKey: "workspace.picker.port.to_video" },
+      { id: "audio", type: "audio", hint: "→ audio", hintKey: "workspace.picker.port.to_audio" },
     ],
-    outputs: [{ id: "output_video", type: "video", hint: "video" }],
+    outputs: [{ id: "output_video", type: "video", hint: "video", hintKey: "workspace.picker.port.video" }],
   },
   {
     nodeType: "chatAiNode",
     label: "Chat AI",
+    labelKey: "workspace.toolnames.assistant",
     defaultLabel: "Chat AI",
     icon: "MessageSquare",
-    inputs: [{ id: "context", type: "text", hint: "→ context" }],
-    outputs: [{ id: "text", type: "text", hint: "text" }],
+    inputs: [{ id: "context", type: "text", hint: "→ context", hintKey: "workspace.picker.port.to_context" }],
+    outputs: [{ id: "text", type: "text", hint: "text", hintKey: "workspace.picker.port.text" }],
   },
   {
     nodeType: "audioGenNode",
     label: "Audio Gen",
+    labelKey: "workspace.toolnames.audio_gen",
     defaultLabel: "Audio Generation",
     icon: "AudioLines",
-    inputs: [{ id: "text", type: "text", hint: "→ script" }],
-    outputs: [{ id: "audio", type: "audio", hint: "audio" }],
+    inputs: [{ id: "text", type: "text", hint: "→ script", hintKey: "workspace.picker.port.to_script" }],
+    outputs: [{ id: "audio", type: "audio", hint: "audio", hintKey: "workspace.picker.port.audio" }],
   },
   {
     nodeType: "videoToPromptNode",
     label: "Video to Prompt",
+    labelKey: "workspace.toolnames.video_to_prompt",
     defaultLabel: "Video to Prompt",
     icon: "FileVideo",
-    inputs: [{ id: "video", type: "video", hint: "→ video" }],
-    outputs: [{ id: "text", type: "text", hint: "prompt" }],
+    inputs: [{ id: "video", type: "video", hint: "→ video", hintKey: "workspace.picker.port.to_video" }],
+    outputs: [{ id: "text", type: "text", hint: "prompt", hintKey: "workspace.picker.port.prompt" }],
   },
   {
     nodeType: "imageTo3dNode",
     label: "Image to 3D",
+    labelKey: "workspace.toolnames.image_to_3d",
     defaultLabel: "Image to 3D",
     icon: "Box",
-    inputs: [{ id: "image", type: "image", hint: "→ image" }],
+    inputs: [{ id: "image", type: "image", hint: "→ image", hintKey: "workspace.picker.port.to_image" }],
     outputs: [],
   },
 ];
@@ -221,10 +239,12 @@ export function getPickerOptions(state: CanvasNodePickerState): PickerOption[] {
       return {
         nodeType: entry.nodeType,
         label: entry.label,
+        labelKey: entry.labelKey,
         icon: entry.icon,
         defaultLabel: entry.defaultLabel,
         newNodeHandle: firstPort?.id ?? "",
         portHint: firstPort?.hint,
+        portHintKey: firstPort?.hintKey ?? "workspace.picker.port.text",
       };
     });
   }
@@ -240,10 +260,12 @@ export function getPickerOptions(state: CanvasNodePickerState): PickerOption[] {
       opts.push({
         nodeType: entry.nodeType,
         label: entry.label,
+        labelKey: entry.labelKey,
         icon: entry.icon,
         defaultLabel: entry.defaultLabel,
         newNodeHandle: p.id,
         portHint: p.hint,
+        portHintKey: p.hintKey,
       });
     }
   }
@@ -311,7 +333,15 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
   const [childHighlight, setChildHighlight] = useState(0);
   const rowRefs = useRef<Array<HTMLLIElement | null>>([]);
 
-  const allOpts = useMemo(() => getPickerOptions(state), [state]);
+  const allOpts = useMemo(
+    () =>
+      getPickerOptions(state).map((option) => ({
+        ...option,
+        label: t(option.labelKey),
+        portHint: t(option.portHintKey),
+      })),
+    [state, t],
+  );
 
   const trimmedQuery = query.trim().toLowerCase();
   const isSearching = trimmedQuery.length > 0;
@@ -480,7 +510,7 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
           ) : isSearching ? (
             // Flat search-results list — no submenus, all matches inline.
             filteredFlat.map((opt, i) => {
-              const Icon = (Lucide as any)[opt.icon] ?? Lucide.Box;
+              const Icon = lucideIcon(opt.icon);
               return (
                 <li key={`${opt.nodeType}-${opt.newNodeHandle}-${i}`}>
                   <button
@@ -507,7 +537,7 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
             // Grouped list — parent rows, with optional hover flyout
             // for groups that have 2+ ports.
             groups.map((g, i) => {
-              const Icon = (Lucide as any)[g.icon] ?? Lucide.Box;
+              const Icon = lucideIcon(g.icon);
               const hasChildren = g.children.length > 1;
               const onlyChild = g.children[0];
               return (
@@ -577,7 +607,7 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
                 >
                   <ul className="max-h-[min(18rem,calc(100vh-12rem))] overflow-y-auto p-1.5">
                     {g.children.map((opt, j) => {
-                      const ChildIcon = (Lucide as any)[opt.icon] ?? Lucide.Box;
+                      const ChildIcon = lucideIcon(opt.icon);
                       return (
                         <li key={`${opt.nodeType}-${opt.newNodeHandle}-${j}`}>
                           <button

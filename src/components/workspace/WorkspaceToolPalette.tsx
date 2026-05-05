@@ -19,85 +19,89 @@ import {
   Sparkles, Film, AudioLines, Scissors, Combine, FileVideo,
   Users, Type, Box, type LucideIcon,
 } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
+import type { TranslationKey } from "@/contexts/locales/en";
 
 interface PaletteItem {
   type: string;
-  label: string;
-  category: string;
-  description: string;
+  defaultLabel: string;
+  labelKey: TranslationKey;
+  categoryKey: TranslationKey;
+  descriptionKey: TranslationKey;
   icon: LucideIcon;
 }
 
 const ITEMS: PaletteItem[] = [
   {
     type: "textNode",
-    label: "Text",
-    category: "Text",
-    description:
-      "Plain text node. Use @ to mention image / video assets — the mention turns into a chip and the model reads the asset as a ref.",
+    defaultLabel: "Text",
+    labelKey: "workspace.toolnames.text",
+    categoryKey: "workspace.picker.cat_text",
+    descriptionKey: "workspace.toolnames.text_desc",
     icon: Type,
   },
   {
     type: "imageGenNode",
-    label: "Image Gen",
-    category: "AI · Image",
-    description:
-      "Generate or edit images. Pick a model: Banana, SeedDream, or GPT Image 2. Up to 14–16 ref images depending on model.",
+    defaultLabel: "Image Generation",
+    labelKey: "workspace.toolnames.image_gen",
+    categoryKey: "workspace.toolPalette.category.aiImage",
+    descriptionKey: "workspace.toolnames.image_gen_desc",
     icon: Sparkles,
   },
   {
     type: "videoGenNode",
-    label: "Video Gen",
-    category: "AI · Video",
-    description:
-      "Generate videos. Kling family (Standard / Motion Control / Omni v3) and SeedDance. Omni v3 supports Element refs for character consistency.",
+    defaultLabel: "Video Generation",
+    labelKey: "workspace.toolnames.video_gen",
+    categoryKey: "workspace.toolPalette.category.aiVideo",
+    descriptionKey: "workspace.toolnames.video_gen_desc",
     icon: Film,
   },
   {
     type: "audioGenNode",
-    label: "Audio Gen",
-    category: "AI · Audio",
-    description:
-      "Generate narration with Gemini TTS voices. Output is an audio asset ready for Merge A/V.",
+    defaultLabel: "Audio Generation",
+    labelKey: "workspace.toolnames.audio_gen",
+    categoryKey: "workspace.toolPalette.category.aiAudio",
+    descriptionKey: "workspace.toolnames.audio_gen_desc",
     icon: AudioLines,
   },
   {
     type: "removeBackgroundNode",
-    label: "Remove BG",
-    category: "AI · Image",
-    description:
-      "Strip the background from an image using BiRefNet (via Replicate). Output is a transparent PNG.",
+    defaultLabel: "Remove Background",
+    labelKey: "workspace.toolnames.remove_bg",
+    categoryKey: "workspace.toolPalette.category.aiImage",
+    descriptionKey: "workspace.toolnames.remove_bg_desc",
     icon: Scissors,
   },
   {
     type: "mergeAudioNode",
-    label: "Merge A/V",
-    category: "AI · Audio",
-    description: "Mux an audio track onto a video clip. Output is an MP4 with the new soundtrack.",
+    defaultLabel: "Merge Audio + Video",
+    labelKey: "workspace.toolnames.merge_av",
+    categoryKey: "workspace.toolPalette.category.aiAudio",
+    descriptionKey: "workspace.toolnames.merge_av_desc",
     icon: Combine,
   },
   {
     type: "elementNode",
-    label: "Kling Element",
-    category: "Character",
-    description:
-      "Save a character or object as a reusable Kling Omni element (4 ref + 1 frontal). Drop the saved element back onto any canvas later.",
+    defaultLabel: "Kling Element",
+    labelKey: "workspace.toolnames.kling_element",
+    categoryKey: "workspace.picker.cat_character",
+    descriptionKey: "workspace.toolnames.kling_element_desc",
     icon: Users,
   },
   {
     type: "videoToPromptNode",
-    label: "Video to Prompt",
-    category: "Assistant",
-    description:
-      "Read a video clip and write a scene-by-scene prompt breakdown — useful as input for a downstream Image / Video generator.",
+    defaultLabel: "Video to Prompt",
+    labelKey: "workspace.toolnames.video_to_prompt",
+    categoryKey: "workspace.toolnames.assistant",
+    descriptionKey: "workspace.toolnames.video_to_prompt_desc",
     icon: FileVideo,
   },
   {
     type: "imageTo3dNode",
-    label: "Image to 3D",
-    category: "AI · 3D",
-    description:
-      "Turn a reference image into a 3D model (GLB) via Tripo3D. The result is saved to the node preview and asset library.",
+    defaultLabel: "Image to 3D",
+    labelKey: "workspace.toolnames.image_to_3d",
+    categoryKey: "workspace.toolPalette.category.ai3d",
+    descriptionKey: "workspace.toolnames.image_to_3d_desc",
     icon: Box,
   },
 ];
@@ -123,15 +127,19 @@ export default WorkspaceToolPalette;
 /* ─── Atom: hover-tooltip icon button ──────────────────────── */
 
 function PaletteIcon({ item }: { item: PaletteItem }) {
+  const { t } = useLanguage();
   const Icon = item.icon;
+  const label = t(item.labelKey);
+  const category = t(item.categoryKey);
+  const description = t(item.descriptionKey);
   return (
     <div className="ws-tool-icon group relative">
       <button
         type="button"
         draggable
-        onDragStart={(e) => onDragStart(e, item.type, item.label)}
+        onDragStart={(e) => onDragStart(e, item.type, item.defaultLabel)}
         className="flex h-10 w-10 cursor-grab items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-800/80 hover:text-zinc-100 active:cursor-grabbing active:bg-zinc-700"
-        aria-label={item.label}
+        aria-label={label}
       >
         <Icon className="h-[18px] w-[18px]" />
       </button>
@@ -144,13 +152,13 @@ function PaletteIcon({ item }: { item: PaletteItem }) {
         className="ws-tool-tooltip pointer-events-none absolute left-full top-1/2 z-[80] ml-2 w-[260px] -translate-y-1/2 rounded-lg bg-zinc-900/95 px-3.5 py-3 opacity-0 shadow-xl shadow-black/40 transition-opacity duration-150 group-hover:opacity-100 backdrop-blur"
       >
         <div className="text-[15px] font-semibold leading-5 text-white">
-          {item.label}
+          {label}
         </div>
         <div className="mt-0.5 text-[12.5px] font-semibold uppercase text-zinc-300">
-          {item.category}
+          {category}
         </div>
         <div className="mt-1.5 text-[13.5px] leading-5 text-zinc-300">
-          {item.description}
+          {description}
         </div>
       </div>
     </div>

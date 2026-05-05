@@ -30,17 +30,17 @@ const Cookies = () => {
           </Link>
           <Link to="/" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-4 w-4" />
-            {t("cookiesBackToHome" as any)}
+            {t("cookiesBackToHome")}
           </Link>
         </div>
       </nav>
 
       <main className="mx-auto max-w-4xl px-6 py-12">
         <h1 className="text-3xl font-bold text-foreground md:text-4xl">
-          {t("cookiesPageTitle" as any)}
+          {t("cookiesPageTitle")}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {t("cookiesPageLastUpdated" as any)}
+          {t("cookiesPageLastUpdated")}
         </p>
 
         <div className="prose prose-invert mt-8 max-w-none text-muted-foreground prose-headings:text-foreground prose-h2:text-xl prose-h2:mt-8 prose-h2:mb-3 prose-p:leading-relaxed prose-li:leading-relaxed prose-strong:text-foreground">
@@ -51,14 +51,14 @@ const Cookies = () => {
         {/* ── Manage preferences CTA ──────────────────────────── */}
         <div className="mt-10 rounded-2xl border border-border/50 bg-card/50 p-6">
           <h2 className="text-xl font-semibold text-foreground">
-            {t("cookiesManagePreferences" as any)}
+            {t("cookiesManagePreferences")}
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            {t("cookiesManagePreferencesDesc" as any)}
+            {t("cookiesManagePreferencesDesc")}
           </p>
           <div className="mt-4">
             <Button variant="gradient" size="sm" onClick={reopenBanner}>
-              {t("cookiesReopenBanner" as any)}
+              {t("cookiesReopenBanner")}
             </Button>
           </div>
         </div>

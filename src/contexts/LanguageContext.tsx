@@ -10,6 +10,7 @@ const LANGUAGE_COUNTRY_CODES: Partial<Record<Language, readonly string[]>> = {
   th: ["TH"],
   es: ["AR", "BO", "CL", "CO", "CR", "CU", "DO", "EC", "ES", "GQ", "GT", "HN", "MX", "NI", "PA", "PE", "PR", "PY", "SV", "UY", "VE"],
   ja: ["JP"],
+  hi: ["IN"],
 };
 const LANGUAGE_NATIVE_LABELS: Record<Language, string> = {
   en: "English",

@@ -15,6 +15,7 @@ interface PlanData {
   flow_quota: number | null;
   discount_official: number;
   discount_community: number;
+  cashback_percent?: number | null;
 }
 
 interface PricingPlanCardProps {
@@ -46,14 +47,15 @@ const PricingPlanCard = ({
   isCurrent,
   billingCycle,
   monthlyPrice,
-  monthlyCredits,
-  language,
+  monthlyCredits: _monthlyCredits,
+  language: _language,
   onSubscribe,
 }: PricingPlanCardProps) => {
   const { t } = useLanguage();
   const Icon = ICON_MAP[plan.name] || Rocket;
   const isAnnual = billingCycle === "annual";
   const monthlyEquivPrice = isAnnual && plan.price_thb > 0 ? Math.round(plan.price_thb / 12) : plan.price_thb;
+  const cashbackPercent = plan.cashback_percent ?? 0;
 
   return (
     <div
@@ -107,13 +109,13 @@ const PricingPlanCard = ({
               <span className="text-3xl font-bold text-foreground">
                 ฿{plan.price_thb.toLocaleString()}
               </span>
-              <span className="text-muted-foreground text-sm">/year</span>
+              <span className="text-muted-foreground text-sm">/{t("pricingPlanCard.year")}</span>
               <p className="text-xs text-muted-foreground">
-                ≈ ฿{monthlyEquivPrice.toLocaleString()}/mo
+                ≈ ฿{monthlyEquivPrice.toLocaleString()}/{t("pricingPlanCard.monthShort")}
               </p>
               {monthlyPrice > 0 && (
                 <p className="text-xs text-muted-foreground line-through">
-                  ฿{(monthlyPrice * 12).toLocaleString()}/year
+                  ฿{(monthlyPrice * 12).toLocaleString()}/{t("pricingPlanCard.year")}
                 </p>
               )}
             </div>
@@ -122,7 +124,7 @@ const PricingPlanCard = ({
               <span className="text-3xl font-bold text-foreground">
                 ฿{plan.price_thb.toLocaleString()}
               </span>
-              <span className="text-muted-foreground text-sm">/mo</span>
+              <span className="text-muted-foreground text-sm">/{t("pricingPlanCard.monthShort")}</span>
             </div>
           )}
         </div>
@@ -144,7 +146,7 @@ const PricingPlanCard = ({
                   {plan.upfront_credits.toLocaleString()}
                 </p>
                 <p className="text-[10px] text-primary/70 font-medium">
-                  Credits
+                  {t("pricingPlanCard.credits")}
                 </p>
               </>
             ) : (
@@ -171,21 +173,21 @@ const PricingPlanCard = ({
       </div>
 
       {/* Discount & Cashback badges */}
-      {(plan.discount_official > 0 || plan.discount_community > 0 || (plan as any).cashback_percent > 0) && (
+      {(plan.discount_official > 0 || plan.discount_community > 0 || cashbackPercent > 0) && (
         <div className="flex flex-wrap gap-1.5 pt-3">
-          {(plan as any).cashback_percent > 0 && (
+          {cashbackPercent > 0 && (
             <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
-              {(plan as any).cashback_percent}% Cashback
+              {t("pricingPlanCard.cashback", { percent: cashbackPercent })}
             </Badge>
           )}
           {plan.discount_official > 0 && (
             <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
-              {plan.discount_official}% off Official
+              {t("pricingPlanCard.officialDiscount", { percent: plan.discount_official })}
             </Badge>
           )}
           {plan.discount_community > 0 && (
             <Badge variant="outline" className="text-[10px] border-accent/30 text-accent">
-              {plan.discount_community}% off Community
+              {t("pricingPlanCard.communityDiscount", { percent: plan.discount_community })}
             </Badge>
           )}
         </div>

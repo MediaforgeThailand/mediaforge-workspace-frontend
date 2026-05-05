@@ -17,7 +17,7 @@ import {
   Sparkles,
   XCircle,
 } from "lucide-react";
-import { getLocalizedText, useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useCredits } from "@/hooks/useCredits";
 
@@ -64,10 +64,8 @@ const PromptPayPromoModal = ({
   requiredCredits,
   currentBalance = 0,
 }: PromptPayPromoModalProps) => {
-  const { language } = useLanguage();
+  const { t } = useLanguage();
   const { refetch } = useCredits();
-  const txt = (values: Parameters<typeof getLocalizedText>[1]) =>
-    getLocalizedText(language, values);
 
   const [pkg, setPkg] = useState<PromoPackage | null>(null);
   const [step, setStep] = useState<Step>("loading");
@@ -113,7 +111,7 @@ const PromptPayPromoModal = ({
       if (remaining <= 0) {
         cleanup();
         setStep("error");
-        setErrorMsg(txt({ en: "QR Code expired", th: "QR Code หมดอายุ", es: "Código QR caducado", ja: "QR コードの有効期限が切れました" }));
+        setErrorMsg(t("promptPayPromo.qrExpired"));
       }
     };
     tick();
@@ -121,7 +119,7 @@ const PromptPayPromoModal = ({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [step, qrData, language, cleanup]);
+  }, [step, qrData, t, cleanup]);
 
   // Boot: load promo package + request QR
   useEffect(() => {
@@ -218,7 +216,7 @@ const PromptPayPromoModal = ({
           <div className="px-5 py-12 flex flex-col items-center text-center space-y-3">
             <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
             <p className="text-sm text-muted-foreground">
-              {txt({ en: "Creating QR code…", th: "กำลังสร้าง QR…", es: "Creando código QR…", ja: "QR コードを作成中…" })}
+              {t("promptPayPromo.creatingQr")}
             </p>
           </div>
         )}
@@ -231,21 +229,16 @@ const PromptPayPromoModal = ({
               <DialogHeader className="space-y-2">
                 <DialogTitle className="text-base font-semibold text-foreground flex items-center gap-2">
                   <QrCode className="w-4 h-4 text-emerald-400" />
-                  {txt({ en: "Top up to generate", th: "เติมเครดิตเพื่อสร้างผลงาน", es: "Recargar para generar", ja: "生成するためにチャージ" })}
+                  {t("promptPayPromo.topUpToGenerate")}
                 </DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground">
                   {requiredCredits
-                    ? txt({
-                        en: `Need ${requiredCredits.toLocaleString()} credits · balance ${currentBalance.toLocaleString()}`,
-                        th: `ต้องใช้ ${requiredCredits.toLocaleString()} credits · ยอดคงเหลือ ${currentBalance.toLocaleString()}`,
-                        es: `Necesitas ${requiredCredits.toLocaleString()} créditos · saldo ${currentBalance.toLocaleString()}`,
-                        ja: `${requiredCredits.toLocaleString()} クレジット必要 · 残高 ${currentBalance.toLocaleString()}`,
+                    ? t("promptPayPromo.requiredBalance", {
+                        required: requiredCredits.toLocaleString(),
+                        balance: currentBalance.toLocaleString(),
                       })
-                    : txt({
-                        en: `Balance: ${currentBalance.toLocaleString()} credits`,
-                        th: `ยอดคงเหลือ: ${currentBalance.toLocaleString()} credits`,
-                        es: `Saldo: ${currentBalance.toLocaleString()} créditos`,
-                        ja: `残高: ${currentBalance.toLocaleString()} クレジット`,
+                    : t("promptPayPromo.balance", {
+                        balance: currentBalance.toLocaleString(),
                       })}
                 </DialogDescription>
               </DialogHeader>
@@ -258,21 +251,21 @@ const PromptPayPromoModal = ({
                     <Sparkles className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
                     <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider">
                       {pkg.badge_label ||
-                        txt({ en: "Special Offer", th: "ข้อเสนอพิเศษ", es: "Oferta especial", ja: "特別オファー" })}
+                        t("promptPayPromo.specialOffer")}
                     </span>
                   </div>
                   <p className="text-sm font-bold text-foreground leading-tight">
                     {pkg.name}
                   </p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    {pkg.credits.toLocaleString()} credits
+                    {t("promptPayPromo.credits", { credits: pkg.credits.toLocaleString() })}
                     {pkg.bonus_percent && pkg.bonus_percent > 0 ? (
                       <>
                         {" "}
                         ·{" "}
                         <span className="text-emerald-400 font-semibold">
                           +{pkg.bonus_percent}%{" "}
-                          {txt({ en: "bonus", th: "โบนัส", es: "bonificación", ja: "ボーナス" })}
+                          {t("promptPayPromo.bonus")}
                         </span>
                       </>
                     ) : null}
@@ -283,7 +276,7 @@ const PromptPayPromoModal = ({
                     ฿{Number(pkg.price_thb).toLocaleString()}
                   </div>
                   <div className="text-[10px] text-muted-foreground mt-1">
-                    {txt({ en: "one-time", th: "ครั้งเดียว", es: "una sola vez", ja: "1 回のみ" })}
+                    {t("promptPayPromo.oneTime")}
                   </div>
                 </div>
               </div>
@@ -295,13 +288,13 @@ const PromptPayPromoModal = ({
                 {qrData.qrCodeSvgUrl ? (
                   <img
                     src={qrData.qrCodeSvgUrl}
-                    alt="PromptPay QR"
+                    alt={t("checkout.quickTopUp.promptpayQrCode")}
                     className="w-52 h-52"
                   />
                 ) : qrData.qrCodePngUrl ? (
                   <img
                     src={qrData.qrCodePngUrl}
-                    alt="PromptPay QR"
+                    alt={t("checkout.quickTopUp.promptpayQrCode")}
                     className="w-52 h-52"
                   />
                 ) : (
@@ -314,7 +307,7 @@ const PromptPayPromoModal = ({
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Clock className="w-3.5 h-3.5" />
                 <span>
-                  {txt({ en: "Expires in", th: "หมดอายุใน", es: "Vence en", ja: "有効期限" })}{" "}
+                  {t("promptPayPromo.expiresIn")}{" "}
                   {formatTime(timeLeft)}
                 </span>
               </div>
@@ -322,7 +315,7 @@ const PromptPayPromoModal = ({
               <div className="flex items-center gap-2 text-xs text-emerald-400">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 <span>
-                  {txt({ en: "Waiting for payment… credits added automatically", th: "รอการชำระเงิน… เครดิตจะเข้าอัตโนมัติ", es: "Esperando pago… créditos agregados automáticamente", ja: "支払い待ち…クレジットは自動で追加されます" })}
+                  {t("promptPayPromo.waitingForPayment")}
                 </span>
               </div>
 
@@ -330,7 +323,7 @@ const PromptPayPromoModal = ({
                 variant="outline"
                 className="text-[10px] border-border text-muted-foreground"
               >
-                PromptPay · Thai QR Payment
+                {t("promptPayPromo.thaiQrPayment")}
               </Badge>
             </div>
           </>
@@ -344,19 +337,18 @@ const PromptPayPromoModal = ({
             </div>
             <div>
               <h3 className="text-lg font-bold text-foreground">
-                {txt({ en: "Payment Successful!", th: "ชำระเงินสำเร็จ!", es: "¡Pago exitoso!", ja: "支払いが完了しました！" })}
+                {t("promptPayPromo.paymentSuccessful")}
               </h3>
               <p className="text-sm text-muted-foreground mt-1 flex items-center justify-center gap-1.5">
                 <Gift className="w-3.5 h-3.5 text-emerald-400" />+
-                {qrData.credits.toLocaleString()} credits{" "}
-                {txt({ en: "added to your account", th: "ถูกเพิ่มแล้ว", es: "añadido a tu cuenta", ja: "アカウントに追加されました" })}
+                {t("promptPayPromo.addedCredits", { credits: qrData.credits.toLocaleString() })}
               </p>
             </div>
             <Button
               onClick={() => onOpenChange(false)}
               className="bg-emerald-500 hover:bg-emerald-600 text-white"
             >
-              {txt({ en: "Start generating", th: "เริ่มสร้างผลงาน", es: "Empezar a generar", ja: "生成を開始" })}
+              {t("promptPayPromo.startGenerating")}
             </Button>
           </div>
         )}
@@ -369,12 +361,12 @@ const PromptPayPromoModal = ({
             </div>
             <div>
               <h3 className="text-lg font-bold text-foreground">
-                {txt({ en: "Something went wrong", th: "เกิดข้อผิดพลาด", es: "Algo salió mal", ja: "問題が発生しました" })}
+                {t("promptPayPromo.somethingWentWrong")}
               </h3>
               <p className="text-sm text-muted-foreground mt-1">{errorMsg}</p>
             </div>
             <Button variant="outline" onClick={handleRetry}>
-              {txt({ en: "Try Again", th: "ลองอีกครั้ง", es: "Inténtalo de nuevo", ja: "もう一度試す" })}
+              {t("promptPayPromo.tryAgain")}
             </Button>
           </div>
         )}

@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import BaseNodeWrapper, { type PortDef } from "./BaseNodeWrapper";
 import { NODE_API_SCHEMA } from "./nodeApiSchema";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const SCHEMA = NODE_API_SCHEMA.mp3InputNode;
 const MAX_BYTES = 3 * 1024 * 1024; // 3MB
@@ -31,6 +32,7 @@ export interface Mp3InputNodeData {
 const Mp3InputNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as unknown as Mp3InputNodeData;
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { setNodes } = useReactFlow();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -48,13 +50,13 @@ const Mp3InputNode = memo(({ id, data, selected }: NodeProps) => {
 
   const handleUpload = useCallback(
     async (file: File) => {
-      if (!user) { toast.error("Please log in to upload files"); return; }
+      if (!user) { toast.error(t("mp3Input.loginRequired")); return; }
       if (!file.type.startsWith("audio/") && !file.name.toLowerCase().endsWith(".mp3")) {
-        toast.error("Only MP3 audio files are supported");
+        toast.error(t("mp3Input.onlyMp3"));
         return;
       }
       if (file.size > MAX_BYTES) {
-        toast.error("MP3 file is too large (max 3MB)");
+        toast.error(t("mp3Input.tooLarge"));
         return;
       }
 
@@ -69,7 +71,7 @@ const Mp3InputNode = memo(({ id, data, selected }: NodeProps) => {
         .upload(storagePath, file, { contentType: file.type || "audio/mpeg", upsert: true });
 
       if (uploadErr) {
-        toast.error(`Upload failed: ${file.name}`);
+        toast.error(t("mp3Input.uploadFailed", { filename: file.name }));
         updateData({ previewUrl: undefined, fileName: undefined, uploading: false });
         URL.revokeObjectURL(localPreview);
         return;
@@ -87,7 +89,7 @@ const Mp3InputNode = memo(({ id, data, selected }: NodeProps) => {
       });
       URL.revokeObjectURL(localPreview);
     },
-    [user, updateData],
+    [user, updateData, t],
   );
 
   const handleFileChange = useCallback(
@@ -129,15 +131,15 @@ const Mp3InputNode = memo(({ id, data, selected }: NodeProps) => {
           ),
         )
       }
-      badge="CREATOR"
+      badge={t("mp3Input.creatorBadge")}
       accent="amber"
       icon={Music}
       inputs={[]}
       outputs={OUTPUT_PORTS}
       selected={selected}
       width={280}
-      footerLeft="MP3 · max 3MB"
-      footerRight={d.fileName ? "Uploaded" : "Empty"}
+      footerLeft={t("mp3Input.footerLimit")}
+      footerRight={d.fileName ? t("mp3Input.uploaded") : t("mp3Input.empty")}
     >
       <div className="px-3 pb-3 pt-1">
         <input
@@ -158,7 +160,7 @@ const Mp3InputNode = memo(({ id, data, selected }: NodeProps) => {
               <button
                 onClick={(e) => { e.stopPropagation(); clearFile(); }}
                 className="text-white/40 hover:text-white/80 transition-colors"
-                title="Remove"
+                title={t("mp3Input.remove")}
               >
                 <X className="w-3 h-3" />
               </button>
@@ -191,9 +193,9 @@ const Mp3InputNode = memo(({ id, data, selected }: NodeProps) => {
               <Upload className="w-4 h-4 text-white/40" />
             )}
             <span className="text-[10.5px] text-white/55">
-              {d.uploading ? "Uploading…" : "Click or drag MP3 here"}
+              {d.uploading ? t("mp3Input.uploading") : t("mp3Input.dropHere")}
             </span>
-            <span className="text-[9px] text-white/30">Max 3MB</span>
+            <span className="text-[9px] text-white/30">{t("mp3Input.maxSize")}</span>
           </button>
         )}
       </div>

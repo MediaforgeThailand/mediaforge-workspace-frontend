@@ -16,17 +16,17 @@ const AUP = () => {
           </Link>
           <Link to="/" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-4 w-4" />
-            {t("aupBackToHome" as any)}
+            {t("aupBackToHome")}
           </Link>
         </div>
       </nav>
 
       <main className="mx-auto max-w-4xl px-6 py-12">
         <h1 className="text-3xl font-bold text-foreground md:text-4xl">
-          {t("aupPageTitle" as any)}
+          {t("aupPageTitle")}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {t("aupPageLastUpdated" as any)}
+          {t("aupPageLastUpdated")}
         </p>
 
         <div className="prose prose-invert mt-8 max-w-none text-muted-foreground prose-headings:text-foreground prose-h2:text-xl prose-h2:mt-8 prose-h2:mb-3 prose-p:leading-relaxed prose-li:leading-relaxed prose-strong:text-foreground">

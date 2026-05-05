@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, QrCode, Sparkles, Check, Gift } from "lucide-react";
 import QuickTopUpModal from "@/components/QuickTopUpModal";
-import { getLocalizedText, useLanguage, type Language } from "@/contexts/LanguageContext";
+import { useLanguage, type Language } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -30,13 +30,11 @@ interface TopupSectionProps {
   currentBalance?: number;
 }
 
-const TopupSection = ({ topupPackages, language, onTopup, currentBalance = 0 }: TopupSectionProps) => {
+const TopupSection = ({ topupPackages, onTopup, currentBalance = 0 }: TopupSectionProps) => {
   const [promptPayOpen, setPromptPayOpen] = useState(false);
   const [redeemedIds, setRedeemedIds] = useState<Set<string>>(new Set());
   const { t } = useLanguage();
   const { user } = useAuth();
-  const txt = (values: Parameters<typeof getLocalizedText>[1]) =>
-    getLocalizedText(language, values);
 
   // Split promo vs standard
   const promoPackages = topupPackages.filter((p) => p.is_promo);
@@ -64,7 +62,7 @@ const TopupSection = ({ topupPackages, language, onTopup, currentBalance = 0 }: 
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-bold text-foreground">
           <Plus className="inline w-5 h-5 mr-2 text-foreground" />
-          {txt({ en: "Credit Top-up", th: "เติมเครดิต", es: "Recarga de créditos", ja: "クレジットチャージ" })}
+          {t("topupSection.title")}
         </h2>
         <p className="text-muted-foreground text-sm">{t("topupDesc")}</p>
       </div>
@@ -102,13 +100,13 @@ const TopupSection = ({ topupPackages, language, onTopup, currentBalance = 0 }: 
                   <div className="flex items-start justify-between gap-3 mb-4">
                     <Badge className="bg-gradient-to-r from-amber-500 to-pink-500 text-white border-0 font-bold text-[10px] px-2.5 py-1 uppercase tracking-wider shadow-lg">
                       <Sparkles className="w-3 h-3 mr-1" />
-                      {pkg.badge_label || txt({ en: "Special Offer", th: "ข้อเสนอพิเศษ", es: "Oferta especial", ja: "特別オファー" })}
+                      {pkg.badge_label || t("topupSection.specialOffer")}
                     </Badge>
                     {bonus > 0 && (
                       <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/40">
                         <Gift className="w-3 h-3 text-emerald-400" />
                         <span className="text-[11px] font-bold text-emerald-400">
-                          +{bonus}% {txt({ en: "BONUS", th: "โบนัส", es: "BONIFICACIÓN", ja: "ボーナス" })}
+                          +{bonus}% {t("topupSection.bonus")}
                         </span>
                       </div>
                     )}
@@ -118,8 +116,8 @@ const TopupSection = ({ topupPackages, language, onTopup, currentBalance = 0 }: 
                   <h3 className="text-xl font-extrabold text-foreground mb-1">{pkg.name}</h3>
                   <p className="text-xs text-muted-foreground mb-4">
                     {pkg.one_time_per_user
-                      ? txt({ en: "One-time purchase per account", th: "ซื้อได้เพียงครั้งเดียวต่อบัญชี", es: "Compra única por cuenta", ja: "1 アカウント 1 回のみ購入可能" })
-                      : txt({ en: "Limited-time offer", th: "ข้อเสนอจำกัดเวลา", es: "Oferta por tiempo limitado", ja: "期間限定オファー" })}
+                      ? t("topupSection.oneTimePurchase")
+                      : t("topupSection.limitedTimeOffer")}
                   </p>
 
                   {/* Credits — big number with strikethrough original */}
@@ -136,7 +134,7 @@ const TopupSection = ({ topupPackages, language, onTopup, currentBalance = 0 }: 
                       <span className="line-through">{pkg.original_credits.toLocaleString()}</span>
                       <span className="ml-2 text-emerald-400 font-semibold">
                         +{(pkg.credits - pkg.original_credits).toLocaleString()}{" "}
-                        {txt({ en: "free credits", th: "เครดิตฟรี", es: "créditos gratis", ja: "無料クレジット" })}
+                        {t("topupSection.freeCredits")}
                       </span>
                     </p>
                   )}
@@ -147,7 +145,7 @@ const TopupSection = ({ topupPackages, language, onTopup, currentBalance = 0 }: 
                       ฿{Number(pkg.price_thb).toLocaleString()}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {txt({ en: "one-time", th: "ครั้งเดียว", es: "una sola vez", ja: "1 回のみ" })}
+                      {t("topupSection.oneTime")}
                     </span>
                   </div>
 
@@ -160,12 +158,12 @@ const TopupSection = ({ topupPackages, language, onTopup, currentBalance = 0 }: 
                     {isRedeemed ? (
                       <>
                         <Check className="w-4 h-4 mr-1.5" />
-                        {txt({ en: "Already Redeemed", th: "ใช้สิทธิ์แล้ว", es: "Ya canjeado", ja: "取得済み" })}
+                        {t("topupSection.alreadyRedeemed")}
                       </>
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4 mr-1.5" />
-                        {txt({ en: "Grab This Deal", th: "รับเลย", es: "Aprovecha esta oferta", ja: "このオファーを利用" })}
+                        {t("topupSection.grabDeal")}
                       </>
                     )}
                   </Button>

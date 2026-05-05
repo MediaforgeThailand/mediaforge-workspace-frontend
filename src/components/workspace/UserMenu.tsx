@@ -148,6 +148,7 @@ function UsageRow({
   available: number;
   colorClass: string;
 }) {
+  const { t } = useLanguage();
   const pct = percentOf(used, total);
   return (
     <div className="space-y-[5px]">
@@ -161,8 +162,8 @@ function UsageRow({
         <div className={`h-full rounded-full ${colorClass}`} style={{ width: `${pct}%` }} />
       </div>
       <div className="flex items-center justify-between gap-3 text-[10.5px] leading-[13px] text-white/[0.66]">
-        <span>Spent {formatCompact(used)}</span>
-        <span>Available {formatCompact(available)}</span>
+        <span>{t("workspace.userMenu.spent")} {formatCompact(used)}</span>
+        <span>{t("common.available2")} {formatCompact(available)}</span>
       </div>
     </div>
   );
@@ -355,7 +356,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
                     className="flex h-[30px] w-full items-center justify-center gap-[7px] rounded-[8px] bg-emerald-500 px-[10px] text-[12px] font-semibold leading-none text-white transition-colors hover:bg-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200/70"
                   >
                     <GraduationCap className="h-[13px] w-[13px]" />
-                    University admin
+                    {t("workspace.userMenu.universityAdmin")}
                   </button>
                 </div>
               )
@@ -381,7 +382,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
                   className="flex h-[28px] w-full items-center justify-center gap-[7px] rounded-[8px] bg-white/[0.055] px-[10px] text-[12px] font-semibold leading-none text-white transition-colors hover:bg-white/[0.10]"
                 >
                   {hasTeamContext ? <Building2 className="h-[13px] w-[13px]" /> : <UserPlus className="h-[13px] w-[13px]" />}
-                  {hasTeamContext ? "Admin Console" : "Create your team"}
+                  {hasTeamContext ? t("common.adminConsole") : t("common.createYourTeam")}
                 </button>
               </div>
             )}
@@ -390,7 +391,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
 
         <div className="bg-white/[0.02] px-[12px] py-[10px]">
           <UsageRow
-            label="Personal"
+            label={t("workspace.userMenu.personal")}
             used={personalUsed}
             total={personalTotal}
             available={personalBalance}

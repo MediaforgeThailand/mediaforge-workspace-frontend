@@ -1,6 +1,6 @@
 import { CheckCircle2, Sparkles, Zap, Crown, Building2, Rocket } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getLocalizedText, useLanguage, type Language } from "@/contexts/LanguageContext";
+import { useLanguage, type Language } from "@/contexts/LanguageContext";
 
 interface PlanData {
   id: string;
@@ -53,12 +53,9 @@ const PricingCard = ({
   isCurrent,
   billingCycle,
   monthlyPrice,
-  language,
   onSubscribe,
 }: PricingCardProps) => {
   const { t } = useLanguage();
-  const txt = (values: Parameters<typeof getLocalizedText>[1]) =>
-    getLocalizedText(language, values);
   const Icon = ICON_MAP[plan.name] || Rocket;
   const titleColor = TITLE_COLORS[plan.name] || "#FAFAFA";
   const months = MONTHS_MAP[billingCycle] ?? 1;
@@ -71,17 +68,12 @@ const PricingCard = ({
       : plan.upfront_credits;
 
   const billedLabel = isMultiMonth
-    ? txt({
-        en: `billed ฿${plan.price_thb.toLocaleString()} every ${months} months`,
-        th: `เรียกเก็บ ฿${plan.price_thb.toLocaleString()} ทุก ${months} เดือน`,
-        es: `facturado ฿${plan.price_thb.toLocaleString()} cada ${months} meses`,
-        ja: `${months} か月ごとに ฿${plan.price_thb.toLocaleString()} を請求`,
+    ? t("pricingCard.billing.everyMonths", {
+        price: plan.price_thb.toLocaleString(),
+        months,
       })
-    : txt({
-        en: `billed ฿${plan.price_thb.toLocaleString()} monthly`,
-        th: `เรียกเก็บ ฿${plan.price_thb.toLocaleString()} ทุกเดือน`,
-        es: `facturado ฿${plan.price_thb.toLocaleString()} mensualmente`,
-        ja: `月額 ฿${plan.price_thb.toLocaleString()} を請求`,
+    : t("pricingCard.billing.monthly", {
+        price: plan.price_thb.toLocaleString(),
       });
 
   return (
@@ -120,7 +112,7 @@ const PricingCard = ({
           <span className="text-white text-4xl font-semibold">
             ฿{monthlyEquivPrice.toLocaleString()}
           </span>
-          <span className="text-neutral-400 text-sm">/{txt({ en: "mo", th: "เดือน", es: "mes", ja: "月" })}</span>
+          <span className="text-neutral-400 text-sm">/{t("pricingCard.monthAbbrev")}</span>
         </div>
         <p className="text-neutral-500 text-xs">{billedLabel}</p>
       </div>
@@ -130,16 +122,16 @@ const PricingCard = ({
         isMultiMonth ? (
           <div className="rounded-xl py-3 px-4 text-center bg-purple-500/10 border border-purple-400/30">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-purple-300 mb-0.5">
-              {txt({ en: "Receive instantly", th: "รับทันทีเมื่อชำระ", es: "Recibe al instante", ja: "支払い後すぐに付与" })}
+              {t("pricingCard.receiveInstantly")}
             </div>
             <div className="text-purple-200 font-black text-2xl tabular-nums leading-tight">
               {plan.upfront_credits.toLocaleString()}
             </div>
             <div className="text-purple-300/80 text-[10px] font-medium">
-              {txt({ en: "credits (no monthly drip)", th: "เครดิต (ได้ครบทันที ไม่ต้องรอ)", es: "créditos (sin goteo mensual)", ja: "クレジット（一括付与）" })}
+              {t("pricingCard.creditsNoDrip")}
             </div>
             <div className="text-neutral-500 text-[10px] mt-1.5">
-              ≈ {monthlyCreditsEquiv.toLocaleString()} {txt({ en: "credits/mo", th: "เครดิต/เดือน", es: "créditos/mes", ja: "クレジット/月" })}
+              ≈ {monthlyCreditsEquiv.toLocaleString()} {t("pricingCard.creditsPerMonthShort")}
             </div>
           </div>
         ) : (
@@ -154,11 +146,8 @@ const PricingCard = ({
 
       {plan.discount_official > 0 && (
         <p className="text-sm font-medium text-violet-200">
-          {txt({
-            en: `${plan.discount_official}% off all Generations`,
-            th: `${plan.discount_official}% ส่วนลดการ Generate ทั้งหมด`,
-            es: `${plan.discount_official}% de descuento en todas las generaciones`,
-            ja: `すべての生成が ${plan.discount_official}% 割引`,
+          {t("pricingCard.generationDiscount", {
+            discount: plan.discount_official,
           })}
         </p>
       )}
