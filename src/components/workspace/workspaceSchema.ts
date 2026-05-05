@@ -784,7 +784,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         type: "json",
         default: "",
         placeholder: '[{"prompt":"Scene 1…","duration":3}]',
-        supportedModels: ["kling-v3-omni"],
+        supportedModels: ["kling-v3-pro", "kling-v3-omni"],
         visibleWhen: { multi_shot: "true" },
       },
       {

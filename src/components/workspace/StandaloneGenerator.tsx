@@ -501,6 +501,7 @@ const OPTION_LABEL_KEYS = {
   opaque: "workspace.standalone.option.opaque",
   image: "workspace.standalone.option.image",
   video: "workspace.standalone.option.video",
+  adaptive: "workspace.standalone.option.adaptive",
 } as const satisfies Record<string, TranslationKey>;
 
 const STATUS_LABEL_KEYS = {

@@ -517,6 +517,14 @@ const DURATION_COST_MODELS = new Set(["kling-v3-pro", "kling-v3-omni"]);
 const WORKSPACE_NODE_UI_SCALE = 1.15;
 const DEFAULT_COMPACT_WIDTH = 437;
 
+const PORT_LABEL_KEYS = {
+  ref_audio: "workspace.port.ref_audio",
+  ref_video: "workspace.port.ref_video",
+  ref_image: "workspace.port.ref_image",
+  reference_image: "workspace.port.reference_image",
+  elements: "workspace.port.elements",
+} as const;
+
 interface NodeData {
   label?: string;
   params?: Record<string, unknown>;
@@ -551,7 +559,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const [isHovered, setIsHovered] = useState(false);
   // Used by friendlyError() to localize jargon errors before they
   // reach the user. Raw text still lands in console.error.
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const currentWorkspaceId = useWorkspaceStore((s) => s.current?.workspaceId ?? null);
 
   // Refs + ResizeObserver for the dynamic prompt-lift logic. The
@@ -2155,6 +2163,12 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         param.key === "model_name"
           ? cleanModelLabelMap(rawEffectiveLabels)
           : rawEffectiveLabels;
+      const localizedEffectiveLabels = effectiveOptions.includes("adaptive")
+        ? {
+            ...effectiveLabels,
+            adaptive: t("workspace.standalone.option.adaptive"),
+          }
+        : effectiveLabels;
       const value = params[param.key] ?? resolved?.default ?? param.default;
 
       // Voice picker for audio gen was removed — see audioGenNode in
@@ -2204,7 +2218,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               label={param.label}
               value={String(value)}
               options={effectiveOptions as [string, string]}
-              optionLabels={effectiveLabels}
+              optionLabels={localizedEffectiveLabels}
               onChange={(v) => updateParam(param.key, v)}
             />
           );
@@ -2214,7 +2228,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             key={param.key}
             value={String(value)}
             options={effectiveOptions}
-            optionLabels={effectiveLabels}
+            optionLabels={localizedEffectiveLabels}
             onChange={(v) => updateParam(param.key, v)}
             // Long lists (model_name today, future picker-style params)
             // open as a search-and-keyboard-nav dropdown instead of a
@@ -2248,8 +2262,13 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       // toolbar; falls through to nothing.
       return null;
     },
-    [params, selectedModel, updateParam, schemaKey, id],
+    [params, selectedModel, t, updateParam, schemaKey, id],
   );
+
+  const localizePortLabel = (handleId: string, fallback: string): string => {
+    const key = PORT_LABEL_KEYS[handleId as keyof typeof PORT_LABEL_KEYS];
+    return key ? t(key) : fallback;
+  };
 
   // Some node types (Image to 3D / Tripo3D) take only an image input
   // — the model's API doesn't accept a text prompt, so showing the
@@ -2673,7 +2692,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           key={`in-${inp.id}`}
           dir="target"
           handleId={inp.id}
-          label={inp.label}
+          label={localizePortLabel(inp.id, inp.label)}
           portType={portTypeFromHandleId(inp.id)}
           color={colorOf(inp.color)}
           index={i}
@@ -2684,7 +2703,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           key={`out-${out.id}`}
           dir="source"
           handleId={out.id}
-          label={out.label}
+          label={localizePortLabel(out.id, out.label)}
           portType={portTypeFromHandleId(out.id)}
           color={colorOf(out.color)}
           index={i}
