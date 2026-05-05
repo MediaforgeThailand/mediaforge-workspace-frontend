@@ -201,7 +201,7 @@ export default function WorkspaceSidebar({
   //     panel from the main content (different elevation).
   //   • Width tightened 198 → 192 keeps the visual rhythm.
   return (
-    <div className="ws-scroll-hide h-full shrink-0 bg-[hsl(var(--surface-0))] py-[12px] pl-[12px]">
+    <div className="ws-scroll-hide h-full shrink-0 bg-[hsl(var(--surface-0))] py-0 pl-0">
       <aside
         className="mf-readable ws-scroll-hide flex h-full w-[230px] flex-col gap-[4px] overflow-y-auto rounded-[20px] border border-transparent px-[4px] py-[12px] text-[#b0b4ba]"
         style={{

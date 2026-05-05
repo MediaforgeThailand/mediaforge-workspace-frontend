@@ -36,12 +36,6 @@ import type { Node as RFNode } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
 
-const PANEL_WIDTH = 220;
-/** Floor of the rendered height for the bottom-edge clamp — the actual
- *  height varies with how many rows are visible (4–6 typically), this
- *  is the worst case at 6 rows incl. separators. */
-const PANEL_MAX_HEIGHT = 240;
-
 export interface NodeContextMenuItem {
   key: string;
   label: string;
@@ -109,17 +103,16 @@ const NodeContextMenu = ({ position, items, onClose }: Props) => {
     };
   }, [onClose]);
 
-  // Edge clamp — never let the menu render off-screen. Mirrors the
-  // approach in CanvasContextMenu so behaviour is consistent across
-  // the two right-click experiences.
-  const left = Math.min(
-    position.x,
-    Math.max(8, window.innerWidth - PANEL_WIDTH - 8),
-  );
-  const top = Math.min(
-    position.y,
-    Math.max(8, window.innerHeight - PANEL_MAX_HEIGHT - 8),
-  );
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const pad = 8;
+    const nextLeft = Math.min(position.x, window.innerWidth - rect.width - pad);
+    const nextTop = Math.min(position.y, window.innerHeight - rect.height - pad);
+    el.style.left = `${Math.max(pad, nextLeft)}px`;
+    el.style.top = `${Math.max(pad, nextTop)}px`;
+  }, [position.x, position.y, items.length]);
 
   const fire = (item: NodeContextMenuItem) => {
     if (item.disabled) return;
@@ -133,16 +126,11 @@ const NodeContextMenu = ({ position, items, onClose }: Props) => {
       role="menu"
       aria-label={t("workspace.nodemenu.aria")}
       className={cn(
-        "fixed z-[1310] flex flex-col overflow-hidden",
-        "rounded-xl",
-        "bg-[hsl(220_10%_8%)]/95 backdrop-blur-2xl",
-        "shadow-[0_18px_48px_-16px_hsl(0_0%_0%/0.7),0_0_0_1px_hsl(0_0%_100%/0.04)]",
-        "py-1",
+        "fixed z-[9999] min-w-[180px] overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 py-1 shadow-xl",
       )}
       style={{
-        left,
-        top,
-        width: PANEL_WIDTH,
+        left: position.x,
+        top: position.y,
         fontFamily: "var(--font-sans)",
       }}
       onContextMenu={(e) => {
@@ -153,17 +141,12 @@ const NodeContextMenu = ({ position, items, onClose }: Props) => {
       }}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      {/* Top sheen — matches CanvasContextMenu's frosted top edge. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent"
-      />
       {items.map((item) => {
         const Icon = item.icon;
         return (
           <div key={item.key}>
             {item.separatorBefore && (
-              <div className="my-1 mx-2 h-px bg-white/5" />
+              <div className="my-1 border-t border-neutral-800" />
             )}
             <button
               type="button"
@@ -172,15 +155,17 @@ const NodeContextMenu = ({ position, items, onClose }: Props) => {
               onClick={() => fire(item)}
               title={item.label}
               className={cn(
-                "flex w-full items-center gap-2.5 px-3 py-2 text-left text-[14.5px] font-semibold leading-5 transition-colors",
+                "flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors",
                 item.disabled
                   ? "cursor-not-allowed text-zinc-600"
                   : item.danger
-                    ? "text-zinc-300 hover:bg-rose-500/15 hover:text-rose-200"
-                    : "text-zinc-200 hover:bg-white/[0.06] hover:text-zinc-50",
+                    ? "text-neutral-300 hover:bg-red-600/20 hover:text-red-400"
+                    : "text-neutral-300 hover:bg-neutral-800 hover:text-neutral-100",
               )}
             >
-              <Icon className="h-4 w-4 shrink-0 opacity-90" />
+              <span className={cn("flex-shrink-0", item.danger && "text-red-500")}>
+                <Icon size={14} />
+              </span>
               <span className="truncate">{item.label}</span>
             </button>
           </div>

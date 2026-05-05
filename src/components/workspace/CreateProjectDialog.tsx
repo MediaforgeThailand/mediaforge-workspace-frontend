@@ -123,14 +123,14 @@ export function CreateProjectDialog({
        *    without this it falls back to system-ui which renders
        *    Thai compressed with thin strokes — exactly the
        *    "อ่านไม่ออก" the user reported.
-       *  - p-6 gap-4 = standard Dialog spacing; the previous p-5
-       *    gap-3 was too tight for legible Thai. */}
+       *  - Compact padding keeps this prompt-sized dialog proportional
+       *    to the short fields and actions inside it. */}
       <DialogContent
-        className="w-[calc(100vw-2rem)] gap-4 border-white/10 bg-[hsl(0_0%_8%)] p-6 text-zinc-100 sm:max-w-[400px]"
+        className="w-[calc(100vw-2rem)] gap-3 border-white/10 bg-[hsl(0_0%_8%)] p-4 text-zinc-100 sm:max-w-[372px]"
         style={{ fontFamily: "'Prompt', system-ui, sans-serif" }}
       >
-        <DialogHeader className="space-y-1">
-          <DialogTitle className="flex items-center gap-2 text-base font-semibold text-zinc-50">
+        <DialogHeader className="space-y-0.5">
+          <DialogTitle className="flex items-center gap-2 text-[17px] font-semibold leading-6 text-zinc-50">
             <FolderPlus className="h-4 w-4 text-zinc-400" />
             {language === "th" ? "สร้างโปรเจคใหม่" : "Create new project"}
           </DialogTitle>
@@ -167,7 +167,7 @@ export function CreateProjectDialog({
             /* 14px input + zinc-400 placeholder = readable on the
              * dark dialog bg AND legible on Thai (descenders/marks
              * need the extra row height). */
-            className="w-full rounded-md bg-black/40 px-3 py-2.5 text-[14px] leading-6 text-zinc-100 outline-none placeholder:text-zinc-500 focus:ring-1 focus:ring-violet-500/50"
+            className="h-9 w-full rounded-md bg-black/40 px-3 text-[13px] leading-5 text-zinc-100 outline-none placeholder:text-zinc-500 focus:ring-1 focus:ring-violet-500/50"
           />
         </div>
 
@@ -176,12 +176,12 @@ export function CreateProjectDialog({
           type="button"
           onClick={() => !submitting && setIsPrivate((v) => !v)}
           disabled={submitting}
-          className="flex w-full items-center justify-between gap-3 rounded-md bg-white/[0.04] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.08] disabled:opacity-60"
+          className="flex w-full items-center justify-between gap-3 rounded-md bg-white/[0.04] px-3 py-2 text-left transition-colors hover:bg-white/[0.08] disabled:opacity-60"
         >
           <div className="flex min-w-0 items-center gap-2.5">
             <span
               className={cn(
-                "grid h-8 w-8 shrink-0 place-items-center rounded-md transition-colors",
+                "grid h-7 w-7 shrink-0 place-items-center rounded-md transition-colors",
                 isPrivate
                   ? "bg-violet-500/20 text-violet-300"
                   : "bg-white/[0.05] text-zinc-400",
@@ -213,7 +213,7 @@ export function CreateProjectDialog({
           <Switch
             checked={isPrivate}
             tabIndex={-1}
-            className="pointer-events-none"
+            className="pointer-events-none h-5 w-9 [&>span]:h-4 [&>span]:w-4 [&>span]:data-[state=checked]:translate-x-4"
             aria-label={
               language === "th" ? "เปิด/ปิดโปรเจคส่วนตัว" : "Toggle private"
             }
@@ -226,12 +226,12 @@ export function CreateProjectDialog({
           </div>
         )}
 
-        <DialogFooter className="gap-2 sm:gap-2">
+        <DialogFooter className="gap-2 pt-1 sm:gap-2">
           <button
             type="button"
             onClick={handleClose}
             disabled={submitting}
-            className="inline-flex h-9 items-center justify-center rounded-md bg-white/[0.06] px-4 text-[13px] font-medium text-zinc-200 transition-colors hover:bg-white/[0.09] disabled:opacity-50"
+            className="inline-flex h-8 items-center justify-center rounded-md bg-white/[0.06] px-3.5 text-[13px] font-medium text-zinc-200 transition-colors hover:bg-white/[0.09] disabled:opacity-50"
           >
             {language === "th" ? "ยกเลิก" : "Cancel"}
           </button>
@@ -239,7 +239,7 @@ export function CreateProjectDialog({
             type="button"
             onClick={handleSubmit}
             disabled={submitting}
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-violet-600 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-violet-600 px-3.5 text-[13px] font-semibold text-white transition-colors hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? (
               <>

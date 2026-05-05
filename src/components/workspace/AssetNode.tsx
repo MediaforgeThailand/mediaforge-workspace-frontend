@@ -296,6 +296,12 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
       data-state={selected ? "selected" : "idle"}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onContextMenu={(event) => {
+        if (!downloadableUrl) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setContextMenu({ x: event.clientX, y: event.clientY });
+      }}
       // Default tile width — 219 (200 → 230 → 219). Now also
       // user-resizable via the corner handle below; persists in
       // `data.compactWidth` so the card keeps the chosen size
