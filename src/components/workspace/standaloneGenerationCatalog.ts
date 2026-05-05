@@ -454,6 +454,10 @@ export function isKlingMotionVideoModel(model: string): boolean {
   return model === "kling-v2-6-motion-pro" || model === "kling-v3-motion-pro";
 }
 
+export function isKlingMultiShotVideoModel(model: string): boolean {
+  return model === "kling-v3-pro" || model === "kling-v3-omni";
+}
+
 export function isVeoVideoModel(model: string): boolean {
   return model.startsWith("veo-");
 }
@@ -691,7 +695,7 @@ export function buildVideoParams(args: {
     const motionParams: Record<string, unknown> = {
       model_name: args.model,
       prompt: args.prompt.trim(),
-      character_orientation: args.characterOrientation ?? "image",
+      character_orientation: args.characterOrientation ?? "video",
       keep_original_sound: args.keepOriginalSound ? "yes" : "no",
       _has_ref_video: hasReferenceVideo,
     };
@@ -713,6 +717,8 @@ export function buildVideoParams(args: {
   }
   if (args.model === "kling-v3-omni") {
     klingParams.keep_original_sound = args.keepOriginalSound ? "yes" : "no";
+  }
+  if (isKlingMultiShotVideoModel(args.model)) {
     klingParams.multi_shot = args.multiShot ? "true" : "false";
     if (args.multiShot && args.multiPrompt?.trim()) {
       klingParams.multi_prompt = args.multiPrompt.trim();

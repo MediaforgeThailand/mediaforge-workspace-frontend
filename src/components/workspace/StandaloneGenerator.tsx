@@ -294,7 +294,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     videoEnd: null,
     videoRefImage: null,
     videoRefVideo: null,
-    videoCharacterOrientation: "image",
+    videoCharacterOrientation: "video",
     videoKeepOriginalSound: false,
     videoNegativePrompt: "",
     videoPersonGeneration: "allow_adult",
@@ -329,7 +329,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     videoEnd: null,
     videoRefImage: null,
     videoRefVideo: null,
-    videoCharacterOrientation: "image",
+    videoCharacterOrientation: "video",
     videoKeepOriginalSound: false,
     videoNegativePrompt: "",
     videoPersonGeneration: "allow_adult",
@@ -364,7 +364,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     videoEnd: null,
     videoRefImage: null,
     videoRefVideo: null,
-    videoCharacterOrientation: "image",
+    videoCharacterOrientation: "video",
     videoKeepOriginalSound: false,
     videoNegativePrompt: "",
     videoPersonGeneration: "allow_adult",
@@ -399,7 +399,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     videoEnd: null,
     videoRefImage: null,
     videoRefVideo: null,
-    videoCharacterOrientation: "image",
+    videoCharacterOrientation: "video",
     videoKeepOriginalSound: false,
     videoNegativePrompt: "",
     videoPersonGeneration: "allow_adult",
@@ -955,7 +955,7 @@ export default function StandaloneGenerator({
       if (!isVeoVideoModel(model)) nextPatch.videoPersonGeneration = "allow_adult";
       if (!isSeedance) nextPatch.videoReturnLastFrame = false;
       if (isSeedance && !seedanceVideoSupportsAudio(model)) nextPatch.videoWithAudio = false;
-      if (model !== "kling-v3-omni") {
+      if (!videoSupportsMultiShot(model)) {
         nextPatch.videoMultiShot = false;
         nextPatch.videoMultiPrompt = "";
       }
@@ -1566,7 +1566,7 @@ export default function StandaloneGenerator({
                 },
               ]
             : []),
-          ...(form.model === "kling-v3-omni" && form.videoMultiShot
+          ...(videoSupportsMultiShot(form.model) && form.videoMultiShot
             ? [
                 {
                   id: "multi-prompt",
@@ -3185,7 +3185,7 @@ function VideoControls({
           <SelectField
             label={t("workspace.standalone.aspect")}
             value={form.videoRatio}
-            options={isSeedance ? ["16:9", "9:16", "1:1", "4:3"] : ["Auto", "16:9", "9:16", "1:1"]}
+            options={isSeedance ? seedanceRatioOptionsForModel(form.model) : ["Auto", "16:9", "9:16", "1:1"]}
             onChange={(videoRatio) => onChange({ videoRatio })}
           />
           <SelectField
@@ -5557,10 +5557,18 @@ function videoRequiresStartFrame(model: string): boolean {
 }
 
 function videoRatioOptionsForModel(model: string): string[] {
-  if (isSeedanceVideoModel(model)) return ["16:9", "9:16", "1:1", "4:3"];
+  if (isSeedanceVideoModel(model)) return seedanceRatioOptionsForModel(model);
   if (isVeoVideoModel(model)) return ["16:9", "9:16"];
   if (isKlingMotionVideoModel(model)) return [];
   return ["Auto", "16:9", "9:16", "1:1"];
+}
+
+function seedanceRatioOptionsForModel(_model: string): string[] {
+  return ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "adaptive"];
+}
+
+function videoSupportsMultiShot(model: string): boolean {
+  return model === "kling-v3-pro" || model === "kling-v3-omni";
 }
 
 function videoResolutionOptionsForModel(model: string): string[] {
@@ -5608,7 +5616,7 @@ function videoModelSettingTags(model: string, language: "en" | "th"): Array<{
     });
   }
 
-  if (model === "kling-v3-omni") {
+  if (videoSupportsMultiShot(model)) {
     tags.push({
       label: standaloneInlineLabel("multiShots", language),
       icon: "multi",
@@ -5788,7 +5796,7 @@ function buildVideoPanelSettings({
     });
   }
 
-  if (form.model === "kling-v3-omni") {
+  if (videoSupportsMultiShot(form.model)) {
     settings.push({
       id: "multi-shot",
       label: standaloneInlineLabel("multiShot", language),
