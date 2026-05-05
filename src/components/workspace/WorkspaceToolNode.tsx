@@ -513,7 +513,7 @@ const ICONS: Record<string, LucideIcon> = {
   imageTo3dNode: Box,
 };
 
-const OMNI_MODELS = new Set(["kling-v3-omni"]);
+const DURATION_COST_MODELS = new Set(["kling-v3-pro", "kling-v3-omni"]);
 const WORKSPACE_NODE_UI_SCALE = 1.15;
 const DEFAULT_COMPACT_WIDTH = 437;
 
@@ -2019,7 +2019,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
   const { data: creditCosts, isLoading: creditCostsLoading } = useCreatorCreditCosts();
   const isMotionModel = selectedModel.includes("motion");
-  const isOmniModel = OMNI_MODELS.has(selectedModel);
+  const showsDurationCost = DURATION_COST_MODELS.has(selectedModel);
 
   const nodeCost = useMemo(() => {
     if (!creditCosts || !schema) return null;
@@ -2037,7 +2037,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
   const costSuffix = isMotionModel
     ? "/s"
-    : isOmniModel
+    : showsDurationCost
       ? ` (${params.duration ?? 5}s)`
       : undefined;
 
@@ -2316,7 +2316,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     [updateNodeField],
   );
 
-  // Multi-shot scenes (only used when multi_shot=true on Kling Omni).
+  // Multi-shot scenes (Kling VIDEO 3.0 / Omni when multi_shot=true).
   const multiShotScenes: SceneBlock[] = Array.isArray(params.multi_prompt)
     ? (params.multi_prompt as SceneBlock[])
     : [];
@@ -2622,7 +2622,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           )}
         </div>
 
-        {/* ── Multi-shot scene builder (Kling Omni only) — keeps its
+        {/* ── Multi-shot scene builder (Kling VIDEO 3.0 / Omni) — keeps its
          *  own row below the preview because the scene list grows
          *  too tall to overlay sensibly. */}
         {runStatus === "error" && d.lastRunError && (

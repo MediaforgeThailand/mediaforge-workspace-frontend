@@ -477,6 +477,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         label: "ref_image",
         color: "cyan",
         supportedModels: ["kling-v3-omni"],
+        maxConnections: 7,
       },
       {
         id: "reference_image",
@@ -495,15 +496,35 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           "kling-v2-6-motion-pro",
           "kling-v3-motion-pro",
           "kling-v3-omni",
-          ...SEEDANCE_VIDEO_REF_MODELS,
         ],
+      },
+      {
+        id: "ref_video",
+        label: "ref_video",
+        color: "rose",
+        supportedModels: [...SEEDANCE_VIDEO_REF_MODELS],
+        maxConnections: 3,
+      },
+      {
+        id: "ref_audio",
+        label: "ref_audio",
+        color: "amber",
+        supportedModels: [...SEEDANCE_VIDEO_REF_MODELS],
+        maxConnections: 3,
       },
       {
         id: "elements",
         label: "elements",
         color: "rose",
-        supportedModels: ["kling-v3-omni"],
-        maxConnections: 4, // Kling Omni v3 supports up to 4 element refs
+        supportedModels: ["kling-v3-pro", "kling-v3-omni"],
+        maxConnections: 4, // Kling VIDEO 3.0 / Omni support element refs
+      },
+      {
+        id: "elements",
+        label: "elements",
+        color: "rose",
+        supportedModels: ["kling-v3-motion-pro"],
+        maxConnections: 1,
       },
     ],
     outputs: [
@@ -584,7 +605,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         key: "ratio",
         label: "Aspect Ratio",
         type: "select",
-        options: ["16:9", "9:16", "1:1", "4:3"],
+        options: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "adaptive"],
         default: "16:9",
         supportedModels: [...SEEDANCE_MODELS],
       },
@@ -736,7 +757,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         type: "select",
         options: ["image", "video"],
         optionLabels: { "image": "Follow Image", "video": "Follow Video" },
-        default: "image",
+        default: "video",
         supportedModels: ["kling-v2-6-motion-pro", "kling-v3-motion-pro"],
       },
       {
@@ -755,7 +776,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         options: ["false", "true"],
         optionLabels: { "false": "Off", "true": "Director Mode" },
         default: "false",
-        supportedModels: ["kling-v3-omni"],
+        supportedModels: ["kling-v3-pro", "kling-v3-omni"],
       },
       {
         key: "multi_prompt",
