@@ -28,6 +28,7 @@ import { Layers, Sparkles, ChevronRight, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import WorkspaceAssetPanel from "./WorkspaceAssetPanel";
 import WorkspaceAIAssistantPanel from "./WorkspaceAIAssistantPanel";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type SidebarTab = "assets" | "ai";
 
@@ -38,6 +39,7 @@ type SidebarTab = "assets" | "ai";
 // hidden or collapsed.
 
 const WorkspaceRightSidebar = () => {
+  const { t: i18n } = useLanguage();
   const [tab, setTab] = useState<SidebarTab>("assets");
   // Collapsed = thin icon rail. Expand by clicking a tab icon (which
   // also switches to that tab) or by clicking the toggle.
@@ -58,7 +60,7 @@ const WorkspaceRightSidebar = () => {
         style={{ fontFamily: "var(--font-sans)", zoom: 0.92 }}
       >
         <RailButton
-          title="Expand assets"
+          title={i18n("workspace.rightSidebar.expandAssets")}
           onClick={() => {
             setTab("assets");
             setCollapsed(false);
@@ -66,7 +68,7 @@ const WorkspaceRightSidebar = () => {
           icon={Layers}
         />
         <RailButton
-          title="Expand AI assistant"
+          title={i18n("workspace.rightSidebar.expandAiAssistant")}
           onClick={() => {
             setTab("ai");
             setCollapsed(false);
@@ -76,7 +78,7 @@ const WorkspaceRightSidebar = () => {
         />
         <div className="my-1 h-px w-6 bg-white/10" />
         <RailButton
-          title="Expand sidebar"
+          title={i18n("workspace.rightSidebar.expandSidebar")}
           onClick={() => setCollapsed(false)}
           icon={ChevronLeft}
         />
@@ -141,7 +143,7 @@ const WorkspaceRightSidebar = () => {
           onClick={() => setTab("assets")}
           icon={Layers}
         >
-          Assets
+          {i18n("common.assets")}
         </PillTab>
         <PillTab
           active={tab === "ai"}
@@ -149,16 +151,16 @@ const WorkspaceRightSidebar = () => {
           icon={Sparkles}
           accent="amber"
         >
-          คุยกับ Max
+          {i18n("workspace.rightSidebar.chatWithMax")}
           <span className="ml-1.5 rounded-sm bg-amber-400/20 px-1 py-px font-mono text-[8px] uppercase tracking-wider text-amber-300">
-            Beta
+            {i18n("workspace.rightSidebar.beta")}
           </span>
         </PillTab>
         <button
           type="button"
           onClick={() => setCollapsed(true)}
-          title="Collapse sidebar"
-          aria-label="Collapse sidebar"
+          title={i18n("workspace.rightSidebar.collapseSidebar")}
+          aria-label={i18n("workspace.rightSidebar.collapseSidebar")}
           className="ml-auto rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-100"
         >
           <ChevronRight className="h-4 w-4" />

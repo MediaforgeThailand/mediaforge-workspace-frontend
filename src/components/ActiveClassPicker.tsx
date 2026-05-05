@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ChevronDown, BookOpen, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Props {
   className?: string;
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export default function ActiveClassPicker({ className, variant = "full" }: Props) {
+  const { t } = useLanguage();
   const { data: memberships } = useUserClassMemberships();
   const active = useActiveClass();
 
@@ -43,7 +45,7 @@ export default function ActiveClassPicker({ className, variant = "full" }: Props
           <span className="flex items-center gap-2 min-w-0">
             <BookOpen className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">
-              {active?.class_name ?? "Pick a class"}
+              {active?.class_name ?? t("activeClassPicker.pickClass")}
             </span>
           </span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
@@ -51,7 +53,7 @@ export default function ActiveClassPicker({ className, variant = "full" }: Props
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
         <DropdownMenuLabel className="text-xs uppercase tracking-wide text-muted-foreground">
-          Active class · spends credits from
+          {t("activeClassPicker.activeClassCreditsFrom")}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {candidates.map((m) => (
@@ -63,7 +65,7 @@ export default function ActiveClassPicker({ className, variant = "full" }: Props
             <div className="min-w-0">
               <div className="text-sm font-medium truncate">{m.class_name}</div>
               <div className="text-xs text-muted-foreground font-mono">
-                {m.class_code} · {m.credits_balance.toLocaleString()} credits
+                {m.class_code} · {m.credits_balance.toLocaleString()} {t("activeClassPicker.credits")}
               </div>
             </div>
             {active?.class_id === m.class_id && (

@@ -20,6 +20,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useIsOrgAdmin } from "@/hooks/useIsOrgUser";
 import {
   consumerOrgAdminApi,
@@ -77,6 +78,7 @@ import { cn } from "@/lib/utils";
 // ─────────────────────────────────────────────────────────────────────
 
 export default function TeacherCenter() {
+
   const { user, profile } = useAuth();
   const isOrgAdmin = useIsOrgAdmin();
   const { data: classes, isLoading: loadingClasses } = useManageableClasses();
@@ -127,6 +129,7 @@ function Sidebar(props: {
   isOrgAdmin: boolean;
   userName: string;
 }) {
+  const { t: i18n } = useLanguage();
   const navigate = useNavigate();
   return (
     <aside className="w-[260px] shrink-0 border-r border-border bg-card/40 flex flex-col">
@@ -135,13 +138,13 @@ function Sidebar(props: {
         <div className="flex items-center gap-2 mb-3">
           <Crown className="h-4 w-4 text-amber-500" />
           <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-            Teacher Center
+            {i18n("teacherCenter.teacherCenter")}
           </span>
         </div>
         <div className="text-sm font-medium truncate">{props.userName}</div>
         {props.isOrgAdmin && (
           <Badge variant="outline" className="mt-1.5 text-[10px] gap-1 border-amber-500/40 text-amber-700 dark:text-amber-300">
-            <Sparkles className="h-2.5 w-2.5" /> Org Admin
+            <Sparkles className="h-2.5 w-2.5" /> {i18n("teacherCenter.orgAdmin")}
           </Badge>
         )}
       </div>
@@ -158,10 +161,10 @@ function Sidebar(props: {
         </div>
 
         {props.loading ? (
-          <div className="px-2 py-4 text-xs text-muted-foreground">Loading…</div>
+          <div className="px-2 py-4 text-xs text-muted-foreground">{i18n("common.loading")}</div>
         ) : props.classes.length === 0 ? (
           <div className="px-2 py-4 text-xs text-muted-foreground">
-            No classes yet.
+            {i18n("teacherCenter.noClassesYet")}
           </div>
         ) : (
           <ul className="space-y-0.5">
@@ -219,7 +222,7 @@ function Sidebar(props: {
           onClick={() => navigate("/app/workspace")}
         >
           <ArrowLeft className="h-3.5 w-3.5 mr-2" />
-          Back to workspace
+          {i18n("common.backToWorkspace2")}
         </Button>
       </div>
     </aside>
@@ -231,6 +234,7 @@ function Sidebar(props: {
 // ─────────────────────────────────────────────────────────────────────
 
 function ClassDetail({ classId, classes }: { classId: string; classes: TeacherClass[] }) {
+  const { t: i18n } = useLanguage();
   const cls = classes.find((c) => c.id === classId);
   const [membersPage, setMembersPage] = useState(1);
   const membersPageSize = 25;
@@ -257,7 +261,7 @@ function ClassDetail({ classId, classes }: { classId: string; classes: TeacherCl
   }, [classId]);
 
   if (!cls) {
-    return <div className="p-10 text-muted-foreground">Class not found.</div>;
+    return <div className="p-10 text-muted-foreground">{i18n("teacherCenter.classNotFound")}</div>;
   }
 
   return (
@@ -278,11 +282,11 @@ function ClassDetail({ classId, classes }: { classId: string; classes: TeacherCl
             <div className="flex items-center gap-2 shrink-0">
               <Button variant="outline" size="sm">
                 <Plus className="h-3.5 w-3.5 mr-1.5" />
-                Add student
+                {i18n("teacherCenter.addStudent")}
               </Button>
               <Button size="sm" className="bg-primary">
                 <PlayCircle className="h-4 w-4 mr-1.5" />
-                Live class
+                {i18n("teacherCenter.liveClass")}
               </Button>
             </div>
           </div>
@@ -294,26 +298,23 @@ function ClassDetail({ classId, classes }: { classId: string; classes: TeacherCl
         <div className="border-b border-border bg-background sticky top-[73px] z-10">
           <TabsList className="px-7 h-11 bg-transparent border-0 rounded-none gap-1">
             <TabsTrigger value="overview" className="data-[state=active]:bg-accent text-sm">
-              Overview
-            </TabsTrigger>
+              {i18n("common.overview")}</TabsTrigger>
             <TabsTrigger value="members" className="data-[state=active]:bg-accent text-sm">
-              Members
-              <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0 h-4">
+              {i18n("common.members")}<Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0 h-4">
                 {studentCount}
               </Badge>
             </TabsTrigger>
             <TabsTrigger value="ai" className="data-[state=active]:bg-accent text-sm">
-              AI Usage
+              {i18n("teacherCenter.aiUsage")}
               <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0 h-4">
                 {distinctModels}
               </Badge>
             </TabsTrigger>
             <TabsTrigger value="codes" className="data-[state=active]:bg-accent text-sm">
-              QR Codes
+              {i18n("education.common.qrCodes")}
             </TabsTrigger>
             <TabsTrigger value="activity" className="data-[state=active]:bg-accent text-sm">
-              Activity
-            </TabsTrigger>
+              {i18n("common.activity")}</TabsTrigger>
           </TabsList>
         </div>
 
@@ -334,7 +335,7 @@ function ClassDetail({ classId, classes }: { classId: string; classes: TeacherCl
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <Activity className="h-3.5 w-3.5" />
-                7-day usage trend
+                {i18n("teacherCenter.usageTrend7Days")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -425,6 +426,7 @@ function StatStrip(props: {
   totalRuns: number;
   usedPercent: number;
 }) {
+  const { t: i18n } = useLanguage();
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       <StatCard
@@ -435,7 +437,7 @@ function StatStrip(props: {
         accent="primary"
       />
       <StatCard
-        label="Credits remaining"
+        label={i18n("teacherCenter.creditsRemaining")}
         value={props.remaining.toLocaleString()}
         sub={`of ${props.totalCredits.toLocaleString()} pool`}
         icon={<Coins className="h-3.5 w-3.5" />}
@@ -443,14 +445,14 @@ function StatStrip(props: {
         progress={props.usedPercent}
       />
       <StatCard
-        label="Used (30d)"
+        label={i18n("teacherCenter.used30d")}
         value={props.usedThisMonth.toLocaleString()}
         sub={`${props.totalRuns.toLocaleString()} runs`}
         icon={<Activity className="h-3.5 w-3.5" />}
         accent="violet"
       />
       <StatCard
-        label="AI Models"
+        label={i18n("teacherCenter.aiModels")}
         value={props.distinctModels.toString()}
         sub="in use this month"
         icon={<Sparkles className="h-3.5 w-3.5" />}
@@ -509,6 +511,7 @@ function StatCard({
 // ─────────────────────────────────────────────────────────────────────
 
 function ModelRankingCard({ models }: { models: import("./useTeacherData").ModelUsageRow[] }) {
+  const { t: i18n } = useLanguage();
   const totalCredits = models.reduce((s, m) => s + m.total_credits, 0);
   const top = models.slice(0, 5);
   const rest = models.slice(5);
@@ -519,7 +522,7 @@ function ModelRankingCard({ models }: { models: import("./useTeacherData").Model
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
           <BarChart3 className="h-3.5 w-3.5" />
-          AI Models · ranked by usage (30 days)
+          {i18n("teacherCenter.aiModelsRankedByUsage30Days")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -536,7 +539,7 @@ function ModelRankingCard({ models }: { models: import("./useTeacherData").Model
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium truncate">{meta.display}</span>
                   <span className="text-[10px] text-muted-foreground shrink-0">
-                    {m.uses} runs · {m.unique_users} users
+                    {m.uses} {i18n("teacherCenter.runs")} · {m.unique_users} {i18n("teacherCenter.users")}
                   </span>
                 </div>
                 <div className="mt-1 h-1.5 rounded-full bg-muted overflow-hidden">
@@ -562,7 +565,7 @@ function ModelRankingCard({ models }: { models: import("./useTeacherData").Model
           <div className="pt-1 mt-1 border-t border-border/60">
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <div className="w-4" />
-              <div>+ {rest.length} more</div>
+              <div>+ {rest.length} {i18n("common.more")}</div>
               <div className="flex-1" />
               <div className="tabular-nums">{restCredits.toLocaleString()}</div>
             </div>
@@ -570,7 +573,7 @@ function ModelRankingCard({ models }: { models: import("./useTeacherData").Model
         )}
         {models.length === 0 && (
           <div className="text-sm text-muted-foreground py-6 text-center">
-            No model usage yet — students haven't run any AI tools this period.
+            {i18n("teacherCenter.emptyModelUsageDescription")}
           </div>
         )}
       </CardContent>
@@ -583,6 +586,7 @@ function ModelRankingCard({ models }: { models: import("./useTeacherData").Model
 // ─────────────────────────────────────────────────────────────────────
 
 function TopSpendersCard({ members }: { members: ClassMember[] }) {
+  const { t: i18n } = useLanguage();
   const sorted = [...members]
     .filter((m) => m.status === "active")
     .sort((a, b) => b.credits_lifetime_used - a.credits_lifetime_used)
@@ -593,13 +597,13 @@ function TopSpendersCard({ members }: { members: ClassMember[] }) {
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
           <Users className="h-3.5 w-3.5" />
-          Top spenders
+          {i18n("teacherCenter.topSpenders")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2.5">
         {sorted.length === 0 && (
           <div className="text-sm text-muted-foreground py-6 text-center">
-            No students yet.
+            {i18n("teacherCenter.noStudentsYet")}
           </div>
         )}
         {sorted.map((m, i) => {
@@ -631,7 +635,7 @@ function TopSpendersCard({ members }: { members: ClassMember[] }) {
                 <div className="text-sm font-semibold tabular-nums">
                   {m.credits_balance}/{cap}
                 </div>
-                <div className="text-[10px] text-muted-foreground">used {m.credits_lifetime_used}</div>
+                <div className="text-[10px] text-muted-foreground">{i18n("common.used_lower")}{m.credits_lifetime_used}</div>
               </div>
             </div>
           );
@@ -651,6 +655,7 @@ function InsightsCard(props: {
   totalCredits: number;
   usedCredits: number;
 }) {
+  const { t: i18n } = useLanguage();
   const insights: { tone: "info" | "warn" | "ok"; text: string }[] = [];
 
   // 1) Most-used model
@@ -700,8 +705,7 @@ function InsightsCard(props: {
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
           <Sparkles className="h-3.5 w-3.5" />
-          Insights
-        </CardTitle>
+          {i18n("common.insights")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
         {insights.map((it, i) => (
@@ -733,6 +737,7 @@ function AIUsagePanel({
   totalRuns: number;
   totalCredits: number;
 }) {
+  const { t: i18n } = useLanguage();
   const grouped = useMemo(() => {
     const cats: Record<string, typeof models> = {};
     models.forEach((m) => {
@@ -747,21 +752,21 @@ function AIUsagePanel({
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <StatCard
-          label="Total runs (30d)"
+          label={i18n("teacherCenter.totalRuns30d")}
           value={totalRuns.toLocaleString()}
           sub="across all models"
           icon={<Activity className="h-3.5 w-3.5" />}
           accent="primary"
         />
         <StatCard
-          label="Credits spent"
+          label={i18n("teacherCenter.creditsSpent")}
           value={totalCredits.toLocaleString()}
           sub={`avg ${totalRuns > 0 ? (totalCredits / totalRuns).toFixed(1) : "0"} per run`}
           icon={<Coins className="h-3.5 w-3.5" />}
           accent="emerald"
         />
         <StatCard
-          label="Distinct models"
+          label={i18n("teacherCenter.distinctModels")}
           value={models.length.toString()}
           sub="in use"
           icon={<Sparkles className="h-3.5 w-3.5" />}
@@ -772,7 +777,7 @@ function AIUsagePanel({
       {/* Bar chart */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Credits per model</CardTitle>
+          <CardTitle className="text-sm font-medium">{i18n("teacherCenter.creditsPerModel")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-64">
@@ -813,7 +818,7 @@ function AIUsagePanel({
       {/* Detailed table grouped by category */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Detailed breakdown</CardTitle>
+          <CardTitle className="text-sm font-medium">{i18n("teacherCenter.detailedBreakdown")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
           {Object.entries(grouped).map(([cat, list]) => (
@@ -845,19 +850,19 @@ function AIUsagePanel({
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-sm font-semibold tabular-nums">{m.uses}</div>
-                        <div className="text-[10px] text-muted-foreground">runs</div>
+                        <div className="text-[10px] text-muted-foreground">{i18n("common.runs")}</div>
                       </div>
                       <div className="text-right shrink-0 w-20">
                         <div className="text-sm font-semibold tabular-nums">
                           {m.total_credits.toLocaleString()}
                         </div>
-                        <div className="text-[10px] text-muted-foreground">credits</div>
+                        <div className="text-[10px] text-muted-foreground">{i18n("common.credits")}</div>
                       </div>
                       <div className="text-right shrink-0 w-12">
                         <div className="text-xs tabular-nums text-muted-foreground">
                           {m.unique_users}
                         </div>
-                        <div className="text-[10px] text-muted-foreground">users</div>
+                        <div className="text-[10px] text-muted-foreground">{i18n("common.users")}</div>
                       </div>
                     </div>
                   );
@@ -867,7 +872,7 @@ function AIUsagePanel({
           ))}
           {models.length === 0 && (
             <div className="text-sm text-muted-foreground py-10 text-center">
-              No model usage in the last 30 days.
+              {i18n("teacherCenter.noModelUsageInLast30Days")}
             </div>
           )}
         </CardContent>
@@ -907,6 +912,7 @@ function MembersPanel({
   hasMore: boolean;
   onPageChange: (page: number) => void;
 }) {
+  const { t: i18n } = useLanguage();
   const [selected, setSelected] = useState<ClassMember | null>(null);
   const startRow = totalStudents === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endRow = totalStudents === 0 ? 0 : startRow + members.length - 1;
@@ -917,26 +923,24 @@ function MembersPanel({
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium">
-              Class roster
+              {i18n("teacherCenter.classRoster")}
               <span className="ml-2 text-xs text-muted-foreground font-normal">
-                {totalStudents} students
-              </span>
+                {totalStudents} {i18n("common.students")}</span>
             </CardTitle>
             <Button size="sm" variant="outline">
               <Plus className="h-3.5 w-3.5 mr-1.5" />
-              Invite
-            </Button>
+              {i18n("common.invite")}</Button>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           <table className="w-full">
             <thead>
               <tr className="text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
-                <th className="text-left font-medium px-4 py-2.5">Student</th>
-                <th className="text-left font-medium px-4 py-2.5">Status</th>
-                <th className="text-left font-medium px-4 py-2.5">Space</th>
-                <th className="text-right font-medium px-4 py-2.5">Balance</th>
-                <th className="text-right font-medium px-4 py-2.5">Used</th>
+                <th className="text-left font-medium px-4 py-2.5">{i18n("common.student")}</th>
+                <th className="text-left font-medium px-4 py-2.5">{i18n("common.status")}</th>
+                <th className="text-left font-medium px-4 py-2.5">{i18n("common.space")}</th>
+                <th className="text-right font-medium px-4 py-2.5">{i18n("common.balance")}</th>
+                <th className="text-right font-medium px-4 py-2.5">{i18n("common.used")}</th>
                 <th className="w-10"></th>
               </tr>
             </thead>
@@ -988,7 +992,7 @@ function MembersPanel({
                           </div>
                         </div>
                       ) : (
-                        <span className="text-xs text-muted-foreground">No class space</span>
+                        <span className="text-xs text-muted-foreground">{i18n("teacherCenter.noClassSpace")}</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -1009,7 +1013,7 @@ function MembersPanel({
               {members.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">
-                    No students yet. Generate a QR code to invite the class.
+                    {i18n("teacherCenter.emptyRosterDescription")}
                   </td>
                 </tr>
               )}
@@ -1029,16 +1033,14 @@ function MembersPanel({
               disabled={currentPage <= 1}
               onClick={() => onPageChange(currentPage - 1)}
             >
-              Previous
-            </Button>
+              {i18n("common.previous")}</Button>
             <Button
               size="sm"
               variant="outline"
               disabled={!hasMore}
               onClick={() => onPageChange(currentPage + 1)}
             >
-              Next
-            </Button>
+              {i18n("common.next")}</Button>
           </div>
         </div>
       </Card>
@@ -1056,6 +1058,7 @@ function MembersPanel({
 }
 
 function MemberDetail({ member, classId }: { member: ClassMember; classId: string }) {
+  const { t: i18n } = useLanguage();
   const { data: breakdown } = useMemberModelBreakdown(classId, member.user_id, 30);
   const queryClient = useQueryClient();
   const activeSpace = getPrimaryStudentSpace(member);
@@ -1093,7 +1096,7 @@ function MemberDetail({ member, classId }: { member: ClassMember; classId: strin
       );
     },
     onSuccess: () => {
-      toast.success("Space credits updated");
+      toast.success(i18n("teacherCenter.spaceCreditsUpdated"));
       setCreditAmount("250");
       setCreditReason("");
       refreshMemberData();
@@ -1142,13 +1145,13 @@ function MemberDetail({ member, classId }: { member: ClassMember; classId: strin
       <Card>
         <CardContent className="p-4 space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Class space</span>
+            <span className="text-muted-foreground">{i18n("common.classSpace")}</span>
             <Badge variant={activeSpace?.status === "active" ? "outline" : "secondary"} className="text-[10px]">
               {activeSpace?.status ?? "not created"}
             </Badge>
           </div>
           <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="text-muted-foreground">Student ID</span>
+            <span className="text-muted-foreground">{i18n("common.studentId")}</span>
             <span className="max-w-[220px] truncate font-mono text-xs">
               {member.student_code ?? "not set"}
             </span>
@@ -1159,17 +1162,17 @@ function MemberDetail({ member, classId }: { member: ClassMember; classId: strin
             </div>
           )}
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Current balance</span>
+            <span className="text-muted-foreground">{i18n("teacherCenter.currentBalance")}</span>
             <span className="font-semibold tabular-nums">{member.credits_balance}/{cap}</span>
           </div>
           <Progress value={percent} className="h-1.5" />
           <div className="grid grid-cols-2 gap-3 pt-2 text-sm">
             <div>
-              <div className="text-xs text-muted-foreground">Lifetime received</div>
+              <div className="text-xs text-muted-foreground">{i18n("teacherCenter.lifetimeReceived")}</div>
               <div className="font-semibold tabular-nums">{member.credits_lifetime_received}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground">Lifetime used</div>
+              <div className="text-xs text-muted-foreground">{i18n("teacherCenter.lifetimeUsed")}</div>
               <div className="font-semibold tabular-nums">{member.credits_lifetime_used}</div>
             </div>
           </div>
@@ -1178,15 +1181,15 @@ function MemberDetail({ member, classId }: { member: ClassMember; classId: strin
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Space management</CardTitle>
+          <CardTitle className="text-sm font-medium">{i18n("teacherCenter.spaceManagement")}</CardTitle>
           <CardDescription>
-            Credits apply only to this student's class space.
+            {i18n("teacherCenter.spaceManagementDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-[120px_1fr] gap-2">
             <div>
-              <Label className="text-xs">Credits</Label>
+              <Label className="text-xs">{i18n("common.credits_title")}</Label>
               <Input
                 type="number"
                 min="1"
@@ -1195,11 +1198,11 @@ function MemberDetail({ member, classId }: { member: ClassMember; classId: strin
               />
             </div>
             <div>
-              <Label className="text-xs">Reason</Label>
+              <Label className="text-xs">{i18n("common.reason")}</Label>
               <Input
                 value={creditReason}
                 onChange={(event) => setCreditReason(event.target.value)}
-                placeholder="Manual class-space grant"
+                placeholder={i18n("teacherCenter.manualClassSpaceGrant")}
               />
             </div>
           </div>
@@ -1214,7 +1217,7 @@ function MemberDetail({ member, classId }: { member: ClassMember; classId: strin
             ) : (
               <Plus className="h-3.5 w-3.5 mr-1.5" />
             )}
-            Add credits to space
+            {i18n("teacherCenter.addCreditsToSpace")}
           </Button>
           <div className="grid grid-cols-2 gap-2">
             <Button
@@ -1224,7 +1227,7 @@ function MemberDetail({ member, classId }: { member: ClassMember; classId: strin
               onClick={() => setSpaceStatus.mutate("passed")}
             >
               <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-              Mark passed
+              {i18n("teacherCenter.markPassed")}
             </Button>
             <Button
               size="sm"
@@ -1233,7 +1236,7 @@ function MemberDetail({ member, classId }: { member: ClassMember; classId: strin
               onClick={() => setSpaceStatus.mutate("ended")}
             >
               <Ban className="h-3.5 w-3.5 mr-1.5" />
-              End space
+              {i18n("teacherCenter.endSpace")}
             </Button>
           </div>
         </CardContent>
@@ -1242,11 +1245,11 @@ function MemberDetail({ member, classId }: { member: ClassMember; classId: strin
       {/* Per-model breakdown */}
       <div>
         <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-          Model usage (30 days)
+          {i18n("teacherCenter.modelUsage30Days")}
         </div>
         {(breakdown ?? []).length === 0 ? (
           <div className="text-sm text-muted-foreground py-6 text-center border rounded-md">
-            No model usage yet.
+            {i18n("teacherCenter.noModelUsageYet")}
           </div>
         ) : (
           <div className="space-y-1.5">
@@ -1257,11 +1260,11 @@ function MemberDetail({ member, classId }: { member: ClassMember; classId: strin
                   <div className="text-base">{meta.emoji}</div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{meta.display}</div>
-                    <div className="text-[10px] text-muted-foreground">{m.uses} runs</div>
+                    <div className="text-[10px] text-muted-foreground">{m.uses} {i18n("common.runs")}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-semibold tabular-nums">{m.total_credits}</div>
-                    <div className="text-[10px] text-muted-foreground">credits</div>
+                    <div className="text-[10px] text-muted-foreground">{i18n("common.credits")}</div>
                   </div>
                 </div>
               );
@@ -1285,6 +1288,7 @@ function CodesPanel({
   classId: string;
   creditPoolRemaining: number;
 }) {
+  const { t: i18n } = useLanguage();
   const [createOpen, setCreateOpen] = useState(false);
   const [showQR, setShowQR] = useState<ClassEnrollmentCode | null>(null);
   const codesQuery = useQuery({
@@ -1295,7 +1299,7 @@ function CodesPanel({
   const revokeCode = useMutation({
     mutationFn: (codeId: string) => consumerOrgAdminApi.revokeCode(classId, codeId),
     onSuccess: () => {
-      toast.success("QR code revoked");
+      toast.success(i18n("teacherCenter.qrCodeRevoked"));
       codesQuery.refetch();
     },
     onError: (error: any) => toast.error(error?.message ?? "Could not revoke code"),
@@ -1308,20 +1312,19 @@ function CodesPanel({
         <div>
           <CardTitle className="flex items-center gap-2 text-base">
             <QrCode className="h-4 w-4" />
-            Enrollment QR codes
+            {i18n("teacherCenter.enrollmentQrCodes")}
           </CardTitle>
           <CardDescription>
-            Each scan creates a student class space and grants credits only to that space.
+            {i18n("teacherCenter.codesDescription")}
           </CardDescription>
         </div>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" onClick={() => codesQuery.refetch()} disabled={codesQuery.isFetching}>
             <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", codesQuery.isFetching && "animate-spin")} />
-            Refresh
-          </Button>
+            {i18n("common.refresh")}</Button>
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             <Plus className="h-3.5 w-3.5 mr-1.5" />
-            New QR
+            {i18n("teacherCenter.newQr")}
           </Button>
         </div>
       </CardHeader>
@@ -1332,17 +1335,17 @@ function CodesPanel({
           </div>
         ) : codes.length === 0 ? (
           <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-            No active QR codes yet.
+            {i18n("teacherCenter.noActiveQrCodesYet")}
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
-                <th className="text-left font-medium px-4 py-2.5">Code</th>
-                <th className="text-right font-medium px-4 py-2.5">Credits</th>
-                <th className="text-right font-medium px-4 py-2.5">Uses</th>
-                <th className="text-left font-medium px-4 py-2.5">Expires</th>
-                <th className="text-left font-medium px-4 py-2.5">Description</th>
+                <th className="text-left font-medium px-4 py-2.5">{i18n("common.code")}</th>
+                <th className="text-right font-medium px-4 py-2.5">{i18n("common.credits_title")}</th>
+                <th className="text-right font-medium px-4 py-2.5">{i18n("common.uses")}</th>
+                <th className="text-left font-medium px-4 py-2.5">{i18n("common.expires")}</th>
+                <th className="text-left font-medium px-4 py-2.5">{i18n("common.description")}</th>
                 <th className="w-24"></th>
               </tr>
             </thead>
@@ -1411,6 +1414,7 @@ function CreateCodeDialog({
   onOpenChange: (open: boolean) => void;
   onCreated: (code: ClassEnrollmentCode) => void;
 }) {
+  const { t: i18n } = useLanguage();
   const [creditAmount, setCreditAmount] = useState("250");
   const [maxUses, setMaxUses] = useState("");
   const [expiresMinutes, setExpiresMinutes] = useState("");
@@ -1427,7 +1431,7 @@ function CreateCodeDialog({
       description: description || undefined,
     }),
     onSuccess: ({ code }) => {
-      toast.success("QR code created");
+      toast.success(i18n("teacherCenter.qrCodeCreated"));
       setCreditAmount("250");
       setMaxUses("");
       setExpiresMinutes("");
@@ -1441,14 +1445,14 @@ function CreateCodeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create enrollment QR</DialogTitle>
+          <DialogTitle>{i18n("teacherCenter.createEnrollmentQr")}</DialogTitle>
           <DialogDescription>
-            Students receive these credits in a new class space after scanning.
+            {i18n("teacherCenter.createCodeDescription")}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <Label>Credits per student space</Label>
+            <Label>{i18n("education.common.creditsPerStudentSpace")}</Label>
             <Input
               type="number"
               min="0"
@@ -1456,47 +1460,47 @@ function CreateCodeDialog({
               onChange={(event) => setCreditAmount(event.target.value)}
             />
             <div className={cn("mt-1 text-xs", tooMuch ? "text-destructive" : "text-muted-foreground")}>
-              {creditPoolRemaining.toLocaleString()} credits remaining in this class pool.
+              {creditPoolRemaining.toLocaleString()} {i18n("teacherCenter.creditsRemainingInThisClassPool")}
             </div>
           </div>
           <div>
-            <Label>Max scans</Label>
+            <Label>{i18n("teacherCenter.maxScans")}</Label>
             <Input
               type="number"
               min="1"
               value={maxUses}
               onChange={(event) => setMaxUses(event.target.value)}
-              placeholder="Blank = unlimited"
+              placeholder={i18n("teacherCenter.blankUnlimited")}
             />
           </div>
           <div>
-            <Label>Expires after</Label>
+            <Label>{i18n("teacherCenter.expiresAfter")}</Label>
             <select
               value={expiresMinutes}
               onChange={(event) => setExpiresMinutes(event.target.value)}
               className="flex h-9 w-full rounded-md bg-muted px-3 py-2 text-sm"
             >
-              <option value="">No expiry</option>
-              <option value="15">15 minutes</option>
-              <option value="30">30 minutes</option>
-              <option value="60">1 hour</option>
-              <option value="1440">1 day</option>
+              <option value="">{i18n("education.common.noExpiry")}</option>
+              <option value="15">{i18n("education.duration.fifteenMinutes")}</option>
+              <option value="30">{i18n("education.duration.thirtyMinutes")}</option>
+              <option value="60">{i18n("education.duration.oneHour")}</option>
+              <option value="1440">{i18n("education.duration.oneDay")}</option>
             </select>
           </div>
           <div>
-            <Label>Description</Label>
+            <Label>{i18n("teacherCenter.description")}</Label>
             <Input
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              placeholder="Week 1 class entry"
+              placeholder={i18n("teacherCenter.week1ClassEntry")}
             />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>{i18n("common.cancel")}</Button>
           <Button onClick={() => createCode.mutate()} disabled={createCode.isPending || tooMuch}>
             {createCode.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Generate QR
+            {i18n("teacherCenter.generateQr")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1505,18 +1509,19 @@ function CreateCodeDialog({
 }
 
 function QRDialog({ code, onClose }: { code: ClassEnrollmentCode | null; onClose: () => void }) {
+  const { t: i18n } = useLanguage();
   if (!code) return null;
   const url = `${window.location.origin}/enroll-class/${code.code}`;
   const copyLink = () => {
     navigator.clipboard.writeText(url);
-    toast.success("Enrollment link copied");
+    toast.success(i18n("teacherCenter.enrollmentLinkCopied"));
   };
 
   return (
     <Dialog open={!!code} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Project this QR for students</DialogTitle>
+          <DialogTitle>{i18n("education.common.projectThisQrForStudents")}</DialogTitle>
           <DialogDescription>
             <span className="font-mono">{code.code}</span>
             {code.max_uses ? ` - ${Math.max(code.max_uses - code.uses_count, 0)} scans left` : " - unlimited"}
@@ -1530,7 +1535,7 @@ function QRDialog({ code, onClose }: { code: ClassEnrollmentCode | null; onClose
           <p className="max-w-full break-all text-center text-xs text-muted-foreground">{url}</p>
           <Button size="sm" variant="outline" onClick={copyLink}>
             <Copy className="h-4 w-4 mr-2" />
-            Copy link
+            {i18n("education.common.copyLink")}
           </Button>
         </div>
       </DialogContent>
@@ -1539,15 +1544,16 @@ function QRDialog({ code, onClose }: { code: ClassEnrollmentCode | null; onClose
 }
 
 function ActivityPanel({ events }: { events: import("./useTeacherData").ActivityEvent[] }) {
+  const { t: i18n } = useLanguage();
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium">Recent activity</CardTitle>
+        <CardTitle className="text-sm font-medium">{i18n("teacherCenter.recentActivity")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-1">
         {events.length === 0 && (
           <div className="text-sm text-muted-foreground py-10 text-center">
-            No activity yet.
+            {i18n("teacherCenter.noActivityYet")}
           </div>
         )}
         {events.map((e) => {
@@ -1560,21 +1566,20 @@ function ActivityPanel({ events }: { events: import("./useTeacherData").Activity
                 <span className="text-muted-foreground"> · </span>
                 <span>
                   {e.activity_type === "model_use" && meta && (
-                    <>used <span className="font-medium">{meta.display}</span></>
+                    <>{i18n("common.used_lower")}<span className="font-medium">{meta.display}</span></>
                   )}
                   {e.activity_type === "enrollment" && "joined the class"}
                   {e.activity_type === "credits_granted" && (
-                    <>received <span className="font-medium">{e.credits_used} credits</span></>
+                    <>{i18n("common.received")}<span className="font-medium">{e.credits_used} {i18n("common.credits")}</span></>
                   )}
                   {e.activity_type === "credits_revoked" && (
-                    <>had <span className="font-medium">{e.credits_used} credits</span> revoked</>
+                    <>{i18n("common.had")}<span className="font-medium">{e.credits_used} {i18n("common.credits")}</span> {i18n("common.revoked")}</>
                   )}
                 </span>
               </div>
               {e.credits_used > 0 && e.activity_type === "model_use" && (
                 <div className="text-xs text-muted-foreground tabular-nums shrink-0">
-                  -{e.credits_used} cr
-                </div>
+                  -{e.credits_used} {i18n("common.credit_abbr")}</div>
               )}
               <div className="text-[11px] text-muted-foreground tabular-nums shrink-0 w-20 text-right">
                 {formatRelative(e.created_at)}
@@ -1605,11 +1610,12 @@ function formatRelative(iso: string): string {
 // ─────────────────────────────────────────────────────────────────────
 
 function EmptyState({ isOrgAdmin }: { isOrgAdmin: boolean }) {
+  const { t: i18n } = useLanguage();
   return (
     <div className="flex items-center justify-center min-h-screen p-10">
       <div className="text-center max-w-md">
         <BookOpen className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
-        <h2 className="text-xl font-semibold mb-2">No classes yet</h2>
+        <h2 className="text-xl font-semibold mb-2">{i18n("teacherCenter.noClassesYet2")}</h2>
         <p className="text-sm text-muted-foreground mb-6">
           {isOrgAdmin
             ? "Create the first class for your organization to start managing students and credits."
@@ -1618,7 +1624,7 @@ function EmptyState({ isOrgAdmin }: { isOrgAdmin: boolean }) {
         {isOrgAdmin && (
           <Button>
             <Plus className="h-4 w-4 mr-2" />
-            Create first class
+            {i18n("teacherCenter.createFirstClass")}
           </Button>
         )}
       </div>

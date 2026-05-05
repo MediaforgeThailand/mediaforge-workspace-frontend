@@ -39,12 +39,12 @@ const TextInputNode = memo(({ id, data, selected }: NodeProps) => {
     [id, setNodes],
   );
 
-  const displayName = d.nodeName || d.label || "Text Variable";
+  const displayName = d.nodeName || d.label || t("textInputNode.defaultTitle");
 
   return (
     <BaseNodeWrapper
       title={displayName}
-      badge="TEXT VAR"
+      badge={t("textInputNode.badge")}
       accent="green"
       icon={Type}
       inputs={[]}
@@ -52,25 +52,25 @@ const TextInputNode = memo(({ id, data, selected }: NodeProps) => {
       selected={selected}
       width={280}
       onTitleChange={(name) => updateNodeData({ nodeName: name })}
-      footerLeft="referenced via #[name](id)"
-      footerRight={d.isRequired ? "required" : "optional"}
+      footerLeft={t("textInputNode.referencedVia")}
+      footerRight={d.isRequired ? t("inputNode.required") : t("inputNode.optional")}
     >
       {/* Inline hint banner */}
       <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/[0.06] border border-emerald-400/20 text-[10.5px] text-emerald-200/90">
         <Hash className="w-3 h-3 shrink-0" />
         <span>
-          No ports — injected as{" "}
+          {t("textInputNode.injectedPrefix")}{" "}
           <span className="fs-chip textvar">
             <Hash className="w-2 h-2" />
             {displayName}
           </span>{" "}
-          in prompts
+          {t("textInputNode.injectedSuffix")}
         </span>
       </div>
 
       {/* Default value */}
       <div>
-        <GroupHeader label="DEFAULT VALUE" accent="green" />
+        <GroupHeader label={t("textInputNode.defaultValue")} accent="green" />
         <textarea
           value={d.textValue ?? ""}
           onChange={(e) => { stop(e); updateNodeData({ textValue: e.target.value }); }}
@@ -80,18 +80,18 @@ const TextInputNode = memo(({ id, data, selected }: NodeProps) => {
           onKeyDown={(e) => {
             if (e.key === "Backspace" || e.key === "Delete") e.stopPropagation();
           }}
-          placeholder={d.placeholder || "Enter default value..."}
+          placeholder={d.placeholder || t("textInputNode.enterDefaultValue")}
           className="fs-field fs-field-textarea mt-1.5 min-h-[44px] max-h-[120px] resize-none cursor-text select-text nodrag nopan nowheel"
         />
       </div>
 
       {/* End-user view */}
       <div>
-        <GroupHeader label="END-USER VIEW" accent="green" />
+        <GroupHeader label={t("inputNode.endUserView")} accent="green" />
         <div className="mt-1.5 space-y-2">
           <div>
             <label className="block text-[10px] text-white/55 mb-1 font-medium">
-              User sees
+              {t("inputNode.userSees")}
             </label>
             <input
               type="text"

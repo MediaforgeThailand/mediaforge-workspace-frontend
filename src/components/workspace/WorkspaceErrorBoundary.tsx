@@ -1,8 +1,15 @@
 import { Component, type ReactNode } from "react";
 import { AlertTriangle, RotateCw, ArrowLeft } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Props {
   children: ReactNode;
+  labels: {
+    title: string;
+    description: string;
+    reload: string;
+    back: string;
+  };
 }
 
 interface State {
@@ -48,10 +55,10 @@ class WorkspaceErrorBoundary extends Component<Props, State> {
         <div className="w-full max-w-md rounded-xl border border-rose-500/30 bg-zinc-900/80 p-6 shadow-xl">
           <div className="mb-3 flex items-center gap-2 text-rose-400">
             <AlertTriangle className="h-5 w-5" />
-            <h2 className="text-base font-semibold">Workspace ขัดข้อง</h2>
+            <h2 className="text-base font-semibold">{this.props.labels.title}</h2>
           </div>
           <p className="mb-3 text-sm text-zinc-300">
-            กดปุ่มด้านล่างเพื่อ reload หรือกลับไปหน้า Dashboard
+            {this.props.labels.description}
           </p>
           <div className="mb-4 max-h-32 overflow-auto rounded border border-rose-500/30 bg-rose-500/10 p-2 font-mono text-[11px] text-rose-200">
             {this.state.message}
@@ -63,14 +70,14 @@ class WorkspaceErrorBoundary extends Component<Props, State> {
               className="inline-flex items-center gap-1.5 rounded-md bg-violet-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-600"
             >
               <RotateCw className="h-3.5 w-3.5" />
-              Reload
+              {this.props.labels.reload}
             </button>
             <a
               href="/app/workspace"
               className="inline-flex items-center gap-1.5 rounded-md bg-white/[0.06] px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-white/[0.10]"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              กลับ Dashboard
+              {this.props.labels.back}
             </a>
           </div>
         </div>
@@ -79,4 +86,18 @@ class WorkspaceErrorBoundary extends Component<Props, State> {
   }
 }
 
-export default WorkspaceErrorBoundary;
+export default function WorkspaceErrorBoundaryWithI18n({ children }: { children: ReactNode }) {
+  const { t: i18n } = useLanguage();
+  return (
+    <WorkspaceErrorBoundary
+      labels={{
+        title: i18n("workspace.errorBoundary.workspaceCrashed"),
+        description: i18n("workspace.errorBoundary.useButtonsBelowToReloadOr"),
+        reload: i18n("workspace.errorBoundary.reload"),
+        back: i18n("workspace.errorBoundary.backToDashboard"),
+      }}
+    >
+      {children}
+    </WorkspaceErrorBoundary>
+  );
+}

@@ -115,7 +115,7 @@ const ImageGeneratorConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
       )}>
         <div className="flex flex-col items-center gap-2 text-white/20">
           <ImageIcon className="w-8 h-8" />
-          <span className="text-[10px]">Preview</span>
+          <span className="text-[10px]">{t("nodeConfig.preview")}</span>
         </div>
       </div>
 
@@ -178,7 +178,7 @@ const KlingNodeConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
                 value={(cfg[param.key] as string) ?? (param.default as string) ?? ""}
                 onChange={(e) => updateConfig(node, onUpdate, { [param.key]: e.target.value })}
                 className="text-xs bg-transparent border-white/[0.06] text-white/70 min-h-[60px] resize-none placeholder:text-white/25 focus-visible:ring-white/10"
-                placeholder={param.key === "prompt" ? "Describe the video content..." : "Elements to avoid..."}
+                placeholder={param.key === "prompt" ? t("nodeConfig.videoPromptPlaceholder") : t("nodeConfig.avoidPlaceholder")}
               />
             </div>
           );
@@ -230,20 +230,20 @@ const KlingNodeConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
       {nodeType === "ai/kling_2_6_camera" && (
         <>
           <Separator className="bg-[#2a2a40]" />
-          <p className="text-[10px] text-white/40 font-medium uppercase tracking-wider">Camera Control</p>
+          <p className="text-[10px] text-white/40 font-medium uppercase tracking-wider">{t("nodeConfig.cameraControl")}</p>
           <div className="space-y-1.5">
-            <label className={labelCls}>Camera Type</label>
+            <label className={labelCls}>{t("nodeConfig.cameraType")}</label>
             <Select
               value={(cfg.camera_type as string) ?? "simple"}
               onValueChange={(v) => updateConfig(node, onUpdate, { camera_type: v })}
             >
               <SelectTrigger className={inputCls}><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="simple">Simple (Custom)</SelectItem>
-                <SelectItem value="down_back">Down + Back</SelectItem>
-                <SelectItem value="forward_up">Forward + Up</SelectItem>
-                <SelectItem value="right_turn_forward">Right Turn Forward</SelectItem>
-                <SelectItem value="left_turn_forward">Left Turn Forward</SelectItem>
+                <SelectItem value="simple">{t("nodeConfig.camera.simple")}</SelectItem>
+                <SelectItem value="down_back">{t("nodeConfig.camera.downBack")}</SelectItem>
+                <SelectItem value="forward_up">{t("nodeConfig.camera.forwardUp")}</SelectItem>
+                <SelectItem value="right_turn_forward">{t("nodeConfig.camera.rightTurnForward")}</SelectItem>
+                <SelectItem value="left_turn_forward">{t("nodeConfig.camera.leftTurnForward")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -251,10 +251,10 @@ const KlingNodeConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
           {(cfg.camera_type as string) === "simple" || !(cfg.camera_type as string) ? (
             <div className="space-y-2">
               {[
-                { key: "camera_pan", label: "Pan (left/right)", min: -10, max: 10 },
-                { key: "camera_tilt", label: "Tilt (up/down)", min: -10, max: 10 },
-                { key: "camera_zoom", label: "Zoom (in/out)", min: -10, max: 10 },
-                { key: "camera_roll", label: "Roll", min: -10, max: 10 },
+                { key: "camera_pan", label: t("nodeConfig.camera.pan"), min: -10, max: 10 },
+                { key: "camera_tilt", label: t("nodeConfig.camera.tilt"), min: -10, max: 10 },
+                { key: "camera_zoom", label: t("nodeConfig.camera.zoom"), min: -10, max: 10 },
+                { key: "camera_roll", label: t("nodeConfig.camera.roll"), min: -10, max: 10 },
               ].map(({ key, label, min, max }) => (
                 <div key={key} className="space-y-1">
                   <div className="flex items-center justify-between">
@@ -275,7 +275,7 @@ const KlingNodeConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
           ) : null}
 
           <p className="text-[9px] text-white/20">
-            Camera control is supported with Kling v1 model. Duration fixed at 5s in pro mode.
+            {t("nodeConfig.cameraHint")}
           </p>
         </>
       )}
@@ -307,7 +307,7 @@ const ReferenceImageUploader = ({ node, onUpdate }: NodeConfigPanelProps) => {
   const handleFiles = useCallback(async (files: FileList | null) => {
     if (!files || !user) return;
     const remaining = 3 - urls.length;
-    if (remaining <= 0) { toast.error("Maximum 3 reference images"); return; }
+    if (remaining <= 0) { toast.error(t("nodeConfig.maxReferenceImages")); return; }
     const toUpload = Array.from(files).slice(0, remaining);
     setUploading(true);
     const newUrls = [...urls];
@@ -315,13 +315,13 @@ const ReferenceImageUploader = ({ node, onUpdate }: NodeConfigPanelProps) => {
       const ext = file.name.split(".").pop() || "png";
       const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
       const { error } = await supabase.storage.from("flow-assets").upload(path, file, { contentType: file.type });
-      if (error) { toast.error(`Upload failed: ${file.name}`); continue; }
+      if (error) { toast.error(t("nodeConfig.uploadFailed", { filename: file.name })); continue; }
       const { data: { publicUrl } } = supabase.storage.from("flow-assets").getPublicUrl(path);
       newUrls.push(publicUrl);
     }
     updateConfig(node, onUpdate, { example_image_urls: newUrls });
     setUploading(false);
-  }, [user, urls, node, onUpdate]);
+  }, [user, urls, node, onUpdate, t]);
 
   const removeUrl = useCallback((index: number) => {
     const newUrls = urls.filter((_, i) => i !== index);
@@ -331,14 +331,14 @@ const ReferenceImageUploader = ({ node, onUpdate }: NodeConfigPanelProps) => {
   return (
     <div className="space-y-2 mt-1">
       <Separator className="bg-white/[0.06]" />
-      <label className={labelCls}>Reference Images (Max 3)</label>
+      <label className={labelCls}>{t("nodeConfig.referenceImagesMax")}</label>
       <p className="text-[9px] text-white/25">{t("nodeExampleImages")}</p>
 
       {urls.length > 0 && (
         <div className="flex gap-1.5">
           {urls.map((url, i) => (
             <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-white/[0.08] group/thumb">
-              <img src={url} alt={`ref ${i + 1}`} className="w-full h-full object-cover" />
+              <img src={url} alt={t("nodeConfig.referenceAlt", { index: i + 1 })} className="w-full h-full object-cover" />
               <button
                 onClick={() => removeUrl(i)}
                 className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/70 text-white/80 flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity"
@@ -359,7 +359,7 @@ const ReferenceImageUploader = ({ node, onUpdate }: NodeConfigPanelProps) => {
           onClick={() => fileRef.current?.click()}
         >
           {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <ImagePlus className="w-3 h-3" />}
-          {uploading ? "Uploading..." : `Add Image (${urls.length}/3)`}
+          {uploading ? t("nodeConfig.uploading") : t("nodeConfig.addImage", { count: urls.length })}
         </Button>
       )}
 
@@ -376,31 +376,32 @@ const ReferenceImageUploader = ({ node, onUpdate }: NodeConfigPanelProps) => {
 };
 
 const InputImageConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
+  const { t } = useLanguage();
   const cfg = getConfig(node);
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <label className={labelCls}>Field Label</label>
+        <label className={labelCls}>{t("nodeConfig.fieldLabel")}</label>
         <Input
-          value={(cfg.field_label as string) ?? "Product Photo"}
+          value={(cfg.field_label as string) ?? t("nodeConfig.defaultProductPhoto")}
           onChange={(e) => updateConfig(node, onUpdate, { field_label: e.target.value })}
           className={inputCls}
         />
       </div>
       <div className="flex items-center justify-between">
-        <label className={labelCls}>Required</label>
+        <label className={labelCls}>{t("nodeConfig.required")}</label>
         <Switch
           checked={(cfg.is_required as boolean) ?? true}
           onCheckedChange={(v) => updateConfig(node, onUpdate, { is_required: v })}
         />
       </div>
       <div className="space-y-1.5">
-        <label className={labelCls}>Accepted Types</label>
+        <label className={labelCls}>{t("nodeConfig.acceptedTypes")}</label>
         <Input
           value={(cfg.accept as string) ?? "image/*"}
           onChange={(e) => updateConfig(node, onUpdate, { accept: e.target.value })}
           className={inputCls}
-          placeholder="image/*, .png, .jpg"
+          placeholder={t("nodeConfig.acceptedTypesPlaceholder")}
         />
       </div>
       <ReferenceImageUploader node={node} onUpdate={onUpdate} />
@@ -409,19 +410,20 @@ const InputImageConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
 };
 
 const InputVideoConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
+  const { t } = useLanguage();
   const cfg = getConfig(node);
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <label className={labelCls}>Field Label</label>
+        <label className={labelCls}>{t("nodeConfig.fieldLabel")}</label>
         <Input
-          value={(cfg.field_label as string) ?? "Video File"}
+          value={(cfg.field_label as string) ?? t("nodeConfig.defaultVideoFile")}
           onChange={(e) => updateConfig(node, onUpdate, { field_label: e.target.value })}
           className={inputCls}
         />
       </div>
       <div className="flex items-center justify-between">
-        <label className={labelCls}>Required</label>
+        <label className={labelCls}>{t("nodeConfig.required")}</label>
         <Switch
           checked={(cfg.is_required as boolean) ?? true}
           onCheckedChange={(v) => updateConfig(node, onUpdate, { is_required: v })}
@@ -433,28 +435,29 @@ const InputVideoConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
 };
 
 const InputTextConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
+  const { t } = useLanguage();
   const cfg = getConfig(node);
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <label className={labelCls}>Field Label</label>
+        <label className={labelCls}>{t("nodeConfig.fieldLabel")}</label>
         <Input
-          value={(cfg.field_label as string) ?? "Description"}
+          value={(cfg.field_label as string) ?? t("nodeConfig.defaultDescription")}
           onChange={(e) => updateConfig(node, onUpdate, { field_label: e.target.value })}
           className={inputCls}
         />
       </div>
       <div className="space-y-1.5">
-        <label className={labelCls}>Placeholder</label>
+        <label className={labelCls}>{t("nodeConfig.placeholder")}</label>
         <Input
           value={(cfg.placeholder as string) ?? ""}
           onChange={(e) => updateConfig(node, onUpdate, { placeholder: e.target.value })}
           className={inputCls}
-          placeholder="e.g. Enter product name..."
+          placeholder={t("nodeConfig.placeholderExample")}
         />
       </div>
       <div className="flex items-center justify-between">
-        <label className={labelCls}>Required</label>
+        <label className={labelCls}>{t("nodeConfig.required")}</label>
         <Switch
           checked={(cfg.is_required as boolean) ?? true}
           onCheckedChange={(v) => updateConfig(node, onUpdate, { is_required: v })}
@@ -465,8 +468,9 @@ const InputTextConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
 };
 
 const InputSelectConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
+  const { t } = useLanguage();
   const cfg = getConfig(node);
-  const options = (cfg.options as string[]) ?? ["Option 1", "Option 2"];
+  const options = (cfg.options as string[]) ?? [t("nodeConfig.defaultOption1"), t("nodeConfig.defaultOption2")];
 
   const setOptions = (newOpts: string[]) =>
     updateConfig(node, onUpdate, { options: newOpts });
@@ -474,15 +478,15 @@ const InputSelectConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <label className={labelCls}>Field Label</label>
+        <label className={labelCls}>{t("nodeConfig.fieldLabel")}</label>
         <Input
-          value={(cfg.field_label as string) ?? "Select Option"}
+          value={(cfg.field_label as string) ?? t("nodeConfig.defaultSelectOption")}
           onChange={(e) => updateConfig(node, onUpdate, { field_label: e.target.value })}
           className={inputCls}
         />
       </div>
       <div className="space-y-1.5">
-        <label className={labelCls}>Options</label>
+        <label className={labelCls}>{t("nodeConfig.options")}</label>
         {options.map((opt, i) => (
           <div key={i} className="flex gap-1.5">
             <Input
@@ -508,9 +512,9 @@ const InputSelectConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
           variant="ghost"
           size="sm"
           className="text-[10px] text-white/40 hover:text-white/60 gap-1"
-          onClick={() => setOptions([...options, `Option ${options.length + 1}`])}
+          onClick={() => setOptions([...options, t("nodeConfig.defaultOptionN", { n: options.length + 1 })])}
         >
-          <Plus className="w-3 h-3" /> Add Option
+          <Plus className="w-3 h-3" /> {t("nodeConfig.addOption")}
         </Button>
       </div>
     </div>
@@ -524,7 +528,7 @@ const AiVoiceGenConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <label className={labelCls}>Text / Script</label>
+        <label className={labelCls}>{t("nodeConfig.textScript")}</label>
         <Textarea
           value={(cfg.text as string) ?? ""}
           onChange={(e) => updateConfig(node, onUpdate, { text: e.target.value })}
@@ -533,7 +537,7 @@ const AiVoiceGenConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
         />
       </div>
       <div className="space-y-1.5">
-        <label className={labelCls}>Voice</label>
+        <label className={labelCls}>{t("nodeConfig.voice")}</label>
         <Select
           value={(cfg.model as string) ?? (cfg.voice as string) ?? "Kore"}
           onValueChange={(v) => updateConfig(node, onUpdate, { model: v })}
@@ -556,7 +560,7 @@ const AiTextGenConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <label className={labelCls}>System Prompt</label>
+        <label className={labelCls}>{t("nodeConfig.systemPrompt")}</label>
         <Textarea
           value={(cfg.system_prompt as string) ?? ""}
           onChange={(e) => updateConfig(node, onUpdate, { system_prompt: e.target.value })}
@@ -565,7 +569,7 @@ const AiTextGenConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
         />
       </div>
       <div className="space-y-1.5">
-        <label className={labelCls}>User Prompt Template</label>
+        <label className={labelCls}>{t("nodeConfig.userPromptTemplate")}</label>
         <Textarea
           value={(cfg.prompt as string) ?? ""}
           onChange={(e) => updateConfig(node, onUpdate, { prompt: e.target.value })}
@@ -574,7 +578,7 @@ const AiTextGenConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
         />
       </div>
       <div className="space-y-1.5">
-        <label className={labelCls}>Model</label>
+        <label className={labelCls}>{t("nodeConfig.model")}</label>
         <Select
           value={(cfg.model as string) ?? "google/gemini-2.5-flash"}
           onValueChange={(v) => updateConfig(node, onUpdate, { model: v })}
@@ -597,7 +601,7 @@ const PromptBuilderConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <label className={labelCls}>Prompt Template</label>
+        <label className={labelCls}>{t("nodeConfig.promptTemplate")}</label>
         <Textarea
           value={(cfg.template as string) ?? ""}
           onChange={(e) => updateConfig(node, onUpdate, { template: e.target.value })}
@@ -613,19 +617,20 @@ const PromptBuilderConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
 };
 
 const OutputConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
+  const { t } = useLanguage();
   const cfg = getConfig(node);
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <label className={labelCls}>Output Label</label>
+        <label className={labelCls}>{t("nodeConfig.outputLabel")}</label>
         <Input
-          value={(cfg.output_label as string) ?? "Final Output"}
+          value={(cfg.output_label as string) ?? t("nodeConfig.defaultFinalOutput")}
           onChange={(e) => updateConfig(node, onUpdate, { output_label: e.target.value })}
           className={inputCls}
         />
       </div>
       <p className="text-[9px] text-white/30">
-        This node receives the final result from connected upstream nodes.
+        {t("nodeConfig.outputHint")}
       </p>
     </div>
   );
@@ -658,6 +663,7 @@ const CONFIG_MAP: Record<string, React.FC<NodeConfigPanelProps>> = {
 /* ─── Main Export ─── */
 
 export const NodeConfigPanel = ({ node, onUpdate }: NodeConfigPanelProps) => {
+  const { t } = useLanguage();
   const nodeType = (node.data as Record<string, unknown>)?.nodeType as string;
   const ConfigComponent = CONFIG_MAP[nodeType];
 
@@ -665,7 +671,7 @@ export const NodeConfigPanel = ({ node, onUpdate }: NodeConfigPanelProps) => {
     return (
       <div className="space-y-2">
         <Badge variant="outline" className="text-[9px] border-yellow-500/30 text-yellow-400">
-          No config available for {nodeType}
+          {t("nodeConfig.noConfig", { nodeType })}
         </Badge>
       </div>
     );
@@ -674,7 +680,7 @@ export const NodeConfigPanel = ({ node, onUpdate }: NodeConfigPanelProps) => {
   return (
     <div className="space-y-3">
       <Separator className="bg-[#2a2a40]" />
-      <p className="text-[11px] font-medium text-white/50 uppercase tracking-wider">Configuration</p>
+      <p className="text-[11px] font-medium text-white/50 uppercase tracking-wider">{t("nodeConfig.configuration")}</p>
       <ConfigComponent node={node} onUpdate={onUpdate} />
     </div>
   );

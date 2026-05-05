@@ -1,48 +1,42 @@
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage, type Language } from "@/contexts/LanguageContext";
 
 export type BillingCycleView = "monthly" | "quarterly" | "semiannual" | "annual";
 
 interface PricingHeroProps {
-  language: string;
+  language: Language;
   view: BillingCycleView;
   onViewChange: (view: BillingCycleView) => void;
 }
 
-const SAVE_BADGE: Record<BillingCycleView, { en: string; th: string } | null> = {
-  monthly: null,
-  quarterly: { en: "Save 10%", th: "ลด 10%" },
-  semiannual: { en: "Save 15%", th: "ลด 15%" },
-  annual: { en: "Save 20%", th: "ลด 20%" },
-};
-
-const PricingHero = ({ language, view, onViewChange }: PricingHeroProps) => {
+const PricingHero = ({ view, onViewChange }: PricingHeroProps) => {
   const navigate = useNavigate();
   const { t } = useLanguage();
 
   const segments: { key: BillingCycleView; label: string; badge: string | null }[] = [
-    { key: "monthly", label: language === "th" ? "รายเดือน" : "Monthly", badge: null },
-    { key: "quarterly", label: language === "th" ? "3 เดือน" : "3 Months", badge: language === "th" ? "ลด 10%" : "Save 10%" },
-    { key: "semiannual", label: language === "th" ? "6 เดือน" : "6 Months", badge: language === "th" ? "ลด 15%" : "Save 15%" },
-    { key: "annual", label: language === "th" ? "12 เดือน" : "12 Months", badge: language === "th" ? "ลด 20%" : "Save 20%" },
+    { key: "monthly", label: t("pricingHero.cycle.monthly"), badge: null },
+    { key: "quarterly", label: t("pricingHero.cycle.quarterly"), badge: t("pricingHero.save.quarterly") },
+    { key: "semiannual", label: t("pricingHero.cycle.semiannual"), badge: t("pricingHero.save.semiannual") },
+    { key: "annual", label: t("pricingHero.cycle.annual"), badge: t("pricingHero.save.annual") },
   ];
 
-  const activeBadge = SAVE_BADGE[view];
+  const activeSaveBannerKey =
+    view === "monthly" ? null : (`pricingHero.saveBanner.${view}` as const);
 
   return (
     <section className="w-full py-12 md:py-16 text-center relative">
       <button
         onClick={() => navigate(-1)}
         className="absolute top-4 left-4 md:left-8 w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
-        aria-label="Back"
+        aria-label={t("pricingHero.back")}
       >
         <ArrowLeft className="w-5 h-5 text-neutral-400" />
       </button>
 
       <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tight text-white">
-        {language === "th" ? "ปลดล็อกพลังของ MEDIAFORGE" : "UNLOCK THE POWER OF MEDIAFORGE"}
+        {t("pricingHero.title")}
       </h1>
 
       <p className="text-neutral-400 mt-4 text-base md:text-lg max-w-2xl mx-auto px-4">
@@ -85,15 +79,9 @@ const PricingHero = ({ language, view, onViewChange }: PricingHeroProps) => {
       </div>
 
       {/* Active save banner */}
-      {activeBadge && (
+      {activeSaveBannerKey && (
         <p className="mt-3 text-xs text-violet-300">
-          {language === "th"
-            ? `ประหยัดสูงสุด ${activeBadge.th.replace("ลด ", "")} เมื่อชำระแบบ ${
-                view === "quarterly" ? "3 เดือน" : view === "semiannual" ? "6 เดือน" : "12 เดือน"
-              }`
-            : `${activeBadge.en} when paying ${
-                view === "quarterly" ? "quarterly" : view === "semiannual" ? "semi-annually" : "annually"
-              }`}
+          {t(activeSaveBannerKey)}
         </p>
       )}
     </section>

@@ -1,16 +1,15 @@
 import { Check, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage, type Language, type TranslationKey } from "@/contexts/LanguageContext";
 
 interface PricingCompareProps {
-  language: string;
+  language: Language;
 }
 
 type CellValue = string | boolean | null;
 
 interface CompareRow {
-  feature: string;
-  feature_th: string;
+  featureKey: TranslationKey;
   starter: CellValue;
   growth: CellValue;
   professional: CellValue;
@@ -18,50 +17,53 @@ interface CompareRow {
 }
 
 interface CompareSection {
-  title: string;
-  title_th: string;
+  titleKey: TranslationKey;
   rows: CompareRow[];
 }
 
 const SECTIONS: CompareSection[] = [
   {
-    title: "Credits & Usage",
-    title_th: "เครดิตและการใช้งาน",
+    titleKey: "pricingCompare.sections.creditsUsage",
     rows: [
-      { feature: "Credits/month", feature_th: "เครดิต/เดือน", starter: "67,500", growth: "161,250", professional: "248,750", enterprise: "373,750" },
-      { feature: "Est. images/month", feature_th: "รูปได้ประมาณ/เดือน", starter: "33", growth: "80", professional: "124", enterprise: "186" },
-      { feature: "Est. videos/month", feature_th: "VDO ได้ประมาณ/เดือน", starter: "27", growth: "64", professional: "99", enterprise: "149" },
-      { feature: "Flow Executions", feature_th: "Flow Executions", starter: "Unlimited", growth: "Unlimited", professional: "Unlimited", enterprise: "Unlimited" },
-      { feature: "Access to Flows", feature_th: "เข้าถึง Flows", starter: "All", growth: "All", professional: "All", enterprise: "All" },
+      { featureKey: "pricingCompare.features.creditsMonth", starter: "67,500", growth: "161,250", professional: "248,750", enterprise: "373,750" },
+      { featureKey: "pricingCompare.features.estImagesMonth", starter: "33", growth: "80", professional: "124", enterprise: "186" },
+      { featureKey: "pricingCompare.features.estVideosMonth", starter: "27", growth: "64", professional: "99", enterprise: "149" },
+      { featureKey: "pricingCompare.features.flowExecutions", starter: "Unlimited", growth: "Unlimited", professional: "Unlimited", enterprise: "Unlimited" },
+      { featureKey: "pricingCompare.features.accessToFlows", starter: "All", growth: "All", professional: "All", enterprise: "All" },
     ],
   },
   {
-    title: "Discounts & Benefits",
-    title_th: "ส่วนลดและสิทธิพิเศษ",
+    titleKey: "pricingCompare.sections.discountsBenefits",
     rows: [
-      { feature: "Official Flow discount", feature_th: "Official Flow ลด", starter: null, growth: "5%", professional: "10%", enterprise: "20%" },
-      { feature: "Flow Request", feature_th: "Flow Request", starter: null, growth: true, professional: true, enterprise: true },
+      { featureKey: "pricingCompare.features.officialFlowDiscount", starter: null, growth: "5%", professional: "10%", enterprise: "20%" },
+      { featureKey: "pricingCompare.features.flowRequest", starter: null, growth: true, professional: true, enterprise: true },
     ],
   },
   {
-    title: "Support",
-    title_th: "การสนับสนุน",
+    titleKey: "pricingCompare.sections.support",
     rows: [
-      { feature: "Support Level", feature_th: "ระดับการสนับสนุน", starter: "Standard", growth: "Priority", professional: "Priority", enterprise: "Priority" },
+      { featureKey: "pricingCompare.features.supportLevel", starter: "Standard", growth: "Priority", professional: "Priority", enterprise: "Priority" },
     ],
   },
 ];
 
 const PLAN_NAMES = ["starter", "growth", "professional", "enterprise"] as const;
 const PLAN_LABELS = { starter: "Starter", growth: "Growth", professional: "Professional", enterprise: "Enterprise" };
-
-const CellContent = ({ value }: { value: CellValue }) => {
-  if (value === null) return <Minus className="w-4 h-4 text-neutral-600 mx-auto" />;
-  if (value === true) return <Check className="w-4 h-4 text-green-400 mx-auto" />;
-  return <span>{value}</span>;
+const CELL_LABELS: Record<string, TranslationKey> = {
+  Unlimited: "pricingCompare.cell.unlimited",
+  All: "pricingCompare.cell.all",
+  Standard: "pricingCompare.cell.standard",
+  Priority: "pricingCompare.cell.priority",
 };
 
-const PricingCompare = ({ language }: PricingCompareProps) => {
+const CellContent = ({ value }: { value: CellValue }) => {
+  const { t } = useLanguage();
+  if (value === null) return <Minus className="w-4 h-4 text-neutral-600 mx-auto" />;
+  if (value === true) return <Check className="w-4 h-4 text-green-400 mx-auto" />;
+  return <span>{CELL_LABELS[value] ? t(CELL_LABELS[value]) : value}</span>;
+};
+
+const PricingCompare = (_props: PricingCompareProps) => {
   const { t } = useLanguage();
   return (
     <section className="mt-16 px-4">
@@ -93,16 +95,16 @@ const PricingCompare = ({ language }: PricingCompareProps) => {
 
         {/* Sections */}
         {SECTIONS.map((section) => (
-          <div key={section.title}>
+          <div key={section.titleKey}>
             <div className="bg-neutral-900/50 py-3 px-6 border-b border-neutral-800">
               <span className="text-white font-medium text-sm">
-                {language === "th" ? section.title_th : section.title}
+                {t(section.titleKey)}
               </span>
             </div>
             {section.rows.map((row) => (
-              <div key={row.feature} className="grid grid-cols-5 border-b border-neutral-800">
+              <div key={row.featureKey} className="grid grid-cols-5 border-b border-neutral-800">
                 <div className="py-3 px-6 text-sm text-neutral-300">
-                  {language === "th" ? row.feature_th : row.feature}
+                  {t(row.featureKey)}
                 </div>
                 {PLAN_NAMES.map((p) => (
                   <div
@@ -142,25 +144,25 @@ const PricingCompare = ({ language }: PricingCompareProps) => {
                 <span>{PLAN_LABELS[p]}</span>
                 {isGrowth && (
                   <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-600 text-white">
-                    {language === "th" ? "ยอดนิยม" : "Popular"}
+                    {t("pricingCompare.popular")}
                   </span>
                 )}
               </div>
               {SECTIONS.map((section) => (
-                <div key={section.title}>
+                <div key={section.titleKey}>
                   <div className="px-5 py-2 bg-neutral-900/60 border-y border-neutral-800/60">
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-                      {language === "th" ? section.title_th : section.title}
+                      {t(section.titleKey)}
                     </span>
                   </div>
                   <ul className="divide-y divide-neutral-800/60">
                     {section.rows.map((row) => (
                       <li
-                        key={row.feature}
+                        key={row.featureKey}
                         className="px-5 py-3 flex items-center justify-between gap-3"
                       >
                         <span className="text-sm text-neutral-400 flex-1">
-                          {language === "th" ? row.feature_th : row.feature}
+                          {t(row.featureKey)}
                         </span>
                         <span className="text-sm font-medium text-neutral-200 text-right">
                           {row[p] === null ? (
@@ -168,7 +170,7 @@ const PricingCompare = ({ language }: PricingCompareProps) => {
                           ) : row[p] === true ? (
                             <Check className="w-4 h-4 text-green-400" />
                           ) : (
-                            row[p]
+                            <CellContent value={row[p]} />
                           )}
                         </span>
                       </li>

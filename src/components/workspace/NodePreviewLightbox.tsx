@@ -77,7 +77,7 @@ interface Props {
 }
 
 const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
-  const { language, t } = useLanguage();
+  const { language, t, t: i18n } = useLanguage();
   // Crop-tool toggle. When true the lightbox renders the
   // ImageCropTool overlay on top of the preview. Esc / Cancel
   // bubbles back here to close the tool without closing the
@@ -254,7 +254,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
         <PreviewToolButton
           icon={Download}
           label="GLB"
-          title="Download .glb"
+          title={i18n("workspace.lightbox.downloadGlb")}
           onClick={() =>
             void downloadFromUrl(modelDownloadUrl, preview.label ?? "3d-model")
           }
@@ -277,14 +277,14 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
         ? [
             {
               icon: Download,
-              label: language === "th" ? "ดาวน์โหลด" : "Download",
+              label: i18n("common.download"),
               onClick: () => void downloadFromUrl(preview.url!, preview.label),
             },
           ]
         : [
             {
               icon: Download,
-              label: language === "th" ? "ดาวน์โหลดวิดีโอ" : "Download video",
+              label: i18n("workspace.lightbox.downloadVideo"),
               onClick: () => void downloadFromUrl(preview.url!, preview.label),
             },
           ];
@@ -322,7 +322,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
             <div className="flex items-center justify-end gap-1">
               <InspectorIconButton
                 icon={Maximize2}
-                label={language === "th" ? "เต็มจอ" : "Fullscreen"}
+                label={i18n("workspace.lightbox.fullscreen")}
                 onClick={() => {
                   if (document.fullscreenElement) {
                     void document.exitFullscreen();
@@ -334,18 +334,18 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
               {canCrop && (
                 <InspectorIconButton
                   icon={CropIcon}
-                  label={language === "th" ? "ครอป" : "Crop"}
+                  label={i18n("workspace.lightbox.crop")}
                   onClick={() => setCropOpen(true)}
                 />
               )}
               <InspectorIconButton
                 icon={Copy}
-                label={language === "th" ? "คัดลอก URL" : "Copy URL"}
+                label={i18n("workspace.lightbox.copyUrl")}
                 onClick={copyUrl}
               />
               <InspectorIconButton
                 icon={Download}
-                label={language === "th" ? "ดาวน์โหลด" : "Download"}
+                label={i18n("common.download")}
                 onClick={() => void downloadFromUrl(preview.url!, preview.label)}
               />
             </div>
@@ -353,15 +353,15 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
             <div className="mt-7">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-                  Prompt
+                  {i18n("workspace.lightbox.prompt")}
                 </p>
                 {inspectorPrompt && (
                   <button
                     type="button"
                     onClick={copyPrompt}
                     className="grid h-6 w-6 place-items-center rounded-md text-zinc-400 transition hover:bg-white/[0.06] hover:text-white"
-                    aria-label={language === "th" ? "คัดลอก prompt" : "Copy prompt"}
-                    title={language === "th" ? "คัดลอก prompt" : "Copy prompt"}
+                    aria-label={i18n("workspace.lightbox.copyPrompt")}
+                    title={i18n("workspace.lightbox.copyPrompt")}
                   >
                     <Copy className="h-3.5 w-3.5" />
                   </button>
@@ -370,7 +370,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
               <div className="mt-4 text-[13px] font-semibold leading-relaxed text-white">
                 {inspectorPrompt || (
                   <span className="font-medium text-zinc-500">
-                    {language === "th" ? "ไม่มี prompt" : "No prompt"}
+                    {i18n("workspace.lightbox.noPrompt")}
                   </span>
                 )}
               </div>
@@ -378,7 +378,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
 
             <div className="mt-7">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-                Settings
+                {i18n("common.settings")}
               </p>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {inspectorSettings.length > 0 ? (
@@ -394,7 +394,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
                   ))
                 ) : (
                   <span className="text-[12px] text-zinc-500">
-                    {language === "th" ? "ไม่มีข้อมูล setting" : "No settings"}
+                    {i18n("workspace.lightbox.noSettings")}
                   </span>
                 )}
               </div>
@@ -402,7 +402,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
 
             <div className="mt-auto space-y-2 pb-1">
               <p className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-                {language === "th" ? "เครื่องมือ" : "Tools"}
+                {i18n("common.tools")}
               </p>
               {actionRows.map((action) => (
                 <button
@@ -423,7 +423,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
                   className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-white text-[12px] font-semibold text-zinc-950 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <CropIcon className="h-4 w-4" />
-                  {language === "th" ? "แก้ไขรูปภาพ" : "Edit Image"}
+                  {i18n("workspace.lightbox.editImage")}
                 </button>
               )}
             </div>
@@ -560,12 +560,12 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
         {preview.type === "audio" && preview.url && (
           <div className="flex min-h-[220px] min-w-[280px] flex-col items-center justify-center gap-4 rounded-md bg-zinc-900 p-6">
             <div className="text-xs uppercase tracking-wide text-zinc-500">
-              Audio
+              {i18n("common.audio")}
             </div>
             <AudioPlayButton
               src={preview.url}
               autoPlay
-              label={preview.label ?? "Play audio"}
+              label={preview.label ?? i18n("workspace.common.playAudio")}
               buttonClassName="h-14 w-14"
             />
           </div>
@@ -574,7 +574,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
         {preview.type === "text" && (
           <div className="rounded-md bg-zinc-900 p-6 text-[13px] leading-relaxed text-zinc-100 whitespace-pre-wrap">
             {preview.text || (
-              <span className="italic text-zinc-500">(empty text)</span>
+              <span className="italic text-zinc-500">{i18n("workspace.lightbox.emptyText")}</span>
             )}
           </div>
         )}
@@ -639,7 +639,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
                 className="h-[140px] w-[140px] rounded-md object-contain"
               />
               <span className="text-[11px] font-mono uppercase tracking-[0.25em] text-zinc-400">
-                Loading 3D…
+                {i18n("workspace.lightbox.loading3d")}
               </span>
             </div>
           </div>
@@ -649,7 +649,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
           <div className="grid w-[min(900px,calc(90vw-88px))] grid-cols-3 gap-3">
             {preview.urls.length === 0 ? (
               <div className="col-span-3 flex h-32 items-center justify-center text-xs text-zinc-500">
-                <ImageOff className="mr-2 h-4 w-4" /> Empty group
+                <ImageOff className="mr-2 h-4 w-4" /> {i18n("workspace.lightbox.emptyGroup")}
               </div>
             ) : (
               preview.urls.map((u, i) => (
@@ -678,7 +678,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
         className="absolute inset-x-0 bottom-0 bg-zinc-950/80 px-4 py-2 text-center text-[11px] text-zinc-500"
         onClick={(e) => e.stopPropagation()}
       >
-        Esc · A · click to close
+        {i18n("workspace.lightbox.escClickToClose")}
       </div>
 
       {/* Crop overlay — sits on top of the lightbox at z-[2100]

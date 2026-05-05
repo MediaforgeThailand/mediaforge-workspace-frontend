@@ -15,6 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { Generation } from "./NodeResultBar";
 import { AudioPlayButton } from "./AudioPlayButton";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Props {
   open: boolean;
@@ -31,14 +32,15 @@ const formatTime = (ts: number) => {
 
 const NodeResultDialog = memo(
   ({ open, onOpenChange, generations, selectedIndex, onSelect }: Props) => {
+    const { t: i18n } = useLanguage();
     const current = generations[selectedIndex] ?? generations[0];
 
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-5xl gap-0 p-0">
-          <DialogTitle className="sr-only">Generation history</DialogTitle>
+          <DialogTitle className="sr-only">{i18n("workspace.nodeResultDialog.generationHistory")}</DialogTitle>
           <DialogDescription className="sr-only">
-            Browse all generations produced by this node. Click a thumbnail to select it.
+            {i18n("workspace.nodeResultDialog.description")}
           </DialogDescription>
 
           {/* Main preview — natural aspect, clip to viewport */}
@@ -65,11 +67,11 @@ const NodeResultDialog = memo(
             {current.type === "audio" && current.url && (
               <div className="flex flex-col items-center justify-center gap-3 p-8">
                 <div className="text-[11px] uppercase tracking-wide text-zinc-500">
-                  Audio output
+                  {i18n("workspace.nodeResultDialog.audioOutput")}
                 </div>
                 <AudioPlayButton
                   src={current.url}
-                  label="Play audio"
+                  label={i18n("workspace.common.playAudio")}
                   buttonClassName="h-14 w-14"
                 />
               </div>
@@ -79,7 +81,7 @@ const NodeResultDialog = memo(
           {/* Meta row */}
           <div className="flex items-center justify-between px-4 py-2 text-[11px] text-zinc-400">
             <div>
-              {selectedIndex === 0 ? "Latest" : `#${generations.length - selectedIndex}`} ·{" "}
+              {selectedIndex === 0 ? i18n("common.latest") : `#${generations.length - selectedIndex}`} ·{" "}
               {formatTime(current.createdAt)}
             </div>
             <div className="uppercase tracking-wide text-zinc-500">{current.type}</div>
@@ -89,7 +91,8 @@ const NodeResultDialog = memo(
           {generations.length > 1 && (
             <div className="bg-zinc-950 p-3">
               <div className="mb-2 text-[11px] uppercase tracking-wide text-zinc-500">
-                History — {generations.length} generation{generations.length === 1 ? "" : "s"}
+                {i18n("common.history")} — {generations.length}{" "}
+                {i18n(generations.length === 1 ? "workspace.generation.singular" : "workspace.generation.plural")}
               </div>
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {generations.map((gen, i) => (
@@ -126,7 +129,7 @@ const NodeResultDialog = memo(
                     )}
                     {i === 0 && (
                       <div className="absolute bottom-0 left-0 right-0 bg-emerald-500/80 py-[1px] text-center text-[8px] font-semibold text-black">
-                        LATEST
+                        {i18n("common.latest2")}
                       </div>
                     )}
                   </button>

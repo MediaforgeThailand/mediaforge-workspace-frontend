@@ -15,6 +15,7 @@ import {
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import type { AssetNodeData } from "./AssetNode";
 import { AudioPlayButton } from "./AudioPlayButton";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ToolOption {
   id: string;
@@ -73,6 +74,7 @@ interface Props {
 }
 
 const AssetExpandedDialog = ({ open, onOpenChange, nodeId, data }: Props) => {
+  const { t: i18n } = useLanguage();
   const tools = useMemo(
     () => (data.fieldType === "image" ? IMAGE_TOOLS : VIDEO_TOOLS),
     [data.fieldType],
@@ -111,7 +113,7 @@ const AssetExpandedDialog = ({ open, onOpenChange, nodeId, data }: Props) => {
           <div className="flex items-center gap-2">
             <Icon className="h-4 w-4 text-zinc-400" />
             <DialogTitle className="text-sm font-medium">
-              {data.label || data.fileName || "Asset"}
+              {data.label || data.fileName || i18n("common.asset2")}
             </DialogTitle>
           </div>
           {data.fileName && data.fileName !== data.label && (
@@ -134,34 +136,34 @@ const AssetExpandedDialog = ({ open, onOpenChange, nodeId, data }: Props) => {
               ) : data.fieldType === "audio" ? (
                 <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-zinc-900/80 p-8">
                   <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
-                    Audio
+                    {i18n("common.audio")}
                   </div>
                   <AudioPlayButton
                     src={data.previewUrl}
-                    label={data.label || data.fileName || "Play audio"}
+                    label={data.label || data.fileName || i18n("workspace.common.playAudio")}
                     buttonClassName="h-14 w-14"
                   />
                 </div>
               ) : (
                 <img
                   src={data.previewUrl}
-                  alt={data.label || data.fileName || "asset"}
+                  alt={data.label || data.fileName || i18n("common.asset")}
                   className="max-h-[75vh] max-w-full object-contain"
                 />
               )
             ) : (
-              <div className="text-xs text-zinc-500">no preview</div>
+              <div className="text-xs text-zinc-500">{i18n("workspace.assetExpanded.noPreview")}</div>
             )}
           </div>
 
           {/* Tool sidebar */}
           <aside className="flex w-full shrink-0 flex-col bg-zinc-950 md:w-72 md:border-t-0">
             <div className="border-b border-zinc-800 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
-              Apply tool
+              {i18n("workspace.assetExpanded.applyTool")}
             </div>
             {tools.length === 0 ? (
               <div className="p-4 text-xs text-zinc-500">
-                No tools available for this asset type yet.
+                {i18n("workspace.assetExpanded.noToolsAvailableForThisAssetType")}
               </div>
             ) : (
               <ul className="flex-1 space-y-1 overflow-y-auto p-2">
@@ -176,9 +178,21 @@ const AssetExpandedDialog = ({ open, onOpenChange, nodeId, data }: Props) => {
                       >
                         <ToolIcon className="mt-0.5 h-4 w-4 shrink-0 text-zinc-300" />
                         <div className="min-w-0">
-                          <div className="text-xs font-medium text-zinc-100">{t.label}</div>
+                          <div className="text-xs font-medium text-zinc-100">
+                            {t.id === "remove-bg"
+                              ? i18n("workspace.assetExpanded.removeBackground")
+                              : t.id === "kling-video"
+                                ? i18n("workspace.assetExpanded.animateToVideo")
+                                : t.label}
+                          </div>
                           <div className="text-[11px] leading-snug text-zinc-500">
-                            {t.description}
+                            {t.id === "remove-bg"
+                              ? i18n("workspace.assetExpanded.cutSubjectOutOfItsBackground")
+                              : t.id === "kling-video"
+                                ? i18n("workspace.assetExpanded.imageToVideoViaKling")
+                                : t.id === "seed-dance"
+                                  ? i18n("workspace.assetExpanded.imageToVideoViaSeeddance")
+                                  : t.description}
                           </div>
                         </div>
                       </button>
@@ -188,7 +202,7 @@ const AssetExpandedDialog = ({ open, onOpenChange, nodeId, data }: Props) => {
               </ul>
             )}
             <div className="border-t border-zinc-800 px-3 py-2 text-[11px] text-zinc-500">
-              Clicking a tool adds it to the canvas and wires it to this asset.
+              {i18n("workspace.assetExpanded.clickingToolAddsItTo")}
             </div>
           </aside>
         </div>

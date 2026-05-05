@@ -531,6 +531,14 @@ const DURATION_COST_MODELS = new Set(["kling-v3-pro", "kling-v3-omni"]);
 const WORKSPACE_NODE_UI_SCALE = 1.15;
 const DEFAULT_COMPACT_WIDTH = 437;
 
+const PORT_LABEL_KEYS = {
+  ref_audio: "workspace.port.ref_audio",
+  ref_video: "workspace.port.ref_video",
+  ref_image: "workspace.port.ref_image",
+  reference_image: "workspace.port.reference_image",
+  elements: "workspace.port.elements",
+} as const;
+
 interface NodeData {
   label?: string;
   params?: Record<string, unknown>;
@@ -565,7 +573,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const [isHovered, setIsHovered] = useState(false);
   // Used by friendlyError() to localize jargon errors before they
   // reach the user. Raw text still lands in console.error.
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const currentWorkspaceId = useWorkspaceStore((s) => s.current?.workspaceId ?? null);
 
   // Refs + ResizeObserver for the dynamic prompt-lift logic. The
@@ -710,7 +718,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const runNode = useCallback(async () => {
     if (isRunning) return;
     if (isViewer) {
-      toast.info("View-only mode — runs are disabled.");
+      toast.info(t("workspace.toolNode.viewOnlyRunsDisabled"));
       return;
     }
     const storeState = useWorkspaceStore.getState();
@@ -1574,10 +1582,10 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         // `function consume_credits_for(…) does not exist`,
         // OpenAI 401 …) to friendly Thai/EN copy. Raw error
         // stays in console.error for the team.
-        toast.error(friendlyError(errorMessage, language === "th" ? "th" : "en"));
+        toast.error(friendlyError(errorMessage, language === "th" || language === "ja" ? language : "en"));
       }
     }
-  }, [getNodes, id, isRunning, isViewer, params, schemaKey, setNodes, selectedModel, schema, d.params?.nodeName, language]);
+  }, [getNodes, id, isRunning, isViewer, params, schemaKey, setNodes, selectedModel, schema, d.params?.nodeName, language, t]);
 
   useEffect(() => {
     if (!isRunning) return;
@@ -2088,7 +2096,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   if (!schema) {
     return (
       <div className="rounded-md border border-red-500 bg-red-950 px-3 py-2 text-xs text-red-200">
-        Unknown node type: {schemaKey}
+        {t("workspace.toolNode.unknownNodeType", { nodeType: schemaKey })}
       </div>
     );
   }
@@ -2199,6 +2207,12 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         param.key === "model_name"
           ? cleanModelLabelMap(rawEffectiveLabels)
           : rawEffectiveLabels;
+      const localizedEffectiveLabels = effectiveOptions.includes("adaptive")
+        ? {
+            ...effectiveLabels,
+            adaptive: t("workspace.standalone.option.adaptive"),
+          }
+        : effectiveLabels;
       const value = params[param.key] ?? resolved?.default ?? param.default;
 
       // Voice picker for audio gen was removed — see audioGenNode in
@@ -2248,7 +2262,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               label={param.label}
               value={String(value)}
               options={effectiveOptions as [string, string]}
-              optionLabels={effectiveLabels}
+              optionLabels={localizedEffectiveLabels}
               onChange={(v) => updateParam(param.key, v)}
             />
           );
@@ -2258,14 +2272,14 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             key={param.key}
             value={String(value)}
             options={effectiveOptions}
-            optionLabels={effectiveLabels}
+            optionLabels={localizedEffectiveLabels}
             onChange={(v) => updateParam(param.key, v)}
             // Long lists (model_name today, future picker-style params)
             // open as a search-and-keyboard-nav dropdown instead of a
             // plain Radix Select. Keeps short dropdowns snappy.
             searchable={param.key === "model_name"}
             searchFooter={
-              param.key === "model_name" ? "All models" : undefined
+              param.key === "model_name" ? t("createImagePanel.allModels") : undefined
             }
           />
         );
@@ -2292,8 +2306,13 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       // toolbar; falls through to nothing.
       return null;
     },
-    [params, selectedModel, updateParam, schemaKey, id],
+    [params, selectedModel, t, updateParam, schemaKey, id],
   );
+
+  const localizePortLabel = (handleId: string, fallback: string): string => {
+    const key = PORT_LABEL_KEYS[handleId as keyof typeof PORT_LABEL_KEYS];
+    return key ? t(key) : fallback;
+  };
 
   // Some node types (Image to 3D / Tripo3D) take only an image input
   // — the model's API doesn't accept a text prompt, so showing the
@@ -2428,7 +2447,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               {currentGen.url ? (
                 <img
                   src={previewImageUrl ?? currentGen.url}
-                  alt="3D model preview"
+                  alt={t("workspace.toolNode.modelPreviewAlt")}
                   draggable={false}
                   loading="lazy"
                   decoding="async"
@@ -2450,11 +2469,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                   className="flex w-full items-center justify-center text-zinc-600"
                   style={{ aspectRatio: "1 / 1", background: "hsl(0 0% 6%)" }}
                 >
-                  <span className="text-xs">3D model</span>
+                  <span className="text-xs">{t("workspace.lightbox.alt_3d_model")}</span>
                 </div>
               )}
               <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wide text-amber-300">
-                3D · double-click to view
+                {t("workspace.toolNode.open3dPreviewHint")}
               </span>
             </div>
           ) : currentGen?.type === "image" && currentGen.url && (
@@ -2519,7 +2538,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               }}
               onMouseDown={(e) => e.stopPropagation()}
               className="ws-history-toggle absolute left-2 top-2 nodrag flex items-center gap-1 rounded bg-black/65 px-1.5 py-0.5 text-[10px] text-white/80 backdrop-blur-sm hover:bg-black/80"
-              title="Browse history"
+              title={t("workspace.toolNode.browseHistory")}
             >
               <Maximize2 className="h-2.5 w-2.5" />
               {selectedGenIndex + 1}/{generations.length}
@@ -2568,8 +2587,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                   maxHeightPx={promptMaxH}
                   placeholder={
                     schema.displayName.toLowerCase().includes("video")
-                      ? `Try "ocean waves at sunset, slow pan"`
-                      : `Try "happy dog wearing sunglasses, studio light"`
+                      ? t("workspace.toolNode.videoPromptPlaceholder")
+                      : t("workspace.toolNode.imagePromptPlaceholder")
                   }
                   excludeNodeId={id}
                   scrollRestoreKey={`workspace-tool-node:${id}:prompt`}
@@ -2595,7 +2614,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                 />
               ) : (
                 <span className="ws-compact-prompt-hint">
-                  Wire an image into the input port and press Run
+                  {t("workspace.toolNode.wireImageAndRun")}
                 </span>
               )}
             </div>
@@ -2694,8 +2713,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           className="ws-compact-resize-handle nodrag"
           onPointerDown={onResizeStart}
           onMouseDown={(e) => e.stopPropagation()}
-          title="Drag to resize"
-          aria-label="Resize node"
+          title={t("workspace.toolNode.dragToResize")}
+          aria-label={t("workspace.toolNode.resizeNode")}
         />
         </div> {/* end ws-compact-node body card */}
       </div>
@@ -2717,7 +2736,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           key={`in-${inp.id}`}
           dir="target"
           handleId={inp.id}
-          label={inp.label}
+          label={localizePortLabel(inp.id, inp.label)}
           portType={portTypeFromHandleId(inp.id)}
           color={colorOf(inp.color)}
           index={i}
@@ -2728,7 +2747,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           key={`out-${out.id}`}
           dir="source"
           handleId={out.id}
-          label={out.label}
+          label={localizePortLabel(out.id, out.label)}
           portType={portTypeFromHandleId(out.id)}
           color={colorOf(out.color)}
           index={i}
@@ -2758,13 +2777,14 @@ function MultiGenStepper({
   disabled: boolean;
   onChange: (count: number) => void;
 }) {
+  const { t } = useLanguage();
   const decDisabled = disabled || count <= 1;
   const incDisabled = disabled || count >= MULTI_GEN_MAX;
 
   return (
     <div
       className="nodrag flex h-7 items-center gap-0.5 rounded-full bg-black/35 px-1 text-[11px] font-semibold text-zinc-100"
-      title="Generate multiple variations when Run is pressed"
+      title={t("workspace.toolNode.variationStepperTip")}
       onMouseDown={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
@@ -2777,7 +2797,7 @@ function MultiGenStepper({
           "grid h-5 w-5 place-items-center rounded-full transition-colors",
           decDisabled ? "cursor-not-allowed text-zinc-600" : "text-zinc-300 hover:bg-white/10 hover:text-white",
         )}
-        aria-label="Decrease variation count"
+        aria-label={t("workspace.toolNode.decreaseVariation")}
       >
         <ChevronLeft className="h-3.5 w-3.5" />
       </button>
@@ -2790,7 +2810,7 @@ function MultiGenStepper({
           "grid h-5 w-5 place-items-center rounded-full transition-colors",
           incDisabled ? "cursor-not-allowed text-zinc-600" : "text-zinc-300 hover:bg-white/10 hover:text-white",
         )}
-        aria-label="Increase variation count"
+        aria-label={t("workspace.toolNode.increaseVariation")}
       >
         <ChevronRight className="h-3.5 w-3.5" />
       </button>

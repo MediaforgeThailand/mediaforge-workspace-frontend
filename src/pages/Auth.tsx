@@ -34,11 +34,11 @@ type AuthProps = {
 };
 
 const Auth = ({ mode = "page", onClose, redirectPath }: AuthProps) => {
-  useDocumentTitle("Sign in — MediaForge");
+  const { t, t: i18n } = useLanguage();
+  useDocumentTitle(i18n("auth.signInMediaforge"));
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { t } = useLanguage();
   const isModal = mode === "modal";
   // Tenant subdomain branding (e.g. dmd.mediaforge.co). When the user
   // lands on a claimed host we swap the MediaForge logo for the tenant
@@ -109,7 +109,7 @@ const Auth = ({ mode = "page", onClose, redirectPath }: AuthProps) => {
     if (error) {
       toast({
         variant: "destructive",
-        title: "Google Sign In Failed",
+        title: i18n("auth.googleSignInFailed"),
         description: error.message,
       });
       setIsGoogleLoading(false);
@@ -280,7 +280,7 @@ const Auth = ({ mode = "page", onClose, redirectPath }: AuthProps) => {
            {isResolvingOrg && (
              <div className="text-center text-xs text-muted-foreground">
                <Loader2 className="inline h-3 w-3 animate-spin mr-1" />
-               Checking organisation…
+               {i18n("auth.checkingOrganisation")}
              </div>
            )}
            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -294,7 +294,7 @@ const Auth = ({ mode = "page", onClose, redirectPath }: AuthProps) => {
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="email-login">{t("authEmailLabel")}</Label>
-                      <Input id="email-login" type="email" placeholder="you@example.com" className="" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} onBlur={() => void checkOrgEmail(loginEmail)} required />
+                      <Input id="email-login" type="email" placeholder={i18n("auth.youExampleCom")} className="" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} onBlur={() => void checkOrgEmail(loginEmail)} required />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="password-login">{t("authPasswordLabel")}</Label>
@@ -345,7 +345,7 @@ const Auth = ({ mode = "page", onClose, redirectPath }: AuthProps) => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="email-signup">{t("authEmailLabel")}</Label>
-                      <Input id="email-signup" type="email" placeholder="you@example.com" className="" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} onBlur={() => void checkOrgEmail(signupEmail)} required />
+                      <Input id="email-signup" type="email" placeholder={i18n("auth.youExampleCom")} className="" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} onBlur={() => void checkOrgEmail(signupEmail)} required />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="password-signup">{t("authPasswordLabel")}</Label>

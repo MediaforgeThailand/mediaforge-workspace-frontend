@@ -16,6 +16,7 @@ import { downloadFromUrl } from "./downloadAsset";
 import MediaContextMenu, {
   type MediaContextMenuItem,
 } from "./MediaContextMenu";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export interface Generation {
   id: string;
@@ -42,6 +43,7 @@ const EMPTY_MIN_HEIGHT = 140;
 
 const NodeResultBar = memo(
   ({ generations, selectedIndex = 0, onSelectIndex, width = 300 }: Props) => {
+    const { t: i18n } = useLanguage();
     const [expanded, setExpanded] = useState(false);
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
@@ -52,14 +54,14 @@ const NodeResultBar = memo(
     const contextMenuItems: MediaContextMenuItem[] = [
       {
         key: "preview",
-        label: "Preview",
+        label: i18n("workspace.mediaMenu.preview"),
         icon: Eye,
         disabled: !current,
         onSelect: () => setExpanded(true),
       },
       {
         key: "download",
-        label: "Download",
+        label: i18n("workspace.mediaMenu.download"),
         icon: Download,
         disabled: !current?.url,
         onSelect: () => {
@@ -68,14 +70,14 @@ const NodeResultBar = memo(
       },
       {
         key: "duplicate",
-        label: "Duplicate",
+        label: i18n("workspace.mediaMenu.duplicate"),
         icon: Copy,
         disabled: true,
         onSelect: () => undefined,
       },
       {
         key: "move-board",
-        label: "Move to Board",
+        label: i18n("workspace.mediaMenu.moveToBoard"),
         icon: FolderOpen,
         separatorBefore: true,
         disabled: true,
@@ -83,14 +85,14 @@ const NodeResultBar = memo(
       },
       {
         key: "copy-board",
-        label: "Copy to Board",
+        label: i18n("workspace.mediaMenu.copyToBoard"),
         icon: Copy,
         disabled: true,
         onSelect: () => undefined,
       },
       {
         key: "delete",
-        label: "Delete",
+        label: i18n("workspace.mediaMenu.delete"),
         icon: Trash2,
         separatorBefore: true,
         danger: true,
@@ -153,7 +155,7 @@ const NodeResultBar = memo(
                 <div className="grid min-h-[140px] place-items-center bg-black/60 p-3">
                   <AudioPlayButton
                     src={current.url}
-                    label="Play audio"
+                    label={i18n("workspace.common.playAudio")}
                     buttonClassName="h-11 w-11"
                   />
                 </div>
@@ -173,7 +175,7 @@ const NodeResultBar = memo(
               className="flex items-center justify-center text-[11px] text-white/30"
               style={{ minHeight: EMPTY_MIN_HEIGHT }}
             >
-              Results will appear here
+              {i18n("workspace.nodeResultBar.resultsWillAppearHere")}
             </div>
           )}
         </div>

@@ -34,7 +34,6 @@ import {
   Video,
   Mic2,
   Settings as SettingsIcon,
-  Languages,
   Palette,
   Plus,
   School,
@@ -180,7 +179,7 @@ export default function WorkspaceSidebar({
   onCreate,
 }: WorkspaceSidebarProps) {
   const navigate = useNavigate();
-  const { t, language, setLanguage } = useLanguage();
+  const { t } = useLanguage();
   // Tenant branding override (e.g. dmd.mediaforge.co → DMD logo +
   // "DMD" short name). Returns null on the bare workspace.mediaforge.co
   // host or while the lookup is in flight; we render the default
@@ -299,18 +298,8 @@ export default function WorkspaceSidebar({
       <OrgAdminLink />
 
       {/* ── Bottom utility row ─────────────────────────────────── */}
-      {/* Settings + language toggle sit as a paired "preferences"
-       *  cluster at the bottom of the rail. The language icon is a
-       *  parallel UtilityBtn — same visual weight, no special
-       *  treatment beyond label rendering the TARGET language in its
-       *  own script (universal language-switcher convention). */}
       <div className="flex items-center gap-[4px] px-[8px] pb-[2px] pt-[8px]">
         <UtilityBtn icon={SettingsIcon} title={t("workspace.sidebar.settings")} onClick={() => navigate("/app/settings")} />
-        <UtilityBtn
-          icon={Languages}
-          title={language === "th" ? "English" : "ภาษาไทย"}
-          onClick={() => setLanguage(language === "th" ? "en" : "th")}
-        />
       </div>
       </aside>
     </div>
@@ -408,7 +397,7 @@ const SidebarNavSection = ({
   translate: (key: NavItem["labelKey"]) => string;
 }) => (
   <div className="pt-[16px]">
-    <div className="px-[16px] pb-[6px] text-[12px] font-semibold uppercase tracking-[0.05px] text-[#43484e]">
+    <div className="workspace-sidebar-section-label px-[16px] pb-[6px] text-[12px] font-semibold uppercase tracking-[0.05px] text-[#43484e]">
       {label}
     </div>
     <div className="flex flex-col gap-[4px]">
@@ -462,7 +451,7 @@ const NavLink = ({
     className={cn(
       /* 2026-05: drop the inset 1px stroke on active — bg lift alone
        *  is enough now that the sidebar is a Layer-1 panel. */
-      "group relative flex h-[32px] min-w-0 items-center gap-[10px] text-left text-[12px] font-medium transition-colors",
+      "workspace-sidebar-nav-link group relative flex h-[32px] min-w-0 items-center gap-[10px] text-left text-[12px] font-medium transition-colors",
       variant === "tool"
         ? "mx-[8px] overflow-hidden rounded-lg bg-[rgba(216,244,246,.04)] px-[8px]"
         : "mx-[12px] rounded-md bg-transparent px-[4px]",
@@ -485,7 +474,7 @@ const NavLink = ({
       <span className="pointer-events-none absolute inset-[-1px] rounded-[10px] shadow-[inset_0_-3px_8px_0_#9050a0,inset_0_2px_8px_0_rgba(255,255,255,.32),0_0_12px_rgba(96,48,128,.62)]" />
     )}
     <Icon className="relative h-[16px] w-[16px] shrink-0" />
-    <span className="relative min-w-0 truncate">{label}</span>
+    <span className="workspace-sidebar-nav-label relative min-w-0 truncate">{label}</span>
   </button>
 );
 

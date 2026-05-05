@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useIsOrgAdmin } from "@/hooks/useIsOrgUser";
 import { useOrgBranding } from "@/hooks/useOrgBranding";
 import { supabase } from "@/integrations/supabase/client";
@@ -61,6 +62,7 @@ function fileToDataUrl(file: File): Promise<string> {
 }
 
 export default function OrgBrandingPanel() {
+  const { t: i18n } = useLanguage();
   const { user, profile } = useAuth();
   const isOrgAdmin = useIsOrgAdmin();
   const navigate = useNavigate();
@@ -83,14 +85,13 @@ export default function OrgBrandingPanel() {
     return (
       <div className="min-h-screen bg-background p-6 md:p-10 max-w-4xl mx-auto space-y-4">
         <Button variant="ghost" size="sm" onClick={() => navigate("/app/workspace")}>
-          <ArrowLeft className="h-4 w-4 mr-2" /> Back to Workspace
+          <ArrowLeft className="h-4 w-4 mr-2" /> {i18n("common.backToWorkspace")}
         </Button>
         <Card>
           <CardHeader>
-            <CardTitle>Branding</CardTitle>
+            <CardTitle>{i18n("orgBranding.branding")}</CardTitle>
             <CardDescription>
-              No organisation is linked to your account yet. Ask an admin
-              to add you to an org, then come back to manage branding.
+              {i18n("orgBranding.noOrganizationDescription")}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -102,6 +103,7 @@ export default function OrgBrandingPanel() {
 }
 
 function BrandingForm({ orgId }: { orgId: string }) {
+  const { t: i18n } = useLanguage();
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -135,14 +137,14 @@ function BrandingForm({ orgId }: { orgId: string }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["org-branding-admin", orgId] });
       qc.invalidateQueries({ queryKey: ["org-branding"] });
-      toast.success("Branding saved");
+      toast.success(i18n("orgBranding.brandingSaved"));
     },
-    onError: (e: any) => toast.error(e?.message ?? "Save failed"),
+    onError: (e: any) => toast.error(e?.message ?? i18n("orgBranding.saveFailed")),
   });
 
   const uploadLogoMut = useMutation({
     mutationFn: async (file: File) => {
-      if (file.size > 2 * 1024 * 1024) throw new Error("Logo file must be 2 MB or smaller");
+      if (file.size > 2 * 1024 * 1024) throw new Error(i18n("orgBranding.logoFileMustBe2MbOr"));
       const logoDataUrl = await fileToDataUrl(file);
       await orgConsole<BrandingPayload>({
         action: "save_org_branding",
@@ -155,9 +157,9 @@ function BrandingForm({ orgId }: { orgId: string }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["org-branding-admin", orgId] });
       qc.invalidateQueries({ queryKey: ["org-branding"] });
-      toast.success("Logo uploaded");
+      toast.success(i18n("orgBranding.logoUploaded"));
     },
-    onError: (e: any) => toast.error(e?.message ?? "Upload failed"),
+    onError: (e: any) => toast.error(e?.message ?? i18n("orgBranding.uploadFailed")),
   });
 
   const previewLogo = org?.logo_url ?? DEFAULT_BRAND_LOGO;
@@ -175,19 +177,19 @@ function BrandingForm({ orgId }: { orgId: string }) {
     <div className="min-h-screen bg-background p-6 md:p-10 max-w-4xl mx-auto space-y-6">
       <div>
         <Button variant="ghost" size="sm" onClick={() => navigate("/app/workspace")} className="-ml-2 mb-2">
-          <ArrowLeft className="h-4 w-4 mr-2" /> Back to Workspace
+          <ArrowLeft className="h-4 w-4 mr-2" /> {i18n("common.backToWorkspace")}
         </Button>
-        <h1 className="text-3xl font-bold">Org Branding</h1>
+        <h1 className="text-3xl font-bold">{i18n("orgBranding.orgBranding")}</h1>
         <p className="text-sm text-muted-foreground">
-          Logo and short name for {org?.display_name ?? org?.name ?? "your organisation"}.
+          {i18n("orgBranding.logoAndShortNameFor")} {org?.display_name ?? org?.name ?? i18n("orgBranding.yourOrganisation")}.
         </p>
       </div>
 
       {/* Logo + short name */}
       <Card>
         <CardHeader>
-          <CardTitle>Identity</CardTitle>
-          <CardDescription>Shown in the sidebar and on the login screen.</CardDescription>
+          <CardTitle>{i18n("orgBranding.identity")}</CardTitle>
+          <CardDescription>{i18n("orgBranding.shownInSidebarAndOn")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center gap-4">
@@ -211,7 +213,7 @@ function BrandingForm({ orgId }: { orgId: string }) {
                   ) : (
                     <Upload className="h-4 w-4" />
                   )}
-                  Upload logo
+                  {i18n("orgBranding.uploadLogo")}
                 </span>
               </Label>
               <input
@@ -226,12 +228,12 @@ function BrandingForm({ orgId }: { orgId: string }) {
                   e.target.value = "";
                 }}
               />
-              <p className="text-xs text-muted-foreground">PNG / JPG / SVG / WEBP, up to 2 MB.</p>
+              <p className="text-xs text-muted-foreground">{i18n("orgBranding.pngJpgSvgWebpUpTo2")}</p>
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="short-name">Short name (2–8 chars, e.g. &quot;DMD&quot;)</Label>
+            <Label htmlFor="short-name">{i18n("orgBranding.shortName28CharsEG")}</Label>
             <Input
               id="short-name"
               value={shortName}
@@ -242,7 +244,7 @@ function BrandingForm({ orgId }: { orgId: string }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="brand-color">Brand colour (optional)</Label>
+            <Label htmlFor="brand-color">{i18n("orgBranding.brandColourOptional")}</Label>
             <Input
               id="brand-color"
               value={brandColor}
@@ -257,7 +259,7 @@ function BrandingForm({ orgId }: { orgId: string }) {
               disabled={saveOrgMut.isPending}
             >
               {saveOrgMut.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Save changes
+              {i18n("orgBranding.saveChanges")}
             </Button>
           </div>
         </CardContent>
@@ -266,8 +268,8 @@ function BrandingForm({ orgId }: { orgId: string }) {
       {/* Live preview */}
       <Card>
         <CardHeader>
-          <CardTitle>Sidebar preview</CardTitle>
-          <CardDescription>How the brand row renders for tenants on this org.</CardDescription>
+          <CardTitle>{i18n("orgBranding.sidebarPreview")}</CardTitle>
+          <CardDescription>{i18n("orgBranding.howBrandRowRendersForTenants")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="w-[260px] rounded-lg border bg-[hsl(0_0%_4%)] p-3">

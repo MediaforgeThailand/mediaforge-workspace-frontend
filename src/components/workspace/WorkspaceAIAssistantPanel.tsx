@@ -40,6 +40,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   useWorkspaceStore,
   type ChatAttachment,
@@ -129,6 +130,7 @@ const SYSTEM_PROMPT = `คุณคือ "Max" ผู้ช่วยมือ�
 - ถ้า user ถามเรื่องนอกหัวข้อ prompt-writing ตอบสั้น ๆ แล้วชวนกลับมาที่ prompt`;
 
 const WorkspaceAIAssistantPanel = () => {
+  const { t: i18n } = useLanguage();
   const messages = useWorkspaceStore((s) => s.chatMessages);
   const isStreaming = useWorkspaceStore((s) => s.chatIsStreaming);
   const addChatMessage = useWorkspaceStore((s) => s.addChatMessage);
@@ -259,11 +261,11 @@ const WorkspaceAIAssistantPanel = () => {
         // the user so they don't trust the persisted history.
         console.warn("[ai-assistant] persist failed:", insertErr);
         toast.warning(
-          "Chat saved locally only — couldn't write to history (refresh will lose it).",
+          i18n("workspace.aiAssistant.chatSavedLocallyOnlyCouldnTWrite"),
         );
       }
     },
-    [user?.id, current?.id, current?.name],
+    [user?.id, current?.id, current?.name, i18n],
   );
 
   const onSubmit = async () => {
@@ -341,12 +343,12 @@ const WorkspaceAIAssistantPanel = () => {
   const ingestImageFile = useCallback(
     (file: File) => {
       if (!file.type.startsWith("image/")) {
-        toast.error("รองรับเฉพาะไฟล์รูปภาพ");
+        toast.error(i18n("workspace.aiAssistant.onlyImageFilesAreSupported"));
         return;
       }
       if (file.size > MAX_ATTACHMENT_BYTES) {
         toast.error(
-          `รูปใหญ่เกิน ${Math.round(MAX_ATTACHMENT_BYTES / (1024 * 1024))}MB ลองย่อก่อนวาง`,
+          i18n("workspace.aiAssistant.imageIsLargerThanMbResize", { size: Math.round(MAX_ATTACHMENT_BYTES / (1024 * 1024)) }),
         );
         return;
       }
@@ -359,10 +361,10 @@ const WorkspaceAIAssistantPanel = () => {
           { mime: file.type, dataUrl },
         ]);
       };
-      reader.onerror = () => toast.error("อ่านไฟล์รูปไม่สำเร็จ");
+      reader.onerror = () => toast.error(i18n("workspace.aiAssistant.couldNotReadImageFile"));
       reader.readAsDataURL(file);
     },
-    [],
+    [i18n],
   );
 
   const onPaste = useCallback(
@@ -427,7 +429,7 @@ const WorkspaceAIAssistantPanel = () => {
           ))}
         </div>
         <div className="mt-1.5 truncate text-[10px] text-zinc-500">
-          ผู้ช่วยเขียน prompt · {activeModel.caption}
+          {i18n("workspace.aiAssistant.promptWritingAssistant")} · {activeModel.caption}
         </div>
       </div>
 
@@ -436,16 +438,16 @@ const WorkspaceAIAssistantPanel = () => {
         {messages.length === 0 && (
           <div className="mt-6 text-center text-[11px] leading-relaxed text-zinc-500">
             <Sparkles className="mx-auto mb-2 h-5 w-5 text-zinc-600" />
-            ทักมาเลยครับ บอก Max ว่าอยากได้รูปหรือวิดีโอแบบไหน
+            {i18n("workspace.aiAssistant.tellMaxWhatKindOfImageOr")}
             <div className="mt-3 space-y-1.5 text-left text-zinc-600">
               <div className="rounded bg-zinc-900/50 px-2 py-1.5">
-                "อยากได้ภาพ product shot นาฬิกาบนพื้นหินอ่อน แสง golden hour"
+                {i18n("workspace.aiAssistant.iWantProductShotOf")}
               </div>
               <div className="rounded bg-zinc-900/50 px-2 py-1.5">
-                "ช่วยปรับ prompt นี้ให้กล้อง dolly-in ช้า ๆ"
+                {i18n("workspace.aiAssistant.makeThisPromptSlowDollyIn")}
               </div>
               <div className="rounded bg-zinc-900/50 px-2 py-1.5">
-                "Element ของ Kling Omni ใช้ตอนไหน"
+                {i18n("workspace.aiAssistant.whenShouldIUseKlingOmniElement")}
               </div>
             </div>
           </div>
@@ -463,7 +465,7 @@ const WorkspaceAIAssistantPanel = () => {
         {isStreaming && (
           <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
             <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
-            Max กำลังคิด…
+            {i18n("workspace.aiAssistant.maxIsThinking")}
           </div>
         )}
       </div>
@@ -489,7 +491,7 @@ const WorkspaceAIAssistantPanel = () => {
                   type="button"
                   onClick={() => removeAttachment(i)}
                   className="absolute right-0.5 top-0.5 rounded-full bg-black/70 p-0.5 text-white/90 opacity-0 transition-opacity hover:bg-black group-hover:opacity-100"
-                  title="ลบรูปนี้"
+                  title={i18n("workspace.aiAssistant.removeThisImage")}
                 >
                   <XIcon className="h-2.5 w-2.5" />
                 </button>
@@ -514,7 +516,7 @@ const WorkspaceAIAssistantPanel = () => {
             onClick={() => fileInputRef.current?.click()}
             disabled={isStreaming}
             className="rounded bg-zinc-900/50 p-1.5 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
-            title="แนบรูป (หรือ Ctrl+V วางจาก clipboard)"
+            title={i18n("workspace.aiAssistant.attachImageOrCtrlVToPaste")}
           >
             <Paperclip className="h-3.5 w-3.5" />
           </button>
@@ -523,7 +525,7 @@ const WorkspaceAIAssistantPanel = () => {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
             onPaste={onPaste}
-            placeholder="พิมพ์ที่อยากได้ หรือวาง prompt / รูป ให้ Max ดู…"
+            placeholder={i18n("workspace.aiAssistant.typeWhatYouWantOrPaste")}
             rows={2}
             disabled={isStreaming}
             className="flex-1 resize-none rounded bg-zinc-900/50 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-zinc-600 disabled:opacity-50"
@@ -533,16 +535,16 @@ const WorkspaceAIAssistantPanel = () => {
             onClick={onSubmit}
             disabled={(!input.trim() && pendingAttachments.length === 0) || isStreaming}
             className="rounded bg-zinc-200 p-1.5 text-zinc-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
-            title="ส่ง (Enter)"
+            title={i18n("workspace.aiAssistant.sendEnter")}
           >
             <Send className="h-3.5 w-3.5" />
           </button>
         </div>
         <div className="mt-1.5 flex items-center justify-between text-[10px] text-zinc-600">
-          <span>Enter = ส่ง · Shift+Enter = บรรทัดใหม่ · Ctrl+V = วางรูป</span>
-          {!user && <span className="text-amber-600/80">guest — ไม่บันทึก</span>}
+          <span>{i18n("workspace.aiAssistant.enterSendShiftEnterNewLineCtrl")}</span>
+          {!user && <span className="text-amber-600/80">{i18n("workspace.aiAssistant.guestNotSaved")}</span>}
           {user && current && (
-            <span className="truncate pl-2">{current.nodes.length} nodes</span>
+            <span className="truncate pl-2">{current.nodes.length} {i18n("common.nodes")}</span>
           )}
         </div>
       </div>
@@ -651,18 +653,19 @@ const MessageBubble = ({
 /* ── Code block with copy button ──────────────────────────── */
 
 const CodeBlock = ({ lang, text }: { lang?: string; text: string }) => {
+  const { t: i18n } = useLanguage();
   const [copied, setCopied] = useState(false);
 
   const onCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
-      toast.success("คัดลอก prompt แล้ว");
+      toast.success(i18n("workspace.aiAssistant.promptCopied"));
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
-      toast.error("Copy ไม่สำเร็จ");
+      toast.error(i18n("workspace.aiAssistant.copyFailed"));
     }
-  }, [text]);
+  }, [text, i18n]);
 
   // Friendly label: "prompt" / "negative" / language → uppercase
   const tag = (lang || "code").toUpperCase();
@@ -696,17 +699,17 @@ const CodeBlock = ({ lang, text }: { lang?: string; text: string }) => {
               ? "bg-emerald-500/20 text-emerald-300"
               : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200",
           )}
-          title="คัดลอก"
+          title={i18n("common.copy")}
         >
           {copied ? (
             <>
               <CheckIcon className="h-3 w-3" />
-              คัดลอกแล้ว
+              {i18n("common.copied")}
             </>
           ) : (
             <>
               <CopyIcon className="h-3 w-3" />
-              Copy
+              {i18n("common.copy")}
             </>
           )}
         </button>

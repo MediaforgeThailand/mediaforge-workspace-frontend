@@ -7,13 +7,15 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
+import type { TranslationKey } from "@/contexts/locales/en";
 
 export interface PaletteNodeDef {
   type: string;
   label: string;
+  labelKey: TranslationKey;
   icon: typeof ImagePlus;
   category: "user_input" | "creator_input" | "ai" | "output";
-  description: string;
+  description: TranslationKey;
   defaultOverrides?: Record<string, unknown>;
   /** Optional highlight color for the icon & label */
   highlight?: string;
@@ -24,6 +26,7 @@ export const NODE_PALETTE: PaletteNodeDef[] = [
   {
     type: "inputNode",
     label: "Image Upload",
+    labelKey: "nodePalette.label.imageUpload",
     icon: ImagePlus,
     category: "user_input",
     description: "nodeDescImageUpload",
@@ -32,6 +35,7 @@ export const NODE_PALETTE: PaletteNodeDef[] = [
   {
     type: "inputNode",
     label: "Video Upload",
+    labelKey: "nodePalette.label.videoUpload",
     icon: FileVideo,
     category: "user_input",
     description: "nodeDescVideoUpload",
@@ -40,6 +44,7 @@ export const NODE_PALETTE: PaletteNodeDef[] = [
   {
     type: "textInputNode",
     label: "Text Input",
+    labelKey: "nodePalette.label.textInput",
     icon: Type,
     category: "user_input",
     description: "nodeDescTextInput",
@@ -49,6 +54,7 @@ export const NODE_PALETTE: PaletteNodeDef[] = [
   {
     type: "inputNode",
     label: "Creator Image",
+    labelKey: "nodePalette.label.creatorImage",
     icon: Image,
     category: "creator_input",
     description: "nodeDescCreatorImage",
@@ -57,6 +63,7 @@ export const NODE_PALETTE: PaletteNodeDef[] = [
   {
     type: "inputNode",
     label: "Creator Video",
+    labelKey: "nodePalette.label.creatorVideo",
     icon: Film,
     category: "creator_input",
     description: "nodeDescCreatorVideo",
@@ -65,6 +72,7 @@ export const NODE_PALETTE: PaletteNodeDef[] = [
   {
     type: "mp3InputNode",
     label: "MP3 Audio (Creator)",
+    labelKey: "nodePalette.label.mp3AudioCreator",
     icon: Music,
     category: "creator_input",
     description: "nodeDescMp3Input",
@@ -74,6 +82,7 @@ export const NODE_PALETTE: PaletteNodeDef[] = [
   {
     type: "chatAiNode",
     label: "Chat AI (Gemini / GPT)",
+    labelKey: "nodePalette.label.chatAi",
     icon: MessageSquare,
     category: "ai",
     description: "nodeDescChatAi",
@@ -81,6 +90,7 @@ export const NODE_PALETTE: PaletteNodeDef[] = [
   {
     type: "bananaProNode",
     label: "Image Gen (Banana Pro)",
+    labelKey: "nodePalette.label.imageGenBananaPro",
     icon: Layers,
     category: "ai",
     description: "nodeDescImageGen",
@@ -89,6 +99,7 @@ export const NODE_PALETTE: PaletteNodeDef[] = [
   {
     type: "klingVideoNode",
     label: "Image to Video (Kling)",
+    labelKey: "nodePalette.label.imageToVideoKling",
     icon: Film,
     category: "ai",
     description: "nodeDescVideoGen",
@@ -96,6 +107,7 @@ export const NODE_PALETTE: PaletteNodeDef[] = [
   {
     type: "removeBackgroundNode",
     label: "Remove Background",
+    labelKey: "nodePalette.label.removeBackground",
     icon: Eraser,
     category: "ai",
     description: "nodeDescRemoveBg",
@@ -104,6 +116,7 @@ export const NODE_PALETTE: PaletteNodeDef[] = [
   {
     type: "seedDanceNode",
     label: "Image to Video (SeedDance)",
+    labelKey: "nodePalette.label.imageToVideoSeedDance",
     icon: Film,
     category: "ai",
     description: "nodeDescSeedDanceVideo",
@@ -112,6 +125,7 @@ export const NODE_PALETTE: PaletteNodeDef[] = [
   {
     type: "seedDreamNode",
     label: "Image Gen (SeedDream)",
+    labelKey: "nodePalette.label.imageGenSeedDream",
     icon: Sparkles,
     category: "ai",
     description: "nodeDescSeedDreamImage",
@@ -120,6 +134,7 @@ export const NODE_PALETTE: PaletteNodeDef[] = [
   {
     type: "mergeAudioNode",
     label: "Merge Audio + Video",
+    labelKey: "nodePalette.label.mergeAudioVideo",
     icon: Clapperboard,
     category: "ai",
     description: "nodeDescMergeAudio",
@@ -128,12 +143,16 @@ export const NODE_PALETTE: PaletteNodeDef[] = [
   // Output node is auto-created with the flow — not user-addable
 ];
 
-const CATEGORIES = [
-  { key: "user_input", label: "USER INPUT", dotColor: "#60a5fa", dotGlow: "0 0 8px rgba(96,165,250,0.5)" },
-  { key: "creator_input", label: "CREATOR INPUT", dotColor: "#f59e0b", dotGlow: "0 0 8px rgba(245,158,11,0.5)" },
-  { key: "ai", label: "AI PROCESSING", dotColor: "#a855f7", dotGlow: "0 0 8px rgba(168,85,247,0.5)" },
-  
-] as const;
+const CATEGORIES: Array<{
+  key: PaletteNodeDef["category"];
+  labelKey: TranslationKey;
+  dotColor: string;
+  dotGlow: string;
+}> = [
+  { key: "user_input", labelKey: "nodePalette.category.userInput", dotColor: "#60a5fa", dotGlow: "0 0 8px rgba(96,165,250,0.5)" },
+  { key: "creator_input", labelKey: "nodePalette.category.creatorInput", dotColor: "#f59e0b", dotGlow: "0 0 8px rgba(245,158,11,0.5)" },
+  { key: "ai", labelKey: "nodePalette.category.aiProcessing", dotColor: "#a855f7", dotGlow: "0 0 8px rgba(168,85,247,0.5)" },
+];
 
 interface NodePaletteProps {
   onAddNode: (type: string, label: string, position?: { x: number; y: number }, overrides?: Record<string, unknown>) => void;
@@ -144,14 +163,17 @@ const NodePalette = ({ onAddNode, onCollapse }: NodePaletteProps) => {
   const { t } = useLanguage();
   const [search, setSearch] = useState("");
 
-  const filtered = NODE_PALETTE.filter((n) =>
-    n.label.toLowerCase().includes(search.toLowerCase()) ||
-    t(n.description as any).toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = NODE_PALETTE.filter((n) => {
+    const localizedLabel = t(n.labelKey);
+    return (
+      localizedLabel.toLowerCase().includes(search.toLowerCase()) ||
+      t(n.description).toLowerCase().includes(search.toLowerCase())
+    );
+  });
 
-  const onDragStart = (e: React.DragEvent, node: PaletteNodeDef) => {
+  const onDragStart = (e: React.DragEvent, node: PaletteNodeDef, label: string) => {
     e.dataTransfer.setData("application/reactflow-type", node.type);
-    e.dataTransfer.setData("application/reactflow-label", node.label);
+    e.dataTransfer.setData("application/reactflow-label", label);
     if (node.defaultOverrides) {
       e.dataTransfer.setData("application/reactflow-overrides", JSON.stringify(node.defaultOverrides));
     }
@@ -195,7 +217,7 @@ const NodePalette = ({ onAddNode, onCollapse }: NodePaletteProps) => {
                       style={{ background: cat.dotColor, boxShadow: cat.dotGlow }}
                     />
                     <span className="text-[10px] font-semibold text-[#94a3b8] uppercase tracking-[1px]">
-                      {cat.label}
+                      {t(cat.labelKey)}
                     </span>
                   </div>
                   <div className="rounded-lg px-1.5 py-0.5" style={{ background: "#12141a" }}>
@@ -206,13 +228,15 @@ const NodePalette = ({ onAddNode, onCollapse }: NodePaletteProps) => {
                 </div>
 
                 {/* Node items */}
-                {items.map((node, idx) => (
+                {items.map((node, idx) => {
+                  const localizedLabel = t(node.labelKey);
+                  return (
                   <button
                     key={`${node.type}-${node.label}-${idx}`}
                     className="flex gap-3 items-start p-2.5 rounded-2xl hover:bg-white/5 cursor-grab active:cursor-grabbing transition-colors text-left w-full"
-                    onClick={() => onAddNode(node.type, node.label, undefined, node.defaultOverrides)}
+                    onClick={() => onAddNode(node.type, localizedLabel, undefined, node.defaultOverrides)}
                     draggable
-                    onDragStart={(e) => onDragStart(e, node)}
+                    onDragStart={(e) => onDragStart(e, node, localizedLabel)}
                   >
                     <node.icon
                       className="shrink-0 mt-0.5"
@@ -225,14 +249,14 @@ const NodePalette = ({ onAddNode, onCollapse }: NodePaletteProps) => {
                         className="text-xs font-semibold"
                         style={{ color: node.highlight || "#f8fafc" }}
                       >
-                        {node.label}
+                        {localizedLabel}
                       </div>
                       <div className="text-[9px] text-[#94a3b8] mt-0.5">
-                        {t(node.description as any)}
+                        {t(node.description)}
                       </div>
                     </div>
                   </button>
-                ))}
+                )})}
               </div>
             );
           })}
@@ -246,7 +270,7 @@ const NodePalette = ({ onAddNode, onCollapse }: NodePaletteProps) => {
           className="flex items-center gap-3 text-[#94a3b8] hover:text-[#f8fafc] transition-colors"
         >
           <PanelLeftClose className="w-[15px] h-[10px]" />
-          <span className="text-xs font-semibold">Collapse</span>
+          <span className="text-xs font-semibold">{t("nodePalette.collapse")}</span>
         </button>
       </div>
     </aside>

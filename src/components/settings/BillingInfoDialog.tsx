@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { AlertCircle, Loader2, Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 
 /**
@@ -57,6 +58,7 @@ const BillingInfoDialog = ({
   defaultEmail,
   onSaved,
 }: BillingInfoDialogProps) => {
+  const { t: i18n } = useLanguage();
   const { user, refreshProfile } = useAuth();
   const { toast } = useToast();
   const [form, setForm] = useState<BillingAddress>({});
@@ -86,7 +88,7 @@ const BillingInfoDialog = ({
   const handleSave = async () => {
     if (!user) return;
     if (!form.name?.trim() || !form.email?.trim()) {
-      setError("Name and email are required.");
+      setError(i18n("settings.billingInfo.nameAndEmailAreRequired"));
       return;
     }
     setSaving(true);
@@ -112,7 +114,7 @@ const BillingInfoDialog = ({
       return;
     }
 
-    toast({ title: "Billing information saved" });
+    toast({ title: i18n("settings.billingInfo.billingInformationSaved") });
     await refreshProfile();
     onSaved?.(next);
     setSaving(false);
@@ -125,10 +127,10 @@ const BillingInfoDialog = ({
         <div className="px-6 pt-6 pb-2">
           <DialogHeader>
             <DialogTitle className="text-base font-semibold text-zinc-50">
-              Change billing information
+              {i18n("settings.billingInfo.changeBillingInformation")}
             </DialogTitle>
             <DialogDescription className="text-[11px] text-zinc-400">
-              Used on receipts and invoices. Tax ID is optional but required for B2B VAT-compliant invoicing.
+              {i18n("settings.billingInfo.usedOnReceiptsAndInvoicesTaxId")}
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -136,7 +138,7 @@ const BillingInfoDialog = ({
         <div className="px-6 pb-4 space-y-3 max-h-[60vh] overflow-y-auto">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2 space-y-1">
-              <Label className="text-[11px] text-zinc-400">Name</Label>
+              <Label className="text-[11px] text-zinc-400">{i18n("common.name")}</Label>
               <Input
                 value={form.name ?? ""}
                 onChange={handleChange("name")}
@@ -144,7 +146,7 @@ const BillingInfoDialog = ({
               />
             </div>
             <div className="col-span-2 space-y-1">
-              <Label className="text-[11px] text-zinc-400">Email</Label>
+              <Label className="text-[11px] text-zinc-400">{i18n("common.email")}</Label>
               <Input
                 type="email"
                 value={form.email ?? ""}
@@ -153,7 +155,7 @@ const BillingInfoDialog = ({
               />
             </div>
             <div className="col-span-2 space-y-1">
-              <Label className="text-[11px] text-zinc-400">Address line 1</Label>
+              <Label className="text-[11px] text-zinc-400">{i18n("settings.billingInfo.addressLine1")}</Label>
               <Input
                 value={form.line1 ?? ""}
                 onChange={handleChange("line1")}
@@ -161,7 +163,7 @@ const BillingInfoDialog = ({
               />
             </div>
             <div className="col-span-2 space-y-1">
-              <Label className="text-[11px] text-zinc-400">Address line 2 (optional)</Label>
+              <Label className="text-[11px] text-zinc-400">{i18n("settings.billingInfo.addressLine2Optional")}</Label>
               <Input
                 value={form.line2 ?? ""}
                 onChange={handleChange("line2")}
@@ -169,7 +171,7 @@ const BillingInfoDialog = ({
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-[11px] text-zinc-400">City</Label>
+              <Label className="text-[11px] text-zinc-400">{i18n("settings.billingInfo.city")}</Label>
               <Input
                 value={form.city ?? ""}
                 onChange={handleChange("city")}
@@ -177,7 +179,7 @@ const BillingInfoDialog = ({
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-[11px] text-zinc-400">Postal code</Label>
+              <Label className="text-[11px] text-zinc-400">{i18n("settings.billingInfo.postalCode")}</Label>
               <Input
                 value={form.postal_code ?? ""}
                 onChange={handleChange("postal_code")}
@@ -185,7 +187,7 @@ const BillingInfoDialog = ({
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-[11px] text-zinc-400">State / Province</Label>
+              <Label className="text-[11px] text-zinc-400">{i18n("settings.billingInfo.stateProvince")}</Label>
               <Input
                 value={form.state ?? ""}
                 onChange={handleChange("state")}
@@ -193,7 +195,7 @@ const BillingInfoDialog = ({
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-[11px] text-zinc-400">Country (ISO 2)</Label>
+              <Label className="text-[11px] text-zinc-400">{i18n("settings.billingInfo.countryIso2")}</Label>
               <Input
                 value={form.country ?? ""}
                 onChange={handleChange("country")}
@@ -202,11 +204,11 @@ const BillingInfoDialog = ({
               />
             </div>
             <div className="col-span-2 space-y-1">
-              <Label className="text-[11px] text-zinc-400">Tax ID (optional)</Label>
+              <Label className="text-[11px] text-zinc-400">{i18n("settings.billingInfo.taxIdOptional")}</Label>
               <Input
                 value={form.tax_id ?? ""}
                 onChange={handleChange("tax_id")}
-                placeholder="e.g. 0123456789012"
+                placeholder={i18n("settings.billingInfo.taxIdPlaceholder")}
                 className="h-9 bg-black/30 border-white/10 text-zinc-100"
               />
             </div>
@@ -227,7 +229,7 @@ const BillingInfoDialog = ({
             onClick={() => onOpenChange(false)}
             className="text-zinc-400"
           >
-            Cancel
+            {i18n("common.cancel")}
           </Button>
           <Button
             size="sm"
@@ -238,12 +240,12 @@ const BillingInfoDialog = ({
             {saving ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                Saving…
+                {i18n("common.saving")}
               </>
             ) : (
               <>
                 <Save className="w-3.5 h-3.5 mr-1.5" />
-                Save
+                {i18n("common.save")}
               </>
             )}
           </Button>

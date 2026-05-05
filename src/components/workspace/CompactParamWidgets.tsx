@@ -47,6 +47,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 /**
  * Returns true when the given select param ought to render as a
@@ -231,6 +232,7 @@ function SearchableMiniSelect({
   triggerLabel: string;
   searchFooter?: string;
 }) {
+  const { t: i18n } = useLanguage();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   return (
@@ -263,13 +265,13 @@ function SearchableMiniSelect({
             <div className="flex items-center bg-white/[0.04] px-2.5">
               <Search className="mr-2 h-3.5 w-3.5 shrink-0 opacity-50" />
               <CommandPrimitive.Input
-                placeholder="Search"
+                placeholder={i18n("common.search")}
                 className="h-8 w-full border-0 bg-transparent px-0 py-0 text-[13px] outline-none placeholder:text-muted-foreground"
               />
             </div>
             <CommandList className="ws-picker-scroll max-h-[260px]">
               <CommandEmpty className="py-4 text-center text-[12.5px] text-muted-foreground">
-                No results
+                {i18n("workspace.params.noResults")}
               </CommandEmpty>
               {options.map((opt) => {
                 const label = labelOf(opt);
@@ -293,12 +295,12 @@ function SearchableMiniSelect({
             </CommandList>
             {/* Footer — same tinted-fill trick as the search row. */}
             <div className="flex items-center justify-between bg-white/[0.03] px-3 py-1.5 text-[10.5px] uppercase tracking-wide text-muted-foreground">
-              <span>{searchFooter ?? "All options"}</span>
+              <span>{searchFooter ?? i18n("workspace.params.allOptions")}</span>
               <span className="flex items-center gap-1">
                 <kbd className="rounded bg-white/10 px-1 py-px font-mono text-[9px]">
                   ↑↓
                 </kbd>
-                Navigate
+                {i18n("workspace.params.navigate")}
               </span>
             </div>
           </Command>
@@ -397,6 +399,7 @@ export function NumberStepper({
   onChange,
   prefix = "×",
 }: NumberStepperProps) {
+  const { t } = useLanguage();
   const dec = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -419,7 +422,7 @@ export function NumberStepper({
         onClick={dec}
         className="ws-stepper-btn"
         disabled={value <= min}
-        aria-label="Decrease"
+        aria-label={t("compactParamWidgets.decrease")}
       >
         <Minus />
       </button>
@@ -432,7 +435,7 @@ export function NumberStepper({
         onClick={inc}
         className="ws-stepper-btn"
         disabled={value >= max}
-        aria-label="Increase"
+        aria-label={t("compactParamWidgets.increase")}
       >
         <Plus />
       </button>

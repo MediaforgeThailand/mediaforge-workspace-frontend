@@ -52,7 +52,7 @@ const QuickCheckoutModal = ({
   currentBalance,
   requiredCredits,
 }: QuickCheckoutModalProps) => {
-  const { language, t } = useLanguage();
+  const { language, t, t: i18n } = useLanguage();
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [selectedPkgId, setSelectedPkgId] = useState("");
@@ -148,7 +148,7 @@ const QuickCheckoutModal = ({
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  {HERO_TOPUP.credits.toLocaleString()} credits · {t("qcInstant")}
+                  {HERO_TOPUP.credits.toLocaleString()} {i18n("common.credits")} · {t("qcInstant")}
                 </p>
               </div>
               <Button
@@ -192,7 +192,7 @@ const QuickCheckoutModal = ({
                     {STANDARD_TOPUP.name}
                   </p>
                   <p className="text-[11px] text-slate-400">
-                    {STANDARD_TOPUP.credits.toLocaleString()} credits
+                    {STANDARD_TOPUP.credits.toLocaleString()} {t("common.credits")}
                   </p>
                 </div>
               </div>
@@ -224,7 +224,7 @@ const QuickCheckoutModal = ({
                     </span>
                   </p>
                   <p className="text-[11px] text-slate-400">
-                    {proPlan.credits.toLocaleString()} credits
+                    {proPlan.credits.toLocaleString()} {t("common.credits")}
                   </p>
                 </div>
               </div>

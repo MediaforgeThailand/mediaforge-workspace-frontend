@@ -28,11 +28,14 @@ const InsufficientCreditsDialog = ({
 }: InsufficientCreditsDialogProps) => {
   const navigate = useNavigate();
   const { credits, refetch } = useCredits(workspaceId);
-  const { language } = useLanguage();
+  const { t } = useLanguage();
   const [topupOpen, setTopupOpen] = useState(false);
 
   const balance = credits?.balance ?? 0;
   const shortage = requiredCredits ? Math.max(0, requiredCredits - balance) : 0;
+  const balanceText = balance.toLocaleString();
+  const requiredText = requiredCredits?.toLocaleString() ?? "";
+  const shortageText = shortage.toLocaleString();
   const isEducationSpace =
     credits?.credit_scope === "education_space" ||
     credits?.organization_type === "school" ||
@@ -51,37 +54,25 @@ const InsufficientCreditsDialog = ({
             <DialogTitle className="flex items-center gap-2 text-white">
               <Coins className="h-5 w-5 text-sky-400" />
               {isEducationSpace
-                ? language === "th" ? "เครดิตใน class space ไม่พอ" : "Class space credits are low"
-                : language === "th" ? "เครดิตไม่เพียงพอ" : "Not enough credits"}
+                ? t("insufficientCredits.classSpaceLow")
+                : t("insufficientCredits.notEnough")}
             </DialogTitle>
             <DialogDescription className="text-zinc-300">
               {isEducationSpace
-                ? language === "th"
-                  ? `space นี้มี ${balance.toLocaleString()} credits ให้ขออาจารย์เติมเครดิตใน class space นี้ก่อนใช้งานต่อ`
-                  : `This class space has ${balance.toLocaleString()} credits. Ask your teacher to add credits to this space before continuing.`
+                ? t("insufficientCredits.classSpaceDescription", { balance: balanceText })
                 : requiredCredits
-                  ? language === "th"
-                    ? `ต้องใช้ ${requiredCredits.toLocaleString()} credits แต่ตอนนี้มี ${balance.toLocaleString()} credits`
-                    : `This action needs ${requiredCredits.toLocaleString()} credits. Current balance: ${balance.toLocaleString()} credits.`
-                  : language === "th"
-                    ? `ยอดคงเหลือปัจจุบัน ${balance.toLocaleString()} credits`
-                    : `Current balance: ${balance.toLocaleString()} credits.`}
+                  ? t("insufficientCredits.requiredDescription", { required: requiredText, balance: balanceText })
+                  : t("insufficientCredits.balanceDescription", { balance: balanceText })}
             </DialogDescription>
           </DialogHeader>
 
           <div className="mt-2 space-y-3">
             <div className="rounded-xl border border-sky-400/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
               {isEducationSpace
-                ? language === "th"
-                  ? "เครดิตของนักเรียนถูกล็อกตาม class space จึงไม่สามารถเติมเงินส่วนตัวเพื่อใช้แทนได้"
-                  : "Student credits are locked to each class space, so personal top-ups cannot be used here."
+                ? t("insufficientCredits.classSpaceLocked")
                 : shortage > 0
-                  ? language === "th"
-                    ? `ขาดอีก ${shortage.toLocaleString()} credits`
-                    : `Short by ${shortage.toLocaleString()} credits.`
-                  : language === "th"
-                    ? "เติมเครดิตหรือเลือกแพ็กเกจใหม่เพื่อใช้งานต่อ"
-                    : "Top up credits or choose a plan to continue."}
+                  ? t("insufficientCredits.shortBy", { shortage: shortageText })
+                  : t("insufficientCredits.topUpOrChoosePlan")}
             </div>
 
             {isEducationSpace ? (
@@ -90,7 +81,7 @@ const InsufficientCreditsDialog = ({
                 onClick={() => onOpenChange(false)}
               >
                 <BookOpen className="mr-2 h-4 w-4" />
-                {language === "th" ? "กลับไปที่ class space" : "Back to class space"}
+                {t("insufficientCredits.backToClassSpace")}
               </Button>
             ) : (
               <>
@@ -99,9 +90,7 @@ const InsufficientCreditsDialog = ({
                   onClick={() => setTopupOpen(true)}
                 >
                   <Zap className="mr-2 h-4 w-4" />
-                  {language === "th"
-                    ? "Top-up ด่วนด้วย PromptPay QR"
-                    : "Quick top-up with PromptPay QR"}
+                  {t("insufficientCredits.quickTopUpPromptPay")}
                 </Button>
 
                 <Button
@@ -110,7 +99,7 @@ const InsufficientCreditsDialog = ({
                   onClick={handleGoToPricing}
                 >
                   <ArrowUpCircle className="mr-2 h-4 w-4" />
-                  {language === "th" ? "ไปหน้า Plan & Pricing" : "Go to plans and pricing"}
+                  {t("insufficientCredits.goToPlansPricing")}
                 </Button>
               </>
             )}

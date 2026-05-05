@@ -10,7 +10,7 @@ import { ReactFlowProvider, useReactFlow, type Node } from "@xyflow/react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
 import PromptMentionTextarea from "@/components/flow/nodes/PromptMentionTextarea";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage, type Language } from "@/contexts/LanguageContext";
 import sampleRefOne from "@/assets/showcase-cat-astronaut.jpg";
 import sampleRefTwo from "@/assets/mock-packshot-perfume.jpg";
 import sampleRefThree from "@/assets/pro-trend-space-cat.jpg";
@@ -22,85 +22,63 @@ import {
 
 type BottomTab = "video" | "image" | "3d" | "audio";
 
-const PANEL_COPY = {
-  en: {
-    video: "Video",
-    image: "Image",
-    audio: "Audio",
-    models: "Models",
-    recommended: "Recommended",
-    allModels: "All models",
-    all: "All",
-    startEndFrame: "Start/End Frame",
-    textWithReference: "Text with Reference",
-    imageHistory: "Image History",
-    setStartEndFrame: "Set start & end frame",
-    setStartFrame: "Set start frame",
-    startFrame: "Start frame",
-    endFrame: "End frame",
-    addVisualReference: "Add visual reference",
-    creations: "Creations",
-    uploads: "Uploads",
-    uploadImages: "Upload Images",
-    uploadVideos: "Upload Videos",
-    uploadAssets: "Upload Assets",
-    dropFiles: "Drop files here or Ctrl+V",
-    noAssets: "No compatible assets yet.",
-    autoModel: "Auto-select the best model based on the prompt",
-    gptModel: "OpenAI's next-gen image model",
-    googleVideoModel: "Google video generation model",
-    seedanceModel: "Seedance video generation model",
-    klingModel: "Kling AI video generation model",
-    threeDModel: "3D generation model",
-    voiceModel: "Voice generation model",
-    googlePremiumImage: "Google's premium image model",
-    googleImage: "Google's Gemini image model",
-    byteDanceImage: "ByteDance image generation model",
-    fluxImage: "Black Forest Labs image model",
-    recraftImage: "Recraft image and SVG generation model",
-    imageModel: "Image generation model",
-  },
-  th: {
-    video: "วิดีโอ",
-    image: "รูปภาพ",
-    audio: "เสียง",
-    models: "Models",
-    recommended: "แนะนำ",
-    allModels: "Model ทั้งหมด",
-    all: "ทั้งหมด",
-    startEndFrame: "เฟรมเริ่ม/จบ",
-    textWithReference: "ข้อความพร้อมอ้างอิง",
-    imageHistory: "ประวัติรูปภาพ",
-    setStartEndFrame: "ตั้งเฟรมเริ่มและจบ",
-    setStartFrame: "ตั้งเฟรมเริ่ม",
-    startFrame: "เฟรมเริ่มต้น",
-    endFrame: "เฟรมจบ",
-    addVisualReference: "เพิ่มภาพอ้างอิง",
-    creations: "งานที่สร้าง",
-    uploads: "อัปโหลด",
-    uploadImages: "อัปโหลดรูปภาพ",
-    uploadVideos: "อัปโหลดวิดีโอ",
-    uploadAssets: "อัปโหลดไฟล์",
-    dropFiles: "วางไฟล์ที่นี่หรือกด Ctrl+V",
-    noAssets: "ยังไม่มีไฟล์ที่ใช้ได้",
-    autoModel: "เลือก Model ที่เหมาะสมให้อัตโนมัติจาก prompt",
-    gptModel: "Model รูปภาพรุ่นใหม่จาก OpenAI",
-    googleVideoModel: "Model สร้างวิดีโอจาก Google",
-    seedanceModel: "Model สร้างวิดีโอจาก Seedance",
-    klingModel: "Model สร้างวิดีโอจาก Kling AI",
-    threeDModel: "Model สร้าง 3D",
-    voiceModel: "Model สร้างเสียง",
-    googlePremiumImage: "Model รูปภาพระดับพรีเมียมจาก Google",
-    googleImage: "Model รูปภาพ Gemini จาก Google",
-    byteDanceImage: "Model สร้างรูปภาพจาก ByteDance",
-    fluxImage: "Model รูปภาพจาก Black Forest Labs",
-    recraftImage: "Model รูปภาพและ SVG จาก Recraft",
-    imageModel: "Model สร้างรูปภาพ",
-  },
-} as const;
-
-function panelCopy(language: "en" | "th") {
-  return PANEL_COPY[language];
+function usePanelCopy() {
+  const { t } = useLanguage();
+  return {
+    video: t("createImagePanel.video"),
+    image: t("createImagePanel.image"),
+    audio: t("createImagePanel.audio"),
+    models: t("createImagePanel.models"),
+    recommended: t("createImagePanel.recommended"),
+    allModels: t("createImagePanel.allModels"),
+    all: t("createImagePanel.all"),
+    startEndFrame: t("createImagePanel.startEndFrame"),
+    textWithReference: t("createImagePanel.textWithReference"),
+    imageHistory: t("createImagePanel.imageHistory"),
+    setStartEndFrame: t("createImagePanel.setStartEndFrame"),
+    setStartFrame: t("createImagePanel.setStartFrame"),
+    startFrame: t("createImagePanel.startFrame"),
+    endFrame: t("createImagePanel.endFrame"),
+    addVisualReference: t("createImagePanel.addVisualReference"),
+    creations: t("createImagePanel.creations"),
+    uploads: t("createImagePanel.uploads"),
+    uploadImages: t("createImagePanel.uploadImages"),
+    uploadVideos: t("createImagePanel.uploadVideos"),
+    uploadAssets: t("createImagePanel.uploadAssets"),
+    dropFiles: t("createImagePanel.dropFiles"),
+    noAssets: t("createImagePanel.noAssets"),
+    autoModel: t("createImagePanel.autoModel"),
+    gptModel: t("createImagePanel.gptModel"),
+    googleVideoModel: t("createImagePanel.googleVideoModel"),
+    seedanceModel: t("createImagePanel.seedanceModel"),
+    klingModel: t("createImagePanel.klingModel"),
+    threeDModel: t("createImagePanel.threeDModel"),
+    voiceModel: t("createImagePanel.voiceModel"),
+    googlePremiumImage: t("createImagePanel.googlePremiumImage"),
+    googleImage: t("createImagePanel.googleImage"),
+    byteDanceImage: t("createImagePanel.byteDanceImage"),
+    fluxImage: t("createImagePanel.fluxImage"),
+    recraftImage: t("createImagePanel.recraftImage"),
+    imageModel: t("createImagePanel.imageModel"),
+    removeReference: t("createImagePanel.removeReference"),
+    closeReferences: t("createImagePanel.closeReferences"),
+    deleteAsset: t("createImagePanel.deleteAsset"),
+    closeModels: t("createImagePanel.closeModels"),
+    newBadge: t("createImagePanel.newBadge"),
+    defaultImageTitle: t("createImagePanel.defaultImageTitle"),
+    defaultVideoTitle: t("createImagePanel.defaultVideoTitle"),
+    modelCaption: t("createImagePanel.modelCaption"),
+    imagePromptLabel: t("createImagePanel.imagePromptLabel"),
+    imagePromptPlaceholder: t("createImagePanel.imagePromptPlaceholder"),
+    videoPromptLabel: t("createImagePanel.videoPromptLabel"),
+    videoPromptPlaceholder: t("createImagePanel.videoPromptPlaceholder"),
+    imageReferenceHint: t("createImagePanel.imageReferenceHint"),
+    videoReferenceHint: t("createImagePanel.videoReferenceHint"),
+    createForFree: t("createImagePanel.createForFree"),
+    creating: t("createImagePanel.creating"),
+    generate: t("createImagePanel.generate"),
+    generating: t("createImagePanel.generating"),
+  };
 }
 
 interface CreateImagePanelReference {
@@ -261,11 +239,11 @@ interface ModelSettingTag {
 }
 
 export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
-  title = "Create Image",
-  modelCaption = "Model",
+  title,
+  modelCaption,
   prompt: controlledPrompt,
-  promptLabel = "Describe your image",
-  promptPlaceholder = "What do you want to see? Example: 'A cat sitting on a table, warm morning light...'",
+  promptLabel,
+  promptPlaceholder,
   onPromptChange,
   showPromptInput = true,
   modelLabel = "Nano Banana Pro",
@@ -276,8 +254,8 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   references = [],
   maxReferences = 10,
   showReferences = true,
-  referenceTitle = "Add visual references",
-  referenceHint = "JPEG/PNG/WEBP/GIF, 20 MB max",
+  referenceTitle,
+  referenceHint,
   referenceAccept = "image/*",
   referenceAssets = [],
   onAddReferences,
@@ -290,8 +268,8 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   textControls = [],
   extraControls,
   onCreate,
-  createLabel = "Create for Free",
-  runningLabel = "Creating...",
+  createLabel,
+  runningLabel,
   running = false,
   showQuantity = true,
   quantity: controlledQuantity,
@@ -299,8 +277,15 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   bottom: controlledBottom,
   onBottomChange,
 }) => {
-  const { language } = useLanguage();
-  const copy = panelCopy(language);
+  const copy = usePanelCopy();
+  const resolvedTitle = title ?? copy.defaultImageTitle;
+  const resolvedModelCaption = modelCaption ?? copy.modelCaption;
+  const resolvedPromptLabel = promptLabel ?? copy.imagePromptLabel;
+  const resolvedPromptPlaceholder = promptPlaceholder ?? copy.imagePromptPlaceholder;
+  const resolvedReferenceTitle = referenceTitle ?? copy.addVisualReference;
+  const resolvedReferenceHint = referenceHint ?? copy.imageReferenceHint;
+  const resolvedCreateLabel = createLabel ?? copy.createForFree;
+  const resolvedRunningLabel = runningLabel ?? copy.creating;
   const [bottomState, setBottomState] = useState<BottomTab>("image");
   const [modelOpen, setModelOpen] = useState(false);
   const [referenceOpen, setReferenceOpen] = useState(false);
@@ -364,7 +349,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
       {/* ===== HEADER ===== */}
       <header className="flex h-[56px] shrink-0 items-center px-[20px]">
         <h1 className="flex min-w-0 flex-1 items-center text-[16px] font-semibold leading-[24px] tracking-[-0.12px] text-white">
-          <span className="line-clamp-1">{title}</span>
+          <span className="standalone-panel-title line-clamp-1">{resolvedTitle}</span>
         </h1>
       </header>
 
@@ -380,7 +365,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
             {modelInitial}
           </div>
           <div className="flex-1 flex flex-col items-start min-w-0">
-            <span className="text-[12px] leading-[16px] text-neutral-400">{modelCaption}</span>
+            <span className="text-[12px] leading-[16px] text-neutral-400">{resolvedModelCaption}</span>
             <span className="text-[14px] leading-[20px] font-semibold text-white">{cleanModelDisplayName(modelLabel)}</span>
           </div>
           <ChevronRight className="h-[16px] w-[16px] text-neutral-500" />
@@ -388,7 +373,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
         <ModelsPopover
           open={modelOpen}
           onClose={() => setModelOpen(false)}
-          models={buildModels(modelOptions, modelLabel, selectedModelId, language)}
+          models={buildModels(modelOptions, modelLabel, selectedModelId, copy)}
           selectedIds={[selectedModelId]}
           onToggle={(id) => {
             onModelChange?.(id);
@@ -409,7 +394,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
         {/* Prompt box */}
         <section className="shrink-0 rounded-[16px] border border-white/[0.02] bg-[#16181a] p-[7px]">
           <div className="mb-[6px] flex items-center px-[2px]">
-            <span className="text-[14px] font-semibold leading-[20px] text-white">{promptLabel}</span>
+            <span className="standalone-section-title text-[14px] font-semibold leading-[20px] text-white">{resolvedPromptLabel}</span>
           </div>
 
           {/* Visual references box (PINK glow border) */}
@@ -471,9 +456,9 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex min-w-0 items-center gap-[8px]">
-                  <span className="truncate text-[14px] leading-[20px] font-semibold text-white">{referenceTitle}</span>
+                  <span className="standalone-reference-title truncate text-[14px] leading-[20px] font-semibold text-white">{resolvedReferenceTitle}</span>
                 </div>
-                <p className="text-[12px] leading-[16px] text-neutral-400 mt-[2px]">{referenceHint}</p>
+                <p className="standalone-reference-hint text-[12px] leading-[16px] text-neutral-400 mt-[2px]">{resolvedReferenceHint}</p>
               </div>
               <span className="text-[12px] leading-[16px] text-neutral-300 self-start">
                 {references.length}/{maxReferences}
@@ -499,7 +484,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
             <StandalonePromptMentionTextarea
               value={prompt}
               onChange={updatePrompt}
-              placeholder={promptPlaceholder}
+              placeholder={resolvedPromptPlaceholder}
               mentionOptions={mentionOptions}
               className="mt-[7px] min-h-[70px] max-h-[190px] rounded-[10px] border-white/[0.06] bg-[#121314] px-[10px] py-[8px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-[#ff24c5]/50"
             />
@@ -557,7 +542,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
           }}
         >
           <span className="pointer-events-none absolute -left-8 top-1/2 h-20 w-28 -translate-y-1/2 rounded-full bg-[#C77DFF]/35 blur-2xl" />
-          <span className="relative">{running ? runningLabel : createLabel}</span>
+          <span className="relative">{running ? resolvedRunningLabel : resolvedCreateLabel}</span>
         </button>
       </div>
 
@@ -593,11 +578,11 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
 };
 
 export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
-  title = "Frame to Video",
-  modelCaption = "Model",
+  title,
+  modelCaption,
   prompt: controlledPrompt,
-  promptLabel = "Describe your video",
-  promptPlaceholder = "Describe scene transitions, camera movement, trajectories, or character actions.",
+  promptLabel,
+  promptPlaceholder,
   onPromptChange,
   modelLabel = "Kling 2.6 Pro",
   modelInitial = "K",
@@ -612,8 +597,8 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
   referenceSlots = [],
   references = [],
   maxReferences = 4,
-  referenceTitle = "Add visual references",
-  referenceHint = "JPEG/PNG/WEBP/MP4, 20 MB max",
+  referenceTitle,
+  referenceHint,
   referenceAccept = "image/*,video/*",
   referenceAssets = [],
   onAddReferences,
@@ -625,16 +610,23 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
   settings = [],
   textControls = [],
   onCreate,
-  createLabel = "Generate",
-  runningLabel = "Generating...",
+  createLabel,
+  runningLabel,
   running = false,
   quantity: controlledQuantity,
   onQuantityChange,
   bottom: controlledBottom,
   onBottomChange,
 }) => {
-  const { language } = useLanguage();
-  const copy = panelCopy(language);
+  const copy = usePanelCopy();
+  const resolvedTitle = title ?? copy.defaultVideoTitle;
+  const resolvedModelCaption = modelCaption ?? copy.modelCaption;
+  const resolvedPromptLabel = promptLabel ?? copy.videoPromptLabel;
+  const resolvedPromptPlaceholder = promptPlaceholder ?? copy.videoPromptPlaceholder;
+  const resolvedReferenceTitle = referenceTitle ?? copy.addVisualReference;
+  const resolvedReferenceHint = referenceHint ?? copy.videoReferenceHint;
+  const resolvedCreateLabel = createLabel ?? copy.generate;
+  const resolvedRunningLabel = runningLabel ?? copy.generating;
   const [modelOpen, setModelOpen] = useState(false);
   const [referenceOpen, setReferenceOpen] = useState(false);
   const [referenceSlotId, setReferenceSlotId] = useState<string | null>(null);
@@ -739,7 +731,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
     <div className="standalone-create-panel flex h-full w-full max-w-[480px] flex-col overflow-hidden rounded-[20px] border border-white/[0.02] bg-[#121314]">
       <header className="flex h-[56px] shrink-0 items-center px-[20px]">
         <h1 className="flex min-w-0 flex-1 items-center text-[16px] font-semibold leading-[24px] tracking-[-0.12px] text-white">
-          <span className="line-clamp-1">{title}</span>
+          <span className="standalone-panel-title line-clamp-1">{resolvedTitle}</span>
         </h1>
       </header>
 
@@ -770,7 +762,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
             {modelInitial}
           </div>
           <div className="flex min-w-0 flex-1 flex-col items-start">
-            <span className="text-[12px] leading-[16px] text-neutral-400">{modelCaption}</span>
+            <span className="text-[12px] leading-[16px] text-neutral-400">{resolvedModelCaption}</span>
             <span className="truncate text-[14px] font-semibold leading-[20px] text-white">{cleanModelDisplayName(modelLabel)}</span>
           </div>
           <ChevronRight className="h-[16px] w-[16px] text-neutral-500" />
@@ -779,7 +771,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
         <ModelsPopover
           open={modelOpen}
           onClose={() => setModelOpen(false)}
-          models={buildModels(modelOptions, modelLabel, selectedModelId, language)}
+          models={buildModels(modelOptions, modelLabel, selectedModelId, copy)}
           selectedIds={[selectedModelId]}
           onToggle={(id) => {
             onModelChange?.(id);
@@ -844,7 +836,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
 
         <section className="shrink-0 rounded-[16px] border border-white/[0.02] bg-[#16181a] p-[7px]">
           <div className="mb-[6px] flex items-center px-[2px]">
-            <span className="text-[14px] font-semibold leading-[20px] text-white">{promptLabel}</span>
+            <span className="standalone-section-title text-[14px] font-semibold leading-[20px] text-white">{resolvedPromptLabel}</span>
           </div>
 
           {activeMode === "reference" && (
@@ -924,9 +916,9 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center gap-[8px]">
-                        <span className="truncate text-[14px] font-semibold leading-[20px] text-white">{referenceTitle}</span>
+                        <span className="standalone-reference-title truncate text-[14px] font-semibold leading-[20px] text-white">{resolvedReferenceTitle}</span>
                       </div>
-                      <p className="mt-[2px] truncate text-[12px] leading-[16px] text-neutral-400">{referenceHint}</p>
+                      <p className="standalone-reference-hint mt-[2px] truncate text-[12px] leading-[16px] text-neutral-400">{resolvedReferenceHint}</p>
                     </div>
                     <span className="self-start text-[12px] leading-[16px] text-neutral-300">
                       {references.length}/{maxReferences}
@@ -953,7 +945,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           <StandalonePromptMentionTextarea
             value={prompt}
             onChange={updatePrompt}
-            placeholder={promptPlaceholder}
+            placeholder={resolvedPromptPlaceholder}
             mentionOptions={mentionOptions}
             className="mt-[7px] min-h-[70px] max-h-[190px] rounded-[10px] border-white/[0.06] bg-[#121314] px-[10px] py-[8px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-[#ff24c5]/50"
           />
@@ -1007,7 +999,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
         >
           <span className="pointer-events-none absolute inset-x-4 top-0 h-[16px] rounded-b-full bg-white/25 blur-[10px]" />
           <span className="pointer-events-none absolute -left-8 top-1/2 h-20 w-28 -translate-y-1/2 rounded-full bg-[#C77DFF]/35 blur-2xl" />
-          <span className="relative">{running ? runningLabel : createLabel}</span>
+          <span className="relative">{running ? resolvedRunningLabel : resolvedCreateLabel}</span>
         </button>
       </div>
 
@@ -1061,7 +1053,7 @@ function VideoModeCard({
       disabled={disabled}
       onClick={onClick}
       className={clsx(
-        "group relative flex h-[70px] min-w-0 flex-col items-center justify-center gap-[6px] overflow-hidden rounded-[12px] text-[13px] font-semibold leading-[18px] transition-all",
+        "video-mode-card group relative flex h-[70px] min-w-0 flex-col items-center justify-center gap-[6px] overflow-hidden rounded-[12px] text-[13px] font-semibold leading-[18px] transition-all",
         disabled
           ? "cursor-not-allowed bg-white/[0.015] text-neutral-600 ring-1 ring-inset ring-white/[0.03]"
           : active
@@ -1070,7 +1062,7 @@ function VideoModeCard({
       )}
     >
       <VideoModeIcon mode={mode} active={active} disabled={disabled} />
-      <span className="max-w-full truncate px-[4px]">{label}</span>
+      <span className="video-mode-card-label max-w-full truncate px-[4px]">{label}</span>
     </button>
   );
 }
@@ -1116,8 +1108,7 @@ function FrameReferenceSlot({
   slot: CreateVideoPanelFrameSlot;
   onHistory?: () => void;
 }) {
-  const { language } = useLanguage();
-  const copy = panelCopy(language);
+  const copy = usePanelCopy();
   const refItem = slot.refItem;
   const isVideo = refItem?.mime?.startsWith("video/");
   const frameLabel = slot.id === "start" ? copy.startFrame : copy.endFrame;
@@ -1332,8 +1323,8 @@ function VideoSettingCard({ setting }: { setting: CreateVideoPanelSetting }) {
         <SlidersHorizontal className="h-[14px] w-[14px]" />
       </span>
       <span className="flex min-w-0 flex-1 flex-col items-start">
-        <span className="text-[11px] leading-[14px] text-neutral-400">{setting.label}</span>
-        <span className="max-w-full truncate text-[13px] font-semibold leading-[16px] text-white">{displayValue}</span>
+        <span className="standalone-setting-label text-[11px] leading-[14px] text-neutral-400">{setting.label}</span>
+        <span className="standalone-setting-value max-w-full truncate text-[13px] font-semibold leading-[16px] text-white">{displayValue}</span>
       </span>
     </>
   );
@@ -1522,7 +1513,7 @@ function VideoTextControlCard({ control }: { control: CreateVideoPanelTextContro
         compact ? "gap-[6px] px-[10px] py-[8px]" : "gap-[8px] p-[10px]",
       )}
     >
-      <span className="text-[12px] font-semibold leading-[16px] text-white">{control.label}</span>
+      <span className="standalone-text-control-label text-[12px] font-semibold leading-[16px] text-white">{control.label}</span>
       <textarea
         value={control.value}
         onChange={(event) => control.onChange(event.target.value)}
@@ -1687,6 +1678,7 @@ function SelectedReferenceThumb({
   index: number;
   onRemove?: (id: string) => void;
 }) {
+  const copy = usePanelCopy();
   const isVideo = reference.mime?.startsWith("video/");
   const label = referenceDisplayLabel(reference, index, 10);
   const fullLabel = referenceBaseName(reference, index);
@@ -1715,7 +1707,7 @@ function SelectedReferenceThumb({
             onRemove(reference.id);
           }}
           className="absolute right-[4px] top-[4px] grid h-[20px] w-[20px] place-items-center rounded-full bg-black/70 text-white opacity-0 backdrop-blur transition-opacity hover:bg-white hover:text-black group-hover:opacity-100"
-          aria-label="Remove reference"
+          aria-label={copy.removeReference}
         >
           <X className="h-[12px] w-[12px]" />
         </button>
@@ -1727,7 +1719,7 @@ function SelectedReferenceThumb({
 function ReferencePicker({
   open,
   onClose,
-  title = "Add visual references",
+  title,
   references,
   assets,
   accept,
@@ -1747,8 +1739,7 @@ function ReferencePicker({
   onDeleteAsset?: (reference: CreateImagePanelReference) => void;
   closeOnSelect?: boolean;
 }) {
-  const { language } = useLanguage();
-  const copy = panelCopy(language);
+  const copy = usePanelCopy();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const localUploadUrlsRef = useRef<string[]>([]);
@@ -1872,12 +1863,12 @@ function ReferencePicker({
         }}
       />
       <header className="flex h-[56px] shrink-0 items-center justify-between px-[20px]">
-        <h2 className="text-[17px] font-semibold leading-6 text-white">{title}</h2>
+        <h2 className="text-[17px] font-semibold leading-6 text-white">{title ?? copy.addVisualReference}</h2>
         <button
           type="button"
           onClick={onClose}
           className="grid h-[30px] w-[30px] place-items-center rounded-[8px] text-neutral-300 transition hover:bg-white/[0.06] hover:text-white"
-          aria-label="Close references"
+          aria-label={copy.closeReferences}
         >
           <X className="h-[16px] w-[16px]" />
         </button>
@@ -2000,8 +1991,8 @@ function ReferencePicker({
                       onDeleteAsset?.(asset);
                     }}
                     className="absolute right-[6px] top-[6px] grid h-[26px] w-[26px] place-items-center rounded-full border border-white/[0.10] bg-black/70 text-white opacity-0 shadow-[0_8px_20px_rgba(0,0,0,.35)] backdrop-blur transition hover:border-rose-300/40 hover:bg-gradient-to-br hover:from-[#ff2f92] hover:to-[#8b5cf6] hover:text-white group-hover:opacity-100"
-                    aria-label="Delete asset"
-                    title="Delete asset"
+                    aria-label={copy.deleteAsset}
+                    title={copy.deleteAsset}
                   >
                     <Trash2 className="h-[13px] w-[13px]" />
                   </span>
@@ -2047,16 +2038,15 @@ const buildModels = (
   options: CreateImagePanelModel[],
   fallbackLabel: string,
   fallbackId: string,
-  language: "en" | "th",
+  copy: ReturnType<typeof usePanelCopy>,
 ): Model[] => {
   const source =
     options.length > 0 ? options : [{ id: fallbackId, label: fallbackLabel }];
-  const copy = panelCopy(language);
   return orderModelsByRecommendation(source).map((model) => ({
     id: model.id,
     name: cleanModelDisplayName(model.label),
     description: modelDescriptionFor(model.id, model.label, copy),
-    badge: modelBadgeFor(model.id, model.label),
+    badge: modelBadgeFor(model.id, model.label, copy),
     settings: model.settings ?? [],
     recommended: recommendationRankForModel(model.id) !== null,
   }));
@@ -2065,7 +2055,7 @@ const buildModels = (
 const modelDescriptionFor = (
   id: string,
   name: string,
-  copy: ReturnType<typeof panelCopy>,
+  copy: ReturnType<typeof usePanelCopy>,
 ) => {
   const haystack = `${id} ${name}`.toLowerCase();
   if (haystack.includes("auto")) return copy.autoModel;
@@ -2091,10 +2081,10 @@ const modelDescriptionFor = (
   return copy.imageModel;
 };
 
-const modelBadgeFor = (id: string, name: string) => {
+const modelBadgeFor = (id: string, name: string, copy: ReturnType<typeof usePanelCopy>) => {
   const haystack = `${id} ${name}`.toLowerCase();
   if (haystack.includes("gpt") || haystack.includes("nano") || haystack.includes("seedream")) {
-    return "New";
+    return copy.newBadge;
   }
   return undefined;
 };
@@ -2106,8 +2096,7 @@ export const ModelsPopover: React.FC<ModelsPopoverProps> = ({
   selectedIds,
   onToggle,
 }) => {
-  const { language } = useLanguage();
-  const copy = panelCopy(language);
+  const copy = usePanelCopy();
   const [filter, setFilter] = useState<Filter>("all-models");
   const recommendedModels = models.filter((model) => model.recommended);
   const recommended = recommendedModels.length > 0
@@ -2140,7 +2129,7 @@ export const ModelsPopover: React.FC<ModelsPopoverProps> = ({
           type="button"
           onClick={onClose}
           className="flex h-[28px] w-[28px] items-center justify-center rounded-[8px] hover:bg-white/[0.06] transition-colors"
-          aria-label="Close models"
+          aria-label={copy.closeModels}
         >
           <X className="h-4 w-4 text-neutral-300" />
         </button>

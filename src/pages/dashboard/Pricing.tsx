@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, Check, X, Loader2, Minus, Plus, Users } from "lucide-react";
+import { ArrowLeft, Check, X, Loader2, Sparkles, Minus, Plus, Users } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCredits } from "@/hooks/useCredits";
@@ -11,6 +11,7 @@ import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
 import { UserMenu } from "@/components/workspace/UserMenu";
 import {
+  WORKSPACE_CURRENCIES,
   detectWorkspaceCurrency,
   formatWorkspaceMoneyFromThb,
   type SupportedWorkspaceCurrency,
@@ -72,86 +73,68 @@ interface TopupPackage {
 }
 
 type CycleTab = "monthly" | "annual";
+type ProfilePlanFields = {
+  subscription_plan_id?: string | null;
+  current_plan_id?: string | null;
+};
 
 // Per-plan subtitle copy (Phase 6 promo).
-const PLAN_SUBTITLE: Record<string, { en: string; th: string }> = {
-  Starter: {
-    en: "For hobbyists getting started with AI generation.",
-    th: "สำหรับมือใหม่ที่กำลังเริ่มต้นสร้างงานด้วย AI",
-  },
-  Creator: {
-    en: "For active creators shipping content weekly.",
-    th: "สำหรับครีเอเตอร์ที่ผลิตคอนเทนต์ทุกสัปดาห์",
-  },
-  Pro: {
-    en: "For professionals scaling their content production. 10% discount on credit usage.",
-    th: "สำหรับมืออาชีพที่ผลิตคอนเทนต์จำนวนมาก ลดค่าเครดิต 10%",
-  },
-  Team: {
-    en: "Built for design + content teams. Shared credit pool, centralised billing, SSO support. Best value for organisations.",
-    th: "สำหรับทีมออกแบบและคอนเทนต์ พูลเครดิตร่วม ออกใบกำกับรวม รองรับ SSO คุ้มที่สุดสำหรับองค์กร",
-  },
-};
+const PLAN_SUBTITLE_KEYS = {
+  Starter: "pricing.plan.starter.subtitle",
+  Creator: "pricing.plan.creator.subtitle",
+  Pro: "pricing.plan.pro.subtitle",
+  Team: "pricing.plan.team.subtitle",
+} as const;
+type PlanName = keyof typeof PLAN_SUBTITLE_KEYS;
 
 // Feature rows shown inside every card. Each entry maps a label to which plans include it.
 // Order matches the screenshot top-to-bottom.
-const FEATURE_ROWS: { en: string; th: string; plans: Record<string, boolean> }[] = [
+const FEATURE_ROWS = [
   {
-    en: "Access to all image, video & audio models",
-    th: "เข้าถึงโมเดลภาพ วิดีโอ และเสียงทั้งหมด",
+    key: "pricing.feature.allModels",
     plans: { Starter: true, Creator: true, Pro: true, Team: true },
   },
   {
-    en: "Spaces: shared canvas built for workflows",
-    th: "Spaces: แคนวาสร่วมสำหรับเวิร์กโฟลว์",
+    key: "pricing.feature.spacesCanvas",
     plans: { Starter: true, Creator: true, Pro: true, Team: true },
   },
   {
-    en: "Pro editing tools (image, video, design)",
-    th: "เครื่องมือตัดต่อระดับโปร (ภาพ/วิดีโอ/ดีไซน์)",
+    key: "pricing.feature.proEditing",
     plans: { Starter: true, Creator: true, Pro: true, Team: true },
   },
   {
-    en: "Music, voice & sound effects generation",
-    th: "สร้างเสียงดนตรี เสียงพากย์ และซาวด์เอฟเฟกต์",
+    key: "pricing.feature.audioGeneration",
     plans: { Starter: true, Creator: true, Pro: true, Team: true },
   },
   {
-    en: "Commercial AI license",
-    th: "ลิขสิทธิ์ใช้งานเชิงพาณิชย์",
+    key: "pricing.feature.commercialLicense",
     plans: { Starter: true, Creator: true, Pro: true, Team: true },
   },
   {
-    en: "Top up credits anytime",
-    th: "เติมเครดิตเพิ่มได้ตลอดเวลา",
+    key: "pricing.feature.topUpAnytime",
     plans: { Starter: true, Creator: true, Pro: true, Team: true },
   },
   {
-    en: "Train AI styles, characters & products",
-    th: "เทรน AI สำหรับสไตล์ ตัวละคร และผลิตภัณฑ์",
+    key: "pricing.feature.trainStyles",
     plans: { Starter: false, Creator: true, Pro: true, Team: true },
   },
   {
-    en: "Early access to new AI features",
-    th: "ทดลองฟีเจอร์ AI ใหม่ก่อนใคร",
+    key: "pricing.feature.earlyAccess",
     plans: { Starter: false, Creator: false, Pro: true, Team: true },
   },
   {
-    en: "File naming convention",
-    th: "ระบบตั้งชื่อไฟล์",
+    key: "pricing.feature.fileNaming",
     plans: { Starter: false, Creator: false, Pro: true, Team: true },
   },
   {
-    en: "Multi-seat / shared team credit pool",
-    th: "หลายที่นั่ง / พูลเครดิตของทีม",
+    key: "pricing.feature.teamCreditPool",
     plans: { Starter: false, Creator: false, Pro: false, Team: true },
   },
   {
-    en: "Centralised billing & SSO",
-    th: "ออกใบกำกับรวม รองรับ SSO",
+    key: "pricing.feature.centralBillingSso",
     plans: { Starter: false, Creator: false, Pro: false, Team: true },
   },
-];
+] as const;
 
 // MODEL_ROWS / GET UNLIMITED section removed — workspace pricing
 // doesn't advertise per-model "unlimited free" entries because we
@@ -169,9 +152,9 @@ const TEAM_MIN_SEATS = 2;
 const TEAM_MAX_SEATS = 500;
 
 const Pricing = () => {
-  useDocumentTitle("Pricing — MediaForge");
+  const { t: i18n } = useLanguage();
+  useDocumentTitle(i18n("pricing.pricingMediaforge"));
   const navigate = useNavigate();
-  const { language, t } = useLanguage();
   const { refetch } = useCredits();
   const { profile, refreshProfile, session, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -181,7 +164,7 @@ const Pricing = () => {
   const [topupPackages, setTopupPackages] = useState<TopupPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [cycle, setCycle] = useState<CycleTab>("monthly");
-  const currency = useMemo<SupportedWorkspaceCurrency>(() => detectWorkspaceCurrency(), []);
+  const [currency, setCurrency] = useState<SupportedWorkspaceCurrency>(() => detectWorkspaceCurrency());
   const [submittingPlanId, setSubmittingPlanId] = useState<string | null>(null);
   const [, setOpeningPortal] = useState(false);
   const [checkoutPlan, setCheckoutPlan] = useState<SubscriptionPlan | null>(null);
@@ -195,26 +178,34 @@ const Pricing = () => {
         .select("*")
         .eq("is_active", true)
         .order("sort_order"),
-      supabase.from("topup_packages" as any).select("*").eq("is_active", true).order("sort_order"),
+      supabase.from("topup_packages").select("*").eq("is_active", true).order("sort_order"),
     ]).then(([planRes, topupRes]) => {
-      if (planRes.data) setPlans(planRes.data as any);
-      if (topupRes.data) setTopupPackages(topupRes.data as any);
+      if (planRes.data) setPlans(planRes.data as SubscriptionPlan[]);
+      if (topupRes.data) setTopupPackages(topupRes.data as TopupPackage[]);
       setLoading(false);
     });
   }, []);
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("workspace_currency", currency);
+    } catch {
+      // Ignore private browsing / disabled storage.
+    }
+  }, [currency]);
+
   // Toast on Stripe success redirect.
   useEffect(() => {
     if (searchParams.get("payment") === "success" || searchParams.get("topup") === "success") {
-      toast({ title: t("pricingPaymentSuccess"), description: t("pricingCreditsAdded") });
+      toast({ title: i18n("pricingPaymentSuccess"), description: i18n("pricingCreditsAdded") });
       refetch();
       refreshProfile();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  const currentPlanId =
-    (profile as any)?.subscription_plan_id || (profile as any)?.current_plan_id || null;
+  const profilePlan = profile as unknown as ProfilePlanFields | null;
+  const currentPlanId = profilePlan?.subscription_plan_id || profilePlan?.current_plan_id || null;
   const currentPlan = plans.find((p) => p.id === currentPlanId) || null;
 
   // 4-card layout. Order: Starter, Creator, Pro, Team. Filter to active rows.
@@ -226,11 +217,12 @@ const Pricing = () => {
   const handleSubscribe = (plan: SubscriptionPlan) => {
     if (authLoading) {
       toast({
-        title: language === "th" ? "กำลังตรวจสอบบัญชี" : "Checking account",
-        description: language === "th" ? "กรุณารอสักครู่แล้วลองอีกครั้ง" : "Please wait a moment and try again.",
+        title: i18n("pricing.checkout.checkingAccount"),
+        description: i18n("pricing.checkout.pleaseWaitTryAgain"),
       });
       return;
     }
+
     if (!session?.access_token) {
       navigate(`/auth?redirect=${encodeURIComponent("/app/pricing")}`);
       return;
@@ -245,13 +237,12 @@ const Pricing = () => {
     // Need a Stripe price for the chosen cycle.
     const priceId =
       cycle === "annual" ? plan.stripe_price_id_annual : plan.stripe_price_id_monthly;
-    if (false && !priceId) {
+    if (!priceId) {
       toast({
-        title: language === "th" ? "ยังไม่พร้อม" : "Not available",
-        description:
-          language === "th"
-            ? `ราคา ${cycle === "annual" ? "รายปี" : "รายเดือน"} ยังไม่ได้ตั้งค่าสำหรับแพ็กเกจนี้`
-            : `${cycle === "annual" ? "Annual" : "Monthly"} price not configured for this plan yet.`,
+        title: i18n("pricing.checkout.notAvailable"),
+        description: i18n("pricing.checkout.priceNotConfigured", {
+          cycle: i18n(cycle === "annual" ? "pricing.cycle.annual" : "pricing.cycle.monthly"),
+        }),
       });
       return;
     }
@@ -272,7 +263,7 @@ const Pricing = () => {
     } catch (e) {
       console.error("[Pricing] portal error:", e);
       toast({
-        title: language === "th" ? "เปิดพอร์ทัลไม่ได้" : "Could not open billing portal",
+        title: i18n("common.couldNotOpenBillingPortal"),
         description: e instanceof Error ? e.message : String(e),
         variant: "destructive",
       });
@@ -289,18 +280,18 @@ const Pricing = () => {
   // Decide CTA copy based on the user's current plan vs the card.
   const ctaLabelFor = (plan: SubscriptionPlan): string => {
     if (plan.target === "team") {
-      return language === "th" ? "เริ่มทีม" : "Start team";
+      return i18n("pricing.cta.startTeam");
     }
     if (currentPlan && currentPlan.id === plan.id) {
-      return language === "th" ? "แพ็กเกจปัจจุบัน" : "Your current plan";
+      return i18n("pricing.cta.currentPlan");
     }
     if (currentPlan && currentPlan.target === "user") {
       if (currentPlan.sort_order < plan.sort_order)
-        return language === "th" ? "อัปเกรด" : "Upgrade";
+        return i18n("pricing.cta.upgrade");
       if (currentPlan.sort_order > plan.sort_order)
-        return language === "th" ? "ดาวน์เกรด" : "Downgrade";
+        return i18n("pricing.cta.downgrade");
     }
-    return language === "th" ? "อัปเกรด" : "Upgrade";
+    return i18n("pricing.cta.upgrade");
   };
 
   return (
@@ -314,13 +305,13 @@ const Pricing = () => {
         <button
           onClick={() => navigate("/app/workspace")}
           className="absolute left-5 top-5 flex h-[44px] w-[44px] items-center justify-center rounded-full bg-white/[0.055] text-zinc-300 transition-colors hover:bg-white/[0.09] hover:text-white md:left-8"
-          aria-label="Back to workspace"
+          aria-label={i18n("common.backToWorkspace2")}
         >
           <ArrowLeft className="h-5 w-5 text-neutral-300" />
         </button>
 
         <h1 className="mx-auto max-w-[860px] text-[38px] font-black leading-[0.96] tracking-[-0.02em] text-white sm:text-[50px] md:text-[58px]">
-          Let's become professionals together
+          {i18n("pricing.letSBecomeProfessionalsTogether")}
         </h1>
       </section>
 
@@ -340,7 +331,7 @@ const Pricing = () => {
                     : "text-zinc-300 hover:bg-white/[0.06] hover:text-white",
                 )}
               >
-                {language === "th" ? "รายเดือน" : "Monthly"}
+                {i18n("pricing.cycle.monthly")}
               </button>
               <button
                 type="button"
@@ -352,7 +343,7 @@ const Pricing = () => {
                     : "text-zinc-300 hover:bg-white/[0.06] hover:text-white",
                 )}
               >
-                {language === "th" ? "รายปี" : "Annual"}
+                {i18n("pricing.cycle.annual")}
                 <span className={cn(
                   "rounded-full px-[7px] py-[2px] text-[10px] font-black",
                   cycle === "annual" ? "bg-emerald-500/15 text-emerald-700" : "bg-emerald-500/15 text-emerald-300",
@@ -361,6 +352,19 @@ const Pricing = () => {
                 </span>
               </button>
             </div>
+              <label className="sr-only" htmlFor="workspace-currency">{i18n("pricing.currency.label")}</label>
+              <select
+                id="workspace-currency"
+                value={currency}
+                onChange={(event) => setCurrency(event.target.value as SupportedWorkspaceCurrency)}
+                className="h-[38px] rounded-full border border-white/10 bg-[#252525] px-4 text-[12.5px] font-semibold text-white outline-none transition-colors hover:bg-white/[0.08] focus:border-violet-400/70"
+              >
+                {WORKSPACE_CURRENCIES.map((item) => (
+                  <option key={item.currency} value={item.currency} className="bg-[#1b1b1b] text-white">
+                    {item.currency.toUpperCase()} {item.currency === "thb" ? i18n("pricing.currency.promptPay") : i18n("pricing.currency.cardSubscription")}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -370,7 +374,7 @@ const Pricing = () => {
             </div>
           ) : orderedPlans.length === 0 ? (
             <p className="py-16 text-center text-neutral-500">
-              {language === "th" ? "ไม่มีแพ็กเกจ" : "No plans available"}
+              {i18n("pricing.emptyPlans")}
             </p>
           ) : (
             <div className="grid grid-cols-1 items-start gap-[14px] pt-[26px] sm:grid-cols-2 lg:grid-cols-4">
@@ -379,8 +383,7 @@ const Pricing = () => {
                   key={plan.id}
                   plan={plan}
                   cycle={cycle}
-                  language={language}
-                  ctaLabel={plan.target === "team" ? (language === "th" ? "เริ่มทีม" : "Start team") : ctaLabelFor(plan)}
+                  ctaLabel={ctaLabelFor(plan)}
                   isCurrent={currentPlan?.id === plan.id}
                   submitting={submittingPlanId === plan.id}
                   onSubscribe={() => handleSubscribe(plan)}
@@ -410,7 +413,6 @@ const Pricing = () => {
         packageId={checkoutPlan?.id ?? ""}
         billingInterval={cycle}
         currency={currency}
-        uiLanguage={language === "th" ? "th" : "en"}
         onSuccess={() => {
           void refetch();
           void refreshProfile();
@@ -427,7 +429,6 @@ const Pricing = () => {
         billingInterval={cycle}
         teamSeats={teamSeats}
         currency={currency}
-        uiLanguage={language === "th" ? "th" : "en"}
         onSuccess={() => {
           void refetch();
           void refreshProfile();
@@ -442,7 +443,6 @@ const Pricing = () => {
 interface PlanCardProps {
   plan: SubscriptionPlan;
   cycle: CycleTab;
-  language: string;
   ctaLabel: string;
   isCurrent: boolean;
   submitting: boolean;
@@ -452,11 +452,13 @@ interface PlanCardProps {
   currency: SupportedWorkspaceCurrency;
 }
 
-const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSubscribe, teamSeats, onTeamSeatsChange, currency }: PlanCardProps) => {
+const PlanCard = ({ plan, cycle, ctaLabel, isCurrent, submitting, onSubscribe, teamSeats, onTeamSeatsChange, currency }: PlanCardProps) => {
+  const { t: i18n } = useLanguage();
   const isTeam = plan.target === "team";
   const isPro = plan.is_featured === true; // Phase 1 seeded Pro as is_featured.
-  const subtitle =
-    PLAN_SUBTITLE[plan.name]?.[language === "th" ? "th" : "en"] ?? "";
+  const displayPlanName = plan.name === "Team" ? i18n("pricing.plan.team.name") : plan.name;
+  const subtitleKey = PLAN_SUBTITLE_KEYS[plan.name as PlanName];
+  const subtitle = subtitleKey ? i18n(subtitleKey) : "";
 
   // Price calculation:
   //   monthly: price_thb
@@ -509,17 +511,17 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
       {/* Ribbon */}
       {isPro ? (
         <div className="absolute left-0 right-0 top-0 flex h-[24px] items-center justify-center bg-[#4f6cff] text-[10px] font-black uppercase tracking-[0.02em] text-white">
-          {language === "th" ? "คุ้มที่สุด" : "BEST VALUE"}
+          {i18n("pricing.badge.recommended")}
         </div>
       ) : isTeam ? (
         <div className="absolute left-0 right-0 top-0 flex h-[24px] items-center justify-center bg-[#7b49d8] text-[10px] font-black uppercase tracking-[0.02em] text-white">
-          {language === "th" ? "ตัวเลือกผู้เชี่ยวชาญ" : "EXPERT CHOICE"}
+          {i18n("pricing.badge.expertChoice")}
         </div>
       ) : null}
 
       {/* Plan name */}
       <h3 className="text-[23px] font-semibold leading-[24px] tracking-[-0.01em] text-white">
-        {plan.name}
+        {displayPlanName}
       </h3>
 
       {/* Subtitle */}
@@ -540,7 +542,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
                   {displayTeamAnnualSeatPrice}
                 </span>
                 <span className="text-[12px] font-medium text-zinc-300">
-                  / seat / {language === "th" ? "เดือน" : "month"}
+                  / {i18n("pricing.seat")} / {i18n("pricing.period.month")}
                 </span>
               </div>
             ) : (
@@ -549,18 +551,14 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
                   {displayTeamSeatPrice}
                 </span>
                 <span className="text-[12px] font-medium text-zinc-300">
-                  / seat / {language === "th" ? "เดือน" : "month"}
+                  / {i18n("pricing.seat")} / {i18n("pricing.period.month")}
                 </span>
               </div>
             )}
             <p className="mt-[7px] text-[11px] font-medium leading-[15px] text-zinc-400">
               {showAnnual
-                ? language === "th"
-                  ? "ชำระรายปี เครดิตเติมเพิ่มตามการใช้งาน"
-                  : "Billed annually. Credits are topped up by usage."
-                : language === "th"
-                  ? "เครดิตเติมเพิ่มตามการใช้งาน"
-                  : "Credits are topped up by usage."}
+                ? i18n("pricing.team.billedAnnuallyUsageCredits")
+                : i18n("pricing.team.usageCredits")}
             </p>
           </>
         ) : showAnnual ? (
@@ -573,11 +571,11 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
                 {displayAnnualPerMonth}
               </span>
               <span className="text-[13px] font-medium text-zinc-300">
-                /{language === "th" ? "เดือน" : "month"}
+                /{i18n("pricing.period.month")}
               </span>
             </div>
             <p className="mt-[7px] text-[11px] font-medium leading-[15px] text-zinc-400">
-              {language === "th" ? "ชำระรายปี" : "Billed annually"}
+              {i18n("pricing.billing.annually")}
             </p>
           </>
         ) : (
@@ -587,11 +585,11 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
                 {displayMonthlyPrice}
               </span>
               <span className="text-[13px] font-medium text-zinc-300">
-                /{language === "th" ? "เดือน" : "month"}
+                /{i18n("pricing.period.month")}
               </span>
             </div>
             <p className="mt-[7px] text-[11px] font-medium leading-[15px] text-zinc-400">
-              {language === "th" ? "ชำระรายเดือน" : "Billed monthly"}
+              {i18n("pricing.billing.monthly")}
             </p>
           </>
         )}
@@ -609,7 +607,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
         {submitting ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin" />
-            {language === "th" ? "กำลังเปิด..." : "Opening..."}
+            {i18n("pricing.cta.opening")}
           </>
         ) : (
           ctaLabel
@@ -628,12 +626,8 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
             {credits.toLocaleString()}{" "}
             <span className="font-medium text-zinc-300">
               {cycle === "annual"
-                ? language === "th"
-                  ? "เครดิต/ปี"
-                  : "credits/year"
-                : language === "th"
-                  ? "เครดิต/เดือน"
-                  : "credits/month"}
+                ? i18n("pricing.creditsPerYear")
+                : i18n("pricing.creditsPerMonth")}
             </span>
           </span>
         </div>
@@ -644,7 +638,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
           <div className="flex items-center justify-between gap-[10px]">
             <div className="flex items-center gap-[6px] text-[12px] font-semibold leading-[13px] text-zinc-100">
               <Users className="h-[13px] w-[13px] text-purple-300" />
-              Seats
+              {i18n("pricing.seats")}
             </div>
             <div className="flex h-[28px] items-center overflow-hidden rounded-full bg-white/[0.07]">
               <button
@@ -652,7 +646,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
                 onClick={decrementSeats}
                 disabled={teamSeats <= TEAM_MIN_SEATS}
                 className="grid h-[28px] w-[28px] place-items-center text-zinc-300 transition-colors hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-35"
-                aria-label="Decrease seats"
+                aria-label={i18n("pricing.decreaseSeats")}
               >
                 <Minus className="h-[12px] w-[12px]" />
               </button>
@@ -661,7 +655,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
                 type="button"
                 onClick={incrementSeats}
                 className="grid h-[28px] w-[28px] place-items-center text-zinc-300 transition-colors hover:bg-white/[0.08]"
-                aria-label="Increase seats"
+                aria-label={i18n("pricing.increaseSeats")}
               >
                 <Plus className="h-[12px] w-[12px]" />
               </button>
@@ -669,24 +663,24 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
           </div>
           <div className="grid gap-[2px] text-[11.5px] font-medium leading-[13px] text-zinc-400">
             <div className="flex justify-between gap-2">
-              <span>Base credits</span>
-              <span>{TEAM_BASE_CREDITS_PER_SEAT_MONTH.toLocaleString()} / seat</span>
+              <span>{i18n("pricing.baseCredits")}</span>
+              <span>{TEAM_BASE_CREDITS_PER_SEAT_MONTH.toLocaleString()} / {i18n("pricing.seat")}</span>
             </div>
             <div className="flex justify-between gap-2 text-emerald-300">
-              <span>Promotion</span>
-              <span>+{TEAM_PROMO_CREDITS_PER_SEAT_MONTH.toLocaleString()} / seat</span>
+              <span>{i18n("pricing.promotion")}</span>
+              <span>+{TEAM_PROMO_CREDITS_PER_SEAT_MONTH.toLocaleString()} / {i18n("pricing.seat")}</span>
             </div>
             <div className="flex justify-between gap-2 pt-[1px] text-[12px] font-semibold leading-[13px] text-white">
-              <span>{teamSeats} seats total</span>
-              <span>{teamCreditsForSelectedSeats.toLocaleString()} credits</span>
+              <span>{i18n("pricing.seatsTotal", { count: teamSeats })}</span>
+              <span>{teamCreditsForSelectedSeats.toLocaleString()} {i18n("common.credits")}</span>
             </div>
           </div>
         </div>
       )}
 
       <div className="mt-[2px] flex flex-col gap-[2px]">
-        <ModelAvailabilityRow label="Seedance 2.0" accent={accent} language={language} />
-        <ModelAvailabilityRow label="GPT Image 2" accent={accent} language={language} />
+        <ModelAvailabilityRow label="Seedance 2.0" accent={accent} />
+        <ModelAvailabilityRow label="GPT Image 2" accent={accent} />
       </div>
 
       {/* Pro discount line / Team discount line */}
@@ -695,7 +689,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
           <span className="flex h-[16px] w-[13px] shrink-0 items-center justify-center">
             <Check className="h-[11px] w-[11px]" />
           </span>
-          <span>{language === "th" ? "ลดค่าเครดิต 10%" : "10% discount on credit usage"}</span>
+          <span>{i18n("pricing.discount.proCredit")}</span>
         </div>
       )}
       {isTeam && (
@@ -703,7 +697,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
           <span className="flex h-[16px] w-[13px] shrink-0 items-center justify-center">
             <Check className="h-[11px] w-[11px]" />
           </span>
-          <span>{language === "th" ? "ค่าเครดิตถูกกว่า 20%" : "20% cheaper cost per credit"}</span>
+          <span>{i18n("pricing.discount.teamCredit")}</span>
         </div>
       )}
 
@@ -720,10 +714,10 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
       {/* Feature list */}
       <ul className="mt-[1px] flex flex-col gap-[1px]">
         {FEATURE_ROWS.map((row) => {
-          const has = row.plans[plan.name] ?? false;
+          const has = row.plans[plan.name as PlanName] ?? false;
           return (
             <li
-              key={row.en}
+              key={row.key}
               className={cn(
                 "min-h-[16px] items-center gap-[6px] py-0 text-[12px] font-medium leading-[16px]",
                 has ? "flex text-zinc-100" : "hidden text-zinc-600 sm:flex"
@@ -738,7 +732,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
                   <X className="h-[11px] w-[11px] text-zinc-600" />
                 </span>
               )}
-              <span>{language === "th" ? row.th : row.en}</span>
+              <span>{i18n(row.key)}</span>
             </li>
           );
         })}
@@ -755,7 +749,7 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
               <Check className="h-[11px] w-[11px] text-[#4f6cff]" />
             </span>
             <span>
-              {language === "th" ? "สต็อก 250M+ ภาพและวิดีโอ" : "250M+ Premium assets"}
+              {i18n("pricing.feature.premiumAssets")}
             </span>
           </div>
         </div>
@@ -767,23 +761,33 @@ const PlanCard = ({ plan, cycle, language, ctaLabel, isCurrent, submitting, onSu
 const ModelAvailabilityRow = ({
   label,
   accent,
-  language,
 }: {
   label: string;
   accent: "blue" | "purple" | "neutral";
-  language: string;
-}) => (
-  <div className="flex min-h-[18px] items-center justify-between gap-2 text-[12px] font-semibold leading-[18px] text-zinc-100">
-    <span>{label}</span>
-    <span
-      className={cn(
-        "text-[9px] font-black uppercase leading-none",
-        accent === "purple" ? "text-[#a855f7]" : "text-[#4f6cff]",
-      )}
-    >
-      {language === "th" ? "พร้อมใช้" : "NOW AVAILABLE"}
-    </span>
-  </div>
-);
+}) => {
+  const { t: i18n } = useLanguage();
+
+  return (
+    <div className="flex min-h-[18px] items-center justify-between gap-2 text-[12px] font-semibold leading-[18px] text-zinc-100">
+      <span className="inline-flex items-center gap-[6px]">
+        <Sparkles
+          className={cn(
+            "h-[11px] w-[11px]",
+            accent === "purple" ? "text-[#a855f7]" : "text-[#4f6cff]",
+          )}
+        />
+        {label}
+      </span>
+      <span
+        className={cn(
+          "text-[9px] font-black uppercase leading-none",
+          accent === "purple" ? "text-[#a855f7]" : "text-[#4f6cff]",
+        )}
+      >
+        {i18n("pricing.badge.nowAvailable")}
+      </span>
+    </div>
+  );
+};
 
 export default Pricing;

@@ -29,6 +29,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
 import WorkspaceCanvasPagePill from "@/components/workspace/WorkspaceCanvasPagePill";
 import CanvasHeader from "@/components/workspace/CanvasHeader";
@@ -433,13 +434,14 @@ function CanvasHydrationStatus({
   hasUser: boolean;
   customStatus?: string;
 }) {
+  const { t: i18n } = useLanguage();
   const status =
     customStatus ??
     (authLoading
-      ? "Checking sign-in…"
+      ? i18n("workspace.canvas.checkingSignIn")
       : hasUser
-        ? "Loading canvas from server…"
-        : "Looking up canvas…");
+        ? i18n("workspace.canvas.loadingCanvasFromServer")
+        : i18n("workspace.canvas.lookingUpCanvas"));
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 text-zinc-300">
       <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-700 border-t-zinc-200" />
@@ -448,7 +450,7 @@ function CanvasHydrationStatus({
         href="/app/workspace"
         className="text-[11px] text-zinc-500 underline-offset-4 hover:text-zinc-300 hover:underline"
       >
-        ← Back to workspaces
+        {i18n("workspace.canvas.backToWorkspaces")}
       </a>
     </div>
   );

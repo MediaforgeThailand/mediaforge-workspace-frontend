@@ -67,7 +67,7 @@ export function CreateProjectDialog({
   defaultColor,
   onCreate,
 }: CreateProjectDialogProps) {
-  const { language } = useLanguage();
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [isPrivate, setIsPrivate] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -95,8 +95,7 @@ export function CreateProjectDialog({
     setSubmitting(true);
     try {
       const trimmedName = name.trim();
-      const fallbackName =
-        language === "th" ? "โปรเจคไม่มีชื่อ" : "Untitled project";
+      const fallbackName = t("createProject.untitled");
       const finalName = (trimmedName || fallbackName).slice(0, 80);
       await onCreate({
         name: finalName,
@@ -132,19 +131,17 @@ export function CreateProjectDialog({
         <DialogHeader className="space-y-0.5">
           <DialogTitle className="flex items-center gap-2 text-[17px] font-semibold leading-6 text-zinc-50">
             <FolderPlus className="h-4 w-4 text-zinc-400" />
-            {language === "th" ? "สร้างโปรเจคใหม่" : "Create new project"}
+            {t("createProject.title")}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            {language === "th"
-              ? "ตั้งชื่อโปรเจคและเลือกความเป็นส่วนตัว"
-              : "Pick a name and set privacy"}
+            {t("createProject.description")}
           </DialogDescription>
         </DialogHeader>
 
         {/* ── Name ─────────────────────────────────────────────── */}
         <div className="space-y-1.5">
           <label className="text-[13px] font-medium text-zinc-300">
-            {language === "th" ? "ชื่อโปรเจค" : "Project name"}
+            {t("createProject.nameLabel")}
           </label>
           <input
             type="text"
@@ -152,9 +149,7 @@ export function CreateProjectDialog({
             onChange={(e) => setName(e.target.value.slice(0, 80))}
             disabled={submitting}
             placeholder={
-              language === "th"
-                ? "เช่น แคมเปญสงกรานต์ 2026"
-                : "e.g. Songkran Campaign 2026"
+              t("createProject.namePlaceholder")
             }
             autoFocus
             spellCheck={false}
@@ -195,16 +190,12 @@ export function CreateProjectDialog({
             </span>
             <div className="min-w-0 leading-tight">
               <div className="text-[13px] font-medium text-zinc-100">
-                {language === "th" ? "โปรเจคส่วนตัว" : "Private project"}
+                {t("createProject.privateProject")}
               </div>
               <div className="mt-0.5 text-[12px] text-zinc-400">
                 {isPrivate
-                  ? language === "th"
-                    ? "เฉพาะคุณเท่านั้นที่เห็น"
-                    : "Only you can see"
-                  : language === "th"
-                    ? "ทีมในองค์กรเดียวกันเห็นได้"
-                    : "Team can see"}
+                  ? t("createProject.onlyYouCanSee")
+                  : t("createProject.teamCanSee")}
               </div>
             </div>
           </div>
@@ -215,7 +206,7 @@ export function CreateProjectDialog({
             tabIndex={-1}
             className="pointer-events-none h-5 w-9 [&>span]:h-4 [&>span]:w-4 [&>span]:data-[state=checked]:translate-x-4"
             aria-label={
-              language === "th" ? "เปิด/ปิดโปรเจคส่วนตัว" : "Toggle private"
+              t("createProject.togglePrivate")
             }
           />
         </button>
@@ -233,7 +224,7 @@ export function CreateProjectDialog({
             disabled={submitting}
             className="inline-flex h-8 items-center justify-center rounded-md bg-white/[0.06] px-3.5 text-[13px] font-medium text-zinc-200 transition-colors hover:bg-white/[0.09] disabled:opacity-50"
           >
-            {language === "th" ? "ยกเลิก" : "Cancel"}
+            {t("createProject.cancel")}
           </button>
           <button
             type="button"
@@ -244,12 +235,12 @@ export function CreateProjectDialog({
             {submitting ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                {language === "th" ? "กำลังสร้าง…" : "Creating…"}
+                {t("createProject.creating")}
               </>
             ) : (
               <>
                 <FolderPlus className="h-3.5 w-3.5" />
-                {language === "th" ? "สร้าง" : "Create"}
+                {t("createProject.create")}
               </>
             )}
           </button>

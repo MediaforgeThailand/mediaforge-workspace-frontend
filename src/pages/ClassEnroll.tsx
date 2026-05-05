@@ -19,21 +19,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CheckCircle2, XCircle, BookOpen, Workflow, Loader2 } from "lucide-react";
-
-const ERROR_LABELS: Record<string, string> = {
-  code_not_found: "This code doesn't exist or has been deleted.",
-  code_revoked: "This code was revoked by the teacher.",
-  code_expired: "This code has expired.",
-  code_exhausted: "This code has reached its maximum redemptions.",
-  class_not_active: "This class isn't active yet, or has ended.",
-  class_full: "This class is full.",
-  already_redeemed: "You've already enrolled in this class with this code.",
-  not_signed_in: "Please sign in first.",
-  invalid_code: "That code looks malformed.",
-  student_code_required: "Enter your student ID so the class space can be assigned correctly.",
-};
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function ClassEnroll() {
+  const { t: i18n } = useLanguage();
   const { code } = useParams<{ code: string }>();
   const { user, refreshProfile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -49,7 +38,34 @@ export default function ClassEnroll() {
   >({ phase: "idle" });
 
   // After auth is resolved, show the enrollment form (or bounce guest)
-  if (authLoading) return <PageLoadingAnim label="Signing you in…" />;
+  const errorLabel = (error: string) => {
+    switch (error) {
+      case "code_not_found":
+        return i18n("classEnroll.error.codeNotFound");
+      case "code_revoked":
+        return i18n("classEnroll.error.codeRevoked");
+      case "code_expired":
+        return i18n("classEnroll.error.codeExpired");
+      case "code_exhausted":
+        return i18n("classEnroll.error.codeExhausted");
+      case "class_not_active":
+        return i18n("classEnroll.error.classNotActive");
+      case "class_full":
+        return i18n("classEnroll.error.classFull");
+      case "already_redeemed":
+        return i18n("classEnroll.error.alreadyRedeemed");
+      case "not_signed_in":
+        return i18n("classEnroll.error.notSignedIn");
+      case "invalid_code":
+        return i18n("classEnroll.error.invalidCode");
+      case "student_code_required":
+        return i18n("classEnroll.error.studentCodeRequired");
+      default:
+        return error;
+    }
+  };
+
+  if (authLoading) return <PageLoadingAnim label={i18n("classEnroll.signingIn")} />;
   if (!user) {
     return <Navigate to={`/auth?redirect=${encodeURIComponent(`/enroll-class/${code}`)}`} replace />;
   }
@@ -93,26 +109,28 @@ export default function ClassEnroll() {
               <BookOpen className="h-8 w-8 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Join class</h1>
+              <h1 className="text-2xl font-bold">{i18n("classEnroll.joinClass")}</h1>
               <p className="text-sm text-muted-foreground mt-1 font-mono">{code}</p>
             </div>
 
             <div className="text-left space-y-2 max-w-sm mx-auto">
-              <Label htmlFor="student-code">Student ID</Label>
+              <Label htmlFor="student-code">
+                {i18n("common.studentId")}{" "}
+                <span className="text-muted-foreground">{i18n("common.optional")}</span>
+              </Label>
               <Input
                 id="student-code"
                 value={studentCode}
                 onChange={(e) => setStudentCode(e.target.value)}
-                placeholder="e.g. 6612345"
-                required
+                placeholder={i18n("classEnroll.eG6612345")}
               />
               <p className="text-xs text-muted-foreground">
-                This is used to name and lock your class space.
+                {i18n("classEnroll.yourTeacherMayAskToRecordThis")}
               </p>
             </div>
 
-            <Button onClick={submit} size="lg" className="w-full max-w-sm" disabled={!studentCode.trim()}>
-              Join class
+            <Button onClick={submit} size="lg" className="w-full max-w-sm">
+              {i18n("classEnroll.joinClass")}
             </Button>
           </>
         )}
@@ -120,7 +138,7 @@ export default function ClassEnroll() {
         {status.phase === "redeeming" && (
           <>
             <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
-            <h2 className="text-xl font-bold">Joining class…</h2>
+            <h2 className="text-xl font-bold">{i18n("classEnroll.joiningClass")}</h2>
           </>
         )}
 
@@ -129,13 +147,13 @@ export default function ClassEnroll() {
             <div className="mx-auto h-16 w-16 rounded-full bg-green-500/10 flex items-center justify-center">
               <CheckCircle2 className="h-8 w-8 text-green-500" />
             </div>
-            <h1 className="text-2xl font-bold">Welcome to {status.class_name}</h1>
+            <h1 className="text-2xl font-bold">{i18n("classEnroll.welcomeTo", { className: status.class_name })}</h1>
             <p className="text-muted-foreground">
-              You received <span className="font-mono font-semibold text-foreground">{status.balance.toLocaleString()}</span> credits for this class space.
+              {i18n("classEnroll.receivedCreditsPrefix")} <span className="font-mono font-semibold text-foreground">{status.balance.toLocaleString()}</span> {i18n("classEnroll.receivedCreditsSuffix")}
             </p>
-            <p className="text-xs text-muted-foreground">Redirecting to workspace…</p>
+            <p className="text-xs text-muted-foreground">{i18n("classEnroll.redirecting")}</p>
             <Button onClick={() => navigate(status.workspace_id ? `/app/workspace/${status.workspace_id}` : "/app/workspace", { replace: true })}>
-              <Workflow className="h-4 w-4 mr-2" /> Go to workspace now
+              <Workflow className="h-4 w-4 mr-2" /> {i18n("classEnroll.goToWorkspaceNow")}
             </Button>
           </>
         )}
@@ -145,19 +163,19 @@ export default function ClassEnroll() {
             <div className="mx-auto h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center">
               <XCircle className="h-8 w-8 text-destructive" />
             </div>
-            <h1 className="text-2xl font-bold">Couldn't join</h1>
+            <h1 className="text-2xl font-bold">{i18n("classEnroll.couldNotJoin")}</h1>
             <p className="text-muted-foreground">
-              {ERROR_LABELS[status.error] ?? status.error}
+              {errorLabel(status.error)}
             </p>
             <div className="flex justify-center gap-2">
               <Button
                 variant="outline"
                 onClick={() => { setHasSubmitted(false); setStatus({ phase: "idle" }); }}
               >
-                Try again
+                {i18n("classEnroll.tryAgain")}
               </Button>
               <Button onClick={() => navigate("/app/workspace", { replace: true })}>
-                Continue to workspace
+                {i18n("classEnroll.continueToWorkspace")}
               </Button>
             </div>
           </>

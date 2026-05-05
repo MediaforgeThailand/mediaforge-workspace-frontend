@@ -88,7 +88,7 @@ export default function OrgLoginPanel({ email, resolution, redirectPath, onBack 
         ) : null}
         <div>
           <p className="text-xs uppercase tracking-wider text-muted-foreground">
-            Sign in to
+            {t("orgLogin.signInTo")}
           </p>
           <h2 className="text-xl font-semibold text-foreground">{org.name}</h2>
           <p className="text-xs text-muted-foreground mt-1">{email}</p>
@@ -111,13 +111,13 @@ export default function OrgLoginPanel({ email, resolution, redirectPath, onBack 
             ) : (
               <Mail className="mr-2 h-4 w-4" />
             )}
-            Send sign-in link to {email}
+            {t("orgLogin.sendSignInLink", { email })}
           </Button>
         )}
 
         {otpSent && (
           <div className="rounded-md border border-green-500/30 bg-green-500/5 p-3 text-center text-sm text-green-300">
-            Check your inbox at <span className="font-medium">{email}</span> for the sign-in link.
+            {t("orgLogin.checkInboxPrefix")} <span className="font-medium">{email}</span> {t("orgLogin.checkInboxSuffix")}
           </div>
         )}
 
@@ -125,7 +125,7 @@ export default function OrgLoginPanel({ email, resolution, redirectPath, onBack 
           <div className="relative py-1">
             <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border/40" /></div>
             <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
-              <span className="bg-background px-2 text-muted-foreground">or use SSO</span>
+              <span className="bg-background px-2 text-muted-foreground">{t("orgLogin.orUseSso")}</span>
             </div>
           </div>
         )}
@@ -148,7 +148,7 @@ export default function OrgLoginPanel({ email, resolution, redirectPath, onBack 
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
               </svg>
             )}
-            Continue with Google Workspace
+            {t("orgLogin.continueGoogleWorkspace")}
           </Button>
         )}
 
@@ -170,7 +170,7 @@ export default function OrgLoginPanel({ email, resolution, redirectPath, onBack 
                 <rect x="12" y="12" width="10" height="10" fill="#FFB900" />
               </svg>
             )}
-            Continue with Microsoft
+            {t("orgLogin.continueMicrosoft")}
           </Button>
         )}
       </div>
@@ -184,7 +184,7 @@ export default function OrgLoginPanel({ email, resolution, redirectPath, onBack 
         onClick={onBack}
       >
         <ArrowLeft className="mr-2 h-3 w-3" />
-        Use a different email
+        {t("orgLogin.useDifferentEmail")}
       </Button>
     </div>
   );

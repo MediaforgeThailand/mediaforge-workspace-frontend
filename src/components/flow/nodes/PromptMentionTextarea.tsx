@@ -134,7 +134,7 @@ function getNodeIcon(nodeType: string, data: Record<string, unknown>): MentionOp
   return "ai";
 }
 
-function getNodeDisplayLabel(data: Record<string, unknown>): string {
+function getNodeDisplayLabel(data: Record<string, unknown>, fallback: string): string {
   // Resolution order matters — different node families store the
   // user-editable display name in different places:
   //
@@ -156,7 +156,7 @@ function getNodeDisplayLabel(data: Record<string, unknown>): string {
   for (const c of candidates) {
     if (typeof c === "string" && c.trim()) return c;
   }
-  return "Untitled";
+  return fallback;
 }
 
 function getNodePreviewUrl(data: Record<string, unknown>): string | undefined {
@@ -482,13 +482,13 @@ const PromptMentionTextarea = memo(({
         const data = n.data as Record<string, unknown>;
         return {
           nodeId: n.id,
-          label: getNodeDisplayLabel(data),
+          label: getNodeDisplayLabel(data, t("workspace.mentions.untitled")),
           type: n.type || "unknown",
           icon: getNodeIcon(n.type || "", data),
           previewUrl: getNodePreviewUrl(data),
         };
       });
-  }, [getNodes, excludeNodeId, allowedNodeTypes, allowedNodeIds, mentionOptionsOverride]);
+  }, [getNodes, excludeNodeId, allowedNodeTypes, allowedNodeIds, mentionOptionsOverride, t]);
 
   /* ── Text var options (# trigger — textInputNode) ──
    * Same connection-aware filter as @ mentions: a #variable that
@@ -507,13 +507,13 @@ const PromptMentionTextarea = memo(({
         const data = n.data as Record<string, unknown>;
         return {
           nodeId: n.id,
-          label: getNodeDisplayLabel(data),
+          label: getNodeDisplayLabel(data, t("workspace.mentions.untitled")),
           type: n.type || "unknown",
           icon: "textvar" as const,
           isTextVar: true,
         };
       });
-  }, [getNodes, excludeNodeId, allowedTextVarTypes, allowedNodeIds]);
+  }, [getNodes, excludeNodeId, allowedTextVarTypes, allowedNodeIds, t]);
 
   const filteredOptions = useMemo(() => {
     const baseOptions = activeTriggerRef.current === "#" ? textVarOptions : mentionOptions;
@@ -1136,7 +1136,7 @@ const PromptMentionTextarea = memo(({
           className="nodrag nopan z-[9999] max-h-[320px] overflow-y-auto rounded-lg border border-white/10 bg-[hsl(220_15%_12%)] py-1 shadow-xl shadow-black/40 backdrop-blur-xl [scrollbar-width:thin]"
         >
           <div className="px-2 py-0.5 text-[8px] font-semibold uppercase tracking-wider text-white/30">
-            {activeTriggerRef.current === "#" ? "Inject text variable" : "Reference a node"}
+            {activeTriggerRef.current === "#" ? t("workspace.mentions.injectTextVariable") : t("workspace.mentions.referenceNode")}
           </div>
           {filteredOptions.map((option, idx) => {
             const Icon = ICON_MAP[option.icon];

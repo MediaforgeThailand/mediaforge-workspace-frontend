@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import logo from "@/assets/logo-white.png";
 import { Button } from "@/components/ui/button";
+import { LegalFallbackNotice } from "@/components/legal/LegalFallbackNotice";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 const Cookies = () => {
@@ -29,34 +30,35 @@ const Cookies = () => {
           </Link>
           <Link to="/" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-4 w-4" />
-            {t("cookiesBackToHome" as any)}
+            {t("cookiesBackToHome")}
           </Link>
         </div>
       </nav>
 
       <main className="mx-auto max-w-4xl px-6 py-12">
         <h1 className="text-3xl font-bold text-foreground md:text-4xl">
-          {t("cookiesPageTitle" as any)}
+          {t("cookiesPageTitle")}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {t("cookiesPageLastUpdated" as any)}
+          {t("cookiesPageLastUpdated")}
         </p>
 
         <div className="prose prose-invert mt-8 max-w-none text-muted-foreground prose-headings:text-foreground prose-h2:text-xl prose-h2:mt-8 prose-h2:mb-3 prose-p:leading-relaxed prose-li:leading-relaxed prose-strong:text-foreground">
+          <LegalFallbackNotice language={language} />
           {language === "th" ? <ThaiCookies /> : <EnglishCookies />}
         </div>
 
         {/* ── Manage preferences CTA ──────────────────────────── */}
         <div className="mt-10 rounded-2xl border border-border/50 bg-card/50 p-6">
           <h2 className="text-xl font-semibold text-foreground">
-            {t("cookiesManagePreferences" as any)}
+            {t("cookiesManagePreferences")}
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            {t("cookiesManagePreferencesDesc" as any)}
+            {t("cookiesManagePreferencesDesc")}
           </p>
           <div className="mt-4">
             <Button variant="gradient" size="sm" onClick={reopenBanner}>
-              {t("cookiesReopenBanner" as any)}
+              {t("cookiesReopenBanner")}
             </Button>
           </div>
         </div>
@@ -103,7 +105,7 @@ const EnglishCookies = () => (
     <p>Saves your in-app preferences. Lives entirely in your browser; we don't read it.</p>
     <ul>
       <li><strong>Theme</strong> — remembers light/dark mode (`vite-ui-theme`).</li>
-      <li><strong>Language</strong> — remembers Thai vs. English (`mf-lang`).</li>
+      <li><strong>Language</strong> — remembers your current language preference: English, ไทย, Español, 日本語, हिन्दी (<code>mf-lang</code>).</li>
       <li><strong>Workspace cache</strong> — recently-opened spaces, draft canvas state, last-active workspace.</li>
     </ul>
 
@@ -133,7 +135,7 @@ const EnglishCookies = () => (
         <tr>
           <td><code>mf-lang</code></td>
           <td>Functional</td>
-          <td>Language preference (TH / EN)</td>
+          <td>Language preference (en / th / es / ja / hi)</td>
           <td>Persistent</td>
         </tr>
         <tr>
@@ -209,7 +211,7 @@ const ThaiCookies = () => (
     <p>เก็บการตั้งค่าใน app ของคุณ อยู่ใน browser ของคุณทั้งหมด เราไม่ได้อ่าน</p>
     <ul>
       <li><strong>Theme</strong> — จดจำโหมดสว่าง/มืด (<code>vite-ui-theme</code>)</li>
-      <li><strong>ภาษา</strong> — จดจำไทย/อังกฤษ (<code>mf-lang</code>)</li>
+      <li><strong>ภาษา</strong> — จดจำภาษาที่คุณเลือก: English, ไทย, Español, 日本語, हिन्दी (<code>mf-lang</code>)</li>
       <li><strong>Workspace cache</strong> — space ที่เปิดล่าสุด canvas state แบบร่าง workspace ล่าสุดที่ใช้งาน</li>
     </ul>
 
@@ -239,7 +241,7 @@ const ThaiCookies = () => (
         <tr>
           <td><code>mf-lang</code></td>
           <td>Functional</td>
-          <td>การตั้งค่าภาษา (TH / EN)</td>
+          <td>การตั้งค่าภาษา (en / th / es / ja / hi)</td>
           <td>ถาวร</td>
         </tr>
         <tr>

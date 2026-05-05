@@ -68,7 +68,7 @@ const RATIO_THB_TO_CREDITS = 25;
 const CardForm = ({ threshold, amountThb, setupIntentId, onSuccess }: CardFormProps) => {
   const stripe = useStripeJs();
   const elements = useElements();
-  const { language } = useLanguage();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,16 +89,12 @@ const CardForm = ({ threshold, amountThb, setupIntentId, onSuccess }: CardFormPr
       redirect: "if_required",
     });
     if (confirmErr) {
-      setError(confirmErr.message ?? "Card binding failed");
+      setError(confirmErr.message ?? t("autoRefill.cardBindingFailed"));
       setSubmitting(false);
       return;
     }
     if (!setupIntent || setupIntent.status !== "succeeded") {
-      setError(
-        language === "th"
-          ? "การยืนยันบัตรไม่สำเร็จ — ลองอีกครั้ง"
-          : "Card setup didn't succeed — try again",
-      );
+      setError(t("autoRefill.cardSetupDidNotSucceed"));
       setSubmitting(false);
       return;
     }
@@ -125,11 +121,7 @@ const CardForm = ({ threshold, amountThb, setupIntentId, onSuccess }: CardFormPr
           "verify_failed";
         // Translate the most common error code.
         if (typeof msg === "string" && /verify_charge_failed|card_decline/i.test(msg)) {
-          setError(
-            language === "th"
-              ? "บัตรไม่สามารถตัดเงินได้ — ลองบัตรอื่นหรือติดต่อธนาคาร"
-              : "Card couldn't be charged — try another card or contact your bank",
-          );
+          setError(t("autoRefill.cardChargeFailed"));
         } else {
           setError(String(msg));
         }
@@ -137,14 +129,11 @@ const CardForm = ({ threshold, amountThb, setupIntentId, onSuccess }: CardFormPr
         return;
       }
       toast({
-        title:
-          language === "th"
-            ? "เปิดเติมเครดิตอัตโนมัติแล้ว"
-            : "Auto-refill enabled",
-        description:
-          language === "th"
-            ? `บัตรผูกแล้ว — เมื่อเครดิตต่ำกว่า ${threshold} ระบบจะเติม ฿${amountThb.toLocaleString()} อัตโนมัติ`
-            : `Card bound — when balance drops below ${threshold} credits, ฿${amountThb.toLocaleString()} will be charged automatically.`,
+        title: t("autoRefill.enabledToastTitle"),
+        description: t("autoRefill.enabledToastDescription", {
+          threshold,
+          amount: amountThb.toLocaleString(),
+        }),
       });
       onSuccess();
     } catch (err) {
@@ -175,21 +164,17 @@ const CardForm = ({ threshold, amountThb, setupIntentId, onSuccess }: CardFormPr
         {submitting ? (
           <>
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            {language === "th" ? "กำลังยืนยัน…" : "Verifying…"}
+            {t("autoRefill.verifying")}
           </>
         ) : (
           <>
             <CheckCircle2 className="h-3.5 w-3.5" />
-            {language === "th"
-              ? `ยืนยันบัตร (ทดสอบหัก ฿20 และคืนทันที)`
-              : `Verify card (charges ฿20 + immediate refund)`}
+            {t("autoRefill.verifyCard")}
           </>
         )}
       </button>
       <p className="text-[10.5px] text-zinc-500 leading-relaxed">
-        {language === "th"
-          ? "เพื่อยืนยันว่าบัตรของคุณตัดเงินได้จริง ระบบจะหัก ฿20 และคืนเงินทันที (ภายใน 5-10 วันทำการตามนโยบายธนาคาร) ก่อนเปิดใช้การเติมเครดิตอัตโนมัติ"
-          : "To prove your card can actually charge, we'll temporarily debit ฿20 and refund it instantly (5-10 business days back to your card per bank policy) before enabling auto-refill."}
+        {t("autoRefill.verificationNotice")}
       </p>
     </form>
   );
@@ -200,7 +185,7 @@ export function AutoRefillSetupDialog({
   onOpenChange,
   onEnabled,
 }: AutoRefillSetupDialogProps) {
-  const { language } = useLanguage();
+  const { t } = useLanguage();
   const [step, setStep] = useState<"configure" | "card" | "done">("configure");
   const [threshold, setThreshold] = useState(100);
   const [amountThb, setAmountThb] = useState(500);
@@ -231,12 +216,12 @@ export function AutoRefillSetupDialog({
         const msg =
           (data as { error?: string } | null)?.error ??
           invokeErr?.message ??
-          "Could not start card setup";
+          t("autoRefill.couldNotStartSetup");
         throw new Error(msg);
       }
       const cs = (data as { client_secret?: string }).client_secret;
       const sid = (data as { setup_intent_id?: string }).setup_intent_id;
-      if (!cs || !sid) throw new Error("Stripe didn't return a client secret");
+      if (!cs || !sid) throw new Error(t("autoRefill.missingClientSecret"));
       setClientSecret(cs);
       setSetupIntentId(sid);
       setStep("card");
@@ -273,14 +258,10 @@ export function AutoRefillSetupDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base text-zinc-50">
             <CreditCard className="h-4 w-4" />
-            {language === "th"
-              ? "ตั้งค่าเติมเครดิตอัตโนมัติ"
-              : "Set up auto-refill"}
+            {t("autoRefill.title")}
           </DialogTitle>
           <DialogDescription className="text-[12.5px] leading-relaxed text-zinc-400">
-            {language === "th"
-              ? "เมื่อเครดิตของคุณต่ำกว่าค่าที่ตั้งไว้ ระบบจะหักบัตรอัตโนมัติเพื่อเติมเครดิตให้ ผูกบัตรเสริมจาก PromptPay ที่ใช้อยู่ได้ — ใช้ตอนเร่งด่วน ตอนใช้งานเยอะ"
-              : "When your credits drop below the threshold, your saved card is charged automatically. This complements PromptPay top-ups for high-traffic moments."}
+            {t("autoRefill.description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -289,9 +270,7 @@ export function AutoRefillSetupDialog({
             <div className="space-y-3">
               <div>
                 <label className="text-[12px] font-medium text-zinc-300">
-                  {language === "th"
-                    ? "เติมเมื่อเครดิตต่ำกว่า"
-                    : "Refill when balance drops below"}
+                  {t("autoRefill.thresholdLabel")}
                 </label>
                 <input
                   type="number"
@@ -306,14 +285,12 @@ export function AutoRefillSetupDialog({
                   className="mt-1 w-full rounded-md bg-black/40 px-3 py-2 text-[13px] text-zinc-100 outline-none focus:border-violet-500/40"
                 />
                 <p className="mt-1 text-[10.5px] text-zinc-500">
-                  {language === "th"
-                    ? "ขั้นต่ำ 50 / สูงสุด 10,000 เครดิต"
-                    : "Min 50 / max 10,000 credits"}
+                  {t("autoRefill.thresholdHelp")}
                 </p>
               </div>
               <div>
                 <label className="text-[12px] font-medium text-zinc-300">
-                  {language === "th" ? "จำนวนที่เติมต่อครั้ง" : "Refill amount per cycle"}
+                  {t("autoRefill.amountLabel")}
                 </label>
                 <div className="relative mt-1">
                   <span className="pointer-events-none absolute inset-y-0 left-3 grid place-items-center text-[13px] text-zinc-500">
@@ -334,9 +311,10 @@ export function AutoRefillSetupDialog({
                   />
                 </div>
                 <p className="mt-1 text-[10.5px] text-zinc-500">
-                  {language === "th"
-                    ? `จะได้ ${previewCredits.toLocaleString()} เครดิต ต่อครั้ง (1 บาท = ${RATIO_THB_TO_CREDITS} เครดิต)`
-                    : `≈ ${previewCredits.toLocaleString()} credits per refill (1 THB = ${RATIO_THB_TO_CREDITS} credits)`}
+                  {t("autoRefill.previewCredits", {
+                    credits: previewCredits.toLocaleString(),
+                    ratio: RATIO_THB_TO_CREDITS,
+                  })}
                 </p>
               </div>
             </div>
@@ -362,14 +340,12 @@ export function AutoRefillSetupDialog({
               {loading ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  {language === "th" ? "กำลังเตรียม…" : "Preparing…"}
+                  {t("autoRefill.preparing")}
                 </>
               ) : (
                 <>
                   <CreditCard className="h-3.5 w-3.5" />
-                  {language === "th"
-                    ? "ดำเนินการ — ผูกบัตรเครดิต"
-                    : "Continue — bind card"}
+                  {t("autoRefill.continueBindCard")}
                 </>
               )}
             </button>
@@ -396,12 +372,13 @@ export function AutoRefillSetupDialog({
           <div className="flex flex-col items-center gap-3 py-6 text-center">
             <CheckCircle2 className="h-10 w-10 text-emerald-400" />
             <p className="text-sm font-semibold text-zinc-100">
-              {language === "th" ? "เปิดใช้งานแล้ว" : "Auto-refill enabled"}
+              {t("autoRefill.doneTitle")}
             </p>
             <p className="text-[12px] text-zinc-400">
-              {language === "th"
-                ? `ระบบจะเติม ฿${amountThb.toLocaleString()} อัตโนมัติเมื่อเครดิตต่ำกว่า ${threshold}`
-                : `฿${amountThb.toLocaleString()} will be charged when balance drops below ${threshold} credits.`}
+              {t("autoRefill.doneDescription", {
+                amount: amountThb.toLocaleString(),
+                threshold,
+              })}
             </p>
           </div>
         )}

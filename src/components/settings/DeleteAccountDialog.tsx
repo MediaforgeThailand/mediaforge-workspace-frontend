@@ -36,7 +36,7 @@ interface DeleteAccountDialogProps {
 
 export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogProps) {
   const { user, signOut } = useAuth();
-  const { language } = useLanguage();
+  const { t: i18n } = useLanguage();
   const [password, setPassword] = useState("");
   const [emailConfirm, setEmailConfirm] = useState("");
   const [reason, setReason] = useState("");
@@ -72,24 +72,18 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
         const msg = error.message ?? String(error);
         if (/wrong_password|401/.test(msg)) {
           toast.error(
-            language === "th"
-              ? "รหัสผ่านไม่ถูกต้อง"
-              : "Wrong password",
+            i18n("settings.deleteAccount.wrongPassword"),
           );
         } else {
           toast.error(
-            language === "th"
-              ? `ลบบัญชีไม่สำเร็จ: ${msg}`
-              : `Account deletion failed: ${msg}`,
+            i18n("settings.deleteAccount.failedWithMessage", { message: msg }),
           );
         }
         return;
       }
       if ((data as { success?: boolean })?.success) {
         toast.success(
-          language === "th"
-            ? "ลบบัญชีของคุณเรียบร้อยแล้ว"
-            : "Your account has been deleted",
+          i18n("settings.deleteAccount.yourAccountHasBeenDeleted"),
         );
         // Sign out locally — the auth.users row is gone server-
         // side, so the next refresh would 401 anyway. Doing it
@@ -102,9 +96,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
         window.location.href = "/";
       } else {
         toast.error(
-          language === "th"
-            ? "ลบบัญชีไม่สำเร็จ — ติดต่อทีมงาน"
-            : "Account deletion failed — please contact support",
+          i18n("settings.deleteAccount.genericFailure"),
         );
       }
     } catch (err) {
@@ -122,35 +114,21 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base text-red-300">
             <AlertTriangle className="h-4 w-4" />
-            {language === "th" ? "ลบบัญชีถาวร" : "Delete account permanently"}
+            {i18n("settings.deleteAccount.deleteAccountPermanently")}
           </DialogTitle>
           <DialogDescription className="text-[13px] leading-relaxed text-zinc-400">
-            {language === "th" ? (
-              <>
-                การลบบัญชีจะเอา{" "}
-                <span className="font-semibold text-zinc-200">
-                  ข้อมูล โปรเจค ผลงาน เครดิต และประวัติการชำระทั้งหมด
-                </span>{" "}
-                ออกถาวร — กู้คืนไม่ได้ การสมัครสมาชิกที่ยังใช้งานอยู่จะถูกยกเลิกและบัตรเครดิตที่ผูกไว้จะถูกถอนออก
-              </>
-            ) : (
-              <>
-                Deleting your account permanently removes{" "}
-                <span className="font-semibold text-zinc-200">
-                  all your data, projects, generations, credits, and billing history
-                </span>{" "}
-                — this cannot be undone. Active subscriptions are cancelled and saved cards are detached.
-              </>
-            )}
+            {i18n("settings.deleteAccount.warningIntro")}{" "}
+            <span className="font-semibold text-zinc-200">
+              {i18n("settings.deleteAccount.warningDataScope")}
+            </span>{" "}
+            {i18n("settings.deleteAccount.warningConsequence")}
           </DialogDescription>
         </DialogHeader>
 
         {/* Email re-type */}
         <div className="space-y-1.5">
           <label className="text-[12px] font-medium text-zinc-300">
-            {language === "th"
-              ? `พิมพ์อีเมล "${userEmail}" เพื่อยืนยัน`
-              : `Type your email "${userEmail}" to confirm`}
+            {i18n("settings.deleteAccount.typeEmailToConfirm", { email: userEmail })}
           </label>
           <input
             type="email"
@@ -166,7 +144,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
         {/* Password */}
         <div className="space-y-1.5">
           <label className="text-[12px] font-medium text-zinc-300">
-            {language === "th" ? "รหัสผ่าน" : "Password"}
+            {i18n("settings.deleteAccount.password")}
           </label>
           <input
             type="password"
@@ -181,7 +159,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
         {/* Reason (optional) */}
         <div className="space-y-1.5">
           <label className="text-[12px] font-medium text-zinc-300">
-            {language === "th" ? "เหตุผล (ไม่บังคับ)" : "Reason (optional)"}
+            {i18n("common.reasonOptional")}
           </label>
           <textarea
             value={reason}
@@ -189,9 +167,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
             disabled={submitting}
             rows={2}
             placeholder={
-              language === "th"
-                ? "ช่วยให้เราพัฒนาบริการ"
-                : "Helps us improve the product"
+              i18n("settings.deleteAccount.helpsUsImproveProduct")
             }
             className="w-full resize-none rounded-md bg-black/40 px-3 py-2 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-red-500/40"
           />
@@ -204,7 +180,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
             disabled={submitting}
             className="inline-flex h-9 items-center justify-center rounded-md bg-white/[0.06] px-4 text-[13px] font-medium text-zinc-200 transition-colors hover:bg-white/[0.09]"
           >
-            {language === "th" ? "ยกเลิก" : "Cancel"}
+            {i18n("common.cancel")}
           </button>
           <button
             type="button"
@@ -218,7 +194,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
             )}
           >
             {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            {language === "th" ? "ลบบัญชีถาวร" : "Delete forever"}
+            {i18n("settings.deleteAccount.deleteForever")}
           </button>
         </DialogFooter>
       </DialogContent>

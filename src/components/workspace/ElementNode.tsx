@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useFreshSignedUrl } from "./useFreshSignedUrl";
 import { PortIcon } from "./PortIcon";
@@ -60,6 +61,7 @@ interface ElementNodeData {
 const ElementNode = memo(({ id, data, selected }: NodeProps) => {
   const d = (data ?? {}) as ElementNodeData;
   const { setNodes } = useReactFlow();
+  const { t: i18n } = useLanguage();
   const { user } = useAuth();
   const edges = useEdges();
   const allNodes = useNodes();
@@ -113,16 +115,16 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
   const onCreate = useCallback(async () => {
     if (creating || isSaved) return;
     if (!user) {
-      toast.error("Please log in to create an element");
+      toast.error(i18n("workspace.elementNode.pleaseLogInToCreateElement"));
       return;
     }
     const name = (d.label ?? "").trim();
     if (!name) {
-      toast.error("Element name is required");
+      toast.error(i18n("workspace.elementNode.elementNameIsRequired"));
       return;
     }
     if (wiredRefs.refs.length === 0 && !wiredRefs.frontal) {
-      toast.error("Wire at least one reference image first");
+      toast.error(i18n("workspace.elementNode.wireAtLeastOneReferenceImageFirst"));
       return;
     }
     setCreating(true);
@@ -151,14 +153,14 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
         frontal_image_url: wiredRefs.frontal,
         thumbnail_url: thumbnail ?? undefined,
       });
-      toast.success(`Element "${name}" saved`);
+      toast.success(i18n("workspace.elementNode.elementSaved", { name }));
     } catch (e: any) {
       console.error("[element-create]", e);
-      toast.error(e?.message ?? "Failed to save element");
+      toast.error(e?.message ?? i18n("workspace.elementNode.failedToSaveElement"));
     } finally {
       setCreating(false);
     }
-  }, [creating, isSaved, user, d.label, d.description, wiredRefs, canvasId, updateField]);
+  }, [creating, isSaved, user, d.label, d.description, wiredRefs, canvasId, updateField, i18n]);
 
   // Choose the visual height so handles line up cleanly. Creator mode
   // needs enough room for ref slots + name/desc; saved mode is a card.
@@ -183,13 +185,13 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
           onMouseDown={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
           className="ws-clean-title-input nodrag"
-          placeholder="Character / element name…"
+          placeholder={i18n("workspace.elementNode.characterElementName")}
           disabled={isSaved}
         />
         {isSaved && (
           <Check
             className="h-3 w-3 shrink-0 text-emerald-400"
-            titleAccess="Saved"
+            titleAccess={i18n("workspace.elementNode.saved")}
             style={{ pointerEvents: "auto" }}
           />
         )}
@@ -215,7 +217,7 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
                 url={d.frontal_image_url}
                 alt="frontal"
                 accent
-                title="Frontal view"
+                title={i18n("workspace.elementNode.frontalView")}
               />
             )}
           </div>
@@ -236,13 +238,13 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
             onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
             className="nodrag mb-2 w-full truncate bg-transparent text-[10px] text-zinc-400 outline-none placeholder:text-zinc-600"
-            placeholder="Description (optional)"
+            placeholder={i18n("common.descriptionOptional")}
           />
 
           {/* Ref slot rows */}
           <div className="relative text-[10px] text-zinc-400">
             <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-zinc-500">
-              Reference images ({wiredRefs.refs.length}/4)
+              {i18n("workspace.elementNode.referenceImages")} ({wiredRefs.refs.length}/4)
             </div>
             <ul className="space-y-1">
               {REF_SLOTS.map((slot, i) => {
@@ -265,7 +267,7 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
               })}
             </ul>
             <div className="mt-2 text-[9px] font-semibold uppercase tracking-wide text-zinc-500">
-              Frontal {wiredRefs.frontal ? "✓" : "(optional)"}
+              {i18n("workspace.elementNode.frontal")} {wiredRefs.frontal ? "✓" : i18n("common.optional")}
             </div>
           </div>
 
@@ -285,14 +287,14 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
                   ? "cursor-wait bg-white/[0.06] text-white/60"
                   : "bg-pink-500/20 text-pink-200 hover:bg-pink-500/30",
               )}
-              title="Save as a re-usable Element. Listed in the Asset Library afterwards."
+              title={i18n("workspace.elementNode.saveAsReUsableElementListed")}
             >
               {creating ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <Plus className="h-3.5 w-3.5" />
               )}
-              {creating ? "Creating…" : "Create Element"}
+              {creating ? i18n("workspace.elementNode.creating") : i18n("workspace.elementNode.createElement")}
             </button>
           </div>
         </div>
@@ -319,7 +321,7 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
         <PortIcon
           dir="target"
           handleId="frontal"
-          label="Frontal (optional)"
+          label={i18n("workspace.elementNode.frontalOptional")}
           portType="image"
           color={IMAGE_COLOR}
           index={REF_SLOTS.length}
@@ -330,7 +332,7 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
       <PortIcon
         dir="source"
         handleId="element"
-        label="Element output"
+        label={i18n("workspace.elementNode.elementOutput")}
         portType="element"
         color={ELEMENT_COLOR}
         index={0}

@@ -1,6 +1,7 @@
 import { ArrowLeft, Building2, CheckCircle2, ShieldCheck, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/contexts/LanguageContext";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
 
 const TEAM_SEAT_PRICE_THB = 1600;
@@ -8,7 +9,8 @@ const TEAM_BASE_CREDITS = 65_000;
 const TEAM_PROMO_CREDITS = 25_000;
 
 export default function TeamRegister() {
-  useDocumentTitle("Team registration - MediaForge");
+  const { t: i18n } = useLanguage();
+  useDocumentTitle(i18n("teamRegistration.teamRegistrationMediaforge"));
   const navigate = useNavigate();
 
   return (
@@ -16,7 +18,7 @@ export default function TeamRegister() {
       <div className="mx-auto max-w-5xl px-5 py-8">
         <Button variant="ghost" className="mb-6 text-zinc-400" onClick={() => navigate("/app/settings?tab=team")}>
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to settings
+          {i18n("teamRegistration.backToSettings")}
         </Button>
 
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -24,32 +26,35 @@ export default function TeamRegister() {
             <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-violet-500/15 text-violet-200">
               <Building2 className="h-5 w-5" />
             </div>
-            <h1 className="text-2xl font-semibold">Create a Team workspace</h1>
+            <h1 className="text-2xl font-semibold">{i18n("teamRegistration.createTeamWorkspace")}</h1>
             <p className="mt-2 max-w-2xl text-sm text-zinc-400">
-              {`Team is now self-serve inside Workspace. Start at 2 seats, ฿${TEAM_SEAT_PRICE_THB.toLocaleString()} / seat / month, with ${(TEAM_BASE_CREDITS + TEAM_PROMO_CREDITS).toLocaleString()} shared credits per seat.`}
+              {i18n("teamRegistration.teamIsNowSelfServeInsideWorkspace", {
+                  price: TEAM_SEAT_PRICE_THB.toLocaleString(),
+                  credits: (TEAM_BASE_CREDITS + TEAM_PROMO_CREDITS).toLocaleString(),
+                })}
             </p>
 
             <div className="mt-6 rounded-xl bg-black/30 p-4">
-              <div className="text-xs uppercase tracking-[0.12em] text-zinc-500">Next step</div>
+              <div className="text-xs uppercase tracking-[0.12em] text-zinc-500">{i18n("teamRegistration.nextStep")}</div>
               <p className="mt-1 text-sm text-zinc-300">
-                Buy seats from Pricing. After payment, your account becomes the team admin and can invite members from Settings.
+                {i18n("teamRegistration.nextStepDescription")}
               </p>
             </div>
 
             <div className="mt-6 flex flex-wrap gap-3">
               <Button onClick={() => navigate("/app/pricing")}>
-                Buy team seats
+                {i18n("common.buyTeamSeats")}
               </Button>
               <Button variant="outline" onClick={() => navigate("/app/settings?tab=team")}>
-                Review team status
+                {i18n("teamRegistration.reviewTeamStatus")}
               </Button>
             </div>
           </section>
 
           <aside className="space-y-3">
-            <Feature icon={<ShieldCheck className="h-4 w-4" />} title="Workspace admin" body="The buyer becomes the team admin immediately after payment." />
-            <Feature icon={<Users className="h-4 w-4" />} title={`฿${TEAM_SEAT_PRICE_THB.toLocaleString()} / seat`} body="Minimum 2 seats. Add more seats any time." />
-            <Feature icon={<CheckCircle2 className="h-4 w-4" />} title="Shared credit pool" body={`${TEAM_BASE_CREDITS.toLocaleString()} base credits + ${TEAM_PROMO_CREDITS.toLocaleString()} promo credits per seat each month.`} />
+            <Feature icon={<ShieldCheck className="h-4 w-4" />} title={i18n("teamRegistration.workspaceAdmin")} body={i18n("teamRegistration.adminRoleDescription")} />
+            <Feature icon={<Users className="h-4 w-4" />} title={i18n("teamRegistration.thbSeat", { price: TEAM_SEAT_PRICE_THB.toLocaleString() })} body={i18n("teamRegistration.minimum2SeatsAddMoreSeatsAny")} />
+            <Feature icon={<CheckCircle2 className="h-4 w-4" />} title={i18n("teamRegistration.sharedCreditPool")} body={i18n("teamRegistration.baseCreditsPromoCreditsPer", { base: TEAM_BASE_CREDITS.toLocaleString(), promo: TEAM_PROMO_CREDITS.toLocaleString() })} />
           </aside>
         </div>
       </div>

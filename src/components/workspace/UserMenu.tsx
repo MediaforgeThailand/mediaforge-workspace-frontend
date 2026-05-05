@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
@@ -7,9 +8,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Settings as SettingsIcon,
+  Check,
+  ChevronDown,
   Languages,
   LogOut,
   CreditCard,
@@ -17,19 +21,29 @@ import {
   Building2,
   Crown,
   GraduationCap,
+  Search,
   UserPlus,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAuthModal } from "@/contexts/AuthModalContext";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { getLanguageNativeLabel, SUPPORTED_LANGUAGES, useLanguage, type Language } from "@/contexts/LanguageContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useEducationStudentLock, useIsClassTeacher, useIsOrgAdmin } from "@/hooks/useIsOrgUser";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 const numberCompact = new Intl.NumberFormat("en-US", {
   notation: "compact",
   maximumFractionDigits: 1,
 });
+
+const LANGUAGE_SEARCH_ALIASES: Record<Language, string> = {
+  en: "english en",
+  th: "thai thailand ภาษาไทย th",
+  es: "spanish espanol español es",
+  ja: "japanese 日本語 ja",
+  hi: "hindi हिन्दी hi india",
+};
 
 function clampPercent(value: number) {
   if (!Number.isFinite(value)) return 0;
@@ -134,6 +148,7 @@ function UsageRow({
   available: number;
   colorClass: string;
 }) {
+  const { t } = useLanguage();
   const pct = percentOf(used, total);
   return (
     <div className="space-y-[5px]">
@@ -147,8 +162,8 @@ function UsageRow({
         <div className={`h-full rounded-full ${colorClass}`} style={{ width: `${pct}%` }} />
       </div>
       <div className="flex items-center justify-between gap-3 text-[10.5px] leading-[13px] text-white/[0.66]">
-        <span>Spent {formatCompact(used)}</span>
-        <span>Available {formatCompact(available)}</span>
+        <span>{t("workspace.userMenu.spent")} {formatCompact(used)}</span>
+        <span>{t("common.available2")} {formatCompact(available)}</span>
       </div>
     </div>
   );
@@ -160,10 +175,26 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
   const { user, profile, signOut, loading: authLoading } = useAuth();
   const { openAuthModal } = useAuthModal();
   const { t, language, setLanguage } = useLanguage();
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
+  const [languageQuery, setLanguageQuery] = useState("");
   const { credits } = useCredits();
   const isOrgAdmin = useIsOrgAdmin();
   const isClassTeacher = useIsClassTeacher();
   const educationStudentLock = useEducationStudentLock();
+  const filteredLanguageOptions = useMemo(() => {
+    const query = languageQuery.trim().toLowerCase();
+    if (!query) return [...SUPPORTED_LANGUAGES];
+
+    return SUPPORTED_LANGUAGES.filter((option) => {
+      const nativeLabel = getLanguageNativeLabel(option).toLowerCase();
+      return (
+        option.includes(query) ||
+        nativeLabel.includes(query) ||
+        LANGUAGE_SEARCH_ALIASES[option].toLowerCase().includes(query)
+      );
+    });
+  }, [languageQuery]);
 
   // While auth is still resolving, render an invisible placeholder so
   // we don't show the guest Sign-in pill and then snap to the avatar
@@ -252,7 +283,16 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu
+      open={profileMenuOpen}
+      onOpenChange={(open) => {
+        setProfileMenuOpen(open);
+        if (!open) {
+          setLanguageMenuOpen(false);
+          setLanguageQuery("");
+        }
+      }}
+    >
       <DropdownMenuTrigger
         className="flex items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/50"
         style={{ width: triggerSize, height: triggerSize }}
@@ -272,6 +312,12 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
         align="end"
         sideOffset={6}
         className="max-h-[calc(100vh-48px)] w-[288px] overflow-y-auto rounded-[14px] border-white/[0.10] bg-[#121212] p-0 text-white shadow-2xl"
+        onInteractOutside={(event) => {
+          const target = event.target;
+          if (target instanceof HTMLElement && target.closest("[data-language-popover]")) {
+            event.preventDefault();
+          }
+        }}
       >
         <DropdownMenuLabel className="p-0 font-normal">
           <div className="p-[12px] pb-[10px]">
@@ -310,7 +356,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
                     className="flex h-[30px] w-full items-center justify-center gap-[7px] rounded-[8px] bg-emerald-500 px-[10px] text-[12px] font-semibold leading-none text-white transition-colors hover:bg-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200/70"
                   >
                     <GraduationCap className="h-[13px] w-[13px]" />
-                    University admin
+                    {t("workspace.userMenu.universityAdmin")}
                   </button>
                 </div>
               )
@@ -336,7 +382,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
                   className="flex h-[28px] w-full items-center justify-center gap-[7px] rounded-[8px] bg-white/[0.055] px-[10px] text-[12px] font-semibold leading-none text-white transition-colors hover:bg-white/[0.10]"
                 >
                   {hasTeamContext ? <Building2 className="h-[13px] w-[13px]" /> : <UserPlus className="h-[13px] w-[13px]" />}
-                  {hasTeamContext ? "Admin Console" : "Create your team"}
+                  {hasTeamContext ? t("common.adminConsole") : t("common.createYourTeam")}
                 </button>
               </div>
             )}
@@ -345,7 +391,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
 
         <div className="bg-white/[0.02] px-[12px] py-[10px]">
           <UsageRow
-            label="Personal"
+            label={t("workspace.userMenu.personal")}
             used={personalUsed}
             total={personalTotal}
             available={personalBalance}
@@ -373,19 +419,90 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
           {t("workspace.usermenu.settings")}
         </DropdownMenuItem>
 
-        <DropdownMenuItem
-          onSelect={(e) => {
-            e.preventDefault();
-            setLanguage(language === "th" ? "en" : "th");
-          }}
-          className="mx-[7px] my-[3px] h-[30px] cursor-pointer gap-[10px] rounded-[8px] px-[10px] text-[12px] font-medium leading-none text-white focus:bg-white/[0.06] focus:text-white"
-        >
-          <Languages className="h-[14px] w-[14px] text-white/[0.82]" />
-          <span className="flex-1">Language</span>
-          <span className="rounded-[7px] bg-white/[0.08] px-[7px] py-[3px] text-[11px] leading-none text-white">
-            {language === "th" ? "English" : "Thai"}
-          </span>
-        </DropdownMenuItem>
+        <div className="mx-[7px] my-[3px] rounded-[8px] px-[10px] py-[7px]">
+          <div className="flex items-center gap-[10px]">
+            <Languages className="h-[14px] w-[14px] shrink-0 text-white/[0.82]" />
+            <span className="flex-1 text-[12px] font-medium leading-none text-white">
+              {t("workspace.userMenu.language")}
+            </span>
+            <Popover
+              open={languageMenuOpen}
+              onOpenChange={(open) => {
+                setLanguageMenuOpen(open);
+                if (!open) setLanguageQuery("");
+              }}
+            >
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(event) => event.stopPropagation()}
+                  className="flex h-[30px] min-w-[116px] items-center justify-between gap-2 rounded-[8px] border border-white/[0.12] bg-white/[0.04] px-[9px] text-[12px] font-semibold leading-none text-white transition hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/60"
+                  aria-expanded={languageMenuOpen}
+                  aria-haspopup="listbox"
+                >
+                  <span className="truncate">{getLanguageNativeLabel(language)}</span>
+                  <ChevronDown
+                    className={cn(
+                      "h-[13px] w-[13px] shrink-0 text-white/70 transition-transform",
+                      languageMenuOpen && "rotate-180",
+                    )}
+                  />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                data-language-popover
+                align="end"
+                side="bottom"
+                sideOffset={8}
+                collisionPadding={12}
+                onOpenAutoFocus={(event) => event.preventDefault()}
+                onCloseAutoFocus={(event) => event.preventDefault()}
+                className="z-[70] w-[256px] rounded-[10px] border border-white/[0.10] bg-[#1b1b1b] p-2 text-white shadow-2xl"
+              >
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-[14px] w-[14px] -translate-y-1/2 text-white/55" />
+                  <input
+                    value={languageQuery}
+                    onChange={(event) => setLanguageQuery(event.target.value)}
+                    onKeyDown={(event) => event.stopPropagation()}
+                    placeholder={t("workspace.userMenu.languageSearch")}
+                    className="h-[34px] w-full rounded-[8px] border border-white/[0.12] bg-white/[0.04] pl-8 pr-2.5 text-[12px] text-white outline-none placeholder:text-white/45 focus:border-sky-300/50"
+                  />
+                </div>
+                <div className="mt-2 max-h-[156px] overflow-y-auto overscroll-contain pr-1" role="listbox">
+                  {filteredLanguageOptions.length === 0 ? (
+                    <div className="px-2 py-2 text-[12px] text-white/55">
+                      {t("workspace.userMenu.languageNoResults")}
+                    </div>
+                  ) : (
+                    filteredLanguageOptions.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        role="option"
+                        aria-selected={option === language}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setLanguage(option);
+                          setLanguageMenuOpen(false);
+                          setLanguageQuery("");
+                        }}
+                        className={cn(
+                          "flex h-[34px] w-full items-center justify-between rounded-[8px] px-2 text-left text-[12px] font-medium text-white/85 transition hover:bg-white/[0.06]",
+                          option === language && "text-[#5b6df8]",
+                        )}
+                      >
+                        <span>{getLanguageNativeLabel(option)}</span>
+                        {option === language && <Check className="h-[14px] w-[14px] text-[#5b6df8]" />}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
 
         <DropdownMenuSeparator className="mt-1 bg-white/[0.08]" />
 

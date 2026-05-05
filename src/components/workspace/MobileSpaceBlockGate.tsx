@@ -35,7 +35,7 @@ export default function MobileSpaceBlockGate({
 }: {
   children: ReactNode;
 }) {
-  const { language } = useLanguage();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [isPhone, setIsPhone] = useState(() => isPhoneViewport());
 
@@ -51,8 +51,6 @@ export default function MobileSpaceBlockGate({
   }, []);
 
   if (!isPhone) return <>{children}</>;
-
-  const isThai = language === "th";
 
   // Always send the user back to the dashboard rather than `history.back()`
   // — they often arrive at a Space via a direct link (share / push notif),
@@ -77,32 +75,28 @@ export default function MobileSpaceBlockGate({
               MediaForge Space
             </p>
             <h1 className="mt-1 text-xl font-semibold tracking-normal text-white">
-              {isThai ? "ต้องใช้หน้าจอที่ใหญ่กว่านี้" : "Use a larger screen"}
+              {t("mobileSpaceBlockGate.title")}
             </h1>
           </div>
         </div>
 
         <div className="space-y-3 text-sm leading-6 text-zinc-300">
           <p>
-            {isThai
-              ? "ฟีเจอร์ Space ไม่รองรับการใช้งานบนมือถือ เพราะพื้นที่จอไม่พอสำหรับ canvas, node, prompt และการลากเชื่อมต่อให้แม่นยำ"
-              : "Space is not available on phones because the canvas, nodes, prompts, and drag controls need more room to work reliably."}
+            {t("mobileSpaceBlockGate.description")}
           </p>
           <p className="text-zinc-400">
-            {isThai
-              ? "กรุณาเปิดผ่าน Desktop, Laptop, iPad หรือหน้าจอที่กว้างกว่านี้"
-              : "Please open it on a desktop, laptop, iPad, or another larger screen."}
+            {t("mobileSpaceBlockGate.openOnLargerScreen")}
           </p>
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-2 text-xs font-medium text-zinc-400">
           <div className="flex items-center gap-2 rounded-md bg-black/25 px-3 py-2">
             <Smartphone className="h-3.5 w-3.5 text-zinc-500" />
-            {isThai ? "มือถือถูกบล็อก" : "Phone blocked"}
+            {t("mobileSpaceBlockGate.phoneBlocked")}
           </div>
           <div className="flex items-center gap-2 rounded-md bg-black/25 px-3 py-2">
             <Maximize2 className="h-3.5 w-3.5 text-zinc-500" />
-            {isThai ? "ใช้จอใหญ่กว่า" : "Bigger screen"}
+            {t("mobileSpaceBlockGate.biggerScreen")}
           </div>
         </div>
 
@@ -112,7 +106,7 @@ export default function MobileSpaceBlockGate({
           className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-white text-sm font-semibold text-zinc-900 transition hover:bg-zinc-200"
         >
           <ArrowLeft className="h-4 w-4" />
-          {isThai ? "กลับหน้าหลัก" : "Back to dashboard"}
+          {t("mobileSpaceBlockGate.backToDashboard")}
         </button>
       </section>
     </main>

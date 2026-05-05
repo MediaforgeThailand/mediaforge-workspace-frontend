@@ -76,12 +76,12 @@ const InputNode = memo(({ id, data, selected }: NodeProps) => {
 
   const handleUpload = useCallback(
     async (file: File) => {
-      if (!user) { toast.error("Please log in to upload files"); return; }
+      if (!user) { toast.error(t("inputNode.loginRequired")); return; }
       const isVideo = file.type.startsWith("video/");
       const expectedVideo = d.fieldType === "video";
-      if (isVideo && !expectedVideo) { toast.error("This node accepts images only"); return; }
-      if (!isVideo && expectedVideo) { toast.error("This node accepts videos only"); return; }
-      if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) { toast.error("Only image and video files are supported"); return; }
+      if (isVideo && !expectedVideo) { toast.error(t("inputNode.imagesOnly")); return; }
+      if (!isVideo && expectedVideo) { toast.error(t("inputNode.videosOnly")); return; }
+      if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) { toast.error(t("inputNode.mediaOnly")); return; }
 
       const localPreview = URL.createObjectURL(file);
       updateNodeData({ previewUrl: localPreview, fileName: file.name, uploading: true });
@@ -94,7 +94,7 @@ const InputNode = memo(({ id, data, selected }: NodeProps) => {
         .upload(storagePath, file, { contentType: file.type, upsert: true });
 
       if (uploadErr) {
-        toast.error(`Upload failed: ${file.name}`);
+        toast.error(t("inputNode.uploadFailed", { filename: file.name }));
         updateNodeData({ previewUrl: undefined, fileName: undefined, uploading: false });
         URL.revokeObjectURL(localPreview);
         return;
@@ -112,7 +112,7 @@ const InputNode = memo(({ id, data, selected }: NodeProps) => {
       });
       URL.revokeObjectURL(localPreview);
     },
-    [user, d.fieldType, updateNodeData],
+    [user, d.fieldType, updateNodeData, t],
   );
 
   const handleFileChange = useCallback(
@@ -141,7 +141,7 @@ const InputNode = memo(({ id, data, selected }: NodeProps) => {
 
   const isCreator = !!d.creatorAsset;
   const accent = isCreator ? "amber" : "blue";
-  const tagLabel = isCreator ? "CREATOR" : "INPUT";
+  const tagLabel = isCreator ? t("inputNode.creatorBadge") : t("inputNode.inputBadge");
   const IconComp = d.fieldType === "video" ? Film : ImagePlus;
   const config = (d.config as Record<string, unknown>) ?? {};
   const exampleImageUrls = (config.example_image_urls as string[]) ?? [];
@@ -150,21 +150,21 @@ const InputNode = memo(({ id, data, selected }: NodeProps) => {
   const handleExampleUpload = useCallback(
     async (files: FileList | File[]) => {
       if (!user) {
-        toast.error("Please log in to upload files");
+        toast.error(t("inputNode.loginRequired"));
         return;
       }
 
       const incomingFiles = Array.from(files);
       const invalidFiles = incomingFiles.filter((file) => !file.type.startsWith("image/"));
       if (invalidFiles.length > 0) {
-        toast.error("Reference examples must be image files only");
+        toast.error(t("inputNode.referenceImagesOnly"));
       }
 
       const imageFiles = incomingFiles.filter((file) => file.type.startsWith("image/"));
       const remainingSlots = 3 - exampleImageUrls.length;
 
       if (remainingSlots <= 0) {
-        toast.error("Maximum 3 reference images");
+        toast.error(t("inputNode.maxReferenceImages"));
         return;
       }
 
@@ -184,7 +184,7 @@ const InputNode = memo(({ id, data, selected }: NodeProps) => {
           .upload(storagePath, file, { contentType: file.type, upsert: true });
 
         if (error) {
-          toast.error(`Upload failed: ${file.name}`);
+          toast.error(t("inputNode.uploadFailed", { filename: file.name }));
           continue;
         }
 
@@ -201,7 +201,7 @@ const InputNode = memo(({ id, data, selected }: NodeProps) => {
       setIsUploadingExamples(false);
       setIsExampleDragOver(false);
     },
-    [exampleImageUrls, updateNodeConfig, user],
+    [exampleImageUrls, updateNodeConfig, user, t],
   );
 
   const handleExampleFileChange = useCallback(
@@ -240,16 +240,16 @@ const InputNode = memo(({ id, data, selected }: NodeProps) => {
 
   return (
     <BaseNodeWrapper
-      title={d.nodeName || d.label || "Input"}
+      title={d.nodeName || d.label || t("inputNode.defaultTitle")}
       badge={tagLabel}
       accent={accent}
       icon={IconComp}
-      outputs={[{ id: "default", label: d.fieldType === "video" ? "VIDEO" : "IMAGE", color: accent, dim: !isConnected && !d.creatorAsset }]}
+      outputs={[{ id: "default", label: d.fieldType === "video" ? t("inputNode.videoPort") : t("inputNode.imagePort"), color: accent, dim: !isConnected && !d.creatorAsset }]}
       selected={selected}
       width={260}
       onTitleChange={(name) => updateNodeData({ nodeName: name })}
-      footerLeft={d.fileName ? d.fileName.slice(0, 22) : "no media"}
-      footerRight={d.required ? "required" : "optional"}
+      footerLeft={d.fileName ? d.fileName.slice(0, 22) : t("inputNode.noMedia")}
+      footerRight={d.required ? t("inputNode.required") : t("inputNode.optional")}
     >
       {/* Unconnected warning */}
       {!isConnected && !d.creatorAsset && (
@@ -261,7 +261,7 @@ const InputNode = memo(({ id, data, selected }: NodeProps) => {
 
       {/* Source media section */}
       <div>
-        <GroupHeader label="SOURCE MEDIA" accent={accent} />
+        <GroupHeader label={t("inputNode.sourceMedia")} accent={accent} />
         <div className="mt-1.5">
           {d.previewUrl ? (
             <div className="relative rounded-xl overflow-hidden border group" style={{ borderColor: accentTone.bd }}>
@@ -277,7 +277,7 @@ const InputNode = memo(({ id, data, selected }: NodeProps) => {
               ) : (
                 <img
                   src={d.previewUrl}
-                  alt={d.fileName || "Preview"}
+                  alt={d.fileName || t("inputNode.previewAlt")}
                   className={cn("w-full object-cover max-h-64", d.uploading && "opacity-50")}
                 />
               )}
@@ -296,7 +296,7 @@ const InputNode = memo(({ id, data, selected }: NodeProps) => {
               )}
               <div className="absolute inset-x-0 bottom-0 h-7 bg-gradient-to-t from-black/65 to-transparent flex items-end px-2 pb-1">
                 <p className="text-[9.5px] text-white/85 font-mono truncate">
-                  {d.uploading ? "uploading…" : d.fileName || d.fieldType}
+                  {d.uploading ? t("inputNode.uploading") : d.fileName || d.fieldType}
                 </p>
               </div>
             </div>
@@ -319,10 +319,10 @@ const InputNode = memo(({ id, data, selected }: NodeProps) => {
             >
               <Upload className="w-5 h-5" style={{ color: accentTone.c }} />
               <p className="text-[11px] font-medium text-white/75">
-                {isDragOver ? "Drop here" : "Click or drop file"}
+                {isDragOver ? t("inputNode.dropHere") : t("inputNode.clickOrDropFile")}
               </p>
               <p className="text-[9.5px] text-white/40 font-mono tracking-[0.04em]">
-                {d.fieldType === "video" ? "MP4 · MOV · WEBM" : "PNG · JPG · WEBP · max 10MB"}
+                {d.fieldType === "video" ? t("inputNode.videoFormats") : t("inputNode.imageFormats")}
               </p>
             </div>
           )}
@@ -359,7 +359,7 @@ const InputNode = memo(({ id, data, selected }: NodeProps) => {
               <div className="grid grid-cols-4 gap-1.5">
                 {exampleImageUrls.map((url, index) => (
                   <div key={`${url}-${index}`} className="relative aspect-square overflow-hidden rounded-md border border-white/[0.08] group/example">
-                    <img src={url} alt={`Reference ${index + 1}`} className="w-full h-full object-cover" />
+                    <img src={url} alt={t("inputNode.referenceAlt", { index: index + 1 })} className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); removeExampleImage(index); }}
@@ -390,9 +390,9 @@ const InputNode = memo(({ id, data, selected }: NodeProps) => {
               <div className="flex flex-col items-center justify-center gap-1 py-2">
                 <ImagePlus className="w-4 h-4 text-violet-300/70" />
                 <p className="text-[10px] font-medium text-white/60">
-                  {isUploadingExamples ? "Uploading refs…" : "Click or drop ref images"}
+                  {isUploadingExamples ? t("inputNode.uploadingRefs") : t("inputNode.clickOrDropRefImages")}
                 </p>
-                <p className="text-[9px] text-white/30">Reference examples · max 3</p>
+                <p className="text-[9px] text-white/30">{t("inputNode.referenceExamplesMax")}</p>
               </div>
             )}
           </div>
@@ -409,11 +409,11 @@ const InputNode = memo(({ id, data, selected }: NodeProps) => {
 
       {/* End-user view section */}
       <div>
-        <GroupHeader label="END-USER VIEW" accent={accent} />
+        <GroupHeader label={t("inputNode.endUserView")} accent={accent} />
         <div className="mt-1.5 space-y-1.5">
           <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] px-2.5 py-1.5">
             <p className="text-[9.5px] text-white/35 mb-0.5 font-mono uppercase tracking-[0.06em]">
-              {isCreator ? "Creator asset" : "User sees"}
+              {isCreator ? t("inputNode.creatorAsset") : t("inputNode.userSees")}
             </p>
             <input
               type="text"
@@ -421,7 +421,7 @@ const InputNode = memo(({ id, data, selected }: NodeProps) => {
               onChange={(e) => { e.stopPropagation(); updateNodeData({ fieldLabel: e.target.value }); }}
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
-              placeholder={isCreator ? "Pre-set asset" : "Upload your image"}
+              placeholder={isCreator ? t("inputNode.preSetAsset") : t("inputNode.uploadYourImage")}
               className="w-full bg-transparent text-[11px] text-white/80 font-medium focus:outline-none placeholder:text-white/20 nodrag"
             />
           </div>
