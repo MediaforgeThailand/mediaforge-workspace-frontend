@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ExternalLink, Loader2, Receipt, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 /**
  * Billing history dialog.
@@ -53,6 +54,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 const BillingHistoryDialog = ({ open, onOpenChange }: BillingHistoryDialogProps) => {
+  const { t: i18n } = useLanguage();
   const [rows, setRows] = useState<BillingRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +72,7 @@ const BillingHistoryDialog = ({ open, onOpenChange }: BillingHistoryDialogProps)
         if (data?.error) throw new Error(data.error);
         setRows(((data?.rows ?? []) as BillingRow[]));
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Could not load billing history");
+        if (!cancelled) setError(e instanceof Error ? e.message : i18n("settings.billingHistory.couldNotLoadBillingHistory"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -85,10 +87,10 @@ const BillingHistoryDialog = ({ open, onOpenChange }: BillingHistoryDialogProps)
           <DialogHeader>
             <DialogTitle className="text-base font-semibold text-zinc-50 flex items-center gap-2">
               <Receipt className="w-4 h-4 text-violet-300" />
-              Billing history
+              {i18n("settings.billingHistory.billingHistory")}
             </DialogTitle>
             <DialogDescription className="text-[11px] text-zinc-400">
-              Subscription invoices and one-off top-up receipts from your Stripe account.
+              {i18n("settings.billingHistory.subscriptionInvoicesAndOneOffTopUp")}
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -97,7 +99,7 @@ const BillingHistoryDialog = ({ open, onOpenChange }: BillingHistoryDialogProps)
           {loading && (
             <div className="flex items-center gap-2 py-8 justify-center text-xs text-zinc-500">
               <Loader2 className="w-4 h-4 animate-spin" />
-              Loading…
+              {i18n("common.loading")}
             </div>
           )}
 
@@ -111,9 +113,9 @@ const BillingHistoryDialog = ({ open, onOpenChange }: BillingHistoryDialogProps)
           {!loading && !error && rows.length === 0 && (
             <div className="text-center py-12">
               <Receipt className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
-              <p className="text-sm text-zinc-300 font-medium">No billing history yet</p>
+              <p className="text-sm text-zinc-300 font-medium">{i18n("settings.billingHistory.noBillingHistoryYet")}</p>
               <p className="text-[11px] text-zinc-500 mt-1">
-                Once you make your first payment, invoices and receipts will show up here.
+                {i18n("settings.billingHistory.emptyDescription")}
               </p>
             </div>
           )}
@@ -152,7 +154,7 @@ const BillingHistoryDialog = ({ open, onOpenChange }: BillingHistoryDialogProps)
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-zinc-500 hover:text-zinc-100 transition-colors p-1"
-                        aria-label="Open invoice"
+                        aria-label={i18n("settings.billingHistory.openInvoice")}
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
                       </a>
@@ -171,7 +173,7 @@ const BillingHistoryDialog = ({ open, onOpenChange }: BillingHistoryDialogProps)
             onClick={() => onOpenChange(false)}
             className="text-zinc-300 hover:text-zinc-50"
           >
-            Close
+            {i18n("common.close")}
           </Button>
         </div>
       </DialogContent>

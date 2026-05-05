@@ -1,7 +1,7 @@
 import { ArrowLeft, Maximize2, Monitor, Smartphone } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { getLocalizedText, useLanguage } from "@/contexts/LanguageContext";
 
 function isPhoneViewport() {
   if (typeof window === "undefined") return false;
@@ -52,7 +52,8 @@ export default function MobileSpaceBlockGate({
 
   if (!isPhone) return <>{children}</>;
 
-  const isThai = language === "th";
+  const txt = (values: Parameters<typeof getLocalizedText>[1]) =>
+    getLocalizedText(language, values);
 
   // Always send the user back to the dashboard rather than `history.back()`
   // — they often arrive at a Space via a direct link (share / push notif),
@@ -77,32 +78,38 @@ export default function MobileSpaceBlockGate({
               MediaForge Space
             </p>
             <h1 className="mt-1 text-xl font-semibold tracking-normal text-white">
-              {isThai ? "ต้องใช้หน้าจอที่ใหญ่กว่านี้" : "Use a larger screen"}
+              {txt({ en: "Use a larger screen", th: "ต้องใช้หน้าจอที่ใหญ่กว่านี้", es: "Usa una pantalla más grande", ja: "より大きな画面で開いてください" })}
             </h1>
           </div>
         </div>
 
         <div className="space-y-3 text-sm leading-6 text-zinc-300">
           <p>
-            {isThai
-              ? "ฟีเจอร์ Space ไม่รองรับการใช้งานบนมือถือ เพราะพื้นที่จอไม่พอสำหรับ canvas, node, prompt และการลากเชื่อมต่อให้แม่นยำ"
-              : "Space is not available on phones because the canvas, nodes, prompts, and drag controls need more room to work reliably."}
+            {txt({
+              en: "Space is not available on phones because the canvas, nodes, prompts, and drag controls need more room to work reliably.",
+              th: "ฟีเจอร์ Space ไม่รองรับการใช้งานบนมือถือ เพราะพื้นที่จอไม่พอสำหรับ canvas, node, prompt และการลากเชื่อมต่อให้แม่นยำ",
+              es: "Space no está disponible en teléfonos porque el canvas, los nodos, los prompts y los controles de arrastre necesitan más espacio para funcionar bien.",
+              ja: "Space はスマートフォンでは利用できません。canvas、node、prompt、ドラッグ操作を安定して使うには、より広い画面が必要です。",
+            })}
           </p>
           <p className="text-zinc-400">
-            {isThai
-              ? "กรุณาเปิดผ่าน Desktop, Laptop, iPad หรือหน้าจอที่กว้างกว่านี้"
-              : "Please open it on a desktop, laptop, iPad, or another larger screen."}
+            {txt({
+              en: "Please open it on a desktop, laptop, iPad, or another larger screen.",
+              th: "กรุณาเปิดผ่าน Desktop, Laptop, iPad หรือหน้าจอที่กว้างกว่านี้",
+              es: "Ábrelo en desktop, laptop, iPad u otra pantalla más grande.",
+              ja: "Desktop、Laptop、iPad など、より大きな画面で開いてください。",
+            })}
           </p>
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-2 text-xs font-medium text-zinc-400">
           <div className="flex items-center gap-2 rounded-md bg-black/25 px-3 py-2">
             <Smartphone className="h-3.5 w-3.5 text-zinc-500" />
-            {isThai ? "มือถือถูกบล็อก" : "Phone blocked"}
+            {txt({ en: "Phone blocked", th: "มือถือถูกบล็อก", es: "Teléfono bloqueado", ja: "スマホは非対応" })}
           </div>
           <div className="flex items-center gap-2 rounded-md bg-black/25 px-3 py-2">
             <Maximize2 className="h-3.5 w-3.5 text-zinc-500" />
-            {isThai ? "ใช้จอใหญ่กว่า" : "Bigger screen"}
+            {txt({ en: "Bigger screen", th: "ใช้จอใหญ่กว่า", es: "Pantalla más grande", ja: "大きな画面" })}
           </div>
         </div>
 
@@ -112,7 +119,7 @@ export default function MobileSpaceBlockGate({
           className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-white text-sm font-semibold text-zinc-900 transition hover:bg-zinc-200"
         >
           <ArrowLeft className="h-4 w-4" />
-          {isThai ? "กลับหน้าหลัก" : "Back to dashboard"}
+          {txt({ en: "Back to dashboard", th: "กลับหน้าหลัก", es: "Volver al panel", ja: "ダッシュボードに戻る" })}
         </button>
       </section>
     </main>

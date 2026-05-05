@@ -25,6 +25,7 @@ import { useState, useEffect, useRef } from "react";
 import { Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { deleteCanvasFromServer } from "./canvasPersistence";
 import SaveStateBadge from "./SaveStateBadge";
 
@@ -32,6 +33,7 @@ const TAB_MIN_W = 120;
 const TAB_MAX_W = 200;
 
 const WorkspaceTabBar = () => {
+  const { t: i18n } = useLanguage();
   // CRITICAL — `canvases` was the FLAT, top-level list (which surfaced
   // every tab as its own row on the dashboard, the bug the user
   // reported). After the v2 schema split, tabs live under workspaces;
@@ -254,8 +256,8 @@ const WorkspaceTabBar = () => {
                   isActive ? "opacity-60 hover:opacity-100" : "opacity-0 group-hover:opacity-60 hover:!opacity-100",
                   "hover:bg-zinc-800 hover:text-rose-300",
                 )}
-                title="Close tab"
-                aria-label="Close tab"
+                title={i18n("workspace.tabBar.closeTab")}
+                aria-label={i18n("workspace.tabBar.closeTab")}
               >
                 <X className="h-3 w-3" />
               </button>
@@ -268,8 +270,8 @@ const WorkspaceTabBar = () => {
         type="button"
         onClick={newTab}
         className="flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[11.5px] text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-100"
-        title="New tab (creates a new canvas)"
-        aria-label="New tab"
+        title={i18n("workspace.tabBar.newTabCreatesNewCanvas")}
+        aria-label={i18n("workspace.tabBar.newTab")}
       >
         <Plus className="h-3.5 w-3.5" />
       </button>

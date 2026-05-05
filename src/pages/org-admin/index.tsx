@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useTeachingClasses, useIsClassTeacher, useUserClassMemberships } from "@/hooks/useIsOrgUser";
 import {
   consumerOrgAdminApi,
@@ -35,6 +36,8 @@ import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 
 export default function OrgAdminPanel() {
+  const { t: i18n } = useLanguage();
+
   const { user, profile } = useAuth();
   const isTeacher = useIsClassTeacher();
   const teaching = useTeachingClasses();
@@ -61,26 +64,28 @@ export default function OrgAdminPanel() {
       <div className="flex items-center justify-between">
         <div>
           <Button variant="ghost" size="sm" onClick={() => navigate("/app/workspace")} className="-ml-2 mb-2">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Workspace
+            <ArrowLeft className="h-4 w-4 mr-2" /> {i18n("common.backToWorkspace")}
           </Button>
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <Crown className="h-7 w-7 text-primary" />
-            My Classes
+            {i18n("orgAdmin.myClasses")}
           </h1>
-          <p className="text-sm text-muted-foreground">Classes you teach. Click one to manage.</p>
+          <p className="text-sm text-muted-foreground">{i18n("orgAdmin.classesYouTeachClickOneToManage")}</p>
         </div>
         <CreateClassButton orgId={orgId} />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Teaching</CardTitle>
-          <CardDescription>{teaching.length} class{teaching.length === 1 ? "" : "es"}</CardDescription>
+          <CardTitle>{i18n("common.teaching")}</CardTitle>
+          <CardDescription>
+            {teaching.length} {i18n(teaching.length === 1 ? "common.class" : "common.classes")}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {teaching.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
-              You aren't listed as a teacher on any class yet. Click <span className="font-semibold">Create class</span> to start one.
+              {i18n("orgAdmin.emptyTeacherMessagePrefix")} <span className="font-semibold">{i18n("orgAdmin.createClass")}</span> {i18n("orgAdmin.toStartOne")}
             </p>
           ) : (
             <ul className="divide-y">
@@ -109,6 +114,7 @@ export default function OrgAdminPanel() {
 // ─── Create class dialog ────────────────────────────────────────────────────
 
 function CreateClassButton({ orgId }: { orgId: string }) {
+  const { t: i18n } = useLanguage();
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
   const [name, setName] = useState("");
@@ -147,61 +153,61 @@ function CreateClassButton({ orgId }: { orgId: string }) {
   return (
     <>
       <Button onClick={() => setOpen(true)}>
-        <Plus className="h-4 w-4 mr-2" /> Create class
+        <Plus className="h-4 w-4 mr-2" /> {i18n("orgAdmin.createClass")}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Create a new class</DialogTitle>
+            <DialogTitle>{i18n("orgAdmin.createNewClass")}</DialogTitle>
             <DialogDescription>
-              You'll be set as the primary instructor. Add co-teachers, allocate credit budget, and generate enrolment QRs from the class detail page.
+              {i18n("orgAdmin.createClassDescription")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Class name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Digital Media" />
+              <Label>{i18n("orgAdmin.className")}</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={i18n("orgAdmin.digitalMedia")} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Term</Label>
+                <Label>{i18n("common.term")}</Label>
                 <Input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="1" />
               </div>
               <div>
-                <Label>Year (พ.ศ.)</Label>
+                <Label>{i18n("orgAdmin.year")}</Label>
                 <Input value={year} onChange={(e) => setYear(e.target.value)} placeholder="2569" />
               </div>
             </div>
             <div>
-              <Label>Max students</Label>
+              <Label>{i18n("orgAdmin.maxStudents")}</Label>
               <Input type="number" value={maxStudents} onChange={(e) => setMaxStudents(e.target.value)} />
             </div>
             <div className={usesRecurringCredits ? "grid grid-cols-2 gap-3" : "space-y-3"}>
               <div>
-                <Label>Credit policy</Label>
+                <Label>{i18n("orgAdmin.creditPolicy")}</Label>
                 <select
                   value={policy}
                   onChange={(e) => setPolicy(e.target.value as any)}
                   className="w-full h-10 px-3 rounded-md border border-input bg-background"
                 >
-                  <option value="monthly_reset">Monthly Reset (resets each month)</option>
-                  <option value="weekly_drip">Weekly Drip (top up each week)</option>
-                  <option value="manual">Manual (teacher grants only)</option>
+                  <option value="monthly_reset">{i18n("orgAdmin.monthlyResetResetsEachMonth")}</option>
+                  <option value="weekly_drip">{i18n("orgAdmin.weeklyDripTopUpEachWeek")}</option>
+                  <option value="manual">{i18n("orgAdmin.manualTeacherGrantsOnly")}</option>
                 </select>
               </div>
               {usesRecurringCredits && (
                 <div>
-                  <Label>{policy === "monthly_reset" ? "Monthly credits" : "Weekly credits"}</Label>
+                  <Label>{policy === "monthly_reset" ? i18n("orgAdmin.monthlyCredits") : i18n("orgAdmin.weeklyCredits")}</Label>
                   <Input type="number" value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} />
                 </div>
               )}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setOpen(false)}>{i18n("common.cancel")}</Button>
             <Button onClick={() => create.mutate()} disabled={!name || create.isPending}>
               {create.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Create class
+              {i18n("orgAdmin.createClass")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -213,6 +219,7 @@ function CreateClassButton({ orgId }: { orgId: string }) {
 // ─── Class Detail ──────────────────────────────────────────────────────────
 
 function ClassDetail({ classId, onBack }: { classId: string; onBack: () => void }) {
+  const { t: i18n } = useLanguage();
   const qc = useQueryClient();
 
   const detail = useQuery({
@@ -256,40 +263,45 @@ function ClassDetail({ classId, onBack }: { classId: string; onBack: () => void 
   const c = detail.data.class;
   const remaining = detail.data.credit_pool_remaining;
   const pendingCount = detail.data.pending_credit_requests;
+  const creditPolicyLabel =
+    c.credit_policy === "monthly_reset"
+      ? i18n("orgAdmin.creditPolicy.monthlyReset")
+      : c.credit_policy === "weekly_drip"
+        ? i18n("orgAdmin.creditPolicy.weeklyDrip")
+        : i18n("orgAdmin.creditPolicy.manual");
 
   return (
     <div className="min-h-screen bg-background p-6 md:p-10 max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2 mb-2">
-            <ArrowLeft className="h-4 w-4 mr-2" /> All Classes
+            <ArrowLeft className="h-4 w-4 mr-2" /> {i18n("orgAdmin.allClasses")}
           </Button>
           <h1 className="text-3xl font-bold">{c.name}</h1>
           <p className="text-sm text-muted-foreground font-mono">
-            {c.code}{c.term ? ` · Term ${c.term}/${c.year ?? ""}` : ""}
-            {" · "}{c.credit_policy} ({c.credit_amount}/cycle)
+            {c.code}{c.term ? ` · ${i18n("common.term")} ${c.term}/${c.year ?? ""}` : ""}
+            {" · "}{creditPolicyLabel} ({c.credit_amount}/{i18n("orgAdmin.cycle")})
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={refresh}>
-          <RefreshCw className="h-4 w-4 mr-2" /> Refresh
-        </Button>
+          <RefreshCw className="h-4 w-4 mr-2" /> {i18n("common.refresh")}</Button>
       </div>
 
       {/* Pool summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <SummaryCard label="Class pool" value={c.credit_pool} sub="Allocated by super admin" />
-        <SummaryCard label="Consumed" value={c.credit_pool_consumed} sub="By workspace runs" />
-        <SummaryCard label="Remaining" value={remaining} highlight sub="Available to grant" />
-        <SummaryCard label="Members" value={detail.data.active_member_count} icon={<Users className="h-4 w-4" />} />
+        <SummaryCard label={i18n("orgAdmin.classPool")} value={c.credit_pool} sub={i18n("orgAdmin.allocatedBySuperAdmin")} />
+        <SummaryCard label={i18n("orgAdmin.consumed")} value={c.credit_pool_consumed} sub={i18n("orgAdmin.byWorkspaceRuns")} />
+        <SummaryCard label={i18n("orgAdmin.remaining")} value={remaining} highlight sub={i18n("orgAdmin.availableToGrant")} />
+        <SummaryCard label={i18n("common.members")} value={detail.data.active_member_count} icon={<Users className="h-4 w-4" />} />
       </div>
 
       <Tabs defaultValue="members">
         <TabsList>
-          <TabsTrigger value="members">Members</TabsTrigger>
-          <TabsTrigger value="codes">QR Codes</TabsTrigger>
-          <TabsTrigger value="teachers">Teachers</TabsTrigger>
+          <TabsTrigger value="members">{i18n("common.members")}</TabsTrigger>
+          <TabsTrigger value="codes">{i18n("education.common.qrCodes")}</TabsTrigger>
+          <TabsTrigger value="teachers">{i18n("common.teachers")}</TabsTrigger>
           <TabsTrigger value="requests">
-            Requests {pendingCount > 0 && <Badge className="ml-1.5">{pendingCount}</Badge>}
+            {i18n("common.requests")}{pendingCount > 0 && <Badge className="ml-1.5">{pendingCount}</Badge>}
           </TabsTrigger>
         </TabsList>
 
@@ -360,6 +372,7 @@ function MembersPanel({
   spaces: ClassStudentSpace[];
   poolRemaining: number; onChange: () => void;
 }) {
+  const { t: i18n } = useLanguage();
   const [grantTarget, setGrantTarget] = useState<ClassMember | null>(null);
   const spacesByUser = useMemo(() => {
     const map = new Map<string, ClassStudentSpace[]>();
@@ -376,7 +389,7 @@ function MembersPanel({
   }
   if (members.length === 0) {
     return <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">
-      No members yet. Generate a QR code in the next tab and let students scan.
+      {i18n("orgAdmin.noMembersYetGenerateQrCodeInNextTa")}
     </CardContent></Card>;
   }
 
@@ -386,12 +399,12 @@ function MembersPanel({
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-muted-foreground bg-muted/30">
             <tr>
-              <th className="py-2 px-3">Member</th>
-              <th className="py-2 px-3">Student ID</th>
-              <th className="py-2 px-3 text-right">Space balance</th>
-              <th className="py-2 px-3 text-right">Used</th>
-              <th className="py-2 px-3 text-right">Runs (30d)</th>
-              <th className="py-2 px-3">Last active</th>
+              <th className="py-2 px-3">{i18n("common.member")}</th>
+              <th className="py-2 px-3">{i18n("common.studentId")}</th>
+              <th className="py-2 px-3 text-right">{i18n("orgAdmin.spaceBalance")}</th>
+              <th className="py-2 px-3 text-right">{i18n("common.used")}</th>
+              <th className="py-2 px-3 text-right">{i18n("orgAdmin.runs30d")}</th>
+              <th className="py-2 px-3">{i18n("orgAdmin.lastActive")}</th>
               <th></th>
             </tr>
           </thead>
@@ -422,7 +435,7 @@ function MembersPanel({
                 </td>
                 <td className="py-2 px-3 text-right">
                   <Button variant="ghost" size="sm" onClick={() => setGrantTarget(m)}>
-                    <Coins className="h-4 w-4 mr-1" /> Space credits
+                    <Coins className="h-4 w-4 mr-1" /> {i18n("orgAdmin.spaceCredits")}
                   </Button>
                 </td>
               </tr>
@@ -453,6 +466,7 @@ function GrantDialog({
   onClose: () => void;
   onDone: () => void;
 }) {
+  const { t: i18n } = useLanguage();
   const [amount, setAmount] = useState("");
   const [mode, setMode] = useState<"grant" | "revoke">("grant");
   const [reason, setReason] = useState("");
@@ -506,7 +520,7 @@ function GrantDialog({
         <div className="space-y-3">
           {spaces.length > 0 ? (
             <div>
-              <Label>Class space</Label>
+              <Label>{i18n("common.classSpace")}</Label>
               <select
                 value={selectedSpaceId}
                 onChange={(e) => setSelectedSpaceId(e.target.value)}
@@ -514,43 +528,42 @@ function GrantDialog({
               >
                 {spaces.map((space) => (
                   <option key={space.workspace_id} value={space.workspace_id}>
-                    {space.workspace_name ?? space.workspace_id} · {space.credits_balance.toLocaleString()} credits · {space.status}
+                    {space.workspace_name ?? space.workspace_id} · {space.credits_balance.toLocaleString()} {i18n("common.credits")} · {space.status}
                   </option>
                 ))}
               </select>
             </div>
           ) : (
             <p className="rounded-md border border-dashed border-muted-foreground/30 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-              This student has no class space yet. The first grant will create one and lock the credits to that space.
+              {i18n("orgAdmin.noClassSpaceHint")}
             </p>
           )}
           <div className="flex gap-2">
             <Button variant={mode === "grant" ? "default" : "outline"} size="sm" className="flex-1" onClick={() => setMode("grant")}>
-              <Plus className="h-3 w-3 mr-1" /> Grant
+              <Plus className="h-3 w-3 mr-1" /> {i18n("orgAdmin.grant")}
             </Button>
             <Button variant={mode === "revoke" ? "default" : "outline"} size="sm" className="flex-1" onClick={() => setMode("revoke")}>
-              <Minus className="h-3 w-3 mr-1" /> Revoke
+              <Minus className="h-3 w-3 mr-1" /> {i18n("orgAdmin.revoke")}
             </Button>
           </div>
           <div>
-            <Label>Amount</Label>
+            <Label>{i18n("orgAdmin.amount")}</Label>
             <Input type="number" min="1" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="50" />
-            {tooMuch && <p className="text-xs text-destructive mt-1">Class pool only has {poolRemaining.toLocaleString()} credits remaining.</p>}
+            {tooMuch && <p className="text-xs text-destructive mt-1">{i18n("orgAdmin.classPoolOnlyHas")} {poolRemaining.toLocaleString()} {i18n("orgAdmin.creditsRemaining")}</p>}
             {mode === "grant" && !tooMuch && (
-              <p className="text-xs text-muted-foreground mt-1">Pool remaining: {poolRemaining.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground mt-1">{i18n("orgAdmin.poolRemaining")} {poolRemaining.toLocaleString()}</p>
             )}
           </div>
           <div>
-            <Label>Reason (optional)</Label>
-            <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="QR scan reward / make-up class / etc." />
+            <Label>{i18n("common.reasonOptional")}</Label>
+            <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={i18n("orgAdmin.qrScanRewardMakeUpClassEtc")} />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>{i18n("common.cancel")}</Button>
           <Button onClick={() => mut.mutate()} disabled={!amount || tooMuch || mut.isPending}>
             {mut.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Confirm
-          </Button>
+            {i18n("common.confirm")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -564,11 +577,12 @@ function CodesPanel({
 }: {
   classId: string; codes: ClassEnrollmentCode[]; isLoading: boolean; onChange: () => void;
 }) {
+  const { t: i18n } = useLanguage();
   const [createOpen, setCreateOpen] = useState(false);
   const [showQR, setShowQR] = useState<ClassEnrollmentCode | null>(null);
   const revoke = useMutation({
     mutationFn: (id: string) => consumerOrgAdminApi.revokeCode(classId, id),
-    onSuccess: () => { toast.success("Code revoked"); onChange(); },
+    onSuccess: () => {
     onError: (e: any) => toast.error(e?.message ?? "Failed"),
   });
 
@@ -576,20 +590,20 @@ function CodesPanel({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <div>
-          <CardTitle className="flex items-center gap-2"><QrCode className="h-5 w-5" /> Enrolment QR codes</CardTitle>
+          <CardTitle className="flex items-center gap-2"><QrCode className="h-5 w-5" /> {i18n("orgAdmin.enrolmentQrCodes")}</CardTitle>
           <CardDescription>
-            Generate a code, project the QR for students to scan. Each student can scan one code per class only once.
+            {i18n("orgAdmin.codesDescription")}
           </CardDescription>
         </div>
-        <Button size="sm" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-2" /> Create QR</Button>
+        <Button size="sm" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-2" /> {i18n("orgAdmin.createQr")}</Button>
       </CardHeader>
       <CardContent>
         {isLoading ? <div className="py-8 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>
-        : codes.length === 0 ? <p className="text-sm text-muted-foreground text-center py-6">No active codes.</p>
+        : codes.length === 0 ? <p className="text-sm text-muted-foreground text-center py-6">{i18n("orgAdmin.noActiveCodes")}</p>
         : (
           <table className="w-full text-sm">
             <thead className="text-left text-xs text-muted-foreground border-b">
-              <tr><th className="py-2">Code</th><th>Uses</th><th>Expires</th><th>Description</th><th></th></tr>
+              <tr><th className="py-2">{i18n("common.code")}</th><th>{i18n("common.uses")}</th><th>{i18n("common.expires")}</th><th>{i18n("common.description")}</th><th></th></tr>
             </thead>
             <tbody>
               {codes.map((c) => (
@@ -625,6 +639,7 @@ function CodesPanel({
 function CreateCodeDialog({
   open, classId, onOpenChange, onCreated,
 }: { open: boolean; classId: string; onOpenChange: (b: boolean) => void; onCreated: (c: ClassEnrollmentCode) => void }) {
+  const { t: i18n } = useLanguage();
   const [maxUses, setMaxUses] = useState("");
   const [creditAmount, setCreditAmount] = useState("250");
   const [expiresMinutes, setExpiresMinutes] = useState<string>("");
@@ -650,45 +665,44 @@ function CreateCodeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create enrolment QR</DialogTitle>
+          <DialogTitle>{i18n("orgAdmin.createEnrolmentQr")}</DialogTitle>
           <DialogDescription>
-            Students scan this to join the class. They'll receive starting credits per the class's policy.
+            {i18n("orgAdmin.createCodeDescription")}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <Label>Credits per student space</Label>
+            <Label>{i18n("education.common.creditsPerStudentSpace")}</Label>
             <Input type="number" min="0" value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} placeholder="250" />
           </div>
           <div>
-            <Label>Max enrolments <span className="text-muted-foreground">(blank = unlimited up to class capacity)</span></Label>
-            <Input type="number" min="1" value={maxUses} onChange={(e) => setMaxUses(e.target.value)} placeholder="e.g. 42" />
+            <Label>{i18n("orgAdmin.maxEnrolments")} <span className="text-muted-foreground">{i18n("orgAdmin.blankUnlimitedUpToClassCapacity")}</span></Label>
+            <Input type="number" min="1" value={maxUses} onChange={(e) => setMaxUses(e.target.value)} placeholder={i18n("orgAdmin.eG42")} />
           </div>
           <div>
-            <Label>Expires after (minutes) <span className="text-muted-foreground">(blank = never)</span></Label>
+            <Label>{i18n("orgAdmin.expiresAfterMinutes")} <span className="text-muted-foreground">{i18n("orgAdmin.blankNever")}</span></Label>
             <select
               value={expiresMinutes}
               onChange={(e) => setExpiresMinutes(e.target.value)}
               className="w-full h-10 px-3 rounded-md border border-input bg-background"
             >
-              <option value="">No expiry</option>
-              <option value="5">5 minutes</option>
-              <option value="15">15 minutes</option>
-              <option value="30">30 minutes</option>
-              <option value="60">1 hour</option>
-              <option value="1440">1 day</option>
+              <option value="">{i18n("education.common.noExpiry")}</option>
+              <option value="5">{i18n("education.duration.fiveMinutes")}</option>
+              <option value="15">{i18n("education.duration.fifteenMinutes")}</option>
+              <option value="30">{i18n("education.duration.thirtyMinutes")}</option>
+              <option value="60">{i18n("education.duration.oneHour")}</option>
+              <option value="1440">{i18n("education.duration.oneDay")}</option>
             </select>
           </div>
           <div>
-            <Label>Description (optional)</Label>
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Week 1 enrolment" />
+            <Label>{i18n("common.descriptionOptional")}</Label>
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder={i18n("orgAdmin.week1Enrolment")} />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>{i18n("common.cancel")}</Button>
           <Button onClick={() => create.mutate()} disabled={create.isPending}>
-            {create.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Generate
-          </Button>
+            {create.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} {i18n("common.generate")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -696,15 +710,16 @@ function CreateCodeDialog({
 }
 
 function QRDialog({ code, onClose }: { code: ClassEnrollmentCode | null; onClose: () => void }) {
+  const { t: i18n } = useLanguage();
   if (!code) return null;
   const url = `${window.location.origin}/enroll-class/${code.code}`;
-  const copy = () => { navigator.clipboard.writeText(url); toast.success("Link copied"); };
+  const copy = () => {
 
   return (
     <Dialog open={!!code} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Project this QR for students</DialogTitle>
+          <DialogTitle>{i18n("education.common.projectThisQrForStudents")}</DialogTitle>
           <DialogDescription>
             <span className="font-mono">{code.code}</span>
             {code.max_uses ? ` · ${code.max_uses - code.uses_count} of ${code.max_uses} left` : " · unlimited"}
@@ -717,7 +732,7 @@ function QRDialog({ code, onClose }: { code: ClassEnrollmentCode | null; onClose
             <QRCodeSVG value={url} size={240} level="M" />
           </div>
           <p className="text-xs text-muted-foreground break-all text-center">{url}</p>
-          <Button variant="outline" size="sm" onClick={copy}><Copy className="h-4 w-4 mr-2" /> Copy link</Button>
+          <Button variant="outline" size="sm" onClick={copy}><Copy className="h-4 w-4 mr-2" /> {i18n("education.common.copyLink")}</Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -734,6 +749,7 @@ function TeachersPanel({
   teachers: Array<{ user_id: string; role: "primary" | "co" }>;
   onChange: () => void;
 }) {
+  const { t: i18n } = useLanguage();
   const [email, setEmail] = useState("");
 
   const add = useMutation({
@@ -748,7 +764,7 @@ function TeachersPanel({
 
   const remove = useMutation({
     mutationFn: (userId: string) => consumerOrgAdminApi.removeTeacher(classId, userId),
-    onSuccess: () => { toast.success("Teacher removed"); onChange(); },
+    onSuccess: () => {
     onError: (e: any) => toast.error(e?.message ?? "Failed"),
   });
 
@@ -764,9 +780,9 @@ function TeachersPanel({
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Add co-teacher</CardTitle>
+          <CardTitle>{i18n("orgAdmin.addCoTeacher")}</CardTitle>
           <CardDescription>
-            They must already have signed up. After adding, they'll see this class in their "My Classes" panel.
+            {i18n("orgAdmin.addTeacherDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -775,30 +791,29 @@ function TeachersPanel({
             className="flex items-end gap-2"
           >
             <div className="flex-1">
-              <Label htmlFor="teacher-email">Teacher's email</Label>
+              <Label htmlFor="teacher-email">{i18n("orgAdmin.teacherSEmail")}</Label>
               <Input
                 id="teacher-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="instructor@silpakorn.edu"
+                placeholder={i18n("orgAdmin.instructorSilpakornEdu")}
               />
             </div>
             <Button type="submit" disabled={!email || add.isPending}>
               {add.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
-              Add
-            </Button>
+              {i18n("common.add")}</Button>
           </form>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Teaching this class</CardTitle>
+          <CardTitle>{i18n("orgAdmin.teachingThisClass")}</CardTitle>
         </CardHeader>
         <CardContent>
           {all.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">No teachers assigned.</p>
+            <p className="text-sm text-muted-foreground text-center py-6">{i18n("orgAdmin.noTeachersAssigned")}</p>
           ) : (
             <ul className="divide-y">
               {all.map((t) => (
@@ -809,7 +824,7 @@ function TeachersPanel({
                       {t.role}
                     </Badge>
                     {t.from_class_row && (
-                      <Badge variant="outline" className="ml-1.5 text-xs">primary instructor</Badge>
+                      <Badge variant="outline" className="ml-1.5 text-xs">{i18n("orgAdmin.primaryInstructor")}</Badge>
                     )}
                   </div>
                   {!t.from_class_row && (
@@ -834,6 +849,7 @@ function RequestsPanel({
 }: {
   classId: string; requests: any[]; isLoading: boolean; onChange: () => void;
 }) {
+  const { t: i18n } = useLanguage();
   const review = useMutation({
     mutationFn: ({ id, approve, amount }: { id: string; approve: boolean; amount?: number }) =>
       consumerOrgAdminApi.reviewCreditRequest(id, approve, { amount_granted: amount }),
@@ -844,19 +860,19 @@ function RequestsPanel({
   if (isLoading) return <div className="py-8 flex justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   if (requests.length === 0) {
     return <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">
-      No credit requests yet.
+      {i18n("orgAdmin.noCreditRequestsYet")}
     </CardContent></Card>;
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><ClipboardList className="h-5 w-5" /> Credit requests</CardTitle>
+        <CardTitle className="flex items-center gap-2"><ClipboardList className="h-5 w-5" /> {i18n("orgAdmin.creditRequests")}</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-muted-foreground bg-muted/30">
-            <tr><th className="py-2 px-3">Student</th><th>Amount</th><th>Reason</th><th>Status</th><th>When</th><th></th></tr>
+            <tr><th className="py-2 px-3">{i18n("common.student")}</th><th>{i18n("common.amount")}</th><th>{i18n("common.reason")}</th><th>{i18n("common.status")}</th><th>{i18n("common.when")}</th><th></th></tr>
           </thead>
           <tbody>
             {requests.map((r) => (
@@ -876,11 +892,9 @@ function RequestsPanel({
                   {r.status === "pending" && (
                     <div className="flex gap-1 justify-end">
                       <Button size="sm" variant="default" onClick={() => review.mutate({ id: r.id, approve: true })}>
-                        Approve
-                      </Button>
+                        {i18n("common.approve")}</Button>
                       <Button size="sm" variant="outline" onClick={() => review.mutate({ id: r.id, approve: false })}>
-                        Deny
-                      </Button>
+                        {i18n("common.deny")}</Button>
                     </div>
                   )}
                 </td>

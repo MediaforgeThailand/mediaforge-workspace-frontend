@@ -1560,7 +1560,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         // `function consume_credits_for(…) does not exist`,
         // OpenAI 401 …) to friendly Thai/EN copy. Raw error
         // stays in console.error for the team.
-        toast.error(friendlyError(errorMessage, language === "th" ? "th" : "en"));
+        toast.error(friendlyError(errorMessage, language === "th" || language === "ja" ? language : "en"));
       }
     }
   }, [getNodes, id, isRunning, isViewer, params, schemaKey, setNodes, selectedModel, schema, d.params?.nodeName, language]);

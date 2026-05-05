@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useFreshSignedUrl } from "./useFreshSignedUrl";
 
@@ -135,6 +136,7 @@ const onAssetDragStart = (e: React.DragEvent, a: PanelAsset) => {
 const EMPTY_NODES: ReadonlyArray<{ id: string; data: unknown; type?: string }> = [];
 
 const WorkspaceAssetPanel = () => {
+  const { t: i18n } = useLanguage();
   // Walk EVERY canvas's graph — assets from other tabs surface here
   // automatically, without the user having to re-open them.
   const allGraphs = useWorkspaceStore((s) => s.graphs);
@@ -358,7 +360,7 @@ const WorkspaceAssetPanel = () => {
       <div className="flex items-center gap-2 px-4 pt-3 pb-2">
         <Layers className="h-4 w-4 text-zinc-400" />
         <span className="text-[13px] font-semibold tracking-tight text-zinc-100">
-          Assets
+          {i18n("common.assets")}
         </span>
         <span className="ml-auto font-mono text-[10.5px] text-zinc-500">
           {filtered.length}/{counts.all}
@@ -369,7 +371,7 @@ const WorkspaceAssetPanel = () => {
             window.dispatchEvent(new CustomEvent("workspace-open-all-assets"))
           }
           className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100"
-          title="Browse all assets"
+          title={i18n("workspace.assetPanel.browseAllAssets")}
         >
           <Maximize2 className="h-3.5 w-3.5" />
         </button>
@@ -383,21 +385,21 @@ const WorkspaceAssetPanel = () => {
           active={sourceFilters.has("generated")}
           onClick={() => toggleSource("generated")}
           icon={Sparkles}
-          label="Generated"
+          label={i18n("workspace.assetPanel.generated")}
           count={counts.generated}
         />
         <FilterPill
           active={sourceFilters.has("uploaded")}
           onClick={() => toggleSource("uploaded")}
           icon={Upload}
-          label="Uploaded"
+          label={i18n("workspace.assetPanel.uploaded")}
           count={counts.uploaded}
         />
         <FilterPill
           active={sourceFilters.has("element")}
           onClick={() => toggleSource("element")}
           icon={Users}
-          label="Elements"
+          label={i18n("workspace.assetPanel.elements")}
           count={counts.element}
         />
       </div>
@@ -408,21 +410,21 @@ const WorkspaceAssetPanel = () => {
           active={typeFilters.has("image")}
           onClick={() => toggleType("image")}
           icon={ImageIcon}
-          label="Image"
+          label={i18n("common.image")}
           count={counts.image}
         />
         <FilterPill
           active={typeFilters.has("video")}
           onClick={() => toggleType("video")}
           icon={Film}
-          label="Video"
+          label={i18n("common.video")}
           count={counts.video}
         />
         <FilterPill
           active={typeFilters.has("audio")}
           onClick={() => toggleType("audio")}
           icon={Music}
-          label="Audio"
+          label={i18n("common.audio")}
           count={counts.audio}
         />
         <FilterPill
@@ -443,8 +445,8 @@ const WorkspaceAssetPanel = () => {
         {filtered.length === 0 ? (
           <div className="flex h-full items-center justify-center px-6 text-center text-[12px] italic text-zinc-500">
             {assets.length === 0
-              ? "No assets yet — drop a file or run a tool."
-              : "Nothing matches the current filter."}
+              ? i18n("workspace.assetPanel.noAssetsYetDropFileOr")
+              : i18n("workspace.assetPanel.nothingMatchesCurrentFilter")}
           </div>
         ) : (
           <ul className="grid grid-cols-2 gap-2.5">
@@ -480,7 +482,7 @@ const WorkspaceAssetPanel = () => {
       {/* Footer hint — dim, mono. Same styling as the context menu's
        *  footer row so users feel they're in a consistent system. */}
       <div className="px-4 py-2.5 text-[11px] text-zinc-500">
-        Drag a tile to the canvas to re-use it.
+        {i18n("workspace.assetPanel.dragTileToCanvasTo")}
       </div>
 
       {/* AllAssetsDialog and the hidden upload-trigger input are mounted
@@ -668,7 +670,7 @@ const AssetTile = ({
             }}
             onMouseDown={(e) => e.stopPropagation()}
             className="absolute right-1.5 top-1.5 rounded-md bg-black/60 p-1 text-zinc-300 opacity-0 backdrop-blur transition-opacity hover:text-red-400 group-hover:opacity-100"
-            title="Delete this saved element"
+            title={i18n("workspace.assetPanel.deleteThisSavedElement")}
           >
             <Trash2 className="h-3 w-3" />
           </button>

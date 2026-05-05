@@ -9,6 +9,7 @@ import { Coins } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCredits } from "@/hooks/useCredits";
 import { useActiveClass } from "@/hooks/useIsOrgUser";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Props {
   variant?: "pill" | "card";
@@ -17,11 +18,12 @@ interface Props {
 }
 
 export default function OrgCreditBadge({ variant = "pill", className, workspaceId = null }: Props) {
+  const { t: i18n } = useLanguage();
   const { credits } = useCredits(workspaceId);
   const active = useActiveClass();
   if (!active && credits?.credit_scope !== "education_space") return null;
 
-  const label = "Credits";
+  const label = i18n("common.credits2");
   const value = Number(credits?.credit_scope === "education_space" ? credits.balance : active?.credits_balance ?? 0).toLocaleString();
   const lifetimeUsed = Number(credits?.credit_scope === "education_space" ? credits.total_used : active?.credits_lifetime_used ?? 0);
   const lifetimeReceived = Number(credits?.credit_scope === "education_space" ? credits.total_purchased : active?.credits_lifetime_received ?? 0);
@@ -46,7 +48,7 @@ export default function OrgCreditBadge({ variant = "pill", className, workspaceI
         </div>
         {lifetimeReceived > 0 && (
           <div className="text-xs text-amber-200/50 mt-1">
-            received {lifetimeReceived.toLocaleString()} · used {lifetimeUsed.toLocaleString()}
+            {i18n("common.received")} {lifetimeReceived.toLocaleString()} · {i18n("common.usedLower")} {lifetimeUsed.toLocaleString()}
           </div>
         )}
       </div>
@@ -59,7 +61,7 @@ export default function OrgCreditBadge({ variant = "pill", className, workspaceI
         "inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs",
         className,
       )}
-      title={`${scopeName ?? "Class space"} · received ${lifetimeReceived.toLocaleString()} · used ${lifetimeUsed.toLocaleString()}`}
+      title={`${scopeName ?? i18n("common.classSpace")} · ${i18n("common.received")} ${lifetimeReceived.toLocaleString()} · ${i18n("common.usedLower")} ${lifetimeUsed.toLocaleString()}`}
     >
       <Coins className="h-3 w-3 text-amber-300" />
       <span className="text-amber-200/80">{label}</span>

@@ -28,7 +28,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { getLanguageLocale, useLanguage, type Language } from "@/contexts/LanguageContext";
 import { friendlyError, functionErrorMessage } from "@/lib/friendlyError";
 import { UserMenu } from "@/components/workspace/UserMenu";
 import {
@@ -521,7 +521,7 @@ function standaloneToolNav(tool: StandaloneToolKey, t: TranslationFn) {
 
 function standaloneCreateActionTitle(
   tool: StandaloneToolKey,
-  language: "en" | "th",
+  language: Language,
 ) {
   const labels: Record<StandaloneToolKey, { en: string; th: string }> = {
     image_gen: { en: "Create Image", th: "สร้างรูปภาพ" },
@@ -529,12 +529,12 @@ function standaloneCreateActionTitle(
     voice_gen: { en: "Create Audio", th: "สร้างเสียง" },
     image_to_3d: { en: "Create 3D", th: "สร้าง 3D" },
   };
-  return labels[tool][language];
+  return labels[tool][language === "th" ? "th" : "en"];
 }
 
 function standaloneCreateButtonLabel(
   tool: StandaloneToolKey,
-  language: "en" | "th",
+  language: Language,
   estimatedCost?: number | null,
 ) {
   if (
@@ -696,9 +696,9 @@ const STANDALONE_INLINE_LABELS: Record<
 
 function standaloneInlineLabel(
   key: StandaloneInlineLabelKey,
-  language: "en" | "th",
+  language: Language,
 ) {
-  return STANDALONE_INLINE_LABELS[key][language];
+  return STANDALONE_INLINE_LABELS[key][language === "th" ? "th" : "en"];
 }
 
 function standaloneStatusLabel(status: StandaloneJobRow["status"], t: TranslationFn) {
@@ -4578,14 +4578,14 @@ function CreationTile({
   const contextMenuItems: MediaContextMenuItem[] = [
     {
       key: "preview",
-      label: "Preview",
+      label: t("workspace.mediaMenu.preview"),
       icon: Eye,
       disabled: !canOpenPreview,
       onSelect: openMediaPreview,
     },
     {
       key: "download",
-      label: "Download",
+      label: t("workspace.mediaMenu.download"),
       icon: Download,
       disabled: !downloadUrl,
       onSelect: () => {
@@ -4594,14 +4594,14 @@ function CreationTile({
     },
     {
       key: "duplicate",
-      label: "Duplicate",
+      label: t("workspace.mediaMenu.duplicate"),
       icon: Copy,
       disabled: true,
       onSelect: () => undefined,
     },
     {
       key: "move-board",
-      label: "Move to Board",
+      label: t("workspace.mediaMenu.moveToBoard"),
       icon: FolderOpen,
       separatorBefore: true,
       disabled: true,
@@ -4609,14 +4609,14 @@ function CreationTile({
     },
     {
       key: "copy-board",
-      label: "Copy to Board",
+      label: t("workspace.mediaMenu.copyToBoard"),
       icon: Copy,
       disabled: true,
       onSelect: () => undefined,
     },
     {
       key: "delete",
-      label: "Delete",
+      label: t("workspace.mediaMenu.delete"),
       icon: Trash2,
       separatorBefore: true,
       danger: true,
@@ -5581,7 +5581,7 @@ function compactRangeLabel(values: string[]): string | null {
   return `${firstPrefix}-${last}`;
 }
 
-function videoModelSettingTags(model: string, language: "en" | "th"): Array<{
+function videoModelSettingTags(model: string, language: Language): Array<{
   label: string;
   icon?: "reference" | "frames" | "audio" | "resolution" | "duration" | "multi";
 }> {
@@ -5651,7 +5651,7 @@ function buildVideoPanelSettings({
   resolutionOptions: string[];
   durationOptions: string[];
   onChange: (patch: Partial<StandaloneFormState>) => void;
-  language: "en" | "th";
+  language: Language;
 }) {
   const settings: Array<{
     id: string;
@@ -5815,7 +5815,7 @@ function buildImagePanelSettings({
   resolutionOptions: string[];
   onChange: (patch: Partial<StandaloneFormState>) => void;
   t: TranslationFn;
-  language: "en" | "th";
+  language: Language;
 }): CreateVideoPanelSetting[] {
   const isGpt = form.model === "gpt-image-2";
   const isSeedream = isSeedreamImageModel(form.model);
@@ -5911,7 +5911,7 @@ function buildThreeDPanelSettings({
   form: StandaloneFormState;
   onChange: (patch: Partial<StandaloneFormState>) => void;
   t: TranslationFn;
-  language: "en" | "th";
+  language: Language;
 }): CreateVideoPanelSetting[] {
   return [
     {
@@ -5937,7 +5937,7 @@ function buildThreeDPanelSettings({
   ];
 }
 
-function imageModelSettingTags(model: string, language: "en" | "th"): Array<{
+function imageModelSettingTags(model: string, language: Language): Array<{
   label: string;
   icon?: "reference" | "resolution";
 }> {
@@ -5961,7 +5961,7 @@ function imageModelSettingTags(model: string, language: "en" | "th"): Array<{
   ];
 }
 
-function threeDModelSettingTags(model: string, language: "en" | "th"): Array<{
+function threeDModelSettingTags(model: string, language: Language): Array<{
   label: string;
   icon?: "reference" | "resolution";
 }> {
@@ -5974,7 +5974,7 @@ function threeDModelSettingTags(model: string, language: "en" | "th"): Array<{
   ];
 }
 
-function audioModelSettingTags(model: string, language: "en" | "th"): Array<{
+function audioModelSettingTags(model: string, language: Language): Array<{
   label: string;
   icon?: "audio" | "multi";
 }> {
@@ -6003,7 +6003,7 @@ function formatDate(
 ): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString(language === "th" ? "th-TH" : "en-US", {
+  return date.toLocaleString(getLanguageLocale(language), {
     month: "short",
     day: "numeric",
     hour: "2-digit",

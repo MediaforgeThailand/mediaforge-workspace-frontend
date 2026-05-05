@@ -506,7 +506,7 @@ function isStandaloneSection(section: SectionKey): section is StandaloneToolKey 
 const STALE_BODY_CLASSES = ["ws-lightbox-open", "ws-resizing"];
 
 const WorkspaceDashboardInner = () => {
-  const { t } = useLanguage();
+  const { t, t: i18n } = useLanguage();
   useDocumentTitle("Workspace — MediaForge");
   // Force-clear any canvas-only body classes that might have leaked
   // from the previous route. Runs once on mount — the cleanup return
@@ -692,7 +692,7 @@ const WorkspaceDashboardInner = () => {
 
   const handleCreateProject = () => {
     if (educationLockedStudent) {
-      toast.error("Class students can only use spaces created from a class QR or link.");
+      toast.error(i18n("workspace.education.studentLockedToast"));
       setSection("spaces");
       return;
     }
@@ -1209,7 +1209,7 @@ const HomeView = ({
   educationLockedStudent?: boolean;
 }) => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, t: i18n } = useLanguage();
   const { user, loading: authLoading } = useAuth();
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const canvases = useWorkspaceStore((s) => s.canvases);
@@ -1355,7 +1355,7 @@ const HomeView = ({
 
   const handleNew = () => {
     if (educationLockedStudent) {
-      toast.error("Scan a class QR or link to create a class space.");
+      toast.error(i18n("workspace.home.scanClassQrOrLinkTo"));
       onSection("spaces");
       return;
     }
@@ -1516,22 +1516,22 @@ const EducationLockedToolView = ({
   onOpenSidebar?: () => void;
 }) => (
   <>
-    <PageHeader title="Class workspace" rightSlot={<UserMenu />} onOpenSidebar={onOpenSidebar} />
+    <PageHeader title={i18n("workspace.home.classWorkspace")} rightSlot={<UserMenu />} onOpenSidebar={onOpenSidebar} />
     <div className="flex flex-1 items-center justify-center px-5 py-10">
       <div className="w-full max-w-[520px] rounded-2xl border border-white/[0.08] bg-[hsl(0_0%_7%)] p-6 text-center">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300">
           <Lock className="h-6 w-6" />
         </div>
-        <h2 className="mt-4 text-xl font-semibold text-zinc-50">Class spaces only</h2>
+        <h2 className="mt-4 text-xl font-semibold text-zinc-50">{i18n("workspace.home.classSpacesOnly")}</h2>
         <p className="mt-2 text-sm leading-6 text-zinc-400">
-          Student accounts on a university domain can generate only inside spaces created by a class QR or link.
+          {i18n("workspace.education.studentLockedDescription")}
         </p>
         <button
           type="button"
           onClick={onOpenSpaces}
           className="mt-5 inline-flex h-9 items-center justify-center rounded-lg bg-emerald-500 px-4 text-sm font-semibold text-white transition hover:bg-emerald-400"
         >
-          Open class spaces
+          {i18n("workspace.home.openClassSpaces")}
         </button>
       </div>
     </div>
@@ -1557,13 +1557,13 @@ const EducationClassDashboard = ({
         <div className="min-w-0">
           <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-[13.5px] font-semibold text-emerald-100">
             <GraduationCap className="h-3.5 w-3.5" />
-            Education workspace
+            {i18n("workspace.home.educationWorkspace")}
           </div>
           <h2 className="truncate text-2xl font-semibold tracking-normal text-white">
             {active.class_name}
           </h2>
           <p className="mt-1 text-sm text-emerald-50/70">
-            {active.class_code} · {classes.length} active class{classes.length === 1 ? "" : "es"} · student wallet
+            {active.class_code} · {classes.length} {i18n(classes.length === 1 ? "workspace.class.active_class" : "workspace.class.active_classes")} · {i18n("workspace.home.studentWallet")}
           </p>
         </div>
 
@@ -1574,7 +1574,7 @@ const EducationClassDashboard = ({
             onClick={onOpenSpaces}
             className="inline-flex h-9 items-center gap-2 rounded-lg bg-white px-3 text-sm font-semibold text-zinc-950 transition-colors hover:bg-emerald-50"
           >
-            Open class spaces
+            {i18n("workspace.home.openClassSpaces")}
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
@@ -1584,23 +1584,23 @@ const EducationClassDashboard = ({
         <div className="rounded-xl bg-white/[0.06] p-3">
           <div className="flex items-center gap-2 text-xs uppercase tracking-[0.14em] text-emerald-100/70">
             <WalletCards className="h-3.5 w-3.5" />
-            Balance
+            {i18n("common.balance")}
           </div>
           <p className="mt-2 text-2xl font-semibold text-white">
             {active.credits_balance.toLocaleString()}
           </p>
-          <p className="mt-1 text-xs text-emerald-50/55">credits available for this class</p>
+          <p className="mt-1 text-xs text-emerald-50/55">{i18n("workspace.home.creditsAvailableForThisClass")}</p>
         </div>
         <div className="rounded-xl bg-white/[0.06] p-3">
-          <div className="text-xs uppercase tracking-[0.14em] text-emerald-100/70">Received</div>
+          <div className="text-xs uppercase tracking-[0.14em] text-emerald-100/70">{i18n("common.received")}</div>
           <p className="mt-2 text-2xl font-semibold text-white">
             {active.credits_lifetime_received.toLocaleString()}
           </p>
-          <p className="mt-1 text-xs text-emerald-50/55">teacher and class grants</p>
+          <p className="mt-1 text-xs text-emerald-50/55">{i18n("workspace.home.teacherAndClassGrants")}</p>
         </div>
         <div className="rounded-xl bg-white/[0.06] p-3">
           <div className="mb-2 flex justify-between text-xs uppercase tracking-[0.14em] text-emerald-100/70">
-            <span>Used</span>
+            <span>{i18n("common.used")}</span>
             <span>{pctUsed}%</span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-white/10">
@@ -1636,7 +1636,7 @@ const ProjectsCard = ({
   onCreate: () => void;
   onDelete: (id: string) => void;
 }) => {
-  const { t } = useLanguage();
+  const { t, t: i18n } = useLanguage();
   /* Type-to-confirm dialog state. We model the in-flight delete as
    * an optional pointer to the candidate project; the input field
    * lives alongside in `confirmText`. Both reset on close. The old
@@ -1805,7 +1805,7 @@ const ProjectsCard = ({
               <br />
               {t("workspace.home.delete_dialog_type")}
               <span className="rounded bg-red-500/15 px-1.5 py-0.5 font-mono text-[13.5px] font-semibold text-red-300 ring-1 ring-inset ring-red-500/30">
-                ยืนยัน
+                {i18n("workspace.home.confirm")}
               </span>
               {t("workspace.home.delete_dialog_to_confirm")}
             </DialogDescription>
@@ -1994,7 +1994,7 @@ const ProjectQuickSwitch = ({
               <span className="max-w-[150px] truncate">{project.name}</span>
               {teamProject && (
                 <span className="rounded bg-sky-400/15 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-sky-200">
-                  Team
+                  {t("common.team")}
                 </span>
               )}
               <span className="rounded bg-white/[0.06] px-1.5 py-px text-[10px] font-bold text-zinc-400">
@@ -2018,7 +2018,7 @@ const SpacesShowcaseCard = ({
   onNew?: () => void;
   onSeeAll: () => void;
 }) => {
-  const { t } = useLanguage();
+  const { t, t: i18n } = useLanguage();
   return (
     <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-3">
       <div className="mb-2.5 flex items-center justify-between">
@@ -2053,7 +2053,7 @@ const SpacesShowcaseCard = ({
           </button>
         ) : (
           <div className="flex min-h-[86px] w-full items-center justify-center rounded-xl bg-white/[0.02] px-4 text-center text-[13px] text-zinc-500">
-            Scan a class QR or open your class link to create a space.
+            {i18n("workspace.home.scanClassQrOrOpenYour")}
           </div>
         )
       ) : (
@@ -2095,7 +2095,7 @@ const ToolsCard = ({
   tools: HomeTool[];
   onOpen: (tool: StandaloneToolKey) => void;
 }) => {
-  const { t } = useLanguage();
+  const { t, t: i18n } = useLanguage();
   return (
     <div className="min-w-0 rounded-2xl bg-[hsl(0_0%_7%)] p-3">
       <div className="mb-2.5 flex items-center justify-between">
@@ -2323,7 +2323,7 @@ const ProjectsManagerView = ({
   educationLockedStudent?: boolean;
 }) => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, t: i18n } = useLanguage();
   const { user, loading: authLoading } = useAuth();
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const canvases = useWorkspaceStore((s) => s.canvases);
@@ -2502,7 +2502,7 @@ const ProjectsManagerView = ({
   return (
     <>
       <PageHeader
-        title="Projects"
+        title={t("workspace.home.projects")}
         rightSlot={<UserMenu />}
         onOpenSidebar={onOpenSidebar}
       />
@@ -2514,7 +2514,7 @@ const ProjectsManagerView = ({
           <aside className="min-w-0 self-start rounded-md bg-[hsl(0_0%_8.5%)] p-1.5">
             <div className="mb-1 flex items-center justify-between px-1.5">
               <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-500">
-                Projects
+                {t("workspace.home.projects")}
               </div>
               <button
                 type="button"
@@ -2557,7 +2557,7 @@ const ProjectsManagerView = ({
                       </span>
                       {teamProject && (
                         <span className="rounded bg-sky-400/15 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-sky-200">
-                          Team
+                          {t("common.team")}
                         </span>
                       )}
                     </button>
@@ -2687,7 +2687,7 @@ const SpacesView = ({
   educationLockedStudent?: boolean;
 }) => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, t: i18n } = useLanguage();
   const { user, loading: authLoading } = useAuth();
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const canvases = useWorkspaceStore((s) => s.canvases);
@@ -2766,7 +2766,7 @@ const SpacesView = ({
 
   const handleNew = () => {
     if (educationLockedStudent) {
-      toast.error("Scan a class QR or open a class link to create a student class space.");
+      toast.error(i18n("workspace.home.scanClassQrOrOpen"));
       return;
     }
     const { workspaceId } = createWorkspace(t("workspace.spaces.untitled_space"), activeProjectId);
@@ -3059,7 +3059,7 @@ const SpacesTabs = ({
   tab: "mine" | "shared" | "templates";
   onChange: (t: "mine" | "shared" | "templates") => void;
 }) => {
-  const { t } = useLanguage();
+  const { t, t: i18n } = useLanguage();
   const items: { key: "mine" | "shared" | "templates"; label: string; icon: LucideIcon }[] = [
     { key: "mine", label: t("workspace.spaces.tab_my"), icon: UserCircle2 },
     { key: "shared", label: t("workspace.spaces.tab_shared"), icon: Users },
@@ -3111,7 +3111,7 @@ const SpacesIconBtn = ({
 );
 
 const SpaceToolbar = ({ onNew }: { onNew: () => void }) => {
-  const { t } = useLanguage();
+  const { t, t: i18n } = useLanguage();
   return (
     <div className="flex items-center gap-2">
       <button
@@ -3210,7 +3210,7 @@ const SpaceCard = memo(function SpaceCard({
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
-  const { t } = useLanguage();
+  const { t, t: i18n } = useLanguage();
   const cardRef = useRef<HTMLLIElement | null>(null);
   const [renderPreview, setRenderPreview] = useState(false);
   const canDuplicate = canManage && !ws.classId;
@@ -3258,7 +3258,7 @@ const SpaceCard = memo(function SpaceCard({
             {!canManage && (
               <span className="inline-flex shrink-0 items-center gap-1 rounded bg-white/[0.08] px-1.5 py-0.5 text-[10px] font-medium text-zinc-300">
                 <Users className="h-3 w-3" />
-                Team
+                {t("common.team")}
               </span>
             )}
             {ws.educationStatus && ws.educationStatus !== "active" && (
@@ -3329,7 +3329,7 @@ const PageHeader = ({
    *  modals / nested screens) keep a plain header. */
   onOpenSidebar?: () => void;
 }) => {
-  const { t } = useLanguage();
+  const { t, t: i18n } = useLanguage();
   return (
   /* 2026-05: drop the bottom hairline. Header sits flush on Layer-0
    *  page bg; the content cards underneath are Layer-1/2 so the
@@ -3441,7 +3441,7 @@ const Placeholder = ({
   section: Section;
   onOpenSidebar?: () => void;
 }) => {
-  const { t } = useLanguage();
+  const { t, t: i18n } = useLanguage();
   // Section title resolver — returns a localised label for the page
   // header. Tool sections still pull from STANDALONE_TOOLS (these
   // carry their own brand-stable names like "Image Generator").

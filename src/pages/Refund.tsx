@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import logo from "@/assets/logo-white.png";
+import { LegalFallbackNotice } from "@/components/legal/LegalFallbackNotice";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 const Refund = () => {
@@ -29,6 +30,7 @@ const Refund = () => {
         </p>
 
         <div className="prose prose-invert mt-8 max-w-none text-muted-foreground prose-headings:text-foreground prose-h2:text-xl prose-h2:mt-8 prose-h2:mb-3 prose-p:leading-relaxed prose-li:leading-relaxed prose-strong:text-foreground">
+          <LegalFallbackNotice language={language} />
           {language === "th" ? <ThaiRefund /> : <EnglishRefund />}
         </div>
       </main>

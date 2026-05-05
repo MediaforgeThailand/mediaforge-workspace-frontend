@@ -52,7 +52,7 @@ const QuickTopUpModal = ({
   packages,
   currentBalance = 0,
 }: QuickTopUpModalProps) => {
-  const { language } = useLanguage();
+  const { t: i18n } = useLanguage();
   const { refetch } = useCredits();
 
   const [step, setStep] = useState<ModalStep>("select");
@@ -95,9 +95,7 @@ const QuickTopUpModal = ({
       if (remaining <= 0) {
         cleanup();
         setStep("error");
-        setErrorMsg(
-          language === "th" ? "QR Code หมดอายุ" : "QR Code expired"
-        );
+        setErrorMsg(i18n("quickTopup.qrExpired"));
       }
     };
     updateTimer();
@@ -105,7 +103,7 @@ const QuickTopUpModal = ({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [step, qrData, language, cleanup]);
+  }, [step, qrData, i18n, cleanup]);
 
   const handleSelectPackage = async (pkg: TopupPackage) => {
     setLoading(pkg.id);
@@ -186,14 +184,12 @@ const QuickTopUpModal = ({
               <DialogHeader className="space-y-1">
                 <DialogTitle className="text-base font-semibold text-foreground flex items-center gap-2">
                   <QrCode className="w-4 h-4 text-emerald-400" />
-                  {language === "th"
-                    ? "เติมเครดิตด่วน — PromptPay"
-                    : "Quick Top-Up — PromptPay"}
+                  {i18n("quickTopup.title")}
                 </DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground">
-                  {language === "th"
-                    ? `ยอดคงเหลือ: ${currentBalance.toLocaleString()} credits · สแกน QR จ่ายทันที`
-                    : `Balance: ${currentBalance.toLocaleString()} credits · Scan QR to pay instantly`}
+                  {i18n("quickTopup.balancePrompt", {
+                    balance: currentBalance.toLocaleString(),
+                  })}
                 </DialogDescription>
               </DialogHeader>
             </div>
@@ -215,7 +211,7 @@ const QuickTopUpModal = ({
                         {pkg.name}
                       </p>
                       <p className="text-[11px] text-muted-foreground">
-                        {pkg.credits.toLocaleString()} credits
+                        {pkg.credits.toLocaleString()} {i18n("common.credits")}
                       </p>
                     </div>
                   </div>
@@ -238,13 +234,11 @@ const QuickTopUpModal = ({
           <div className="px-5 py-6 flex flex-col items-center text-center space-y-4">
             <DialogHeader className="space-y-1">
               <DialogTitle className="text-base font-semibold text-foreground">
-                {language === "th"
-                  ? "สแกน QR Code เพื่อชำระเงิน"
-                  : "Scan QR Code to Pay"}
+                {i18n("quickTopup.scanQrToPay")}
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
                 {qrData.packageName} · {qrData.credits.toLocaleString()}{" "}
-                credits · ฿{qrData.amount.toLocaleString()}
+                {i18n("common.credits")} · ฿{qrData.amount.toLocaleString()}
               </DialogDescription>
             </DialogHeader>
 
@@ -253,13 +247,13 @@ const QuickTopUpModal = ({
               {qrData.qrCodeSvgUrl ? (
                 <img
                   src={qrData.qrCodeSvgUrl}
-                  alt="PromptPay QR Code"
+                  alt={i18n("checkout.quickTopUp.promptpayQrCode")}
                   className="w-56 h-56"
                 />
               ) : qrData.qrCodePngUrl ? (
                 <img
                   src={qrData.qrCodePngUrl}
-                  alt="PromptPay QR Code"
+                  alt={i18n("checkout.quickTopUp.promptpayQrCode")}
                   className="w-56 h-56"
                 />
               ) : (
@@ -273,7 +267,7 @@ const QuickTopUpModal = ({
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="w-3.5 h-3.5" />
               <span>
-                {language === "th" ? "หมดอายุใน" : "Expires in"}{" "}
+                {i18n("quickTopup.expiresIn")}{" "}
                 {formatTime(timeLeft)}
               </span>
             </div>
@@ -282,9 +276,7 @@ const QuickTopUpModal = ({
             <div className="flex items-center gap-2 text-xs text-emerald-400">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
               <span>
-                {language === "th"
-                  ? "รอการชำระเงิน..."
-                  : "Waiting for payment..."}
+                {i18n("quickTopup.waitingForPayment")}
               </span>
             </div>
 
@@ -292,7 +284,7 @@ const QuickTopUpModal = ({
               variant="outline"
               className="text-[10px] border-border text-muted-foreground"
             >
-              PromptPay · Thai QR Payment
+              {i18n("quickTopup.promptpayThaiQr")}
             </Badge>
           </div>
         )}
@@ -305,18 +297,19 @@ const QuickTopUpModal = ({
             </div>
             <div>
               <h3 className="text-lg font-bold text-foreground">
-                {language === "th" ? "ชำระเงินสำเร็จ!" : "Payment Successful!"}
+                {i18n("quickTopup.paymentSuccessful")}
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
-                +{qrData.credits.toLocaleString()} credits{" "}
-                {language === "th" ? "ถูกเพิ่มแล้ว" : "added to your account"}
+                {i18n("quickTopup.creditsAdded", {
+                  credits: qrData.credits.toLocaleString(),
+                })}
               </p>
             </div>
             <Button
               onClick={() => onOpenChange(false)}
               className="bg-emerald-500 hover:bg-emerald-600 text-white"
             >
-              {language === "th" ? "เสร็จสิ้น" : "Done"}
+              {i18n("quickTopup.done")}
             </Button>
           </div>
         )}
@@ -329,7 +322,7 @@ const QuickTopUpModal = ({
             </div>
             <div>
               <h3 className="text-lg font-bold text-foreground">
-                {language === "th" ? "เกิดข้อผิดพลาด" : "Something went wrong"}
+                {i18n("quickTopup.errorTitle")}
               </h3>
               <p className="text-sm text-muted-foreground mt-1">{errorMsg}</p>
             </div>
@@ -340,7 +333,7 @@ const QuickTopUpModal = ({
                 setErrorMsg("");
               }}
             >
-              {language === "th" ? "ลองอีกครั้ง" : "Try Again"}
+              {i18n("quickTopup.tryAgain")}
             </Button>
           </div>
         )}

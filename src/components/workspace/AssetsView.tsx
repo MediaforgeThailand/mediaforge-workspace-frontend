@@ -683,13 +683,13 @@ export default function AssetsView({
           asset.source === "generation"
             ? [
                 asset.modelLabel ? { label: asset.modelLabel } : null,
-                asset.durationSec ? { label: "Duration", value: `${asset.durationSec}s` } : null,
+                asset.durationSec ? { label: t("workspace.assets.meta_duration"), value: `${asset.durationSec}s` } : null,
                 asset.width && asset.height
-                  ? { label: "Size", value: `${asset.width}x${asset.height}` }
+                  ? { label: t("workspace.assets.meta_size"), value: `${asset.width}x${asset.height}` }
                   : null,
-                { label: "Created", value: formatRelative(asset.createdAt, t) },
+                { label: t("workspace.assets.meta_created"), value: formatRelative(asset.createdAt, t) },
               ].filter(Boolean) as Array<{ label: string; value?: string }>
-            : [{ label: "Uploaded", value: formatRelative(asset.createdAt, t) }],
+            : [{ label: t("workspace.assets.meta_uploaded"), value: formatRelative(asset.createdAt, t) }],
       });
       return;
     }
@@ -704,13 +704,13 @@ export default function AssetsView({
         asset.source === "generation"
           ? [
               asset.modelLabel ? { label: asset.modelLabel } : null,
-              asset.durationSec ? { label: "Duration", value: `${asset.durationSec}s` } : null,
+              asset.durationSec ? { label: t("workspace.assets.meta_duration"), value: `${asset.durationSec}s` } : null,
               asset.width && asset.height
-                ? { label: "Size", value: `${asset.width}x${asset.height}` }
+                ? { label: t("workspace.assets.meta_size"), value: `${asset.width}x${asset.height}` }
                 : null,
-              { label: "Created", value: formatRelative(asset.createdAt, t) },
+              { label: t("workspace.assets.meta_created"), value: formatRelative(asset.createdAt, t) },
             ].filter(Boolean) as Array<{ label: string; value?: string }>
-          : [{ label: "Uploaded", value: formatRelative(asset.createdAt, t) }],
+          : [{ label: t("workspace.assets.meta_uploaded"), value: formatRelative(asset.createdAt, t) }],
     });
   }, [t]);
 
@@ -756,14 +756,14 @@ export default function AssetsView({
         setPreview(null);
       }
       setDeleteTarget(null);
-      toast.success("Asset deleted");
+      toast.success(t("workspace.assets.deleteSuccess"));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      toast.error(`Could not delete asset: ${message}`);
+      toast.error(t("workspace.assets.deleteFailed", { message }));
     } finally {
       setDeletingAsset(false);
     }
-  }, [deleteTarget, preview, user]);
+  }, [deleteTarget, preview, t, user]);
 
   return (
     <div className="flex h-full min-h-0 w-full overflow-hidden text-zinc-100">
@@ -1064,11 +1064,11 @@ export default function AssetsView({
                   <AlertTriangle className="h-4 w-4" />
                 </span>
                 <DialogTitle className="text-[16px] font-bold leading-tight text-white">
-                  Delete asset?
+                  {t("workspace.assets.deleteTitle")}
                 </DialogTitle>
               </div>
               <DialogDescription className="text-[13px] leading-relaxed text-zinc-400">
-                This removes the asset from your library and deletes the stored file when it belongs to your account.
+                {t("workspace.assets.deleteDescription")}
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -1079,7 +1079,7 @@ export default function AssetsView({
               onClick={() => setDeleteTarget(null)}
               className="inline-flex h-8 items-center justify-center rounded-[9px] border border-white/[0.08] px-3 text-[12px] font-semibold text-zinc-200 transition hover:bg-white/[0.06] disabled:opacity-60"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               type="button"
@@ -1088,7 +1088,7 @@ export default function AssetsView({
               className="inline-flex h-8 items-center justify-center gap-1.5 rounded-[9px] bg-red-500 px-3 text-[12px] font-bold text-white shadow-[0_10px_22px_rgba(239,68,68,.28)] transition hover:bg-red-400 disabled:opacity-60"
             >
               {deletingAsset ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-              Delete
+              {t("workspace.assets.deleteAction")}
             </button>
           </div>
         </DialogContent>
@@ -1219,26 +1219,26 @@ function AssetCard({
   const contextMenuItems: MediaContextMenuItem[] = [
     {
       key: "preview",
-      label: "Preview",
+      label: t("workspace.mediaMenu.preview"),
       icon: Eye,
       onSelect: () => onPreview(asset),
     },
     {
       key: "download",
-      label: "Download",
+      label: t("workspace.mediaMenu.download"),
       icon: Download,
       onSelect: () => void downloadFromUrl(asset.url, modelLabel),
     },
     {
       key: "duplicate",
-      label: "Duplicate",
+      label: t("workspace.mediaMenu.duplicate"),
       icon: Copy,
       disabled: true,
       onSelect: () => undefined,
     },
     {
       key: "move-board",
-      label: "Move to Board",
+      label: t("workspace.mediaMenu.moveToBoard"),
       icon: Folder,
       separatorBefore: true,
       disabled: true,
@@ -1246,14 +1246,14 @@ function AssetCard({
     },
     {
       key: "copy-board",
-      label: "Copy to Board",
+      label: t("workspace.mediaMenu.copyToBoard"),
       icon: Copy,
       disabled: true,
       onSelect: () => undefined,
     },
     {
       key: "delete",
-      label: "Delete",
+      label: t("workspace.mediaMenu.delete"),
       icon: Trash2,
       separatorBefore: true,
       danger: true,
@@ -1334,8 +1334,8 @@ function AssetCard({
               onDelete(asset);
             }}
             className="grid h-7 w-7 place-items-center rounded-full border border-white/[0.10] bg-black/62 text-white shadow-[0_8px_20px_rgba(0,0,0,.35)] backdrop-blur transition hover:border-rose-300/40 hover:bg-rose-500 hover:text-white"
-            title="Delete asset"
-            aria-label="Delete asset"
+            title={t("workspace.assets.deleteAsset")}
+            aria-label={t("workspace.assets.deleteAsset")}
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -1372,7 +1372,7 @@ function AssetCard({
           <span className="shrink-0">{dateLabel}</span>
           <span className="inline-flex shrink-0 items-center gap-0.5">
             <Icon className="h-2.5 w-2.5" />
-            {asset.kind === "3d" ? "3D" : asset.kind}
+            {t(asset.kind === "3d" ? "workspace.assets.kind_3d" : `workspace.assets.kind_${asset.kind}`)}
           </span>
         </div>
       </div>

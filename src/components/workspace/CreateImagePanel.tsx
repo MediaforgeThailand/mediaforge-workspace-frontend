@@ -10,7 +10,7 @@ import { ReactFlowProvider, useReactFlow, type Node } from "@xyflow/react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
 import PromptMentionTextarea from "@/components/flow/nodes/PromptMentionTextarea";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage, type Language } from "@/contexts/LanguageContext";
 import sampleRefOne from "@/assets/showcase-cat-astronaut.jpg";
 import sampleRefTwo from "@/assets/mock-packshot-perfume.jpg";
 import sampleRefThree from "@/assets/pro-trend-space-cat.jpg";
@@ -99,8 +99,8 @@ const PANEL_COPY = {
   },
 } as const;
 
-function panelCopy(language: "en" | "th") {
-  return PANEL_COPY[language];
+function panelCopy(language: Language) {
+  return language === "th" ? PANEL_COPY.th : PANEL_COPY.en;
 }
 
 interface CreateImagePanelReference {
@@ -2047,7 +2047,7 @@ const buildModels = (
   options: CreateImagePanelModel[],
   fallbackLabel: string,
   fallbackId: string,
-  language: "en" | "th",
+  language: Language,
 ): Model[] => {
   const source =
     options.length > 0 ? options : [{ id: fallbackId, label: fallbackLabel }];

@@ -34,6 +34,7 @@ import {
   QrCode,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useCredits } from "@/hooks/useCredits";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -135,6 +136,7 @@ const compactPrimaryButtonClass = cn(
 );
 
 const PlanBilling = () => {
+  const { t: i18n } = useLanguage();
   const { user, profile, refreshProfile } = useAuth();
   const { credits } = useCredits();
   const navigate = useNavigate();
@@ -280,14 +282,14 @@ const PlanBilling = () => {
       if (error) throw error;
       await refreshProfile();
       toast({
-        title: "ปิดใช้งานแล้ว / Auto-refill disabled",
-        description: "บัตรที่ผูกไว้ถูกถอนออก / Saved card detached",
+        title: i18n("settings.planBilling.autoRefillDisabled"),
+        description: i18n("settings.planBilling.savedCardDetached"),
       });
     } catch (err) {
       // Best effort: server fail keeps the local toggle off; the
       // next refresh will sync.
       const msg = err instanceof Error ? err.message : String(err);
-      toast({ title: "Could not save", description: msg, variant: "destructive" });
+      toast({ title: i18n("settings.planBilling.couldNotSave"), description: msg, variant: "destructive" });
     }
   };
 
@@ -310,11 +312,11 @@ const PlanBilling = () => {
         window.location.href = data.url;
         return;
       }
-      throw new Error("Customer portal did not return a URL");
+      throw new Error(i18n("settings.planBilling.customerPortalDidNotReturnUrl"));
     } catch (e) {
       toast({
-        title: "Could not open billing portal",
-        description: e instanceof Error ? e.message : "Try again in a moment.",
+        title: i18n("common.couldNotOpenBillingPortal"),
+        description: e instanceof Error ? e.message : i18n("settings.planBilling.tryAgainInMoment"),
         variant: "destructive",
       });
       setCancelling(false);
@@ -330,9 +332,9 @@ const PlanBilling = () => {
   return (
     <div className="max-w-3xl space-y-[14px]">
       <div>
-        <h2 className="text-[21px] font-semibold leading-[27px] text-zinc-50">Plan & billing</h2>
+        <h2 className="text-[21px] font-semibold leading-[27px] text-zinc-50">{i18n("settings.planBilling.planBilling")}</h2>
         <p className="mt-[2px] text-[13px] leading-[18px] text-zinc-500">
-          Manage your subscription, credits, and payment methods.
+          {i18n("settings.planBilling.subtitle")}
         </p>
       </div>
 
@@ -342,29 +344,29 @@ const PlanBilling = () => {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-[8px]">
               <h3 className="text-[14px] font-semibold leading-[18px] text-zinc-50">
-                {plan?.name ?? "Free plan"}
+                {plan?.name ?? i18n("settings.planBilling.freePlan")}
               </h3>
               {!isFree && (
                 <span className="text-[13px] leading-[18px] text-zinc-300">
                   {formatThb(planPrice)}
-                  <span className="text-zinc-500">/{isAnnual ? "year" : "month"}</span>
+                  <span className="text-zinc-500">/{isAnnual ? i18n("settings.planBilling.year") : i18n("settings.planBilling.month")}</span>
                 </span>
               )}
               {isFree && (
                 <Badge variant="outline" className="border-white/15 px-[7px] py-[1px] text-[10.5px] leading-[14px] text-zinc-400">
-                  No active subscription
+                  {i18n("settings.planBilling.noActiveSubscription")}
                 </Badge>
               )}
             </div>
             <div className="mt-[6px] flex items-center gap-[8px] text-[12px] leading-[16px] text-zinc-500">
-              {!isFree && <span>Billed {isAnnual ? "annually" : "monthly"}</span>}
+              {!isFree && <span>{i18n("settings.planBilling.billed", { cycle: isAnnual ? i18n("settings.planBilling.annually") : i18n("settings.planBilling.monthly") })}</span>}
               {!isFree && currentPeriodEnd && (
                 <>
                   <span className="text-zinc-700">·</span>
-                  <span>Next payment: {formatLongDate(currentPeriodEnd)}</span>
+                  <span>{i18n("settings.planBilling.nextPayment", { date: formatLongDate(currentPeriodEnd) ?? "" })}</span>
                 </>
               )}
-              {isFree && <span>Upgrade to unlock more credits and pro features.</span>}
+              {isFree && <span>{i18n("settings.planBilling.upgradeToUnlockMoreCreditsAndPro")}</span>}
             </div>
           </div>
           <div className="flex flex-shrink-0 items-center gap-[8px]">
@@ -375,7 +377,7 @@ const PlanBilling = () => {
               className={compactOutlineButtonClass}
             >
               <Building2 />
-              Create your team
+              {i18n("common.createYourTeam")}
             </Button>
             <Button
               size="sm"
@@ -383,7 +385,7 @@ const PlanBilling = () => {
               className={compactPrimaryButtonClass}
             >
               <Sparkles />
-              {isFree ? "View plans" : "Upgrade plan"}
+              {isFree ? i18n("settings.planBilling.viewPlans") : i18n("settings.planBilling.upgradePlan")}
             </Button>
           </div>
         </div>
@@ -393,9 +395,9 @@ const PlanBilling = () => {
       <section className="rounded-lg bg-white/[0.04] p-[14px]">
         <div className="mb-[10px] flex flex-wrap items-start justify-between gap-[10px]">
           <div>
-            <h3 className="text-[14px] font-semibold leading-[18px] text-zinc-50">Credits</h3>
+            <h3 className="text-[14px] font-semibold leading-[18px] text-zinc-50">{i18n("common.credits2")}</h3>
             <p className="mt-[2px] text-[12px] leading-[16px] text-zinc-500">
-              Credits reset every {isAnnual ? "year" : "month"} on renewal.
+              {i18n("settings.planBilling.creditsResetEveryOnRenewal", { cycle: isAnnual ? i18n("settings.planBilling.year") : i18n("settings.planBilling.month") })}
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-[8px]">
@@ -403,9 +405,9 @@ const PlanBilling = () => {
               type="button"
               role="switch"
               aria-checked={autoRefill}
-              aria-label="Auto-refill credits"
+              aria-label={i18n("settings.planBilling.autoRefillCredits")}
               onClick={() => void handleAutoRefill(!autoRefill)}
-              title="Auto-refill - top up automatically when balance is low"
+              title={i18n("settings.planBilling.autoRefillDescription")}
               className={cn(
                 "flex h-[34px] items-center gap-[8px] rounded-full border px-[10px] text-[12px] font-semibold leading-[16px] transition-colors",
                 autoRefill
@@ -413,7 +415,7 @@ const PlanBilling = () => {
                   : "border-white/10 bg-white/[0.04] text-zinc-300 hover:border-white/15 hover:bg-white/[0.07] hover:text-white",
               )}
             >
-              <span>{autoRefill ? "Auto-refill on" : "Auto-refill off"}</span>
+              <span>{autoRefill ? i18n("settings.planBilling.autoRefillOn") : i18n("settings.planBilling.autoRefillOff")}</span>
               <span
                 className={cn(
                   "relative h-[18px] w-[32px] rounded-full border transition-colors",
@@ -434,7 +436,7 @@ const PlanBilling = () => {
               className={compactPrimaryButtonClass}
             >
               <Plus />
-              Buy extra credits
+              {i18n("settings.planBilling.buyExtraCredits")}
             </Button>
           </div>
         </div>
@@ -444,17 +446,17 @@ const PlanBilling = () => {
             <span className="text-[28px] font-bold leading-[34px] tabular-nums text-zinc-50">
               {formatCreditsBig(balance)}
             </span>
-            <span className="text-[12px] leading-[16px] text-zinc-500">total credits</span>
+            <span className="text-[12px] leading-[16px] text-zinc-500">{i18n("settings.planBilling.totalCredits")}</span>
           </div>
 
           <Progress value={usagePct} className="h-[5px] bg-white/[0.05]" />
 
           <div className="flex items-center justify-between text-[12px] leading-[16px] text-zinc-400">
             <span>
-              Spent: <span className="text-zinc-200 tabular-nums">{used.toLocaleString()}</span>
+              {i18n("settings.planBilling.spent")} <span className="text-zinc-200 tabular-nums">{used.toLocaleString()}</span>
             </span>
             <span>
-              Available: <span className="text-zinc-200 tabular-nums">{balance.toLocaleString()}</span>
+              {i18n("settings.planBilling.available")} <span className="text-zinc-200 tabular-nums">{balance.toLocaleString()}</span>
             </span>
           </div>
         </div>
@@ -465,7 +467,7 @@ const PlanBilling = () => {
       <section className="rounded-lg bg-white/[0.04] p-[14px]">
         <div className="flex items-center justify-between gap-[14px]">
           <div className="min-w-0">
-            <h3 className="text-[14px] font-semibold leading-[18px] text-zinc-50">Billing information</h3>
+            <h3 className="text-[14px] font-semibold leading-[18px] text-zinc-50">{i18n("settings.planBilling.billingInformation")}</h3>
             <p className="mt-[6px] text-[12px] leading-[16px] text-zinc-300">
               {billingName} <span className="text-zinc-600">·</span>{" "}
               <span className="text-zinc-400">{billingEmail}</span>
@@ -485,7 +487,7 @@ const PlanBilling = () => {
               onClick={() => setShowBillingInfo(true)}
               className={compactOutlineButtonClass}
             >
-              Change
+              {i18n("settings.planBilling.change")}
             </Button>
             <Button
               size="sm"
@@ -493,7 +495,7 @@ const PlanBilling = () => {
               onClick={() => setShowBillingHistory(true)}
               className={compactOutlineButtonClass}
             >
-              History
+              {i18n("common.history")}
             </Button>
           </div>
         </div>
@@ -503,9 +505,9 @@ const PlanBilling = () => {
       <section className="rounded-lg bg-white/[0.04] p-[14px]">
         <div className="mb-[10px] flex items-start justify-between gap-[14px]">
           <div>
-            <h3 className="text-[14px] font-semibold leading-[18px] text-zinc-50">Payment details</h3>
+            <h3 className="text-[14px] font-semibold leading-[18px] text-zinc-50">{i18n("settings.planBilling.paymentDetails")}</h3>
             <p className="mt-[2px] text-[12px] leading-[16px] text-zinc-500">
-              Cards saved here are reused for renewals and auto-refills.
+              {i18n("settings.planBilling.cardsSavedHereAreReusedForRenewals")}
             </p>
           </div>
           <Button
@@ -514,7 +516,7 @@ const PlanBilling = () => {
             onClick={() => setShowUpdatePayment(true)}
             className={compactOutlineButtonClass}
           >
-            Update
+            {i18n("settings.planBilling.update")}
           </Button>
         </div>
 
@@ -522,12 +524,12 @@ const PlanBilling = () => {
           {loadingPMs && (
             <div className="flex items-center gap-[8px] py-[8px] text-[12px] leading-[16px] text-zinc-500">
               <Loader2 className="h-[14px] w-[14px] animate-spin" />
-              Loading payment methods…
+              {i18n("settings.planBilling.loadingPaymentMethods")}
             </div>
           )}
           {!loadingPMs && paymentMethods.length === 0 && (
             <p className="text-[12px] leading-[16px] text-zinc-500 italic">
-              No payment methods saved yet. Click "Update" to add a card.
+              {i18n("settings.planBilling.emptyPaymentMethodsDescription")}
             </p>
           )}
           {paymentMethods.map((pm) => {
@@ -556,14 +558,14 @@ const PlanBilling = () => {
                   </p>
                   {isCard && pm.exp_month && pm.exp_year && (
                     <p className="text-[11px] leading-[15px] text-zinc-500">
-                      Expires {String(pm.exp_month).padStart(2, "0")}/{String(pm.exp_year).slice(-2)}
+                      {i18n("settings.planBilling.expires", { date: `${String(pm.exp_month).padStart(2, "0")}/${String(pm.exp_year).slice(-2)}` })}
                     </p>
                   )}
                 </div>
                 {isDefault && (
                   <span className="rounded border border-violet-500/30 bg-violet-500/15 px-[6px] py-[2px] text-[10px] font-bold uppercase leading-[13px] text-violet-200">
                     <Star className="-mt-[2px] mr-[2px] inline h-[10px] w-[10px]" />
-                    Default
+                    {i18n("settings.planBilling.default")}
                   </span>
                 )}
                 {!isDefault && isCard && (
@@ -574,15 +576,15 @@ const PlanBilling = () => {
                         body: { op: "set_default", payment_method_id: pm.id },
                       });
                       if (error) {
-                        toast({ title: "Could not update", variant: "destructive" });
+                        toast({ title: i18n("settings.planBilling.couldNotUpdate"), variant: "destructive" });
                       } else {
                         await refreshPaymentMethods();
-                        toast({ title: "Default updated" });
+                        toast({ title: i18n("settings.planBilling.defaultUpdated") });
                       }
                     }}
                     className="text-[11px] leading-[15px] text-zinc-400 transition-colors hover:text-zinc-100"
                   >
-                    Make default
+                    {i18n("settings.planBilling.makeDefault")}
                   </button>
                 )}
                 {!isDefault && (
@@ -593,13 +595,13 @@ const PlanBilling = () => {
                         body: { op: "detach", payment_method_id: pm.id },
                       });
                       if (error) {
-                        toast({ title: "Could not remove", variant: "destructive" });
+                        toast({ title: i18n("settings.planBilling.couldNotRemove"), variant: "destructive" });
                       } else {
                         await refreshPaymentMethods();
                       }
                     }}
                     className="p-[4px] text-zinc-500 transition-colors hover:text-red-400"
-                    aria-label="Remove payment method"
+                    aria-label={i18n("settings.planBilling.removePaymentMethod")}
                   >
                     <Trash2 className="h-[14px] w-[14px]" />
                   </button>
@@ -616,16 +618,16 @@ const PlanBilling = () => {
           <AccordionTrigger className="py-[12px] text-[13px] font-medium leading-[18px] text-red-300 hover:text-red-200 hover:no-underline">
             <div className="flex items-center gap-[8px]">
               <ShieldAlert className="h-[16px] w-[16px]" />
-              Danger zone — Cancel a subscription
+              {i18n("settings.planBilling.dangerZoneCancelSubscription")}
             </div>
           </AccordionTrigger>
           <AccordionContent className="pb-[14px]">
             <div className="space-y-[12px] text-[12px] leading-[18px] text-zinc-400">
               <p>
-                Cancelling closes auto-renewal but lets you keep access until the end of the current billing period.
+                {i18n("settings.planBilling.cancelHelpText")}
                 {currentPeriodEnd && (
                   <>
-                    {" "}You'll keep access until{" "}
+                    {" "}{i18n("settings.planBilling.youLlKeepAccessUntil")}{" "}
                     <span className="text-zinc-200 font-medium">
                       {formatLongDate(currentPeriodEnd)}
                     </span>.
@@ -639,7 +641,7 @@ const PlanBilling = () => {
                 onClick={() => setConfirmCancel(true)}
                 className={cn(denseButtonClass, "border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:opacity-50")}
               >
-                {isFree ? "No active subscription" : "Cancel subscription"}
+                {isFree ? i18n("settings.planBilling.noActiveSubscription") : i18n("settings.planBilling.cancelSubscription")}
               </Button>
             </div>
           </AccordionContent>
@@ -677,21 +679,21 @@ const PlanBilling = () => {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <Building2 className="w-5 h-5 text-violet-400" />
-              Team feature ships in the next wave
+              {i18n("settings.planBilling.teamFeatureShipsInNextWave")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              The self-serve team setup is part of the team / org rollout. For now, our onboarding flow is contact-sales — drop us a line and we'll set up a shared workspace, centralised billing, and SSO for your team.
+              {i18n("settings.planBilling.theSelfServeTeamSetupIsPart")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Maybe later</AlertDialogCancel>
+            <AlertDialogCancel>{i18n("settings.planBilling.maybeLater")}</AlertDialogCancel>
             <AlertDialogAction asChild>
               <a
                 href="mailto:sales@mediaforge.co?subject=Team%20plan%20enquiry"
                 className="inline-flex items-center gap-1.5"
               >
                 <Mail className="w-3.5 h-3.5" />
-                Email sales
+                {i18n("settings.planBilling.emailSales")}
               </a>
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -707,14 +709,14 @@ const PlanBilling = () => {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-red-300">
               <AlertCircle className="w-5 h-5" />
-              Cancel subscription
+              {i18n("settings.planBilling.cancelSubscription")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              We'll open the secure Stripe customer portal where you can confirm cancellation. Your subscription will remain active until the end of the current billing period.
+              {i18n("settings.planBilling.weLlOpenSecureStripeCustomer")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={cancelling}>Keep subscription</AlertDialogCancel>
+            <AlertDialogCancel disabled={cancelling}>{i18n("settings.planBilling.keepSubscription")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();
@@ -726,12 +728,12 @@ const PlanBilling = () => {
               {cancelling ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                  Opening portal…
+                  {i18n("settings.planBilling.openingPortal")}
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-                  Continue to portal
+                  {i18n("settings.planBilling.continueToPortal")}
                 </>
               )}
             </AlertDialogAction>

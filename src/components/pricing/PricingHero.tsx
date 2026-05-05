@@ -1,32 +1,34 @@
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { getLocalizedText, useLanguage, type Language } from "@/contexts/LanguageContext";
 
 export type BillingCycleView = "monthly" | "quarterly" | "semiannual" | "annual";
 
 interface PricingHeroProps {
-  language: string;
+  language: Language;
   view: BillingCycleView;
   onViewChange: (view: BillingCycleView) => void;
 }
 
-const SAVE_BADGE: Record<BillingCycleView, { en: string; th: string } | null> = {
+const SAVE_BADGE: Record<BillingCycleView, (Partial<Record<Language, string>> & { en: string }) | null> = {
   monthly: null,
-  quarterly: { en: "Save 10%", th: "ลด 10%" },
-  semiannual: { en: "Save 15%", th: "ลด 15%" },
-  annual: { en: "Save 20%", th: "ลด 20%" },
+  quarterly: { en: "Save 10%", th: "ลด 10%", es: "Ahorra 10%", ja: "10%お得" },
+  semiannual: { en: "Save 15%", th: "ลด 15%", es: "Ahorra 15%", ja: "15%お得" },
+  annual: { en: "Save 20%", th: "ลด 20%", es: "Ahorra 20%", ja: "20%お得" },
 };
 
 const PricingHero = ({ language, view, onViewChange }: PricingHeroProps) => {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const txt = (values: Parameters<typeof getLocalizedText>[1]) =>
+    getLocalizedText(language, values);
 
   const segments: { key: BillingCycleView; label: string; badge: string | null }[] = [
-    { key: "monthly", label: language === "th" ? "รายเดือน" : "Monthly", badge: null },
-    { key: "quarterly", label: language === "th" ? "3 เดือน" : "3 Months", badge: language === "th" ? "ลด 10%" : "Save 10%" },
-    { key: "semiannual", label: language === "th" ? "6 เดือน" : "6 Months", badge: language === "th" ? "ลด 15%" : "Save 15%" },
-    { key: "annual", label: language === "th" ? "12 เดือน" : "12 Months", badge: language === "th" ? "ลด 20%" : "Save 20%" },
+    { key: "monthly", label: txt({ en: "Monthly", th: "รายเดือน", es: "Mensual", ja: "月額" }), badge: null },
+    { key: "quarterly", label: txt({ en: "3 Months", th: "3 เดือน", es: "3 meses", ja: "3 か月" }), badge: txt(SAVE_BADGE.quarterly!) },
+    { key: "semiannual", label: txt({ en: "6 Months", th: "6 เดือน", es: "6 meses", ja: "6 か月" }), badge: txt(SAVE_BADGE.semiannual!) },
+    { key: "annual", label: txt({ en: "12 Months", th: "12 เดือน", es: "12 meses", ja: "12 か月" }), badge: txt(SAVE_BADGE.annual!) },
   ];
 
   const activeBadge = SAVE_BADGE[view];
@@ -42,7 +44,7 @@ const PricingHero = ({ language, view, onViewChange }: PricingHeroProps) => {
       </button>
 
       <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tight text-white">
-        {language === "th" ? "ปลดล็อกพลังของ MEDIAFORGE" : "UNLOCK THE POWER OF MEDIAFORGE"}
+        {txt({ en: "UNLOCK THE POWER OF MEDIAFORGE", th: "ปลดล็อกพลังของ MEDIAFORGE", es: "DESBLOQUEA EL PODER DE MEDIAFORGE", ja: "MEDIAFORGE の力を解き放つ" })}
       </h1>
 
       <p className="text-neutral-400 mt-4 text-base md:text-lg max-w-2xl mx-auto px-4">
@@ -87,13 +89,20 @@ const PricingHero = ({ language, view, onViewChange }: PricingHeroProps) => {
       {/* Active save banner */}
       {activeBadge && (
         <p className="mt-3 text-xs text-violet-300">
-          {language === "th"
-            ? `ประหยัดสูงสุด ${activeBadge.th.replace("ลด ", "")} เมื่อชำระแบบ ${
-                view === "quarterly" ? "3 เดือน" : view === "semiannual" ? "6 เดือน" : "12 เดือน"
-              }`
-            : `${activeBadge.en} when paying ${
-                view === "quarterly" ? "quarterly" : view === "semiannual" ? "semi-annually" : "annually"
-              }`}
+          {txt({
+            en: `${activeBadge.en} when paying ${
+              view === "quarterly" ? "quarterly" : view === "semiannual" ? "semi-annually" : "annually"
+            }`,
+            th: `ประหยัดสูงสุด ${activeBadge.th?.replace("ลด ", "")} เมื่อชำระแบบ ${
+              view === "quarterly" ? "3 เดือน" : view === "semiannual" ? "6 เดือน" : "12 เดือน"
+            }`,
+            es: `${activeBadge.es} al pagar ${
+              view === "quarterly" ? "trimestralmente" : view === "semiannual" ? "semestralmente" : "anualmente"
+            }`,
+            ja: `${activeBadge.ja}。${
+              view === "quarterly" ? "3 か月" : view === "semiannual" ? "6 か月" : "12 か月"
+            }払いの場合`,
+          })}
         </p>
       )}
     </section>

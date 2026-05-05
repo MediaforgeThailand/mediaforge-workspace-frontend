@@ -102,7 +102,7 @@ const DEFAULT_ASSET_NODE_WIDTH = 219;
 const AssetNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as unknown as AssetNodeData;
   const { setNodes, getNode } = useReactFlow();
-  const { t } = useLanguage();
+  const { t, t: i18n } = useLanguage();
   const [isHovered, setIsHovered] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   // Re-sign the previewUrl on mount in case it was generated under
@@ -238,14 +238,14 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
   const contextMenuItems: MediaContextMenuItem[] = [
     {
       key: "preview",
-      label: "Preview",
+      label: i18n("workspace.mediaMenu.preview"),
       icon: Eye,
       disabled: true,
       onSelect: () => undefined,
     },
     {
       key: "download",
-      label: "Download",
+      label: i18n("workspace.mediaMenu.download"),
       icon: Download,
       disabled: !downloadableUrl,
       onSelect: () => {
@@ -256,13 +256,13 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
     },
     {
       key: "duplicate",
-      label: "Duplicate",
+      label: i18n("workspace.mediaMenu.duplicate"),
       icon: Copy,
       onSelect: onDuplicateNode,
     },
     {
       key: "move-board",
-      label: "Move to Board",
+      label: i18n("workspace.mediaMenu.moveToBoard"),
       icon: FolderOpen,
       separatorBefore: true,
       disabled: true,
@@ -270,14 +270,14 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
     },
     {
       key: "copy-board",
-      label: "Copy to Board",
+      label: i18n("workspace.mediaMenu.copyToBoard"),
       icon: Copy,
       disabled: true,
       onSelect: () => undefined,
     },
     {
       key: "delete",
-      label: "Delete",
+      label: i18n("workspace.mediaMenu.delete"),
       icon: Trash2,
       separatorBefore: true,
       danger: true,
@@ -443,7 +443,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
             >
               <AudioPlayButton
                 src={livePreviewUrl}
-                label={d.fileName ?? "Play audio"}
+                label={d.fileName ?? i18n("workspace.common.playAudio")}
                 buttonClassName="h-11 w-11"
               />
             </div>
@@ -458,7 +458,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
           )
         ) : (
           <div className="flex aspect-video items-center justify-center text-[11px] text-zinc-500">
-            no preview
+            {i18n("workspace.assetNode.noPreview")}
           </div>
         )}
         {/* Expand affordance on hover */}

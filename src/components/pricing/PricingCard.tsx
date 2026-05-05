@@ -1,6 +1,6 @@
 import { CheckCircle2, Sparkles, Zap, Crown, Building2, Rocket } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { getLocalizedText, useLanguage, type Language } from "@/contexts/LanguageContext";
 
 interface PlanData {
   id: string;
@@ -21,7 +21,7 @@ interface PricingCardProps {
   isCurrent: boolean;
   billingCycle: "monthly" | "quarterly" | "semiannual" | "annual";
   monthlyPrice: number;
-  language: string;
+  language: Language;
   onSubscribe: () => void;
 }
 
@@ -57,6 +57,8 @@ const PricingCard = ({
   onSubscribe,
 }: PricingCardProps) => {
   const { t } = useLanguage();
+  const txt = (values: Parameters<typeof getLocalizedText>[1]) =>
+    getLocalizedText(language, values);
   const Icon = ICON_MAP[plan.name] || Rocket;
   const titleColor = TITLE_COLORS[plan.name] || "#FAFAFA";
   const months = MONTHS_MAP[billingCycle] ?? 1;
@@ -68,14 +70,19 @@ const PricingCard = ({
       ? Math.round(plan.upfront_credits / months)
       : plan.upfront_credits;
 
-  const billedLabel =
-    language === "th"
-      ? isMultiMonth
-        ? `เรียกเก็บ ฿${plan.price_thb.toLocaleString()} ทุก ${months} เดือน`
-        : `เรียกเก็บ ฿${plan.price_thb.toLocaleString()} ทุกเดือน`
-      : isMultiMonth
-        ? `billed ฿${plan.price_thb.toLocaleString()} every ${months} months`
-        : `billed ฿${plan.price_thb.toLocaleString()} monthly`;
+  const billedLabel = isMultiMonth
+    ? txt({
+        en: `billed ฿${plan.price_thb.toLocaleString()} every ${months} months`,
+        th: `เรียกเก็บ ฿${plan.price_thb.toLocaleString()} ทุก ${months} เดือน`,
+        es: `facturado ฿${plan.price_thb.toLocaleString()} cada ${months} meses`,
+        ja: `${months} か月ごとに ฿${plan.price_thb.toLocaleString()} を請求`,
+      })
+    : txt({
+        en: `billed ฿${plan.price_thb.toLocaleString()} monthly`,
+        th: `เรียกเก็บ ฿${plan.price_thb.toLocaleString()} ทุกเดือน`,
+        es: `facturado ฿${plan.price_thb.toLocaleString()} mensualmente`,
+        ja: `月額 ฿${plan.price_thb.toLocaleString()} を請求`,
+      });
 
   return (
     <div
@@ -113,7 +120,7 @@ const PricingCard = ({
           <span className="text-white text-4xl font-semibold">
             ฿{monthlyEquivPrice.toLocaleString()}
           </span>
-          <span className="text-neutral-400 text-sm">/{language === "th" ? "เดือน" : "mo"}</span>
+          <span className="text-neutral-400 text-sm">/{txt({ en: "mo", th: "เดือน", es: "mes", ja: "月" })}</span>
         </div>
         <p className="text-neutral-500 text-xs">{billedLabel}</p>
       </div>
@@ -123,16 +130,16 @@ const PricingCard = ({
         isMultiMonth ? (
           <div className="rounded-xl py-3 px-4 text-center bg-purple-500/10 border border-purple-400/30">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-purple-300 mb-0.5">
-              {language === "th" ? "รับทันทีเมื่อชำระ" : "Receive instantly"}
+              {txt({ en: "Receive instantly", th: "รับทันทีเมื่อชำระ", es: "Recibe al instante", ja: "支払い後すぐに付与" })}
             </div>
             <div className="text-purple-200 font-black text-2xl tabular-nums leading-tight">
               {plan.upfront_credits.toLocaleString()}
             </div>
             <div className="text-purple-300/80 text-[10px] font-medium">
-              {language === "th" ? "เครดิต (ได้ครบทันที ไม่ต้องรอ)" : "credits (no monthly drip)"}
+              {txt({ en: "credits (no monthly drip)", th: "เครดิต (ได้ครบทันที ไม่ต้องรอ)", es: "créditos (sin goteo mensual)", ja: "クレジット（一括付与）" })}
             </div>
             <div className="text-neutral-500 text-[10px] mt-1.5">
-              ≈ {monthlyCreditsEquiv.toLocaleString()} {language === "th" ? "เครดิต/เดือน" : "credits/mo"}
+              ≈ {monthlyCreditsEquiv.toLocaleString()} {txt({ en: "credits/mo", th: "เครดิต/เดือน", es: "créditos/mes", ja: "クレジット/月" })}
             </div>
           </div>
         ) : (
@@ -147,9 +154,12 @@ const PricingCard = ({
 
       {plan.discount_official > 0 && (
         <p className="text-sm font-medium text-violet-200">
-          {language === "th"
-            ? `${plan.discount_official}% ส่วนลดการ Generate ทั้งหมด`
-            : `${plan.discount_official}% off all Generations`}
+          {txt({
+            en: `${plan.discount_official}% off all Generations`,
+            th: `${plan.discount_official}% ส่วนลดการ Generate ทั้งหมด`,
+            es: `${plan.discount_official}% de descuento en todas las generaciones`,
+            ja: `すべての生成が ${plan.discount_official}% 割引`,
+          })}
         </p>
       )}
 

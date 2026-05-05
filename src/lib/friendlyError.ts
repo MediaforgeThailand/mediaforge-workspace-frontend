@@ -27,13 +27,14 @@
  *   }
  */
 
-export type Lang = "en" | "th";
+export type Lang = "en" | "th" | "ja";
 
 interface ErrorMapping {
   /** Pattern to test the raw error message against. */
   match: RegExp;
   th: string;
   en: string;
+  ja: string;
 }
 
 const MAPPINGS: ErrorMapping[] = [
@@ -42,16 +43,19 @@ const MAPPINGS: ErrorMapping[] = [
     match: /INSUFFICIENT_CREDITS|insufficient[\s_-]*credit/i,
     th: "เครดิตไม่พอ — เติมเครดิตหรืออัปเกรดแพ็กเกจก่อนครับ",
     en: "Not enough credits — please top up or upgrade your plan.",
+    ja: "クレジットが不足しています。チャージするかプランをアップグレードしてください。",
   },
   {
     match: /PROVIDER_BILLING_ERROR|provider[\s_-]*bill|insufficient[\s_-]*balance/i,
     th: "ระบบ AI ผู้ให้บริการขัดข้องชั่วคราว ทีมงานกำลังแก้ไข",
     en: "The AI provider is temporarily unavailable. Our team is on it.",
+    ja: "AI プロバイダーが一時的に利用できません。チームが対応中です。",
   },
   {
     match: /function .*consume_credits|function .*grant_credits|relation .* does not exist/i,
     th: "ระบบเครดิตขัดข้อง — ทีมงานได้รับแจ้งแล้ว",
     en: "Credit system error — our team has been notified.",
+    ja: "クレジットシステムで問題が発生しました。チームに通知済みです。",
   },
 
   // ── Auth / session ──────────────────────────────────────────
@@ -59,16 +63,19 @@ const MAPPINGS: ErrorMapping[] = [
     match: /Invalid login credentials|Email not confirmed|invalid_grant/i,
     th: "อีเมลหรือรหัสผ่านไม่ถูกต้อง หรือยังไม่ได้ยืนยันอีเมล",
     en: "Wrong email or password — or your email isn't verified yet.",
+    ja: "メールアドレスまたはパスワードが正しくないか、メール確認が未完了です。",
   },
   {
     match: /JWT.*expired|expired[\s_-]*session|refresh[\s_-]*token[\s_-]*not[\s_-]*found/i,
     th: "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่",
     en: "Your session expired — please sign in again.",
+    ja: "セッションの有効期限が切れました。もう一度ログインしてください。",
   },
   {
     match: /User already registered|email[\s_-]*already/i,
     th: "อีเมลนี้สมัครไว้แล้ว ลองเข้าสู่ระบบแทน",
     en: "This email is already registered — try signing in instead.",
+    ja: "このメールアドレスは登録済みです。ログインをお試しください。",
   },
 
   // ── Storage / RLS ───────────────────────────────────────────
@@ -76,16 +83,19 @@ const MAPPINGS: ErrorMapping[] = [
     match: /row[\s_-]*level[\s_-]*security|RLS|new row violates/i,
     th: "ไม่มีสิทธิ์ทำรายการนี้ — ลองออกจากระบบและเข้าใหม่",
     en: "You don't have permission for this action — try signing in again.",
+    ja: "この操作の権限がありません。ログアウトして再ログインしてください。",
   },
   {
     match: /Bucket not found|object not found|storage.*404/i,
     th: "ไฟล์ที่อ้างอิงหายไปแล้ว ลองอัปโหลดใหม่",
     en: "The referenced file is missing — try re-uploading.",
+    ja: "参照ファイルが見つかりません。再アップロードしてください。",
   },
   {
     match: /file size|too large|exceeded.*size|413/i,
     th: "ไฟล์ใหญ่เกินกำหนด (สูงสุด 200MB)",
     en: "File too large (max 200 MB).",
+    ja: "ファイルサイズが大きすぎます（最大 200MB）。",
   },
 
   // ── Provider auth / config ──────────────────────────────────
@@ -93,16 +103,19 @@ const MAPPINGS: ErrorMapping[] = [
     match: /OpenAI 401|api[\s_-]*key|unauthorized|401[\s_]/i,
     th: "ระบบ AI ขัดข้องชั่วคราว — ทีมงานกำลังแก้ไข",
     en: "AI service temporarily down — our team is on it.",
+    ja: "AI サービスが一時的に利用できません。チームが対応中です。",
   },
   {
     match: /content[\s_-]*polic|moderation|blocked|safety[\s_-]*system|disallowed/i,
     th: "เนื้อหาที่ขอนี้ผู้ให้บริการ AI ปฏิเสธ ลองปรับ prompt ให้ปลอดภัยกว่านี้",
     en: "The AI provider blocked this request — try a safer prompt.",
+    ja: "AI プロバイダーがこのリクエストをブロックしました。より安全なプロンプトに調整してください。",
   },
   {
     match: /rate[\s_-]*limit|429|too many requests/i,
     th: "ใช้งานถี่เกินไป รอสักครู่แล้วลองใหม่",
     en: "Too many requests — please wait a moment and try again.",
+    ja: "リクエストが多すぎます。少し待ってから再試行してください。",
   },
   {
     match: /Veo image input was rejected|inlineData.*isn'?t supported|imageBytes|models\/veo.*not found/i,
@@ -115,11 +128,13 @@ const MAPPINGS: ErrorMapping[] = [
     match: /Failed to fetch|NetworkError|fetch failed|abort/i,
     th: "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่",
     en: "Couldn't reach the server — check your connection and try again.",
+    ja: "サーバーに接続できません。インターネット接続を確認して再試行してください。",
   },
   {
     match: /timeout|timed out|deadline/i,
     th: "การประมวลผลใช้เวลานานเกินไป ลองใหม่อีกครั้ง",
     en: "Request took too long — please try again.",
+    ja: "処理に時間がかかりすぎました。もう一度お試しください。",
   },
 
   // ── Validation ─────────────────────────────────────────────
@@ -127,11 +142,13 @@ const MAPPINGS: ErrorMapping[] = [
     match: /still[\s_-]*uploading|asset[\s_-]*not[\s_-]*ready/i,
     th: "ไฟล์อ้างอิงยังอัปโหลดไม่เสร็จ รอสักครู่แล้วกด Run อีกครั้ง",
     en: "Reference file is still uploading — wait a moment and click Run again.",
+    ja: "参照ファイルはまだアップロード中です。少し待ってから再度 Run してください。",
   },
   {
     match: /validation|invalid[\s_-]*param|400[\s_]/i,
     th: "ข้อมูลที่ส่งไม่ถูกต้อง — ตรวจสอบแล้วลองใหม่",
     en: "Some inputs are invalid — please double-check and try again.",
+    ja: "入力内容に誤りがあります。確認して再試行してください。",
   },
 ];
 
@@ -139,6 +156,7 @@ const MAPPINGS: ErrorMapping[] = [
 const GENERIC: Record<Lang, string> = {
   th: "เกิดข้อผิดพลาด ลองอีกครั้งหรือติดต่อทีมงาน",
   en: "Something went wrong — try again or contact support.",
+  ja: "問題が発生しました。もう一度試すか、サポートにお問い合わせください。",
 };
 
 /**
@@ -169,7 +187,7 @@ export function friendlyError(err: unknown, lang: Lang = "en"): string {
 
   for (const m of MAPPINGS) {
     if (m.match.test(raw)) {
-      return lang === "th" ? m.th : m.en;
+      return m[lang] ?? m.en;
     }
   }
   return GENERIC[lang];

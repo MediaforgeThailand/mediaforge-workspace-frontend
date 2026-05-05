@@ -17,7 +17,7 @@ import {
   Sparkles,
   XCircle,
 } from "lucide-react";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { getLocalizedText, useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useCredits } from "@/hooks/useCredits";
 
@@ -66,6 +66,8 @@ const PromptPayPromoModal = ({
 }: PromptPayPromoModalProps) => {
   const { language } = useLanguage();
   const { refetch } = useCredits();
+  const txt = (values: Parameters<typeof getLocalizedText>[1]) =>
+    getLocalizedText(language, values);
 
   const [pkg, setPkg] = useState<PromoPackage | null>(null);
   const [step, setStep] = useState<Step>("loading");
@@ -111,7 +113,7 @@ const PromptPayPromoModal = ({
       if (remaining <= 0) {
         cleanup();
         setStep("error");
-        setErrorMsg(language === "th" ? "QR Code หมดอายุ" : "QR Code expired");
+        setErrorMsg(txt({ en: "QR Code expired", th: "QR Code หมดอายุ", es: "Código QR caducado", ja: "QR コードの有効期限が切れました" }));
       }
     };
     tick();
@@ -216,7 +218,7 @@ const PromptPayPromoModal = ({
           <div className="px-5 py-12 flex flex-col items-center text-center space-y-3">
             <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
             <p className="text-sm text-muted-foreground">
-              {language === "th" ? "กำลังสร้าง QR…" : "Creating QR code…"}
+              {txt({ en: "Creating QR code…", th: "กำลังสร้าง QR…", es: "Creando código QR…", ja: "QR コードを作成中…" })}
             </p>
           </div>
         )}
@@ -229,18 +231,22 @@ const PromptPayPromoModal = ({
               <DialogHeader className="space-y-2">
                 <DialogTitle className="text-base font-semibold text-foreground flex items-center gap-2">
                   <QrCode className="w-4 h-4 text-emerald-400" />
-                  {language === "th"
-                    ? "เติมเครดิตเพื่อสร้างผลงาน"
-                    : "Top up to generate"}
+                  {txt({ en: "Top up to generate", th: "เติมเครดิตเพื่อสร้างผลงาน", es: "Recargar para generar", ja: "生成するためにチャージ" })}
                 </DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground">
                   {requiredCredits
-                    ? language === "th"
-                      ? `ต้องใช้ ${requiredCredits.toLocaleString()} credits · ยอดคงเหลือ ${currentBalance.toLocaleString()}`
-                      : `Need ${requiredCredits.toLocaleString()} credits · balance ${currentBalance.toLocaleString()}`
-                    : language === "th"
-                      ? `ยอดคงเหลือ: ${currentBalance.toLocaleString()} credits`
-                      : `Balance: ${currentBalance.toLocaleString()} credits`}
+                    ? txt({
+                        en: `Need ${requiredCredits.toLocaleString()} credits · balance ${currentBalance.toLocaleString()}`,
+                        th: `ต้องใช้ ${requiredCredits.toLocaleString()} credits · ยอดคงเหลือ ${currentBalance.toLocaleString()}`,
+                        es: `Necesitas ${requiredCredits.toLocaleString()} créditos · saldo ${currentBalance.toLocaleString()}`,
+                        ja: `${requiredCredits.toLocaleString()} クレジット必要 · 残高 ${currentBalance.toLocaleString()}`,
+                      })
+                    : txt({
+                        en: `Balance: ${currentBalance.toLocaleString()} credits`,
+                        th: `ยอดคงเหลือ: ${currentBalance.toLocaleString()} credits`,
+                        es: `Saldo: ${currentBalance.toLocaleString()} créditos`,
+                        ja: `残高: ${currentBalance.toLocaleString()} クレジット`,
+                      })}
                 </DialogDescription>
               </DialogHeader>
             </div>
@@ -252,7 +258,7 @@ const PromptPayPromoModal = ({
                     <Sparkles className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
                     <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider">
                       {pkg.badge_label ||
-                        (language === "th" ? "ข้อเสนอพิเศษ" : "Special Offer")}
+                        txt({ en: "Special Offer", th: "ข้อเสนอพิเศษ", es: "Oferta especial", ja: "特別オファー" })}
                     </span>
                   </div>
                   <p className="text-sm font-bold text-foreground leading-tight">
@@ -266,7 +272,7 @@ const PromptPayPromoModal = ({
                         ·{" "}
                         <span className="text-emerald-400 font-semibold">
                           +{pkg.bonus_percent}%{" "}
-                          {language === "th" ? "โบนัส" : "bonus"}
+                          {txt({ en: "bonus", th: "โบนัส", es: "bonificación", ja: "ボーナス" })}
                         </span>
                       </>
                     ) : null}
@@ -277,7 +283,7 @@ const PromptPayPromoModal = ({
                     ฿{Number(pkg.price_thb).toLocaleString()}
                   </div>
                   <div className="text-[10px] text-muted-foreground mt-1">
-                    {language === "th" ? "ครั้งเดียว" : "one-time"}
+                    {txt({ en: "one-time", th: "ครั้งเดียว", es: "una sola vez", ja: "1 回のみ" })}
                   </div>
                 </div>
               </div>
@@ -308,7 +314,7 @@ const PromptPayPromoModal = ({
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Clock className="w-3.5 h-3.5" />
                 <span>
-                  {language === "th" ? "หมดอายุใน" : "Expires in"}{" "}
+                  {txt({ en: "Expires in", th: "หมดอายุใน", es: "Vence en", ja: "有効期限" })}{" "}
                   {formatTime(timeLeft)}
                 </span>
               </div>
@@ -316,9 +322,7 @@ const PromptPayPromoModal = ({
               <div className="flex items-center gap-2 text-xs text-emerald-400">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 <span>
-                  {language === "th"
-                    ? "รอการชำระเงิน… เครดิตจะเข้าอัตโนมัติ"
-                    : "Waiting for payment… credits added automatically"}
+                  {txt({ en: "Waiting for payment… credits added automatically", th: "รอการชำระเงิน… เครดิตจะเข้าอัตโนมัติ", es: "Esperando pago… créditos agregados automáticamente", ja: "支払い待ち…クレジットは自動で追加されます" })}
                 </span>
               </div>
 
@@ -340,19 +344,19 @@ const PromptPayPromoModal = ({
             </div>
             <div>
               <h3 className="text-lg font-bold text-foreground">
-                {language === "th" ? "ชำระเงินสำเร็จ!" : "Payment Successful!"}
+                {txt({ en: "Payment Successful!", th: "ชำระเงินสำเร็จ!", es: "¡Pago exitoso!", ja: "支払いが完了しました！" })}
               </h3>
               <p className="text-sm text-muted-foreground mt-1 flex items-center justify-center gap-1.5">
                 <Gift className="w-3.5 h-3.5 text-emerald-400" />+
                 {qrData.credits.toLocaleString()} credits{" "}
-                {language === "th" ? "ถูกเพิ่มแล้ว" : "added to your account"}
+                {txt({ en: "added to your account", th: "ถูกเพิ่มแล้ว", es: "añadido a tu cuenta", ja: "アカウントに追加されました" })}
               </p>
             </div>
             <Button
               onClick={() => onOpenChange(false)}
               className="bg-emerald-500 hover:bg-emerald-600 text-white"
             >
-              {language === "th" ? "เริ่มสร้างผลงาน" : "Start generating"}
+              {txt({ en: "Start generating", th: "เริ่มสร้างผลงาน", es: "Empezar a generar", ja: "生成を開始" })}
             </Button>
           </div>
         )}
@@ -365,12 +369,12 @@ const PromptPayPromoModal = ({
             </div>
             <div>
               <h3 className="text-lg font-bold text-foreground">
-                {language === "th" ? "เกิดข้อผิดพลาด" : "Something went wrong"}
+                {txt({ en: "Something went wrong", th: "เกิดข้อผิดพลาด", es: "Algo salió mal", ja: "問題が発生しました" })}
               </h3>
               <p className="text-sm text-muted-foreground mt-1">{errorMsg}</p>
             </div>
             <Button variant="outline" onClick={handleRetry}>
-              {language === "th" ? "ลองอีกครั้ง" : "Try Again"}
+              {txt({ en: "Try Again", th: "ลองอีกครั้ง", es: "Inténtalo de nuevo", ja: "もう一度試す" })}
             </Button>
           </div>
         )}

@@ -20,6 +20,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 /**
  * Buy extra credits — custom-amount-only, PromptPay QR checkout.
@@ -71,6 +72,7 @@ interface PromptPayQr {
 }
 
 const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogProps) => {
+  const { t: i18n } = useLanguage();
   const { toast } = useToast();
 
   const [step, setStep] = useState<Step>("form");
@@ -132,7 +134,7 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
   // ── Submit ────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!isAmountValid) {
-      setErrorMsg(`กรอกจำนวนเงินขั้นต่ำ ${MIN_TOPUP_THB.toLocaleString()} บาท`);
+      setErrorMsg(i18n("settings.buyCredits.enterAtLeastThb", { amount: MIN_TOPUP_THB.toLocaleString() }));
       return;
     }
     setSubmitting(true);
@@ -146,7 +148,7 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
         throw new Error(
           data?.error ||
             (error as { message?: string } | null)?.message ||
-            "ไม่สามารถสร้างใบชำระเงินได้",
+            i18n("settings.buyCredits.couldNotCreatePaymentRequest"),
         );
       }
       const qr = data as PromptPayQr;
@@ -192,14 +194,14 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
             clearInterval(pollRef.current);
             pollRef.current = null;
           }
-          setErrorMsg("QR หมดอายุแล้ว — กรุณาสร้างใบชำระใหม่");
+          setErrorMsg(i18n("settings.buyCredits.qrExpiredPleaseCreateNewPayment"));
           setStep("error");
         }
       };
       tick();
       timerRef.current = setInterval(tick, 1000);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "เกิดข้อผิดพลาด";
+      const msg = err instanceof Error ? err.message : i18n("settings.buyCredits.somethingWentWrong");
       setErrorMsg(msg);
       setStep("error");
     } finally {
@@ -220,20 +222,19 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
         <div className="relative px-6 pt-6 pb-3">
           <DialogHeader className="space-y-1.5 pr-8">
             <DialogTitle className="text-base font-semibold text-zinc-50">
-              เติมเครดิต (Top-up)
+              {i18n("settings.buyCredits.topUpCredits")}
             </DialogTitle>
             <DialogDescription className="text-[11.5px] leading-relaxed text-zinc-400">
-              ชำระผ่าน{" "}
+              {i18n("settings.buyCredits.payWith")}{" "}
               <span className="font-medium text-zinc-200">PromptPay QR</span>{" "}
-              · 1 บาท = {RATIO_THB_TO_CREDITS} เครดิต · เครดิตหมดอายุ 1 ปี
-              หลังเติม
+              · {i18n("settings.buyCredits.exchangeRateNote", { credits: RATIO_THB_TO_CREDITS })}
             </DialogDescription>
           </DialogHeader>
           <button
             type="button"
             onClick={() => onOpenChange(false)}
             className="absolute right-4 top-4 text-zinc-500 transition-colors hover:text-zinc-200"
-            aria-label="Close"
+            aria-label={i18n("common.close")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -247,7 +248,7 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
                 htmlFor="topup-amount"
                 className="text-[12px] font-medium text-zinc-300"
               >
-                จำนวนเงินที่ต้องการเติม (บาท)
+                {i18n("settings.buyCredits.topUpAmountThb")}
               </Label>
               <div className="mt-1.5 flex items-center gap-2">
                 <span className="text-[18px] font-medium text-zinc-500">฿</span>
@@ -266,8 +267,7 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
               </div>
               <div className="mt-2 flex items-center justify-between text-[10.5px] text-zinc-500">
                 <span>
-                  ขั้นต่ำ ฿{MIN_TOPUP_THB.toLocaleString()} · สูงสุด ฿
-                  {MAX_TOPUP_THB.toLocaleString()}
+                  {i18n("settings.buyCredits.minimum")} ฿{MIN_TOPUP_THB.toLocaleString()} · {i18n("settings.buyCredits.maximum")} ฿{MAX_TOPUP_THB.toLocaleString()}
                 </span>
               </div>
             </div>
@@ -295,15 +295,15 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
             <div className="rounded-xl bg-white/[0.04] px-4 py-3">
               <div className="flex items-center justify-between">
                 <span className="text-[11.5px] text-zinc-400">
-                  เครดิตที่จะได้รับ
+                  {i18n("settings.buyCredits.creditsYouWillReceive")}
                 </span>
                 <span className="text-[20px] font-semibold text-emerald-300">
                   +{fmtCredits(previewCredits)}
                 </span>
               </div>
               <div className="mt-1 flex items-center justify-between text-[10.5px] text-zinc-500">
-                <span>ที่อัตรา 1 บาท = {RATIO_THB_TO_CREDITS} เครดิต</span>
-                <span>ชำระ {fmtThb(validatedAmount)}</span>
+                <span>{i18n("settings.buyCredits.at1ThbCredits", { credits: RATIO_THB_TO_CREDITS })}</span>
+                <span>{i18n("settings.buyCredits.pay", { amount: fmtThb(validatedAmount) })}</span>
               </div>
             </div>
 
@@ -322,12 +322,12 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
               {submitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  กำลังสร้าง QR…
+                  {i18n("settings.buyCredits.creatingQr")}
                 </>
               ) : (
                 <>
                   <QrCode className="mr-2 h-4 w-4" />
-                  สร้าง QR ชำระเงิน
+                  {i18n("settings.buyCredits.createPaymentQr")}
                 </>
               )}
             </Button>
@@ -339,13 +339,13 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
           <div className="space-y-4 px-6 pb-6 pt-2">
             <div className="rounded-xl bg-white/[0.04] p-4">
               <div className="flex items-center justify-between text-[11px]">
-                <span className="text-zinc-400">ยอดชำระ</span>
+                <span className="text-zinc-400">{i18n("settings.buyCredits.paymentAmount")}</span>
                 <span className="font-semibold text-zinc-100">
                   {fmtThb(qrData.amount)}
                 </span>
               </div>
               <div className="mt-1 flex items-center justify-between text-[11px]">
-                <span className="text-zinc-400">เครดิตที่จะได้รับ</span>
+                <span className="text-zinc-400">{i18n("settings.buyCredits.creditsYouWillReceive")}</span>
                 <span className="font-semibold text-emerald-300">
                   +{fmtCredits(qrData.credits)}
                 </span>
@@ -357,33 +357,33 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   src={qrData.qrCodeSvgUrl}
-                  alt="PromptPay QR"
+                  alt={i18n("settings.common.promptpayQr")}
                   className="h-56 w-56 rounded-lg bg-white p-3"
                 />
               ) : qrData.qrCodePngUrl ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   src={qrData.qrCodePngUrl}
-                  alt="PromptPay QR"
+                  alt={i18n("settings.common.promptpayQr")}
                   className="h-56 w-56 rounded-lg bg-white p-3"
                 />
               ) : (
                 <div className="flex h-56 w-56 items-center justify-center rounded-lg bg-white/10 text-zinc-500">
-                  ไม่พบ QR
+                  {i18n("settings.buyCredits.qrNotFound")}
                 </div>
               )}
               <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
                 <Clock className="h-3 w-3" />
-                <span>หมดอายุใน {formatTime(secondsLeft)}</span>
+                <span>{i18n("settings.buyCredits.expiresIn", { time: formatTime(secondsLeft) })}</span>
               </div>
               <div className="text-center text-[10.5px] text-zinc-500">
-                สแกน QR ในแอปธนาคาร · เครดิตจะเข้าระบบทันทีหลังชำระสำเร็จ
+                {i18n("settings.buyCredits.scanQrInYourBankingApp")}
               </div>
             </div>
 
             <div className="flex items-center gap-2 text-[11px] text-zinc-400">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-400" />
-              กำลังรอการชำระเงิน…
+              {i18n("settings.buyCredits.waitingForPayment")}
             </div>
           </div>
         )}
@@ -395,13 +395,13 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
               <CheckCircle2 className="h-12 w-12 text-emerald-300" />
               <div className="text-center">
                 <div className="text-[15px] font-semibold text-zinc-50">
-                  ชำระเงินสำเร็จ
+                  {i18n("settings.buyCredits.paymentSuccessful")}
                 </div>
                 <div className="mt-1 text-[12px] text-emerald-200">
-                  +{fmtCredits(qrData.credits)} เครดิตเข้าระบบแล้ว
+                  {i18n("settings.buyCredits.creditsAdded", { credits: fmtCredits(qrData.credits) })}
                 </div>
                 <div className="mt-1 text-[10.5px] text-zinc-400">
-                  ยอดชำระ {fmtThb(qrData.amount)}
+                  {i18n("settings.buyCredits.paymentAmount2", { amount: fmtThb(qrData.amount) })}
                 </div>
               </div>
             </div>
@@ -409,13 +409,13 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
               onClick={() => {
                 onOpenChange(false);
                 toast({
-                  title: "เติมเครดิตเรียบร้อย",
-                  description: `+${fmtCredits(qrData.credits)} เครดิตในบัญชี`,
+                  title: i18n("settings.buyCredits.creditsToppedUp"),
+                  description: i18n("settings.buyCredits.creditsInYourAccount", { credits: fmtCredits(qrData.credits) }),
                 });
               }}
               className="h-11 w-full bg-zinc-100 text-[13.5px] font-semibold text-zinc-900 hover:bg-zinc-200"
             >
-              เสร็จสิ้น
+              {i18n("settings.buyCredits.done")}
             </Button>
           </div>
         )}
@@ -427,10 +427,10 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
               <AlertCircle className="h-12 w-12 text-red-300" />
               <div className="text-center">
                 <div className="text-[15px] font-semibold text-zinc-50">
-                  ชำระไม่สำเร็จ
+                  {i18n("settings.buyCredits.paymentFailed")}
                 </div>
                 <div className="mt-1 max-w-[300px] text-[11.5px] text-red-200">
-                  {errorMsg ?? "เกิดข้อผิดพลาด ลองใหม่อีกครั้ง"}
+                  {errorMsg ?? i18n("settings.buyCredits.somethingWentWrongPleaseTryAgain")}
                 </div>
               </div>
             </div>
@@ -441,7 +441,7 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
               }}
               className="h-11 w-full bg-violet-500 text-[13.5px] font-semibold text-white hover:bg-violet-400"
             >
-              ลองใหม่
+              {i18n("settings.buyCredits.tryAgain")}
             </Button>
           </div>
         )}

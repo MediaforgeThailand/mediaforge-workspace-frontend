@@ -28,7 +28,7 @@ import {
   Plus,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { SUPPORTED_LANGUAGES, getLanguageLocale, getLanguageNativeLabel, useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -144,8 +144,6 @@ const Settings = () => {
     );
   };
 
-  const toggleLanguage = () => setLanguage(language === "en" ? "th" : "en");
-
   // ── Section dispatch ────────────────────────────────────────
   const renderProfile = () => (
     <div className="max-w-4xl space-y-[24px]">
@@ -217,7 +215,7 @@ const Settings = () => {
                   : "text-zinc-200",
               )}
             >
-              {new Date(profile.current_period_end).toLocaleDateString(t("switchLang"), {
+              {new Date(profile.current_period_end).toLocaleDateString(getLanguageLocale(language), {
                 year: "numeric",
                 month: "long",
                 day: "numeric",
@@ -243,19 +241,17 @@ const Settings = () => {
       <Separator className="bg-white/5" />
       <div className="max-w-xl rounded-lg border border-red-500/20 bg-red-500/[0.04] p-[16px]">
         <h3 className="text-[15px] font-semibold leading-[20px] text-red-200">
-          {language === "th" ? "พื้นที่อันตราย" : "Danger zone"}
+          {i18n("settings.team.dangerZone")}
         </h3>
         <p className="mt-1.5 text-[14px] leading-[22px] text-zinc-300">
-          {language === "th"
-            ? "การลบบัญชีจะเอาข้อมูล โปรเจค ผลงาน เครดิต และประวัติการชำระทั้งหมดออกถาวร — กู้คืนไม่ได้"
-            : "Deleting your account permanently removes all data, projects, generations, credits, and billing history — this cannot be undone."}
+          {i18n("settings.account.dangerDescription")}
         </p>
         <button
           type="button"
           onClick={() => setDeleteDialogOpen(true)}
           className="mt-[12px] inline-flex h-[36px] items-center gap-[6px] rounded-md border border-red-500/30 bg-red-500/10 px-[12px] text-[14px] font-medium text-red-200 transition-colors hover:bg-red-500/20"
         >
-          {language === "th" ? "ลบบัญชีถาวร" : "Delete account"}
+          {i18n("settings.team.deleteAccount")}
         </button>
       </div>
     </div>
@@ -270,12 +266,23 @@ const Settings = () => {
             <Globe className="h-[16px] w-[16px] text-zinc-500" />
             {t("language")}
           </span>
-          <button
-            onClick={toggleLanguage}
-            className="rounded-md bg-white/[0.05] px-[12px] py-[6px] text-[14px] font-medium text-zinc-200 transition-colors hover:text-zinc-100"
-          >
-            {language === "en" ? "EN → TH" : "TH → EN"}
-          </button>
+          <div className="flex items-center gap-1 rounded-md bg-white/[0.05] p-1">
+            {SUPPORTED_LANGUAGES.map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setLanguage(option)}
+                className={cn(
+                  "rounded px-[10px] py-[5px] text-[13px] font-medium transition-colors",
+                  language === option
+                    ? "bg-white text-zinc-950"
+                    : "text-zinc-300 hover:bg-white/[0.06] hover:text-zinc-100",
+                )}
+              >
+                {getLanguageNativeLabel(option)}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -476,7 +483,7 @@ async function functionErrorMessage(error: unknown): Promise<string> {
 
 function TeamSettingsPanel() {
   const { user, refreshProfile } = useAuth();
-  const { language } = useLanguage();
+  const { language, t: i18n } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -502,7 +509,7 @@ function TeamSettingsPanel() {
     if (error) {
       const description = await functionErrorMessage(error);
       toast({
-        title: "Could not load team status",
+        title: i18n("settings.team.couldNotLoadTeamStatus"),
         description,
         variant: "destructive",
       });
@@ -523,7 +530,7 @@ function TeamSettingsPanel() {
       if (overviewError) {
         const description = await functionErrorMessage(overviewError);
         toast({
-          title: "Could not load team dashboard",
+          title: i18n("settings.team.couldNotLoadTeamDashboard"),
           description,
           variant: "destructive",
         });
@@ -549,7 +556,7 @@ function TeamSettingsPanel() {
     if (error) {
       const description = await functionErrorMessage(error);
       toast({
-        title: "Could not open Admin Console",
+        title: i18n("settings.team.couldNotOpenAdminConsole"),
         description,
         variant: "destructive",
       });
@@ -559,8 +566,8 @@ function TeamSettingsPanel() {
     const payload = (data?.data ?? data) as { url?: string };
     if (!payload?.url) {
       toast({
-        title: "Could not open Admin Console",
-        description: "The sign-in handoff did not return a redirect URL.",
+        title: i18n("settings.team.couldNotOpenAdminConsole"),
+        description: i18n("settings.team.theSignInHandoffDidNotReturn"),
         variant: "destructive",
       });
       setOpeningConsole(false);
@@ -572,7 +579,7 @@ function TeamSettingsPanel() {
   const createSubTeam = async () => {
     const name = newTeamName.trim();
     if (!name) {
-      toast({ title: "Team name is required", variant: "destructive" });
+      toast({ title: i18n("settings.team.teamNameIsRequired"), variant: "destructive" });
       return;
     }
     setCreatingTeam(true);
@@ -581,10 +588,10 @@ function TeamSettingsPanel() {
     });
     if (error) {
       const description = await functionErrorMessage(error);
-      toast({ title: "Could not create team", description, variant: "destructive" });
+      toast({ title: i18n("settings.team.couldNotCreateTeam"), description, variant: "destructive" });
     } else {
       setNewTeamName("");
-      toast({ title: "Team created" });
+      toast({ title: i18n("settings.team.teamCreated") });
       await loadStatus();
     }
     setCreatingTeam(false);
@@ -593,7 +600,7 @@ function TeamSettingsPanel() {
   const inviteTeamMember = async () => {
     const email = inviteEmail.trim().toLowerCase();
     if (!email || !email.includes("@")) {
-      toast({ title: "Enter a valid email", variant: "destructive" });
+      toast({ title: i18n("settings.team.enterValidEmail"), variant: "destructive" });
       return;
     }
     setInviting(true);
@@ -607,10 +614,10 @@ function TeamSettingsPanel() {
     });
     if (error) {
       const description = await functionErrorMessage(error);
-      toast({ title: "Could not invite member", description, variant: "destructive" });
+      toast({ title: i18n("settings.team.couldNotInviteMember"), description, variant: "destructive" });
     } else {
       setInviteEmail("");
-      toast({ title: "Invitation ready", description: `${email} can join this team workspace.` });
+      toast({ title: i18n("settings.team.invitationReady"), description: i18n("settings.team.canJoinThisTeamWorkspace", { email }) });
       await loadStatus();
     }
     setInviting(false);
@@ -683,12 +690,12 @@ function TeamSettingsPanel() {
   if (!active && pending) {
     return (
       <div className="max-w-2xl rounded-[16px] bg-amber-400/[0.08] p-[20px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-        <h2 className="text-[20px] font-semibold leading-[26px] text-zinc-50">Team request pending</h2>
+        <h2 className="text-[20px] font-semibold leading-[26px] text-zinc-50">{i18n("settings.team.teamRequestPending")}</h2>
         <p className="mt-[8px] text-[14px] leading-[22px] text-zinc-400">
-          Your company domain matched an organization, but an admin needs to approve your access before you can use the team dashboard or shared credit pool.
+          {i18n("settings.team.pendingApprovalDescription")}
         </p>
         <div className="mt-[16px] rounded-[12px] bg-black/30 p-[12px] text-[14px] leading-[20px]">
-          <div className="text-zinc-500">Organization</div>
+          <div className="text-zinc-500">{i18n("settings.team.organization")}</div>
           <div className="font-medium text-zinc-100">
             {pending.organization?.display_name || pending.organization?.name || pending.organization_id}
           </div>
@@ -700,13 +707,17 @@ function TeamSettingsPanel() {
   if (!active) {
     return (
       <div className="max-w-2xl rounded-[16px] bg-zinc-900/60 p-[20px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-        <h2 className="text-[20px] font-semibold leading-[26px] text-zinc-50">Create a team workspace</h2>
+        <h2 className="text-[20px] font-semibold leading-[26px] text-zinc-50">{i18n("settings.team.createTeamWorkspace")}</h2>
         <p className="mt-[8px] text-[14px] leading-[22px] text-zinc-400">
-          Team starts at 2 seats. Each seat is {seatPriceLabel} and adds {seatTotalCredits.toLocaleString()} shared credits per month, including the current {seatPromoCredits.toLocaleString()} credit promotion.
+          {i18n("settings.team.teamStartsAt2SeatsEachSeat", {
+            seatPrice: seatPriceLabel,
+            credits: seatTotalCredits.toLocaleString(),
+            promo: seatPromoCredits.toLocaleString(),
+          })}
         </p>
         <Button className="mt-[20px] h-[36px] px-[14px] text-[14px]" onClick={() => navigate("/app/pricing")}>
           <Users className="mr-[8px] h-[16px] w-[16px]" />
-          Buy team seats
+          {i18n("common.buyTeamSeats")}
         </Button>
       </div>
     );
@@ -721,7 +732,7 @@ function TeamSettingsPanel() {
     >
       <div className="flex flex-col gap-[12px] lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Team</p>
+          <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-zinc-500">{i18n("settings.team.team")}</p>
           <h2 className="mt-[4px] text-[28px] font-semibold leading-[34px] text-zinc-50">{orgName}</h2>
         </div>
         {canOpenConsole && !isSelfServeTeam ? (
@@ -731,7 +742,7 @@ function TeamSettingsPanel() {
             ) : (
               <ExternalLink className="mr-[8px] h-[16px] w-[16px]" />
             )}
-            Admin Console
+            {i18n("common.adminConsole")}
           </Button>
         ) : null}
       </div>
@@ -741,14 +752,14 @@ function TeamSettingsPanel() {
           <div className="rounded-[16px] bg-zinc-900/55 p-[13px] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
             <div className="flex items-center justify-between gap-[12px]">
               <div>
-                <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Seat plan</p>
+                <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-zinc-500">{i18n("settings.team.seatPlan")}</p>
                 <h3 className="mt-[3px] text-[18px] font-semibold leading-[23px] text-zinc-50">
-                  {seatsUsed}/{seatsPurchased} active seats
+                  {i18n("settings.team.valueActiveSeats", { used: seatsUsed, purchased: seatsPurchased })}
                 </h3>
               </div>
               <Button className="h-[34px] rounded-full bg-purple-500 px-[12px] text-[13px] hover:bg-purple-400" onClick={() => navigate("/app/pricing")}>
                 <Plus className="mr-[6px] h-[14px] w-[14px]" />
-                Buy seats
+                {i18n("settings.team.buySeats")}
               </Button>
             </div>
             <div className="mt-[10px] h-[6px] overflow-hidden rounded-full bg-zinc-800">
@@ -761,16 +772,16 @@ function TeamSettingsPanel() {
             </div>
             <div className="mt-[10px] grid grid-cols-3 gap-[7px] text-[12px] leading-[16px]">
               <div className="rounded-[10px] bg-black/22 p-[8px]">
-                <div className="text-zinc-500">Available</div>
+                <div className="text-zinc-500">{i18n("common.available2")}</div>
                 <div className="mt-[3px] font-semibold text-zinc-50">{seatsAvailable}</div>
-                {seatsReserved > 0 ? <div className="mt-[2px] text-[11px] text-zinc-500">{seatsReserved} reserved</div> : null}
+                {seatsReserved > 0 ? <div className="mt-[2px] text-[11px] text-zinc-500">{i18n("settings.team.reserved", { count: seatsReserved })}</div> : null}
               </div>
               <div className="rounded-[10px] bg-black/22 p-[8px]">
-                <div className="text-zinc-500">Credits / seat</div>
+                <div className="text-zinc-500">{i18n("settings.team.creditsSeat")}</div>
                 <div className="mt-[3px] font-semibold text-zinc-50">{seatBaseCredits.toLocaleString()}</div>
               </div>
               <div className="rounded-[10px] bg-black/22 p-[8px]">
-                <div className="text-zinc-500">Promo / seat</div>
+                <div className="text-zinc-500">{i18n("settings.team.promoSeat")}</div>
                 <div className="mt-[3px] font-semibold text-emerald-300">+{seatPromoCredits.toLocaleString()}</div>
               </div>
             </div>
@@ -781,7 +792,7 @@ function TeamSettingsPanel() {
               <div>
                 <div className="mb-[7px] flex items-center gap-[7px] text-[13px] font-semibold text-zinc-200">
                   <Mail className="h-[15px] w-[15px] text-purple-300" />
-                  Invite member
+                  {i18n("settings.team.inviteMember")}
                 </div>
                 <div className="flex flex-col gap-[8px] sm:flex-row">
                   <Input
@@ -797,25 +808,25 @@ function TeamSettingsPanel() {
                     className="h-[36px] rounded-[10px] bg-black/28 px-[10px] text-[13px] text-zinc-100 outline-none"
                     disabled={inviting}
                   >
-                    <option value="">Company pool</option>
+                    <option value="">{i18n("common.companyPool")}</option>
                     {teams.map((team) => (
                       <option key={team.id} value={team.id}>{team.name}</option>
                     ))}
                   </select>
                   <Button className="h-[36px] px-[12px] text-[13px]" onClick={inviteTeamMember} disabled={seatsAvailable <= 0 || inviting}>
                     {inviting ? <Loader2 className="mr-[7px] h-[14px] w-[14px] animate-spin" /> : <UserPlus className="mr-[7px] h-[14px] w-[14px]" />}
-                    Invite
+                    {i18n("settings.team.invite")}
                   </Button>
                 </div>
                 {seatsAvailable <= 0 ? (
-                  <p className="mt-[6px] text-[12px] text-amber-300">No empty seats. Buy more seats before inviting another active member.</p>
+                  <p className="mt-[6px] text-[12px] text-amber-300">{i18n("settings.team.noEmptySeatsBuyMoreSeatsBefore")}</p>
                 ) : null}
               </div>
 
               <div>
                 <div className="mb-[7px] flex items-center gap-[7px] text-[13px] font-semibold text-zinc-200">
                   <Users className="h-[15px] w-[15px] text-sky-300" />
-                  Add sub-team
+                  {i18n("settings.team.addSubTeam")}
                 </div>
                 <div className="flex gap-[8px]">
                   <Input
@@ -842,13 +853,13 @@ function TeamSettingsPanel() {
             <div>
           <div className="flex items-center gap-[8px] text-[14px] font-medium leading-[18px] text-zinc-200">
             <Wallet className="h-[17px] w-[17px] text-sky-300" />
-            Shared
+            {i18n("settings.team.shared")}
           </div>
           <div className="mt-[7px] text-[24px] font-semibold leading-[28px] text-zinc-50">
             {formatCredits(organizationCredits)}
           </div>
             </div>
-            <span className="rounded-full bg-black/30 px-[9px] py-[5px] text-[12px] leading-[15px] text-zinc-400">available</span>
+            <span className="rounded-full bg-black/30 px-[9px] py-[5px] text-[12px] leading-[15px] text-zinc-400">{i18n("common.available")}</span>
           </div>
         </motion.div>
         <motion.div className="relative overflow-hidden rounded-[14px] bg-zinc-900/70 px-[14px] py-[12px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.03 }}>
@@ -857,13 +868,13 @@ function TeamSettingsPanel() {
             <div>
           <div className="flex items-center gap-[8px] text-[14px] font-medium leading-[18px] text-zinc-200">
             <Building2 className="h-[17px] w-[17px] text-violet-300" />
-            Teams
+            {i18n("settings.team.teams")}
           </div>
           <div className="mt-[7px] text-[24px] font-semibold leading-[28px] text-zinc-50">
             {formatCredits(Math.max(1, teams.length || (active.team ? 1 : 0)))}
           </div>
             </div>
-            <span className="rounded-full bg-black/30 px-[9px] py-[5px] text-[12px] leading-[15px] text-zinc-400">incl. pool</span>
+            <span className="rounded-full bg-black/30 px-[9px] py-[5px] text-[12px] leading-[15px] text-zinc-400">{i18n("settings.team.inclPool")}</span>
           </div>
         </motion.div>
         <motion.div className="relative overflow-hidden rounded-[14px] bg-zinc-900/70 px-[14px] py-[12px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.06 }}>
@@ -872,13 +883,13 @@ function TeamSettingsPanel() {
             <div>
           <div className="flex items-center gap-[8px] text-[14px] font-medium leading-[18px] text-zinc-200">
             <Activity className="h-[17px] w-[17px] text-emerald-300" />
-            Online
+            {i18n("settings.team.online")}
           </div>
           <div className="mt-[7px] text-[24px] font-semibold leading-[28px] text-zinc-50">
             {formatCredits(onlineMembers.length)}
           </div>
             </div>
-            <span className="rounded-full bg-black/30 px-[9px] py-[5px] text-[12px] leading-[15px] text-zinc-400">{formatCredits(activeMembers.length)} seats</span>
+            <span className="rounded-full bg-black/30 px-[9px] py-[5px] text-[12px] leading-[15px] text-zinc-400">{formatCredits(activeMembers.length)} {i18n("settings.team.seats")}</span>
           </div>
         </motion.div>
         <motion.div className="relative overflow-hidden rounded-[14px] bg-zinc-900/70 px-[14px] py-[12px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.09 }}>
@@ -887,14 +898,14 @@ function TeamSettingsPanel() {
             <div>
           <div className="flex items-center gap-[8px] text-[14px] font-medium leading-[18px] text-zinc-200">
             <ReceiptText className="h-[17px] w-[17px] text-amber-300" />
-            Used 30d
+            {i18n("settings.team.used30d")}
           </div>
           <div className="mt-[7px] text-[24px] font-semibold leading-[28px] text-zinc-50">
             {formatCredits(generationCredits30d)}
           </div>
             </div>
             <span className="rounded-full bg-black/30 px-[9px] py-[5px] text-[12px] leading-[15px] text-zinc-400">
-              {formatCredits(overview?.usage_summary?.generation_count_30d ?? 0)} runs
+              {formatCredits(overview?.usage_summary?.generation_count_30d ?? 0)} {i18n("settings.team.runs")}
             </span>
           </div>
         </motion.div>
@@ -904,25 +915,25 @@ function TeamSettingsPanel() {
         <>
           <section className="rounded-[16px] bg-zinc-900/55 p-[12px] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
             <div className="flex items-center justify-between">
-              <h3 className="text-[17px] font-semibold leading-[22px] text-zinc-50">Credit pools</h3>
+              <h3 className="text-[17px] font-semibold leading-[22px] text-zinc-50">{i18n("settings.team.creditPools")}</h3>
               <p className="text-[12.5px] leading-[18px] text-zinc-500">{orgName}</p>
             </div>
             <div className="mt-[10px] space-y-[8px]">
               <div className="rounded-[12px] bg-black/22 p-[12px]">
                 <div className="flex items-start justify-between gap-[12px]">
                   <div>
-                    <h4 className="text-[15px] font-semibold leading-[20px] text-zinc-50">Company pool</h4>
+                    <h4 className="text-[15px] font-semibold leading-[20px] text-zinc-50">{i18n("common.companyPool")}</h4>
                     <p className="mt-[2px] text-[12.5px] leading-[17px] text-zinc-500">{orgName}</p>
                   </div>
-                  <Badge className="bg-emerald-400/15 text-emerald-200 hover:bg-emerald-400/15">active</Badge>
+                  <Badge className="bg-emerald-400/15 text-emerald-200 hover:bg-emerald-400/15">{i18n("settings.team.active")}</Badge>
                 </div>
                 <div className="mt-[10px] grid grid-cols-2 gap-[8px]">
                   <div className="rounded-[10px] bg-black/25 p-[9px]">
-                    <div className="text-[12.5px] text-zinc-500">Available</div>
+                    <div className="text-[12.5px] text-zinc-500">{i18n("common.available2")}</div>
                     <div className="mt-[4px] text-[18px] font-semibold text-zinc-50">{formatCredits(overview.organization?.credit_available ?? 0)}</div>
                   </div>
                   <div className="rounded-[10px] bg-black/25 p-[9px]">
-                    <div className="text-[12.5px] text-zinc-500">Allocated</div>
+                    <div className="text-[12.5px] text-zinc-500">{i18n("settings.team.allocated")}</div>
                     <div className="mt-[4px] text-[18px] font-semibold text-zinc-50">{formatCredits(overview.organization?.credit_pool_allocated ?? 0)}</div>
                   </div>
                 </div>
@@ -938,7 +949,7 @@ function TeamSettingsPanel() {
                         <h4 className="text-[15px] font-semibold leading-[20px] text-zinc-50">{team.name}</h4>
                         <p className="mt-[2px] text-[12.5px] uppercase leading-[17px] text-zinc-500">{team.code || "team"}</p>
                       </div>
-                      <span className="text-[12.5px] text-zinc-400">{formatCredits(team.member_count ?? 0)} members</span>
+                      <span className="text-[12.5px] text-zinc-400">{formatCredits(team.member_count ?? 0)} {i18n("settings.team.members2")}</span>
                     </div>
                     <div className="mt-[9px] h-[6px] overflow-hidden rounded-full bg-zinc-800">
                       <motion.div className="h-full rounded-full bg-sky-400" initial={{ width: 0 }} animate={{ width: `${percent}%` }} transition={{ duration: 0.5, ease: "easeOut" }} />
@@ -956,9 +967,9 @@ function TeamSettingsPanel() {
             <div className="rounded-[16px] bg-zinc-900/55 p-[12px] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
               <div className="mb-[10px] flex items-center justify-between px-[2px]">
                 <div>
-                  <h3 className="text-[17px] font-semibold leading-[22px] text-zinc-50">Members</h3>
+                  <h3 className="text-[17px] font-semibold leading-[22px] text-zinc-50">{i18n("settings.team.members")}</h3>
                 </div>
-                <span className="rounded-full bg-white/[0.07] px-[10px] py-[5px] text-[12px] text-zinc-300">{formatCredits(members.length)} accounts</span>
+                <span className="rounded-full bg-white/[0.07] px-[10px] py-[5px] text-[12px] text-zinc-300">{formatCredits(members.length)} {i18n("settings.team.accounts")}</span>
               </div>
               <div className="space-y-[7px]">
                 {members.slice(0, 10).map((member) => {
@@ -975,8 +986,8 @@ function TeamSettingsPanel() {
                         <div className="truncate text-[12.5px] leading-[18px] text-zinc-500">{member.email || "No email"}</div>
                       </div>
                       <div>
-                        <div className="truncate text-[13.5px] font-medium text-zinc-200">{team?.name || "Company pool"}</div>
-                        <div className="text-[12px] text-zinc-500">{member.role === "org_admin" ? "Admin" : "Member"}</div>
+                        <div className="truncate text-[13.5px] font-medium text-zinc-200">{team?.name || i18n("common.companyPool")}</div>
+                        <div className="text-[12px] text-zinc-500">{member.role === "org_admin" ? i18n("settings.team.admin") : i18n("settings.team.member")}</div>
                       </div>
                       <div>
                         <Badge className={cn(
@@ -984,7 +995,7 @@ function TeamSettingsPanel() {
                           isOnline ? "bg-emerald-400/12 text-emerald-200" : "bg-zinc-800 text-zinc-300",
                         )}>
                           <span className={cn("h-[7px] w-[7px] rounded-full", isOnline ? "bg-emerald-300" : "bg-zinc-500")} />
-                          {isOnline ? "active" : "offline"}
+                          {isOnline ? i18n("settings.team.active") : i18n("settings.team.offline")}
                         </Badge>
                       </div>
                       <div className="text-[12.5px] leading-[18px] text-zinc-400">
@@ -1001,37 +1012,37 @@ function TeamSettingsPanel() {
 
             <div className="rounded-[16px] bg-zinc-900/55 p-[12px] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
               <div className="mb-[10px] flex items-center justify-between px-[2px]">
-                <h3 className="text-[17px] font-semibold leading-[22px] text-zinc-50">Credit flow</h3>
-                <span className="text-[12.5px] text-zinc-500">latest</span>
+                <h3 className="text-[17px] font-semibold leading-[22px] text-zinc-50">{i18n("settings.team.creditFlow")}</h3>
+                <span className="text-[12.5px] text-zinc-500">{i18n("common.latest3")}</span>
               </div>
               <div className="space-y-[8px]">
-                {allocationTransactions.length > 0 ? allocationTransactions.map((tx) => {
-                  const team = tx.class_id ? teamById.get(tx.class_id) : null;
-                  const isPositive = Number(tx.amount ?? 0) >= 0;
+                {allocationTransactions.length > 0 ? allocationTransactions.map((transaction) => {
+                  const team = transaction.class_id ? teamById.get(transaction.class_id) : null;
+                  const isPositive = Number(transaction.amount ?? 0) >= 0;
                   return (
-                    <motion.div key={tx.id} className="rounded-[12px] bg-black/22 p-[11px]" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.18 }}>
+                    <motion.div key={transaction.id} className="rounded-[12px] bg-black/22 p-[11px]" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.18 }}>
                       <div className="flex items-start justify-between gap-[10px]">
                         <div className="min-w-0">
                           <div className="truncate text-[14px] font-semibold leading-[19px] text-zinc-50">
-                            {team?.name || (tx.organization_id ? "Organization pool" : "Member credit")}
+                            {team?.name || (transaction.organization_id ? i18n("settings.team.organizationPool") : i18n("settings.team.memberCredit"))}
                           </div>
                           <div className="mt-[3px] line-clamp-2 text-[12.5px] leading-[17px] text-zinc-500">
-                            {tx.description || tx.reason || "Credit movement"}
+                            {transaction.description || transaction.reason || i18n("settings.team.creditMovement")}
                           </div>
                         </div>
                         <div className={cn("rounded-full px-[9px] py-[5px] text-[13px] font-semibold", isPositive ? "bg-emerald-400/12 text-emerald-200" : "bg-amber-400/12 text-amber-200")}>
-                          {isPositive ? "+" : ""}{formatCredits(tx.amount ?? 0)}
+                          {isPositive ? "+" : ""}{formatCredits(transaction.amount ?? 0)}
                         </div>
                       </div>
                       <div className="mt-[8px] flex items-center justify-between gap-[10px] text-[12px] text-zinc-600">
-                        <span className="truncate">{tx.actor_display_name || tx.actor_email || "System"}</span>
-                        <span>{formatRelative(tx.created_at)}</span>
+                        <span className="truncate">{transaction.actor_display_name || transaction.actor_email || i18n("settings.team.system")}</span>
+                        <span>{formatRelative(transaction.created_at)}</span>
                       </div>
                     </motion.div>
                   );
                 }) : (
                   <div className="rounded-[12px] bg-black/22 p-[14px] text-[13.5px] leading-[20px] text-zinc-500">
-                    No team allocation yet.
+                    {i18n("settings.team.noTeamAllocationYet")}
                   </div>
                 )}
               </div>
@@ -1040,7 +1051,10 @@ function TeamSettingsPanel() {
         </>
       ) : (
         <p className="max-w-4xl text-[16px] leading-[24px] text-zinc-200">
-          Your account uses {active.team?.name || "the company pool"} in {orgName}. Full team analytics, member status, and credit transfer logs are available to organization admins.
+          {i18n("settings.team.yourAccountUsesInFull", {
+            team: active.team?.name || i18n("settings.team.theCompanyPool"),
+            org: orgName,
+          })}
         </p>
       )}
     </motion.div>
