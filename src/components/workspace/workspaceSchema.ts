@@ -483,6 +483,9 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         label: "reference_image",
         color: "cyan",
         supportedModels: [...SEEDANCE_VIDEO_REF_MODELS],
+        // BytePlus Seedance 2.0 reference-image mode accepts 1-9
+        // reference images, each sent as role="reference_image".
+        maxConnections: 9,
       },
       {
         id: "ref_video",
