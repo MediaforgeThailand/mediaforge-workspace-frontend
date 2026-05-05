@@ -1402,11 +1402,11 @@ const HomeView = ({
             className="flex min-h-[150px] items-start justify-center px-2 pt-4 text-center md:min-h-[176px] md:pt-5 lg:min-h-[188px] lg:pt-6"
           >
             <h2 className="workspace-home-hero-heading max-w-[860px] text-[42px] font-semibold leading-[0.98] tracking-[0px] text-white md:text-[64px] lg:text-[76px]">
-              <span className="block">Every idea</span>
+              <span className="block">{t("workspace.home.hero.line1")}</span>
               <span className="block">
-                deserve to{" "}
+                {t("workspace.home.hero.line2_prefix")}{" "}
                 <span className="workspace-home-hero-accent bg-gradient-to-r from-[#c77dff] via-[#9b4de0] to-[#5b2a8c] bg-clip-text text-transparent">
-                  exist
+                  {t("workspace.home.hero.line2_accent")}
                 </span>
               </span>
             </h2>
@@ -1451,7 +1451,7 @@ const HomeView = ({
           <section className="mt-14">
             <div className="flex items-center justify-between gap-4">
               <h2 className="text-[26px] font-semibold leading-tight text-white md:text-[30px]">
-                Inspirations
+                {t("workspace.home.inspirations")}
               </h2>
               <div className="inline-flex h-10 items-center rounded-full bg-[#151719] p-1 ring-1 ring-white/[0.04]">
                 {(["image", "video"] as const).map((kind) => {
@@ -1468,7 +1468,7 @@ const HomeView = ({
                           : "text-zinc-400 hover:text-white",
                       )}
                     >
-                      {kind}
+                      {kind === "image" ? t("workspace.home.kind.image") : t("workspace.home.kind.video")}
                     </button>
                   );
                 })}

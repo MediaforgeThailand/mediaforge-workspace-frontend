@@ -1874,6 +1874,12 @@ export const th = {
 
     // Dashboard / workspace home
     "workspace.home.title": "หน้าหลัก",
+    "workspace.home.hero.line1": "ทุกไอเดีย",
+    "workspace.home.hero.line2_prefix": "ควรได้",
+    "workspace.home.hero.line2_accent": "เกิดขึ้นจริง",
+    "workspace.home.inspirations": "แรงบันดาลใจ",
+    "workspace.home.kind.image": "รูปภาพ",
+    "workspace.home.kind.video": "วิดีโอ",
     "workspace.home.projects": "โปรเจกต์",
     "workspace.home.spaces": "Spaces",
     "workspace.home.tools": "เครื่องมือ",

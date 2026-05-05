@@ -1884,6 +1884,12 @@ export const es = {
 
     // Dashboard / workspace home
     "workspace.home.title": "Inicio",
+    "workspace.home.hero.line1": "Cada idea",
+    "workspace.home.hero.line2_prefix": "merece",
+    "workspace.home.hero.line2_accent": "existir",
+    "workspace.home.inspirations": "Inspiraciones",
+    "workspace.home.kind.image": "Imagen",
+    "workspace.home.kind.video": "Vídeo",
     "workspace.home.projects": "Proyectos",
     "workspace.home.spaces": "Espacios",
     "workspace.home.tools": "Herramientas",
