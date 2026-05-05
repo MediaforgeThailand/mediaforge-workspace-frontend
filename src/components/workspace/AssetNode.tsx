@@ -11,13 +11,29 @@
 
 import { memo, useCallback, useMemo, useState } from "react";
 import { type NodeProps, useReactFlow } from "@xyflow/react";
-import { Image as ImageIcon, Film, Music, Box, Loader2, Maximize2 } from "lucide-react";
+import {
+  Image as ImageIcon,
+  Film,
+  Music,
+  Box,
+  Loader2,
+  Maximize2,
+  Eye,
+  Download,
+  Copy,
+  FolderOpen,
+  Trash2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFreshSignedUrl } from "./useFreshSignedUrl";
 import { PortIcon } from "./PortIcon";
 import { MiniSelect } from "./CompactParamWidgets";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { AudioPlayButton } from "./AudioPlayButton";
+import { downloadFromUrl } from "./downloadAsset";
+import MediaContextMenu, {
+  type MediaContextMenuItem,
+} from "./MediaContextMenu";
 
 export interface AssetNodeData {
   /** Editable label — this is what @-mentions reference. */
@@ -85,9 +101,10 @@ const DEFAULT_ASSET_NODE_WIDTH = 219;
 
 const AssetNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as unknown as AssetNodeData;
-  const { setNodes } = useReactFlow();
+  const { setNodes, getNode } = useReactFlow();
   const { t } = useLanguage();
   const [isHovered, setIsHovered] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   // Re-sign the previewUrl on mount in case it was generated under
   // the old 24h TTL and has since expired. Falls back to the raw
   // URL untouched for blob:/data: URLs and non-Supabase sources.
@@ -181,6 +198,32 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
     [id, d.compactWidth, setNodes],
   );
 
+  const onDuplicateNode = useCallback(() => {
+    const source = getNode(id);
+    if (!source) return;
+    const nextId = `n_${crypto.randomUUID()}`;
+    setNodes((ns) => [
+      ...ns.map((n) => ({ ...n, selected: false })),
+      {
+        ...source,
+        id: nextId,
+        selected: true,
+        position: {
+          x: source.position.x + 30,
+          y: source.position.y + 30,
+        },
+        data: {
+          ...source.data,
+          label: `${d.label || d.fileName || "Asset"} copy`,
+        },
+      },
+    ]);
+  }, [d.fileName, d.label, getNode, id, setNodes]);
+
+  const onDeleteNode = useCallback(() => {
+    setNodes((ns) => ns.filter((n) => n.id !== id));
+  }, [id, setNodes]);
+
   // Preview opens via the canvas-level `onNodeDoubleClick` handler
   // (WorkspaceCanvas → NodePreviewLightbox). Asset node no longer
   // owns its own expanded dialog — single source of truth, and the
@@ -191,6 +234,56 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
     : d.fieldType === "audio" ? Music
     : d.fieldType === "model3d" ? Box
     : ImageIcon;
+  const downloadableUrl = livePreviewUrl ?? d.previewUrl;
+  const contextMenuItems: MediaContextMenuItem[] = [
+    {
+      key: "preview",
+      label: "Preview",
+      icon: Eye,
+      disabled: true,
+      onSelect: () => undefined,
+    },
+    {
+      key: "download",
+      label: "Download",
+      icon: Download,
+      disabled: !downloadableUrl,
+      onSelect: () => {
+        if (downloadableUrl) {
+          void downloadFromUrl(downloadableUrl, d.fileName || d.label || "asset");
+        }
+      },
+    },
+    {
+      key: "duplicate",
+      label: "Duplicate",
+      icon: Copy,
+      onSelect: onDuplicateNode,
+    },
+    {
+      key: "move-board",
+      label: "Move to Board",
+      icon: FolderOpen,
+      separatorBefore: true,
+      disabled: true,
+      onSelect: () => undefined,
+    },
+    {
+      key: "copy-board",
+      label: "Copy to Board",
+      icon: Copy,
+      disabled: true,
+      onSelect: () => undefined,
+    },
+    {
+      key: "delete",
+      label: "Delete",
+      icon: Trash2,
+      separatorBefore: true,
+      danger: true,
+      onSelect: onDeleteNode,
+    },
+  ];
   // Title icon stays neutral grey across every node type — team
   // feedback was that a multi-coloured canvas was too noisy. The
   // glyph alone (Image vs Film vs Music vs Box) is what now signals
@@ -260,6 +353,11 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
             "group relative bg-black ws-preview-zone",
             !d.uploading && d.previewUrl && "cursor-pointer",
           )}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setContextMenu({ x: event.clientX, y: event.clientY });
+          }}
         >
         {/* Reference role picker — fades in on hover/select via the
          *  shared `.ws-compact-overlay` rule (same affordance the
@@ -400,6 +498,13 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
         title={t("workspace.node.asset_drag_resize")}
         aria-label={t("workspace.node.asset_resize")}
       />
+      {contextMenu && (
+        <MediaContextMenu
+          position={contextMenu}
+          items={contextMenuItems}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   );
 });

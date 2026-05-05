@@ -8,7 +8,9 @@ import {
   ChevronDown,
   ChevronRight,
   Crop,
+  Copy,
   Download,
+  Eye,
   ExternalLink,
   FolderOpen,
   ImagePlus,
@@ -79,6 +81,9 @@ import {
   videoSupportsStartEndFrames,
 } from "./standaloneGenerationCatalog";
 import { orderModelsByRecommendation } from "./modelDisplay";
+import MediaContextMenu, {
+  type MediaContextMenuItem,
+} from "./MediaContextMenu";
 // Hardcoded voice catalogs (Gemini star names, Google Studio
 // labels, ElevenLabs default presets) were deleted in the
 // preset-purge cleanup. ElevenLabs voices come from a live
@@ -4465,6 +4470,7 @@ function CreationTile({
   onPreview: (preview: PreviewPayload) => void;
 }) {
   const { language, t } = useLanguage();
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const result = job.result;
   const params = job.request?.params ?? {};
   const prompt = String(params.prompt ?? "");
@@ -4568,6 +4574,55 @@ function CreationTile({
       });
     }
   };
+  const contextMenuItems: MediaContextMenuItem[] = [
+    {
+      key: "preview",
+      label: "Preview",
+      icon: Eye,
+      disabled: !canOpenPreview,
+      onSelect: openMediaPreview,
+    },
+    {
+      key: "download",
+      label: "Download",
+      icon: Download,
+      disabled: !downloadUrl,
+      onSelect: () => {
+        if (downloadUrl) void downloadFromUrl(downloadUrl, downloadName);
+      },
+    },
+    {
+      key: "duplicate",
+      label: "Duplicate",
+      icon: Copy,
+      disabled: true,
+      onSelect: () => undefined,
+    },
+    {
+      key: "move-board",
+      label: "Move to Board",
+      icon: FolderOpen,
+      separatorBefore: true,
+      disabled: true,
+      onSelect: () => undefined,
+    },
+    {
+      key: "copy-board",
+      label: "Copy to Board",
+      icon: Copy,
+      disabled: true,
+      onSelect: () => undefined,
+    },
+    {
+      key: "delete",
+      label: "Delete",
+      icon: Trash2,
+      separatorBefore: true,
+      danger: true,
+      disabled: true,
+      onSelect: () => undefined,
+    },
+  ];
   return (
     <article className="group relative flex h-[230px] max-w-full overflow-hidden rounded-[10px] bg-black/40 shadow-[inset_0_0_0_1px_rgba(255,255,255,.04)]">
       <div
@@ -4579,6 +4634,15 @@ function CreationTile({
         role={canOpenPreview ? "button" : undefined}
         tabIndex={canOpenPreview ? 0 : undefined}
         onClick={canOpenPreview ? openMediaPreview : undefined}
+        onContextMenu={
+          canOpenPreview || downloadUrl
+            ? (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setContextMenu({ x: event.clientX, y: event.clientY });
+              }
+            : undefined
+        }
         onKeyDown={
           canOpenPreview
             ? (event) => {
@@ -4698,6 +4762,13 @@ function CreationTile({
             {t("workspace.standalone.status.failed")}
           </div>
         </div>
+      )}
+      {contextMenu && (
+        <MediaContextMenu
+          position={contextMenu}
+          items={contextMenuItems}
+          onClose={() => setContextMenu(null)}
+        />
       )}
     </article>
   );

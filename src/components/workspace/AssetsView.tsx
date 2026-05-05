@@ -51,6 +51,8 @@ import {
   ChevronDown,
   RefreshCcw,
   ExternalLink,
+  Eye,
+  Copy,
   Download,
   Trash2,
   AlertTriangle,
@@ -65,6 +67,10 @@ import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { getSignedUrl } from "@/hooks/useSignedUrl";
 import { cn } from "@/lib/utils";
 import NodePreviewLightbox, { type PreviewPayload } from "./NodePreviewLightbox";
+import { downloadFromUrl } from "./downloadAsset";
+import MediaContextMenu, {
+  type MediaContextMenuItem,
+} from "./MediaContextMenu";
 import {
   Dialog,
   DialogContent,
@@ -1183,6 +1189,7 @@ function AssetCard({
   const Icon = KIND_ICON[asset.kind];
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [hovered, setHovered] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   // Lazily play / pause on hover so the grid doesn't choke on a
   // page full of <video autoplay loop>.
@@ -1209,6 +1216,50 @@ function AssetCard({
       ? `${Math.round(asset.durationSec)}s`
       : null;
   const dateLabel = formatRelative(asset.createdAt, t);
+  const contextMenuItems: MediaContextMenuItem[] = [
+    {
+      key: "preview",
+      label: "Preview",
+      icon: Eye,
+      onSelect: () => onPreview(asset),
+    },
+    {
+      key: "download",
+      label: "Download",
+      icon: Download,
+      onSelect: () => void downloadFromUrl(asset.url, modelLabel),
+    },
+    {
+      key: "duplicate",
+      label: "Duplicate",
+      icon: Copy,
+      disabled: true,
+      onSelect: () => undefined,
+    },
+    {
+      key: "move-board",
+      label: "Move to Board",
+      icon: Folder,
+      separatorBefore: true,
+      disabled: true,
+      onSelect: () => undefined,
+    },
+    {
+      key: "copy-board",
+      label: "Copy to Board",
+      icon: Copy,
+      disabled: true,
+      onSelect: () => undefined,
+    },
+    {
+      key: "delete",
+      label: "Delete",
+      icon: Trash2,
+      separatorBefore: true,
+      danger: true,
+      onSelect: () => onDelete(asset),
+    },
+  ];
 
   return (
     <div
@@ -1224,6 +1275,11 @@ function AssetCard({
         tabIndex={0}
         title={t("workspace.assets.open_download")}
         onClick={() => onPreview(asset)}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          setContextMenu({ x: event.clientX, y: event.clientY });
+        }}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
@@ -1320,6 +1376,13 @@ function AssetCard({
           </span>
         </div>
       </div>
+      {contextMenu && (
+        <MediaContextMenu
+          position={contextMenu}
+          items={contextMenuItems}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   );
 }

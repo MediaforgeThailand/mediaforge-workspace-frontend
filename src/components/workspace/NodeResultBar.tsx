@@ -9,9 +9,13 @@
  */
 
 import { memo, useState } from "react";
-import { Maximize2 } from "lucide-react";
+import { Copy, Download, Eye, FolderOpen, Maximize2, Trash2 } from "lucide-react";
 import NodeResultDialog from "./NodeResultDialog";
 import { AudioPlayButton } from "./AudioPlayButton";
+import { downloadFromUrl } from "./downloadAsset";
+import MediaContextMenu, {
+  type MediaContextMenuItem,
+} from "./MediaContextMenu";
 
 export interface Generation {
   id: string;
@@ -39,9 +43,61 @@ const EMPTY_MIN_HEIGHT = 140;
 const NodeResultBar = memo(
   ({ generations, selectedIndex = 0, onSelectIndex, width = 300 }: Props) => {
     const [expanded, setExpanded] = useState(false);
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
     const hasGens = !!generations && generations.length > 0;
     const current = hasGens ? (generations![selectedIndex] ?? generations![0]) : null;
+    const canUseMediaMenu =
+      !!current?.url && (current.type === "image" || current.type === "video");
+    const contextMenuItems: MediaContextMenuItem[] = [
+      {
+        key: "preview",
+        label: "Preview",
+        icon: Eye,
+        disabled: !current,
+        onSelect: () => setExpanded(true),
+      },
+      {
+        key: "download",
+        label: "Download",
+        icon: Download,
+        disabled: !current?.url,
+        onSelect: () => {
+          if (current?.url) void downloadFromUrl(current.url, current.id);
+        },
+      },
+      {
+        key: "duplicate",
+        label: "Duplicate",
+        icon: Copy,
+        disabled: true,
+        onSelect: () => undefined,
+      },
+      {
+        key: "move-board",
+        label: "Move to Board",
+        icon: FolderOpen,
+        separatorBefore: true,
+        disabled: true,
+        onSelect: () => undefined,
+      },
+      {
+        key: "copy-board",
+        label: "Copy to Board",
+        icon: Copy,
+        disabled: true,
+        onSelect: () => undefined,
+      },
+      {
+        key: "delete",
+        label: "Delete",
+        icon: Trash2,
+        separatorBefore: true,
+        danger: true,
+        disabled: true,
+        onSelect: () => undefined,
+      },
+    ];
 
     return (
       <>
@@ -57,6 +113,15 @@ const NodeResultBar = memo(
                 setExpanded(true);
               }}
               onMouseDown={(e) => e.stopPropagation()}
+              onContextMenu={
+                canUseMediaMenu
+                  ? (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setContextMenu({ x: e.clientX, y: e.clientY });
+                    }
+                  : undefined
+              }
             >
               {current.type === "image" && current.url && (
                 <img src={current.url} className="block h-auto w-full" alt="" />
@@ -120,6 +185,13 @@ const NodeResultBar = memo(
             generations={generations!}
             selectedIndex={selectedIndex}
             onSelect={onSelectIndex}
+          />
+        )}
+        {contextMenu && (
+          <MediaContextMenu
+            position={contextMenu}
+            items={contextMenuItems}
+            onClose={() => setContextMenu(null)}
           />
         )}
       </>
