@@ -365,6 +365,12 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         supportedModels: ["kling-v2-6-motion-pro", "kling-v3-motion-pro", "kling-v3-omni"],
       },
       {
+        id: "reference_image",
+        label: "reference_image",
+        color: "cyan",
+        supportedModels: [...SEEDANCE_VIDEO_REF_MODELS],
+      },
+      {
         id: "ref_video",
         label: "ref_video",
         color: "rose",
@@ -811,6 +817,7 @@ const TEXT_HANDLE_IDS = new Set([
 const IMAGE_HANDLE_IDS = new Set([
   "image",
   "ref_image",
+  "reference_image",
   "image_input",
   "start_frame",
   "end_frame",

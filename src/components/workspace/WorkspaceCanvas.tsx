@@ -222,7 +222,7 @@ function countGroupChildrenOfType(
 /** TextNode's img_1/2/3 slots accept either image OR video, so they   */
 /* appear in both sets below.                                         */
 const IMAGE_TARGETS = new Set([
-  "image", "image_input", "ref_image", "start_frame", "end_frame", "mask",
+  "image", "image_input", "ref_image", "reference_image", "start_frame", "end_frame", "mask",
   "img_1", "img_2", "img_3",
   // ElementNode (Kling element) — 4 reference slots + 1 frontal
   "ref_1", "ref_2", "ref_3", "ref_4", "frontal",
