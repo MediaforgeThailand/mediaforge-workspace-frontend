@@ -75,6 +75,22 @@ const BANANA_MODELS = ["nano-banana-2", "nano-banana-pro"] as const;
 const OPENAI_IMAGE_MODELS = ["gpt-image-2"] as const;
 const ELEVENLABS_TTS_MODELS = ["elevenlabs-multilingual-v2", "elevenlabs-turbo-v2-5"] as const;
 const GEMINI_TTS_MODELS = ["gemini-3.1-flash-tts-preview", "gemini-2.5-pro-preview-tts"] as const;
+/** All 30 official preset speakers shipped with Gemini 3.1 Flash TTS
+ *  Preview (verified against
+ *  https://ai.google.dev/gemini-api/docs/speech-generation, May 2026).
+ *  Backend `executeGeminiTts` validates against the same set; if Google
+ *  publishes new presets, update both `GEMINI_TTS_VOICES` here and the
+ *  Set in `workspace-run-node/index.ts` together. Order is alphabetical
+ *  so the dropdown shows them in a predictable column. */
+export const GEMINI_TTS_VOICES = [
+  "Achernar", "Achird", "Algenib", "Algieba", "Alnilam",
+  "Aoede", "Autonoe", "Callirrhoe", "Charon", "Despina",
+  "Enceladus", "Erinome", "Fenrir", "Gacrux", "Iapetus",
+  "Kore", "Laomedeia", "Leda", "Orus", "Puck",
+  "Pulcherrima", "Rasalgethi", "Sadachbia", "Sadaltager", "Schedar",
+  "Sulafat", "Umbriel", "Vindemiatrix", "Zephyr", "Zubenelgenubi",
+] as const;
+export const DEFAULT_GEMINI_TTS_VOICE = "Kore";
 // Backend still supports Google Cloud TTS, but the workspace project does not
 // currently have GOOGLE_TTS_API_KEY configured, so keep it hidden in the UI.
 const GOOGLE_TTS_MODELS = [] as const;
@@ -996,6 +1012,19 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         },
         default: "neutral",
         supportedModels: [...ELEVENLABS_TTS_MODELS],
+      },
+      {
+        // Gemini 3.1 Flash TTS / 2.5 Pro TTS share the same 30 preset
+        // speaker catalogue. Picking one sends `prebuiltVoiceConfig`
+        // with that voiceName in the speechConfig — see backend
+        // `executeGeminiTts`. Default `Kore` matches the backend
+        // fallback when the param is empty.
+        key: "voice",
+        label: "Voice",
+        type: "select",
+        options: [...GEMINI_TTS_VOICES],
+        default: DEFAULT_GEMINI_TTS_VOICE,
+        supportedModels: [...GEMINI_TTS_MODELS],
       },
       {
         key: "speed",

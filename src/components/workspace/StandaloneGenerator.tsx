@@ -85,6 +85,7 @@ import {
   videoSupportsReferenceVideo,
   videoSupportsStartEndFrames,
 } from "./standaloneGenerationCatalog";
+import { GEMINI_TTS_VOICES, DEFAULT_GEMINI_TTS_VOICE } from "./workspaceSchema";
 import { orderModelsByRecommendation } from "./modelDisplay";
 import MediaContextMenu, {
   type MediaContextMenuItem,
@@ -3453,7 +3454,6 @@ function VideoControls({
   const isMotion = isKlingMotionVideoModel(form.model);
   const isVeo = isVeoVideoModel(form.model);
   const supportsAudioToggle =
-    isVeo ||
     (isSeedance && seedanceVideoSupportsAudio(form.model)) ||
     (!isSeedance && !isVeo && !isMotion);
   const supportsStartEnd = videoSupportsStartEndFrames(form.model);
@@ -3833,6 +3833,12 @@ function VoiceSettingsControls({
       {provider === "elevenlabs" && (
         <ElevenLabsVoiceParams form={form} onChange={onChange} />
       )}
+      {provider === "gemini" && (
+        <GeminiVoicePicker
+          value={form.voice || DEFAULT_GEMINI_TTS_VOICE}
+          onChange={(voice) => onChange({ voice })}
+        />
+      )}
       {provider !== "elevenlabs" && (
         <TextInputField
           label={t("workspace.standalone.voice_instructions")}
@@ -3846,6 +3852,59 @@ function VoiceSettingsControls({
         />
       )}
     </>
+  );
+}
+
+/** Gemini 3.1 / 2.5 Pro TTS voice picker — 30 official preset speakers
+ *  shipped by Google. We keep the same compact grid feel as the
+ *  ElevenLabs picker so the voice gen panel reads consistently. The
+ *  voice list lives in `workspaceSchema.GEMINI_TTS_VOICES` and is
+ *  validated server-side by `executeGeminiTts`. */
+function GeminiVoicePicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (voiceName: string) => void;
+}) {
+  return (
+    <div>
+      <FieldLabel
+        label="Voice"
+        meta={`${GEMINI_TTS_VOICES.length} preset speakers`}
+      />
+      <div className="ws-scroll-hide mt-2 grid max-h-[270px] grid-cols-3 gap-2 overflow-y-auto pr-0.5">
+        {GEMINI_TTS_VOICES.map((voiceName) => {
+          const active = value === voiceName;
+          return (
+            <button
+              key={voiceName}
+              type="button"
+              onClick={() => onChange(voiceName)}
+              className={cn(
+                "flex min-h-[58px] flex-col items-start justify-center rounded-lg border border-dashed px-3 py-2 text-left transition",
+                active
+                  ? "border-amber-300/50 bg-amber-300/10"
+                  : "border-white/[0.12] bg-[#242424] hover:bg-[#2d2d2d]",
+              )}
+            >
+              <span
+                className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"
+                style={{
+                  background:
+                    TINT_PALETTE[pickTintFromName(voiceName)] ?? TINT_PALETTE.zinc,
+                }}
+              >
+                {voiceName.charAt(0)}
+              </span>
+              <span className="mt-1.5 block w-full truncate text-[11px] font-bold text-white">
+                {voiceName}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -6271,11 +6330,17 @@ function buildVideoPanelSettings({
   const isMotion = isKlingMotionVideoModel(form.model);
   const isVeo = isVeoVideoModel(form.model);
   const supportsAudioToggle =
-    isVeo ||
     (isSeedance && seedanceVideoSupportsAudio(form.model)) ||
     (!isSeedance && !isVeo && !isMotion);
 
-  if (supportsAudioToggle) {
+  if (isVeo) {
+    settings.push({
+      id: "audio",
+      label: standaloneInlineLabel("audio", language),
+      value: language === "th" ? "เปิดตลอด" : "Always on",
+      kind: "readonly",
+    });
+  } else if (supportsAudioToggle) {
     settings.push({
       id: "audio",
       label: standaloneInlineLabel("audio", language),

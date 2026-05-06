@@ -274,7 +274,7 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
         label: "Google Veo 3.1",
         provider: "Google",
         badge: "Standard",
-        description: "Google Veo 3.1 with optional audio — 4/6/8s at 720p, 8s at 1080p.",
+        description: "Google Veo 3.1 with native audio included — 4/6/8s at 720p, 8s at 1080p.",
       },
     ],
   },
