@@ -145,6 +145,12 @@ const MAPPINGS: ErrorMapping[] = [
     ja: "参照ファイルはまだアップロード中です。少し待ってから再度 Run してください。",
   },
   {
+    match: /Seedance 2\.0 reference videos?|reference video.*2-15|reference video duration|total.*reference.*15|content\[\d+\].*video duration/i,
+    th: "วิดีโออ้างอิงของ Seedance 2.0 ต้องยาว 2-15 วินาที และรวมกันไม่เกิน 15 วินาที",
+    en: "Seedance 2.0 reference videos must be 2-15 seconds, with total reference video duration up to 15 seconds.",
+    ja: "Seedance 2.0 の参照動画は 2〜15 秒、合計 15 秒以内にしてください。",
+  },
+  {
     match: /validation|invalid[\s_-]*param|400[\s_]/i,
     th: "ข้อมูลที่ส่งไม่ถูกต้อง — ตรวจสอบแล้วลองใหม่",
     en: "Some inputs are invalid — please double-check and try again.",

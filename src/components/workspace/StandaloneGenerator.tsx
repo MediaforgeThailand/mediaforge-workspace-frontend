@@ -68,6 +68,7 @@ import {
   isKlingMotionVideoModel,
   seedanceResolutionOptionsForModel,
   seedanceVideoSupportsAudio,
+  isSeedance20VideoModel,
   isSeedanceVideoModel,
   isSeedreamImageModel,
   isVeoVideoModel,
@@ -103,10 +104,70 @@ const SIGNED_URL_TTL_SEC = 60 * 60 * 24 * 365;
 const STANDALONE_JOB_SELECT =
   "id,node_type,provider,model,request,status,attempts,result,error,last_error,created_at,completed_at,run_after,deadline_at,locked_by,lock_expires_at,credits_charged,credits_refunded";
 const DEFAULT_WORKSPACE_INFRASTRUCTURE_BUFFER_PERCENT = 40;
+const SEEDANCE_REF_VIDEO_MIN_SEC = 2;
+const SEEDANCE_REF_VIDEO_MAX_SEC = 15;
 
 const isInsufficientCreditsError = (message: string) =>
   /insufficient|not enough|credit/i.test(message) &&
   !/api credit|provider credit/i.test(message);
+
+function seedanceReferenceVideoDurationMessage(durationSec?: number | null): string {
+  const durationLabel =
+    typeof durationSec === "number" && Number.isFinite(durationSec)
+      ? ` (${durationSec.toFixed(1)}s)`
+      : "";
+  return `Seedance 2.0 reference videos must be ${SEEDANCE_REF_VIDEO_MIN_SEC}-${SEEDANCE_REF_VIDEO_MAX_SEC} seconds${durationLabel}.`;
+}
+
+function unreadableSeedanceReferenceVideoMessage(): string {
+  return "Could not read the reference video duration. Upload an MP4/MOV video between 2 and 15 seconds.";
+}
+
+function isSeedanceReferenceVideoDurationValid(
+  durationSec: number | null | undefined,
+): durationSec is number {
+  return (
+    typeof durationSec === "number" &&
+    Number.isFinite(durationSec) &&
+    durationSec >= SEEDANCE_REF_VIDEO_MIN_SEC &&
+    durationSec <= SEEDANCE_REF_VIDEO_MAX_SEC
+  );
+}
+
+function readVideoDurationFromSource(
+  src: string,
+  revoke?: () => void,
+): Promise<number | null> {
+  return new Promise((resolve) => {
+    const video = document.createElement("video");
+    let settled = false;
+    const finish = (value: number | null) => {
+      if (settled) return;
+      settled = true;
+      video.removeAttribute("src");
+      video.load();
+      revoke?.();
+      resolve(value);
+    };
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    video.onloadedmetadata = () =>
+      finish(Number.isFinite(video.duration) ? video.duration : null);
+    video.onerror = () => finish(null);
+    window.setTimeout(() => finish(null), 5000);
+    video.src = src;
+  });
+}
+
+function readVideoFileDuration(file: File): Promise<number | null> {
+  const objectUrl = URL.createObjectURL(file);
+  return readVideoDurationFromSource(objectUrl, () => URL.revokeObjectURL(objectUrl));
+}
+
+function readVideoUrlDuration(url: string): Promise<number | null> {
+  return readVideoDurationFromSource(url);
+}
 
 type UploadSlot =
   | "image-ref"
@@ -142,6 +203,7 @@ interface UploadedRef {
   assetId?: string;
   storageBucket?: "ai-media" | "user_assets";
   storagePath?: string;
+  durationSec?: number;
 }
 
 type PanelReferenceAsset = {
@@ -153,6 +215,7 @@ type PanelReferenceAsset = {
   assetId?: string;
   storageBucket?: "ai-media" | "user_assets";
   storagePath?: string;
+  durationSec?: number;
 };
 
 type DeletableReference = {
@@ -204,6 +267,10 @@ interface StandaloneResult {
     model_url?: string;
     rendered_image?: string;
     provider?: string;
+    duration_seconds?: number | string;
+    duration?: number | string;
+    video_duration?: number | string;
+    [key: string]: unknown;
   };
   credits_spent?: number;
 }
@@ -1198,8 +1265,27 @@ export default function StandaloneGenerator({
           toast.error(needsVideo ? t("workspace.toast.upload_video_ref") : t("workspace.toast.upload_image_ref"));
           continue;
         }
+        let durationSec: number | null = null;
+        if (
+          needsVideo &&
+          activeTool === "video_gen" &&
+          isSeedance20VideoModel(form.model)
+        ) {
+          durationSec = await readVideoFileDuration(file);
+          if (durationSec == null) {
+            toast.error(unreadableSeedanceReferenceVideoMessage());
+            continue;
+          }
+          if (!isSeedanceReferenceVideoDurationValid(durationSec)) {
+            toast.error(seedanceReferenceVideoDurationMessage(durationSec));
+            continue;
+          }
+        }
         const uploaded = await uploadReference(file, user?.id, activeProject.id);
-        applyUploadedReference(slot, uploaded);
+        applyUploadedReference(slot, {
+          ...uploaded,
+          durationSec: durationSec ?? uploaded.durationSec,
+        });
       }
       toast.success(t("workspace.toast.reference_uploaded"));
     } catch (err) {
@@ -1209,7 +1295,7 @@ export default function StandaloneGenerator({
     }
   };
 
-  const selectPanelReferenceAsset = (
+  const selectPanelReferenceAsset = async (
     reference: PanelReferenceAsset,
     slotOverride?: UploadSlot,
   ) => {
@@ -1224,6 +1310,22 @@ export default function StandaloneGenerator({
       toast.error(t("workspace.toast.upload_image_ref"));
       return;
     }
+    let durationSec = reference.durationSec;
+    if (
+      slot === "video-ref-video" &&
+      activeTool === "video_gen" &&
+      isSeedance20VideoModel(form.model)
+    ) {
+      durationSec = durationSec ?? (await readVideoUrlDuration(reference.url)) ?? undefined;
+      if (durationSec == null) {
+        toast.error(unreadableSeedanceReferenceVideoMessage());
+        return;
+      }
+      if (!isSeedanceReferenceVideoDurationValid(durationSec)) {
+        toast.error(seedanceReferenceVideoDurationMessage(durationSec));
+        return;
+      }
+    }
     applyUploadedReference(slot, {
       id: reference.id,
       name: reference.name ?? "asset-reference",
@@ -1233,6 +1335,7 @@ export default function StandaloneGenerator({
       assetId: reference.assetId,
       storageBucket: reference.storageBucket,
       storagePath: reference.storagePath,
+      durationSec,
     });
   };
 
@@ -1549,9 +1652,13 @@ export default function StandaloneGenerator({
     videoPanelMode === "frames"
       ? "JPEG/PNG/WEBP, 20 MB max"
       : videoSupportsReferenceImage(form.model) && videoSupportsReferenceVideo(form.model)
-        ? "JPEG/PNG/WEBP/MP4, 20 MB max"
+        ? isSeedance20VideoModel(form.model)
+          ? "JPEG/PNG/WEBP/MP4, video 2-15s"
+          : "JPEG/PNG/WEBP/MP4, 20 MB max"
         : videoSupportsReferenceVideo(form.model)
-          ? "MP4/MOV/WEBM, 20 MB max"
+          ? isSeedance20VideoModel(form.model)
+            ? "MP4/MOV, 2-15s"
+            : "MP4/MOV/WEBM, 20 MB max"
           : "JPEG/PNG/WEBP, 20 MB max";
   const videoSettings =
     activeTool === "video_gen"
@@ -1636,8 +1743,27 @@ export default function StandaloneGenerator({
     }
     setUploading(slot);
     try {
+      let durationSec: number | null = null;
+      if (
+        needsVideo &&
+        activeTool === "video_gen" &&
+        isSeedance20VideoModel(form.model)
+      ) {
+        durationSec = await readVideoFileDuration(file);
+        if (durationSec == null) {
+          toast.error(unreadableSeedanceReferenceVideoMessage());
+          return;
+        }
+        if (!isSeedanceReferenceVideoDurationValid(durationSec)) {
+          toast.error(seedanceReferenceVideoDurationMessage(durationSec));
+          return;
+        }
+      }
       const uploaded = await uploadReference(file, user?.id, activeProject.id);
-      applyUploadedReference(slot, uploaded);
+      applyUploadedReference(slot, {
+        ...uploaded,
+        durationSec: durationSec ?? uploaded.durationSec,
+      });
       toast.success(t("workspace.toast.reference_uploaded"));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
@@ -1665,6 +1791,27 @@ export default function StandaloneGenerator({
     if (validation) {
       toast.error(validation);
       return;
+    }
+    if (
+      activeTool === "video_gen" &&
+      form.videoInputMode === "reference" &&
+      isSeedance20VideoModel(form.model) &&
+      form.videoRefVideo
+    ) {
+      const durationSec =
+        form.videoRefVideo.durationSec ??
+        (await readVideoUrlDuration(form.videoRefVideo.url));
+      if (durationSec == null) {
+        toast.error(unreadableSeedanceReferenceVideoMessage());
+        return;
+      }
+      if (!isSeedanceReferenceVideoDurationValid(durationSec)) {
+        toast.error(seedanceReferenceVideoDurationMessage(durationSec));
+        return;
+      }
+      if (form.videoRefVideo.durationSec == null) {
+        updateForm({ videoRefVideo: { ...form.videoRefVideo, durationSec } });
+      }
     }
     if (
       estimatedCost != null &&
@@ -4262,6 +4409,19 @@ const REFERENCE_MEDIA_FILE_RE = /\.(png|jpe?g|webp|gif|mp4|mov|webm|m4v)(?:[?#].
 const firstText = (...values: Array<unknown>): string | undefined => {
   for (const value of values) {
     if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+};
+
+const firstFiniteNumber = (...values: Array<unknown>): number | undefined => {
+  for (const value of values) {
+    const numeric =
+      typeof value === "number"
+        ? value
+        : typeof value === "string" && value.trim()
+          ? Number(value)
+          : Number.NaN;
+    if (Number.isFinite(numeric)) return numeric;
   }
   return undefined;
 };

@@ -65,6 +65,7 @@ import type { Generation } from "./NodeResultBar";
 // picker on the canvas — backend uses its own per-provider default.
 import { cloneNodeFresh } from "./cloneNode";
 import { useFreshSignedUrl } from "./useFreshSignedUrl";
+import { getSignedUrl } from "@/hooks/useSignedUrl";
 import NodeQuickActionRail from "./NodeQuickActionRail";
 // Workspace-local schema + helpers — kept out of the shared file so
 // the main flow editor stays untouched.
@@ -102,10 +103,87 @@ const PROMPT_TOP_RESERVE_RATIO = 0.3;
 const PROMPT_TOP_RESERVE_MIN = 52;
 const PROMPT_MIN_EDIT_H = 38;
 const PROMPT_MAX_EDIT_H = 240;
+const SEEDANCE_REF_VIDEO_MIN_SEC = 2;
+const SEEDANCE_REF_VIDEO_MAX_SEC = 15;
 
 function isSeedanceV2VideoModel(model: string | undefined): boolean {
   const m = String(model ?? "").toLowerCase();
   return m.startsWith("seedance-2-0") || m.startsWith("dreamina-seedance-2-0");
+}
+
+function seedanceReferenceVideoDurationMessage(durationSec?: number | null): string {
+  const durationLabel =
+    typeof durationSec === "number" && Number.isFinite(durationSec)
+      ? ` (${durationSec.toFixed(1)}s)`
+      : "";
+  return `Seedance 2.0 reference videos must be ${SEEDANCE_REF_VIDEO_MIN_SEC}-${SEEDANCE_REF_VIDEO_MAX_SEC} seconds${durationLabel}.`;
+}
+
+function isSeedanceReferenceVideoDurationValid(
+  durationSec: number | null | undefined,
+): durationSec is number {
+  return (
+    typeof durationSec === "number" &&
+    Number.isFinite(durationSec) &&
+    durationSec >= SEEDANCE_REF_VIDEO_MIN_SEC &&
+    durationSec <= SEEDANCE_REF_VIDEO_MAX_SEC
+  );
+}
+
+function readVideoDurationFromSource(src: string): Promise<number | null> {
+  return new Promise((resolve) => {
+    const video = document.createElement("video");
+    let settled = false;
+    const finish = (value: number | null) => {
+      if (settled) return;
+      settled = true;
+      video.removeAttribute("src");
+      video.load();
+      resolve(value);
+    };
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    video.onloadedmetadata = () =>
+      finish(Number.isFinite(video.duration) ? video.duration : null);
+    video.onerror = () => finish(null);
+    window.setTimeout(() => finish(null), 5000);
+    video.src = src;
+  });
+}
+
+function videoInputUrls(value: unknown): string[] {
+  const values = Array.isArray(value) ? value : [value];
+  return values.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+}
+
+async function readReferenceVideoDuration(url: string): Promise<number | null> {
+  const readableUrl =
+    /^(https?:|blob:|data:)/i.test(url) ? url : await getSignedUrl(url);
+  return readVideoDurationFromSource(readableUrl);
+}
+
+async function validateSeedanceReferenceVideos(inputs: Record<string, unknown>): Promise<void> {
+  const urls = videoInputUrls(inputs.ref_video);
+  if (urls.length === 0) return;
+  let totalDuration = 0;
+  for (const url of urls) {
+    const durationSec = await readReferenceVideoDuration(url);
+    if (durationSec == null) {
+      throw new Error(
+        "Could not read the Seedance 2.0 reference video duration. Use an MP4/MOV video between 2 and 15 seconds.",
+      );
+    }
+    if (!isSeedanceReferenceVideoDurationValid(durationSec)) {
+      throw new Error(seedanceReferenceVideoDurationMessage(durationSec));
+    }
+    totalDuration += durationSec;
+  }
+  if (totalDuration > SEEDANCE_REF_VIDEO_MAX_SEC) {
+    throw new Error(
+      `Seedance 2.0 reference videos must total ${SEEDANCE_REF_VIDEO_MAX_SEC} seconds or less (${totalDuration.toFixed(1)}s).`,
+    );
+  }
 }
 
 function computePromptMaxHeight(previewHeight: number, toolbarHeight: number): number {
@@ -832,6 +910,10 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         } else if (!inputs.ref_image) {
           inputs.ref_image = mentionedImage.url;
         }
+      }
+
+      if (schemaKey === "videoGenNode" && isSeedanceV2VideoModel(selectedModel)) {
+        await validateSeedanceReferenceVideos(inputs);
       }
 
       log({
