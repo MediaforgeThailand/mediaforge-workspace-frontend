@@ -340,6 +340,52 @@ const MULTI_SELECT_KEYS: string[] = ["Shift", "Meta", "Control"];
 const DEFAULT_EDGE_OPTIONS = { type: "default" } as const;
 const PRO_OPTIONS = { hideAttribution: true } as const;
 
+const PASTE_FILE_EXT_BY_MIME: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/svg+xml": "svg",
+};
+
+function normalizeClipboardFile(file: File, index: number): File {
+  if (file.name && file.name.trim()) return file;
+  const ext =
+    PASTE_FILE_EXT_BY_MIME[file.type] ??
+    file.type.split("/")[1]?.replace(/[^a-z0-9]/gi, "") ??
+    "png";
+  return new File([file], `pasted-image-${Date.now()}-${index + 1}.${ext}`, {
+    type: file.type || "image/png",
+    lastModified: Date.now(),
+  });
+}
+
+function isEditablePasteTarget(target: EventTarget | null): boolean {
+  const el = target instanceof HTMLElement ? target : null;
+  if (!el) return false;
+  const tag = el.tagName;
+  return (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    tag === "SELECT" ||
+    el.isContentEditable ||
+    el.closest('[contenteditable="true"], input, textarea, select') != null
+  );
+}
+
+function clipboardFiles(event: ClipboardEvent): File[] {
+  const directFiles = Array.from(event.clipboardData?.files ?? []);
+  if (directFiles.length > 0) {
+    return directFiles.map((file, index) => normalizeClipboardFile(file, index));
+  }
+  const items = Array.from(event.clipboardData?.items ?? []);
+  return items
+    .filter((item) => item.kind === "file")
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => Boolean(file))
+    .map((file, index) => normalizeClipboardFile(file, index));
+}
+
 const nodeTypes = {
   // All schema-driven tools route through WorkspaceToolNode — that's
   // the only place where the V2 Run button + workspace-run-node
@@ -1619,6 +1665,54 @@ const Inner = () => {
     window.addEventListener("workspace-upload-files", onUpload);
     return () => window.removeEventListener("workspace-upload-files", onUpload);
   }, [uploadAsset, screenToFlowPosition]);
+
+  /* Clipboard image paste -> AssetNode.
+   *
+   * Copied screenshots and copied image files arrive as File blobs on
+   * ClipboardEvent.clipboardData. Route them through the same upload
+   * path as drag/drop so storage upload, signed URLs, grouping, and
+   * AssetNode state all stay consistent. Text paste inside prompts or
+   * form fields is left alone. */
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      if (isViewer || isEditablePasteTarget(event.target)) return;
+      if (!wrapperRef.current) return;
+      const files = clipboardFiles(event).filter((file) => {
+        const type = file.type.toLowerCase();
+        return (
+          type.startsWith("image/") ||
+          type.startsWith("video/") ||
+          type.startsWith("audio/")
+        );
+      });
+      if (files.length === 0) return;
+      event.preventDefault();
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const centre = screenToFlowPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      });
+      const PER_ROW = 5;
+      const STEP_X = 240;
+      const STEP_Y = 280;
+      files.forEach((file, i) => {
+        const col = i % PER_ROW;
+        const row = Math.floor(i / PER_ROW);
+        const pos = {
+          x: centre.x + (col - (PER_ROW - 1) / 2) * STEP_X,
+          y: centre.y + row * STEP_Y,
+        };
+        void uploadAsset(file, pos);
+      });
+      toast.success(
+        files.length === 1
+          ? "Pasted media added to canvas"
+          : `${files.length} pasted media files added to canvas`,
+      );
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [isViewer, screenToFlowPosition, uploadAsset]);
 
   /**
    * Live grouping — figures out whether the node the user just

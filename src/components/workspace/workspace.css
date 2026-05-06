@@ -599,6 +599,7 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   height: auto;
 }
 .ws-compact-audio-preview {
+  position: relative;
   min-height: 168px;
   width: 100%;
   display: grid;
@@ -609,6 +610,8 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
     linear-gradient(135deg, hsl(0 0% 5%), hsl(0 0% 8%));
 }
 .ws-compact-audio-card {
+  position: relative;
+  z-index: 9;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -619,6 +622,7 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   border-radius: 14px;
   background: hsl(0 0% 100% / 0.055);
   box-shadow: 0 18px 44px -30px hsl(0 0% 0% / 0.9);
+  pointer-events: auto;
 }
 .ws-compact-audio-icon {
   display: grid;
@@ -1347,6 +1351,10 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
  * specifically for 3D viewers — they should be drag-orbittable
  * without a prior select-click. */
 .react-flow__node:not(.selected) .ws-preview-zone .ws-model-viewer {
+  pointer-events: auto !important;
+}
+.react-flow__node:not(.selected) .ws-preview-zone .ws-compact-audio-card,
+.react-flow__node:not(.selected) .ws-preview-zone .ws-compact-audio-card * {
   pointer-events: auto !important;
 }
 
