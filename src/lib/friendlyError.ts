@@ -32,6 +32,12 @@ const MAPPINGS: Array<{ match: RegExp; th: string; en: string; ja: string }> = [
     ja: "Seedance 2.0 の参照動画は 2〜15 秒、合計 15 秒以内にしてください。",
   },
   {
+    match: /Seedance rejected the reference media|verified real-human assets|asset:\/\/|real person|privacy-sensitive|PrivacyInformation|SensitiveContentDetected/i,
+    th: "Seedance 2.0 ปฏิเสธภาพคนจริงใน route นี้ ถ้าต้องใช้คนจริงให้ใช้ asset ที่ยืนยันสิทธิ์แล้ว หรือเลือกโมเดล/ผู้ให้บริการอื่นครับ",
+    en: "Seedance 2.0 blocked the real-person reference on this route. Use a verified real-human asset, or choose another model/provider.",
+    ja: "Seedance 2.0 はこの経路で実在人物の参照画像をブロックしました。認証済みの人物アセットを使うか、別のモデル/プロバイダーを選んでください。",
+  },
+  {
     match: /content[\s_-]*polic|moderation|blocked|safety[\s_-]*system|disallowed/i,
     th: "ผู้ให้บริการ AI ปฏิเสธคำขอนี้ ลองปรับ prompt หรือไฟล์อ้างอิงให้ปลอดภัยขึ้นครับ",
     en: "The AI provider blocked this request. Try a safer prompt or reference file.",
