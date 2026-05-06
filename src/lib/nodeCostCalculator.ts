@@ -33,10 +33,10 @@ function resolutionTier(size: unknown): "1k" | "2k" | "4k" | "auto" {
 function findOpenAiImageCost(params: Record<string, unknown>, creditCosts: CreditCostRow[]) {
   const model = String(params.model_name ?? params.model ?? "gpt-image-2").toLowerCase();
   const rawQuality = String(params.quality ?? "medium").toLowerCase();
-  const quality = ["low", "medium", "high"].includes(rawQuality) ? rawQuality : "medium";
+  const quality = ["low", "medium", "high", "auto"].includes(rawQuality) ? rawQuality : "medium";
   const size = String(params.size ?? "1024x1024").toLowerCase();
   const tier = resolutionTier(size === "auto" ? "1024x1024" : size);
-  const exactGptImage2Sku = model.match(/^gpt-image-2:(1k|2k|4k):(low|medium|high)$/);
+  const exactGptImage2Sku = model.match(/^gpt-image-2:(1k|2k|4k):(low|medium|high|auto)$/);
   const keys = exactGptImage2Sku
     ? [model]
     : model === "gpt-image-2"
@@ -181,8 +181,11 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
       (Array.isArray(params.reference_video_urls) && params.reference_video_urls.length > 0) ||
       Boolean(params.reference_video_url || params.video_url || params.ref_video);
     const replicatePricingModel =
-      model === "replicate-seedance-2-0" && hasRefVideoInput
-        ? `${model}-video-ref`
+      (model.startsWith("seedance-2-0") ||
+        model.startsWith("dreamina-seedance-2-0") ||
+        model.startsWith("replicate-seedance-2-0")) &&
+      hasRefVideoInput
+        ? "replicate-seedance-2-0-video-ref"
         : model;
     const modelAliases =
       model === "veo-3.1-generate-001"
