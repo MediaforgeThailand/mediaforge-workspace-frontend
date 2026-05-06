@@ -35,7 +35,7 @@ import { friendlyError } from "@/lib/friendlyError";
 
 import { type ParamDef } from "@/components/flow/nodes/nodeApiSchema";
 import { useNodeCreditCosts as useCreatorCreditCosts } from "@/hooks/useNodeCreditCosts";
-import { useVoicePreview, type VoicePreviewProvider } from "@/hooks/useVoicePreview";
+import { useVoicePreview } from "@/hooks/useVoicePreview";
 import { calculateNodeCost } from "@/lib/nodeCostCalculator";
 import PromptMentionTextarea from "@/components/flow/nodes/PromptMentionTextarea";
 import MultiShotBuilder, {
@@ -110,31 +110,27 @@ const SEEDANCE_REF_VIDEO_MIN_SEC = 2;
 const SEEDANCE_REF_VIDEO_MAX_SEC = 15;
 
 /**
- * Inline ▶ pill that auditions a TTS voice via the `voice-preview`
- * edge function. Renders next to the Voice MiniSelect in the audio
- * gen node's compact toolbar so creators can sample a speaker before
- * committing to a full render. Cached per voice, free (no credits).
+ * Per-row ▶ button rendered INSIDE each item in the searchable Gemini
+ * voice picker. It does NOT mount its own `useVoicePreview` instance —
+ * that would create 30 isolated <audio> elements that wouldn't stop
+ * each other when a different voice is auditioned. Instead, the
+ * parent (WorkspaceToolNode) holds one shared hook and pipes state
+ * into each row via these props.
  */
-function VoicePreviewPill({
-  provider,
+function VoicePreviewItemButton({
   voiceId,
+  isPlaying,
+  isLoading,
+  onPlay,
 }: {
-  provider: VoicePreviewProvider;
   voiceId: string;
+  isPlaying: boolean;
+  isLoading: boolean;
+  onPlay: (voiceId: string) => void;
 }) {
-  const { playingId, loadingId, play } = useVoicePreview(provider);
-  const isPlaying = playingId === voiceId;
-  const isLoading = loadingId === voiceId;
-  const handleClick = async (e: React.MouseEvent) => {
+  const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!voiceId) return;
-    try {
-      await play(voiceId);
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Couldn't play voice preview",
-      );
-    }
+    onPlay(voiceId);
   };
   return (
     <button
@@ -145,9 +141,9 @@ function VoicePreviewPill({
         isPlaying ? `Stop ${voiceId} preview` : `Play ${voiceId} preview`
       }
       className={cn(
-        "ws-mini-select-trigger nodrag",
-        "px-[10px]",
-        isPlaying && "!bg-amber-300/20 !text-amber-200",
+        "grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-full transition",
+        "bg-white/[0.08] text-zinc-200 hover:bg-white/[0.16] hover:text-white",
+        isPlaying && "bg-amber-300/30 text-amber-200",
       )}
     >
       {isLoading ? (
@@ -718,6 +714,24 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   // reach the user. Raw text still lands in console.error.
   const { language, t } = useLanguage();
   const currentWorkspaceId = useWorkspaceStore((s) => s.current?.workspaceId ?? null);
+
+  // Shared voice-preview hook for the audio gen node. Mounted on
+  // every node type (cheap — just a couple of useState refs until
+  // the first ▶ click), so the searchable Voice MiniSelect can pipe
+  // a single play/pause/loading state into all 30 row buttons. A
+  // per-row hook would mount 30 isolated <audio> elements that
+  // wouldn't stop each other when the user auditions a new voice.
+  const voicePreview = useVoicePreview("gemini");
+  const handleVoicePreviewPlay = useCallback(
+    (voiceId: string) => {
+      void voicePreview.play(voiceId).catch((err) => {
+        toast.error(
+          err instanceof Error ? err.message : "Couldn't play voice preview",
+        );
+      });
+    },
+    [voicePreview],
+  );
 
   // Refs + ResizeObserver for the dynamic prompt-lift logic. The
   // prompt overlay sits above the settings toolbar and used to lift
@@ -2400,27 +2414,34 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             />
           );
         }
-        // Gemini TTS voice picker: pair the searchable MiniSelect with
-        // a ▶ preview pill so creators can audition a speaker without
-        // running the full audio gen. The preview hits the
-        // `voice-preview` edge fn (cached per voice in Storage).
+        // Gemini TTS voice picker: searchable MiniSelect with a ▶
+        // preview button INSIDE each list row so creators can audition
+        // any speaker without committing to it. Selection still happens
+        // when the user clicks the row body (or hits Enter); the action
+        // button stops propagation so its click never selects.
         if (
           param.key === "voice" &&
           typeof selectedModel === "string" &&
           selectedModel.startsWith("gemini-")
         ) {
           return (
-            <span key={param.key} className="contents">
-              <MiniSelect
-                value={String(value)}
-                options={effectiveOptions}
-                optionLabels={localizedEffectiveLabels}
-                onChange={(v) => updateParam(param.key, v)}
-                searchable
-                searchFooter="All preset voices"
-              />
-              <VoicePreviewPill provider="gemini" voiceId={String(value)} />
-            </span>
+            <MiniSelect
+              key={param.key}
+              value={String(value)}
+              options={effectiveOptions}
+              optionLabels={localizedEffectiveLabels}
+              onChange={(v) => updateParam(param.key, v)}
+              searchable
+              searchFooter="All preset voices"
+              renderItemAction={(voiceId) => (
+                <VoicePreviewItemButton
+                  voiceId={voiceId}
+                  isPlaying={voicePreview.playingId === voiceId}
+                  isLoading={voicePreview.loadingId === voiceId}
+                  onPlay={handleVoicePreviewPlay}
+                />
+              )}
+            />
           );
         }
         return (

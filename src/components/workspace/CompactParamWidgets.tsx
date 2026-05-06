@@ -146,6 +146,13 @@ interface MiniSelectProps {
   /** Footer hint shown under the searchable list, e.g. "All models".
    *  Defaults sensibly when omitted. */
   searchFooter?: string;
+  /** Optional per-item action button rendered on the right edge of
+   *  each row in the searchable dropdown (e.g. the ▶ voice preview
+   *  pill on the Gemini voice picker). Click events on the returned
+   *  node are NOT propagated to the row, so users can preview a
+   *  voice without committing to it as the selection. Only honoured
+   *  when `searchable` is true. */
+  renderItemAction?: (option: string) => React.ReactNode;
 }
 
 export function MiniSelect({
@@ -157,6 +164,7 @@ export function MiniSelect({
   prefix,
   searchable = false,
   searchFooter,
+  renderItemAction,
 }: MiniSelectProps) {
   const labelOf = (v: string) => optionLabels?.[v] ?? v;
   const display = labelOf(value);
@@ -172,6 +180,7 @@ export function MiniSelect({
         onChange={onChange}
         triggerLabel={prefix ? `${prefix} ${truncated}` : truncated}
         searchFooter={searchFooter}
+        renderItemAction={renderItemAction}
       />
     );
   }
@@ -224,6 +233,7 @@ function SearchableMiniSelect({
   onChange,
   triggerLabel,
   searchFooter,
+  renderItemAction,
 }: {
   value: string;
   options: string[];
@@ -231,6 +241,7 @@ function SearchableMiniSelect({
   onChange: (v: string) => void;
   triggerLabel: string;
   searchFooter?: string;
+  renderItemAction?: (option: string) => React.ReactNode;
 }) {
   const { t: i18n } = useLanguage();
   const [open, setOpen] = useState(false);
@@ -275,6 +286,7 @@ function SearchableMiniSelect({
               </CommandEmpty>
               {options.map((opt) => {
                 const label = labelOf(opt);
+                const action = renderItemAction?.(opt);
                 return (
                   <CommandItem
                     key={opt}
@@ -286,9 +298,27 @@ function SearchableMiniSelect({
                     className={cn(
                       "mx-1 my-px cursor-pointer rounded-md px-2 py-1.5 text-[12.5px] aria-selected:bg-accent",
                       opt === value && "bg-accent/40 font-medium",
+                      action && "pr-1",
                     )}
                   >
-                    <span className="truncate">{label}</span>
+                    <span className="min-w-0 flex-1 truncate">{label}</span>
+                    {action ? (
+                      // Wrap the action so a click on it doesn't bubble
+                      // up and select the row. cmdk's CommandItem treats
+                      // any pointer-up inside its tree as a select; a
+                      // simple onClick stopPropagation on the inner
+                      // wrapper short-circuits that path while still
+                      // letting keyboard nav (↑↓ + Enter) commit the
+                      // selection from the row body.
+                      <span
+                        className="ml-2 flex shrink-0 items-center"
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        {action}
+                      </span>
+                    ) : null}
                   </CommandItem>
                 );
               })}
