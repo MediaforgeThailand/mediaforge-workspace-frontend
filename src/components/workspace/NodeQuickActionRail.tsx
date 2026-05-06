@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type SyntheticEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 import {
   ChevronRight,
   Clock3,
@@ -26,8 +26,19 @@ type NodeQuickActionRailProps = {
   onDelete?: () => void;
   nodeId?: string;
   mediaKind?: "image" | "video" | "audio" | "model3d" | "text" | null;
+  mediaUrl?: string | null;
+  mediaFileName?: string | null;
+  mediaCreatedAt?: number | string | null;
+  mediaSizeBytes?: number | null;
   className?: string;
   bodyTopOffsetPx?: number;
+};
+
+type MediaInfo = {
+  format: string;
+  size: string;
+  dimensions: string;
+  added: string;
 };
 
 type MenuItem = {
@@ -54,28 +65,174 @@ const MENU_ITEMS: MenuItem[] = [
   { label: "Extract frame", icon: ImageIcon, disabled: true },
 ];
 
+const UNKNOWN_VALUE = "--";
+
+function formatBytes(bytes: number | null | undefined): string {
+  if (typeof bytes !== "number" || !Number.isFinite(bytes) || bytes <= 0) {
+    return UNKNOWN_VALUE;
+  }
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  const precision = value >= 10 || unitIndex === 0 ? 0 : 1;
+  return `${value.toFixed(precision)} ${units[unitIndex]}`;
+}
+
+function formatAddedDate(value: number | string | null | undefined): string {
+  if (value == null) return UNKNOWN_VALUE;
+  const date = typeof value === "number" ? new Date(value) : new Date(value);
+  if (Number.isNaN(date.getTime())) return UNKNOWN_VALUE;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function getFormatFromSource(
+  url: string | null | undefined,
+  fileName: string | null | undefined,
+  kind: NodeQuickActionRailProps["mediaKind"],
+): string {
+  const source = fileName || url || "";
+  const withoutQuery = source.split("?")[0] ?? source;
+  const match = withoutQuery.match(/\.([a-z0-9]{2,5})$/i);
+  if (match?.[1]) return match[1].toUpperCase();
+  if (kind === "model3d") return "3D";
+  if (kind) return kind.toUpperCase();
+  return UNKNOWN_VALUE;
+}
+
+async function readContentLength(url: string): Promise<number | null> {
+  try {
+    const response = await fetch(url, { method: "HEAD" });
+    const raw = response.headers.get("content-length");
+    const bytes = raw ? Number(raw) : NaN;
+    return Number.isFinite(bytes) && bytes > 0 ? bytes : null;
+  } catch {
+    return null;
+  }
+}
+
+function readImageDimensions(url: string): Promise<string> {
+  return new Promise((resolve) => {
+    const image = new Image();
+    let settled = false;
+    const finish = (value: string) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    image.onload = () => {
+      const width = image.naturalWidth;
+      const height = image.naturalHeight;
+      finish(width && height ? `${width} x ${height}` : UNKNOWN_VALUE);
+    };
+    image.onerror = () => finish(UNKNOWN_VALUE);
+    window.setTimeout(() => finish(UNKNOWN_VALUE), 6000);
+    image.src = url;
+  });
+}
+
+function readVideoDimensions(url: string): Promise<string> {
+  return new Promise((resolve) => {
+    const video = document.createElement("video");
+    let settled = false;
+    const finish = (value: string) => {
+      if (settled) return;
+      settled = true;
+      video.removeAttribute("src");
+      video.load();
+      resolve(value);
+    };
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    video.onloadedmetadata = () => {
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+      finish(width && height ? `${width} x ${height}` : UNKNOWN_VALUE);
+    };
+    video.onerror = () => finish(UNKNOWN_VALUE);
+    window.setTimeout(() => finish(UNKNOWN_VALUE), 6000);
+    video.src = url;
+  });
+}
+
 export default function NodeQuickActionRail({
   visible,
   onDelete,
   nodeId,
   mediaKind,
+  mediaUrl,
+  mediaFileName,
+  mediaCreatedAt,
+  mediaSizeBytes,
   className,
   bodyTopOffsetPx = 0,
 }: NodeQuickActionRailProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [resolvedInfo, setResolvedInfo] = useState<MediaInfo | null>(null);
+  const [infoLoading, setInfoLoading] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const { t } = useLanguage();
+  const canShowInfo =
+    !!mediaUrl && (mediaKind === "image" || mediaKind === "video" || mediaKind === "model3d");
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!menuOpen && !infoOpen) return;
     const onPointerDown = (event: PointerEvent) => {
       if (!rootRef.current?.contains(event.target as HTMLElement)) {
         setMenuOpen(false);
+        setInfoOpen(false);
       }
     };
     window.addEventListener("pointerdown", onPointerDown);
     return () => window.removeEventListener("pointerdown", onPointerDown);
-  }, [menuOpen]);
+  }, [menuOpen, infoOpen]);
+
+  const baseInfo = useMemo<MediaInfo>(
+    () => ({
+      format: getFormatFromSource(mediaUrl, mediaFileName, mediaKind),
+      size: formatBytes(mediaSizeBytes),
+      dimensions: UNKNOWN_VALUE,
+      added: formatAddedDate(mediaCreatedAt),
+    }),
+    [mediaCreatedAt, mediaFileName, mediaKind, mediaSizeBytes, mediaUrl],
+  );
+
+  useEffect(() => {
+    setResolvedInfo(null);
+    setInfoLoading(false);
+  }, [mediaUrl, mediaKind, mediaFileName, mediaSizeBytes, mediaCreatedAt]);
+
+  useEffect(() => {
+    if (!infoOpen || !canShowInfo || !mediaUrl) return;
+    let cancelled = false;
+    setInfoLoading(true);
+    const loadInfo = async () => {
+      const [bytes, dimensions] = await Promise.all([
+        mediaSizeBytes ? Promise.resolve(mediaSizeBytes) : readContentLength(mediaUrl),
+        mediaKind === "video"
+          ? readVideoDimensions(mediaUrl)
+          : mediaKind === "image" || mediaKind === "model3d"
+            ? readImageDimensions(mediaUrl)
+            : Promise.resolve(UNKNOWN_VALUE),
+      ]);
+      if (cancelled) return;
+      setResolvedInfo({
+        ...baseInfo,
+        size: formatBytes(bytes),
+        dimensions,
+      });
+      setInfoLoading(false);
+    };
+    void loadInfo();
+    return () => {
+      cancelled = true;
+    };
+  }, [baseInfo, canShowInfo, infoOpen, mediaKind, mediaSizeBytes, mediaUrl]);
 
   const stopNodeGesture = (event: SyntheticEvent) => {
     event.stopPropagation();
@@ -107,6 +264,7 @@ export default function NodeQuickActionRail({
       className={cn(
         "node-quick-action-rail nodrag nopan",
         (visible || menuOpen) && "is-visible",
+        infoOpen && "is-visible",
         className,
       )}
       style={bodyTopOffsetPx ? { top: bodyTopOffsetPx + 8 } : undefined}
@@ -126,9 +284,17 @@ export default function NodeQuickActionRail({
         </button>
         <button
           type="button"
-          className="node-quick-action-button is-disabled"
+          className={cn(
+            "node-quick-action-button",
+            !canShowInfo && "is-disabled",
+          )}
           aria-label={t("workspace.nodeRail.nodeInfo")}
-          disabled
+          aria-expanded={infoOpen}
+          disabled={!canShowInfo}
+          onClick={() => {
+            setMenuOpen(false);
+            setInfoOpen((open) => !open);
+          }}
         >
           <Info className="h-[14px] w-[14px]" />
         </button>
@@ -184,6 +350,22 @@ export default function NodeQuickActionRail({
               </button>
             );
           })}
+        </div>
+      )}
+
+      {infoOpen && canShowInfo && (
+        <div className="node-media-info-card" role="status">
+          {([
+            ["FORMAT", (resolvedInfo ?? baseInfo).format],
+            ["SIZE", infoLoading ? "..." : (resolvedInfo ?? baseInfo).size],
+            ["DIMENSIONS", infoLoading ? "..." : (resolvedInfo ?? baseInfo).dimensions],
+            ["ADDED", (resolvedInfo ?? baseInfo).added],
+          ] as const).map(([label, value]) => (
+            <div key={label} className="node-media-info-field">
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </div>
+          ))}
         </div>
       )}
     </div>

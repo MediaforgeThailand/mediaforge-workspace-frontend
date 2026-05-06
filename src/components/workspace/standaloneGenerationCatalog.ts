@@ -274,7 +274,7 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
         label: "Google Veo 3.1",
         provider: "Google",
         badge: "Standard",
-        description: "Google Veo 3.1 with native audio — 4/6/8s, 720p/1080p, 16:9 or 9:16.",
+        description: "Google Veo 3.1 with optional audio — 4/6/8s at 720p, 8s at 1080p.",
       },
     ],
   },
@@ -663,17 +663,19 @@ export function buildVideoParams(args: {
     // Veo 3.1 only accepts "16:9" or "9:16" for aspectRatio. Coerce
     // anything else (e.g. the dashboard's "Auto" default) to 16:9.
     const aspect = args.ratio === "9:16" ? "9:16" : "16:9";
-    // Resolution: Veo accepts "720p" or "1080p"; default 720p.
-    const res = args.resolution === "1080p" ? "1080p" : "720p";
     // Duration: snap to the nearest valid value (4 / 6 / 8).
     const dur = args.duration <= 4 ? 4 : args.duration <= 6 ? 6 : 8;
+    // Google only supports Veo 3.1 1080p at 8 seconds. Preserve the
+    // user's duration choice by falling back to 720p for 4s/6s.
+    const res = args.resolution === "1080p" && dur === 8 ? "1080p" : "720p";
     return {
       model_name: args.model,
       prompt: args.prompt.trim(),
       aspect_ratio: aspect,
       resolution: res,
       duration: String(dur),
-      // Audio is always-on for Veo (no toggle); withAudio arg ignored.
+      generate_audio: String(args.withAudio),
+      replicate_generate_audio: String(args.withAudio),
       person_generation:
         args.personGeneration === "allow_all" ? "allow_all" : "allow_adult",
     };

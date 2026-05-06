@@ -26,6 +26,7 @@
  */
 import {
   BookOpen,
+  ChevronDown,
   FolderOpen,
   Home as HomeIcon,
   History as HistoryIcon,
@@ -53,6 +54,7 @@ import { supabase } from "@/integrations/supabase/client";
 import OrgCreditBadge from "@/components/OrgCreditBadge";
 import ActiveClassPicker from "@/components/ActiveClassPicker";
 import AllAssetsDialog from "@/components/workspace/AllAssetsDialog";
+import type { ProjectMeta } from "@/store/useWorkspaceStore";
 
 // Default brand (no tenant subdomain match). Centralised so the
 // org-admin branding preview can re-use the exact same fallback.
@@ -174,12 +176,18 @@ export interface WorkspaceSidebarProps {
   onNavigate?: (s: SectionKey) => void;
   /** Reserved for shells that still pass the legacy sidebar create action. */
   onCreate?: () => void;
+  projects?: ProjectMeta[];
+  activeProjectId?: string | null;
+  onSelectProject?: (id: string | null) => void;
 }
 
 export default function WorkspaceSidebar({
   active,
   onNavigate,
   onCreate,
+  projects = [],
+  activeProjectId = null,
+  onSelectProject,
 }: WorkspaceSidebarProps) {
   const navigate = useNavigate();
   const { t } = useLanguage();
@@ -191,6 +199,15 @@ export default function WorkspaceSidebar({
   const branding = useOrgBranding();
   const brandLogo = branding?.logoUrl ?? DEFAULT_BRAND_LOGO;
   const brandName = branding?.shortName ?? DEFAULT_BRAND_NAME;
+  const projectOptions = [...projects].sort(
+    (a, b) =>
+      Number(b.id === activeProjectId) - Number(a.id === activeProjectId) ||
+      b.updatedAt - a.updatedAt,
+  );
+  const selectedProjectId =
+    activeProjectId && projectOptions.some((project) => project.id === activeProjectId)
+      ? activeProjectId
+      : projectOptions[0]?.id ?? "";
 
   const handleClick = (s: SectionKey) => {
     if (onNavigate) onNavigate(s);
@@ -253,6 +270,28 @@ export default function WorkspaceSidebar({
       )}
 
       {/* ── Top nav group ──────────────────────────────────────── */}
+      {onSelectProject && projectOptions.length > 0 && (
+        <label className="relative mx-[8px] mb-[8px] block">
+          <span className="sr-only">{t("workspace.home.projects")}</span>
+          <select
+            value={selectedProjectId}
+            onChange={(event) => onSelectProject(event.target.value || null)}
+            className="w-full appearance-none rounded-md border border-white/[0.08] bg-white/[0.045] py-[6px] pl-[10px] pr-[28px] text-[12px] font-semibold leading-none text-white outline-none transition hover:bg-white/[0.07] focus:border-white/[0.18] focus:bg-white/[0.08]"
+            title={
+              projectOptions.find((project) => project.id === selectedProjectId)?.name ??
+              t("workspace.home.projects")
+            }
+          >
+            {projectOptions.map((project) => (
+              <option key={project.id} value={project.id} className="bg-zinc-950 text-white">
+                {project.name}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-[9px] top-1/2 h-[13px] w-[13px] -translate-y-1/2 text-zinc-400" />
+        </label>
+      )}
+
       <nav className="flex flex-col gap-[4px]">
         {NAV_TOP.map((it) => (
           <NavLink

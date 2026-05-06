@@ -954,10 +954,26 @@ export default function StandaloneGenerator({
   }, [activeJobIdsKey, activeJobs, refetchJobs]);
 
   const updateForm = (patch: Partial<StandaloneFormState>) => {
-    setForms((prev) => ({
-      ...prev,
-      [activeTool]: { ...prev[activeTool], ...patch },
-    }));
+    setForms((prev) => {
+      const next = { ...prev[activeTool], ...patch };
+      if (activeTool === "video_gen" && isVeoVideoModel(next.model)) {
+        if (patch.videoResolution === "1080p" && next.videoDuration !== 8) {
+          next.videoDuration = 8;
+        } else if (
+          patch.videoDuration != null &&
+          Number(patch.videoDuration) !== 8 &&
+          next.videoResolution === "1080p"
+        ) {
+          next.videoResolution = "720p";
+        } else if (next.videoResolution === "1080p" && next.videoDuration !== 8) {
+          next.videoResolution = "720p";
+        }
+      }
+      return {
+        ...prev,
+        [activeTool]: next,
+      };
+    });
   };
 
   const setToolModel = (
@@ -1027,7 +1043,7 @@ export default function StandaloneGenerator({
       if (!model.startsWith("kling")) nextPatch.videoNegativePrompt = "";
       if (!isVeoVideoModel(model)) nextPatch.videoPersonGeneration = "allow_adult";
       if (!isSeedance) nextPatch.videoReturnLastFrame = false;
-      if (isSeedance && !seedanceVideoSupportsAudio(model)) nextPatch.videoWithAudio = false;
+      if (!isVeoVideoModel(model) && isSeedance && !seedanceVideoSupportsAudio(model)) nextPatch.videoWithAudio = false;
       if (!videoSupportsMultiShot(model)) {
         nextPatch.videoMultiShot = false;
         nextPatch.videoMultiPrompt = "";
@@ -1573,7 +1589,10 @@ export default function StandaloneGenerator({
 
   const videoRatioOptions = videoRatioOptionsForModel(form.model);
   const videoResolutionOptions = videoResolutionOptionsForModel(form.model);
-  const videoDurationOptions = videoDurationsForModel(form.model).map(String);
+  const videoDurationOptions = videoDurationOptionsForSettings(
+    form.model,
+    form.videoResolution,
+  ).map(String);
   const videoFrameSlots =
     activeTool === "video_gen"
       ? [
@@ -3278,12 +3297,16 @@ function VideoControls({
   const isMotion = isKlingMotionVideoModel(form.model);
   const isVeo = isVeoVideoModel(form.model);
   const supportsAudioToggle =
+    isVeo ||
     (isSeedance && seedanceVideoSupportsAudio(form.model)) ||
     (!isSeedance && !isVeo && !isMotion);
   const supportsStartEnd = videoSupportsStartEndFrames(form.model);
   const supportsRefImage = videoSupportsReferenceImage(form.model);
   const supportsRefVideo = videoSupportsReferenceVideo(form.model);
-  const durations = videoDurationsForModel(form.model);
+  const durations = videoDurationOptionsForSettings(
+    form.model,
+    form.videoResolution,
+  );
 
   useEffect(() => {
     if (!durations.includes(form.videoDuration)) {
@@ -5804,6 +5827,11 @@ function videoResolutionOptionsForModel(model: string): string[] {
   return [];
 }
 
+function videoDurationOptionsForSettings(model: string, resolution: string): number[] {
+  if (isVeoVideoModel(model) && resolution === "1080p") return [8];
+  return videoDurationsForModel(model);
+}
+
 function compactRangeLabel(values: string[]): string | null {
   if (values.length === 0) return null;
   if (values.length === 1) return values[0];
@@ -5902,17 +5930,11 @@ function buildVideoPanelSettings({
   const isMotion = isKlingMotionVideoModel(form.model);
   const isVeo = isVeoVideoModel(form.model);
   const supportsAudioToggle =
+    isVeo ||
     (isSeedance && seedanceVideoSupportsAudio(form.model)) ||
     (!isSeedance && !isVeo && !isMotion);
 
-  if (isVeo) {
-    settings.push({
-      id: "audio",
-      label: standaloneInlineLabel("audio", language),
-      value: standaloneInlineLabel("on", language),
-      kind: "readonly",
-    });
-  } else if (supportsAudioToggle) {
+  if (supportsAudioToggle) {
     settings.push({
       id: "audio",
       label: standaloneInlineLabel("audio", language),

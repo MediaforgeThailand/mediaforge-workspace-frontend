@@ -106,6 +106,12 @@ const MAPPINGS: ErrorMapping[] = [
     ja: "AI サービスが一時的に利用できません。チームが対応中です。",
   },
   {
+    match: /Seedance rejected the reference media|verified real-human assets|asset:\/\/|real person|privacy-sensitive|PrivacyInformation|SensitiveContentDetected/i,
+    th: "Seedance 2.0 ปฏิเสธภาพคนจริงใน route นี้ ถ้าต้องใช้คนจริงให้ใช้ asset ที่ยืนยันสิทธิ์แล้ว หรือเลือกโมเดล/ผู้ให้บริการอื่นครับ",
+    en: "Seedance 2.0 blocked the real-person reference on this route. Use a verified real-human asset, or choose another model/provider.",
+    ja: "Seedance 2.0 はこの経路で実在人物の参照画像をブロックしました。認証済みの人物アセットを使うか、別のモデル/プロバイダーを選んでください。",
+  },
+  {
     match: /content[\s_-]*polic|moderation|blocked|safety[\s_-]*system|disallowed/i,
     th: "เนื้อหาที่ขอนี้ผู้ให้บริการ AI ปฏิเสธ ลองปรับ prompt ให้ปลอดภัยกว่านี้",
     en: "The AI provider blocked this request — try a safer prompt.",
@@ -121,6 +127,7 @@ const MAPPINGS: ErrorMapping[] = [
     match: /Veo image input was rejected|inlineData.*isn'?t supported|imageBytes|models\/veo.*not found/i,
     th: "Veo 3.1 ยังรับรูปอ้างอิงไม่ได้ในตอนนี้ ลองสร้างแบบ Text to Video ก่อนครับ",
     en: "Veo 3.1 image input is unavailable right now. Try Text to Video first.",
+    ja: "Veo 3.1 の画像入力は現在利用できません。まず Text to Video をお試しください。",
   },
   {
     match: /Veo: failed to fetch start\/end frame \((?:400|401|403|404|410)\)|failed to fetch start\/end frame/i,
