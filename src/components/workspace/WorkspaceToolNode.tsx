@@ -86,7 +86,7 @@ import { cleanModelLabelMap } from "./modelDisplay";
 
 const RUN_EDGE_FUNCTION = "workspace-run-node";
 const DEFAULT_WORKSPACE_INFRASTRUCTURE_BUFFER_PERCENT = 40;
-const MAX_VISIBLE_RUN_MS = 30 * 60_000;
+const MAX_VISIBLE_RUN_MS = 60 * 60_000;
 const STALE_RUN_GRACE_MS = 30_000;
 const MULTI_GEN_MAX = 3;
 const MULTI_GEN_X_OFFSET = 480;
@@ -1001,9 +1001,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         // becoming active (e.g. fast Banana 2 generations finishing
         // in 2-3s while the WebSocket handshake is still happening).
         // Hard timeout falls back to the same MAX_VISIBLE_RUN_MS as
-        // before; the DB-side sweep cron will mark anything stuck
-        // beyond 5 min as failed and refund credits, so the UI
-        // resolves either way.
+        // the durable worker deadline; DB-side sweep only releases stale
+        // locks for retry before that deadline.
         const pollJob = (): Promise<Record<string, unknown>> =>
           new Promise((resolve, reject) => {
             let lastStatus = "queued";
@@ -1138,10 +1137,9 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                 });
             }, 5_000);
 
-            // Hard wall — sweep cron will already have marked the
-            // row failed long before this fires (5-min threshold vs
-            // 30-min wall here), but keep the timer as a safety net
-            // in case the realtime channel disconnects silently.
+            // Hard wall — keep this aligned with the durable worker's
+            // one-hour deadline in case the realtime channel disconnects
+            // silently.
             const timeoutId = setTimeout(() => {
               if (settled) return;
               settled = true;
@@ -1247,7 +1245,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       // Behaviour:
       //   • Per-attempt timeout: 180s (longer than the edge fn's
       //     150s wall clock so the response has time to land).
-      //   • Total budget: 30 minutes — user-visible spinner for
+      //   • Total budget: 60 minutes — user-visible spinner for
       //     the entire window. No error toasts during retry.
       //   • Backoff: 3, 5, 10, 15, 30, 60s (cap). Spaces out provider
       //     hits so we don't pile on a struggling endpoint.
