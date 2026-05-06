@@ -1,21 +1,33 @@
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { en, type TranslationKey } from "./locales/en";
 
-export const SUPPORTED_LANGUAGES = ["en", "th"] as const;
+export const SUPPORTED_LANGUAGES = ["en", "th", "es", "ja", "hi"] as const;
 export type Language = (typeof SUPPORTED_LANGUAGES)[number];
 
 const LANGUAGE_STORAGE_KEY = "mf-lang";
 const DEFAULT_LANGUAGE: Language = "en";
 const LANGUAGE_COUNTRY_CODES: Partial<Record<Language, readonly string[]>> = {
   th: ["TH"],
+  es: [
+    "AR", "BO", "CL", "CO", "CR", "CU", "DO", "EC", "ES", "GQ", "GT",
+    "HN", "MX", "NI", "PA", "PE", "PR", "PY", "SV", "UY", "VE",
+  ],
+  ja: ["JP"],
+  hi: ["IN"],
 };
 const LANGUAGE_NATIVE_LABELS: Record<Language, string> = {
   en: "English",
   th: "ไทย",
+  es: "Español",
+  ja: "日本語",
+  hi: "हिन्दी",
 };
 const LANGUAGE_LOCALES: Record<Language, string> = {
   en: "en-US",
   th: "th-TH",
+  es: "es-ES",
+  ja: "ja-JP",
+  hi: "hi-IN",
 };
 const COUNTRY_LANGUAGE_LOOKUP = new Map<string, Language>(
   Object.entries(LANGUAGE_COUNTRY_CODES).flatMap(([language, countryCodes]) =>
@@ -49,6 +61,9 @@ const loadedTranslations: Partial<Record<Language, TranslationMap>> = { en };
 const localeLoaders: Record<Language, () => Promise<TranslationMap>> = {
   en: async () => en,
   th: () => import("./locales/th").then((module) => module.th),
+  es: () => import("./locales/es").then((module) => module.es),
+  ja: () => import("./locales/ja").then((module) => module.ja),
+  hi: () => import("./locales/hi").then((module) => module.hi),
 };
 
 interface LanguageContextType {

@@ -168,6 +168,76 @@ const MAPPINGS: ErrorMapping[] = [
     en: "Some inputs are invalid — please double-check and try again.",
     ja: "入力内容に誤りがあります。確認して再試行してください。",
   },
+
+  // ── Workspace media-tool errors (videoAudioActions, StandaloneGenerator) ─
+  {
+    match: /Audio extraction is not supported|Muted video export is not supported|Canvas rendering is not available/i,
+    th: "เบราว์เซอร์นี้ไม่รองรับการตัดต่อเสียง/วิดีโอ ลองเปิดด้วย Chrome หรือ Edge เวอร์ชันล่าสุด",
+    en: "Your browser doesn't support this video/audio operation. Try the latest Chrome or Edge.",
+    ja: "このブラウザはこの音声/動画操作をサポートしていません。最新の Chrome または Edge をお試しください。",
+  },
+  {
+    match: /does not contain an audio track/i,
+    th: "วิดีโอนี้ไม่มีแทร็กเสียง",
+    en: "This video has no audio track.",
+    ja: "このビデオには音声トラックがありません。",
+  },
+  {
+    match: /Muted video export produced no data/i,
+    th: "การ export วิดีโอแบบไม่มีเสียงไม่ได้ข้อมูล ลองอีกครั้ง",
+    en: "Muted video export produced no data. Please try again.",
+    ja: "ミュート動画の書き出しでデータが生成されませんでした。もう一度お試しください。",
+  },
+  {
+    match: /Please sign in before uploading|^Not signed in/i,
+    th: "กรุณาเข้าสู่ระบบก่อน",
+    en: "Please sign in first.",
+    ja: "先にサインインしてください。",
+  },
+  {
+    match: /Create or select a project before uploading/i,
+    th: "สร้างหรือเลือกโปรเจกต์ก่อนอัปโหลดไฟล์อ้างอิง",
+    en: "Create or select a project before uploading references.",
+    ja: "参照をアップロードする前にプロジェクトを作成または選択してください。",
+  },
+  {
+    match: /Only image or video references are supported/i,
+    th: "รองรับเฉพาะไฟล์อ้างอิงประเภทรูปภาพหรือวิดีโอเท่านั้น",
+    en: "Only image or video references are supported here.",
+    ja: "画像またはビデオの参照のみサポートされています。",
+  },
+
+  // ── Billing portal / org-admin / teacher-center ─────────────
+  {
+    match: /No portal URL returned|portal[\s_-]*url[\s_-]*not/i,
+    th: "เปิด portal ไม่ได้ ลองใหม่หรือติดต่อทีมงาน",
+    en: "Could not open the billing portal. Please try again or contact support.",
+    ja: "請求ポータルを開けませんでした。もう一度お試しいただくか、サポートにお問い合わせください。",
+  },
+  {
+    match: /Amount must be a positive integer|amount_must_be_positive/i,
+    th: "จำนวนต้องเป็นเลขจำนวนเต็มบวก",
+    en: "Amount must be a positive whole number.",
+    ja: "数量は正の整数でなければなりません。",
+  },
+  {
+    match: /No class space to revoke|student_space_not_found/i,
+    th: "ยังไม่มี space ของนักเรียนให้ดำเนินการ",
+    en: "No student space found to act on yet.",
+    ja: "対象となる生徒のスペースが見つかりません。",
+  },
+  {
+    match: /class_budget_exhausted/i,
+    th: "เครดิตของคลาสไม่พอ",
+    en: "Class credit pool is not enough.",
+    ja: "クラスのクレジットプールが不足しています。",
+  },
+  {
+    match: /No promo package available/i,
+    th: "ตอนนี้ยังไม่มีแพ็กโปรโมชันให้เลือก ลองใหม่ภายหลังครับ",
+    en: "No promotional package is available right now. Please try again later.",
+    ja: "現在ご利用いただけるプロモーションパッケージはありません。後ほど再度お試しください。",
+  },
 ];
 
 /** Generic fallback when no pattern matches. */

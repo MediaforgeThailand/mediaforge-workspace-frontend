@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   Box,
   ChevronDown,
@@ -60,6 +61,7 @@ function genFieldType(
 }
 
 const AllAssetsDialog = ({ open, onClose }: Props) => {
+  const { t } = useLanguage();
   const allGraphs = useWorkspaceStore((s) => s.graphs);
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const canvases = useWorkspaceStore((s) => s.canvases);
@@ -362,7 +364,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
                 ref={searchRef}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search files, tags..."
+                placeholder={t("workspace.allAssets.searchPlaceholder")}
                 className="h-full w-full rounded-[4px] border border-[#2f2f2f] bg-[#181818] pl-8 pr-2 text-[13px] font-medium text-zinc-100 outline-none placeholder:text-[#777] focus:border-[#555]"
               />
             </div>

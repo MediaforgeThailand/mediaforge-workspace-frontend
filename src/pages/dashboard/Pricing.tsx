@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, Check, X, Loader2, Sparkles, Minus, Plus, Users } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { friendlyError } from "@/lib/friendlyError";
 import { useCredits } from "@/hooks/useCredits";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -152,7 +153,7 @@ const TEAM_MIN_SEATS = 2;
 const TEAM_MAX_SEATS = 500;
 
 const Pricing = () => {
-  const { t: i18n } = useLanguage();
+  const { t: i18n, language } = useLanguage();
   useDocumentTitle(i18n("pricing.pricingMediaforge"));
   const navigate = useNavigate();
   const { refetch } = useCredits();
@@ -264,7 +265,7 @@ const Pricing = () => {
       console.error("[Pricing] portal error:", e);
       toast({
         title: i18n("common.couldNotOpenBillingPortal"),
-        description: e instanceof Error ? e.message : String(e),
+        description: friendlyError(e, language === "th" ? "th" : "en"),
         variant: "destructive",
       });
     } finally {

@@ -19,6 +19,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type NodeQuickActionRailProps = {
   visible: boolean;
@@ -63,6 +64,7 @@ export default function NodeQuickActionRail({
 }: NodeQuickActionRailProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -116,7 +118,7 @@ export default function NodeQuickActionRail({
         <button
           type="button"
           className="node-quick-action-button"
-          aria-label="Open node tools"
+          aria-label={t("workspace.nodeRail.openTools")}
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((open) => !open)}
         >
@@ -125,7 +127,7 @@ export default function NodeQuickActionRail({
         <button
           type="button"
           className="node-quick-action-button is-disabled"
-          aria-label="Node info"
+          aria-label={t("workspace.nodeRail.nodeInfo")}
           disabled
         >
           <Info className="h-[14px] w-[14px]" />
@@ -133,7 +135,7 @@ export default function NodeQuickActionRail({
         <button
           type="button"
           className="node-quick-action-button is-disabled"
-          aria-label="Focus node"
+          aria-label={t("workspace.nodeRail.focusNode")}
           disabled
         >
           <ScanSearch className="h-[14px] w-[14px]" />
@@ -144,7 +146,7 @@ export default function NodeQuickActionRail({
             "node-quick-action-button is-danger",
             !onDelete && "is-disabled",
           )}
-          aria-label="Delete node"
+          aria-label={t("workspace.nodeRail.deleteNode")}
           disabled={!onDelete}
           onClick={() => onDelete?.()}
         >

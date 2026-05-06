@@ -21,6 +21,7 @@ import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { friendlyError } from "@/lib/friendlyError";
 import { useIsOrgAdmin } from "@/hooks/useIsOrgUser";
 import {
   consumerOrgAdminApi,
@@ -1058,7 +1059,7 @@ function MembersPanel({
 }
 
 function MemberDetail({ member, classId }: { member: ClassMember; classId: string }) {
-  const { t: i18n } = useLanguage();
+  const { t: i18n, language } = useLanguage();
   const { data: breakdown } = useMemberModelBreakdown(classId, member.user_id, 30);
   const queryClient = useQueryClient();
   const activeSpace = getPrimaryStudentSpace(member);
@@ -1102,9 +1103,7 @@ function MemberDetail({ member, classId }: { member: ClassMember; classId: strin
       refreshMemberData();
     },
     onError: (error: any) => {
-      toast.error(error?.message === "class_budget_exhausted"
-        ? "Class credit pool is not enough"
-        : error?.message ?? "Could not update credits");
+      toast.error(friendlyError(error?.message ?? error, language === "th" ? "th" : "en"));
     },
   });
   const setSpaceStatus = useMutation({
@@ -1113,10 +1112,14 @@ function MemberDetail({ member, classId }: { member: ClassMember; classId: strin
       return consumerOrgAdminApi.setSpaceStatus(classId, activeSpace.workspace_id, status);
     },
     onSuccess: (_, status) => {
-      toast.success(status === "passed" ? "Space marked as passed" : `Space status set to ${status}`);
+      toast.success(
+        status === "passed"
+          ? i18n("teacherCenter.spaceMarkedAsPassed")
+          : i18n("teacherCenter.spaceStatusSet", { status }),
+      );
       refreshMemberData();
     },
-    onError: (error: any) => toast.error(error?.message ?? "Could not update space"),
+    onError: (error: any) => toast.error(friendlyError(error?.message ?? error, language === "th" ? "th" : "en")),
   });
 
   return (

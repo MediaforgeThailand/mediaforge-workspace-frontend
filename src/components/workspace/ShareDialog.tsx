@@ -33,6 +33,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Copy, Eye, Pencil, Trash2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { friendlyError } from "@/lib/friendlyError";
 
 type ShareRole = "viewer" | "editor";
 
@@ -55,7 +56,7 @@ interface Props {
 
 const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) => {
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   /** Friendly relative time for the share list ("Created 2m ago"). */
   const timeAgo = (iso: string): string => {
     const ts = new Date(iso).getTime();
@@ -146,7 +147,9 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
       console.error("[ShareDialog] generate failed:", err);
       toast({
         title: t("workspace.share.couldnt_generate"),
-        description: err?.message ?? t("workspace.share.try_again"),
+        description: err
+          ? friendlyError(err, language === "th" ? "th" : "en")
+          : t("workspace.share.try_again"),
         variant: "destructive",
       });
     } finally {
@@ -182,7 +185,9 @@ const ShareDialog = ({ open, onOpenChange, workspaceId, workspaceName }: Props) 
       console.error("[ShareDialog] revoke failed:", err);
       toast({
         title: t("workspace.share.couldnt_revoke"),
-        description: err?.message ?? t("workspace.share.try_again"),
+        description: err
+          ? friendlyError(err, language === "th" ? "th" : "en")
+          : t("workspace.share.try_again"),
         variant: "destructive",
       });
     } finally {

@@ -36,6 +36,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useReactFlow, type Edge, type Node } from "@xyflow/react";
 import { toast } from "sonner";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ClipboardSnapshot {
   nodes: Node[];
@@ -61,6 +62,7 @@ export function useWorkspaceShortcuts({
   onPreviewSelected,
 }: ShortcutOptions = {}) {
   const rf = useReactFlow();
+  const { t } = useLanguage();
   const clipboardRef = useRef<ClipboardSnapshot | null>(null);
   const cursorRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
@@ -348,11 +350,11 @@ export function useWorkspaceShortcuts({
           if (shift) {
             const before = store.redoStack.length;
             store.redo();
-            if (before === 0) toast.info("Nothing to redo");
+            if (before === 0) toast.info(t("workspace.shortcuts.nothingToRedo"));
           } else {
             const before = store.history.length;
             store.undo();
-            if (before === 0) toast.info("Nothing to undo");
+            if (before === 0) toast.info(t("workspace.shortcuts.nothingToUndo"));
           }
           return;
         }
@@ -361,7 +363,7 @@ export function useWorkspaceShortcuts({
           const store = useWorkspaceStore.getState();
           const before = store.redoStack.length;
           store.redo();
-          if (before === 0) toast.info("Nothing to redo");
+          if (before === 0) toast.info(t("workspace.shortcuts.nothingToRedo"));
           return;
         }
         if (lower === "enter") {
@@ -424,5 +426,6 @@ export function useWorkspaceShortcuts({
     runAll,
     onAddNode,
     onPreviewSelected,
+    t,
   ]);
 }
