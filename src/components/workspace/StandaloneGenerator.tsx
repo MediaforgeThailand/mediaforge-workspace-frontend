@@ -105,6 +105,9 @@ const RUN_EDGE_FUNCTION = "workspace-run-node";
 const STANDALONE_CANVAS_ID = "standalone";
 const STORAGE_BUCKET = "ai-media";
 const SIGNED_URL_TTL_SEC = 60 * 60 * 24 * 365;
+const IMAGE_REFERENCE_UPLOAD_MAX_BYTES = 4 * 1024 * 1024;
+const IMAGE_REFERENCE_UPLOAD_MAX_SIDE = 1600;
+const IMAGE_REFERENCE_UPLOAD_JPEG_QUALITY = 0.88;
 const STANDALONE_JOB_SELECT =
   "id,node_type,provider,model,request,status,attempts,result,error,last_error,created_at,completed_at,run_after,deadline_at,locked_by,lock_expires_at,credits_charged,credits_refunded";
 const DEFAULT_WORKSPACE_INFRASTRUCTURE_BUFFER_PERCENT = 40;
@@ -171,6 +174,75 @@ function readVideoFileDuration(file: File): Promise<number | null> {
 
 function readVideoUrlDuration(url: string): Promise<number | null> {
   return readVideoDurationFromSource(url);
+}
+
+function loadImageElement(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Could not read image reference."));
+    };
+    img.src = objectUrl;
+  });
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("Could not normalize image reference."));
+      },
+      type,
+      quality,
+    );
+  });
+}
+
+function replaceFileExtension(name: string, ext: string): string {
+  const base = name.replace(/\.[^.]+$/, "") || "reference";
+  return `${base}.${ext}`;
+}
+
+async function normalizeImageReferenceUpload(file: File): Promise<File> {
+  if (!file.type.startsWith("image/")) return file;
+  if (file.type === "image/svg+xml" || file.type === "image/gif") return file;
+  if (file.size <= IMAGE_REFERENCE_UPLOAD_MAX_BYTES) return file;
+
+  const img = await loadImageElement(file);
+  const maxSourceSide = Math.max(img.naturalWidth || img.width, img.naturalHeight || img.height);
+  if (!maxSourceSide) return file;
+
+  const scale = Math.min(1, IMAGE_REFERENCE_UPLOAD_MAX_SIDE / maxSourceSide);
+  const width = Math.max(1, Math.round((img.naturalWidth || img.width) * scale));
+  const height = Math.max(1, Math.round((img.naturalHeight || img.height) * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return file;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(img, 0, 0, width, height);
+
+  const blob = await canvasToBlob(
+    canvas,
+    "image/jpeg",
+    IMAGE_REFERENCE_UPLOAD_JPEG_QUALITY,
+  );
+  if (blob.size >= file.size) return file;
+
+  return new File([blob], replaceFileExtension(file.name, "jpg"), {
+    type: "image/jpeg",
+    lastModified: file.lastModified,
+  });
 }
 
 type UploadSlot =
@@ -5701,7 +5773,8 @@ async function uploadReference(
   if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
     throw new Error("Only image or video references are supported on this surface.");
   }
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 80);
+  const uploadFile = await normalizeImageReferenceUpload(file);
+  const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 80);
   // Storage RLS on `ai-media` requires the FIRST folder segment to
   // equal `auth.uid()`:
   //   policy: `(auth.uid())::text = (storage.foldername(name))[1]`
@@ -5713,8 +5786,8 @@ async function uploadReference(
   const storagePath = `${userId}/standalone/${projectId}/${Date.now()}-${safeName}`;
   const { error: uploadError } = await supabase.storage
     .from(STORAGE_BUCKET)
-    .upload(storagePath, file, {
-      contentType: file.type || "application/octet-stream",
+    .upload(storagePath, uploadFile, {
+      contentType: uploadFile.type || "application/octet-stream",
       upsert: true,
     });
   if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
@@ -5731,7 +5804,7 @@ async function uploadReference(
     storagePath,
     name: file.name,
     url: data.signedUrl,
-    mime: file.type,
+    mime: uploadFile.type,
   };
 }
 
