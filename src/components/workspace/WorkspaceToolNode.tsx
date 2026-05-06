@@ -648,6 +648,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const { getEdges, getNodes, setNodes, setEdges } = useReactFlow();
   const edges = useEdges();
   const prevHasRefVideo = useRef<boolean | undefined>(undefined);
+  const runInFlightRef = useRef(false);
   const [insufficientOpen, setInsufficientOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   // Used by friendlyError() to localize jargon errors before they
@@ -795,11 +796,12 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const isViewer = useWorkspaceShareRole(selectIsViewer);
 
   const runNode = useCallback(async () => {
-    if (isRunning) return;
+    if (runInFlightRef.current || isRunning) return;
     if (isViewer) {
       toast.info(t("workspace.toolNode.viewOnlyRunsDisabled"));
       return;
     }
+    runInFlightRef.current = true;
     const storeState = useWorkspaceStore.getState();
     const log = useDebugLogStore.getState().push;
     const nodeLabelForLog =
@@ -1666,6 +1668,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         // stays in console.error for the team.
         toast.error(userErrorMessage);
       }
+    } finally {
+      runInFlightRef.current = false;
     }
   }, [getNodes, id, isRunning, isViewer, params, schemaKey, setNodes, selectedModel, schema, d.params?.nodeName, language, t]);
 
@@ -1741,7 +1745,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         void runNode();
         return;
       }
-      if (isRunning || isViewer) return;
+      if (runInFlightRef.current || isRunning || isViewer) return;
 
       const sourceNode = getNodes().find((node) => node.id === id) as Node | undefined;
       if (!sourceNode) return;
