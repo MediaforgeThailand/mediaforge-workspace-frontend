@@ -6096,7 +6096,7 @@ function buildImagePanelSettings({
         label: standaloneInlineLabel("quality", language),
         value: form.quality,
         kind: "select",
-        options: ["low", "medium", "high", "auto"].map((value) => ({
+        options: ["low", "medium", "high"].map((value) => ({
           value,
           label: standaloneOptionLabel(value, t),
         })),

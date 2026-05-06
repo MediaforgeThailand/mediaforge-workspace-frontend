@@ -261,12 +261,11 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         key: "quality",
         label: "Quality",
         type: "select",
-        options: ["low", "medium", "high", "auto"],
+        options: ["low", "medium", "high"],
         optionLabels: {
           low: "Low",
           medium: "Medium",
           high: "High",
-          auto: "Auto Quality",
         },
         default: "medium",
         supportedModels: [...OPENAI_IMAGE_MODELS],

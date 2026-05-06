@@ -601,11 +601,14 @@ export function buildImageParams(args: {
     model: args.model,
   });
   if (args.model === "gpt-image-2") {
+    const quality = ["low", "medium", "high"].includes(args.quality)
+      ? args.quality
+      : "medium";
     return {
       model_name: args.model,
       prompt: styledPrompt,
       size: composeGptImageSize(args.aspectRatio, args.resolution),
-      quality: args.quality,
+      quality,
       output_format: args.outputFormat,
       background: args.outputFormat === "jpeg" ? "auto" : args.background,
       moderation: "auto",
