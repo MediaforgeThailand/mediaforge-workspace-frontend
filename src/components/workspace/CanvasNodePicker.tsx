@@ -613,7 +613,7 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
               if (!g || g.children.length <= 1) return null;
               return (
                 <div
-                  className="absolute left-full ml-2 w-[190px] overflow-hidden rounded-[8px] border border-[#2d2d2d] bg-[#171717] py-[5px] shadow-[0_14px_30px_rgba(0,0,0,.48)]"
+                  className="absolute left-[calc(100%-1px)] w-[190px] overflow-hidden rounded-[8px] border border-[#2d2d2d] bg-[#171717] py-[5px] shadow-[0_14px_30px_rgba(0,0,0,.48)]"
                   style={{
                     top: flyoutAnchor ? flyoutAnchor.top : 0,
                     animation: "canvas-picker-flyout-in 100ms ease-out",
