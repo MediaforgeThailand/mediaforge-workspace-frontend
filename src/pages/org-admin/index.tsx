@@ -124,6 +124,7 @@ function CreateClassButton({ orgId }: { orgId: string }) {
   const [maxStudents, setMaxStudents] = useState("42");
   const [policy, setPolicy] = useState<"manual" | "monthly_reset" | "weekly_drip">("manual");
   const [creditAmount, setCreditAmount] = useState("200");
+  const [classPool, setClassPool] = useState("10000");
 
   const navigate = useNavigate();
   const [, setParams] = useSearchParams();
@@ -138,12 +139,14 @@ function CreateClassButton({ orgId }: { orgId: string }) {
       max_students: parseInt(maxStudents, 10) || null as any,
       credit_policy: policy,
       credit_amount: usesRecurringCredits ? parseInt(creditAmount, 10) || 0 : 0,
+      credit_pool: Math.max(0, parseInt(classPool, 10) || 0),
       primary_instructor_id: user?.id ?? null,
     } as any),
     onSuccess: ({ class: cls }) => {
       toast.success(`Class "${cls.name}" created (${cls.code})`);
       setOpen(false);
       setName("");
+      setClassPool("10000");
       qc.invalidateQueries({ queryKey: ["mf-um-class-memberships"] });
       // Jump straight into the new class detail
       setParams({ class: cls.id });
@@ -182,6 +185,19 @@ function CreateClassButton({ orgId }: { orgId: string }) {
             <div>
               <Label>{i18n("orgAdmin.maxStudents")}</Label>
               <Input type="number" value={maxStudents} onChange={(e) => setMaxStudents(e.target.value)} />
+            </div>
+            <div>
+              <Label>Class pool credits</Label>
+              <Input
+                type="number"
+                min="0"
+                value={classPool}
+                onChange={(e) => setClassPool(e.target.value)}
+                placeholder="10000"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                QR grants and manual student-space top-ups spend from this class pool.
+              </p>
             </div>
             <div className={usesRecurringCredits ? "grid grid-cols-2 gap-3" : "space-y-3"}>
               <div>
@@ -290,11 +306,12 @@ function ClassDetail({ classId, onBack }: { classId: string; onBack: () => void 
 
       {/* Pool summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <SummaryCard label={i18n("orgAdmin.classPool")} value={c.credit_pool} sub={i18n("orgAdmin.allocatedBySuperAdmin")} />
+        <SummaryCard label={i18n("orgAdmin.classPool")} value={c.credit_pool} sub="Allocated to this class" />
         <SummaryCard label={i18n("orgAdmin.consumed")} value={c.credit_pool_consumed} sub={i18n("orgAdmin.byWorkspaceRuns")} />
         <SummaryCard label={i18n("orgAdmin.remaining")} value={remaining} highlight sub={i18n("orgAdmin.availableToGrant")} />
         <SummaryCard label={i18n("common.members")} value={detail.data.active_member_count} icon={<Users className="h-4 w-4" />} />
       </div>
+      <ClassPoolTopUpCard classId={classId} remaining={remaining} onDone={refresh} />
 
       <Tabs defaultValue="members">
         <TabsList>
@@ -345,6 +362,78 @@ function ClassDetail({ classId, onBack }: { classId: string; onBack: () => void 
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function ClassPoolTopUpCard({
+  classId,
+  remaining,
+  onDone,
+}: {
+  classId: string;
+  remaining: number;
+  onDone: () => void;
+}) {
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const addPool = useMutation({
+    mutationFn: () => {
+      const parsed = parseInt(amount, 10);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        throw new Error("Enter a positive credit amount.");
+      }
+      return consumerOrgAdminApi.allocateToClass(
+        classId,
+        parsed,
+        reason.trim() || "teacher_class_pool_top_up",
+      );
+    },
+    onSuccess: (res) => {
+      toast.success(`Added ${Number(res.delta ?? amount).toLocaleString()} credits to class pool`);
+      setAmount("");
+      setReason("");
+      onDone();
+    },
+    onError: (error: any) => {
+      const message = error?.message === "organization_pool_exhausted"
+        ? "Institution pool does not have enough credits."
+        : error?.message ?? "Could not add class pool credits.";
+      toast.error(message);
+    },
+  });
+
+  return (
+    <Card className="border-emerald-500/25 bg-emerald-500/5">
+      <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-end">
+        <div className="min-w-0 flex-1">
+          <Label>Add class pool credits</Label>
+          <Input
+            type="number"
+            min="1"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="10000"
+            className="mt-1"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Current remaining: <span className="font-mono">{remaining.toLocaleString()}</span>. QR grants spend from this pool.
+          </p>
+        </div>
+        <div className="min-w-0 flex-1">
+          <Label>Reason</Label>
+          <Input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="extra workshop / makeup class"
+            className="mt-1"
+          />
+        </div>
+        <Button onClick={() => addPool.mutate()} disabled={!amount || addPool.isPending} className="md:w-[150px]">
+          {addPool.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+          Add pool
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
