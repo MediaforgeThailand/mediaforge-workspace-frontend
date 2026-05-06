@@ -674,8 +674,7 @@ export function buildVideoParams(args: {
       aspect_ratio: aspect,
       resolution: res,
       duration: String(dur),
-      generate_audio: String(args.withAudio),
-      replicate_generate_audio: String(args.withAudio),
+      generate_audio: "true",
       person_generation:
         args.personGeneration === "allow_all" ? "allow_all" : "allow_adult",
     };

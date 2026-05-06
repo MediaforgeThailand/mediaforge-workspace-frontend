@@ -748,7 +748,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         options: ["false", "true"],
         optionLabels: { "false": "No Audio", "true": "With Audio" },
         default: "false",
-        supportedModels: [...SEEDANCE_AUDIO_MODELS, ...VEO_MODELS],
+        supportedModels: [...SEEDANCE_AUDIO_MODELS],
       },
       {
         key: "character_orientation",
