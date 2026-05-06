@@ -21,7 +21,9 @@ import {
 import { PortIcon } from "./PortIcon";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { friendlyError } from "@/lib/friendlyError";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 import { type ParamDef } from "@/components/flow/nodes/nodeApiSchema";
 import { useNodeCreditCosts as useCreatorCreditCosts } from "@/hooks/useNodeCreditCosts";
@@ -490,6 +492,7 @@ interface NodeData {
 const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const schemaKey = String(type ?? "");
   const schema = getWorkspaceSchema(schemaKey);
+  const { language } = useLanguage();
   const { getEdges, getNodes, setNodes, setEdges } = useReactFlow();
   const edges = useEdges();
   const prevHasRefVideo = useRef<boolean | undefined>(undefined);
@@ -1275,6 +1278,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       );
     } catch (e: any) {
       const errorMessage = String(e?.message ?? e);
+      const userErrorMessage = friendlyError(errorMessage, language === "th" ? "th" : "en");
       const shouldToast = runStillActive();
       setNodes((ns) =>
         ns.map((n) =>
@@ -1286,7 +1290,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                   status: "error",
                   runStartedAt: null,
                   activeRunId: null,
-                  lastRunError: errorMessage,
+                  lastRunError: userErrorMessage,
                 },
               }
             : n,
@@ -1297,9 +1301,9 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         nodeId: id,
         title: `✗ ${nodeLabelForLog} · ${String(e?.message ?? e)}`,
       });
-      if (shouldToast) toast.error(errorMessage);
+      if (shouldToast) toast.error(userErrorMessage);
     }
-  }, [getNodes, id, isRunning, isViewer, params, schemaKey, setNodes, selectedModel, schema, d.params?.nodeName]);
+  }, [getNodes, id, isRunning, isViewer, params, schemaKey, setNodes, selectedModel, schema, d.params?.nodeName, language]);
 
   useEffect(() => {
     if (!isRunning) return;
@@ -1515,6 +1519,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         return;
       }
       if (status === "failed" || status === "permanent_failed") {
+        const rawError = String(job.error ?? job.last_error ?? "Generation failed");
+        const userError = friendlyError(rawError, language === "th" ? "th" : "en");
         setNodes((ns) =>
           ns.map((n) =>
             n.id === id && (n.data as NodeData | undefined)?.status !== "done"
@@ -1527,7 +1533,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                     activeRunId: null,
                     jobStatus: status,
                     jobAttempts: attempts,
-                    lastRunError: String(job.error ?? job.last_error ?? "Generation failed"),
+                    lastRunError: userError,
                   },
                 }
               : n,
@@ -1559,7 +1565,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       cancelled = true;
       if (pollTimer != null) window.clearInterval(pollTimer);
     };
-  }, [d.backgroundJobId, d.jobStatus, getNodes, id, runStatus, setNodes]);
+  }, [d.backgroundJobId, d.jobStatus, getNodes, id, language, runStatus, setNodes]);
 
   useEffect(() => {
     const handler = (e: Event) => {
