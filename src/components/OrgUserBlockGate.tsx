@@ -1,9 +1,7 @@
 import { Navigate, useLocation } from "react-router-dom";
-import { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useEducationStudentLock } from "@/hooks/useIsOrgUser";
-import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 
 interface Props {
   children: React.ReactNode;
@@ -43,17 +41,6 @@ export default function OrgUserBlockGate({ children }: Props) {
   const { credits, loading: creditsLoading } = useCredits();
   const educationStudentLock = useEducationStudentLock();
   const { pathname, search } = useLocation();
-  const scopeWorkspaceToUser = useWorkspaceStore((s) => s.scopeToUser);
-  const localWorkspaceUserId = useWorkspaceStore((s) => s.localUserId);
-  const expectedWorkspaceUserId = loading ? localWorkspaceUserId : user?.id ?? null;
-  const workspaceScopeReady =
-    loading || localWorkspaceUserId === expectedWorkspaceUserId;
-
-  useEffect(() => {
-    if (loading) return;
-    scopeWorkspaceToUser(user?.id ?? null);
-  }, [loading, scopeWorkspaceToUser, user?.id]);
-
   const settingsTab = new URLSearchParams(search).get("tab") ?? "";
   const planBillingSettingsRoute =
     /^\/app\/settings(\/|$)/.test(pathname) &&
@@ -62,7 +49,6 @@ export default function OrgUserBlockGate({ children }: Props) {
     EDUCATION_BILLING_ROUTES.some((rx) => rx.test(pathname)) ||
     planBillingSettingsRoute;
 
-  if (!workspaceScopeReady) return null;
   if (loading && educationBillingRoute) return null;
   if (loading) return <>{children}</>;
   if (user && educationBillingRoute && !profile) return null;
