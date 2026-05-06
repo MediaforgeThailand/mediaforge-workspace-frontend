@@ -121,6 +121,10 @@ export interface HistorySnap {
 }
 
 interface WorkspaceState {
+  /** Auth user that the persisted workspace cache belongs to. Without this,
+   *  switching accounts in the same browser can expose stale local spaces that
+   *  the new user cannot read through Supabase RLS. */
+  localUserId: string | null;
   projects: ProjectMeta[];
   activeProjectId: string | null;
   /** Top-level workspaces shown on /app/workspace dashboard. Each
@@ -165,6 +169,7 @@ interface WorkspaceState {
   deleteProject: (id: string) => void;
   setActiveProject: (id: string | null) => void;
   mergeServerProjects: (server: ProjectMeta[]) => void;
+  scopeToUser: (userId: string | null) => void;
 
   // workspace-level (top-level entity)
   /** Creates a workspace + a default "Untitled canvas" tab inside it.
@@ -439,6 +444,7 @@ const initialDefaultProject = createDefaultProjectMeta();
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
     (set, get) => ({
+      localUserId: null,
       projects: [initialDefaultProject],
       activeProjectId: initialDefaultProject.id,
       workspaces: [],
@@ -507,6 +513,26 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         }),
 
       setActiveProject: (id) => set(() => ({ activeProjectId: id })),
+
+      scopeToUser: (userId) =>
+        set((s) => {
+          const nextUserId = userId ?? null;
+          if (s.localUserId === nextUserId) return {};
+          const defaultProject = createDefaultProjectMeta();
+          return {
+            localUserId: nextUserId,
+            projects: [defaultProject],
+            activeProjectId: defaultProject.id,
+            workspaces: [],
+            canvases: [],
+            graphs: {},
+            current: null,
+            selectedNodeId: null,
+            deletedWorkspaceIds: {},
+            history: [],
+            redoStack: [],
+          };
+        }),
 
       mergeServerProjects: (serverList) =>
         set((s) => {
@@ -1678,6 +1704,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       // (guests lose their in-memory chat on refresh — that's the
       // same as before).
       partialize: (state) => ({
+        localUserId: state.localUserId,
         projects: state.projects,
         activeProjectId: state.activeProjectId,
         workspaces: state.workspaces,
@@ -1704,6 +1731,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const reset = () => {
           const defaultProject = createDefaultProjectMeta();
           return {
+            localUserId: null,
             projects: [defaultProject],
             activeProjectId: defaultProject.id,
             workspaces: [],
