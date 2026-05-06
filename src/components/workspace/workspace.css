@@ -1890,3 +1890,45 @@ body.ws-lightbox-open .react-flow__node .ws-clean-title {
   background: rgba(255, 255, 255, 0.08);
   color: rgba(244, 244, 245, 0.72);
 }
+
+.node-media-info-card {
+  position: absolute;
+  right: calc(100% + 16px);
+  top: 0;
+  z-index: 3;
+  display: grid;
+  width: 288px;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 26px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 8, 9, 0.96);
+  padding: 18px 20px;
+  color: white;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.48);
+}
+
+.node-media-info-field {
+  min-width: 0;
+}
+
+.node-media-info-field span {
+  display: block;
+  margin-bottom: 5px;
+  color: rgba(244, 244, 245, 0.44);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.node-media-info-field strong {
+  display: block;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

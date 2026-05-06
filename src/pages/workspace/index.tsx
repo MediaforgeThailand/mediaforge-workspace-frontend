@@ -104,7 +104,6 @@ import {
   useActiveClass,
   useEducationStudentLock,
   useIsOrgAdmin,
-  useIsOrgUser,
   useUserClassMemberships,
   type ClassMembershipInfo,
 } from "@/hooks/useIsOrgUser";
@@ -516,14 +515,9 @@ const WorkspaceDashboardInner = () => {
   const [section, setSection] = useState<Section>(initialSection);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { user, loading: authLoading } = useAuth();
-  const isOrgUser = useIsOrgUser();
   const isOrgAdmin = useIsOrgAdmin();
   const educationStudentLock = useEducationStudentLock();
-  const educationLockedStudent = !isOrgAdmin && (
-    isOrgUser ||
-    educationStudentLock.locked ||
-    educationStudentLock.loading
-  );
+  const educationLockedStudent = !isOrgAdmin && educationStudentLock.locked;
   const navigate = useNavigate();
   const projects = useWorkspaceStore((s) => s.projects);
   const activeProjectId = useWorkspaceStore((s) => s.activeProjectId);
@@ -764,6 +758,9 @@ const WorkspaceDashboardInner = () => {
           active={section}
           onNavigate={setSection}
           onCreate={handleCreateProject}
+          projects={projects}
+          activeProjectId={activeProjectId}
+          onSelectProject={setActiveProject}
         />
       </div>
 
@@ -784,6 +781,9 @@ const WorkspaceDashboardInner = () => {
             <WorkspaceSidebar
               active={section}
               onCreate={handleCreateProject}
+              projects={projects}
+              activeProjectId={activeProjectId}
+              onSelectProject={setActiveProject}
               onNavigate={(next) => {
                 setSection(next);
                 setMobileSidebarOpen(false);
@@ -1361,7 +1361,7 @@ const HomeView = ({
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-28 bg-[linear-gradient(0deg,rgba(10,10,11,1)_0%,rgba(10,10,11,.72)_34%,rgba(10,10,11,.28)_68%,rgba(10,10,11,0)_100%)] md:h-32" />
           <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-[linear-gradient(180deg,rgba(10,10,11,.3)_0%,rgba(10,10,11,0)_100%)]" />
           <div className="absolute inset-x-0 top-0 z-20">
-            <PageHeader title={t("workspace.home.title")} rightSlot={<UserMenu />} onOpenSidebar={onOpenSidebar} />
+            <PageHeader title="" rightSlot={<UserMenu />} onOpenSidebar={onOpenSidebar} />
           </div>
         </section>
 

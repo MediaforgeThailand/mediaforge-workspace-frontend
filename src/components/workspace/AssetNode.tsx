@@ -296,6 +296,8 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
                 ? d.fieldType
                 : null
         }
+        mediaUrl={livePreviewUrl ?? d.previewUrl ?? d.posterUrl ?? null}
+        mediaFileName={d.fileName ?? d.label ?? null}
         bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
       />
 

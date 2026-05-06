@@ -651,6 +651,10 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const runInFlightRef = useRef(false);
   const [insufficientOpen, setInsufficientOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [optimisticRun, setOptimisticRun] = useState<{
+    runId: string;
+    startedAt: number;
+  } | null>(null);
   // Used by friendlyError() to localize jargon errors before they
   // reach the user. Raw text still lands in console.error.
   const { language, t } = useLanguage();
@@ -676,6 +680,41 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const previewRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [promptMaxH, setPromptMaxH] = useState<number | null>(null);
+  const patchNodeDataNow = useCallback(
+    (
+      patch: Record<string, unknown>,
+      options: { activeRunId?: string | null; skipReactFlow?: boolean } = {},
+    ) => {
+      const expectedRunId = options.activeRunId ?? null;
+      const store = useWorkspaceStore.getState();
+      const storeNode = store.current?.nodes.find((node) => node.id === id);
+      const storeData = storeNode?.data as NodeData | undefined;
+      const storeMatches =
+        !expectedRunId || ((storeData?.activeRunId ?? null) === expectedRunId);
+
+      if (storeMatches) {
+        store.updateNodeData(id, patch);
+      }
+
+      if (!options.skipReactFlow) {
+        setNodes((ns) =>
+          ns.map((n) => {
+            if (n.id !== id) return n;
+            if (
+              expectedRunId &&
+              ((n.data as NodeData | undefined)?.activeRunId ?? null) !== expectedRunId
+            ) {
+              return n;
+            }
+            return { ...n, data: { ...n.data, ...patch } };
+          }),
+        );
+      }
+
+      return storeMatches;
+    },
+    [id, setNodes],
+  );
   useEffect(() => {
     const target = toolbarRef.current;
     const root = previewRef.current;
@@ -781,8 +820,15 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     return set;
   }, [edges, id]);
   const isMultiShot = String(params.multi_shot) === "true";
-  const runStatus = d.status ?? "idle";
+  const storedRunStatus = d.status ?? "idle";
+  const optimisticRunActive =
+    !!optimisticRun &&
+    storedRunStatus !== "done" &&
+    storedRunStatus !== "error";
+  const runStatus = optimisticRunActive ? "processing" : storedRunStatus;
   const isRunning = runStatus === "processing";
+  const visibleRunStartedAt =
+    optimisticRunActive ? optimisticRun.startedAt : d.runStartedAt;
   const supportsMultiGen = MULTI_GEN_NODE_TYPES.has(schemaKey);
   const multiGenCount = Math.min(
     MULTI_GEN_MAX,
@@ -808,8 +854,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       (d.params?.nodeName as string) || schema?.displayName || schemaKey;
     const runId = NEW_ID();
     const runStartedAt = Date.now();
+    setOptimisticRun({ runId, startedAt: runStartedAt });
     const runStillActive = () => {
-      const current = getNodes().find((node) => node.id === id);
+      const current =
+        useWorkspaceStore.getState().current?.nodes.find((node) => node.id === id) ??
+        getNodes().find((node) => node.id === id);
       return ((current?.data as NodeData | undefined)?.activeRunId ?? null) === runId;
     };
 
@@ -824,25 +873,15 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     // Set processing status (drives the node-shell glow ring too).
     // Stamp `runStartedAt` so <RunTimer /> can show elapsed time
     // next to the spinner. Cleared back to null on success/error.
-    setNodes((ns) =>
-      ns.map((n) =>
-        n.id === id
-          ? {
-              ...n,
-              data: {
-                ...n.data,
-                status: "processing",
-                runStartedAt,
-                activeRunId: runId,
-                lastRunError: null,
-                backgroundJobId: null,
-                jobStatus: null,
-                jobAttempts: 0,
-              },
-            }
-          : n,
-      ),
-    );
+    patchNodeDataNow({
+      status: "processing",
+      runStartedAt,
+      activeRunId: runId,
+      lastRunError: null,
+      backgroundJobId: null,
+      jobStatus: null,
+      jobAttempts: 0,
+    });
 
     log({
       level: "info",
@@ -972,19 +1011,12 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           );
         }
         const jobId = enqueueData.job_id;
-        setNodes((ns) =>
-          ns.map((n) =>
-            n.id === id && ((n.data as NodeData | undefined)?.activeRunId ?? null) === runId
-              ? {
-                  ...n,
-                  data: {
-                    ...n.data,
-                    backgroundJobId: jobId,
-                    jobStatus: "queued",
-                  },
-                }
-              : n,
-          ),
+        patchNodeDataNow(
+          {
+            backgroundJobId: jobId,
+            jobStatus: "queued",
+          },
+          { activeRunId: runId },
         );
         log({
           level: "info",
@@ -1016,13 +1048,9 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               const attempts = Number(job.attempts ?? 0);
               if (status !== lastStatus) {
                 lastStatus = status;
-                setNodes((ns) =>
-                  ns.map((n) =>
-                    n.id === id &&
-                    ((n.data as NodeData | undefined)?.activeRunId ?? null) === runId
-                      ? { ...n, data: { ...n.data, jobStatus: status, jobAttempts: attempts } }
-                      : n,
-                  ),
+                patchNodeDataNow(
+                  { jobStatus: status, jobAttempts: attempts },
+                  { activeRunId: runId },
                 );
                 log({
                   level: "info",
@@ -1190,23 +1218,16 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           createdAt: Date.now(),
         } as any);
 
-        setNodes((ns) =>
-          ns.map((n) =>
-            n.id === id && ((n.data as NodeData | undefined)?.activeRunId ?? null) === runId
-              ? {
-                  ...n,
-                  data: {
-                    ...n.data,
-                    status: "done",
-                    runStartedAt: null,
-                    activeRunId: null,
-                    backgroundJobId: jobId,
-                    jobStatus: "completed",
-                    lastRunError: null,
-                  },
-                }
-              : n,
-          ),
+        patchNodeDataNow(
+          {
+            status: "done",
+            runStartedAt: null,
+            activeRunId: null,
+            backgroundJobId: jobId,
+            jobStatus: "completed",
+            lastRunError: null,
+          },
+          { activeRunId: runId },
         );
         const snippet = (r.prompt_used ?? "").slice(0, 60);
         const srcLabel =
@@ -1602,21 +1623,14 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         createdAt: Date.now(),
       } as any);
 
-      setNodes((ns) =>
-        ns.map((n) =>
-          n.id === id && ((n.data as NodeData | undefined)?.activeRunId ?? null) === runId
-            ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  status: "done",
-                  runStartedAt: null,
-                  activeRunId: null,
-                  lastRunError: null,
-                },
-              }
-            : n,
-        ),
+      patchNodeDataNow(
+        {
+          status: "done",
+          runStartedAt: null,
+          activeRunId: null,
+          lastRunError: null,
+        },
+        { activeRunId: runId },
       );
       // Show which prompt + source so the user can tell at a glance
       // whether the connected Text node was actually honored.
@@ -1645,21 +1659,14 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       const userErrorMessage = friendlyError(errorMessage, language === "th" ? "th" : "en");
       const shouldToast = runStillActive();
       const insufficientCredits = isInsufficientCreditsError(errorMessage);
-      setNodes((ns) =>
-        ns.map((n) =>
-          n.id === id && ((n.data as NodeData | undefined)?.activeRunId ?? null) === runId
-            ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  status: "error",
-                  runStartedAt: null,
-                  activeRunId: null,
-                  lastRunError: insufficientCredits ? errorMessage : userErrorMessage,
-                },
-              }
-            : n,
-        ),
+      patchNodeDataNow(
+        {
+          status: "error",
+          runStartedAt: null,
+          activeRunId: null,
+          lastRunError: insufficientCredits ? errorMessage : userErrorMessage,
+        },
+        { activeRunId: runId },
       );
       log({
         level: "error",
@@ -1675,9 +1682,10 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         toast.error(userErrorMessage);
       }
     } finally {
+      setOptimisticRun(null);
       runInFlightRef.current = false;
     }
-  }, [getNodes, id, isRunning, isViewer, params, schemaKey, setNodes, selectedModel, schema, d.params?.nodeName, language, t]);
+  }, [getNodes, id, isRunning, isViewer, params, schemaKey, patchNodeDataNow, selectedModel, schema, d.params?.nodeName, language, t]);
 
   useEffect(() => {
     if (!isRunning) return;
@@ -1699,26 +1707,17 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       const elapsedMs = Date.now() - startedAt;
       if (elapsedMs < maxElapsedMs) return;
       didTimeout = true;
-      setNodes((ns) =>
-        ns.map((n) =>
-          n.id === id &&
-          (activeRunId
-            ? ((n.data as NodeData | undefined)?.activeRunId ?? null) === activeRunId
-            : ((n.data as NodeData | undefined)?.activeRunId ?? null) == null &&
-              (n.data as NodeData | undefined)?.runStartedAt === startedAt)
-            ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  status: "error",
-                  runStartedAt: null,
-                  activeRunId: null,
-                  lastRunError: timeoutMessage,
-                },
-              }
-            : n,
-        ),
-      );
+      const timeoutPatch = {
+        status: "error",
+        runStartedAt: null,
+        activeRunId: null,
+        lastRunError: timeoutMessage,
+      };
+      if (activeRunId) {
+        patchNodeDataNow(timeoutPatch, { activeRunId });
+      } else {
+        patchNodeDataNow(timeoutPatch);
+      }
       useDebugLogStore.getState().push({
         level: "error",
         nodeId: id,
@@ -1730,7 +1729,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     clearIfStale();
     const timer = window.setInterval(clearIfStale, 15_000);
     return () => window.clearInterval(timer);
-  }, [d.activeRunId, d.runStartedAt, id, isRunning, setNodes]);
+  }, [d.activeRunId, d.runStartedAt, id, isRunning, patchNodeDataNow]);
 
   const updateMultiGenCount = useCallback(
     (next: number) => {
@@ -1817,7 +1816,9 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       } | null;
       if (!result) return;
 
-      const node = getNodes().find((n) => n.id === id);
+      const node =
+        useWorkspaceStore.getState().current?.nodes.find((n) => n.id === id) ??
+        getNodes().find((n) => n.id === id);
       const nodeData = node?.data as NodeData | undefined;
       const generations = Array.isArray(nodeData?.generations)
         ? (nodeData.generations as Array<Record<string, unknown>>)
@@ -1842,24 +1843,14 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         } as Record<string, unknown>);
       }
 
-      setNodes((ns) =>
-        ns.map((n) =>
-          n.id === id
-            ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  status: "done",
-                  runStartedAt: null,
-                  activeRunId: null,
-                  backgroundJobId: resolvedJobId || knownJobId,
-                  jobStatus: "completed",
-                  lastRunError: null,
-                },
-              }
-            : n,
-        ),
-      );
+      patchNodeDataNow({
+        status: "done",
+        runStartedAt: null,
+        activeRunId: null,
+        backgroundJobId: resolvedJobId || knownJobId,
+        jobStatus: "completed",
+        lastRunError: null,
+      });
     };
 
     const checkJob = async () => {
@@ -1889,42 +1880,28 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       if (status === "failed" || status === "permanent_failed") {
         const rawError = String(job.error ?? job.last_error ?? "Generation failed");
         const userError = friendlyError(rawError, language === "th" ? "th" : "en");
-        setNodes((ns) =>
-          ns.map((n) =>
-            n.id === id && (n.data as NodeData | undefined)?.status !== "done"
-              ? {
-                  ...n,
-                  data: {
-                    ...n.data,
-                    status: "error",
-                    runStartedAt: null,
-                    activeRunId: null,
-                    jobStatus: status,
-                    jobAttempts: attempts,
-                    lastRunError: userError,
-                  },
-                }
-              : n,
-          ),
-        );
+        const currentNode = useWorkspaceStore.getState().current?.nodes.find((n) => n.id === id);
+        if ((currentNode?.data as NodeData | undefined)?.status !== "done") {
+          patchNodeDataNow({
+            status: "error",
+            runStartedAt: null,
+            activeRunId: null,
+            jobStatus: status,
+            jobAttempts: attempts,
+            lastRunError: userError,
+          });
+        }
         if (pollTimer != null) window.clearInterval(pollTimer);
         return;
       }
 
-      setNodes((ns) =>
-        ns.map((n) =>
-          n.id === id
-            ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  jobStatus: status || (n.data as NodeData | undefined)?.jobStatus,
-                  jobAttempts: attempts,
-                },
-              }
-            : n,
-        ),
-      );
+      patchNodeDataNow({
+        jobStatus:
+          status ||
+          ((useWorkspaceStore.getState().current?.nodes.find((n) => n.id === id)
+            ?.data as NodeData | undefined)?.jobStatus ?? null),
+        jobAttempts: attempts,
+      });
     };
 
     void checkJob();
@@ -1933,7 +1910,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       cancelled = true;
       if (pollTimer != null) window.clearInterval(pollTimer);
     };
-  }, [d.backgroundJobId, d.jobStatus, getNodes, id, language, runStatus, setNodes]);
+  }, [d.backgroundJobId, d.jobStatus, getNodes, id, language, runStatus, patchNodeDataNow]);
 
   /* ── Listen for Ctrl+Enter / Ctrl+Shift+Enter shortcut ────
    * useWorkspaceShortcuts dispatches a `workspace-run-shortcut`
@@ -2511,6 +2488,17 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               ? currentGen.type
               : null
           }
+          mediaUrl={
+            currentGen?.type === "image"
+              ? (previewImageUrl ?? currentGen.url ?? null)
+              : currentGen?.type === "video"
+                ? (currentGen.url ?? null)
+                : currentGen?.model_url
+                  ? (previewImageUrl ?? currentGen.url ?? null)
+                  : null
+          }
+          mediaFileName={schema.displayName}
+          mediaCreatedAt={currentGen?.createdAt ?? null}
           bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
         />
 
@@ -2788,7 +2776,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               </Tooltip>
               {isRunning && (
                 <RunTimer
-                  startedAt={(d.runStartedAt as number | null | undefined) ?? null}
+                  startedAt={(visibleRunStartedAt as number | null | undefined) ?? null}
                 />
               )}
             </div>
