@@ -77,6 +77,7 @@ import {
   isSeedance20VideoModel,
   isSeedanceVideoModel,
   isSeedreamImageModel,
+  isReplicateVeoVideoModel,
   isVeoVideoModel,
   STANDALONE_TOOL_ORDER,
   STANDALONE_TOOLS,
@@ -1183,7 +1184,7 @@ export default function StandaloneGenerator({
       } else if (!supportsReference && form.videoInputMode === "reference") {
         nextPatch.videoInputMode = "frames";
       }
-      if (!model.startsWith("kling")) nextPatch.videoNegativePrompt = "";
+      if (!model.startsWith("kling") && !model.startsWith("replicate-kling")) nextPatch.videoNegativePrompt = "";
       if (!isVeoVideoModel(model)) nextPatch.videoPersonGeneration = "allow_adult";
       if (!isSeedance) nextPatch.videoReturnLastFrame = false;
       if (!isVeoVideoModel(model) && isSeedance && !seedanceVideoSupportsAudio(model)) nextPatch.videoWithAudio = false;
@@ -3458,6 +3459,7 @@ function VideoControls({
   const isVeo = isVeoVideoModel(form.model);
   const supportsAudioToggle =
     (isSeedance && seedanceVideoSupportsAudio(form.model)) ||
+    isReplicateVeoVideoModel(form.model) ||
     (!isSeedance && !isVeo && !isMotion);
   const supportsStartEnd = videoSupportsStartEndFrames(form.model);
   const supportsRefImage = videoSupportsReferenceImage(form.model);
@@ -3554,7 +3556,7 @@ function VideoControls({
           <SelectField
             label={t("workspace.standalone.aspect")}
             value={form.videoRatio}
-            options={isSeedance ? seedanceRatioOptionsForModel(form.model) : ["Auto", "16:9", "9:16", "1:1"]}
+            options={videoRatioOptionsForModel(form.model)}
             onChange={(videoRatio) => onChange({ videoRatio })}
           />
           <SelectField
@@ -3565,7 +3567,7 @@ function VideoControls({
               onChange({ videoDuration: Number(videoDuration) || 5 })
             }
           />
-          {isSeedance && (
+          {(isSeedance || isVeo) && (
             <SelectField
               label={t("workspace.standalone.resolution")}
               value={form.videoResolution}
@@ -3596,7 +3598,7 @@ function VideoControls({
           onChange={(videoWithAudio) => onChange({ videoWithAudio })}
         />
       )}
-      {(isMotion || form.model === "kling-v3-omni") && supportsRefVideo && (
+      {(isMotion || form.model === "kling-v3-omni" || form.model === "replicate-kling-v3-omni") && supportsRefVideo && (
         <ToggleRow
           label={t("workspace.standalone.keep_original_sound")}
           checked={form.videoKeepOriginalSound}
@@ -3839,6 +3841,7 @@ function VoiceSettingsControls({
       {provider === "gemini" && (
         <GeminiVoicePicker
           value={form.voice || DEFAULT_GEMINI_TTS_VOICE}
+          modelId={form.model}
           onChange={(voice) => onChange({ voice })}
         />
       )}
@@ -3869,16 +3872,18 @@ function VoiceSettingsControls({
  *  in Storage so the second click is an instant CDN hit. */
 function GeminiVoicePicker({
   value,
+  modelId,
   onChange,
 }: {
   value: string;
+  modelId: string;
   onChange: (voiceName: string) => void;
 }) {
   const { playingId, loadingId, play } = useVoicePreview("gemini");
   const handlePreview = async (event: React.MouseEvent, voiceName: string) => {
     event.stopPropagation();
     try {
-      await play(voiceName);
+      await play(voiceName, { modelId });
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Couldn't play voice preview",
@@ -6084,6 +6089,7 @@ function buildCurrentParams(
       characterOrientation: form.videoCharacterOrientation,
       keepOriginalSound: form.videoKeepOriginalSound,
       hasReferenceVideo: usesReferenceMode && !!form.videoRefVideo,
+      referenceVideoDurationSec: form.videoRefVideo?.durationSec ?? null,
       negativePrompt: form.videoNegativePrompt,
       personGeneration: form.videoPersonGeneration,
       returnLastFrame: form.videoReturnLastFrame,
@@ -6334,6 +6340,7 @@ function videoModelSettingTags(model: string, language: "en" | "th"): Array<{
     isVeo ||
     (!isMotion &&
       (model.startsWith("kling") ||
+        model.startsWith("replicate-kling") ||
         (isSeedanceVideoModel(model) && seedanceVideoSupportsAudio(model))))
   ) {
     tags.push({ label: standaloneInlineLabel("audio", language), icon: "audio" });
@@ -6383,9 +6390,10 @@ function buildVideoPanelSettings({
   const isVeo = isVeoVideoModel(form.model);
   const supportsAudioToggle =
     (isSeedance && seedanceVideoSupportsAudio(form.model)) ||
+    isReplicateVeoVideoModel(form.model) ||
     (!isSeedance && !isVeo && !isMotion);
 
-  if (isVeo) {
+  if (isReplicateVeoVideoModel(form.model)) {
     settings.push({
       id: "audio",
       label: standaloneInlineLabel("audio", language),
@@ -6457,7 +6465,10 @@ function buildVideoPanelSettings({
     });
   }
 
-  if ((isMotion || form.model === "kling-v3-omni") && videoSupportsReferenceVideo(form.model)) {
+  if (
+    (isMotion || form.model === "kling-v3-omni" || form.model === "replicate-kling-v3-omni") &&
+    videoSupportsReferenceVideo(form.model)
+  ) {
     settings.push({
       id: "keep-sound",
       label: standaloneInlineLabel("originalSound", language),

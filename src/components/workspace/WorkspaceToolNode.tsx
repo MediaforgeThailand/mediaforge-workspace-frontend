@@ -722,16 +722,6 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   // per-row hook would mount 30 isolated <audio> elements that
   // wouldn't stop each other when the user auditions a new voice.
   const voicePreview = useVoicePreview("gemini");
-  const handleVoicePreviewPlay = useCallback(
-    (voiceId: string) => {
-      void voicePreview.play(voiceId).catch((err) => {
-        toast.error(
-          err instanceof Error ? err.message : "Couldn't play voice preview",
-        );
-      });
-    },
-    [voicePreview],
-  );
 
   // Refs + ResizeObserver for the dynamic prompt-lift logic. The
   // prompt overlay sits above the settings toolbar and used to lift
@@ -2446,7 +2436,17 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                   voiceId={voiceId}
                   isPlaying={voicePreview.playingId === voiceId}
                   isLoading={voicePreview.loadingId === voiceId}
-                  onPlay={handleVoicePreviewPlay}
+                  onPlay={(vid) => {
+                    void voicePreview
+                      .play(vid, { modelId: String(selectedModel) })
+                      .catch((err) => {
+                        toast.error(
+                          err instanceof Error
+                            ? err.message
+                            : "Couldn't play voice preview",
+                        );
+                      });
+                  }}
                 />
               )}
             />
@@ -2502,7 +2502,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       // toolbar; falls through to nothing.
       return null;
     },
-    [params, selectedModel, t, updateParam, schemaKey, id],
+    [params, selectedModel, t, updateParam, schemaKey, id, voicePreview],
   );
 
   const localizePortLabel = (handleId: string, fallback: string): string => {

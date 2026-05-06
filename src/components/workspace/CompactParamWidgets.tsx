@@ -304,17 +304,22 @@ function SearchableMiniSelect({
                     <span className="min-w-0 flex-1 truncate">{label}</span>
                     {action ? (
                       // Wrap the action so a click on it doesn't bubble
-                      // up and select the row. cmdk's CommandItem treats
-                      // any pointer-up inside its tree as a select; a
-                      // simple onClick stopPropagation on the inner
-                      // wrapper short-circuits that path while still
-                      // letting keyboard nav (↑↓ + Enter) commit the
-                      // selection from the row body.
+                      // up and select the row. cmdk's CommandItem
+                      // listens at multiple pointer phases (mousedown
+                      // for highlight, mouseup for select), so we stop
+                      // every pointer event we can — otherwise the
+                      // popover commits the selection mid-click and
+                      // closes before the action's onClick handler
+                      // fires. Keyboard nav (↑↓ + Enter on the row
+                      // body) still selects normally because Enter
+                      // doesn't go through these handlers.
                       <span
                         className="ml-2 flex shrink-0 items-center"
                         onClick={(e) => e.stopPropagation()}
                         onPointerDown={(e) => e.stopPropagation()}
+                        onPointerUp={(e) => e.stopPropagation()}
                         onMouseDown={(e) => e.stopPropagation()}
+                        onMouseUp={(e) => e.stopPropagation()}
                       >
                         {action}
                       </span>
