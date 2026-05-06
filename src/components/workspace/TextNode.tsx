@@ -75,7 +75,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
        *  border, sits above the body (matches the design reference). */}
       <NodeQuickActionRail
         visible={selected}
-        onDelete={onDeleteNode}
+        onDelete={selected ? onDeleteNode : undefined}
         nodeId={id}
         mediaKind="text"
         bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}

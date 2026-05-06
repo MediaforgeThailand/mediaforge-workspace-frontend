@@ -2493,7 +2493,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
          *  scannable. */}
         <NodeQuickActionRail
           visible={selected || isHovered}
-          onDelete={isViewer ? undefined : onDeleteNode}
+          onDelete={!isViewer && selected ? onDeleteNode : undefined}
           nodeId={id}
           mediaKind={
             currentGen?.type === "image" || currentGen?.type === "video"

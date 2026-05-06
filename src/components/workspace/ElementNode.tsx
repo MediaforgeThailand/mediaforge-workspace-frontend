@@ -183,7 +183,7 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
       {/* Floating title — icon + name (+ saved-badge). */}
       <NodeQuickActionRail
         visible={selected}
-        onDelete={onDeleteNode}
+        onDelete={selected ? onDeleteNode : undefined}
         nodeId={id}
         mediaKind={null}
         bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}

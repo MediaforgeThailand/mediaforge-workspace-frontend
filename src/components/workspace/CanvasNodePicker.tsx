@@ -10,7 +10,7 @@
  * the chosen node at the drop position and immediately wires it up.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as Lucide from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -224,7 +224,7 @@ const CATALOG: CatalogEntry[] = [
   },
 ];
 
-const HIDDEN_NODE_TYPES = new Set(["mergeAudioNode", "videoToPromptNode"]);
+const HIDDEN_NODE_TYPES = new Set(["chatAiNode", "mergeAudioNode", "videoToPromptNode"]);
 const VISIBLE_CATALOG = CATALOG.filter((entry) => !HIDDEN_NODE_TYPES.has(entry.nodeType));
 
 /**
@@ -334,6 +334,7 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   // Highlighted child index inside the open flyout (for keyboard nav).
   const [childHighlight, setChildHighlight] = useState(0);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const rowRefs = useRef<Array<HTMLLIElement | null>>([]);
 
   const allOpts = useMemo(
@@ -466,6 +467,20 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
     setFlyoutAnchor({ top: ulTop + el.offsetTop });
   }, [openGroup, isSearching, groups, query]);
 
+  useLayoutEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const pad = 8;
+    const preferredLeft = state.screen.x - 12;
+    const preferredTop = state.screen.y + 6;
+    const flyoutReserve = openGroup ? 198 : 0;
+    const nextLeft = Math.min(preferredLeft, window.innerWidth - rect.width - flyoutReserve - pad);
+    const nextTop = Math.min(preferredTop, window.innerHeight - rect.height - pad);
+    el.style.left = `${Math.max(pad, nextLeft)}px`;
+    el.style.top = `${Math.max(pad, nextTop)}px`;
+  }, [state.screen.x, state.screen.y, visibleRowCount, openGroup, query]);
+
   // Render through a portal to <body> so the picker positions in
   // viewport space, NOT inside the canvas DOM tree. The picker uses
   // `clientX/Y` (viewport coords) for left/top and the parent it
@@ -486,28 +501,25 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
         onContextMenu={(e) => e.preventDefault()}
       />
       <div
-        className="fixed z-50 w-[280px] max-w-[calc(100vw-1rem)] rounded-xl  bg-zinc-950 shadow-xl"
-        style={{
-          left: state.screen.x,
-          top: state.screen.y,
-          transform: "translate(-12px, 6px)",
-        }}
+        ref={panelRef}
+        className="fixed z-50 w-[268px] max-w-[calc(100vw-1rem)] overflow-visible rounded-[8px] border border-[#2d2d2d] bg-[#171717] py-[5px] shadow-[0_18px_40px_rgba(0,0,0,.52)]"
+        style={{ left: state.screen.x, top: state.screen.y, fontFamily: "var(--font-sans)" }}
         onClick={(e) => e.stopPropagation()}
         onMouseLeave={() => setOpenGroup(null)}
       >
-        <div className="border-b border-zinc-800 px-2.5 py-2">
+        <div className="border-b border-[#2a2a2a] px-[8px] pb-[7px] pt-[5px]">
           <input
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKey}
             placeholder={t("workspace.picker.add_node")}
-            className="nodrag w-full rounded-md bg-white/[0.04] px-2.5 py-2 text-[15px] font-medium leading-5 text-zinc-50 outline-none placeholder:text-zinc-400"
+            className="nodrag h-[36px] w-full rounded-[8px] bg-[#202020] px-[10px] text-[13px] font-medium leading-none text-white outline-none ring-1 ring-transparent placeholder:text-[#8b8d91] focus:ring-[#3a3a3a]"
           />
         </div>
-        <ul className="relative max-h-[min(20rem,calc(100vh-10rem))] overflow-y-auto p-1.5">
+        <ul className="relative max-h-[min(18rem,calc(100vh-10rem))] overflow-y-auto px-[5px] py-[5px]">
           {visibleRowCount === 0 ? (
-            <li className="px-3 py-4 text-center text-[14px] italic text-zinc-300">
+            <li className="px-[10px] py-[12px] text-center text-[13px] font-medium text-[#8b8d91]">
               {t("workspace.picker.no_compatible")}
             </li>
           ) : isSearching ? (
@@ -521,15 +533,15 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
                     onClick={() => commit(opt)}
                     onMouseEnter={() => setHighlight(i)}
                     className={cn(
-                      "flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[14.5px] font-semibold leading-5",
+                      "flex h-[34px] w-full items-center gap-[10px] rounded-[7px] px-[10px] text-left text-[13px] font-semibold leading-none transition-colors",
                       i === highlight
-                        ? "bg-zinc-800 text-zinc-100"
-                        : "text-zinc-300 hover:bg-zinc-800/60",
+                        ? "bg-[#2a2a2a] text-white"
+                        : "text-[#d7d7d7] hover:bg-[#242424] hover:text-white",
                     )}
                   >
-                    <Icon className="h-4 w-4 shrink-0 text-zinc-200" />
+                    <Icon className="h-[16px] w-[16px] shrink-0 text-[#d7d7d7]" strokeWidth={2} />
                     <span className="flex-1 truncate">{opt.label}</span>
-                    <span className="text-[12.5px] font-medium text-zinc-300">
+                    <span className="text-[11.5px] font-medium text-[#a0a3a8]">
                       {opt.portHint}
                     </span>
                   </button>
@@ -570,18 +582,18 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
                       commit(g.children[0]);
                     }}
                     className={cn(
-                      "flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[14.5px] font-semibold leading-5",
+                      "flex h-[34px] w-full items-center gap-[10px] rounded-[7px] px-[10px] text-left text-[13px] font-semibold leading-none transition-colors",
                       i === highlight
-                        ? "bg-zinc-800 text-zinc-100"
-                        : "text-zinc-300 hover:bg-zinc-800/60",
+                        ? "bg-[#2a2a2a] text-white"
+                        : "text-[#d7d7d7] hover:bg-[#242424] hover:text-white",
                     )}
                   >
-                    <Icon className="h-4 w-4 shrink-0 text-zinc-200" />
+                    <Icon className="h-[16px] w-[16px] shrink-0 text-[#d7d7d7]" strokeWidth={2} />
                     <span className="flex-1 truncate">{g.label}</span>
                     {hasChildren ? (
-                      <Lucide.ChevronRight className="h-4 w-4 shrink-0 text-zinc-300" />
+                      <Lucide.ChevronRight className="h-[16px] w-[16px] shrink-0 text-[#a0a3a8]" strokeWidth={2} />
                     ) : (
-                      <span className="text-[12.5px] font-medium text-zinc-300">
+                      <span className="text-[11.5px] font-medium text-[#a0a3a8]">
                         {onlyChild.portHint}
                       </span>
                     )}
@@ -601,14 +613,14 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
               if (!g || g.children.length <= 1) return null;
               return (
                 <div
-                  className="absolute left-full ml-2 w-52 rounded-xl  bg-zinc-950 shadow-xl"
+                  className="absolute left-full ml-2 w-[190px] overflow-hidden rounded-[8px] border border-[#2d2d2d] bg-[#171717] py-[5px] shadow-[0_14px_30px_rgba(0,0,0,.48)]"
                   style={{
                     top: flyoutAnchor ? flyoutAnchor.top : 0,
                     animation: "canvas-picker-flyout-in 100ms ease-out",
                   }}
                   onMouseEnter={() => setOpenGroup(g.key)}
                 >
-                  <ul className="max-h-[min(18rem,calc(100vh-12rem))] overflow-y-auto p-1.5">
+                  <ul className="max-h-[min(16rem,calc(100vh-12rem))] overflow-y-auto px-[5px] py-0">
                     {g.children.map((opt, j) => {
                       const ChildIcon = lucideIcon(opt.icon);
                       return (
@@ -618,13 +630,13 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
                             onClick={() => commit(opt)}
                             onMouseEnter={() => setChildHighlight(j)}
                             className={cn(
-                              "flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[14.5px] font-semibold leading-5",
+                              "flex h-[32px] w-full items-center gap-[9px] rounded-[7px] px-[10px] text-left text-[13px] font-semibold leading-none transition-colors",
                               j === childHighlight
-                                ? "bg-zinc-800 text-zinc-100"
-                                : "text-zinc-300 hover:bg-zinc-800/60",
+                                ? "bg-[#2a2a2a] text-white"
+                                : "text-[#d7d7d7] hover:bg-[#242424] hover:text-white",
                             )}
                           >
-                            <ChildIcon className="h-4 w-4 shrink-0 text-zinc-200" />
+                            <ChildIcon className="h-[15px] w-[15px] shrink-0 text-[#d7d7d7]" strokeWidth={2} />
                             <span className="flex-1 truncate">
                               {opt.portHint.replace(/^→\s*/, "")}
                             </span>
@@ -638,7 +650,7 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
             })()
           : null}
 
-        <div className="border-t border-zinc-800 px-3 py-2 text-[12.5px] font-medium text-zinc-300">
+        <div className="border-t border-[#2a2a2a] px-[12px] py-[8px] text-[11px] font-medium leading-none text-[#8b8d91]">
           {t("workspace.picker.hint_row")}
         </div>
       </div>
