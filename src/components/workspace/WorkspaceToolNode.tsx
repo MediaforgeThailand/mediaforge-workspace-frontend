@@ -44,6 +44,7 @@ import {
   TogglePill,
   MiniSelect,
   MiniSlider,
+  MiniTextInput,
   isBinarySelect,
 } from "./CompactParamWidgets";
 import {
@@ -108,7 +109,11 @@ const SEEDANCE_REF_VIDEO_MAX_SEC = 15;
 
 function isSeedanceV2VideoModel(model: string | undefined): boolean {
   const m = String(model ?? "").toLowerCase();
-  return m.startsWith("seedance-2-0") || m.startsWith("dreamina-seedance-2-0");
+  return (
+    m.startsWith("seedance-2-0") ||
+    m.startsWith("dreamina-seedance-2-0") ||
+    m.startsWith("replicate-seedance-2-0")
+  );
 }
 
 function seedanceReferenceVideoDurationMessage(durationSec?: number | null): string {
@@ -1484,7 +1489,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       //   - "tripo3d"  → POST action="poll_tripo3d"
       //   - "seedance" → POST action="poll_seedance"
       //   - "veo"      → POST action="poll_veo"
-      //   - "replicate_veo" → POST action="poll_replicate_veo"
+      //   - "replicate_veo" / "replicate_video" -> Replicate poll action
       //   - "freepik_veo" / "freepik_seedance" → POST action="poll_freepik_video"
       //   - else       → POST action="poll_kling"  (default for video)
       const pollEndpoint = r.provider_meta?.poll_endpoint;
@@ -1495,6 +1500,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         const isSeedance = pollProvider === "seedance";
         const isVeo = pollProvider === "veo";
         const isReplicateVeo = pollProvider === "replicate_veo";
+        const isReplicateVideo = pollProvider === "replicate_video";
         const isFreepikVideo = pollProvider === "freepik_veo" || pollProvider === "freepik_seedance";
         const POLL_INTERVAL_MS = isTripo3d ? 4_000 : 5_000;
         const POLL_TIMEOUT_MS = isTripo3d ? 8 * 60_000 : 6 * 60_000;
@@ -1506,9 +1512,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               ? "poll_veo"
               : isReplicateVeo
                 ? "poll_replicate_veo"
-                : isFreepikVideo
-                  ? "poll_freepik_video"
-              : "poll_kling";
+                : isReplicateVideo
+                  ? "poll_replicate_video"
+                  : isFreepikVideo
+                    ? "poll_freepik_video"
+                    : "poll_kling";
         const providerLabel = isTripo3d
           ? "Tripo3D"
           : isSeedance
@@ -1517,9 +1525,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               ? "Veo"
               : isReplicateVeo
                 ? "Replicate Veo"
+                : isReplicateVideo
+                  ? "Replicate Video"
                 : isFreepikVideo
                   ? pollProvider === "freepik_seedance" ? "Freepik Seedance" : "Freepik Veo"
-              : "Kling";
+                  : "Kling";
         let polledUrl: string | undefined;
         let polledModelUrl: string | undefined;
         let polledPreview: string | undefined;
@@ -2367,6 +2377,17 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             max={max}
             step={step}
             unit={unit}
+            onChange={(v) => updateParam(param.key, v)}
+          />
+        );
+      }
+      if (effectiveType === "text" && param.key === "seed") {
+        return (
+          <MiniTextInput
+            key={param.key}
+            label={param.label}
+            value={String(value ?? "")}
+            placeholder={param.placeholder}
             onChange={(v) => updateParam(param.key, v)}
           />
         );

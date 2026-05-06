@@ -55,6 +55,8 @@ const videoModels: ModelEntry[] = [
   }),
   // Google Veo (Standard tier only — Lite/Fast not yet wired in).
   { slug: "veo-3.1-generate-001", label: "Google Veo 3.1" },
+  { slug: "replicate-seedance-2-0", label: "Seedance 2.0 (Replicate)" },
+  { slug: "replicate-seedance-2-0-video-ref", label: "Seedance 2.0 (Replicate + Video Ref)" },
 ];
 
 export const AVAILABLE_MODELS: FeatureModels[] = [

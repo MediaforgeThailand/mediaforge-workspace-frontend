@@ -61,6 +61,8 @@ const SEEDANCE_1080P_MODELS = [
   "seedance-1-5-pro-251215",
 ] as const;
 const SEEDANCE_720P_MAX_MODELS = [...SEEDANCE_VIDEO_REF_MODELS] as const;
+const REPLICATE_SEEDANCE_MODELS = ["replicate-seedance-2-0"] as const;
+const REPLICATE_SEEDANCE_REF_MODELS = [...REPLICATE_SEEDANCE_MODELS] as const;
 /** Google Veo (Standard tier only). Backend dispatches anything
  *  starting with "veo-" to the Gemini API `predictLongRunning`
  *  endpoint. Real spec verified against
@@ -436,6 +438,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     supportedModels: [
       ...KLING_MODELS.map((m) => m.value),
       ...SEEDANCE_MODELS,
+      ...REPLICATE_SEEDANCE_MODELS,
       ...VEO_MODELS,
     ],
     defaultModel: "kling-v2-6-pro",
@@ -459,7 +462,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         id: "start_frame",
         label: "start_frame",
         color: "blue",
-        supportedModels: [...VEO_MODELS],
+        supportedModels: [...VEO_MODELS, ...REPLICATE_SEEDANCE_MODELS],
       },
       {
         id: "end_frame",
@@ -468,6 +471,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         supportedModels: [
           "kling-v2-6-pro", "kling-v3-pro", "kling-v3-omni",
           ...SEEDANCE_MODELS,
+          ...REPLICATE_SEEDANCE_MODELS,
           ...VEO_MODELS,
         ],
       },
@@ -482,9 +486,8 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         id: "reference_image",
         label: "reference_image",
         color: "cyan",
-        supportedModels: [...SEEDANCE_VIDEO_REF_MODELS],
-        // BytePlus Seedance 2.0 reference-image mode accepts 1-9
-        // reference images, each sent as role="reference_image".
+        supportedModels: [...SEEDANCE_VIDEO_REF_MODELS, ...REPLICATE_SEEDANCE_REF_MODELS],
+        // Seedance 2.0 reference-image mode accepts 1-9 refs.
         maxConnections: 9,
       },
       {
@@ -501,14 +504,14 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         id: "ref_video",
         label: "ref_video",
         color: "rose",
-        supportedModels: [...SEEDANCE_VIDEO_REF_MODELS],
+        supportedModels: [...SEEDANCE_VIDEO_REF_MODELS, ...REPLICATE_SEEDANCE_REF_MODELS],
         maxConnections: 3,
       },
       {
         id: "ref_audio",
         label: "ref_audio",
         color: "amber",
-        supportedModels: [...SEEDANCE_VIDEO_REF_MODELS],
+        supportedModels: [...SEEDANCE_VIDEO_REF_MODELS, ...REPLICATE_SEEDANCE_REF_MODELS],
         maxConnections: 3,
       },
       {
@@ -563,6 +566,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         options: [
           ...KLING_MODELS.map((m) => m.value),
           ...SEEDANCE_MODELS,
+          ...REPLICATE_SEEDANCE_MODELS,
           ...VEO_MODELS,
         ],
         optionLabels: {
@@ -572,6 +576,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           "seedance-1-5-pro-251215": "SeedDance 1.5 Pro",
           "seedance-2-0-lite": "SeedDance 2.0 Fast",
           "seedance-2-0-pro": "SeedDance 2.0",
+          "replicate-seedance-2-0": "Seedance 2.0 (Replicate)",
           "veo-3.1-generate-001": "Google Veo 3.1",
         },
         default: "kling-v2-6-pro",
@@ -609,6 +614,14 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         supportedModels: [...SEEDANCE_MODELS],
       },
       {
+        key: "aspect_ratio",
+        label: "Aspect Ratio",
+        type: "select",
+        options: ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "9:21", "adaptive"],
+        default: "16:9",
+        supportedModels: [...REPLICATE_SEEDANCE_MODELS],
+      },
+      {
         // Veo 3.1 only accepts "16:9" or "9:16" — see real spec.
         key: "aspect_ratio",
         label: "Aspect Ratio",
@@ -632,6 +645,14 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         options: ["480p", "720p"],
         default: "720p",
         supportedModels: [...SEEDANCE_720P_MAX_MODELS],
+      },
+      {
+        key: "resolution",
+        label: "Resolution",
+        type: "select",
+        options: ["480p", "720p", "1080p"],
+        default: "720p",
+        supportedModels: [...REPLICATE_SEEDANCE_MODELS],
       },
       {
         // Veo 3.1 supports 720p / 1080p (4k is gated). Picking 1080p
@@ -668,6 +689,14 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           const isV3 = model === "kling-v3-omni" || model === "kling-v3-pro";
           if (isV3)
             return { type: "slider" as const, min: 3, max: 15, step: 1, default: 5 };
+
+          if (model.startsWith("replicate-seedance"))
+            return {
+              type: "select" as const,
+              options: ["-1", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"],
+              optionLabels: { "-1": "Auto" },
+              default: "5",
+            };
 
           // Veo 3.1 — only 4, 6, or 8 seconds are valid per Google's
           // generateVideos spec.
@@ -714,6 +743,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         supportedModels: [
           "kling-v2-6-pro", "kling-v3-pro", "kling-v3-omni",
           ...SEEDANCE_MODELS,
+          ...REPLICATE_SEEDANCE_MODELS,
           ...VEO_MODELS,
         ],
       },
@@ -749,6 +779,23 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         optionLabels: { "false": "No Audio", "true": "With Audio" },
         default: "false",
         supportedModels: [...SEEDANCE_AUDIO_MODELS],
+      },
+      {
+        key: "generate_audio",
+        label: "Generate Audio",
+        type: "select",
+        options: ["false", "true"],
+        optionLabels: { "false": "No Audio", "true": "With Audio" },
+        default: "true",
+        supportedModels: [...REPLICATE_SEEDANCE_MODELS],
+      },
+      {
+        key: "seed",
+        label: "Seed",
+        type: "text",
+        default: "",
+        placeholder: "Optional integer seed",
+        supportedModels: [...REPLICATE_SEEDANCE_MODELS],
       },
       {
         key: "character_orientation",

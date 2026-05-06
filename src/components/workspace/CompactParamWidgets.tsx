@@ -383,6 +383,57 @@ export function MiniSlider({
 
 /* ── NumberStepper ──────────────────────────────────────── */
 
+interface MiniTextInputProps {
+  label: string;
+  value: string;
+  placeholder?: string;
+  onChange: (value: string) => void;
+}
+
+export function MiniTextInput({
+  label,
+  value,
+  placeholder,
+  onChange,
+}: MiniTextInputProps) {
+  const [open, setOpen] = useState(false);
+  const display = value.trim() ? value.trim() : label;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          className="ws-mini-pill nodrag"
+          title={`${label}: ${value.trim() || "not set"}`}
+        >
+          <span className="max-w-[64px] truncate">{display}</span>
+          <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="z-[9999] w-[210px] border-0 bg-popover p-2.5 shadow-2xl shadow-black/40"
+        side="top"
+        sideOffset={6}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <label className="block text-[10.5px] font-medium uppercase tracking-wide text-muted-foreground">
+          {label}
+        </label>
+        <input
+          value={value}
+          placeholder={placeholder}
+          inputMode="numeric"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(event) => onChange(event.target.value.replace(/[^\d-]/g, ""))}
+          className="mt-2 h-8 w-full rounded-md border border-white/10 bg-white/[0.04] px-2 text-[12.5px] text-white outline-none placeholder:text-white/35 focus:border-white/25"
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 interface NumberStepperProps {
   value: number;
   min?: number;

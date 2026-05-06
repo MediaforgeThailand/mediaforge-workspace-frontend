@@ -175,9 +175,20 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
 
   if (schemaKey === "klingVideoNode" || schemaKey === "videoGenNode") {
     const model = modelName || "kling-v2-6-pro";
+    const hasRefVideoInput =
+      params._has_ref_video === true ||
+      params._has_ref_video === "true" ||
+      (Array.isArray(params.reference_video_urls) && params.reference_video_urls.length > 0) ||
+      Boolean(params.reference_video_url || params.video_url || params.ref_video);
+    const replicatePricingModel =
+      model === "replicate-seedance-2-0" && hasRefVideoInput
+        ? `${model}-video-ref`
+        : model;
     const modelAliases =
       model === "veo-3.1-generate-001"
         ? [model, "veo-3.1-generate-preview"]
+        : replicatePricingModel !== model
+          ? [replicatePricingModel, model]
         : [model];
     const isMotion = model.includes("motion");
     const isOmni = OMNI_MODELS.has(model);
@@ -284,7 +295,8 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
 
     // ── Standard models: fixed pricing (duration + audio match) preferred ──
     const rawDuration = params.duration ?? params.extend_duration ?? "5";
-    const duration = parseInt(String(rawDuration), 10) || 5;
+    const parsedDuration = parseInt(String(rawDuration), 10) || 5;
+    const duration = model.startsWith("replicate-seedance") && parsedDuration <= 0 ? 5 : parsedDuration;
     const hasAudio =
       params.has_audio === true ||
       params.has_audio === "true" ||
