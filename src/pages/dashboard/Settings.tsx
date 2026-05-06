@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +28,14 @@ import { cn } from "@/lib/utils";
 import SettingsLayout, { type SettingsSectionKey } from "@/components/settings/SettingsLayout";
 import ComingSoon from "@/components/settings/ComingSoon";
 import PlanBilling from "@/components/settings/PlanBilling";
+import { updateSchoolProfile } from "@/lib/orgAdminApi";
+
+type StudentClassProfile = {
+  class_id: string;
+  class_name: string;
+  class_code: string | null;
+  student_code: string | null;
+};
 
 /**
  * Settings — multi-section surface backed by an in-page state-driven
@@ -50,6 +59,7 @@ const Settings = () => {
   const { t, language, setLanguage } = useLanguage();
   const { toast } = useToast();
   const location = useLocation();
+  const queryClient = useQueryClient();
 
   // Honour `?tab=…` for deep-linking. Map URL slug → SettingsSectionKey.
   const tabParam = new URLSearchParams(location.search).get("tab");
@@ -68,6 +78,47 @@ const Settings = () => {
   const [company, setCompany] = useState(profile?.company || "");
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || "");
   const [uploading, setUploading] = useState(false);
+  const [studentClassProfiles, setStudentClassProfiles] = useState<StudentClassProfile[]>([]);
+  const [studentCodeDrafts, setStudentCodeDrafts] = useState<Record<string, string>>({});
+  const [savingStudentClassId, setSavingStudentClassId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      setStudentClassProfiles([]);
+      setStudentCodeDrafts({});
+      return;
+    }
+
+    let cancelled = false;
+    const loadStudentProfiles = async () => {
+      const { data, error } = await supabase
+        .from("class_members" as any)
+        .select("class_id, student_code, classes(id, name, code, status)")
+        .eq("user_id", user.id)
+        .eq("role", "student")
+        .eq("status", "active");
+      if (cancelled || error) return;
+
+      const rows = ((data ?? []) as any[]).map((row) => {
+        const cls = Array.isArray(row.classes) ? row.classes[0] : row.classes;
+        return {
+          class_id: String(row.class_id),
+          class_name: String(cls?.name ?? "Class"),
+          class_code: cls?.code ? String(cls.code) : null,
+          student_code: row.student_code ? String(row.student_code) : null,
+        };
+      });
+      const drafts: Record<string, string> = {};
+      for (const row of rows) drafts[row.class_id] = row.student_code ?? "";
+      setStudentClassProfiles(rows);
+      setStudentCodeDrafts(drafts);
+    };
+
+    void loadStudentProfiles();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const handleSave = async () => {
     if (!user) return;
@@ -99,6 +150,32 @@ const Settings = () => {
       setAvatarUrl(urlData.publicUrl);
     }
     setUploading(false);
+  };
+
+  const handleStudentCodeSave = async (classId: string) => {
+    const trimmed = (studentCodeDrafts[classId] ?? "").trim();
+    if (!trimmed) {
+      toast({ title: "Student ID is required", variant: "destructive" });
+      return;
+    }
+    setSavingStudentClassId(classId);
+    try {
+      await updateSchoolProfile({ class_id: classId, student_code: trimmed });
+      setStudentClassProfiles((rows) =>
+        rows.map((row) => (row.class_id === classId ? { ...row, student_code: trimmed } : row)),
+      );
+      queryClient.invalidateQueries({ queryKey: ["class-memberships"] });
+      queryClient.invalidateQueries({ queryKey: ["mf-um-class-memberships"] });
+      toast({ title: "Student ID saved" });
+    } catch (error) {
+      toast({
+        title: "Could not save student ID",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingStudentClassId(null);
+    }
   };
 
   const getPlanBadge = () => {
@@ -174,6 +251,60 @@ const Settings = () => {
         <Label className="text-sm font-medium text-zinc-200">{t("authEmailLabel")}</Label>
         <p className="text-sm text-zinc-400">{user?.email}</p>
       </div>
+
+      {studentClassProfiles.length > 0 && (
+        <div className="max-w-xl space-y-3 rounded-lg border border-white/10 bg-white/[0.03] p-4">
+          <div>
+            <h3 className="text-sm font-semibold text-zinc-100">Student profile</h3>
+            <p className="mt-1 text-xs leading-5 text-zinc-400">
+              Your class spaces are linked to this account. Update your student ID here if it was entered incorrectly.
+            </p>
+          </div>
+          <div className="space-y-3">
+            {studentClassProfiles.map((item) => (
+              <div key={item.class_id} className="rounded-md border border-white/10 bg-black/20 p-3">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-zinc-100">{item.class_name}</div>
+                    {item.class_code && <div className="mt-0.5 font-mono text-xs text-zinc-500">{item.class_code}</div>}
+                  </div>
+                  {item.student_code ? (
+                    <Badge variant="outline" className="border-emerald-400/25 bg-emerald-400/10 text-emerald-200">
+                      Saved
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-amber-400/25 bg-amber-400/10 text-amber-200">
+                      Missing ID
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    value={studentCodeDrafts[item.class_id] ?? ""}
+                    onChange={(event) =>
+                      setStudentCodeDrafts((drafts) => ({ ...drafts, [item.class_id]: event.target.value }))
+                    }
+                    placeholder="Student ID"
+                    className="h-9 rounded-md border-white/10 bg-black/30 px-3 font-mono text-sm text-zinc-100"
+                  />
+                  <Button
+                    onClick={() => handleStudentCodeSave(item.class_id)}
+                    disabled={savingStudentClassId === item.class_id}
+                    className="h-9 shrink-0 px-3 text-sm"
+                  >
+                    {savingStudentClassId === item.class_id ? (
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Save className="mr-1.5 h-3.5 w-3.5" />
+                    )}
+                    Save ID
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <Separator className="bg-white/5" />
 
