@@ -1634,6 +1634,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       );
     } catch (e: any) {
       const errorMessage = String(e?.message ?? e);
+      const userErrorMessage = friendlyError(errorMessage, language === "th" ? "th" : "en");
       const shouldToast = runStillActive();
       const insufficientCredits = isInsufficientCreditsError(errorMessage);
       setNodes((ns) =>
@@ -1646,7 +1647,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                   status: "error",
                   runStartedAt: null,
                   activeRunId: null,
-                  lastRunError: errorMessage,
+                  lastRunError: insufficientCredits ? errorMessage : userErrorMessage,
                 },
               }
             : n,
@@ -1663,7 +1664,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         // `function consume_credits_for(…) does not exist`,
         // OpenAI 401 …) to friendly Thai/EN copy. Raw error
         // stays in console.error for the team.
-        toast.error(friendlyError(errorMessage, language === "th" ? "th" : "en"));
+        toast.error(userErrorMessage);
       }
     }
   }, [getNodes, id, isRunning, isViewer, params, schemaKey, setNodes, selectedModel, schema, d.params?.nodeName, language, t]);
@@ -1876,6 +1877,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         return;
       }
       if (status === "failed" || status === "permanent_failed") {
+        const rawError = String(job.error ?? job.last_error ?? "Generation failed");
+        const userError = friendlyError(rawError, language === "th" ? "th" : "en");
         setNodes((ns) =>
           ns.map((n) =>
             n.id === id && (n.data as NodeData | undefined)?.status !== "done"
@@ -1888,7 +1891,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                     activeRunId: null,
                     jobStatus: status,
                     jobAttempts: attempts,
-                    lastRunError: String(job.error ?? job.last_error ?? "Generation failed"),
+                    lastRunError: userError,
                   },
                 }
               : n,
@@ -1920,7 +1923,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       cancelled = true;
       if (pollTimer != null) window.clearInterval(pollTimer);
     };
-  }, [d.backgroundJobId, d.jobStatus, getNodes, id, runStatus, setNodes]);
+  }, [d.backgroundJobId, d.jobStatus, getNodes, id, language, runStatus, setNodes]);
 
   /* ── Listen for Ctrl+Enter / Ctrl+Shift+Enter shortcut ────
    * useWorkspaceShortcuts dispatches a `workspace-run-shortcut`

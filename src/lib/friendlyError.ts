@@ -122,6 +122,18 @@ const MAPPINGS: ErrorMapping[] = [
     th: "Veo 3.1 ยังรับรูปอ้างอิงไม่ได้ในตอนนี้ ลองสร้างแบบ Text to Video ก่อนครับ",
     en: "Veo 3.1 image input is unavailable right now. Try Text to Video first.",
   },
+  {
+    match: /Veo: failed to fetch start\/end frame \((?:400|401|403|404|410)\)|failed to fetch start\/end frame/i,
+    th: "โหลดรูป Start/End Frame ไม่ได้ ไฟล์อาจหมดอายุหรือไม่มีสิทธิ์เข้าถึง ลองอัปโหลดหรือเลือกภาพใหม่แล้วรันอีกครั้งครับ",
+    en: "The start/end frame could not be loaded. Re-upload or choose the image again, then run it once more.",
+    ja: "開始/終了フレームを読み込めませんでした。画像を再アップロードするか選び直してから再実行してください。",
+  },
+  {
+    match: /Provider queue was busy|provider.*busy|queue was busy|HTTP 503|503|temporar(?:y|ily).*unavailable|high demand|overload/i,
+    th: "ตอนนี้ผู้ให้บริการ AI มีคิวเยอะหรือโหลดสูง ระบบจะลองให้อัตโนมัติจนกว่าจะครบเวลา หากไม่สำเร็จจะคืนเครดิตให้ครับ",
+    en: "The AI provider is busy right now. We'll keep retrying until the time limit; if it still cannot finish, credits will be refunded.",
+    ja: "AI プロバイダーが混み合っています。制限時間まで自動で再試行し、完了できない場合はクレジットを返金します。",
+  },
 
   // ── Network / timeouts ─────────────────────────────────────
   {
