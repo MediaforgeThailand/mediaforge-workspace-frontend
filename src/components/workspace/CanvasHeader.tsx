@@ -33,6 +33,7 @@ import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useWorkspaceShareRole } from "@/store/useWorkspaceShareRole";
 import { UserMenu } from "@/components/workspace/UserMenu";
 import ShareDialog from "@/components/workspace/ShareDialog";
+import OrgCreditBadge from "@/components/OrgCreditBadge";
 
 const CanvasHeader = () => {
   const currentWorkspaceId = useWorkspaceStore(
@@ -95,6 +96,7 @@ const CanvasHeader = () => {
 
       {/* Right — Share + UserMenu */}
       <div className="flex shrink-0 items-center gap-2">
+        <OrgCreditBadge variant="pill" className="hidden h-8 md:inline-flex" />
         {canShare && (
           <button
             type="button"
