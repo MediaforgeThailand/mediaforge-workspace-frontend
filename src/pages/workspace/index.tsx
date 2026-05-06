@@ -551,6 +551,16 @@ const WorkspaceDashboardInner = () => {
         })),
     [projects],
   );
+  const projectIdsWithSpaces = useMemo(() => {
+    const knownProjectIds = new Set(projects.map((project) => project.id));
+    const ids = new Set<string>();
+    for (const workspace of workspaces) {
+      if (workspace.projectId && knownProjectIds.has(workspace.projectId)) {
+        ids.add(workspace.projectId);
+      }
+    }
+    return ids;
+  }, [projects, workspaces]);
 
   const standaloneSyncRef = useRef<string | null>(null);
   useEffect(() => {
@@ -633,8 +643,9 @@ const WorkspaceDashboardInner = () => {
         !!currentActive &&
         stateAfterSync.workspaces.some((w) => w.projectId === currentActive);
       if (!currentActiveHasSpaces) {
+        const knownProjectIds = new Set(stateAfterSync.projects.map((p) => p.id));
         const preferredProjectId =
-          server.find((w) => !!w.projectId)?.projectId ??
+          server.find((w) => !!w.projectId && knownProjectIds.has(w.projectId))?.projectId ??
           stateAfterSync.projects.find((p) =>
             stateAfterSync.workspaces.some((w) => w.projectId === p.id),
           )?.id ??
@@ -654,13 +665,15 @@ const WorkspaceDashboardInner = () => {
       if (activeProjectId) setActiveProject(null);
       return;
     }
-    if (
-      !activeProjectId ||
-      !standaloneProjects.some((project) => project.id === activeProjectId)
-    ) {
-      setActiveProject(standaloneProjects[0].id);
+    const activeProjectExists = standaloneProjects.some((project) => project.id === activeProjectId);
+    const activeProjectHasSpaces = Boolean(activeProjectId && projectIdsWithSpaces.has(activeProjectId));
+    if (!activeProjectExists || (!activeProjectHasSpaces && projectIdsWithSpaces.size > 0)) {
+      const preferred =
+        standaloneProjects.find((project) => projectIdsWithSpaces.has(project.id)) ??
+        standaloneProjects[0];
+      setActiveProject(preferred.id);
     }
-  }, [activeProjectId, setActiveProject, standaloneProjects]);
+  }, [activeProjectId, projectIdsWithSpaces, setActiveProject, standaloneProjects]);
 
   /* "Create project" dialog state. We replaced the native browser
    * prompt() with a styled dialog (see CreateProjectDialog) that
