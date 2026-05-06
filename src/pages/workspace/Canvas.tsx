@@ -56,7 +56,6 @@ import WorkspaceCanvasMediaBridges from "@/components/workspace/WorkspaceCanvasM
 // in a follow-up commit after a focused review.
 // import WorkspaceDebugPanel from "@/components/workspace/WorkspaceDebugPanel";
 import WorkspaceErrorBoundary from "@/components/workspace/WorkspaceErrorBoundary";
-import OrgCreditBadge from "@/components/OrgCreditBadge";
 import {
   loadCanvasFromServer,
   loadWorkspaceFromServer,
@@ -349,14 +348,6 @@ const WorkspaceCanvasPage = () => {
         fontFamily: "var(--font-sans)",
       }}
     >
-      {/* Floating credit pill — top-right of the canvas, above tabs and
-          toolbars. OrgCreditBadge returns null for consumer/guest users
-          (no membership), so the consumer flow is unaffected. */}
-      <div className="pointer-events-none fixed right-[178px] top-[11px] z-[70]">
-        <div className="pointer-events-auto">
-          <OrgCreditBadge variant="pill" workspaceId={routeId ?? null} />
-        </div>
-      </div>
       {/* Wrap the entire workspace in an error boundary so an uncaught
           render exception (model-viewer panic, third-party hook
           assertion, etc.) shows a recoverable error card instead of

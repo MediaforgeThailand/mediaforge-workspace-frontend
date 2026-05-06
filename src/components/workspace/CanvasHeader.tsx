@@ -36,6 +36,7 @@ import { UserMenu } from "@/components/workspace/UserMenu";
 import ShareDialog from "@/components/workspace/ShareDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { CollaborationPresencePill } from "@/components/workspace/CanvasCollaborationOverlay";
+import OrgCreditBadge from "@/components/OrgCreditBadge";
 
 const CanvasHeader = () => {
   const { t } = useLanguage();
@@ -112,6 +113,11 @@ const CanvasHeader = () => {
 
       {/* Right — Share + UserMenu */}
       <div className="fixed right-[18px] top-[3px] z-[95] flex shrink-0 items-center gap-[10px]">
+        <OrgCreditBadge
+          variant="pill"
+          workspaceId={currentWorkspaceId}
+          className="hidden h-[30px] md:inline-flex"
+        />
         <CollaborationPresencePill />
         {canShare && (
           <button
