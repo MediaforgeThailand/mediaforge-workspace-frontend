@@ -1485,6 +1485,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       //   - "seedance" → POST action="poll_seedance"
       //   - "veo"      → POST action="poll_veo"
       //   - "replicate_veo" → POST action="poll_replicate_veo"
+      //   - "freepik_veo" / "freepik_seedance" → POST action="poll_freepik_video"
       //   - else       → POST action="poll_kling"  (default for video)
       const pollEndpoint = r.provider_meta?.poll_endpoint;
       const pollProvider = String(r.provider_meta?.provider ?? "kling").toLowerCase();
@@ -1494,6 +1495,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         const isSeedance = pollProvider === "seedance";
         const isVeo = pollProvider === "veo";
         const isReplicateVeo = pollProvider === "replicate_veo";
+        const isFreepikVideo = pollProvider === "freepik_veo" || pollProvider === "freepik_seedance";
         const POLL_INTERVAL_MS = isTripo3d ? 4_000 : 5_000;
         const POLL_TIMEOUT_MS = isTripo3d ? 8 * 60_000 : 6 * 60_000;
         const pollAction = isTripo3d
@@ -1504,6 +1506,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               ? "poll_veo"
               : isReplicateVeo
                 ? "poll_replicate_veo"
+                : isFreepikVideo
+                  ? "poll_freepik_video"
               : "poll_kling";
         const providerLabel = isTripo3d
           ? "Tripo3D"
@@ -1513,6 +1517,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               ? "Veo"
               : isReplicateVeo
                 ? "Replicate Veo"
+                : isFreepikVideo
+                  ? pollProvider === "freepik_seedance" ? "Freepik Seedance" : "Freepik Veo"
               : "Kling";
         let polledUrl: string | undefined;
         let polledModelUrl: string | undefined;
