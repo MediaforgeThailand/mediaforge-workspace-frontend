@@ -69,7 +69,7 @@ import {
 } from "./workspaceSchema";
 
 const RUN_EDGE_FUNCTION = "workspace-run-node";
-const MAX_VISIBLE_RUN_MS = 30 * 60_000;
+const MAX_VISIBLE_RUN_MS = 60 * 60_000;
 const STALE_RUN_GRACE_MS = 30_000;
 const MULTI_GEN_MAX = 3;
 const MULTI_GEN_X_OFFSET = 480;
@@ -892,7 +892,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       // Behaviour:
       //   • Per-attempt timeout: 180s (longer than the edge fn's
       //     150s wall clock so the response has time to land).
-      //   • Total budget: 30 minutes — user-visible spinner for
+      //   • Total budget: 60 minutes — user-visible spinner for
       //     the entire window. No error toasts during retry.
       //   • Backoff: 3, 5, 10, 15, 30, 60s (cap). Spaces out provider
       //     hits so we don't pile on a struggling endpoint.
