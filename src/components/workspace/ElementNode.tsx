@@ -69,6 +69,7 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
   const canvasId = useWorkspaceStore((s) => s.current?.id);
 
   const [creating, setCreating] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const isSaved = !!d.brand_element_id;
 
   /* React Flow caches handle layout on mount. When `isSaved` flips
@@ -178,11 +179,14 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
     <div
       className="ws-clean-node relative"
       data-state={selected ? "selected" : "idle"}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{ width }}
     >
       {/* Floating title — icon + name (+ saved-badge). */}
       <NodeQuickActionRail
-        visible={selected}
+        visible={selected || isHovered}
+        selected={selected}
         onDelete={selected ? onDeleteNode : undefined}
         nodeId={id}
         mediaKind={null}

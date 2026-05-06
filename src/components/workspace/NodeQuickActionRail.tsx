@@ -23,6 +23,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 
 type NodeQuickActionRailProps = {
   visible: boolean;
+  selected?: boolean;
   onDelete?: () => void;
   nodeId?: string;
   mediaKind?: "image" | "video" | "audio" | "model3d" | "text" | null;
@@ -161,6 +162,7 @@ function readVideoDimensions(url: string): Promise<string> {
 
 export default function NodeQuickActionRail({
   visible,
+  selected = false,
   onDelete,
   nodeId,
   mediaKind,
@@ -237,6 +239,9 @@ export default function NodeQuickActionRail({
   const stopNodeGesture = (event: SyntheticEvent) => {
     event.stopPropagation();
   };
+  const stopControlGesture = (event: SyntheticEvent) => {
+    event.stopPropagation();
+  };
 
   const isItemDisabled = (item: MenuItem) => {
     if (item.disabled) return true;
@@ -278,7 +283,13 @@ export default function NodeQuickActionRail({
           className="node-quick-action-button"
           aria-label={t("workspace.nodeRail.openTools")}
           aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((open) => !open)}
+          onPointerDown={stopControlGesture}
+          onMouseDown={stopControlGesture}
+          onClick={(event) => {
+            stopControlGesture(event);
+            setInfoOpen(false);
+            setMenuOpen((open) => !open);
+          }}
         >
           <MoreVertical className="h-[15px] w-[15px]" />
         </button>
@@ -286,12 +297,15 @@ export default function NodeQuickActionRail({
           type="button"
           className={cn(
             "node-quick-action-button",
-            !canShowInfo && "is-disabled",
+            (!selected || !canShowInfo) && "is-disabled",
           )}
           aria-label={t("workspace.nodeRail.nodeInfo")}
           aria-expanded={infoOpen}
-          disabled={!canShowInfo}
-          onClick={() => {
+          disabled={!selected || !canShowInfo}
+          onPointerDown={stopControlGesture}
+          onMouseDown={stopControlGesture}
+          onClick={(event) => {
+            stopControlGesture(event);
             setMenuOpen(false);
             setInfoOpen((open) => !open);
           }}
@@ -303,6 +317,8 @@ export default function NodeQuickActionRail({
           className="node-quick-action-button is-disabled"
           aria-label={t("workspace.nodeRail.focusNode")}
           disabled
+          onPointerDown={stopControlGesture}
+          onMouseDown={stopControlGesture}
         >
           <ScanSearch className="h-[14px] w-[14px]" />
         </button>
@@ -314,7 +330,12 @@ export default function NodeQuickActionRail({
           )}
           aria-label={t("workspace.nodeRail.deleteNode")}
           disabled={!onDelete}
-          onClick={() => onDelete?.()}
+          onPointerDown={stopControlGesture}
+          onMouseDown={stopControlGesture}
+          onClick={(event) => {
+            stopControlGesture(event);
+            onDelete?.();
+          }}
         >
           <X className="h-[14px] w-[14px]" />
         </button>

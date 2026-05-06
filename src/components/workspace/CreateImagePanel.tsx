@@ -21,6 +21,7 @@ import {
 } from "./modelDisplay";
 
 type BottomTab = "video" | "image" | "3d" | "audio";
+type MaybePromise<T> = T | Promise<T>;
 
 function usePanelCopy() {
   const { language, t } = useLanguage();
@@ -128,9 +129,9 @@ interface CreateImagePanelProps {
   referenceAccept?: string;
   referenceAssets?: CreateImagePanelReference[];
   onAddReferences?: () => void;
-  onReferenceFiles?: (files: File[]) => void;
-  onSelectReferenceAsset?: (reference: CreateImagePanelReference) => void;
-  onDeleteReferenceAsset?: (reference: CreateImagePanelReference) => void;
+  onReferenceFiles?: (files: File[]) => MaybePromise<void>;
+  onSelectReferenceAsset?: (reference: CreateImagePanelReference) => MaybePromise<void>;
+  onDeleteReferenceAsset?: (reference: CreateImagePanelReference) => MaybePromise<void>;
   onRemoveReference?: (id: string) => void;
   mentionOptions?: CreateImagePanelReference[];
   settings?: CreateVideoPanelSetting[];
@@ -156,8 +157,8 @@ interface CreateVideoPanelFrameSlot {
   refItem?: CreateImagePanelReference | null;
   uploading?: boolean;
   onUpload?: () => void;
-  onHistoryFiles?: (files: File[]) => void;
-  onSelectHistoryAsset?: (reference: CreateImagePanelReference) => void;
+  onHistoryFiles?: (files: File[]) => MaybePromise<void>;
+  onSelectHistoryAsset?: (reference: CreateImagePanelReference) => MaybePromise<void>;
   onRemove?: () => void;
 }
 
@@ -167,8 +168,8 @@ interface CreateVideoPanelReferenceSlot {
   accept: "image" | "video";
   refItem?: CreateImagePanelReference | null;
   uploading?: boolean;
-  onFiles?: (files: File[]) => void;
-  onSelectAsset?: (reference: CreateImagePanelReference) => void;
+  onFiles?: (files: File[]) => MaybePromise<void>;
+  onSelectAsset?: (reference: CreateImagePanelReference) => MaybePromise<void>;
   onRemove?: () => void;
 }
 
@@ -199,6 +200,7 @@ interface CreateVideoPanelProps {
   promptLabel?: string;
   promptPlaceholder?: string;
   onPromptChange?: (prompt: string) => void;
+  showPromptInput?: boolean;
   modelLabel?: string;
   modelInitial?: string;
   modelValue?: string;
@@ -218,13 +220,14 @@ interface CreateVideoPanelProps {
   referenceAccept?: string;
   referenceAssets?: CreateImagePanelReference[];
   onAddReferences?: () => void;
-  onReferenceFiles?: (files: File[]) => void;
-  onSelectReferenceAsset?: (reference: CreateImagePanelReference) => void;
-  onDeleteReferenceAsset?: (reference: CreateImagePanelReference) => void;
+  onReferenceFiles?: (files: File[]) => MaybePromise<void>;
+  onSelectReferenceAsset?: (reference: CreateImagePanelReference) => MaybePromise<void>;
+  onDeleteReferenceAsset?: (reference: CreateImagePanelReference) => MaybePromise<void>;
   onRemoveReference?: (id: string) => void;
   mentionOptions?: CreateImagePanelReference[];
   settings?: CreateVideoPanelSetting[];
   textControls?: CreateVideoPanelTextControl[];
+  extraControls?: React.ReactNode;
   onCreate?: () => void;
   createLabel?: string;
   runningLabel?: string;
@@ -586,6 +589,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
   promptLabel,
   promptPlaceholder,
   onPromptChange,
+  showPromptInput = true,
   modelLabel = "Kling 2.6 Pro",
   modelInitial = "K",
   modelValue,
@@ -611,6 +615,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
   mentionOptions = [],
   settings = [],
   textControls = [],
+  extraControls,
   onCreate,
   createLabel,
   runningLabel,
@@ -656,6 +661,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           : "frames";
   const visibleFrameSlots = frameSlots.filter(Boolean);
   const visibleReferenceSlots = referenceSlots.filter(Boolean);
+  const showPromptSection = showPromptInput || activeMode === "reference";
   const activeReferenceSlot =
     visibleReferenceSlots.find((slot) => slot.id === referenceSlotId) ?? null;
   const referenceAcceptsImage = referenceAccept.includes("image");
@@ -836,6 +842,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           </section>
         )}
 
+        {showPromptSection && (
         <section className="shrink-0 rounded-[16px] border border-white/[0.02] bg-[#16181a] p-[7px]">
           <div className="mb-[6px] flex items-center px-[2px]">
             <span className="standalone-section-title text-[14px] font-semibold leading-[20px] text-white">{resolvedPromptLabel}</span>
@@ -944,14 +951,17 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
             </>
           )}
 
-          <StandalonePromptMentionTextarea
-            value={prompt}
-            onChange={updatePrompt}
-            placeholder={resolvedPromptPlaceholder}
-            mentionOptions={mentionOptions}
-            className="mt-[7px] min-h-[70px] max-h-[190px] rounded-[10px] border-white/[0.06] bg-[#121314] px-[10px] py-[8px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-[#ff24c5]/50"
-          />
+          {showPromptInput && (
+            <StandalonePromptMentionTextarea
+              value={prompt}
+              onChange={updatePrompt}
+              placeholder={resolvedPromptPlaceholder}
+              mentionOptions={mentionOptions}
+              className="mt-[7px] min-h-[70px] max-h-[190px] rounded-[10px] border-white/[0.06] bg-[#121314] px-[10px] py-[8px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-[#ff24c5]/50"
+            />
+          )}
         </section>
+        )}
 
         {settings.length > 0 && (
           <div className="grid shrink-0 grid-cols-2 gap-[6px]">
@@ -964,6 +974,12 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
         {textControls.map((control) => (
           <VideoTextControlCard key={control.id} control={control} />
         ))}
+
+        {extraControls && (
+          <div className="flex shrink-0 flex-col gap-[10px]">
+            {extraControls}
+          </div>
+        )}
       </div>
 
       <div className="flex w-full flex-row items-center justify-between gap-[12px] border-t border-white/[0.03] bg-[#141618] px-[12px] py-[10px]">
@@ -1580,11 +1596,19 @@ function referenceDisplayLabel(reference: CreateImagePanelReference, index: numb
   return shortenReferenceName(referenceBaseName(reference, index), maxChars);
 }
 
+function pickerReferenceKey(reference: CreateImagePanelReference): string {
+  if (reference.assetId) return `asset:${reference.assetId}`;
+  if (reference.storageBucket && reference.storagePath) {
+    return `storage:${reference.storageBucket}/${reference.storagePath}`;
+  }
+  return `url:${reference.url?.split("?")[0] || reference.id}`;
+}
+
 function standaloneMentionLabel(reference: CreateImagePanelReference, index: number): string {
   return referenceDisplayLabel(reference, index, 10);
 }
 
-function StandalonePromptMentionTextarea({
+export function StandalonePromptMentionTextarea({
   value,
   onChange,
   placeholder,
@@ -1736,24 +1760,26 @@ function ReferencePicker({
   references: CreateImagePanelReference[];
   assets: CreateImagePanelReference[];
   accept: string;
-  onFiles?: (files: File[]) => void;
-  onSelectAsset?: (reference: CreateImagePanelReference) => void;
-  onDeleteAsset?: (reference: CreateImagePanelReference) => void;
+  onFiles?: (files: File[]) => MaybePromise<void>;
+  onSelectAsset?: (reference: CreateImagePanelReference) => MaybePromise<void>;
+  onDeleteAsset?: (reference: CreateImagePanelReference) => MaybePromise<void>;
   closeOnSelect?: boolean;
 }) {
   const copy = usePanelCopy();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const localUploadUrlsRef = useRef<string[]>([]);
+  const uploadingLocalIdsRef = useRef<Set<string>>(new Set());
   const [tab, setTab] = useState<"creations" | "uploads">("creations");
   const [localUploads, setLocalUploads] = useState<LocalPickerUpload[]>([]);
-  const selectedUrls = new Set(references.map((reference) => reference.url));
+  const [selectingLocalUploadId, setSelectingLocalUploadId] = useState<string | null>(null);
+  const selectedKeys = new Set(references.map(pickerReferenceKey));
   const acceptsImages = accept.includes("image");
   const acceptsVideos = accept.includes("video");
   const pickerAssets = useMemo(() => {
     const seen = new Set<string>();
     return [...references, ...localUploads, ...assets].filter((asset) => {
-      const key = asset.url?.split("?")[0] || asset.id;
+      const key = pickerReferenceKey(asset);
       if (!key || seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -1799,27 +1825,64 @@ function ReferencePicker({
 
   if (!open) return null;
 
+  const localUploadFileKey = (file: File) =>
+    `${file.name}:${file.size}:${file.type}:${file.lastModified}`;
+
   const addFiles = (files: FileList | File[] | null | undefined) => {
     const list = Array.from(files ?? []).filter((file) =>
       (acceptsImages && file.type.startsWith("image/")) ||
       (acceptsVideos && file.type.startsWith("video/")),
     );
     if (list.length === 0) return;
-    const nextUploads = list.map((file) => {
-      const url = URL.createObjectURL(file);
-      localUploadUrlsRef.current.push(url);
-      return {
-        id: `local-${Date.now()}-${file.name}-${Math.random().toString(36).slice(2)}`,
-        name: file.name,
-        url,
-        mime: file.type,
-        source: "upload" as const,
-        file,
-        localObjectUrl: url,
-      };
+    setLocalUploads((prev) => {
+      const seenFiles = new Set(prev.map((upload) => localUploadFileKey(upload.file)));
+      const nextUploads: LocalPickerUpload[] = [];
+      for (const file of list) {
+        const key = localUploadFileKey(file);
+        if (seenFiles.has(key)) continue;
+        seenFiles.add(key);
+        const url = URL.createObjectURL(file);
+        localUploadUrlsRef.current.push(url);
+        nextUploads.push({
+          id: `local-${Date.now()}-${file.name}-${Math.random().toString(36).slice(2)}`,
+          name: file.name,
+          url,
+          mime: file.type,
+          source: "upload" as const,
+          file,
+          localObjectUrl: url,
+        });
+      }
+      return nextUploads.length > 0 ? [...nextUploads, ...prev].slice(0, 80) : prev;
     });
-    setLocalUploads((prev) => [...nextUploads, ...prev].slice(0, 80));
     setTab("uploads");
+  };
+
+  const discardLocalUpload = (upload: LocalPickerUpload) => {
+    URL.revokeObjectURL(upload.localObjectUrl);
+    localUploadUrlsRef.current = localUploadUrlsRef.current.filter(
+      (url) => url !== upload.localObjectUrl,
+    );
+    setLocalUploads((prev) => prev.filter((item) => item.id !== upload.id));
+  };
+
+  const selectLocalUpload = async (upload: LocalPickerUpload) => {
+    if (!onFiles || uploadingLocalIdsRef.current.has(upload.id)) return;
+    uploadingLocalIdsRef.current.add(upload.id);
+    setSelectingLocalUploadId(upload.id);
+    try {
+      await onFiles([upload.file]);
+      discardLocalUpload(upload);
+      if (closeOnSelect) onClose();
+    } finally {
+      uploadingLocalIdsRef.current.delete(upload.id);
+      setSelectingLocalUploadId(null);
+    }
+  };
+
+  const selectAsset = async (asset: CreateImagePanelReference) => {
+    await onSelectAsset?.(asset);
+    if (closeOnSelect) onClose();
   };
 
   const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
@@ -1914,7 +1977,8 @@ function ReferencePicker({
 
           {visibleAssets.map((asset, index) => {
             const localUpload = "file" in asset ? (asset as LocalPickerUpload) : null;
-            const selected = selectedUrls.has(asset.url);
+            const selected = selectedKeys.has(pickerReferenceKey(asset));
+            const isSelectingLocal = !!localUpload && selectingLocalUploadId === localUpload.id;
             const label = referenceDisplayLabel(asset, index, 10);
             const fullLabel = referenceBaseName(asset, index);
             return (
@@ -1922,17 +1986,17 @@ function ReferencePicker({
                 key={asset.id}
                 type="button"
                 title={fullLabel}
+                disabled={isSelectingLocal}
                 onClick={() => {
                   if (localUpload) {
-                    onFiles?.([localUpload.file]);
-                    if (closeOnSelect) onClose();
+                    void selectLocalUpload(localUpload);
                     return;
                   }
-                  onSelectAsset?.(asset);
-                  if (closeOnSelect) onClose();
+                  void selectAsset(asset);
                 }}
                 className={clsx(
                   "group relative h-[126px] overflow-hidden rounded-[10px] bg-black text-left ring-1 transition",
+                  isSelectingLocal && "cursor-wait opacity-70",
                   selected
                     ? "ring-[#ff24c5]"
                     : "ring-white/[0.06] hover:ring-[#ff24c5]/70",
@@ -1955,6 +2019,11 @@ function ReferencePicker({
                 {selected && (
                   <span className="absolute left-[6px] top-[6px] grid h-[20px] w-[20px] place-items-center rounded-full bg-[#ff24c5] text-black">
                     <Check className="h-[13px] w-[13px]" />
+                  </span>
+                )}
+                {isSelectingLocal && (
+                  <span className="absolute inset-0 grid place-items-center bg-black/55 text-[11px] font-semibold text-white backdrop-blur-[1px]">
+                    {copy.creating}
                   </span>
                 )}
                 {(onDeleteAsset || localUpload) && (

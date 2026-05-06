@@ -274,6 +274,15 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
   );
   const personalPercent = percentOf(personalUsed, personalTotal);
   const sharedPercent = percentOf(sharedUsed, sharedTotal);
+  const showSharedUsage = Boolean(credits?.is_shared_pool);
+  const sharedUsageLabel =
+    credits?.credit_scope === "education_space"
+      ? credits.team_name || t("workspace.userMenu.classSpace")
+      : credits?.team_name
+        ? credits.team_name
+        : isEducationOrg
+          ? credits?.organization_name || t("workspace.userMenu.sharedCredits")
+          : t("common.companyPool");
   const triggerSize = compact ? 43 : 40;
   const ringSize = compact ? 43 : 42;
 
@@ -303,7 +312,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
           initial={initial}
           personalPercent={personalPercent}
           sharedPercent={sharedPercent}
-          showShared={Boolean(credits?.is_shared_pool)}
+          showShared={showSharedUsage}
           size={ringSize}
         />
       </DropdownMenuTrigger>
@@ -327,7 +336,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
                 initial={initial}
                 personalPercent={personalPercent}
                 sharedPercent={sharedPercent}
-                showShared={Boolean(credits?.is_shared_pool)}
+                showShared={showSharedUsage}
                 size={38}
               />
               <div className="min-w-0 flex-1">
@@ -389,7 +398,16 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
           </div>
         </DropdownMenuLabel>
 
-        <div className="bg-white/[0.02] px-[12px] py-[10px]">
+        <div className="space-y-[10px] bg-white/[0.02] px-[12px] py-[10px]">
+          {showSharedUsage && (
+            <UsageRow
+              label={sharedUsageLabel}
+              used={sharedUsed}
+              total={sharedTotal}
+              available={sharedBalance}
+              colorClass="bg-yellow-400"
+            />
+          )}
           <UsageRow
             label={t("workspace.userMenu.personal")}
             used={personalUsed}

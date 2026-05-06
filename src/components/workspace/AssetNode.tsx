@@ -285,6 +285,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
       {/* Floating title — icon + editable name. */}
       <NodeQuickActionRail
         visible={selected || isHovered}
+        selected={selected}
         onDelete={selected ? onDeleteNode : undefined}
         nodeId={id}
         mediaKind={

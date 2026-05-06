@@ -14,7 +14,7 @@
  *   }
  */
 
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import {
   type NodeProps,
   useReactFlow,
@@ -37,6 +37,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as unknown as TextNodeData;
   const { setNodes } = useReactFlow();
   const { t } = useLanguage();
+  const [isHovered, setIsHovered] = useState(false);
 
   const updateField = useCallback(
     (field: "label" | "content", value: string) => {
@@ -69,12 +70,15 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
     <div
       className="ws-clean-node relative"
       data-state={selected ? "selected" : "idle"}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{ width: 260 }}
     >
       {/* Floating title — icon + editable name, NO background, NO
        *  border, sits above the body (matches the design reference). */}
       <NodeQuickActionRail
-        visible={selected}
+        visible={selected || isHovered}
+        selected={selected}
         onDelete={selected ? onDeleteNode : undefined}
         nodeId={id}
         mediaKind="text"

@@ -7,12 +7,15 @@ import {
   BookOpen,
   ChevronDown,
   ChevronRight,
+  Clock,
   Crop,
   Copy,
   Download,
   Eye,
   ExternalLink,
+  Film,
   FolderOpen,
+  GripVertical,
   ImagePlus,
   Loader2,
   Menu,
@@ -34,6 +37,7 @@ import { UserMenu } from "@/components/workspace/UserMenu";
 import {
   CreateImagePanel,
   CreateVideoPanel,
+  StandalonePromptMentionTextarea,
   type CreateVideoPanelSetting,
 } from "@/components/workspace/CreateImagePanel";
 import InsufficientCreditsDialog from "@/components/InsufficientCreditsDialog";
@@ -204,6 +208,69 @@ interface UploadedRef {
   storageBucket?: "ai-media" | "user_assets";
   storagePath?: string;
   durationSec?: number;
+}
+
+interface StandaloneSceneBlock {
+  prompt: string;
+  duration: number;
+}
+
+const STANDALONE_MULTISHOT_MAX_SCENES = 6;
+const STANDALONE_MULTISHOT_MIN_DURATION = 1;
+const STANDALONE_MULTISHOT_TOTAL_MIN = 3;
+const STANDALONE_MULTISHOT_TOTAL_MAX = 15;
+const DEFAULT_STANDALONE_MULTISHOT_SCENE: StandaloneSceneBlock = {
+  prompt: "",
+  duration: 3,
+};
+
+function normalizeStandaloneScene(value: unknown): StandaloneSceneBlock | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const rawDuration = Number(record.duration);
+  const duration = Number.isFinite(rawDuration)
+    ? Math.max(STANDALONE_MULTISHOT_MIN_DURATION, Math.min(15, Math.round(rawDuration)))
+    : DEFAULT_STANDALONE_MULTISHOT_SCENE.duration;
+  return {
+    prompt: typeof record.prompt === "string" ? record.prompt : "",
+    duration,
+  };
+}
+
+function parseStandaloneMultiShotScenes(value: string | null | undefined): StandaloneSceneBlock[] {
+  if (!value?.trim()) return [{ ...DEFAULT_STANDALONE_MULTISHOT_SCENE }];
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [{ ...DEFAULT_STANDALONE_MULTISHOT_SCENE }];
+    const scenes = parsed
+      .map(normalizeStandaloneScene)
+      .filter((scene): scene is StandaloneSceneBlock => !!scene)
+      .slice(0, STANDALONE_MULTISHOT_MAX_SCENES);
+    return scenes.length > 0 ? scenes : [{ ...DEFAULT_STANDALONE_MULTISHOT_SCENE }];
+  } catch {
+    return [{ ...DEFAULT_STANDALONE_MULTISHOT_SCENE }];
+  }
+}
+
+function serializeStandaloneMultiShotScenes(scenes: StandaloneSceneBlock[]): string {
+  const normalized = (scenes.length > 0 ? scenes : [{ ...DEFAULT_STANDALONE_MULTISHOT_SCENE }])
+    .map((scene) => ({
+      prompt: scene.prompt ?? "",
+      duration: Math.max(
+        STANDALONE_MULTISHOT_MIN_DURATION,
+        Math.min(15, Math.round(Number(scene.duration) || 1)),
+      ),
+    }))
+    .slice(0, STANDALONE_MULTISHOT_MAX_SCENES);
+  return JSON.stringify(normalized);
+}
+
+function standaloneMultiShotDuration(scenes: StandaloneSceneBlock[]): number {
+  const total = scenes.reduce((sum, scene) => sum + Number(scene.duration || 0), 0);
+  return Math.max(
+    STANDALONE_MULTISHOT_TOTAL_MIN,
+    Math.min(STANDALONE_MULTISHOT_TOTAL_MAX, Math.round(total || 0)),
+  );
 }
 
 type PanelReferenceAsset = {
@@ -813,7 +880,7 @@ export default function StandaloneGenerator({
   const { user } = useAuth();
   const { language, t } = useLanguage();
   const queryClient = useQueryClient();
-  const { credits } = useCredits();
+  const { credits, loading: creditsLoading } = useCredits();
   const { data: creditCosts = [], isLoading: creditCostsLoading } =
     useNodeCreditCosts();
   const { data: workspaceCreditMultiplier = 1 + DEFAULT_WORKSPACE_INFRASTRUCTURE_BUFFER_PERCENT / 100 } =
@@ -1211,7 +1278,7 @@ export default function StandaloneGenerator({
       const patch: Partial<StandaloneFormState> = {};
       if (slot === "image-ref") {
         const maxRefs = maxImageRefsForModel(current.model);
-        if (current.imageRefs.some((ref) => ref.url === uploaded.url)) {
+        if (current.imageRefs.some((ref) => standaloneReferencesMatch(ref, uploaded))) {
           return prev;
         }
         patch.imageRefs = [
@@ -1238,7 +1305,7 @@ export default function StandaloneGenerator({
       } else if (slot === "model-image") {
         const maxRefs = max3dRefsForModel(current.model);
         const existingRefs = threeDReferencesForForm(current);
-        if (existingRefs.some((ref) => ref.url === uploaded.url)) {
+        if (existingRefs.some((ref) => standaloneReferencesMatch(ref, uploaded))) {
           return prev;
         }
         const nextRefs = [...existingRefs, uploaded].slice(0, maxRefs);
@@ -1604,7 +1671,7 @@ export default function StandaloneGenerator({
             uploading: uploading === "video-start",
             onUpload: () => openUpload("video-start"),
             onHistoryFiles: (files: File[]) =>
-              void uploadFrameHistoryFiles("video-start", files),
+              uploadFrameHistoryFiles("video-start", files),
             onSelectHistoryAsset: (reference) =>
               selectFrameHistoryAsset("video-start", reference),
             onRemove: () => updateForm({ videoStart: null }),
@@ -1619,7 +1686,7 @@ export default function StandaloneGenerator({
                   uploading: uploading === "video-end",
                   onUpload: () => openUpload("video-end"),
                   onHistoryFiles: (files: File[]) =>
-                    void uploadFrameHistoryFiles("video-end", files),
+                    uploadFrameHistoryFiles("video-end", files),
                   onSelectHistoryAsset: (reference) =>
                     selectFrameHistoryAsset("video-end", reference),
                   onRemove: () => updateForm({ videoEnd: null }),
@@ -1640,7 +1707,7 @@ export default function StandaloneGenerator({
             refItem: form.videoRefImage,
             uploading: uploading === "video-ref-image",
             onFiles: (files: File[]) =>
-              void uploadPanelReferenceFiles(files, "video-ref-image"),
+              uploadPanelReferenceFiles(files, "video-ref-image"),
             onSelectAsset: (reference: PanelReferenceAsset) =>
               selectPanelReferenceAsset(reference, "video-ref-image"),
             onRemove: () => updateForm({ videoRefImage: null }),
@@ -1652,7 +1719,7 @@ export default function StandaloneGenerator({
             refItem: form.videoRefVideo,
             uploading: uploading === "video-ref-video",
             onFiles: (files: File[]) =>
-              void uploadPanelReferenceFiles(files, "video-ref-video"),
+              uploadPanelReferenceFiles(files, "video-ref-video"),
             onSelectAsset: (reference: PanelReferenceAsset) =>
               selectPanelReferenceAsset(reference, "video-ref-video"),
             onRemove: () => updateForm({ videoRefVideo: null }),
@@ -1704,6 +1771,20 @@ export default function StandaloneGenerator({
     activeTool === "image_to_3d"
       ? buildThreeDPanelSettings({ form, onChange: updateForm, t, language })
       : [];
+  const standaloneMultiShotActive =
+    activeTool === "video_gen" &&
+    videoSupportsMultiShot(form.model) &&
+    form.videoMultiShot;
+  const videoMultiShotScenes = useMemo(
+    () => parseStandaloneMultiShotScenes(form.videoMultiPrompt),
+    [form.videoMultiPrompt],
+  );
+  const updateVideoMultiShotScenes = (scenes: StandaloneSceneBlock[]) => {
+    updateForm({
+      videoMultiPrompt: serializeStandaloneMultiShotScenes(scenes),
+      videoDuration: standaloneMultiShotDuration(scenes),
+    });
+  };
   const videoTextControls =
     activeTool === "video_gen"
       ? [
@@ -1720,19 +1801,6 @@ export default function StandaloneGenerator({
                   rows: 1,
                   onChange: (videoNegativePrompt: string) =>
                     updateForm({ videoNegativePrompt }),
-                },
-              ]
-            : []),
-          ...(videoSupportsMultiShot(form.model) && form.videoMultiShot
-            ? [
-                {
-                  id: "multi-prompt",
-                  label: standaloneInlineLabel("shotListJson", language),
-                  value: form.videoMultiPrompt,
-                  placeholder: '[{"prompt":"Scene 1","duration":3}]',
-                  rows: 3,
-                  onChange: (videoMultiPrompt: string) =>
-                    updateForm({ videoMultiPrompt }),
                 },
               ]
             : []),
@@ -1832,14 +1900,20 @@ export default function StandaloneGenerator({
         updateForm({ videoRefVideo: { ...form.videoRefVideo, durationSec } });
       }
     }
-    if (
-      estimatedCost != null &&
-      credits &&
-      Number(credits.balance ?? 0) < estimatedCost
-    ) {
-      setInsufficientRequiredCredits(estimatedCost);
-      setInsufficientOpen(true);
-      return;
+    if (estimatedCost != null && estimatedCost > 0) {
+      if (creditsLoading || !credits) {
+        toast.error(
+          language === "th"
+            ? "ยังตรวจสอบเครดิตไม่ได้ กรุณารอสักครู่แล้วลองใหม่"
+            : "Credits are still loading. Please try again in a moment.",
+        );
+        return;
+      }
+      if (Number(credits.balance ?? 0) < estimatedCost) {
+        setInsufficientRequiredCredits(estimatedCost);
+        setInsufficientOpen(true);
+        return;
+      }
     }
 
     const mentionPrompt =
@@ -1954,6 +2028,7 @@ export default function StandaloneGenerator({
                 language,
               )}
               onPromptChange={(prompt) => updateForm({ prompt })}
+              showPromptInput={!standaloneMultiShotActive}
               modelLabel={selectedModel?.label ?? "SeedDance 2.0 Pro"}
               modelInitial={selectedModelVisual?.initial ?? "S"}
               modelValue={form.model}
@@ -1987,6 +2062,15 @@ export default function StandaloneGenerator({
               mentionOptions={panelMentionOptions}
               settings={videoSettings}
               textControls={videoTextControls}
+              extraControls={
+                standaloneMultiShotActive ? (
+                  <StandaloneMultiShotBuilder
+                    scenes={videoMultiShotScenes}
+                    onChange={updateVideoMultiShotScenes}
+                    mentionOptions={panelMentionOptions}
+                  />
+                ) : undefined
+              }
               onCreate={() => void run()}
               createLabel={standaloneCreateButtonLabel(
                 activeTool,
@@ -3823,6 +3907,169 @@ function RangeSlider({
   );
 }
 
+function StandaloneMultiShotBuilder({
+  scenes,
+  onChange,
+  mentionOptions,
+}: {
+  scenes: StandaloneSceneBlock[];
+  onChange: (scenes: StandaloneSceneBlock[]) => void;
+  mentionOptions: PanelReferenceAsset[];
+}) {
+  const { t } = useLanguage();
+  const effectiveScenes =
+    scenes.length > 0 ? scenes : [{ ...DEFAULT_STANDALONE_MULTISHOT_SCENE }];
+  const totalDuration = effectiveScenes.reduce(
+    (sum, scene) => sum + Number(scene.duration || 0),
+    0,
+  );
+
+  const updateScene = (
+    index: number,
+    field: keyof StandaloneSceneBlock,
+    value: string | number,
+  ) => {
+    onChange(
+      effectiveScenes.map((scene, sceneIndex) =>
+        sceneIndex === index ? { ...scene, [field]: value } : scene,
+      ),
+    );
+  };
+
+  const addScene = () => {
+    if (effectiveScenes.length >= STANDALONE_MULTISHOT_MAX_SCENES) return;
+    onChange([...effectiveScenes, { prompt: "", duration: 2 }]);
+  };
+
+  const removeScene = (index: number) => {
+    if (effectiveScenes.length <= 1) return;
+    onChange(effectiveScenes.filter((_, sceneIndex) => sceneIndex !== index));
+  };
+
+  return (
+    <section className="shrink-0 rounded-[16px] border border-white/[0.025] bg-[#16181a] p-[9px] shadow-[inset_0_1px_0_rgba(255,255,255,.035)]">
+      <div className="flex items-center justify-between rounded-[12px] border border-violet-400/20 bg-[linear-gradient(90deg,rgba(168,85,247,.12),rgba(168,85,247,.035))] px-[10px] py-[8px]">
+        <div className="flex min-w-0 items-center gap-[8px]">
+          <span className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[8px] border border-violet-300/30 bg-violet-400/15 text-violet-200">
+            <Film className="h-[13px] w-[13px]" />
+          </span>
+          <div className="min-w-0 leading-tight">
+            <div className="text-[12px] font-semibold leading-[16px] text-white">
+              {t("multiShot.directorMode")}
+            </div>
+            <div className="mt-[1px] text-[10px] font-mono leading-[13px] text-white/45">
+              {t("multiShot.storyboardScenes", {
+                count: effectiveScenes.length,
+                max: STANDALONE_MULTISHOT_MAX_SCENES,
+              })}
+            </div>
+          </div>
+        </div>
+        <span className="inline-flex shrink-0 items-center gap-[4px] rounded-full bg-violet-400/15 px-[8px] py-[3px] text-[10.5px] font-semibold leading-[14px] text-violet-100">
+          <Clock className="h-[12px] w-[12px]" />
+          {t("multiShot.totalDuration", { seconds: totalDuration })}
+        </span>
+      </div>
+
+      <div className="mt-[8px]">
+        <div className="flex h-[5px] gap-[2px]">
+          {effectiveScenes.map((scene, index) => (
+            <span
+              key={`${index}-${scene.duration}`}
+              className="rounded-[2px] bg-violet-400/80"
+              style={{ flex: Math.max(Number(scene.duration) || 1, 0.5) }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-[9px] space-y-[8px]">
+        {effectiveScenes.map((scene, index) => (
+          <div
+            key={index}
+            className="relative overflow-hidden rounded-[12px] border border-white/[0.05] bg-[#121314] p-[8px] pl-[10px]"
+          >
+            <span className="absolute left-0 top-0 h-full w-[3px] bg-violet-400/70" />
+            <div className="flex items-start gap-[8px]">
+              <div className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-[10px] border border-white/[0.08] bg-[linear-gradient(135deg,rgba(168,85,247,.75),rgba(236,72,153,.35))] text-[12px] font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,.16)]">
+                {String(index + 1).padStart(2, "0")}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="mb-[6px] flex items-center justify-between gap-[8px]">
+                  <div className="flex min-w-0 items-center gap-[5px]">
+                    <GripVertical className="h-[12px] w-[12px] shrink-0 text-white/30" />
+                    <span className="truncate text-[10.5px] font-semibold uppercase tracking-[0.08em] text-violet-200">
+                      {t("multiShot.sceneNumber", {
+                        number: String(index + 1).padStart(2, "0"),
+                      })}
+                    </span>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-[5px]">
+                    <label className="inline-flex h-[24px] items-center gap-[4px] rounded-[7px] border border-white/[0.08] bg-white/[0.04] px-[6px] text-[10.5px] font-semibold leading-[14px] text-white/85">
+                      <input
+                        type="number"
+                        min={STANDALONE_MULTISHOT_MIN_DURATION}
+                        max={15}
+                        step={1}
+                        value={scene.duration}
+                        onChange={(event) =>
+                          updateScene(
+                            index,
+                            "duration",
+                            Math.max(
+                              STANDALONE_MULTISHOT_MIN_DURATION,
+                              Math.min(15, Number(event.target.value) || 1),
+                            ),
+                          )
+                        }
+                        className="w-[24px] border-0 bg-transparent text-right font-mono text-[10.5px] text-white outline-none"
+                      />
+                      <span className="text-white/45">{t("multiShot.secondsSuffix")}</span>
+                    </label>
+                    {effectiveScenes.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeScene(index)}
+                        className="grid h-[24px] w-[24px] place-items-center rounded-[7px] text-white/35 transition hover:bg-red-500/10 hover:text-red-300"
+                        title={t("multiShot.removeScene")}
+                      >
+                        <Trash2 className="h-[12px] w-[12px]" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <StandalonePromptMentionTextarea
+                  value={scene.prompt}
+                  onChange={(prompt) => updateScene(index, "prompt", prompt)}
+                  placeholder={t("multiShot.scenePromptPlaceholder", {
+                    scene: index + 1,
+                  })}
+                  mentionOptions={mentionOptions}
+                  className="min-h-[46px] max-h-[136px] rounded-[9px] border-white/[0.06] bg-[#0f1011] px-[8px] py-[7px] text-[12px] leading-[18px] text-white placeholder:text-neutral-500 focus:border-violet-400/50"
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {effectiveScenes.length < STANDALONE_MULTISHOT_MAX_SCENES && (
+        <button
+          type="button"
+          onClick={addScene}
+          className="mt-[8px] flex h-[34px] w-full items-center justify-center gap-[6px] rounded-[10px] border border-dashed border-violet-400/30 bg-violet-500/[0.03] text-[12px] font-semibold text-violet-200 transition hover:border-violet-300/55 hover:bg-violet-500/[0.08]"
+        >
+          <Plus className="h-[14px] w-[14px]" />
+          {t("multiShot.addScene", {
+            count: effectiveScenes.length,
+            max: STANDALONE_MULTISHOT_MAX_SCENES,
+          })}
+        </button>
+      )}
+    </section>
+  );
+}
+
 function ThreeDControls({
   form,
   onChange,
@@ -4594,6 +4841,27 @@ function storagePointerFromReferenceUrl(rawUrl: string): Pick<UploadedRef, "stor
   return {};
 }
 
+function standaloneReferenceKey(
+  reference: Pick<UploadedRef, "url" | "assetId" | "storageBucket" | "storagePath">,
+): string {
+  if (reference.assetId) return `asset:${reference.assetId}`;
+  if (reference.storageBucket && reference.storagePath) {
+    return `storage:${reference.storageBucket}/${reference.storagePath}`;
+  }
+  const storagePointer = storagePointerFromReferenceUrl(reference.url);
+  if (storagePointer.storageBucket && storagePointer.storagePath) {
+    return `storage:${storagePointer.storageBucket}/${storagePointer.storagePath}`;
+  }
+  return `url:${reference.url.split("?")[0]}`;
+}
+
+function standaloneReferencesMatch(
+  a: Pick<UploadedRef, "url" | "assetId" | "storageBucket" | "storagePath">,
+  b: Pick<UploadedRef, "url" | "assetId" | "storageBucket" | "storagePath">,
+): boolean {
+  return standaloneReferenceKey(a) === standaloneReferenceKey(b);
+}
+
 async function fetchProjectUserAssets(
   userId: string,
   projectId: string,
@@ -4680,7 +4948,7 @@ function mergeReferenceOptions(
   const merged: UploadedRef[] = [];
   for (const ref of references) {
     if (!ref?.url) continue;
-    const key = ref.url.split("?")[0];
+    const key = standaloneReferenceKey(ref);
     if (seen.has(key)) continue;
     seen.add(key);
     merged.push(ref);
@@ -5405,7 +5673,7 @@ function useProjectReferenceAssets(
 
       const pushRef = async (ref: UploadedRef | null | undefined) => {
         if (!ref?.url) return;
-        const key = ref.url.split("?")[0];
+        const key = standaloneReferenceKey(ref);
         if (seen.has(key)) return;
         seen.add(key);
         refs.push(ref);
@@ -6054,7 +6322,18 @@ function buildVideoPanelSettings({
         : standaloneInlineLabel("off", language),
       kind: "toggle",
       checked: form.videoMultiShot,
-      onToggle: (videoMultiShot) => onChange({ videoMultiShot }),
+      onToggle: (videoMultiShot) => {
+        if (!videoMultiShot) {
+          onChange({ videoMultiShot });
+          return;
+        }
+        const scenes = parseStandaloneMultiShotScenes(form.videoMultiPrompt);
+        onChange({
+          videoMultiShot,
+          videoMultiPrompt: serializeStandaloneMultiShotScenes(scenes),
+          videoDuration: standaloneMultiShotDuration(scenes),
+        });
+      },
     });
   }
 
