@@ -97,17 +97,18 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
             key={item.key}
             type="button"
             onClick={() => onChange(item.key)}
+            title={t(item.labelKey)}
             className={cn(
-              "group flex h-[32px] w-full items-center gap-[8px] rounded-md px-[8px] text-[14px] font-medium leading-[18px] transition-colors",
+              "group flex min-h-[32px] w-full items-center gap-[8px] rounded-md px-[8px] py-[6px] text-[14px] font-medium leading-[18px] transition-colors",
               active
                 ? "bg-white/[0.07] text-zinc-50"
                 : "text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.04]",
             )}
           >
             <item.icon className="h-[15px] w-[15px] flex-shrink-0" />
-            <span className="flex-1 text-left">{t(item.labelKey)}</span>
+            <span className="min-w-0 flex-1 truncate text-left">{t(item.labelKey)}</span>
             {item.comingSoon && (
-              <span className="text-[11.75px] font-semibold uppercase leading-[14px] text-zinc-500 group-hover:text-zinc-400">
+              <span className="flex-shrink-0 text-[11.75px] font-semibold uppercase leading-[14px] text-zinc-500 group-hover:text-zinc-400">
                 {t("workspace.settings.coming_soon_pill")}
               </span>
             )}

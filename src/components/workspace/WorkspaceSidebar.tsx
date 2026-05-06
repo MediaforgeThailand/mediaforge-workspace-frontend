@@ -417,7 +417,7 @@ const OrgAdminLink = () => {
         title={primaryTip}
       >
         <PrimaryIcon className="h-[16px] w-[16px] shrink-0" />
-        {primaryLabel}
+        <span className="min-w-0 truncate">{primaryLabel}</span>
       </button>
       <button
         type="button"
@@ -426,7 +426,7 @@ const OrgAdminLink = () => {
         title={t("workspace.sidebar.branding_tip")}
       >
         <Palette className="h-[16px] w-[16px] shrink-0" />
-        {t("workspace.sidebar.branding")}
+        <span className="min-w-0 truncate">{t("workspace.sidebar.branding")}</span>
       </button>
     </div>
   );
