@@ -33,7 +33,7 @@ function resolutionTier(size: unknown): "1k" | "2k" | "4k" | "auto" {
 function findOpenAiImageCost(params: Record<string, unknown>, creditCosts: CreditCostRow[]) {
   const model = String(params.model_name ?? params.model ?? "gpt-image-2").toLowerCase();
   const rawQuality = String(params.quality ?? "medium").toLowerCase();
-  const quality = ["low", "medium", "high"].includes(rawQuality) ? rawQuality : "medium";
+  const quality = ["low", "medium", "high", "auto"].includes(rawQuality) ? rawQuality : "medium";
   const size = String(params.size ?? "1024x1024").toLowerCase();
   const tier = resolutionTier(size === "auto" ? "1024x1024" : size);
   const keys = [
@@ -162,6 +162,21 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
 
   if (schemaKey === "klingVideoNode" || schemaKey === "videoGenNode") {
     const model = modelName || "kling-v2-6-pro";
+    const hasRefVideoInput =
+      params._has_ref_video === true ||
+      params._has_ref_video === "true" ||
+      (Array.isArray(params.reference_video_urls) && params.reference_video_urls.length > 0) ||
+      Boolean(params.reference_video_url || params.video_url || params.ref_video);
+    const replicatePricingModel =
+      (model.startsWith("seedance-2-0") ||
+        model.startsWith("dreamina-seedance-2-0") ||
+        model.startsWith("replicate-seedance-2-0")) &&
+      hasRefVideoInput
+        ? "replicate-seedance-2-0-video-ref"
+        : model;
+    const modelAliases = replicatePricingModel !== model
+      ? [replicatePricingModel, model]
+      : [model];
     const isMotion = model.includes("motion");
     const isOmni = OMNI_MODELS.has(model);
 
@@ -267,7 +282,8 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
 
     // ── Standard models: fixed pricing (duration + audio match) preferred ──
     const rawDuration = params.duration ?? params.extend_duration ?? "5";
-    const duration = parseInt(String(rawDuration), 10) || 5;
+    const parsedDuration = parseInt(String(rawDuration), 10) || 5;
+    const duration = model.startsWith("replicate-seedance") && parsedDuration <= 0 ? 5 : parsedDuration;
     const hasAudio =
       params.has_audio === true ||
       params.has_audio === "true" ||
@@ -279,7 +295,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
       const resolutionExact = creditCosts.find(
         (r) =>
           r.feature === "generate_freepik_video" &&
-          r.model === `${model}:${resolution}` &&
+          modelAliases.some((alias) => r.model === `${alias}:${resolution}`) &&
           r.pricing_type === "per_second" &&
           (r.has_audio ?? false) === hasAudio,
       );
@@ -289,7 +305,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
         const noAudioResolution = creditCosts.find(
           (r) =>
             r.feature === "generate_freepik_video" &&
-            r.model === `${model}:${resolution}` &&
+            modelAliases.some((alias) => r.model === `${alias}:${resolution}`) &&
             r.pricing_type === "per_second" &&
             (r.has_audio ?? false) === false,
         );
@@ -301,7 +317,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
     const exactMatch = creditCosts.find(
       (r) =>
         r.feature === "generate_freepik_video" &&
-        r.model === model &&
+        modelAliases.includes(r.model) &&
         r.pricing_type === "fixed" &&
         r.duration_seconds === duration &&
         (r.has_audio ?? false) === hasAudio,
@@ -312,7 +328,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
     const durationMatch = creditCosts.find(
       (r) =>
         r.feature === "generate_freepik_video" &&
-        r.model === model &&
+        modelAliases.includes(r.model) &&
         r.pricing_type === "fixed" &&
         r.duration_seconds === duration,
     );
@@ -322,7 +338,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
     let stdPerSecondMatch = creditCosts.find(
       (r) =>
         r.feature === "generate_freepik_video" &&
-        r.model === model &&
+        modelAliases.includes(r.model) &&
         r.pricing_type === "per_second" &&
         (r.has_audio ?? false) === hasAudio,
     );
@@ -331,7 +347,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
       const basePerSec = creditCosts.find(
         (r) =>
           r.feature === "generate_freepik_video" &&
-          r.model === model &&
+          modelAliases.includes(r.model) &&
           r.pricing_type === "per_second" &&
           (r.has_audio ?? false) === false,
       );
@@ -341,7 +357,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
 
     // 4. Any match for this model
     const anyMatch = creditCosts.find(
-      (r) => r.feature === "generate_freepik_video" && r.model === model,
+      (r) => r.feature === "generate_freepik_video" && modelAliases.includes(r.model),
     );
     return anyMatch?.cost ?? null;
   }
