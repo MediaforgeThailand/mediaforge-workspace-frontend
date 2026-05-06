@@ -23,7 +23,7 @@ const TestConsumer = () => {
       <span data-testid="with-params">{t("savePercent", { n: 20 })}</span>
       <span data-testid="with-special-param">{t("upgradeTo", { name: "$&" })}</span>
       <button onClick={() => setLanguage("th")}>Switch to TH</button>
-      <button onClick={() => setLanguage("en")}>Switch to EN</button>
+      <button onClick={() => setLanguage("hi")}>Switch to HI</button>
     </div>
   );
 };
@@ -52,14 +52,14 @@ describe("LanguageContext", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("uses stored Thai preference before navigator and IP detection", async () => {
-    localStorage.setItem("mf-lang", "th");
+  it("uses stored Hindi preference before navigator and IP detection", async () => {
+    localStorage.setItem("mf-lang", "hi");
     setNavigatorLanguage(["en-US"], "en-US");
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
         ok: true,
-        text: async () => "loc=US\n",
+        text: async () => "loc=TH\n",
       }),
     );
 
@@ -69,13 +69,13 @@ describe("LanguageContext", () => {
       </LanguageProvider>
     );
 
-    expect(getByTestId("lang").textContent).toBe("th");
-    await waitFor(() => expect(getByTestId("translated").textContent).toBe("สถิติ"));
+    expect(getByTestId("lang").textContent).toBe("hi");
+    await waitFor(() => expect(getByTestId("translated").textContent).toBe("एनालिटिक्स"));
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("uses Thai when navigator language is th-TH", async () => {
-    setNavigatorLanguage(["th-TH"], "th-TH");
+  it("uses Hindi when navigator language is hi-IN", async () => {
+    setNavigatorLanguage(["hi-IN"], "hi-IN");
 
     const { getByTestId } = render(
       <LanguageProvider>
@@ -83,8 +83,64 @@ describe("LanguageContext", () => {
       </LanguageProvider>
     );
 
-    expect(getByTestId("lang").textContent).toBe("th");
-    await waitFor(() => expect(getByTestId("translated").textContent).toBe("สถิติ"));
+    expect(getByTestId("lang").textContent).toBe("hi");
+    await waitFor(() => expect(getByTestId("translated").textContent).toBe("एनालिटिक्स"));
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("uses Hindi when navigator language is hi", async () => {
+    setNavigatorLanguage(["hi"], "hi");
+
+    const { getByTestId } = render(
+      <LanguageProvider>
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    expect(getByTestId("lang").textContent).toBe("hi");
+    await waitFor(() => expect(getByTestId("translated").textContent).toBe("एनालिटिक्स"));
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("does not force Hindi for en-IN navigator even when IP country is India", async () => {
+    setNavigatorLanguage(["en-IN"], "en-IN");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => "loc=IN\n",
+      }),
+    );
+
+    const { getByTestId } = render(
+      <LanguageProvider>
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    expect(getByTestId("lang").textContent).toBe("en");
+    expect(getByTestId("translated").textContent).toBe("Analytics");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("does not let India IP override en-US navigator", async () => {
+    setNavigatorLanguage(["en-US"], "en-US");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => "loc=IN\n",
+      }),
+    );
+
+    const { getByTestId } = render(
+      <LanguageProvider>
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    expect(getByTestId("lang").textContent).toBe("en");
+    expect(getByTestId("translated").textContent).toBe("Analytics");
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -106,6 +162,67 @@ describe("LanguageContext", () => {
 
     await waitFor(() => expect(getByTestId("lang").textContent).toBe("th"));
     await waitFor(() => expect(getByTestId("translated").textContent).toBe("สถิติ"));
+  });
+
+  it("uses Spanish when IP country is Spain", async () => {
+    setNavigatorLanguage(["zz-ZZ"], "zz-ZZ");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => "loc=ES\n",
+      }),
+    );
+
+    const { getByTestId } = render(
+      <LanguageProvider>
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    await waitFor(() => expect(getByTestId("lang").textContent).toBe("es"));
+    await waitFor(() => expect(getByTestId("translated").textContent).toBe("Analítica"));
+  });
+
+  it("uses Japanese when IP country is Japan", async () => {
+    setNavigatorLanguage(["zz-ZZ"], "zz-ZZ");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => "loc=JP\n",
+      }),
+    );
+
+    const { getByTestId } = render(
+      <LanguageProvider>
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    await waitFor(() => expect(getByTestId("lang").textContent).toBe("ja"));
+    await waitFor(() => expect(getByTestId("translated").textContent).toBe("分析"));
+  });
+
+  it("uses Hindi when IP country is India and navigator language is unknown", async () => {
+    setNavigatorLanguage(["zz-ZZ"], "zz-ZZ");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => "loc=IN\n",
+      }),
+    );
+
+    const { getByTestId } = render(
+      <LanguageProvider>
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    await waitFor(() => expect(getByTestId("lang").textContent).toBe("hi"));
+    expect(getByTestId("translated").textContent).toBe("एनालिटिक्स");
   });
 
   it("uses English when IP country is not mapped to a supported language", async () => {
@@ -164,21 +281,18 @@ describe("LanguageContext", () => {
     await userEvent.click(getByText("Switch to TH"));
     expect(getByTestId("lang").textContent).toBe("th");
     await waitFor(() => expect(getByTestId("translated").textContent).toBe("สถิติ"));
-    expect(localStorage.getItem("mf-lang")).toBe("th");
   });
 
-  it("switches language back to English", async () => {
-    localStorage.setItem("mf-lang", "th");
+  it("switches language to Hindi", async () => {
     const { getByTestId, getByText } = render(
       <LanguageProvider>
         <TestConsumer />
       </LanguageProvider>
     );
-    await waitFor(() => expect(getByTestId("lang").textContent).toBe("th"));
-    await userEvent.click(getByText("Switch to EN"));
-    expect(getByTestId("lang").textContent).toBe("en");
-    await waitFor(() => expect(getByTestId("translated").textContent).toBe("Analytics"));
-    expect(localStorage.getItem("mf-lang")).toBe("en");
+    await userEvent.click(getByText("Switch to HI"));
+    expect(getByTestId("lang").textContent).toBe("hi");
+    await waitFor(() => expect(getByTestId("translated").textContent).toBe("एनालिटिक्स"));
+    expect(localStorage.getItem("mf-lang")).toBe("hi");
   });
 
   it("falls back to English when used outside provider", () => {

@@ -18,6 +18,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { friendlyError } from "@/lib/friendlyError";
 import { supabase } from "@/integrations/supabase/client";
 import { useCredits } from "@/hooks/useCredits";
 
@@ -64,7 +65,7 @@ const PromptPayPromoModal = ({
   requiredCredits,
   currentBalance = 0,
 }: PromptPayPromoModalProps) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { refetch } = useCredits();
 
   const [pkg, setPkg] = useState<PromoPackage | null>(null);
@@ -184,8 +185,7 @@ const PromptPayPromoModal = ({
           }
         }, 3000);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Something went wrong";
-        setErrorMsg(msg);
+        setErrorMsg(friendlyError(err, language === "th" ? "th" : "en"));
         setStep("error");
       }
     })();

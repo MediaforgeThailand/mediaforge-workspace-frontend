@@ -9,6 +9,7 @@ import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { friendlyError } from "@/lib/friendlyError";
 import { useTeachingClasses, useIsClassTeacher, useUserClassMemberships } from "@/hooks/useIsOrgUser";
 import {
   consumerOrgAdminApi,
@@ -849,12 +850,12 @@ function RequestsPanel({
 }: {
   classId: string; requests: any[]; isLoading: boolean; onChange: () => void;
 }) {
-  const { t: i18n } = useLanguage();
+  const { t: i18n, language } = useLanguage();
   const review = useMutation({
     mutationFn: ({ id, approve, amount }: { id: string; approve: boolean; amount?: number }) =>
       consumerOrgAdminApi.reviewCreditRequest(id, approve, { amount_granted: amount }),
-    onSuccess: () => { toast.success("Reviewed"); onChange(); },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+    onSuccess: () => { toast.success(i18n("orgAdmin.creditRequest.reviewed")); onChange(); },
+    onError: (e: any) => toast.error(friendlyError(e?.message ?? e, language === "th" ? "th" : "en")),
   });
 
   if (isLoading) return <div className="py-8 flex justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;

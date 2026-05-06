@@ -107,6 +107,7 @@ import { useCanvasRealtime } from "./useCanvasRealtime";
 import CanvasCollaborationOverlay from "./CanvasCollaborationOverlay";
 import { useCanvasCollaborationStore } from "./canvasCollaboration";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { friendlyError } from "@/lib/friendlyError";
 
 const VIEWPORT_KEY = (canvasId: string) => `workspace-viewport-${canvasId}`;
 const STORAGE_BUCKET = "ai-media";
@@ -515,7 +516,7 @@ const Inner = () => {
     getEdges,
   } = useReactFlow();
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   // Viewer-mode flag — when true, the canvas renders read-only:
   // no node drags, no new connections, no marquee selection (still
   // selectable so the lightbox/preview affordances work, just no
@@ -1061,11 +1062,11 @@ const Inner = () => {
     const all = useWorkspaceStore.getState().current?.nodes ?? [];
     const p = getNodePreview(node, all);
     if (!p) {
-      toast.error("No preview available");
+      toast.error(t("workspace.canvas.noPreviewAvailable"));
       return;
     }
     setPreview(p);
-  }, []);
+  }, [t]);
 
   const uploadTransformedFile = useCallback(
     async (file: File) => {
@@ -1094,7 +1095,7 @@ const Inner = () => {
 
       if (action === "crop") {
         if (!p || p.type !== "image" || !p.url) {
-          toast.error("Crop is available for image nodes only.");
+          toast.error(t("workspace.canvas.cropImageOnly"));
           return;
         }
         setQuickCrop({ src: p.url, label });
@@ -1102,32 +1103,36 @@ const Inner = () => {
       }
 
       if (!p || p.type !== "video" || !p.url) {
-        toast.error("This action is available for video nodes only.");
+        toast.error(t("workspace.canvas.actionVideoOnly"));
         return;
       }
 
       const toastId = toast.loading(
-        action === "export-audio" ? "Exporting audio..." : "Removing audio...",
+        action === "export-audio"
+          ? t("workspace.canvas.exportingAudio")
+          : t("workspace.canvas.removingAudio"),
       );
       try {
         if (action === "export-audio") {
           const audioBlob = await extractAudioBlobFromVideo(p.url);
           await uploadTransformedFile(buildExtractedAudioFile(audioBlob, label));
-          toast.success("Audio asset added to canvas.", { id: toastId });
+          toast.success(t("workspace.canvas.audioAssetAdded"), { id: toastId });
           return;
         }
 
         const mutedVideoBlob = await removeAudioFromVideoBlob(p.url);
         await uploadTransformedFile(buildMutedVideoFile(mutedVideoBlob, label));
-        toast.success("Muted video asset added to canvas.", { id: toastId });
+        toast.success(t("workspace.canvas.mutedVideoAdded"), { id: toastId });
       } catch (err) {
         toast.error(
-          err instanceof Error ? err.message : "Could not process this video.",
+          err instanceof Error
+            ? friendlyError(err.message, language === "th" ? "th" : "en")
+            : t("workspace.canvas.videoProcessFailed"),
           { id: toastId },
         );
       }
     },
-    [uploadTransformedFile],
+    [uploadTransformedFile, t, language],
   );
 
   useEffect(() => {

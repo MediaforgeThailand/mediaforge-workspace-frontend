@@ -1305,7 +1305,7 @@ export default function StandaloneGenerator({
       }
       toast.success(t("workspace.toast.reference_uploaded"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err));
+      toast.error(friendlyError(err, language === "th" ? "th" : "en"));
     } finally {
       setUploading(null);
     }
@@ -1375,7 +1375,7 @@ export default function StandaloneGenerator({
       applyUploadedReference(slot, uploaded);
       toast.success(t("workspace.toast.reference_uploaded"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err));
+      toast.error(friendlyError(err, language === "th" ? "th" : "en"));
     } finally {
       setUploading(null);
     }
@@ -1785,7 +1785,7 @@ export default function StandaloneGenerator({
       });
       toast.success(t("workspace.toast.reference_uploaded"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err));
+      toast.error(friendlyError(err, language === "th" ? "th" : "en"));
     } finally {
       setUploading(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
