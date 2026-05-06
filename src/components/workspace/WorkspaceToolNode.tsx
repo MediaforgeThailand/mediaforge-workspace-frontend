@@ -21,7 +21,7 @@ import {
 } from "@xyflow/react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ChevronLeft, ChevronRight, Film, Loader2, Play, RotateCw, Sparkles, Scissors, Combine, FileVideo,
+  ChevronLeft, ChevronRight, Film, Loader2, Pause, Play, RotateCw, Sparkles, Scissors, Combine, FileVideo,
   Maximize2, Box, Image as ImageIcon, Music,
   type LucideIcon,
 } from "lucide-react";
@@ -35,6 +35,7 @@ import { friendlyError } from "@/lib/friendlyError";
 
 import { type ParamDef } from "@/components/flow/nodes/nodeApiSchema";
 import { useNodeCreditCosts as useCreatorCreditCosts } from "@/hooks/useNodeCreditCosts";
+import { useVoicePreview, type VoicePreviewProvider } from "@/hooks/useVoicePreview";
 import { calculateNodeCost } from "@/lib/nodeCostCalculator";
 import PromptMentionTextarea from "@/components/flow/nodes/PromptMentionTextarea";
 import MultiShotBuilder, {
@@ -61,6 +62,7 @@ import {
 import NodeResultDialog from "./NodeResultDialog";
 import { RunTimer } from "./RunTimer";
 import type { Generation } from "./NodeResultBar";
+import { AudioPlayButton } from "./AudioPlayButton";
 // Voice catalog imports were removed when the hardcoded preset
 // lists were deleted. Audio gen nodes no longer surface a voice
 // picker on the canvas — backend uses its own per-provider default.
@@ -106,6 +108,58 @@ const PROMPT_MIN_EDIT_H = 38;
 const PROMPT_MAX_EDIT_H = 240;
 const SEEDANCE_REF_VIDEO_MIN_SEC = 2;
 const SEEDANCE_REF_VIDEO_MAX_SEC = 15;
+
+/**
+ * Inline ▶ pill that auditions a TTS voice via the `voice-preview`
+ * edge function. Renders next to the Voice MiniSelect in the audio
+ * gen node's compact toolbar so creators can sample a speaker before
+ * committing to a full render. Cached per voice, free (no credits).
+ */
+function VoicePreviewPill({
+  provider,
+  voiceId,
+}: {
+  provider: VoicePreviewProvider;
+  voiceId: string;
+}) {
+  const { playingId, loadingId, play } = useVoicePreview(provider);
+  const isPlaying = playingId === voiceId;
+  const isLoading = loadingId === voiceId;
+  const handleClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!voiceId) return;
+    try {
+      await play(voiceId);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Couldn't play voice preview",
+      );
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      title={isPlaying ? `Stop ${voiceId} preview` : `Play ${voiceId} preview`}
+      aria-label={
+        isPlaying ? `Stop ${voiceId} preview` : `Play ${voiceId} preview`
+      }
+      className={cn(
+        "ws-mini-select-trigger nodrag",
+        "px-[10px]",
+        isPlaying && "!bg-amber-300/20 !text-amber-200",
+      )}
+    >
+      {isLoading ? (
+        <Loader2 className="h-3 w-3 animate-spin" />
+      ) : isPlaying ? (
+        <Pause className="h-3 w-3" />
+      ) : (
+        <Play className="h-3 w-3" />
+      )}
+    </button>
+  );
+}
 
 function isSeedanceV2VideoModel(model: string | undefined): boolean {
   const m = String(model ?? "").toLowerCase();
@@ -2346,6 +2400,29 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             />
           );
         }
+        // Gemini TTS voice picker: pair the searchable MiniSelect with
+        // a ▶ preview pill so creators can audition a speaker without
+        // running the full audio gen. The preview hits the
+        // `voice-preview` edge fn (cached per voice in Storage).
+        if (
+          param.key === "voice" &&
+          typeof selectedModel === "string" &&
+          selectedModel.startsWith("gemini-")
+        ) {
+          return (
+            <span key={param.key} className="contents">
+              <MiniSelect
+                value={String(value)}
+                options={effectiveOptions}
+                optionLabels={localizedEffectiveLabels}
+                onChange={(v) => updateParam(param.key, v)}
+                searchable
+                searchFooter="All preset voices"
+              />
+              <VoicePreviewPill provider="gemini" voiceId={String(value)} />
+            </span>
+          );
+        }
         return (
           <MiniSelect
             key={param.key}
@@ -2512,7 +2589,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           onDelete={!isViewer && selected ? onDeleteNode : undefined}
           nodeId={id}
           mediaKind={
-            currentGen?.type === "image" || currentGen?.type === "video"
+            currentGen?.type === "image" || currentGen?.type === "video" || currentGen?.type === "audio"
               ? currentGen.type
               : null
           }
@@ -2521,9 +2598,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               ? (previewImageUrl ?? currentGen.url ?? null)
               : currentGen?.type === "video"
                 ? (currentGen.url ?? null)
-                : currentGen?.model_url
-                  ? (previewImageUrl ?? currentGen.url ?? null)
-                  : null
+                : currentGen?.type === "audio"
+                  ? (currentGen.url ?? null)
+                  : currentGen?.model_url
+                    ? (previewImageUrl ?? currentGen.url ?? null)
+                    : null
           }
           mediaFileName={schema.displayName}
           mediaCreatedAt={currentGen?.createdAt ?? null}
@@ -2645,6 +2724,40 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           {currentGen?.type === "text" && (
             <div className="max-h-[220px] overflow-y-auto p-3 text-[11px] leading-snug text-white/80">
               {currentGen.text}
+            </div>
+          )}
+          {currentGen?.type === "audio" && currentGen.url && (
+            <div className="ws-compact-audio-preview">
+              <div className="ws-compact-audio-card nodrag">
+                <div className="ws-compact-audio-icon">
+                  <Music className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-semibold leading-[18px] text-white">
+                    {t("workspace.toolnames.audio_gen")}
+                  </div>
+                  <div className="mt-1 h-[18px] overflow-hidden rounded-full bg-white/[0.08]">
+                    <div className="flex h-full items-center gap-[3px] px-2">
+                      {Array.from({ length: 24 }).map((_, index) => (
+                        <span
+                          key={index}
+                          className="block w-[3px] rounded-full bg-amber-300/70"
+                          style={{
+                            height: `${6 + ((index * 7) % 12)}px`,
+                            opacity: 0.35 + ((index % 5) * 0.12),
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <AudioPlayButton
+                  src={currentGen.url}
+                  label={t("workspace.common.playAudio")}
+                  className="shrink-0"
+                  buttonClassName="h-10 w-10 shadow-[0_10px_24px_-14px_rgba(255,255,255,.8)]"
+                />
+              </div>
             </div>
           )}
           {!currentGen && <div className="ws-compact-preview-empty" />}

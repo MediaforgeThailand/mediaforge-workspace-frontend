@@ -19,6 +19,8 @@ import {
   ImagePlus,
   Loader2,
   Menu,
+  Pause,
+  Play,
   Plus,
   Search,
   Sparkles,
@@ -86,6 +88,7 @@ import {
   videoSupportsStartEndFrames,
 } from "./standaloneGenerationCatalog";
 import { GEMINI_TTS_VOICES, DEFAULT_GEMINI_TTS_VOICE } from "./workspaceSchema";
+import { useVoicePreview } from "@/hooks/useVoicePreview";
 import { orderModelsByRecommendation } from "./modelDisplay";
 import MediaContextMenu, {
   type MediaContextMenuItem,
@@ -3859,7 +3862,11 @@ function VoiceSettingsControls({
  *  shipped by Google. We keep the same compact grid feel as the
  *  ElevenLabs picker so the voice gen panel reads consistently. The
  *  voice list lives in `workspaceSchema.GEMINI_TTS_VOICES` and is
- *  validated server-side by `executeGeminiTts`. */
+ *  validated server-side by `executeGeminiTts`.
+ *
+ *  Each card hosts a ▶ button that hits the `voice-preview` edge
+ *  function for a 12-word sample of that speaker — cached per-voice
+ *  in Storage so the second click is an instant CDN hit. */
 function GeminiVoicePicker({
   value,
   onChange,
@@ -3867,6 +3874,17 @@ function GeminiVoicePicker({
   value: string;
   onChange: (voiceName: string) => void;
 }) {
+  const { playingId, loadingId, play } = useVoicePreview("gemini");
+  const handlePreview = async (event: React.MouseEvent, voiceName: string) => {
+    event.stopPropagation();
+    try {
+      await play(voiceName);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Couldn't play voice preview",
+      );
+    }
+  };
   return (
     <div>
       <FieldLabel
@@ -3876,13 +3894,15 @@ function GeminiVoicePicker({
       <div className="ws-scroll-hide mt-2 grid max-h-[270px] grid-cols-3 gap-2 overflow-y-auto pr-0.5">
         {GEMINI_TTS_VOICES.map((voiceName) => {
           const active = value === voiceName;
+          const isPlaying = playingId === voiceName;
+          const isLoading = loadingId === voiceName;
           return (
             <button
               key={voiceName}
               type="button"
               onClick={() => onChange(voiceName)}
               className={cn(
-                "flex min-h-[58px] flex-col items-start justify-center rounded-lg border border-dashed px-3 py-2 text-left transition",
+                "relative flex min-h-[58px] flex-col items-start justify-center rounded-lg border border-dashed px-3 py-2 pr-9 text-left transition",
                 active
                   ? "border-amber-300/50 bg-amber-300/10"
                   : "border-white/[0.12] bg-[#242424] hover:bg-[#2d2d2d]",
@@ -3899,6 +3919,38 @@ function GeminiVoicePicker({
               </span>
               <span className="mt-1.5 block w-full truncate text-[11px] font-bold text-white">
                 {voiceName}
+              </span>
+              {/* Preview ▶ — sits in the top-right of the card. We
+               *  render a real <span role="button"> instead of a nested
+               *  <button> because nested buttons are invalid HTML and
+               *  cause hydration warnings. The outer card click is
+               *  stopped via the handler, so card selection only fires
+               *  when the user clicks the body of the card, not the
+               *  preview affordance. */}
+              <span
+                role="button"
+                tabIndex={0}
+                aria-label={isPlaying ? `Stop ${voiceName} preview` : `Play ${voiceName} preview`}
+                onClick={(e) => void handlePreview(e, voiceName)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.stopPropagation();
+                    void handlePreview(e as unknown as React.MouseEvent, voiceName);
+                  }
+                }}
+                className={cn(
+                  "absolute right-2 top-2 grid h-6 w-6 cursor-pointer place-items-center rounded-full transition",
+                  "bg-white/[0.08] text-zinc-200 hover:bg-white/[0.16] hover:text-white",
+                  isPlaying && "bg-amber-300/30 text-amber-200",
+                )}
+              >
+                {isLoading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : isPlaying ? (
+                  <Pause className="h-3 w-3" />
+                ) : (
+                  <Play className="h-3 w-3" />
+                )}
               </span>
             </button>
           );
