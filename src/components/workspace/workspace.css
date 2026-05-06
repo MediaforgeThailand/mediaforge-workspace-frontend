@@ -786,6 +786,8 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
 .react-flow__node:hover .ws-compact-run-anchor,
 .react-flow__node.selected .ws-compact-run-anchor,
 .react-flow__node .ws-compact-run-anchor:focus-within,
+.ws-clean-node[data-status="processing"] .ws-compact-run-anchor,
+.ws-clean-node[data-status="error"] .ws-compact-run-anchor,
 .react-flow__node:has(.ws-compact-prompt-overlay:focus-within) .ws-compact-run-anchor {
   opacity: 1;
   transform: translateY(0);

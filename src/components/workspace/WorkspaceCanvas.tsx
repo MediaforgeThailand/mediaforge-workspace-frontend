@@ -348,29 +348,35 @@ const PASTE_FILE_EXT_BY_MIME: Record<string, string> = {
   "image/svg+xml": "svg",
 };
 
+function isClipboardMediaType(type: string): boolean {
+  const lower = type.toLowerCase();
+  return (
+    lower.startsWith("image/") ||
+    lower.startsWith("video/") ||
+    lower.startsWith("audio/")
+  );
+}
+
+function pastedFileName(type: string, index: number): string {
+  const lower = type.toLowerCase();
+  const kind = lower.startsWith("video/")
+    ? "video"
+    : lower.startsWith("audio/")
+      ? "audio"
+      : "image";
+  const ext =
+    PASTE_FILE_EXT_BY_MIME[lower] ??
+    lower.split("/")[1]?.replace(/[^a-z0-9]/gi, "") ??
+    "png";
+  return `pasted-${kind}-${Date.now()}-${index + 1}.${ext}`;
+}
+
 function normalizeClipboardFile(file: File, index: number): File {
   if (file.name && file.name.trim()) return file;
-  const ext =
-    PASTE_FILE_EXT_BY_MIME[file.type] ??
-    file.type.split("/")[1]?.replace(/[^a-z0-9]/gi, "") ??
-    "png";
-  return new File([file], `pasted-image-${Date.now()}-${index + 1}.${ext}`, {
+  return new File([file], pastedFileName(file.type || "image/png", index), {
     type: file.type || "image/png",
     lastModified: Date.now(),
   });
-}
-
-function isEditablePasteTarget(target: EventTarget | null): boolean {
-  const el = target instanceof HTMLElement ? target : null;
-  if (!el) return false;
-  const tag = el.tagName;
-  return (
-    tag === "INPUT" ||
-    tag === "TEXTAREA" ||
-    tag === "SELECT" ||
-    el.isContentEditable ||
-    el.closest('[contenteditable="true"], input, textarea, select') != null
-  );
 }
 
 function clipboardFiles(event: ClipboardEvent): File[] {
@@ -384,6 +390,28 @@ function clipboardFiles(event: ClipboardEvent): File[] {
     .map((item) => item.getAsFile())
     .filter((file): file is File => Boolean(file))
     .map((file, index) => normalizeClipboardFile(file, index));
+}
+
+async function asyncClipboardFiles(): Promise<File[]> {
+  if (!navigator.clipboard?.read) return [];
+  try {
+    const items = await navigator.clipboard.read();
+    const files: File[] = [];
+    for (const item of items) {
+      const type = item.types.find(isClipboardMediaType);
+      if (!type) continue;
+      const blob = await item.getType(type);
+      files.push(
+        new File([blob], pastedFileName(blob.type || type, files.length), {
+          type: blob.type || type,
+          lastModified: Date.now(),
+        }),
+      );
+    }
+    return files;
+  } catch {
+    return [];
+  }
 }
 
 const nodeTypes = {
@@ -1671,22 +1699,11 @@ const Inner = () => {
    * Copied screenshots and copied image files arrive as File blobs on
    * ClipboardEvent.clipboardData. Route them through the same upload
    * path as drag/drop so storage upload, signed URLs, grouping, and
-   * AssetNode state all stay consistent. Text paste inside prompts or
-   * form fields is left alone. */
+   * AssetNode state all stay consistent. Text paste still falls through
+   * because we only preventDefault after finding media files. */
   useEffect(() => {
-    const onPaste = (event: ClipboardEvent) => {
-      if (isViewer || isEditablePasteTarget(event.target)) return;
+    const pasteFilesAtViewportCentre = (files: File[]) => {
       if (!wrapperRef.current) return;
-      const files = clipboardFiles(event).filter((file) => {
-        const type = file.type.toLowerCase();
-        return (
-          type.startsWith("image/") ||
-          type.startsWith("video/") ||
-          type.startsWith("audio/")
-        );
-      });
-      if (files.length === 0) return;
-      event.preventDefault();
       const rect = wrapperRef.current.getBoundingClientRect();
       const centre = screenToFlowPosition({
         x: rect.left + rect.width / 2,
@@ -1709,6 +1726,29 @@ const Inner = () => {
           ? "Pasted media added to canvas"
           : `${files.length} pasted media files added to canvas`,
       );
+    };
+
+    const onPaste = (event: ClipboardEvent) => {
+      if (isViewer) return;
+      const files = clipboardFiles(event).filter((file) =>
+        isClipboardMediaType(file.type),
+      );
+      if (files.length > 0) {
+        event.preventDefault();
+        pasteFilesAtViewportCentre(files);
+        return;
+      }
+
+      // Snipping Tool and some browser/image apps put bitmap data on the
+      // Async Clipboard API instead of ClipboardEvent.files. Try that path too
+      // so copied screenshots paste just like copied files.
+      void asyncClipboardFiles().then((asyncFiles) => {
+        const mediaFiles = asyncFiles.filter((file) =>
+          isClipboardMediaType(file.type),
+        );
+        if (mediaFiles.length === 0) return;
+        pasteFilesAtViewportCentre(mediaFiles);
+      });
     };
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);

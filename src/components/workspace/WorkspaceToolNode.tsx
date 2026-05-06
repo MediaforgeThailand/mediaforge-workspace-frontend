@@ -914,8 +914,16 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   // hotkey binding can't bypass the UI.
   const isViewer = useWorkspaceShareRole(selectIsViewer);
 
+  const isNodeCurrentlyProcessing = useCallback(() => {
+    const current =
+      useWorkspaceStore.getState().current?.nodes.find((node) => node.id === id) ??
+      getNodes().find((node) => node.id === id);
+    const currentStatus = (current?.data as NodeData | undefined)?.status;
+    return currentStatus === "processing";
+  }, [getNodes, id]);
+
   const runNode = useCallback(async () => {
-    if (runInFlightRef.current || isRunning) return;
+    if (runInFlightRef.current || isNodeCurrentlyProcessing()) return;
     if (isViewer) {
       toast.info(t("workspace.toolNode.viewOnlyRunsDisabled"));
       return;
@@ -1769,7 +1777,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       setOptimisticRun(null);
       runInFlightRef.current = false;
     }
-  }, [getNodes, id, isRunning, isViewer, params, schemaKey, patchNodeDataNow, selectedModel, schema, d.params?.nodeName, language, t]);
+  }, [getNodes, id, isNodeCurrentlyProcessing, isViewer, params, schemaKey, patchNodeDataNow, selectedModel, schema, d.params?.nodeName, language, t]);
 
   useEffect(() => {
     if (!isRunning) return;
@@ -1834,7 +1842,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         void runNode();
         return;
       }
-      if (runInFlightRef.current || isRunning || isViewer) return;
+      if (runInFlightRef.current || isNodeCurrentlyProcessing() || isViewer) return;
 
       const sourceNode = getNodes().find((node) => node.id === id) as Node | undefined;
       if (!sourceNode) return;
@@ -1876,7 +1884,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       void runNode();
       toast.success(`Generating ${n} variations in parallel`);
     },
-    [getEdges, getNodes, id, isRunning, isViewer, runNode, setEdges, setNodes],
+    [getEdges, getNodes, id, isNodeCurrentlyProcessing, isViewer, runNode, setEdges, setNodes],
   );
 
   useEffect(() => {
@@ -2886,18 +2894,23 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
            *  reads it as part of the same "controls reveal" gesture.
            *  Lives outside .ws-compact-prompt-overlay so it doesn't
            *  inherit the prompt's dynamic-lift behaviour. */}
-          {showInteractiveControls && !isMultiShot && (
+          {!isMultiShot && (
             <div className="ws-compact-run-anchor">
               <Tooltip delayDuration={150}>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
+                    onPointerDownCapture={(e) => {
+                      e.stopPropagation();
+                    }}
+                    onMouseDownCapture={(e) => {
+                      e.stopPropagation();
+                    }}
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
                       runMultiGen(multiGenCount);
                     }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onPointerDown={(e) => e.stopPropagation()}
                     disabled={isRunning || isViewer}
                     className={cn(
                       "ws-compact-run nodrag",
