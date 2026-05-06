@@ -464,6 +464,19 @@ interface StandaloneFormState {
   voiceSimilarity: number;
   /** ElevenLabs voice_settings.style (0–1). */
   voiceStyleAmount: number;
+  /** Gemini-only audio tag presets. The picker on the standalone tool
+   *  bar maps these onto bracketed audio tags (e.g. `[whispers]`,
+   *  `[laughs]`) that get prepended to the script before the run
+   *  request leaves the client — see `composeGeminiAudioTagPrefix`.
+   *  Empty array means "no preset emotion/personality" — the user
+   *  can still type tags directly into the script field. */
+  audioTagsEmotion: string[];
+  audioTagsPersonality: string[];
+  /** Speed bucket — emits a single bracketed tag (`[very slow]` /
+   *  `[very fast]`) when not on `normal`. We discrete-segment instead
+   *  of mapping a numeric slider so the on-wire value stays one of
+   *  the documented Gemini tag tokens. */
+  audioSpeed: "very_slow" | "normal" | "very_fast";
   modelImage: UploadedRef | null;
   modelImages: UploadedRef[];
   texture: boolean;
@@ -487,7 +500,67 @@ const DEFAULT_VOICE_PARAMS = {
   voiceStability: 0.55,
   voiceSimilarity: 0.20,
   voiceStyleAmount: 0.30,
+  audioTagsEmotion: [] as string[],
+  audioTagsPersonality: [] as string[],
+  audioSpeed: "normal" as const,
 };
+
+/** Gemini audio-tag catalogue. The string in `tag` is the literal
+ *  token Gemini's TTS spec accepts inside `[...]` — keep these in
+ *  English even when the script is Thai (Google parses the brackets
+ *  before passing the rest of the prompt to the language model).
+ *  The Thai sublabel is just UX flavour for our pickers.
+ *
+ *  Source: https://ai.google.dev/gemini-api/docs/speech-generation
+ *  (verified May 2026).
+ */
+const GEMINI_EMOTION_TAGS: Array<{ tag: string; label: string; sub: string }> = [
+  { tag: "whispers", label: "Whispers", sub: "กระซิบ" },
+  { tag: "shouting", label: "Shouting", sub: "ตะโกน" },
+  { tag: "laughs", label: "Laughs", sub: "หัวเราะ" },
+  { tag: "sighs", label: "Sighs", sub: "ถอนหายใจ" },
+  { tag: "crying", label: "Crying", sub: "ร้องไห้" },
+  { tag: "excited", label: "Excited", sub: "ตื่นเต้น" },
+];
+const GEMINI_PERSONALITY_TAGS: Array<{ tag: string; label: string; sub: string }> = [
+  { tag: "sarcastically", label: "Sarcastic", sub: "ประชด" },
+  { tag: "dramatically", label: "Dramatic", sub: "ดราม่า" },
+  { tag: "robotically", label: "Robotic", sub: "หุ่นยนต์" },
+  { tag: "like a cartoon dog", label: "Cartoon dog", sub: "หมาการ์ตูน" },
+  { tag: "like dracula", label: "Dracula", sub: "แดร็กคูล่า" },
+  { tag: "calmly", label: "Calm", sub: "ใจเย็น" },
+];
+const GEMINI_SPEED_OPTIONS: Array<{
+  id: "very_slow" | "normal" | "very_fast";
+  label: string;
+  tag: string | null;
+}> = [
+  { id: "very_slow", label: "Slow", tag: "very slow" },
+  { id: "normal", label: "Normal", tag: null },
+  { id: "very_fast", label: "Fast", tag: "very fast" },
+];
+
+/** Combine the picker selections into the bracketed prefix Gemini
+ *  honours. Empty selections collapse to no prefix at all so a user
+ *  who hasn't touched the picker isn't forced into any tone. We
+ *  group emotion + personality into a single `[..., ...]` block
+ *  (Gemini accepts comma-separated tags) and emit speed as a
+ *  separate tag block — that matches the examples in Google's
+ *  speech-generation guide. */
+function composeGeminiAudioTagPrefix(args: {
+  emotion: string[];
+  personality: string[];
+  speed: "very_slow" | "normal" | "very_fast";
+}): string {
+  const tags = [...args.emotion, ...args.personality]
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const blocks: string[] = [];
+  if (tags.length > 0) blocks.push(`[${tags.join(", ")}]`);
+  const speedTag = GEMINI_SPEED_OPTIONS.find((o) => o.id === args.speed)?.tag;
+  if (speedTag) blocks.push(`[${speedTag}]`);
+  return blocks.join(" ");
+}
 
 const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
   image_gen: {
@@ -3853,6 +3926,18 @@ function VoiceSettingsControls({
           onChange={(voice) => onChange({ voice })}
         />
       )}
+      {provider === "gemini" && (
+        <GeminiAudioTagsPanel
+          emotion={form.audioTagsEmotion}
+          personality={form.audioTagsPersonality}
+          speed={form.audioSpeed}
+          onChangeEmotion={(audioTagsEmotion) => onChange({ audioTagsEmotion })}
+          onChangePersonality={(audioTagsPersonality) =>
+            onChange({ audioTagsPersonality })
+          }
+          onChangeSpeed={(audioSpeed) => onChange({ audioSpeed })}
+        />
+      )}
       {provider !== "elevenlabs" && (
         <TextInputField
           label={t("workspace.standalone.voice_instructions")}
@@ -3965,6 +4050,141 @@ function GeminiVoicePicker({
                   <Play className="h-3 w-3" />
                 )}
               </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Gemini audio-tag picker — emotion + personality chips (multi-
+ *  select) + a 3-stop speed segment. Selections compose a bracketed
+ *  prefix that gets prepended to the script before the run request
+ *  (see `composeGeminiAudioTagPrefix`). The user can still type
+ *  inline `[whispers]` etc. directly in the script for finer control;
+ *  this panel covers the common, "set the whole clip's vibe" case
+ *  with no manual typing.
+ *
+ *  Live preview shows the exact bracket prefix that will be sent so
+ *  there's no surprise about what tags reach Gemini. */
+function GeminiAudioTagsPanel({
+  emotion,
+  personality,
+  speed,
+  onChangeEmotion,
+  onChangePersonality,
+  onChangeSpeed,
+}: {
+  emotion: string[];
+  personality: string[];
+  speed: "very_slow" | "normal" | "very_fast";
+  onChangeEmotion: (next: string[]) => void;
+  onChangePersonality: (next: string[]) => void;
+  onChangeSpeed: (next: "very_slow" | "normal" | "very_fast") => void;
+}) {
+  const toggle = (
+    list: string[],
+    tag: string,
+    onChange: (next: string[]) => void,
+  ) => {
+    onChange(list.includes(tag) ? list.filter((t) => t !== tag) : [...list, tag]);
+  };
+  const prefix = composeGeminiAudioTagPrefix({ emotion, personality, speed });
+  return (
+    <div className="rounded-xl bg-white/[0.04] px-3 py-3">
+      <div className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+        Audio tags
+      </div>
+      <p className="mt-1 text-[11.5px] text-zinc-500">
+        เลือกอารมณ์ / บุคลิก / ความเร็ว — Gemini จะใช้ tag ในวงเล็บเพื่อปรับการอ่าน
+      </p>
+
+      <TagChipRow
+        title="อารมณ์ / Emotion"
+        items={GEMINI_EMOTION_TAGS}
+        selected={emotion}
+        onToggle={(tag) => toggle(emotion, tag, onChangeEmotion)}
+      />
+      <TagChipRow
+        title="บุคลิก / Personality"
+        items={GEMINI_PERSONALITY_TAGS}
+        selected={personality}
+        onToggle={(tag) => toggle(personality, tag, onChangePersonality)}
+      />
+
+      <div className="mt-3">
+        <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+          ความเร็ว / Speed
+        </div>
+        <div className="mt-1.5 inline-flex w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[11.5px]">
+          {GEMINI_SPEED_OPTIONS.map((opt) => {
+            const active = speed === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => onChangeSpeed(opt.id)}
+                className={cn(
+                  "flex-1 rounded-md px-2 py-1.5 text-center transition-colors",
+                  active
+                    ? "bg-white/[0.10] text-zinc-50"
+                    : "text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100",
+                )}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {prefix ? (
+        <div className="mt-3 rounded-md bg-black/35 px-2.5 py-1.5 font-mono text-[11px] text-amber-200/90">
+          {prefix} <span className="text-zinc-500">+ script</span>
+        </div>
+      ) : (
+        <div className="mt-3 text-[11px] italic text-zinc-600">
+          (ยังไม่ได้เลือก audio tag — Gemini จะอ่านตาม voice ที่เลือกอย่างเดียว)
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TagChipRow({
+  title,
+  items,
+  selected,
+  onToggle,
+}: {
+  title: string;
+  items: Array<{ tag: string; label: string; sub: string }>;
+  selected: string[];
+  onToggle: (tag: string) => void;
+}) {
+  return (
+    <div className="mt-3">
+      <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+        {title}
+      </div>
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {items.map((item) => {
+          const active = selected.includes(item.tag);
+          return (
+            <button
+              key={item.tag}
+              type="button"
+              onClick={() => onToggle(item.tag)}
+              title={item.sub}
+              className={cn(
+                "rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
+                active
+                  ? "bg-amber-300/20 text-amber-200 ring-1 ring-amber-300/30"
+                  : "bg-white/[0.05] text-zinc-300 hover:bg-white/[0.10] hover:text-white",
+              )}
+            >
+              {item.label}
             </button>
           );
         })}
@@ -6106,9 +6326,24 @@ function buildCurrentParams(
     });
   }
   if (tool === "voice_gen") {
+    // Prepend the picker-composed audio tag block to the user's
+    // script for Gemini models. Other providers ignore the bracketed
+    // tags (ElevenLabs interprets them differently and Google Cloud
+    // TTS treats them as literal text), so we only inject for Gemini.
+    const isGemini = form.model.startsWith("gemini-");
+    const tagPrefix = isGemini
+      ? composeGeminiAudioTagPrefix({
+          emotion: form.audioTagsEmotion,
+          personality: form.audioTagsPersonality,
+          speed: form.audioSpeed,
+        })
+      : "";
+    const composedScript = tagPrefix
+      ? `${tagPrefix} ${form.script}`.trim()
+      : form.script;
     return buildAudioParams({
       model: form.model,
-      script: form.script,
+      script: composedScript,
       voice: form.voice,
       stylePrompt: form.voiceStyle,
       voiceStylePreset: form.voiceStylePreset,
