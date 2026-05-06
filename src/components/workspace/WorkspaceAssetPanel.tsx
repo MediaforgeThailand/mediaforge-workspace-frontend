@@ -551,6 +551,7 @@ const AssetTile = ({
   asset: PanelAsset;
   onDeleteElement?: () => void;
 }) => {
+  const { t: i18n } = useLanguage();
   // The URL we store in node.data was signed with whatever TTL was
   // active at upload time. If it's expired, the hook re-signs in
   // the background and swaps in the fresh URL.

@@ -64,7 +64,7 @@ const TEAM_CREDITS_PER_SEAT_MONTH = TEAM_BASE_CREDITS_PER_SEAT_MONTH + TEAM_PROM
 const Settings = () => {
   useDocumentTitle("Settings — MediaForge");
   const { profile, user, refreshProfile } = useAuth();
-  const { t, language, setLanguage } = useLanguage();
+  const { t, t: i18n, language, setLanguage } = useLanguage();
   const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();

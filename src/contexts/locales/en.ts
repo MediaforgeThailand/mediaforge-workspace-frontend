@@ -2134,6 +2134,7 @@ export const en = {
     // ─── Workspace shell (Wave 4 i18n) ────────────────────────
     // Sidebar
     "workspace.sidebar.home": "Home",
+    "workspace.sidebar.library": "Library",
     "workspace.sidebar.projects": "Projects",
     "workspace.sidebar.all_assets": "All assets",
     "workspace.sidebar.stock": "Stock",
