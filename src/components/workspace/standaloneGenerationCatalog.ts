@@ -151,6 +151,20 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
         description: "Higher quality Banana with 4K support and Flex tier control.",
       },
       {
+        id: "replicate-nano-banana-2",
+        label: "Nano Banana 2",
+        provider: "Replicate",
+        badge: "Fallback",
+        description: "Replicate-routed Banana 2 with the same visible controls.",
+      },
+      {
+        id: "replicate-nano-banana-pro",
+        label: "Nano Banana Pro",
+        provider: "Replicate",
+        badge: "Fallback",
+        description: "Replicate-routed Banana Pro with the same visible controls.",
+      },
+      {
         id: "seedream-5-0-260128",
         label: "SeedDream 5.0",
         provider: "BytePlus",
@@ -177,6 +191,13 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
         provider: "OpenAI",
         badge: "4K",
         description: "Best for precise style and quality control.",
+      },
+      {
+        id: "replicate-gpt-image-2",
+        label: "GPT Image 2",
+        provider: "Replicate",
+        badge: "Fallback",
+        description: "Replicate-routed GPT Image 2 with the same visible controls.",
       },
     ],
   },
@@ -232,6 +253,27 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
         badge: "Omni",
         description: "Multi-input Kling 3 with audio and video reference.",
       },
+      {
+        id: "replicate-kling-v3-pro",
+        label: "Kling 3.0 Pro",
+        provider: "Replicate",
+        badge: "Fallback",
+        description: "Replicate-routed Kling 3 Pro with the same visible controls.",
+      },
+      {
+        id: "replicate-kling-v3-motion-pro",
+        label: "Kling 3.0 Motion Pro",
+        provider: "Replicate",
+        badge: "Fallback",
+        description: "Replicate-routed Kling 3 motion control.",
+      },
+      {
+        id: "replicate-kling-v3-omni",
+        label: "Kling 3.0 Omni",
+        provider: "Replicate",
+        badge: "Fallback",
+        description: "Replicate-routed Kling 3 Omni with the same visible controls.",
+      },
       // ── Seedance family ────────────────────────────────────
       {
         id: "seedance-1-0-pro-250528",
@@ -269,6 +311,20 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
         description: "Latest Seedance 2.0 — premium quality.",
       },
       // ── Google Veo family (Standard tier only) ─────────────
+      {
+        id: "replicate-seedance-2-0",
+        label: "SeedDance 2.0",
+        provider: "Replicate",
+        badge: "Fallback",
+        description: "Replicate-routed Seedance 2.0 with the same visible controls.",
+      },
+      {
+        id: "replicate-veo-3-1",
+        label: "Google Veo 3.1",
+        provider: "Replicate",
+        badge: "Fallback",
+        description: "Replicate-routed Veo 3.1 with optional audio.",
+      },
       {
         id: "veo-3.1-generate-001",
         label: "Google Veo 3.1",
@@ -424,13 +480,18 @@ export function isSeedreamImageModel(model: string): boolean {
 }
 
 export function isSeedanceVideoModel(model: string): boolean {
-  return model.startsWith("seedance") || model.startsWith("dreamina-seedance");
+  return (
+    model.startsWith("seedance") ||
+    model.startsWith("dreamina-seedance") ||
+    model.startsWith("replicate-seedance")
+  );
 }
 
 export function isSeedance20VideoModel(model: string): boolean {
   return (
     model === "seedance-2-0-lite" ||
     model === "seedance-2-0-pro" ||
+    model === "replicate-seedance-2-0" ||
     model === "dreamina-seedance-2-0-fast-260128" ||
     model === "dreamina-seedance-2-0-260128"
   );
@@ -440,6 +501,7 @@ export function seedanceVideoSupportsAudio(model: string): boolean {
   return (
     model.startsWith("seedance-1-5") ||
     model.startsWith("seedance-2-0") ||
+    model.startsWith("replicate-seedance") ||
     model.startsWith("dreamina-seedance-2-0")
   );
 }
@@ -451,15 +513,28 @@ export function seedanceResolutionOptionsForModel(model: string): string[] {
 }
 
 export function isKlingMotionVideoModel(model: string): boolean {
-  return model === "kling-v2-6-motion-pro" || model === "kling-v3-motion-pro";
+  return (
+    model === "kling-v2-6-motion-pro" ||
+    model === "kling-v3-motion-pro" ||
+    model === "replicate-kling-v3-motion-pro"
+  );
 }
 
 export function isKlingMultiShotVideoModel(model: string): boolean {
-  return model === "kling-v3-pro" || model === "kling-v3-omni";
+  return (
+    model === "kling-v3-pro" ||
+    model === "kling-v3-omni" ||
+    model === "replicate-kling-v3-pro" ||
+    model === "replicate-kling-v3-omni"
+  );
 }
 
 export function isVeoVideoModel(model: string): boolean {
-  return model.startsWith("veo-");
+  return model.startsWith("veo-") || model.startsWith("replicate-veo");
+}
+
+export function isReplicateVeoVideoModel(model: string): boolean {
+  return model.startsWith("replicate-veo");
 }
 
 export function videoSupportsStartEndFrames(model: string): boolean {
@@ -467,6 +542,8 @@ export function videoSupportsStartEndFrames(model: string): boolean {
     model === "kling-v2-6-pro" ||
     model === "kling-v3-pro" ||
     model === "kling-v3-omni" ||
+    model === "replicate-kling-v3-pro" ||
+    model === "replicate-kling-v3-omni" ||
     isSeedanceVideoModel(model) ||
     isVeoVideoModel(model)
   );
@@ -480,8 +557,10 @@ export function videoSupportsReferenceImage(model: string): boolean {
   return (
     isKlingMotionVideoModel(model) ||
     model === "kling-v3-omni" ||
+    model === "replicate-kling-v3-omni" ||
     model === "seedance-2-0-lite" ||
-    model === "seedance-2-0-pro"
+    model === "seedance-2-0-pro" ||
+    model === "replicate-seedance-2-0"
   );
 }
 
@@ -489,13 +568,20 @@ export function videoSupportsReferenceVideo(model: string): boolean {
   return (
     isKlingMotionVideoModel(model) ||
     model === "kling-v3-omni" ||
+    model === "replicate-kling-v3-omni" ||
     model === "seedance-2-0-lite" ||
-    model === "seedance-2-0-pro"
+    model === "seedance-2-0-pro" ||
+    model === "replicate-seedance-2-0"
   );
 }
 
 export function videoDurationsForModel(model: string): number[] {
-  if (model === "kling-v3-omni" || model === "kling-v3-pro") {
+  if (
+    model === "kling-v3-omni" ||
+    model === "kling-v3-pro" ||
+    model === "replicate-kling-v3-omni" ||
+    model === "replicate-kling-v3-pro"
+  ) {
     return [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
   }
   if (isVeoVideoModel(model)) {
@@ -505,6 +591,7 @@ export function videoDurationsForModel(model: string): number[] {
   }
   if (
     model.startsWith("seedance-2-0") ||
+    model.startsWith("replicate-seedance") ||
     model.startsWith("dreamina-seedance")
   ) {
     return [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
@@ -600,7 +687,7 @@ export function buildImageParams(args: {
     hasCharacterRef: args.hasCharacterRef,
     model: args.model,
   });
-  if (args.model === "gpt-image-2") {
+  if (args.model === "gpt-image-2" || args.model === "replicate-gpt-image-2") {
     const quality = ["low", "medium", "high"].includes(args.quality)
       ? args.quality
       : "medium";
@@ -625,7 +712,7 @@ export function buildImageParams(args: {
     };
   }
   const bananaSize =
-    args.model === "nano-banana-pro"
+    args.model === "nano-banana-pro" || args.model === "replicate-nano-banana-pro"
       ? args.resolution === "4K"
         ? "4K"
         : args.resolution === "2K"
@@ -652,6 +739,7 @@ export function buildVideoParams(args: {
   characterOrientation?: string;
   keepOriginalSound?: boolean;
   hasReferenceVideo?: boolean;
+  referenceVideoDurationSec?: number | null;
   negativePrompt?: string;
   personGeneration?: string;
   returnLastFrame?: boolean;
@@ -674,7 +762,7 @@ export function buildVideoParams(args: {
       aspect_ratio: aspect,
       resolution: res,
       duration: String(dur),
-      generate_audio: "true",
+      generate_audio: isReplicateVeoVideoModel(args.model) ? String(args.withAudio) : "true",
       person_generation:
         args.personGeneration === "allow_all" ? "allow_all" : "allow_adult",
     };
@@ -705,6 +793,11 @@ export function buildVideoParams(args: {
     };
     if (args.negativePrompt?.trim()) {
       motionParams.negative_prompt = args.negativePrompt.trim();
+    }
+    if (args.referenceVideoDurationSec && Number.isFinite(args.referenceVideoDurationSec)) {
+      const rounded = Math.max(1, Math.ceil(args.referenceVideoDurationSec));
+      motionParams._ref_video_duration = rounded;
+      motionParams.ref_video_duration = rounded;
     }
     return motionParams;
   }

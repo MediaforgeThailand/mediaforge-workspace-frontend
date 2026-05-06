@@ -922,14 +922,22 @@ function standaloneStatusLabel(status: StandaloneJobRow["status"], t: Translatio
   return t(STATUS_LABEL_KEYS[status]);
 }
 
+function isGptImageModel(model: string) {
+  return model === "gpt-image-2" || model === "replicate-gpt-image-2";
+}
+
+function isBananaProImageModel(model: string) {
+  return model === "nano-banana-pro" || model === "replicate-nano-banana-pro";
+}
+
 function imageResolutionOptionsFor(form: StandaloneFormState) {
-  if (form.model === "gpt-image-2") {
+  if (isGptImageModel(form.model)) {
     return gptImageResolutionsFor(form.aspectRatio);
   }
   if (isSeedreamImageModel(form.model)) {
     return ["2K", "3K"];
   }
-  if (form.model === "nano-banana-pro") {
+  if (isBananaProImageModel(form.model)) {
     return ["1K", "2K", "4K"];
   }
   return ["1K", "2K"];
@@ -1007,7 +1015,7 @@ export default function StandaloneGenerator({
   const imageSettings =
     activeTool === "image_gen"
       ? {
-          isGpt: form.model === "gpt-image-2",
+          isGpt: isGptImageModel(form.model),
           isSeedream: isSeedreamImageModel(form.model),
         }
       : null;
@@ -1126,7 +1134,7 @@ export default function StandaloneGenerator({
   ) => {
     const nextPatch: Partial<StandaloneFormState> = { model };
     if (activeTool === "image_gen") {
-      if (model === "gpt-image-2") {
+      if (isGptImageModel(model)) {
         nextPatch.aspectRatio = GPT_IMAGE_ASPECT_RATIOS.includes(form.aspectRatio)
           ? form.aspectRatio
           : "1:1";
@@ -1143,7 +1151,7 @@ export default function StandaloneGenerator({
       } else {
         nextPatch.aspectRatio = form.aspectRatio || "Auto";
         nextPatch.imageResolution =
-          model === "nano-banana-pro" ? "2K" : "1K";
+          isBananaProImageModel(model) ? "2K" : "1K";
       }
       nextPatch.imageRefs = form.imageRefs.slice(0, maxImageRefsForModel(model));
     }
@@ -6240,7 +6248,7 @@ function validateForm(
 
 function maxImageRefsForModel(model: string): number {
   if (isSeedreamImageModel(model)) return 14;
-  if (model === "gpt-image-2") return 16;
+  if (isGptImageModel(model)) return 16;
   return 14;
 }
 
@@ -6554,7 +6562,7 @@ function buildImagePanelSettings({
   t: TranslationFn;
   language: "en" | "th";
 }): CreateVideoPanelSetting[] {
-  const isGpt = form.model === "gpt-image-2";
+  const isGpt = isGptImageModel(form.model);
   const isSeedream = isSeedreamImageModel(form.model);
   const aspectOptions = isGpt
     ? GPT_IMAGE_ASPECT_RATIOS
@@ -6678,9 +6686,9 @@ function imageModelSettingTags(model: string, language: "en" | "th"): Array<{
   label: string;
   icon?: "reference" | "resolution";
 }> {
-  const maxRefs = model === "gpt-image-2" ? 16 : 14;
+  const maxRefs = isGptImageModel(model) ? 16 : 14;
   const referenceLabel = standaloneInlineLabel("reference", language);
-  if (model === "gpt-image-2") {
+  if (isGptImageModel(model)) {
     return [
       { label: `${referenceLabel} ${maxRefs}`, icon: "reference" },
       { label: "1K-4K", icon: "resolution" },
@@ -6694,7 +6702,7 @@ function imageModelSettingTags(model: string, language: "en" | "th"): Array<{
   }
   return [
     { label: `${referenceLabel} ${maxRefs}`, icon: "reference" },
-    { label: model === "nano-banana-pro" ? "1K-4K" : "1K-2K", icon: "resolution" },
+    { label: isBananaProImageModel(model) ? "1K-4K" : "1K-2K", icon: "resolution" },
   ];
 }
 
