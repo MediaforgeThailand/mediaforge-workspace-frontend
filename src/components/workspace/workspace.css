@@ -598,6 +598,39 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   width: 100%;
   height: auto;
 }
+.ws-compact-audio-preview {
+  min-height: 168px;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background:
+    radial-gradient(circle at 18% 20%, hsl(43 96% 56% / 0.14), transparent 34%),
+    linear-gradient(135deg, hsl(0 0% 5%), hsl(0 0% 8%));
+}
+.ws-compact-audio-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(100%, 360px);
+  min-height: 72px;
+  padding: 12px;
+  border: 1px solid hsl(0 0% 100% / 0.08);
+  border-radius: 14px;
+  background: hsl(0 0% 100% / 0.055);
+  box-shadow: 0 18px 44px -30px hsl(0 0% 0% / 0.9);
+}
+.ws-compact-audio-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  color: hsl(43 96% 68%);
+  background: hsl(43 96% 56% / 0.12);
+  border: 1px solid hsl(43 96% 56% / 0.2);
+}
 .ws-compact-preview-empty {
   display: flex;
   align-items: center;
