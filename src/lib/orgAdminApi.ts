@@ -245,13 +245,15 @@ export const consumerOrgAdminApi = {
 };
 
 // ─── Class enrolment (student-facing QR scan) ───────────────────────────
-export async function enrollInClass(code: string, studentCode: string): Promise<{
+export async function enrollInClass(code: string, studentCode?: string): Promise<{
   ok: boolean;
   error?: string;
   class_id?: string;
   class_name?: string;
   credit_policy?: string;
   starting_balance?: number;
+  student_code?: string | null;
+  needs_student_code?: boolean;
   org_id?: string;
   workspace_id?: string;
   project_id?: string;
@@ -276,4 +278,17 @@ export async function enrollInClass(code: string, studentCode: string): Promise<
   } catch {
     return { ok: false, error: `http_${res.status}` };
   }
+}
+
+export function updateSchoolProfile(input: {
+  display_name?: string;
+  avatar_url?: string | null;
+  class_id?: string;
+  student_code?: string;
+}) {
+  return call<{ profile: unknown; student_profile?: { ok?: boolean; class_id?: string; student_code?: string } | null }>(
+    "PATCH",
+    "/school/profile",
+    input,
+  );
 }

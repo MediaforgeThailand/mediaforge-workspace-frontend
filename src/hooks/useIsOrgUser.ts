@@ -97,7 +97,7 @@ export function useUserClassMemberships() {
         class_status: "active",
         org_id: row.organization_id,
         role: row.class_role === "student" ? "member" : "co",
-        student_code: null,
+        student_code: row.student_code ?? null,
         credits_balance: row.credit_balance ?? 0,
         credits_lifetime_received: row.credits_lifetime_received ?? 0,
         credits_lifetime_used: row.credits_lifetime_used ?? 0,
