@@ -23,7 +23,7 @@ import {
 type BottomTab = "video" | "image" | "3d" | "audio";
 
 function usePanelCopy() {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   return {
     video: t("createImagePanel.video"),
     image: t("createImagePanel.image"),
@@ -78,6 +78,8 @@ function usePanelCopy() {
     creating: t("createImagePanel.creating"),
     generate: t("createImagePanel.generate"),
     generating: t("createImagePanel.generating"),
+    clickToReplace:
+      language === "th" ? "คลิกเพื่อเปลี่ยน" : "Click to replace",
   };
 }
 
@@ -1176,7 +1178,7 @@ function FrameReferenceSlot({
                 {refItem.name ?? slot.label}
               </span>
               <span className="mt-[1px] block text-[10px] leading-[13px] text-neutral-500">
-                {language === "th" ? "คลิกเพื่อเปลี่ยน" : "Click to replace"}
+                {copy.clickToReplace}
               </span>
             </span>
             {slot.onRemove && (
