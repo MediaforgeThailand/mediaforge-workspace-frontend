@@ -1043,7 +1043,7 @@ export default function StandaloneGenerator({
       if (!model.startsWith("kling")) nextPatch.videoNegativePrompt = "";
       if (!isVeoVideoModel(model)) nextPatch.videoPersonGeneration = "allow_adult";
       if (!isSeedance) nextPatch.videoReturnLastFrame = false;
-      if (isSeedance && !seedanceVideoSupportsAudio(model)) nextPatch.videoWithAudio = false;
+      if (!isVeoVideoModel(model) && isSeedance && !seedanceVideoSupportsAudio(model)) nextPatch.videoWithAudio = false;
       if (!videoSupportsMultiShot(model)) {
         nextPatch.videoMultiShot = false;
         nextPatch.videoMultiPrompt = "";
@@ -3297,6 +3297,7 @@ function VideoControls({
   const isMotion = isKlingMotionVideoModel(form.model);
   const isVeo = isVeoVideoModel(form.model);
   const supportsAudioToggle =
+    isVeo ||
     (isSeedance && seedanceVideoSupportsAudio(form.model)) ||
     (!isSeedance && !isVeo && !isMotion);
   const supportsStartEnd = videoSupportsStartEndFrames(form.model);
@@ -5929,17 +5930,11 @@ function buildVideoPanelSettings({
   const isMotion = isKlingMotionVideoModel(form.model);
   const isVeo = isVeoVideoModel(form.model);
   const supportsAudioToggle =
+    isVeo ||
     (isSeedance && seedanceVideoSupportsAudio(form.model)) ||
     (!isSeedance && !isVeo && !isMotion);
 
-  if (isVeo) {
-    settings.push({
-      id: "audio",
-      label: standaloneInlineLabel("audio", language),
-      value: standaloneInlineLabel("on", language),
-      kind: "readonly",
-    });
-  } else if (supportsAudioToggle) {
+  if (supportsAudioToggle) {
     settings.push({
       id: "audio",
       label: standaloneInlineLabel("audio", language),

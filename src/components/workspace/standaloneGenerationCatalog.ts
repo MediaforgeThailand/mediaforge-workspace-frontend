@@ -274,7 +274,7 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
         label: "Google Veo 3.1",
         provider: "Google",
         badge: "Standard",
-        description: "Google Veo 3.1 with native audio — 4/6/8s at 720p, 8s at 1080p.",
+        description: "Google Veo 3.1 with optional audio — 4/6/8s at 720p, 8s at 1080p.",
       },
     ],
   },
@@ -674,7 +674,8 @@ export function buildVideoParams(args: {
       aspect_ratio: aspect,
       resolution: res,
       duration: String(dur),
-      // Audio is always-on for Veo (no toggle); withAudio arg ignored.
+      generate_audio: String(args.withAudio),
+      replicate_generate_audio: String(args.withAudio),
       person_generation:
         args.personGeneration === "allow_all" ? "allow_all" : "allow_adult",
     };
