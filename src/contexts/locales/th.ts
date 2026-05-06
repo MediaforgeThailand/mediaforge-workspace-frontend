@@ -2126,6 +2126,7 @@ export const th = {
     // ─── Workspace shell (Wave 4 i18n) ────────────────────────
     // Sidebar
     "workspace.sidebar.home": "หน้าหลัก",
+    "workspace.sidebar.library": "คลัง",
     "workspace.sidebar.projects": "โปรเจกต์",
     "workspace.sidebar.all_assets": "ไฟล์ทั้งหมด",
     "workspace.sidebar.stock": "คลังสื่อสต็อก",

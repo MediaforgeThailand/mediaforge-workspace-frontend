@@ -1424,7 +1424,9 @@ const EducationLockedToolView = ({
 }: {
   onOpenSpaces: () => void;
   onOpenSidebar?: () => void;
-}) => (
+}) => {
+  const { t: i18n } = useLanguage();
+  return (
   <>
     <PageHeader title={i18n("workspace.home.classWorkspace")} rightSlot={<UserMenu />} onOpenSidebar={onOpenSidebar} />
     <div className="flex flex-1 items-center justify-center px-5 py-10">
@@ -1446,7 +1448,8 @@ const EducationLockedToolView = ({
       </div>
     </div>
   </>
-);
+  );
+};
 
 const EducationClassDashboard = ({
   active,
@@ -1457,6 +1460,7 @@ const EducationClassDashboard = ({
   classes: ClassMembershipInfo[];
   onOpenSpaces: () => void;
 }) => {
+  const { t: i18n } = useLanguage();
   const pctUsed = active.credits_lifetime_received > 0
     ? Math.min(100, Math.round((active.credits_lifetime_used / active.credits_lifetime_received) * 100))
     : 0;
