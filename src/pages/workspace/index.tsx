@@ -1879,6 +1879,7 @@ const ProjectQuickSwitch = ({
   onSelectProject: (id: string | null) => void;
 }) => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   if (projects.length === 0) return null;
   const counts = new Map<string, number>();
   for (const workspace of workspaces) {
