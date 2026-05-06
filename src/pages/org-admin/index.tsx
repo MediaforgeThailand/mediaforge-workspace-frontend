@@ -115,6 +115,7 @@ function CreateClassButton({ orgId }: { orgId: string }) {
   const [maxStudents, setMaxStudents] = useState("42");
   const [policy, setPolicy] = useState<"manual" | "monthly_reset" | "weekly_drip">("monthly_reset");
   const [creditAmount, setCreditAmount] = useState("200");
+  const [classPool, setClassPool] = useState("10000");
 
   const navigate = useNavigate();
   const [, setParams] = useSearchParams();
@@ -128,12 +129,14 @@ function CreateClassButton({ orgId }: { orgId: string }) {
       max_students: parseInt(maxStudents, 10) || null as any,
       credit_policy: policy,
       credit_amount: parseInt(creditAmount, 10) || 0,
+      credit_pool: Math.max(0, parseInt(classPool, 10) || 0),
       primary_instructor_id: user?.id ?? null,
     } as any),
     onSuccess: ({ class: cls }) => {
       toast.success(`Class "${cls.name}" created (${cls.code})`);
       setOpen(false);
       setName("");
+      setClassPool("10000");
       qc.invalidateQueries({ queryKey: ["mf-um-class-memberships"] });
       // Jump straight into the new class detail
       setParams({ class: cls.id });
@@ -172,6 +175,19 @@ function CreateClassButton({ orgId }: { orgId: string }) {
             <div>
               <Label>Max students</Label>
               <Input type="number" value={maxStudents} onChange={(e) => setMaxStudents(e.target.value)} />
+            </div>
+            <div>
+              <Label>Class pool credits</Label>
+              <Input
+                type="number"
+                min="0"
+                value={classPool}
+                onChange={(e) => setClassPool(e.target.value)}
+                placeholder="10000"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                QR grants and manual student-space top-ups spend from this class pool.
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -267,11 +283,12 @@ function ClassDetail({ classId, onBack }: { classId: string; onBack: () => void 
 
       {/* Pool summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <SummaryCard label="Class pool" value={c.credit_pool} sub="Allocated by super admin" />
+        <SummaryCard label="Class pool" value={c.credit_pool} sub="Allocated to this class" />
         <SummaryCard label="Consumed" value={c.credit_pool_consumed} sub="By workspace runs" />
         <SummaryCard label="Remaining" value={remaining} highlight sub="Available to grant" />
         <SummaryCard label="Members" value={detail.data.active_member_count} icon={<Users className="h-4 w-4" />} />
       </div>
+      <ClassPoolTopUpCard classId={classId} remaining={remaining} onDone={refresh} />
 
       <Tabs defaultValue="members">
         <TabsList>
@@ -321,6 +338,78 @@ function ClassDetail({ classId, onBack }: { classId: string; onBack: () => void 
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function ClassPoolTopUpCard({
+  classId,
+  remaining,
+  onDone,
+}: {
+  classId: string;
+  remaining: number;
+  onDone: () => void;
+}) {
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const addPool = useMutation({
+    mutationFn: () => {
+      const parsed = parseInt(amount, 10);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        throw new Error("Enter a positive credit amount.");
+      }
+      return consumerOrgAdminApi.allocateToClass(
+        classId,
+        parsed,
+        reason.trim() || "teacher_class_pool_top_up",
+      );
+    },
+    onSuccess: (res) => {
+      toast.success(`Added ${Number(res.delta ?? amount).toLocaleString()} credits to class pool`);
+      setAmount("");
+      setReason("");
+      onDone();
+    },
+    onError: (error: any) => {
+      const message = error?.message === "organization_pool_exhausted"
+        ? "Institution pool does not have enough credits."
+        : error?.message ?? "Could not add class pool credits.";
+      toast.error(message);
+    },
+  });
+
+  return (
+    <Card className="border-emerald-500/25 bg-emerald-500/5">
+      <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-end">
+        <div className="min-w-0 flex-1">
+          <Label>Add class pool credits</Label>
+          <Input
+            type="number"
+            min="1"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="10000"
+            className="mt-1"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Current remaining: <span className="font-mono">{remaining.toLocaleString()}</span>. QR grants spend from this pool.
+          </p>
+        </div>
+        <div className="min-w-0 flex-1">
+          <Label>Reason</Label>
+          <Input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="extra workshop / makeup class"
+            className="mt-1"
+          />
+        </div>
+        <Button onClick={() => addPool.mutate()} disabled={!amount || addPool.isPending} className="md:w-[150px]">
+          {addPool.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+          Add pool
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -558,11 +647,13 @@ function CreateCodeDialog({
   open, classId, onOpenChange, onCreated,
 }: { open: boolean; classId: string; onOpenChange: (b: boolean) => void; onCreated: (c: ClassEnrollmentCode) => void }) {
   const [maxUses, setMaxUses] = useState("");
+  const [creditAmount, setCreditAmount] = useState("250");
   const [expiresMinutes, setExpiresMinutes] = useState<string>("");
   const [description, setDescription] = useState("");
   const create = useMutation({
     mutationFn: () => consumerOrgAdminApi.createCode(classId, {
       max_uses: maxUses ? parseInt(maxUses, 10) : null,
+      credit_amount: Math.max(0, parseInt(creditAmount, 10) || 0),
       expires_at: expiresMinutes
         ? new Date(Date.now() + parseInt(expiresMinutes, 10) * 60_000).toISOString()
         : null,
@@ -570,7 +661,7 @@ function CreateCodeDialog({
     }),
     onSuccess: ({ code }) => {
       toast.success(`Code ${code.code} created`);
-      setMaxUses(""); setExpiresMinutes(""); setDescription("");
+      setMaxUses(""); setCreditAmount("250"); setExpiresMinutes(""); setDescription("");
       onCreated(code);
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed"),
@@ -586,6 +677,10 @@ function CreateCodeDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
+          <div>
+            <Label>Credits per student space</Label>
+            <Input type="number" min="0" value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} placeholder="250" />
+          </div>
           <div>
             <Label>Max enrolments <span className="text-muted-foreground">(blank = unlimited up to class capacity)</span></Label>
             <Input type="number" min="1" value={maxUses} onChange={(e) => setMaxUses(e.target.value)} placeholder="e.g. 42" />
@@ -633,6 +728,7 @@ function QRDialog({ code, onClose }: { code: ClassEnrollmentCode | null; onClose
           <DialogTitle>Project this QR for students</DialogTitle>
           <DialogDescription>
             <span className="font-mono">{code.code}</span>
+            {` - ${Number(code.credit_amount ?? 0).toLocaleString()} credits / student space`}
             {code.max_uses ? ` · ${code.max_uses - code.uses_count} of ${code.max_uses} left` : " · unlimited"}
             {code.expires_at && ` · expires ${new Date(code.expires_at).toLocaleTimeString()}`}
           </DialogDescription>

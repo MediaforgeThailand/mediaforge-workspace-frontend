@@ -30,6 +30,7 @@ type EnrollStatus =
       class_id: string;
       workspace_id?: string;
       student_code?: string | null;
+      already_enrolled?: boolean;
     }
   | {
       phase: "saving_code";
@@ -47,6 +48,7 @@ const ERROR_LABELS: Record<string, string> = {
   code_exhausted: "This code has reached its maximum redemptions.",
   class_not_active: "This class isn't active yet, or has ended.",
   class_full: "This class is full.",
+  class_pool_exhausted: "This class does not have enough pool credits for this QR code. Ask your teacher to add credits to the class pool.",
   not_signed_in: "Please sign in first.",
   invalid_code: "That code looks malformed.",
   student_code_required: "Enter your student ID.",
@@ -92,6 +94,7 @@ export default function ClassEnroll() {
         class_id: res.class_id ?? "",
         workspace_id: res.workspace_id,
         student_code: res.student_code ?? null,
+        already_enrolled: Boolean(res.already_enrolled),
       };
       setStatus(next);
 
@@ -101,8 +104,8 @@ export default function ClassEnroll() {
       qc.invalidateQueries({ queryKey: ["education-student-lock"] });
       await refreshProfile();
 
-      if (res.student_code) {
-        redirectToWorkspace(res.workspace_id);
+      if (res.already_enrolled || res.student_code) {
+        redirectToWorkspace(res.workspace_id, res.already_enrolled ? 1400 : 1800);
       }
     };
 
@@ -148,7 +151,7 @@ export default function ClassEnroll() {
   }
   if (!code) return <Navigate to="/app/workspace" replace />;
 
-  const okNeedsStudentCode = status.phase === "ok" && !status.student_code;
+  const okNeedsStudentCode = status.phase === "ok" && !status.student_code && !status.already_enrolled;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-background">
@@ -170,9 +173,13 @@ export default function ClassEnroll() {
             <div className="mx-auto h-16 w-16 rounded-full bg-green-500/10 flex items-center justify-center">
               <CheckCircle2 className="h-8 w-8 text-green-500" />
             </div>
-            <h1 className="text-2xl font-bold">Welcome to {status.class_name}</h1>
+            <h1 className="text-2xl font-bold">
+              {status.already_enrolled ? `Already enrolled in ${status.class_name}` : `Welcome to ${status.class_name}`}
+            </h1>
             <p className="text-muted-foreground">
-              You received <span className="font-mono font-semibold text-foreground">{status.balance.toLocaleString()}</span> starting credits.
+              {status.already_enrolled ? "Your class space is ready with " : "You received "}
+              <span className="font-mono font-semibold text-foreground">{status.balance.toLocaleString()}</span>
+              {status.already_enrolled ? " credits available." : " starting credits."}
             </p>
 
             {okNeedsStudentCode ? (

@@ -83,6 +83,7 @@ export interface ClassEnrollmentCode {
   code: string;
   max_uses: number | null;
   uses_count: number;
+  credit_amount?: number | null;
   expires_at: string | null;
   description: string | null;
   created_at: string;
@@ -165,6 +166,7 @@ export const consumerOrgAdminApi = {
 
   createCode: (classId: string, input: {
     max_uses?: number | null;
+    credit_amount?: number | null;
     expires_at?: string | null;
     description?: string;
   }) => call<{ code: ClassEnrollmentCode }>("POST", `/classes/${classId}/codes`, input),
@@ -175,10 +177,10 @@ export const consumerOrgAdminApi = {
   // Credit allocation (super-admin only — moves credits org→class)
   allocateToClass: (classId: string, delta: number, reason?: string) =>
     call<{
-      ok: boolean;
+      ok?: boolean;
       class_pool: number;
       class_pool_remaining: number;
-      org_pool_allocated_to_classes: number;
+      org_pool_allocated_to_classes?: number;
       delta: number;
     }>("POST", `/classes/${classId}/allocate`, { delta, reason }),
 
@@ -205,6 +207,7 @@ export async function enrollInClass(code: string, studentCode?: string): Promise
   class_name?: string;
   credit_policy?: string;
   starting_balance?: number;
+  already_enrolled?: boolean;
   student_code?: string | null;
   needs_student_code?: boolean;
   org_id?: string;
