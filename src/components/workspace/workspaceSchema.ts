@@ -59,10 +59,13 @@ const SEEDANCE_1080P_MODELS = [
   "seedance-1-0-pro-250528",
   "seedance-1-0-pro-fast-251015",
   "seedance-1-5-pro-251215",
+  "seedance-2-0-pro",
 ] as const;
-const SEEDANCE_720P_MAX_MODELS = [...SEEDANCE_VIDEO_REF_MODELS] as const;
+const SEEDANCE_720P_MAX_MODELS = ["seedance-2-0-lite"] as const;
 const REPLICATE_SEEDANCE_MODELS = [] as const;
 const REPLICATE_SEEDANCE_REF_MODELS = [...REPLICATE_SEEDANCE_MODELS] as const;
+const KLING_V3_DIRECT_RESOLUTION_MODELS = ["kling-v3-pro", "kling-v3-omni"] as const;
+const KLING_V3_DIRECT_MOTION_RESOLUTION_MODELS = ["kling-v3-motion-pro"] as const;
 const REPLICATE_KLING_FRAME_MODELS = [] as const;
 const REPLICATE_KLING_MOTION_MODELS = [] as const;
 const REPLICATE_KLING_MODELS = [
@@ -207,12 +210,12 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         supportedModels: [...BANANA_MODELS, ...REPLICATE_BANANA_MODELS],
       },
       // Gemini's `imageConfig.imageSize` — controls output resolution.
-      // Banana 2 (gemini-3.x flash image) supports 1K and 2K.
+      // Nano Banana 2 direct Google API accepts 1K, 2K, and 4K.
       {
         key: "image_size",
         label: "Resolution",
         type: "select",
-        options: ["1K", "2K"],
+        options: ["1K", "2K", "4K"],
         default: "1K",
         supportedModels: ["nano-banana-2"],
       },
@@ -294,7 +297,15 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           auto: "Auto Size",
         },
         default: "1024x1024",
-        supportedModels: [...OPENAI_IMAGE_MODELS, ...REPLICATE_OPENAI_IMAGE_MODELS],
+        supportedModels: [...OPENAI_IMAGE_MODELS],
+      },
+      {
+        key: "aspect_ratio",
+        label: "Aspect Ratio",
+        type: "select",
+        options: ["1:1", "3:2", "2:3"],
+        default: "1:1",
+        supportedModels: [...REPLICATE_OPENAI_IMAGE_MODELS],
       },
       {
         key: "quality",
@@ -704,6 +715,26 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         options: ["480p", "720p", "1080p"],
         default: "720p",
         supportedModels: [...REPLICATE_SEEDANCE_MODELS],
+      },
+      {
+        key: "resolution",
+        label: "Resolution",
+        type: "select",
+        options: ["720p", "1080p"],
+        default: "1080p",
+        supportedModels: [
+          ...KLING_V3_DIRECT_RESOLUTION_MODELS,
+          ...KLING_V3_DIRECT_MOTION_RESOLUTION_MODELS,
+          ...REPLICATE_KLING_MOTION_MODELS,
+        ],
+      },
+      {
+        key: "resolution",
+        label: "Resolution",
+        type: "select",
+        options: ["720p", "1080p", "4K"],
+        default: "1080p",
+        supportedModels: [...REPLICATE_KLING_FRAME_MODELS],
       },
       {
         // Veo 3.1 supports 720p / 1080p (4k is gated). Picking 1080p

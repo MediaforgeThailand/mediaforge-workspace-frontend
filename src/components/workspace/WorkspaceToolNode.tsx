@@ -275,6 +275,12 @@ function workspaceCostMultiplierForNode(
   return workspaceMultiplier;
 }
 
+function formatCreditAmount(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 0,
+  }).format(Math.ceil(value));
+}
+
 const NEW_ID = (): string =>
   globalThis.crypto?.randomUUID?.() ??
   `n_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -2350,6 +2356,49 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       ? ` (${params.duration ?? 5}s)`
       : undefined;
 
+  const baseNodeCostDisplay = useMemo(() => {
+    if (!nodeCostQuote) return null;
+    return Math.max(0, Math.ceil(nodeCostQuote.fullCost));
+  }, [nodeCostQuote]);
+
+  const costTotalDiscountPercent = useMemo(() => {
+    return nodeCostQuote?.effectiveDiscountPercent ?? 0;
+  }, [nodeCostQuote]);
+
+  const hasCostDiscount =
+    baseNodeCostDisplay != null &&
+    nodeCost != null &&
+    nodeCost < baseNodeCostDisplay &&
+    costTotalDiscountPercent > 0;
+
+  const costDetailRows = useMemo(() => {
+    if (!nodeCostQuote) return [];
+    const rows = [
+      `Original ${formatCreditAmount(nodeCostQuote.fullCost)}${costSuffix ?? ""} credits`,
+    ];
+    if (nodeCostQuote.discountPercent > 0) {
+      rows.push(`Model -${nodeCostQuote.discountPercent}%`);
+    }
+    if (nodeCostQuote.packageDiscountPercent > 0) {
+      rows.push(
+        `${nodeCostQuote.packageDiscountLabel ?? "Package"} -${nodeCostQuote.packageDiscountPercent}%`,
+      );
+    }
+    if (nodeCostQuote.discountPercent <= 0 && nodeCostQuote.packageDiscountPercent <= 0) {
+      rows.push("No discount applied");
+    }
+    rows.push(
+      `Final ${formatCreditAmount(nodeCostQuote.finalCost)}${costSuffix ?? ""} credits`,
+    );
+    return rows;
+  }, [costSuffix, nodeCostQuote]);
+
+  const costSummaryLabel = creditCostsLoading
+    ? "Loading cost..."
+    : nodeCost != null
+      ? `Total ${formatCreditAmount(nodeCost)}${costSuffix ?? ""} credits`
+      : "Pricing unavailable";
+
   const Icon = ICONS[schemaKey] ?? Sparkles;
 
   // ── Port colour palette ─────────────────────────────────────
@@ -2719,7 +2768,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         <NodeQuickActionRail
           visible={selected || isHovered}
           selected={selected}
-          onDelete={!isViewer && selected ? onDeleteNode : undefined}
+          onDelete={!isViewer ? onDeleteNode : undefined}
           nodeId={id}
           mediaKind={
             currentGen?.type === "image" || currentGen?.type === "video" || currentGen?.type === "audio"
@@ -2771,6 +2820,23 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           ref={previewRef}
           className="ws-compact-preview ws-preview-zone"
           data-square={forceSquarePreview ? "true" : undefined}
+          onDoubleClick={(event) => {
+            const target = event.target as HTMLElement | null;
+            if (
+              target?.closest?.(
+                'button, input, textarea, select, [contenteditable="true"]',
+              )
+            ) {
+              return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            window.dispatchEvent(
+              new CustomEvent("workspace-open-node-preview", {
+                detail: { nodeId: id },
+              }),
+            );
+          }}
         >
           {/* 3D model output — render the rendered_image PNG as a
            *  static preview. Mounting `<model-viewer>` per node
@@ -3031,7 +3097,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="top" align="end">
-                  <div className="flex flex-col gap-0.5 text-xs">
+                  <div className="flex flex-col gap-1 text-xs text-zinc-200">
                     <span>
                       {isViewer
                         ? "View only — runs disabled"
@@ -3042,39 +3108,47 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                             : "Run (Ctrl+Enter)"}
                     </span>
                     {!isViewer && (
-                      <span className="text-muted-foreground">
-                        {creditCostsLoading
-                          ? "Loading cost…"
-                          : nodeCostQuote
-                            ? nodeCostQuote.discountPercent > 0 || nodeCostQuote.packageDiscountPercent > 0
-                              ? (
-                                  <span className="flex flex-wrap items-center gap-1.5">
-                                    <span>Cost:</span>
-                                    <span className="line-through opacity-70">
-                                      {nodeCostQuote.fullCost.toLocaleString()}{costSuffix ?? ""}
-                                    </span>
-                                    <span className="font-semibold text-foreground">
-                                      {nodeCostQuote.finalCost.toLocaleString()}{costSuffix ?? ""} credits
-                                    </span>
-                                    {nodeCostQuote.discountPercent > 0 && (
-                                      <span className="text-[10px] font-medium text-emerald-300">
-                                        Model -{nodeCostQuote.discountPercent}%
-                                      </span>
-                                    )}
-                                    {nodeCostQuote.packageDiscountPercent > 0 && (
-                                      <span className="text-[10px] font-medium text-sky-300">
-                                        {nodeCostQuote.packageDiscountLabel ?? "Team"} -{nodeCostQuote.packageDiscountPercent}%
-                                      </span>
-                                    )}
-                                    {nodeCostQuote.effectiveDiscountPercent > 0 && (
-                                      <span className="text-[10px] text-muted-foreground">
-                                        Total -{nodeCostQuote.effectiveDiscountPercent}%
-                                      </span>
-                                    )}
-                                  </span>
-                                )
-                              : `Cost: ${nodeCostQuote.finalCost.toLocaleString()}${costSuffix ?? ""} credits`
-                            : "Pricing unavailable"}
+                      <span className="flex items-center gap-1.5 whitespace-nowrap text-zinc-200">
+                        {nodeCost != null && !creditCostsLoading ? (
+                          <span className="flex items-baseline gap-1.5 text-zinc-200">
+                            <span>Total</span>
+                            <span className="font-semibold">
+                              {formatCreditAmount(nodeCost)}
+                              {costSuffix ?? ""}
+                            </span>
+                            <span>credits</span>
+                            {hasCostDiscount && baseNodeCostDisplay != null && (
+                              <>
+                                <span className="text-[10px] leading-none text-zinc-200/65 line-through">
+                                  {formatCreditAmount(baseNodeCostDisplay)}
+                                  {costSuffix ?? ""}
+                                </span>
+                                <span className="text-[10px] font-semibold leading-none text-zinc-200">
+                                  Total -{costTotalDiscountPercent}%
+                                </span>
+                              </>
+                            )}
+                          </span>
+                        ) : (
+                          <span>{costSummaryLabel}</span>
+                        )}
+                        {costDetailRows.length > 0 && (
+                          <span className="group/cost relative inline-flex">
+                            <span
+                              className="inline-grid h-3 w-3 place-items-center rounded-full border border-zinc-200/60 text-[9px] font-bold leading-none text-zinc-200"
+                              aria-label="Cost details"
+                            >
+                              !
+                            </span>
+                            <span className="pointer-events-none absolute bottom-full right-0 z-50 mb-1 hidden w-max min-w-[160px] rounded-md border border-white/10 bg-[#151515] p-2 text-left text-[11px] leading-[15px] text-zinc-200 shadow-xl group-hover/cost:block">
+                              {costDetailRows.map((row) => (
+                                <span key={row} className="block text-zinc-200">
+                                  {row}
+                                </span>
+                              ))}
+                            </span>
+                          </span>
+                        )}
                       </span>
                     )}
                   </div>

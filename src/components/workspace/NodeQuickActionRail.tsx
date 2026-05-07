@@ -162,7 +162,6 @@ function readVideoDimensions(url: string): Promise<string> {
 
 export default function NodeQuickActionRail({
   visible,
-  selected = false,
   onDelete,
   nodeId,
   mediaKind,
@@ -273,16 +272,21 @@ export default function NodeQuickActionRail({
         className,
       )}
       style={bodyTopOffsetPx ? { top: bodyTopOffsetPx + 8 } : undefined}
+      draggable={false}
       onMouseDown={stopNodeGesture}
       onPointerDown={stopNodeGesture}
       onClick={stopNodeGesture}
+      onDoubleClick={stopNodeGesture}
     >
       <div className="node-quick-action-stack">
         <button
           type="button"
+          draggable={false}
           className="node-quick-action-button"
           aria-label={t("workspace.nodeRail.openTools")}
           aria-expanded={menuOpen}
+          onPointerDownCapture={stopControlGesture}
+          onMouseDownCapture={stopControlGesture}
           onPointerDown={stopControlGesture}
           onMouseDown={stopControlGesture}
           onClick={(event) => {
@@ -290,18 +294,22 @@ export default function NodeQuickActionRail({
             setInfoOpen(false);
             setMenuOpen((open) => !open);
           }}
+          onDoubleClick={stopControlGesture}
         >
           <MoreVertical className="h-[15px] w-[15px]" />
         </button>
         <button
           type="button"
+          draggable={false}
           className={cn(
             "node-quick-action-button",
-            (!selected || !canShowInfo) && "is-disabled",
+            !canShowInfo && "is-disabled",
           )}
           aria-label={t("workspace.nodeRail.nodeInfo")}
           aria-expanded={infoOpen}
-          disabled={!selected || !canShowInfo}
+          disabled={!canShowInfo}
+          onPointerDownCapture={stopControlGesture}
+          onMouseDownCapture={stopControlGesture}
           onPointerDown={stopControlGesture}
           onMouseDown={stopControlGesture}
           onClick={(event) => {
@@ -309,33 +317,42 @@ export default function NodeQuickActionRail({
             setMenuOpen(false);
             setInfoOpen((open) => !open);
           }}
+          onDoubleClick={stopControlGesture}
         >
           <Info className="h-[14px] w-[14px]" />
         </button>
         <button
           type="button"
+          draggable={false}
           className="node-quick-action-button is-disabled"
           aria-label={t("workspace.nodeRail.focusNode")}
           disabled
+          onPointerDownCapture={stopControlGesture}
+          onMouseDownCapture={stopControlGesture}
           onPointerDown={stopControlGesture}
           onMouseDown={stopControlGesture}
+          onDoubleClick={stopControlGesture}
         >
           <ScanSearch className="h-[14px] w-[14px]" />
         </button>
         <button
           type="button"
+          draggable={false}
           className={cn(
             "node-quick-action-button is-danger",
             !onDelete && "is-disabled",
           )}
           aria-label={t("workspace.nodeRail.deleteNode")}
           disabled={!onDelete}
+          onPointerDownCapture={stopControlGesture}
+          onMouseDownCapture={stopControlGesture}
           onPointerDown={stopControlGesture}
           onMouseDown={stopControlGesture}
           onClick={(event) => {
             stopControlGesture(event);
             onDelete?.();
           }}
+          onDoubleClick={stopControlGesture}
         >
           <X className="h-[14px] w-[14px]" />
         </button>

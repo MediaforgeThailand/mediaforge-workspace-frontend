@@ -41,6 +41,7 @@ export interface NodeContextMenuItem {
   label: string;
   icon: LucideIcon;
   onSelect: () => void;
+  shortcut?: string;
   /** Greyed out + non-interactive. Used for "Download" on a node with
    *  no asset yet (so the user can SEE the option exists, just not
    *  available right now — better discoverability than hiding). */
@@ -172,7 +173,12 @@ const NodeContextMenu = ({ position, items, onClose }: Props) => {
               >
                 <Icon size={14} strokeWidth={2} />
               </span>
-              <span className="truncate">{item.label}</span>
+              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              {item.shortcut && (
+                <span className="ml-auto flex-shrink-0 text-[10px] font-semibold uppercase tracking-normal text-[#777a80]">
+                  {item.shortcut}
+                </span>
+              )}
             </button>
           </div>
         );

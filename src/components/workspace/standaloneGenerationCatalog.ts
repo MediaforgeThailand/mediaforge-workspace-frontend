@@ -441,6 +441,10 @@ export function isSeedance20VideoModel(model: string): boolean {
   );
 }
 
+function isSeedance20LiteVideoModel(model: string): boolean {
+  return model === "seedance-2-0-lite" || model === "dreamina-seedance-2-0-fast-260128";
+}
+
 export function seedanceVideoSupportsAudio(model: string): boolean {
   return (
     model.startsWith("seedance-1-5") ||
@@ -451,7 +455,8 @@ export function seedanceVideoSupportsAudio(model: string): boolean {
 }
 
 export function seedanceResolutionOptionsForModel(model: string): string[] {
-  if (isSeedance20VideoModel(model)) return ["480p", "720p"];
+  if (isSeedance20LiteVideoModel(model)) return ["480p", "720p"];
+  if (isSeedance20VideoModel(model)) return ["480p", "720p", "1080p"];
   if (isSeedanceVideoModel(model)) return ["480p", "720p", "1080p"];
   return [];
 }
@@ -471,6 +476,19 @@ export function isKlingMultiShotVideoModel(model: string): boolean {
     model === "replicate-kling-v3-pro" ||
     model === "replicate-kling-v3-omni"
   );
+}
+
+function klingModeForResolution(model: string, resolution: string): string {
+  const res = String(resolution || "1080p").toLowerCase();
+  const isReplicateFrame =
+    model === "replicate-kling-v3-pro" || model === "replicate-kling-v3-omni";
+  if (isReplicateFrame) {
+    if (res === "4k" || res === "2160p") return "4k";
+    if (res === "720p" || res === "standard" || res === "std") return "standard";
+    return "pro";
+  }
+  if (res === "720p" || res === "standard" || res === "std") return "std";
+  return "pro";
 }
 
 export function isVeoVideoModel(model: string): boolean {
@@ -631,7 +649,7 @@ export function buildImageParams(args: {
     hasCharacterRef: args.hasCharacterRef,
     model: args.model,
   });
-  if (args.model === "gpt-image-2" || args.model === "replicate-gpt-image-2") {
+  if (args.model === "gpt-image-2") {
     const quality = ["low", "medium", "high"].includes(args.quality)
       ? args.quality
       : "medium";
@@ -639,6 +657,23 @@ export function buildImageParams(args: {
       model_name: args.model,
       prompt: styledPrompt,
       size: composeGptImageSize(args.aspectRatio, args.resolution),
+      quality,
+      output_format: args.outputFormat,
+      background: args.outputFormat === "jpeg" ? "auto" : args.background,
+      moderation: "auto",
+    };
+  }
+  if (args.model === "replicate-gpt-image-2") {
+    const quality = ["low", "medium", "high", "auto"].includes(args.quality)
+      ? args.quality
+      : "medium";
+    const aspectRatio = ["1:1", "3:2", "2:3"].includes(args.aspectRatio)
+      ? args.aspectRatio
+      : "1:1";
+    return {
+      model_name: args.model,
+      prompt: styledPrompt,
+      aspect_ratio: aspectRatio,
       quality,
       output_format: args.outputFormat,
       background: args.outputFormat === "jpeg" ? "auto" : args.background,
@@ -655,8 +690,12 @@ export function buildImageParams(args: {
       watermark: "false",
     };
   }
+  const bananaSupports4k =
+    args.model === "nano-banana-2" ||
+    args.model === "nano-banana-pro" ||
+    args.model === "replicate-nano-banana-pro";
   const bananaSize =
-    args.model === "nano-banana-pro" || args.model === "replicate-nano-banana-pro"
+    bananaSupports4k
       ? args.resolution === "4K"
         ? "4K"
         : args.resolution === "2K"
@@ -665,12 +704,15 @@ export function buildImageParams(args: {
       : args.resolution === "2K"
         ? "2K"
         : "1K";
-  return {
+  const bananaParams: Record<string, unknown> = {
     model_name: args.model,
     prompt: styledPrompt,
     aspect_ratio: args.aspectRatio === "Auto" ? "Auto" : args.aspectRatio,
-    image_size: bananaSize,
   };
+  if (args.model !== "replicate-nano-banana-2") {
+    bananaParams.image_size = bananaSize;
+  }
+  return bananaParams;
 }
 
 export function buildVideoParams(args: {
@@ -728,9 +770,13 @@ export function buildVideoParams(args: {
     };
   }
   if (isKlingMotionVideoModel(args.model)) {
+    const mode = klingModeForResolution(args.model, args.resolution);
+    const resolution = mode === "std" ? "720p" : "1080p";
     const motionParams: Record<string, unknown> = {
       model_name: args.model,
       prompt: args.prompt.trim(),
+      mode,
+      resolution,
       character_orientation: args.characterOrientation ?? "video",
       keep_original_sound: args.keepOriginalSound ? "yes" : "no",
       _has_ref_video: hasReferenceVideo,
@@ -745,10 +791,15 @@ export function buildVideoParams(args: {
     }
     return motionParams;
   }
+  const mode = klingModeForResolution(args.model, args.resolution);
+  const resolution =
+    mode === "4k" ? "4K" : mode === "standard" || mode === "std" ? "720p" : "1080p";
   const klingParams: Record<string, unknown> = {
     model_name: args.model,
     prompt: args.prompt.trim(),
     aspect_ratio: args.ratio || "Auto",
+    mode,
+    resolution,
     duration: String(args.duration),
     has_audio: String(args.withAudio),
     _has_ref_video: hasReferenceVideo,

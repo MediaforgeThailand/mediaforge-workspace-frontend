@@ -51,7 +51,6 @@ import {
 } from "@/lib/nodeCostCalculator";
 import { useNodeCreditCosts } from "@/hooks/useNodeCreditCosts";
 import { useCredits } from "@/hooks/useCredits";
-import { DEFAULT_PROJECT_NAME } from "@/store/useWorkspaceStore";
 import {
   buildDownloadFilename,
   downloadFromUrl,
@@ -1004,21 +1003,53 @@ function isGptImageModel(model: string) {
   return model === "gpt-image-2" || model === "replicate-gpt-image-2";
 }
 
+function isDirectGptImageModel(model: string) {
+  return model === "gpt-image-2";
+}
+
+function isReplicateGptImageModel(model: string) {
+  return model === "replicate-gpt-image-2";
+}
+
 function isBananaProImageModel(model: string) {
   return model === "nano-banana-pro" || model === "replicate-nano-banana-pro";
 }
 
-function imageResolutionOptionsFor(form: StandaloneFormState) {
-  if (isGptImageModel(form.model)) {
-    return gptImageResolutionsFor(form.aspectRatio);
+function isDirectBanana2ImageModel(model: string) {
+  return model === "nano-banana-2";
+}
+
+function isReplicateBanana2ImageModel(model: string) {
+  return model === "replicate-nano-banana-2";
+}
+
+function imageAspectOptionsForModel(model: string) {
+  if (isReplicateGptImageModel(model)) return ["1:1", "3:2", "2:3"];
+  if (isDirectGptImageModel(model)) return GPT_IMAGE_ASPECT_RATIOS;
+  return ["Auto", "1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"];
+}
+
+function imageResolutionOptionsForModel(model: string, aspectRatio: string) {
+  if (isDirectGptImageModel(model)) {
+    return gptImageResolutionsFor(aspectRatio);
   }
-  if (isSeedreamImageModel(form.model)) {
+  if (isReplicateGptImageModel(model)) {
+    return [];
+  }
+  if (isSeedreamImageModel(model)) {
     return ["2K", "3K"];
   }
-  if (isBananaProImageModel(form.model)) {
+  if (isBananaProImageModel(model) || isDirectBanana2ImageModel(model)) {
     return ["1K", "2K", "4K"];
   }
+  if (isReplicateBanana2ImageModel(model)) {
+    return [];
+  }
   return ["1K", "2K"];
+}
+
+function imageResolutionOptionsFor(form: StandaloneFormState) {
+  return imageResolutionOptionsForModel(form.model, form.aspectRatio);
 }
 
 export default function StandaloneGenerator({
@@ -1213,23 +1244,33 @@ export default function StandaloneGenerator({
     const nextPatch: Partial<StandaloneFormState> = { model };
     if (activeTool === "image_gen") {
       if (isGptImageModel(model)) {
-        nextPatch.aspectRatio = GPT_IMAGE_ASPECT_RATIOS.includes(form.aspectRatio)
+        const aspectOptions = imageAspectOptionsForModel(model);
+        nextPatch.aspectRatio = aspectOptions.includes(form.aspectRatio)
           ? form.aspectRatio
-          : "1:1";
-        const resolutions = gptImageResolutionsFor(
+          : (aspectOptions[0] ?? "1:1");
+        const resolutions = imageResolutionOptionsForModel(
+          model,
           String(nextPatch.aspectRatio ?? form.aspectRatio),
         );
-        nextPatch.imageResolution = resolutions.includes(form.imageResolution)
-          ? form.imageResolution
-          : (resolutions[0] ?? "1K");
+        if (resolutions.length > 0) {
+          nextPatch.imageResolution = resolutions.includes(form.imageResolution)
+            ? form.imageResolution
+            : (resolutions[0] ?? "1K");
+        }
       } else if (isSeedreamImageModel(model)) {
         nextPatch.imageResolution = ["2K", "3K"].includes(form.imageResolution)
           ? form.imageResolution
           : "2K";
       } else {
         nextPatch.aspectRatio = form.aspectRatio || "Auto";
-        nextPatch.imageResolution =
-          isBananaProImageModel(model) ? "2K" : "1K";
+        const resolutions = imageResolutionOptionsForModel(
+          model,
+          String(nextPatch.aspectRatio ?? form.aspectRatio),
+        );
+        if (resolutions.length > 0) {
+          nextPatch.imageResolution =
+            isBananaProImageModel(model) ? "2K" : (resolutions[0] ?? "1K");
+        }
       }
       nextPatch.imageRefs = form.imageRefs.slice(0, maxImageRefsForModel(model));
     }
@@ -1255,7 +1296,9 @@ export default function StandaloneGenerator({
       }
       const resolutionOptions = videoResolutionOptionsForModel(model);
       if (resolutionOptions.length > 0 && !resolutionOptions.includes(form.videoResolution)) {
-        nextPatch.videoResolution = resolutionOptions[resolutionOptions.length - 1] ?? "720p";
+        nextPatch.videoResolution = resolutionOptions.includes("1080p")
+          ? "1080p"
+          : (resolutionOptions[0] ?? "720p");
       }
       if (!supportsFrames) {
         nextPatch.videoStart = null;
@@ -2772,10 +2815,7 @@ function ProjectPicker({
           <div className="max-h-[220px] space-y-1 overflow-y-auto">
             {projects.map((project) => {
               const active = project.id === activeProject?.id;
-              const canDelete =
-                Boolean(onDeleteProject) &&
-                projects.length > 1 &&
-                project.name !== DEFAULT_PROJECT_NAME;
+              const canDelete = Boolean(onDeleteProject);
               return (
                 <div
                   key={project.id}
@@ -3160,7 +3200,7 @@ function ImageControls({
   const maxRefs = maxImageRefsForModel(form.model);
 
   useEffect(() => {
-    if (!resolutionOptions.includes(form.imageResolution)) {
+    if (resolutionOptions.length > 0 && !resolutionOptions.includes(form.imageResolution)) {
       onChange({ imageResolution: resolutionOptions[0] ?? "1K" });
     }
   }, [form.imageResolution, onChange, resolutionOptions]);
@@ -3423,16 +3463,19 @@ function ImageOutputSettings({
   resolutionOptions: string[];
 }) {
   const { t, language } = useLanguage();
-  const aspectOptions = isGpt
-    ? GPT_IMAGE_ASPECT_RATIOS
-    : ["Auto", "1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"];
+  const aspectOptions = imageAspectOptionsForModel(form.model);
+  const hasResolution = resolutionOptions.length > 0;
   const copy =
     language === "th"
       ? { output: "ผลลัพธ์", quality: "คุณภาพ", standard: "มาตรฐาน" }
       : { output: "Output", quality: "Quality", standard: "Standard" };
   const outputLabel = isSeedream
     ? form.imageResolution
-    : `${form.aspectRatio} · ${form.imageResolution}${isGpt ? ` · ${form.outputFormat}` : ""}`;
+    : [
+        form.aspectRatio,
+        ...(hasResolution ? [form.imageResolution] : []),
+        ...(isGpt ? [form.outputFormat] : []),
+      ].join(" · ");
   const qualityLabel = isGpt
     ? `${standaloneOptionLabel(form.quality, t)} · ${standaloneOptionLabel(form.background, t)}`
     : copy.standard;
@@ -3453,24 +3496,50 @@ function ImageOutputSettings({
               <InvisibleSelectOverlay
                 value={form.aspectRatio}
                 options={aspectOptions}
-                onChange={(aspectRatio) => onChange({ aspectRatio })}
-                className="left-0 w-1/2"
+                onChange={(aspectRatio) => {
+                  if (!isDirectGptImageModel(form.model)) {
+                    onChange({ aspectRatio });
+                    return;
+                  }
+                  const nextResolutions = gptImageResolutionsFor(aspectRatio);
+                  const imageResolution = nextResolutions.includes(form.imageResolution)
+                    ? form.imageResolution
+                    : (nextResolutions[0] ?? "1K");
+                  onChange({ aspectRatio, imageResolution });
+                }}
+                className={
+                  isGpt && hasResolution
+                    ? "left-0 w-1/3"
+                    : isGpt
+                      ? "left-0 w-1/2"
+                      : hasResolution
+                        ? "left-0 w-1/2"
+                        : "inset-x-0"
+                }
                 label={copy.output}
               />
             )}
-            <InvisibleSelectOverlay
-              value={form.imageResolution}
-              options={resolutionOptions}
-              onChange={(imageResolution) => onChange({ imageResolution })}
-              className={isSeedream ? "inset-x-0" : "left-1/2 w-1/2"}
-              label={copy.output}
-            />
+            {hasResolution && (
+              <InvisibleSelectOverlay
+                value={form.imageResolution}
+                options={resolutionOptions}
+                onChange={(imageResolution) => onChange({ imageResolution })}
+                className={
+                  isSeedream
+                    ? "inset-x-0"
+                    : isGpt
+                      ? "left-1/3 w-1/3"
+                      : "left-1/2 w-1/2"
+                }
+                label={copy.output}
+              />
+            )}
             {isGpt && (
               <InvisibleSelectOverlay
                 value={form.outputFormat}
                 options={["png", "jpeg", "webp"]}
                 onChange={(outputFormat) => onChange({ outputFormat })}
-                className="right-0 w-1/3"
+                className={hasResolution ? "right-0 w-1/3" : "right-0 w-1/2"}
                 label={copy.output}
               />
             )}
@@ -3689,7 +3758,7 @@ function VideoControls({
               onChange({ videoDuration: Number(videoDuration) || 5 })
             }
           />
-          {(isSeedance || isVeo) && (
+          {videoResolutionOptionsForModel(form.model).length > 0 && (
             <SelectField
               label={t("workspace.standalone.resolution")}
               value={form.videoResolution}
@@ -6566,6 +6635,11 @@ function videoSupportsMultiShot(model: string): boolean {
 function videoResolutionOptionsForModel(model: string): string[] {
   if (isSeedanceVideoModel(model)) return seedanceResolutionOptionsForModel(model);
   if (isVeoVideoModel(model)) return ["720p", "1080p"];
+  if (isKlingMotionVideoModel(model)) return ["720p", "1080p"];
+  if (model === "replicate-kling-v3-pro" || model === "replicate-kling-v3-omni") {
+    return ["720p", "1080p", "4K"];
+  }
+  if (model === "kling-v3-pro" || model === "kling-v3-omni") return ["720p", "1080p"];
   return [];
 }
 
@@ -6845,9 +6919,7 @@ function buildImagePanelSettings({
 }): CreateVideoPanelSetting[] {
   const isGpt = isGptImageModel(form.model);
   const isSeedream = isSeedreamImageModel(form.model);
-  const aspectOptions = isGpt
-    ? GPT_IMAGE_ASPECT_RATIOS
-    : ["Auto", "1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"];
+  const aspectOptions = imageAspectOptionsForModel(form.model);
   const settings: CreateVideoPanelSetting[] = [];
 
   if (!isSeedream) {
@@ -6858,7 +6930,7 @@ function buildImagePanelSettings({
       kind: "select",
       options: aspectOptions.map((value) => ({ value, label: value })),
       onChange: (aspectRatio) => {
-        if (!isGpt) {
+        if (!isDirectGptImageModel(form.model)) {
           onChange({ aspectRatio });
           return;
         }
@@ -6871,14 +6943,16 @@ function buildImagePanelSettings({
     });
   }
 
-  settings.push({
-    id: "image-resolution",
-    label: standaloneInlineLabel("resolution", language),
-    value: form.imageResolution,
-    kind: "select",
-    options: resolutionOptions.map((value) => ({ value, label: value })),
-    onChange: (imageResolution) => onChange({ imageResolution }),
-  });
+  if (resolutionOptions.length > 0) {
+    settings.push({
+      id: "image-resolution",
+      label: standaloneInlineLabel("resolution", language),
+      value: form.imageResolution,
+      kind: "select",
+      options: resolutionOptions.map((value) => ({ value, label: value })),
+      onChange: (imageResolution) => onChange({ imageResolution }),
+    });
+  }
 
   if (isGpt) {
     settings.push(
@@ -6970,10 +7044,13 @@ function imageModelSettingTags(model: string, language: "en" | "th"): Array<{
   const maxRefs = isGptImageModel(model) ? 16 : 14;
   const referenceLabel = standaloneInlineLabel("reference", language);
   if (isGptImageModel(model)) {
-    return [
+    const tags: Array<{ label: string; icon?: "reference" | "resolution" }> = [
       { label: `${referenceLabel} ${maxRefs}`, icon: "reference" },
-      { label: "1K-4K", icon: "resolution" },
     ];
+    if (isDirectGptImageModel(model)) {
+      tags.push({ label: "1K-4K", icon: "resolution" });
+    }
+    return tags;
   }
   if (isSeedreamImageModel(model)) {
     return [
@@ -6981,9 +7058,17 @@ function imageModelSettingTags(model: string, language: "en" | "th"): Array<{
       { label: "2K-3K", icon: "resolution" },
     ];
   }
+  if (isReplicateBanana2ImageModel(model)) {
+    return [{ label: `${referenceLabel} ${maxRefs}`, icon: "reference" }];
+  }
   return [
     { label: `${referenceLabel} ${maxRefs}`, icon: "reference" },
-    { label: isBananaProImageModel(model) ? "1K-4K" : "1K-2K", icon: "resolution" },
+    {
+      label: isBananaProImageModel(model) || isDirectBanana2ImageModel(model)
+        ? "1K-4K"
+        : "1K-2K",
+      icon: "resolution",
+    },
   ];
 }
 

@@ -304,55 +304,27 @@ function isDefaultProject(project: Pick<ProjectMeta, "name"> | undefined | null)
   return project?.name === DEFAULT_PROJECT_NAME;
 }
 
-function ensureDefaultProject(projects: ProjectMeta[]): ProjectMeta[] {
-  return projects.some(isDefaultProject)
-    ? projects
-    : [createDefaultProjectMeta(), ...projects];
+function projectHasWork(
+  projectId: string,
+  workspaces: WorkspaceMeta[],
+  canvases: CanvasMeta[],
+  graphs: Record<string, CanvasGraph>,
+): boolean {
+  if (workspaces.some((w) => w.projectId === projectId)) return true;
+  if (canvases.some((c) => c.projectId === projectId)) return true;
+  return Object.values(graphs).some((graph) => graph.projectId === projectId);
 }
 
-function dedupeDefaultProjects(
+function pruneEmptyDefaultProjects(
   projects: ProjectMeta[],
-  activeProjectId: string | null,
   workspaces: WorkspaceMeta[],
+  canvases: CanvasMeta[],
+  graphs: Record<string, CanvasGraph>,
 ): ProjectMeta[] {
-  const workspaceCountByProject = new Map<string, number>();
-  for (const workspace of workspaces) {
-    if (!workspace.projectId) continue;
-    workspaceCountByProject.set(
-      workspace.projectId,
-      (workspaceCountByProject.get(workspace.projectId) ?? 0) + 1,
-    );
-  }
-
-  const defaultsByOwner = new Map<string, ProjectMeta>();
-  const score = (project: ProjectMeta) => [
-    project.id === activeProjectId ? 1 : 0,
-    workspaceCountByProject.get(project.id) ?? 0,
-    project.updatedAt,
-  ];
-  const isBetterDefault = (candidate: ProjectMeta, current: ProjectMeta) => {
-    const a = score(candidate);
-    const b = score(current);
-    for (let i = 0; i < a.length; i += 1) {
-      if (a[i] !== b[i]) return a[i] > b[i];
-    }
-    return candidate.id > current.id;
-  };
-
-  const out: ProjectMeta[] = [];
-  for (const project of projects) {
-    if (!isDefaultProject(project)) {
-      out.push(project);
-      continue;
-    }
-    const ownerKey = project.ownerId ?? "__local__";
-    const current = defaultsByOwner.get(ownerKey);
-    if (!current || isBetterDefault(project, current)) {
-      defaultsByOwner.set(ownerKey, project);
-    }
-  }
-  out.push(...defaultsByOwner.values());
-  return out;
+  return projects.filter((project) => {
+    if (!isDefaultProject(project)) return true;
+    return projectHasWork(project.id, workspaces, canvases, graphs);
+  });
 }
 
 /** Default name for a new canvas tab inside a workspace. We use the
@@ -451,13 +423,11 @@ function withCurrent(
   };
 }
 
-const initialDefaultProject = createDefaultProjectMeta();
-
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
     (set, get) => ({
-      projects: [initialDefaultProject],
-      activeProjectId: initialDefaultProject.id,
+      projects: [],
+      activeProjectId: null,
       workspaces: [],
       canvases: [],
       graphs: {},
@@ -497,8 +467,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
       deleteProject: (id) =>
         set((s) => {
-          const targetProject = s.projects.find((p) => p.id === id);
-          if (isDefaultProject(targetProject)) return {};
           const ownedWorkspaces = new Set(
             s.workspaces.filter((w) => w.projectId === id).map((w) => w.id),
           );
@@ -511,7 +479,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           for (const [cid, graph] of Object.entries(s.graphs)) {
             if (!ownedCanvases.has(cid)) graphs[cid] = graph;
           }
-          const projects = ensureDefaultProject(s.projects.filter((p) => p.id !== id));
+          const projects = s.projects.filter((p) => p.id !== id);
           return {
             projects,
             activeProjectId:
@@ -536,14 +504,18 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           });
           for (const local of s.projects) {
             if (!serverList.some((server) => server.id === local.id)) {
+              if (
+                isDefaultProject(local) &&
+                !projectHasWork(local.id, s.workspaces, s.canvases, s.graphs)
+              ) {
+                continue;
+              }
               if (nowMs - local.updatedAt < PENDING_PUSH_WINDOW_MS) {
                 merged.push(local);
               }
             }
           }
-          const withDefault = ensureDefaultProject(
-            dedupeDefaultProjects(merged, s.activeProjectId, s.workspaces),
-          );
+          const withDefault = merged;
           withDefault.sort((a, b) => b.updatedAt - a.updatedAt);
           return {
             projects: withDefault,
@@ -566,7 +538,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           projectId = uid();
           projectToInsert = {
             id: projectId,
-            name: DEFAULT_PROJECT_NAME,
+            name: "Untitled project",
             updatedAt: now(),
           };
         }
@@ -959,7 +931,21 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           // Re-sort newest-first so dashboard's default ordering
           // stays stable.
           merged.sort((a, b) => b.updatedAt - a.updatedAt);
-          return { workspaces: merged };
+          const projects = pruneEmptyDefaultProjects(
+            s.projects,
+            merged,
+            s.canvases,
+            s.graphs,
+          );
+          return {
+            workspaces: merged,
+            projects,
+            activeProjectId:
+              s.activeProjectId &&
+              projects.some((project) => project.id === s.activeProjectId)
+                ? s.activeProjectId
+                : projects[0]?.id ?? null,
+          };
         }),
 
       replaceCanvasGraph: (graph) =>
@@ -1719,10 +1705,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         // we hit corruption / older version and reset to empty so the
         // user lands on the dashboard with a fresh slate.
         const reset = () => {
-          const defaultProject = createDefaultProjectMeta();
           return {
-            projects: [defaultProject],
-            activeProjectId: defaultProject.id,
+            projects: [],
+            activeProjectId: null,
             workspaces: [],
             canvases: [],
             graphs: {},
@@ -1830,7 +1815,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               updatedAt: Date.now(),
             }];
           }
-          validProjects = ensureDefaultProject(validProjects);
           const projectIds = new Set(validProjects.map((p) => p.id));
           const fallbackProjectId = validProjects[0]?.id ?? null;
 
@@ -1921,13 +1905,20 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             };
           }
 
+          const finalProjects = pruneEmptyDefaultProjects(
+            validProjects,
+            validWorkspaces,
+            validCanvases,
+            validGraphs,
+          );
+
           return {
-            projects: validProjects,
+            projects: finalProjects,
             activeProjectId:
               typeof working.activeProjectId === "string" &&
-              validProjects.some((p) => p.id === working.activeProjectId)
+              finalProjects.some((p) => p.id === working.activeProjectId)
                 ? working.activeProjectId
-                : validProjects[0]?.id ?? null,
+                : finalProjects[0]?.id ?? null,
             workspaces: validWorkspaces,
             canvases: validCanvases,
             graphs: validGraphs,

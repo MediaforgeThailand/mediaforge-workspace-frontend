@@ -286,7 +286,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
       <NodeQuickActionRail
         visible={selected || isHovered}
         selected={selected}
-        onDelete={selected ? onDeleteNode : undefined}
+        onDelete={onDeleteNode}
         nodeId={id}
         mediaKind={
           d.uploading
@@ -339,6 +339,23 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
             "group relative bg-black ws-preview-zone",
             !d.uploading && d.previewUrl && "cursor-pointer",
           )}
+          onDoubleClick={(event) => {
+            const target = event.target as HTMLElement | null;
+            if (
+              target?.closest?.(
+                'button, input, textarea, select, [contenteditable="true"]',
+              )
+            ) {
+              return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            window.dispatchEvent(
+              new CustomEvent("workspace-open-node-preview", {
+                detail: { nodeId: id },
+              }),
+            );
+          }}
           onContextMenu={(event) => {
             event.preventDefault();
             event.stopPropagation();

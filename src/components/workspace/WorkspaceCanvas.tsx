@@ -85,6 +85,7 @@ import {
   Eye as CtxEyeIcon,
   FileArchive as CtxFileArchiveIcon,
   FolderOpen as CtxFolderOpenIcon,
+  Group as CtxGroupIcon,
   Trash2 as CtxTrash2Icon,
 } from "lucide-react";
 import { downloadFromUrl } from "./downloadAsset";
@@ -925,8 +926,14 @@ const Inner = () => {
     [uploadAsset, addSchemaNode, addAssetNode, screenToFlowPosition, reparentSpawned],
   );
 
+  const isNodeControlEvent = (event: React.MouseEvent): boolean =>
+    (event.target as HTMLElement | null)?.closest?.(
+      ".node-quick-action-rail, .node-quick-menu, .node-quick-action-button",
+    ) != null;
+
   const onNodeClick: NodeMouseHandler = useCallback(
-    (_e, node) => {
+    (e, node) => {
+      if (isNodeControlEvent(e)) return;
       setSelectedNode(node.id);
       publishSelection(node.id);
     },
@@ -1142,6 +1149,20 @@ const Inner = () => {
     setPreview(p);
   }, [t]);
 
+  useEffect(() => {
+    const handler = (evt: Event) => {
+      const nodeId = (evt as CustomEvent<{ nodeId?: string }>).detail?.nodeId;
+      if (!nodeId) return;
+      const all = useWorkspaceStore.getState().current?.nodes ?? [];
+      const node = all.find((n) => n.id === nodeId);
+      if (!node) return;
+      const p = getNodePreview(node, all);
+      if (p) setPreview(p);
+    };
+    window.addEventListener("workspace-open-node-preview", handler);
+    return () => window.removeEventListener("workspace-open-node-preview", handler);
+  }, []);
+
   const uploadTransformedFile = useCallback(
     async (file: File) => {
       const centre = screenToFlowPosition({
@@ -1305,6 +1326,24 @@ const Inner = () => {
     [setNodes, setEdges, pushHistory],
   );
 
+  const onCtxGroup = useCallback((nodes: Node[]) => {
+    const ids = new Set(nodes.map((n) => n.id));
+    useWorkspaceStore.setState((s) => {
+      if (!s.current) return s;
+      return {
+        ...s,
+        current: {
+          ...s.current,
+          nodes: s.current.nodes.map((n) => ({
+            ...n,
+            selected: ids.has(n.id),
+          })),
+        },
+      };
+    });
+    useWorkspaceStore.getState().groupSelectedNodes();
+  }, []);
+
   /** Build the action list for the current right-click target — used
    *  by the menu render below. Memo'd against the menu state so we
    *  don't recompute every parent render. */
@@ -1371,7 +1410,18 @@ const Inner = () => {
       (acc, n) => acc + harvestAssetsFromNode(n).length,
       0,
     );
+    const groupable = targets.filter(
+      (n) => n.type !== "groupNode" && !n.parentId,
+    ).length;
     return [
+      {
+        key: "group",
+        label: "Group",
+        icon: CtxGroupIcon,
+        shortcut: "Ctrl+G",
+        disabled: groupable < 2,
+        onSelect: () => onCtxGroup(targets),
+      },
       {
         key: "download-zip",
         label: t("workspace.nodemenu.download_zip", { count: targets.length }),
@@ -1401,6 +1451,7 @@ const Inner = () => {
     onCtxDownloadZip,
     onCtxDuplicate,
     onCtxDelete,
+    onCtxGroup,
     t,
   ]);
 
@@ -1531,6 +1582,10 @@ const Inner = () => {
    *  the preview lightbox instead of letting them rename. */
   const onNodeDoubleClick = useCallback(
     (e: React.MouseEvent, node: Node) => {
+      if (isNodeControlEvent(e)) {
+        e.stopPropagation();
+        return;
+      }
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName ?? "";
       const isEditable =

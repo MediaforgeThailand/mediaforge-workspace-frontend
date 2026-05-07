@@ -178,6 +178,21 @@ function findOpenAiImageCost(params: Record<string, unknown>, creditCosts: Credi
   return null;
 }
 
+function replicateVideoPricingVariant(model: string, params: Record<string, unknown>): string | null {
+  if (model === "replicate-veo-3-1") return null;
+  if (model === "replicate-kling-v3-motion-pro") {
+    const raw = String(params.mode ?? params.quality_mode ?? params.resolution ?? "pro").toLowerCase();
+    return raw === "std" || raw === "standard" || raw === "720p" ? "std" : "pro";
+  }
+  if (model.startsWith("replicate-kling-v3")) {
+    const raw = String(params.mode ?? params.quality_mode ?? params.resolution ?? "pro").toLowerCase();
+    if (raw === "4k" || raw === "2160p") return "4k";
+    if (raw === "standard" || raw === "std" || raw === "720p") return "standard";
+    return "pro";
+  }
+  return null;
+}
+
 /**
  * Returns the base credit cost for a node, or null if pricing is missing.
  */
@@ -309,12 +324,15 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
       hasRefVideoInput
         ? "replicate-seedance-2-0-video-ref"
         : model;
+    const replicateVariant = replicateVideoPricingVariant(model, params);
     const modelAliases =
       model === "veo-3.1-generate-001"
         ? [model, "veo-3.1-generate-preview"]
-        : replicatePricingModel !== model
-          ? [replicatePricingModel, model]
-        : [model];
+        : replicateVariant
+          ? [`${model}:${replicateVariant}`, model]
+          : replicatePricingModel !== model
+            ? [replicatePricingModel, model]
+            : [model];
     const isMotion = model.includes("motion");
     const isOmni = OMNI_MODELS.has(model);
 
@@ -405,16 +423,27 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
 
     // ── Motion models: per_second with ref_video duration ──
     if (isMotion) {
+      const motionDuration =
+        parseInt(String(params._ref_video_duration ?? params.ref_video_duration ?? params.duration ?? "5"), 10) || 5;
+      const motionResolution = String(params.resolution ?? "").trim().toLowerCase();
+      if (motionResolution) {
+        const resolutionMatch = creditCosts.find(
+          (r) =>
+            r.feature === "generate_freepik_video" &&
+            modelAliases.some((alias) => r.model === `${alias}:${motionResolution}`) &&
+            r.pricing_type === "per_second",
+        );
+        if (resolutionMatch) return Math.ceil(resolutionMatch.cost * motionDuration);
+      }
+
       const perSecondMatch = creditCosts.find(
         (r) =>
           r.feature === "generate_freepik_video" &&
-          r.model === model &&
+          modelAliases.includes(r.model) &&
           r.pricing_type === "per_second",
       );
       if (perSecondMatch) {
-        const refDuration = params._ref_video_duration as number | undefined;
-        if (!refDuration || refDuration <= 0) return null; // ⚠️ N/A
-        return Math.ceil(perSecondMatch.cost * refDuration);
+        return Math.ceil(perSecondMatch.cost * motionDuration);
       }
     }
 

@@ -51,6 +51,7 @@ import WorkspaceCanvas from "@/components/workspace/WorkspaceCanvas";
 // the unused-import warning while the JSX is commented out.
 import _WorkspaceRightSidebar from "@/components/workspace/WorkspaceRightSidebar";
 import WorkspaceCanvasMediaBridges from "@/components/workspace/WorkspaceCanvasMediaBridges";
+import WorkspacePromptAssistantLauncher from "@/components/workspace/WorkspacePromptAssistantLauncher";
 // DebugPanel still gated — its persisted Zustand store hasn't been
 // audited end-to-end and we don't need it for the demo. Bring back
 // in a follow-up commit after a focused review.
@@ -403,6 +404,7 @@ const WorkspaceCanvasPage = () => {
          *  the popover surfaces in the same recoverable card the
          *  rest of the workspace uses. */}
         {hydrated && <WorkspaceCanvasPagePill />}
+        {hydrated && <WorkspacePromptAssistantLauncher />}
       </WorkspaceErrorBoundary>
     </div>
   );

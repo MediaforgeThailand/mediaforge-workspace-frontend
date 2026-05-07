@@ -1443,7 +1443,7 @@ body.ws-resizing * {
  * should NOT open the lightbox. Lightbox is bound to double-
  * click via WorkspaceCanvas.onNodeDoubleClick. */
 .react-flow__node:not(.selected) .ws-preview-zone {
-  pointer-events: none;
+  pointer-events: auto;
 }
 /* …but DO let mouse-enter / mouse-leave reach the inline preview
  * `<video>` element so the hover-to-play listener fires without
@@ -1801,6 +1801,17 @@ body.ws-lightbox-open .react-flow__node .ws-clean-title {
   transition:
     opacity 120ms ease,
     transform 140ms ease;
+  cursor: pointer !important;
+  user-select: none;
+  -webkit-user-drag: none;
+  touch-action: none;
+}
+
+.node-quick-action-rail *,
+.node-quick-menu,
+.node-quick-menu * {
+  cursor: pointer !important;
+  -webkit-user-drag: none;
 }
 
 .node-quick-action-rail::after {
@@ -1844,6 +1855,8 @@ body.ws-lightbox-open .react-flow__node .ws-clean-title {
   width: 100%;
   place-items: center;
   color: rgba(244, 244, 245, 0.72);
+  cursor: pointer !important;
+  user-select: none;
   transition:
     color 120ms ease,
     background 120ms ease;
@@ -1865,7 +1878,7 @@ body.ws-lightbox-open .react-flow__node .ws-clean-title {
 }
 
 .node-quick-action-button.is-disabled {
-  cursor: default;
+  cursor: default !important;
   color: rgba(255, 255, 255, 0.36);
 }
 
