@@ -1954,10 +1954,125 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     [getEdges, getNodes, id, isNodeCurrentlyProcessing, isViewer, runNode, setEdges, setNodes],
   );
 
+  /* ── Orphaned-completion sweep (mount-only) ──
+   *  Production incident (run 14123ecb): user clicked Run, the
+   *  spinner repaint was lost to the synchronous-state race fixed
+   *  elsewhere in this file, the user closed the canvas, the
+   *  backend completed the job and charged 364 credits — but the
+   *  result never appeared on the node. The existing recovery
+   *  effect below only fires when `backgroundJobId` is set OR
+   *  `runStatus` is processing/error, and the node-id branch
+   *  picks the SINGLE latest row — so once even one earlier
+   *  generation is recorded on the node, any subsequent run that
+   *  failed to deliver client-side stays stranded forever.
+   *
+   *  The sweep below runs once per mount and reconciles the last
+   *  five completed jobs for this node against the local
+   *  `generations` array, applying any that are missing. Cost:
+   *  one indexed lookup per node mount (5 rows max) — paid once
+   *  per canvas open. Dedup by job_id / url / text keeps it
+   *  idempotent if the existing realtime path already delivered
+   *  the row. */
+  useEffect(() => {
+    let cancelled = false;
+    const sweep = async () => {
+      const current = useWorkspaceStore.getState().current;
+      if (!current?.id || !current?.workspaceId) return;
+      const { data: jobs, error } = await supabase
+        .from("workspace_generation_jobs")
+        .select("*")
+        .eq("node_id", id)
+        .eq("canvas_id", current.id)
+        .eq("workspace_id", current.workspaceId)
+        .eq("status", "completed")
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (cancelled || error || !jobs?.length) return;
+      const node =
+        useWorkspaceStore.getState().current?.nodes.find((n) => n.id === id) ??
+        getNodes().find((n) => n.id === id);
+      const existingGens = Array.isArray((node?.data as NodeData | undefined)?.generations)
+        ? ((node!.data as NodeData & {
+            generations?: Array<Record<string, unknown>>;
+          }).generations as Array<Record<string, unknown>>)
+        : [];
+      let recoveredJobId: string | null = null;
+      // Walk oldest → newest so addGeneration appends in
+      // chronological order; the existing UI sorts the carousel
+      // newest-first independently.
+      for (const job of [...jobs].reverse()) {
+        const result = (job as { result?: {
+          type?: "image" | "video" | "text" | "audio";
+          url?: string;
+          text?: string;
+          prompt_used?: string;
+          prompt_source?: string;
+          provider_meta?: { model_url?: string };
+        } | null }).result ?? null;
+        if (!result || (!result.url && !result.text)) continue;
+        const jobId = String((job as { id?: string }).id ?? "");
+        const dup = existingGens.some((g) =>
+          (!!jobId && g.job_id === jobId) ||
+          (!!result.url && g.url === result.url) ||
+          (!!result.text && g.text === result.text)
+        );
+        if (dup) continue;
+        useWorkspaceStore.getState().addGeneration(id, {
+          id: (globalThis.crypto?.randomUUID?.() ?? String(Date.now())),
+          job_id: jobId || undefined,
+          type: result.type ?? "image",
+          url: result.url,
+          text: result.text,
+          model_url: result.provider_meta?.model_url,
+          prompt_used: result.prompt_used,
+          prompt_source: result.prompt_source,
+          createdAt: Date.now(),
+        } as Record<string, unknown>);
+        useDebugLogStore.getState().push({
+          level: "info",
+          nodeId: id,
+          title: `Recovered orphaned completion · ${jobId.slice(0, 8)}`,
+        });
+        recoveredJobId = jobId || recoveredJobId;
+      }
+      if (recoveredJobId) {
+        // Pin to the newest completed row in the fetched window
+        // (jobs[0] thanks to the descending sort) regardless of
+        // which one we actually recovered — pinning to an older
+        // recovered row would silently roll back the
+        // backgroundJobId from a newer realtime-delivered job.
+        const newestJobId = String((jobs[0] as { id?: string })?.id ?? recoveredJobId);
+        patchNodeDataNow({
+          status: "done",
+          runStartedAt: null,
+          activeRunId: null,
+          backgroundJobId: newestJobId,
+          jobStatus: "completed",
+          lastRunError: null,
+        });
+      }
+    };
+    void sweep();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     const knownJobId = d.backgroundJobId ?? null;
     const canRecoverByNode =
-      !knownJobId && (runStatus === "processing" || runStatus === "error");
+      !knownJobId &&
+      (runStatus === "processing" ||
+        runStatus === "error" ||
+        // Broadened in the same incident: a stale-autosave race
+        // could leave `runStatus === "idle"` while persisted node
+        // fields (`runStartedAt`, `activeRunId`, `lastRunError`)
+        // still betray a half-finished run. Treat any of these as
+        // a signal to keep polling for the missed completion.
+        d.runStartedAt != null ||
+        d.activeRunId != null ||
+        d.lastRunError != null);
     if ((!knownJobId && !canRecoverByNode) || d.jobStatus === "completed") return;
 
     let cancelled = false;
@@ -2069,7 +2184,18 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       cancelled = true;
       if (pollTimer != null) window.clearInterval(pollTimer);
     };
-  }, [d.backgroundJobId, d.jobStatus, getNodes, id, language, runStatus, patchNodeDataNow]);
+  }, [
+    d.backgroundJobId,
+    d.jobStatus,
+    d.runStartedAt,
+    d.activeRunId,
+    d.lastRunError,
+    getNodes,
+    id,
+    language,
+    runStatus,
+    patchNodeDataNow,
+  ]);
 
   /* ── Listen for Ctrl+Enter / Ctrl+Shift+Enter shortcut ────
    * useWorkspaceShortcuts dispatches a `workspace-run-shortcut`
