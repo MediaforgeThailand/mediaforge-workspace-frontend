@@ -456,7 +456,14 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
                   <DropdownMenuContent
                     align="start"
                     sideOffset={4}
-                    className="min-w-[200px] max-h-[280px] overflow-y-auto rounded-[6px] bg-[#1c1c1c] p-1 shadow-[0_14px_30px_rgba(0,0,0,.55)]"
+                    /* z-[1600] beats the dialog backdrop's z-[1500].
+                     *  The shared `DropdownMenuContent` defaults to
+                     *  `z-50`, which Radix's Portal still respects
+                     *  even though it appends to <body> — so without
+                     *  this override the popover opened behind the
+                     *  dialog and looked like the trigger did
+                     *  nothing on click. */
+                    className="z-[1600] min-w-[200px] max-h-[280px] overflow-y-auto rounded-[6px] bg-[#1c1c1c] p-1 shadow-[0_14px_30px_rgba(0,0,0,.55)]"
                   >
                     {boardOptions.length === 0 ? (
                       <DropdownMenuItem
