@@ -36,13 +36,13 @@ src/
 │   └── useWorkspaceStore.ts          ← Zustand. canvases[], current{nodes,edges}, selection
 ├── components/workspace/
 │   ├── workspace.css                 ← Visual primitives + animations (see below)
-│   ├── toolRegistry.ts               ← TOOL_REGISTRY[10], PORT_COLORS, PORT_STROKE
+│   ├── workspaceSchema.ts            ← Node type definitions + AI provider schema
 │   ├── WorkspaceCanvas.tsx           ← React Flow surface, drop handler, viewport persist
-│   ├── WorkspaceTopBar.tsx           ← Canvas name input, Save/Run (disabled), node counter
-│   ├── WorkspaceToolPalette.tsx      ← Left panel, drag-source for tools (categorized)
-│   ├── WorkspacePreviewPanel.tsx     ← Right panel: param form for selected node + preview slot
-│   └── nodes/
-│       └── ToolNode.tsx              ← Generic node, dynamic icon, typed handles, state ring
+│   ├── CanvasHeader.tsx              ← Top bar: project chip, canvas name, Share, user menu
+│   ├── CanvasContextMenu.tsx         ← Right-click tool palette (categorised)
+│   ├── WorkspaceCanvasPagePill.tsx   ← Floating bottom-left page switcher
+│   ├── WorkspaceToolNode.tsx         ← Tool node (image/video/audio gen, BG remove, merge audio)
+│   └── …                             ← AssetNode, ElementNode, GroupNode, NodePreviewLightbox, …
 └── pages/workspace/
     ├── index.tsx                     ← Dashboard: list + create canvas
     └── Canvas.tsx                    ← 3-pane editor wrapper (top + palette + canvas + preview)
@@ -145,7 +145,7 @@ roughly in order:
    generated output.
 4. **Result reveal animation** for generated images/videos (multi-
    property: opacity + blur + brightness + saturate + scale).
-   Placeholder slot is already in `WorkspacePreviewPanel`.
+   Renders inside each node's compact preview area.
 5. **Connection affordance:** when an input port is connected, show
    "Receiving input" state in the corresponding param row instead of
    the empty input.

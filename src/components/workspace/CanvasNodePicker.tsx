@@ -485,7 +485,7 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
   // viewport space, NOT inside the canvas DOM tree. The picker uses
   // `clientX/Y` (viewport coords) for left/top and the parent it
   // used to mount under (`workspace-root`, `position: relative`) sits
-  // ~40px below the viewport top thanks to the WorkspaceTabBar — so
+  // ~40px below the viewport top thanks to the canvas header — so
   // an absolute-positioned picker rendered there ended up shifted.
   // Worse, on small screens the scrim's invisible `z-40` div would
   // appear to "block everything" when the user couldn't immediately

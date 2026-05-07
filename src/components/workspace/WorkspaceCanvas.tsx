@@ -6,10 +6,9 @@
  * shared schema + handles Kling custom logic when it applies.
  *
  * Simple AI tools (BG remove, Merge audio) still use their legacy
- * per-tool components directly.
- *
- * All are wrapped with `withResultHistory` so they gain the result-
- * bar / history-dialog affordance when `data.generations` is populated.
+ * per-tool components directly. The result bar / history dialog is
+ * now rendered directly inside each node component when
+ * `data.generations` is populated — there's no shared HOC anymore.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -417,10 +416,9 @@ async function asyncClipboardFiles(): Promise<File[]> {
 const nodeTypes = {
   // All schema-driven tools route through WorkspaceToolNode — that's
   // the only place where the V2 Run button + workspace-run-node
-  // dispatcher live. WorkspaceToolNode now uses the preview-first
+  // dispatcher live. WorkspaceToolNode uses the preview-first
   // compact layout (see CompactParamWidgets / workspace.css), so the
   // result strip and history dialog are baked into the node itself.
-  // The previous `withResultHistory` HOC is no longer needed here.
   imageGenNode: WorkspaceToolNode,
   videoGenNode: WorkspaceToolNode,
   audioGenNode: WorkspaceToolNode,
