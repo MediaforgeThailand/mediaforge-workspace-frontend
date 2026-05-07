@@ -45,6 +45,7 @@ import {
   listServerCanvasIds,
   loadLatestCanvasPreviewsByWorkspaceIds,
   saveCanvasToServer,
+  type ServerWriteResult,
 } from "@/components/workspace/canvasPersistence";
 import {
   Plus,
@@ -181,6 +182,31 @@ function buildCanvasIndex(
     list.sort((a, b) => b.updatedAt - a.updatedAt);
   }
   return index;
+}
+
+async function persistNewWorkspaceBundle(
+  workspaceId: string,
+  canvasId: string,
+  userId: string,
+): Promise<ServerWriteResult> {
+  const state = useWorkspaceStore.getState();
+  const meta = state.workspaces.find((workspace) => workspace.id === workspaceId);
+  if (!meta) return { ok: false, error: "Workspace metadata not found" };
+
+  const project = meta.projectId
+    ? state.projects.find((item) => item.id === meta.projectId)
+    : null;
+  if (project && (!project.ownerId || project.ownerId === userId)) {
+    const projectResult = await upsertProjectToServer(project, userId);
+    if (!projectResult.ok) return projectResult;
+  }
+
+  const workspaceResult = await upsertWorkspaceToServer(meta, userId);
+  if (!workspaceResult.ok) return workspaceResult;
+
+  const graph = useWorkspaceStore.getState().graphs[canvasId];
+  if (!graph) return { ok: false, error: "Canvas graph not found" };
+  return saveCanvasToServer(graph, userId);
 }
 
 /** Pull the per-canvas graph for the minimap — picks the
@@ -1324,27 +1350,17 @@ const HomeView = ({
       );
   }, [recentWorkspaceIds, workspaces, canvasIndex, graphs, educationSpaceStatuses]);
 
-  const handleNew = () => {
+  const handleNew = async () => {
     if (educationLockedStudent) {
       toast.error(i18n("workspace.home.scanClassQrOrLinkTo"));
       onSection("spaces");
       return;
     }
-    const { workspaceId } = createWorkspace(t("workspace.spaces.untitled_space"), activeProjectId);
+    const { workspaceId, canvasId } = createWorkspace(t("workspace.spaces.untitled_space"), activeProjectId);
     if (user?.id) {
-      const state = useWorkspaceStore.getState();
-      const meta = state.workspaces.find((w) => w.id === workspaceId);
-      const project = meta?.projectId
-        ? state.projects.find((p) => p.id === meta.projectId)
-        : null;
-      if (meta) {
-        if (project && (!project.ownerId || project.ownerId === user.id)) {
-          void upsertProjectToServer(project, user.id).then(() =>
-            upsertWorkspaceToServer(meta, user.id),
-          );
-        } else {
-          void upsertWorkspaceToServer(meta, user.id);
-        }
+      const result = await persistNewWorkspaceBundle(workspaceId, canvasId, user.id);
+      if (!result.ok) {
+        console.warn("[workspace] create space server save failed:", result.error);
       }
     }
     navigate(`/app/workspace/${workspaceId}`);
@@ -2331,25 +2347,15 @@ const ProjectsManagerView = ({
     ? "Team project"
     : "Owned by you";
 
-  const handleNewSpace = () => {
-    const { workspaceId } = createWorkspace(
+  const handleNewSpace = async () => {
+    const { workspaceId, canvasId } = createWorkspace(
       t("workspace.spaces.untitled_space"),
       selectedProject?.id ?? activeProjectId,
     );
     if (user?.id) {
-      const state = useWorkspaceStore.getState();
-      const meta = state.workspaces.find((workspace) => workspace.id === workspaceId);
-      const project = meta?.projectId
-        ? state.projects.find((item) => item.id === meta.projectId)
-        : null;
-      if (meta) {
-        if (project && (!project.ownerId || project.ownerId === user.id)) {
-          void upsertProjectToServer(project, user.id).then(() =>
-            upsertWorkspaceToServer(meta, user.id),
-          );
-        } else {
-          void upsertWorkspaceToServer(meta, user.id);
-        }
+      const result = await persistNewWorkspaceBundle(workspaceId, canvasId, user.id);
+      if (!result.ok) {
+        console.warn("[workspace] create space server save failed:", result.error);
       }
     }
     navigate(`/app/workspace/${workspaceId}`);
@@ -2692,26 +2698,16 @@ const SpacesView = ({
     };
   }, [user?.id, authLoading, educationLockedStudent, mergeServerWorkspaces]);
 
-  const handleNew = () => {
+  const handleNew = async () => {
     if (educationLockedStudent) {
       toast.error(i18n("workspace.home.scanClassQrOrOpen"));
       return;
     }
-    const { workspaceId } = createWorkspace(t("workspace.spaces.untitled_space"), activeProjectId);
+    const { workspaceId, canvasId } = createWorkspace(t("workspace.spaces.untitled_space"), activeProjectId);
     if (user?.id) {
-      const state = useWorkspaceStore.getState();
-      const meta = state.workspaces.find((w) => w.id === workspaceId);
-      const project = meta?.projectId
-        ? state.projects.find((p) => p.id === meta.projectId)
-        : null;
-      if (meta) {
-        if (project && (!project.ownerId || project.ownerId === user.id)) {
-          void upsertProjectToServer(project, user.id).then(() =>
-            upsertWorkspaceToServer(meta, user.id),
-          );
-        } else {
-          void upsertWorkspaceToServer(meta, user.id);
-        }
+      const result = await persistNewWorkspaceBundle(workspaceId, canvasId, user.id);
+      if (!result.ok) {
+        console.warn("[workspace] create space server save failed:", result.error);
       }
     }
     navigate(`/app/workspace/${workspaceId}`);

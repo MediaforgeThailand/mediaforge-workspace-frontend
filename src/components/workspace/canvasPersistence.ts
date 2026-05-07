@@ -259,7 +259,7 @@ export async function deleteCanvasFromServer(canvasId: string): Promise<void> {
 export async function saveCanvasToServer(
   graph: CanvasGraph,
   userId: string,
-): Promise<{ ok: boolean; tableMissing?: boolean; error?: string }> {
+): Promise<ServerWriteResult> {
   try {
     const { error } = await supabase.from("workspace_canvases").upsert(
       {
@@ -422,6 +422,12 @@ interface ServerProjectRow {
   updated_at: string;
 }
 
+export type ServerWriteResult = {
+  ok: boolean;
+  tableMissing?: boolean;
+  error?: string;
+};
+
 /** Pull every workspace the signed-in user owns. Returns null if
  *  the user isn't signed in / the table is missing — caller should
  *  fall back to whatever is in localStorage. */
@@ -503,35 +509,70 @@ export async function loadWorkspaceFromServer(
 export async function upsertWorkspaceToServer(
   meta: WorkspaceMeta,
   userId: string,
-): Promise<void> {
-  if (!userId) return;
+): Promise<ServerWriteResult> {
+  if (!userId) return { ok: false, error: "Missing user id" };
+  const insertPayload = {
+    id: meta.id,
+    user_id: meta.ownerId ?? userId,
+    project_id: meta.projectId ?? null,
+    class_id: meta.classId ?? null,
+    education_status: meta.educationStatus ?? null,
+    name: meta.name,
+    // updated_at is set by the table's `workspaces_touch` trigger
+    // — don't send it from the client so concurrent writes don't
+    // race on clock skew between devices.
+  };
+  const updatePayload = {
+    project_id: meta.projectId ?? null,
+    class_id: meta.classId ?? null,
+    education_status: meta.educationStatus ?? null,
+    name: meta.name,
+  };
   try {
-    const { error } = await supabase.from("workspaces").upsert(
-      {
-        id: meta.id,
-        user_id: meta.ownerId ?? userId,
-        project_id: meta.projectId ?? null,
-        class_id: meta.classId ?? null,
-        education_status: meta.educationStatus ?? null,
-        name: meta.name,
-        // updated_at is set by the table's `workspaces_touch` trigger
-        // — don't send it from the client so concurrent writes don't
-        // race on clock skew between devices.
-      },
-      { onConflict: "id" },
-    );
-    if (error) {
-      if (isMissingWorkspacesTableError(error)) {
+    // Avoid PostgREST upsert for workspaces. With the education/team
+    // RLS policy, ON CONFLICT DO UPDATE must satisfy UPDATE policy
+    // even for new spaces. The update policy checks the existing row,
+    // so a brand-new workspace can be rejected before it is inserted.
+    const { error: insertError } = await supabase
+      .from("workspaces")
+      .insert(insertPayload);
+    if (!insertError) return { ok: true };
+
+    if (isMissingWorkspacesTableError(insertError)) {
+      warnOnceAboutMissingWorkspacesTable();
+      return { ok: false, tableMissing: true };
+    }
+
+    if (!isDuplicateKeyError(insertError)) {
+      console.warn(
+        "[canvasPersistence] insert workspace failed:",
+        insertError.message,
+      );
+      return { ok: false, error: insertError.message };
+    }
+
+    const { error: updateError } = await supabase
+      .from("workspaces")
+      .update(updatePayload)
+      .eq("id", meta.id);
+    if (updateError) {
+      if (isMissingWorkspacesTableError(updateError)) {
         warnOnceAboutMissingWorkspacesTable();
-        return;
+        return { ok: false, tableMissing: true };
       }
       console.warn(
         "[canvasPersistence] upsert workspace failed:",
-        error.message,
+        updateError.message,
       );
+      return { ok: false, error: updateError.message };
     }
+    return { ok: true };
   } catch (err) {
     console.warn("[canvasPersistence] upsert workspace threw:", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 
@@ -647,8 +688,8 @@ export async function loadProjectsFromServer(): Promise<ProjectMeta[] | null> {
 export async function upsertProjectToServer(
   meta: ProjectMeta,
   userId: string,
-): Promise<void> {
-  if (!userId) return;
+): Promise<ServerWriteResult> {
+  if (!userId) return { ok: false, error: "Missing user id" };
   try {
     const { error } = await (supabase as any).from("workspace_projects").upsert(
       {
@@ -664,12 +705,18 @@ export async function upsertProjectToServer(
     if (error) {
       if (isMissingProjectsTableError(error)) {
         warnOnceAboutMissingProjectsTable();
-        return;
+        return { ok: false, tableMissing: true };
       }
       console.warn("[canvasPersistence] upsert project failed:", error.message);
+      return { ok: false, error: error.message };
     }
+    return { ok: true };
   } catch (err) {
     console.warn("[canvasPersistence] upsert project threw:", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 
@@ -722,6 +769,13 @@ function isMissingProjectsTableError(err: {
 }): boolean {
   if (err?.code === "42P01" || err?.code === "42703") return true;
   return /relation .* does not exist|public\.workspace_projects|project_id/i.test(
+    err?.message ?? "",
+  );
+}
+
+function isDuplicateKeyError(err: { code?: string; message?: string }): boolean {
+  if (err?.code === "23505") return true;
+  return /duplicate key value violates unique constraint/i.test(
     err?.message ?? "",
   );
 }
