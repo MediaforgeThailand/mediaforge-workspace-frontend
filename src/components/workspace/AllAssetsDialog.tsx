@@ -72,13 +72,34 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const canvases = useWorkspaceStore((s) => s.canvases);
   const current = useWorkspaceStore((s) => s.current);
+  const projects = useWorkspaceStore((s) => s.projects);
+  const activeProjectId = useWorkspaceStore((s) => s.activeProjectId);
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<LibraryTab>("board");
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [draggingExternal, setDraggingExternal] = useState(false);
   const searchRef = useRef<HTMLInputElement | null>(null);
+
+  /* Project selector state. Each Space (`workspace`) belongs to a
+   *  Project; up until now the Board sidebar showed every space
+   *  across every project, which the user reported was overwhelming
+   *  on accounts with many projects. We default the Project dropdown
+   *  to the currently-open project (current.projectId or activeProjectId)
+   *  so the user lands on the spaces they're actually in, then filter
+   *  `boardOptions` below by `workspace.projectId === selectedProjectId`.
+   *
+   *  `effectiveProjectId` falls back through current → active → first
+   *  available so we never end up showing "no spaces" because nothing
+   *  was selected yet. */
+  const effectiveProjectId =
+    selectedProjectId ??
+    current?.projectId ??
+    activeProjectId ??
+    projects[0]?.id ??
+    null;
 
   const canvasMetaById = useMemo(
     () => new Map(canvases.map((canvas) => [canvas.id, canvas] as const)),
@@ -91,23 +112,59 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
         .map((graph) => graph?.workspaceId ?? canvasMetaById.get(graph?.id ?? "")?.workspaceId)
         .filter((id): id is string => Boolean(id)),
     );
+    /* Filter by Project first — the Media Browser used to show every
+     *  space from every project, which the user reported was
+     *  overwhelming. Now only spaces belonging to the currently
+     *  selected project are listed; switching the project dropdown
+     *  in the header narrows the list to that project's spaces. */
     const options = workspaces
-      .filter((workspace) => idsWithGraphs.size === 0 || idsWithGraphs.has(workspace.id))
+      .filter(
+        (workspace) =>
+          (effectiveProjectId == null ||
+            workspace.projectId === effectiveProjectId) &&
+          (idsWithGraphs.size === 0 || idsWithGraphs.has(workspace.id)),
+      )
       .map((workspace) => ({
         id: workspace.id,
         name: workspace.name || "Untitled space",
       }));
+    /* Always surface the currently-open space at the top, even when
+     *  it lives in a different project than `effectiveProjectId` —
+     *  otherwise the user could lose access to the space they're
+     *  literally working in just by switching the dropdown. */
     if (current?.workspaceId && !options.some((option) => option.id === current.workspaceId)) {
-      options.unshift({
-        id: current.workspaceId,
-        name:
-          workspaces.find((workspace) => workspace.id === current.workspaceId)?.name ||
-          current.name ||
-          "Current space",
-      });
+      const currentSpace = workspaces.find((w) => w.id === current.workspaceId);
+      if (
+        effectiveProjectId == null ||
+        currentSpace?.projectId === effectiveProjectId
+      ) {
+        options.unshift({
+          id: current.workspaceId,
+          name:
+            currentSpace?.name ||
+            current.name ||
+            "Current space",
+        });
+      }
     }
     return options;
-  }, [allGraphs, canvasMetaById, current, workspaces]);
+  }, [allGraphs, canvasMetaById, current, workspaces, effectiveProjectId]);
+
+  /* Project dropdown options — every project the user owns / is in,
+   *  with their saved colour chip if any. Used by the header
+   *  dropdown that replaces the old "Media Browser" title text. */
+  const projectOptions = useMemo(
+    () =>
+      projects.map((project) => ({
+        id: project.id,
+        name: project.name || "Untitled project",
+        color: project.color ?? null,
+      })),
+    [projects],
+  );
+
+  const activeProjectName =
+    projectOptions.find((p) => p.id === effectiveProjectId)?.name ?? "All projects";
 
   const assets = useMemo<DialogAsset[]>(() => {
     const out: DialogAsset[] = [];
@@ -238,7 +295,15 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
     setSelectedId(null);
     setQuery("");
     setActiveTab("board");
-    setSelectedWorkspaceId(current?.workspaceId ?? boardOptions[0]?.id ?? null);
+    /* Default the project to whichever one the user is currently
+     *  in (current.projectId), falling back to the active project,
+     *  then to the first project they own. Reset the workspace
+     *  selection so the boardOptions effect below will pick the
+     *  first space from THAT project. */
+    setSelectedProjectId(
+      current?.projectId ?? activeProjectId ?? projects[0]?.id ?? null,
+    );
+    setSelectedWorkspaceId(current?.workspaceId ?? null);
     const id = window.setTimeout(() => searchRef.current?.focus(), 50);
     return () => window.clearTimeout(id);
   }, [open]);
@@ -370,9 +435,88 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
            *  fixed-width title slot — the title takes its natural
            *  width, gap-3 separates from the next control. */}
           <header className="flex h-[48px] shrink-0 items-center gap-3 px-4">
-            <h2 className="shrink-0 text-[13.5px] font-semibold tracking-tight text-[#e8e8e8]">
-              Media Browser
-            </h2>
+            {/* Project picker — replaces the static "Media Browser"
+             *  title because the user wants the dialog to scope to a
+             *  single project at a time (otherwise the Board sidebar
+             *  below dumps every space from every project, which is
+             *  too much on accounts with many projects). The active
+             *  project name shows on the trigger; the popover lists
+             *  the user's projects with their saved colour chip. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex h-[30px] shrink-0 items-center gap-2 rounded-[5px] bg-[#1f1f1f] px-2.5 text-left text-[13.5px] font-semibold tracking-tight text-[#e8e8e8] outline-none transition hover:bg-[#262626] focus-visible:bg-[#262626]"
+                  title="Switch project"
+                >
+                  {projectOptions.find((p) => p.id === effectiveProjectId)
+                    ?.color ? (
+                    <span
+                      className="h-[10px] w-[10px] shrink-0 rounded-full"
+                      style={{
+                        background: projectOptions.find((p) => p.id === effectiveProjectId)
+                          ?.color as string,
+                      }}
+                    />
+                  ) : null}
+                  <span className="max-w-[200px] truncate">{activeProjectName}</span>
+                  <ChevronDown className="h-[13px] w-[13px] shrink-0 text-[#8d8d8d]" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                sideOffset={4}
+                className="z-[1600] min-w-[220px] max-h-[320px] overflow-y-auto rounded-[6px] bg-[#1c1c1c] p-1 shadow-[0_14px_30px_rgba(0,0,0,.55)]"
+              >
+                {projectOptions.length === 0 ? (
+                  <DropdownMenuItem
+                    disabled
+                    className="flex h-[30px] items-center px-2 text-[13px] text-[#9a9a9a]"
+                  >
+                    No projects
+                  </DropdownMenuItem>
+                ) : (
+                  projectOptions.map((project) => {
+                    const isActive = project.id === effectiveProjectId;
+                    return (
+                      <DropdownMenuItem
+                        key={project.id}
+                        className={cn(
+                          "flex h-[30px] cursor-pointer items-center gap-2 rounded-[3px] px-2 text-[13px] focus:bg-[#2a2a2a]",
+                          isActive
+                            ? "bg-violet-500/15 text-violet-100 focus:bg-violet-500/20"
+                            : "text-[#dedede]",
+                        )}
+                        onSelect={() => {
+                          setSelectedProjectId(project.id);
+                          /* Switching projects nukes the workspace
+                           *  selection so the auto-pick effect below
+                           *  picks the first space of the NEW
+                           *  project. Without this the dialog could
+                           *  hold a stale workspace id from the old
+                           *  project that no longer matches anything. */
+                          setSelectedWorkspaceId(null);
+                          setSelectedId(null);
+                        }}
+                      >
+                        {project.color ? (
+                          <span
+                            className="h-[10px] w-[10px] shrink-0 rounded-full"
+                            style={{ background: project.color }}
+                          />
+                        ) : (
+                          <span className="h-[10px] w-[10px] shrink-0 rounded-full bg-[#3a3a3a]" />
+                        )}
+                        <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                        {isActive && (
+                          <Check className="h-[13px] w-[13px] shrink-0 text-violet-300" />
+                        )}
+                      </DropdownMenuItem>
+                    );
+                  })
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <div className="relative h-[28px] w-[260px]">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-[14px] w-[14px] -translate-y-1/2 text-[#9a9a9a]" />
               <input
