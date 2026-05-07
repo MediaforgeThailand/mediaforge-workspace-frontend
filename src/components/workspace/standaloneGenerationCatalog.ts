@@ -312,13 +312,6 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
       },
       // ── Google Veo family (Standard tier only) ─────────────
       {
-        id: "replicate-veo-3-1",
-        label: "Google Veo 3.1",
-        provider: "Replicate",
-        badge: "Fallback",
-        description: "Replicate-routed Veo 3.1 with optional audio.",
-      },
-      {
         id: "veo-3.1-generate-001",
         label: "Google Veo 3.1",
         provider: "Google",
@@ -543,6 +536,7 @@ export function videoSupportsStartEndFrames(model: string): boolean {
 }
 
 export function videoSupportsEndFrame(model: string): boolean {
+  if (model.startsWith("veo-")) return false;
   return videoSupportsStartEndFrames(model);
 }
 

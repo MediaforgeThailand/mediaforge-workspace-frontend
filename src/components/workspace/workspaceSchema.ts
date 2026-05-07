@@ -617,7 +617,6 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           ...SEEDANCE_MODELS,
           ...REPLICATE_SEEDANCE_MODELS,
           ...VEO_MODELS,
-          ...REPLICATE_VEO_MODELS,
           ...REPLICATE_KLING_MODELS,
         ],
         optionLabels: {

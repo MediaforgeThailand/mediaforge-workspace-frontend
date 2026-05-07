@@ -13,8 +13,18 @@ export function cleanModelLabelMap(
   labels: Record<string, string> | undefined,
 ): Record<string, string> | undefined {
   if (!labels) return undefined;
-  return Object.fromEntries(
+  const cleaned = Object.fromEntries(
     Object.entries(labels).map(([key, label]) => [key, cleanModelDisplayName(label)]),
+  );
+  const counts = new Map<string, number>();
+  for (const label of Object.values(cleaned)) {
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+  return Object.fromEntries(
+    Object.entries(labels).map(([key, label]) => {
+      const cleanLabel = cleaned[key];
+      return [key, counts.get(cleanLabel) && counts.get(cleanLabel)! > 1 ? label.trim() : cleanLabel];
+    }),
   );
 }
 
