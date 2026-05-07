@@ -1099,6 +1099,12 @@ export default function StandaloneGenerator({
   const [forms, setForms] =
     useState<Record<StandaloneToolKey, StandaloneFormState>>(INITIAL_FORMS);
   const [running, setRunning] = useState(false);
+  // Synchronous double-click guard. `setRunning` is async — between
+  // a rapid second click and React committing the disabled-button
+  // re-render, the second click would fly through validation and
+  // enqueue a duplicate paid job. The ref flips synchronously so the
+  // second invocation bails before any credits get charged.
+  const runInFlightRef = useRef(false);
   const [uploading, setUploading] = useState<UploadSlot | null>(null);
   const [uploadAccept, setUploadAccept] = useState("image/*");
   const [insufficientOpen, setInsufficientOpen] = useState(false);
@@ -2100,128 +2106,143 @@ export default function StandaloneGenerator({
   };
 
   const run = async () => {
-    if (!user?.id) {
-      toast.error(t("workspace.toast.sign_in_first"));
-      return;
-    }
-    if (!activeProject?.id) {
-      toast.error(t("workspace.toast.create_project_first_gen"));
-      return;
-    }
-    const params = buildCurrentParams(activeTool, form);
-    if (!params) {
-      toast.error(t("workspace.toast.tool_not_ready"));
-      return;
-    }
-    const validation = validateForm(activeTool, form, t);
-    if (validation) {
-      toast.error(validation);
-      return;
-    }
-    if (
-      activeTool === "video_gen" &&
-      form.videoInputMode === "reference" &&
-      isSeedance20VideoModel(form.model) &&
-      form.videoRefVideo
-    ) {
-      const durationSec =
-        form.videoRefVideo.durationSec ??
-        (await readVideoUrlDuration(form.videoRefVideo.url));
-      if (durationSec == null) {
-        toast.error(unreadableSeedanceReferenceVideoMessage());
-        return;
-      }
-      if (!isSeedanceReferenceVideoDurationValid(durationSec)) {
-        toast.error(seedanceReferenceVideoDurationMessage(durationSec));
-        return;
-      }
-      if (form.videoRefVideo.durationSec == null) {
-        updateForm({ videoRefVideo: { ...form.videoRefVideo, durationSec } });
-      }
-    }
-    if (estimatedCost != null && estimatedCost > 0) {
-      if (creditsLoading || !credits) {
-        toast.error(
-          language === "th"
-            ? "ยังตรวจสอบเครดิตไม่ได้ กรุณารอสักครู่แล้วลองใหม่"
-            : "Credits are still loading. Please try again in a moment.",
-        );
-        return;
-      }
-      if (Number(credits.balance ?? 0) < estimatedCost) {
-        setInsufficientRequiredCredits(estimatedCost);
-        setInsufficientOpen(true);
-        return;
-      }
-    }
-
-    const mentionPrompt =
-      activeTool === "voice_gen" ? form.script : form.prompt;
-    const mentionedAssets = resolveStandaloneMentionedAssets(
-      mentionPrompt,
-      panelMentionOptions,
-    );
-    const inputs = mergeStandaloneMentionInputs(
-      activeTool,
-      form,
-      buildCurrentInputs(activeTool, form),
-      mentionedAssets,
-    );
-    const runCount =
-      activeTool === "image_gen"
-        ? Math.min(4, Math.max(1, Number(form.imageCount) || 1))
-        : activeTool === "video_gen"
-          ? Math.min(4, Math.max(1, Number(form.videoCount) || 1))
-        : 1;
+    // Synchronous re-entry guard. React's `setRunning(true)` below
+    // doesn't disable the button until the next commit — a rapid
+    // second click within that window would charge credits twice
+    // (user reported two paid `gpt-image-2` jobs from one intended
+    // generation). The ref flips before anything else and is reset
+    // in `finally` so every exit path (validation bail, throw,
+    // success) clears it.
+    if (runInFlightRef.current) return;
+    runInFlightRef.current = true;
+    // Flip the visible loading state synchronously too — the previous
+    // placement (after all validation) meant the first click had no
+    // visual response, prompting users to click again.
     setRunning(true);
     try {
-      for (let index = 0; index < runCount; index += 1) {
-        const batchParams =
-          runCount > 1
-            ? { ...params, batch_index: index + 1, batch_count: runCount }
-            : params;
-        const { data, error } = await supabase.functions.invoke(
-          RUN_EDGE_FUNCTION,
-          {
-            body: {
-              action: "enqueue_workspace_job",
-              node_type: activeDef.nodeType,
-              params: batchParams,
-              inputs,
-              mentioned_assets: mentionedAssets,
-              project_id: activeProject.id,
-              workspace_id: null,
-              canvas_id: standaloneCanvasId(activeProject.id),
-              node_id: `standalone-${activeProject.id}-${activeTool}-${Date.now()}-${index}`,
-            },
-          },
-        );
-        const resp = data as { job_id?: string; error?: string } | null;
-        if (error || resp?.error || !resp?.job_id) {
-          const serverMessage = error ? await functionErrorMessage(error) : undefined;
-          throw new Error(
-            resp?.error ??
-              serverMessage ??
-              t("workspace.standalone.error_failed_queue"),
-          );
+      if (!user?.id) {
+        toast.error(t("workspace.toast.sign_in_first"));
+        return;
+      }
+      if (!activeProject?.id) {
+        toast.error(t("workspace.toast.create_project_first_gen"));
+        return;
+      }
+      const params = buildCurrentParams(activeTool, form);
+      if (!params) {
+        toast.error(t("workspace.toast.tool_not_ready"));
+        return;
+      }
+      const validation = validateForm(activeTool, form, t);
+      if (validation) {
+        toast.error(validation);
+        return;
+      }
+      if (
+        activeTool === "video_gen" &&
+        form.videoInputMode === "reference" &&
+        isSeedance20VideoModel(form.model) &&
+        form.videoRefVideo
+      ) {
+        const durationSec =
+          form.videoRefVideo.durationSec ??
+          (await readVideoUrlDuration(form.videoRefVideo.url));
+        if (durationSec == null) {
+          toast.error(unreadableSeedanceReferenceVideoMessage());
+          return;
+        }
+        if (!isSeedanceReferenceVideoDurationValid(durationSec)) {
+          toast.error(seedanceReferenceVideoDurationMessage(durationSec));
+          return;
+        }
+        if (form.videoRefVideo.durationSec == null) {
+          updateForm({ videoRefVideo: { ...form.videoRefVideo, durationSec } });
         }
       }
-      toast.success(t("workspace.toast.gen_queued"));
-      void jobsQuery.refetch();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (isInsufficientCreditsError(message)) {
-        setInsufficientRequiredCredits(estimatedCost ?? undefined);
-        setInsufficientOpen(true);
-      } else {
-        // Audit fix: jargon errors (PROVIDER_BILLING_ERROR, OpenAI
-        // 401, raw SQL function names) used to leak verbatim. Run
-        // through friendlyError so the user sees a clean Thai/EN
-        // message and the team gets the raw text in console.error.
-        toast.error(friendlyError(err, language === "th" ? "th" : "en"));
+      if (estimatedCost != null && estimatedCost > 0) {
+        if (creditsLoading || !credits) {
+          toast.error(
+            language === "th"
+              ? "ยังตรวจสอบเครดิตไม่ได้ กรุณารอสักครู่แล้วลองใหม่"
+              : "Credits are still loading. Please try again in a moment.",
+          );
+          return;
+        }
+        if (Number(credits.balance ?? 0) < estimatedCost) {
+          setInsufficientRequiredCredits(estimatedCost);
+          setInsufficientOpen(true);
+          return;
+        }
+      }
+
+      const mentionPrompt =
+        activeTool === "voice_gen" ? form.script : form.prompt;
+      const mentionedAssets = resolveStandaloneMentionedAssets(
+        mentionPrompt,
+        panelMentionOptions,
+      );
+      const inputs = mergeStandaloneMentionInputs(
+        activeTool,
+        form,
+        buildCurrentInputs(activeTool, form),
+        mentionedAssets,
+      );
+      const runCount =
+        activeTool === "image_gen"
+          ? Math.min(4, Math.max(1, Number(form.imageCount) || 1))
+          : activeTool === "video_gen"
+            ? Math.min(4, Math.max(1, Number(form.videoCount) || 1))
+          : 1;
+      try {
+        for (let index = 0; index < runCount; index += 1) {
+          const batchParams =
+            runCount > 1
+              ? { ...params, batch_index: index + 1, batch_count: runCount }
+              : params;
+          const { data, error } = await supabase.functions.invoke(
+            RUN_EDGE_FUNCTION,
+            {
+              body: {
+                action: "enqueue_workspace_job",
+                node_type: activeDef.nodeType,
+                params: batchParams,
+                inputs,
+                mentioned_assets: mentionedAssets,
+                project_id: activeProject.id,
+                workspace_id: null,
+                canvas_id: standaloneCanvasId(activeProject.id),
+                node_id: `standalone-${activeProject.id}-${activeTool}-${Date.now()}-${index}`,
+              },
+            },
+          );
+          const resp = data as { job_id?: string; error?: string } | null;
+          if (error || resp?.error || !resp?.job_id) {
+            const serverMessage = error ? await functionErrorMessage(error) : undefined;
+            throw new Error(
+              resp?.error ??
+                serverMessage ??
+                t("workspace.standalone.error_failed_queue"),
+            );
+          }
+        }
+        toast.success(t("workspace.toast.gen_queued"));
+        void jobsQuery.refetch();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (isInsufficientCreditsError(message)) {
+          setInsufficientRequiredCredits(estimatedCost ?? undefined);
+          setInsufficientOpen(true);
+        } else {
+          // Audit fix: jargon errors (PROVIDER_BILLING_ERROR, OpenAI
+          // 401, raw SQL function names) used to leak verbatim. Run
+          // through friendlyError so the user sees a clean Thai/EN
+          // message and the team gets the raw text in console.error.
+          toast.error(friendlyError(err, language === "th" ? "th" : "en"));
+        }
       }
     } finally {
       setRunning(false);
+      runInFlightRef.current = false;
     }
   };
 
