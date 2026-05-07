@@ -2763,6 +2763,7 @@ export const th = {
 
     // ─── Floating sidebar mode buttons ──────────────────────────────
     "workspace.tools.add_node": "เพิ่ม Node",
+    "workspace.tools.assets": "เปิดคลังสื่อ",
     "workspace.tools.select": "เลือก",
     "workspace.tools.hand": "เลื่อนพื้นที่ (กด Space ค้าง)",
     "workspace.tools.cut_connector": "ตัดสาย",

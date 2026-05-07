@@ -2771,6 +2771,7 @@ export const en = {
 
     // ─── Floating sidebar mode buttons ──────────────────────────────
     "workspace.tools.add_node": "Add node",
+    "workspace.tools.assets": "Open assets",
     "workspace.tools.select": "Select",
     "workspace.tools.hand": "Hand (hold Space)",
     "workspace.tools.cut_connector": "Cut connector",
