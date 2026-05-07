@@ -29,7 +29,7 @@ import { toast } from "sonner";
 import {
   DEFAULT_BRAND_LOGO,
   DEFAULT_BRAND_NAME,
-} from "@/components/workspace/WorkspaceSidebar";
+} from "@/components/workspace/brandAssets";
 
 interface OrgRow {
   id: string;
