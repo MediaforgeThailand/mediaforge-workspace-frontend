@@ -1149,6 +1149,20 @@ export default function StandaloneGenerator({
     [jobsQuery.data],
   );
   const activeJobIdsKey = activeJobs.map((job) => job.id).join("|");
+  // Per-tool active-job count drives the Generate button's disabled
+  // state. The previous gating only used the local `running` flag,
+  // which we cleared as soon as the enqueue API returned (~1-2s)
+  // instead of waiting for the actual job to finish (~30-60s) — so
+  // the spinner flashed off, the button re-enabled, and a second
+  // click queued a duplicate paid run while the first was still
+  // generating. Filter by current tool's nodeType so a video gen
+  // running in the background doesn't lock the image button (and
+  // vice versa).
+  const activeJobsForCurrentTool = useMemo(() => {
+    const nodeType = STANDALONE_TOOLS[activeTool]?.nodeType;
+    if (!nodeType) return 0;
+    return activeJobs.filter((job) => job.node_type === nodeType).length;
+  }, [activeJobs, activeTool]);
 
   useEffect(() => {
     if (!hasActiveJobs) return;
@@ -2226,7 +2240,11 @@ export default function StandaloneGenerator({
           }
         }
         toast.success(t("workspace.toast.gen_queued"));
-        void jobsQuery.refetch();
+        // Await — `setRunning(false)` in finally below would otherwise
+        // race the in-flight refetch and the button could re-enable for
+        // a frame before `activeJobsForCurrentTool` reflects the new
+        // queued row.
+        await jobsQuery.refetch();
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         if (isInsufficientCreditsError(message)) {
@@ -2339,7 +2357,7 @@ export default function StandaloneGenerator({
               )}
               costQuote={estimatedCostQuote}
               runningLabel={t("workspace.standalone.loading")}
-              running={running || !!uploading}
+              running={running || !!uploading || activeJobsForCurrentTool > 0}
               quantity={form.videoCount}
               onQuantityChange={(videoCount) => updateForm({ videoCount })}
               bottom={panelBottom}
@@ -2427,7 +2445,7 @@ export default function StandaloneGenerator({
               )}
               costQuote={estimatedCostQuote}
               runningLabel={t("workspace.standalone.loading")}
-              running={running || !!uploading}
+              running={running || !!uploading || activeJobsForCurrentTool > 0}
               showQuantity={activeTool === "image_gen"}
               quantity={form.imageCount}
               onQuantityChange={(imageCount) => updateForm({ imageCount })}
@@ -2533,10 +2551,10 @@ export default function StandaloneGenerator({
                 <button
                   type="button"
                   onClick={() => void run()}
-                  disabled={running || !!uploading}
+                  disabled={running || !!uploading || activeJobsForCurrentTool > 0}
                   className="btn-cta flex w-full items-center justify-center gap-2 text-[14px] disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-300 disabled:shadow-none disabled:opacity-70"
                 >
-                  {running ? (
+                  {running || activeJobsForCurrentTool > 0 ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Sparkles className="h-4 w-4" />
