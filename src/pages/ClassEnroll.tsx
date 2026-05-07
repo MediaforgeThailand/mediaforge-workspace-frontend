@@ -126,6 +126,8 @@ export default function ClassEnroll() {
         return i18n("classEnroll.error.invalidCode");
       case "student_code_required":
         return i18n("classEnroll.error.studentCodeRequired");
+      case "email_domain_not_allowed":
+        return "Use your college email account to join this class. Sign out and sign in again with the registered school domain.";
       default:
         return error;
     }
