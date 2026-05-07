@@ -14,11 +14,11 @@
   --ws-dur: 200ms;
 
   /* Edge colors by data type — keep in sync with PORT_COLORS in toolRegistry.ts */
-  --ws-wire-text:  hsl(217 91% 60%);   /* blue   */
-  --ws-wire-image: hsl(160 84% 39%);   /* emerald */
-  --ws-wire-video: hsl(258 90% 66%);   /* violet */
-  --ws-wire-audio: hsl(43 96% 56%);    /* amber */
-  --ws-wire-number: hsl(0 0% 65%);     /* zinc  */
+  --ws-wire-text: hsl(217 91% 60%); /* blue   */
+  --ws-wire-image: hsl(160 84% 39%); /* emerald */
+  --ws-wire-video: hsl(258 90% 66%); /* violet */
+  --ws-wire-audio: hsl(43 96% 56%); /* amber */
+  --ws-wire-number: hsl(0 0% 65%); /* zinc  */
 }
 
 .workspace-root .react-flow__viewport {
@@ -80,8 +80,8 @@
  * right-anchored ports therefore share the same animation rules.
  */
 .react-flow__handle.workspace-handle {
-  --port-cx: -50%;         /* horizontal centring on the anchor edge */
-  --port-tx: 0px;          /* outward slide added on activation */
+  --port-cx: -50%; /* horizontal centring on the anchor edge */
+  --port-tx: 0px; /* outward slide added on activation */
   --port-scale: 0.6;
   --port-opacity: 0;
 
@@ -106,7 +106,7 @@
 
   opacity: var(--port-opacity);
   transform: translate(calc(var(--port-cx) + var(--port-tx)), 0)
-             scale(var(--port-scale));
+    scale(var(--port-scale));
   transition:
     opacity var(--ws-dur) var(--ws-ease),
     transform var(--ws-dur) var(--ws-ease),
@@ -186,16 +186,20 @@
  * ports slide further LEFT, right ports slide further RIGHT. */
 
 /* Left-anchored (inputs) — node hovered/selected → slide LEFT. */
-.react-flow__node:hover .react-flow__handle.workspace-handle[data-port-anchor="left"],
-.react-flow__node.selected .react-flow__handle.workspace-handle[data-port-anchor="left"] {
+.react-flow__node:hover
+  .react-flow__handle.workspace-handle[data-port-anchor="left"],
+.react-flow__node.selected
+  .react-flow__handle.workspace-handle[data-port-anchor="left"] {
   --port-tx: -16px;
   --port-scale: 1;
   --port-opacity: 1;
 }
 
 /* Right-anchored (outputs) — node hovered/selected → slide RIGHT. */
-.react-flow__node:hover .react-flow__handle.workspace-handle[data-port-anchor="right"],
-.react-flow__node.selected .react-flow__handle.workspace-handle[data-port-anchor="right"] {
+.react-flow__node:hover
+  .react-flow__handle.workspace-handle[data-port-anchor="right"],
+.react-flow__node.selected
+  .react-flow__handle.workspace-handle[data-port-anchor="right"] {
   --port-tx: 16px;
   --port-scale: 1;
   --port-opacity: 1;
@@ -308,8 +312,12 @@ body[data-rfc="true"][data-rfc-type="model3d"][data-rfc-dir="target"]
  * on hovered / selected nodes — so the highlighted compatible
  * icons stand out. The compatibility rules above use !important
  * to win on cascade. */
-body[data-rfc="true"] .react-flow__node:hover .react-flow__handle.workspace-handle,
-body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-handle {
+body[data-rfc="true"]
+  .react-flow__node:hover
+  .react-flow__handle.workspace-handle,
+body[data-rfc="true"]
+  .react-flow__node.selected
+  .react-flow__handle.workspace-handle {
   --port-tx: 0px;
   --port-scale: 0.55;
   --port-opacity: 0;
@@ -429,8 +437,12 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
 /* Edge drawing animation — used when a node is mid-run, so the user
  * can see data flowing along the wire (marching ants left-to-right). */
 @keyframes ws-draw-edge {
-  from { stroke-dashoffset: var(--path-length, 1000); }
-  to   { stroke-dashoffset: 0; }
+  from {
+    stroke-dashoffset: var(--path-length, 1000);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 .react-flow__edge.animated .react-flow__edge-path {
   stroke: hsl(258 88% 72%);
@@ -438,7 +450,9 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   animation: ws-flow 1.2s linear infinite;
 }
 @keyframes ws-flow {
-  to { stroke-dashoffset: -28; }
+  to {
+    stroke-dashoffset: -28;
+  }
 }
 
 /* ── Clean node shell — floating title + body box ────────────
@@ -737,7 +751,11 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   height: 28px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: linear-gradient(135deg, hsl(262 87% 62%) 0%, hsl(263 86% 58%) 100%);
+  background: linear-gradient(
+    135deg,
+    hsl(262 87% 62%) 0%,
+    hsl(263 86% 58%) 100%
+  );
   color: hsl(0 0% 100%);
   border: none;
   cursor: pointer;
@@ -793,7 +811,8 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
 .react-flow__node .ws-compact-run-anchor:focus-within,
 .ws-clean-node[data-status="processing"] .ws-compact-run-anchor,
 .ws-clean-node[data-status="error"] .ws-compact-run-anchor,
-.react-flow__node:has(.ws-compact-prompt-overlay:focus-within) .ws-compact-run-anchor {
+.react-flow__node:has(.ws-compact-prompt-overlay:focus-within)
+  .ws-compact-run-anchor {
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
@@ -809,6 +828,74 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
  * sits directly on the preview image with a soft drop-shadow so it
  * stays legible over both bright and dark photos. The Run button
  * keeps its own background (it's a button, needs an affordance). */
+.ws-text-prompt-anchor {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  z-index: 8;
+  opacity: 0;
+  transform: translateY(14px);
+  pointer-events: none;
+  transition:
+    opacity 200ms var(--ws-ease),
+    transform 220ms var(--ws-ease);
+}
+.react-flow__node:hover .ws-text-prompt-anchor,
+.react-flow__node.selected .ws-text-prompt-anchor,
+.react-flow__node .ws-text-prompt-anchor:focus-within,
+.ws-clean-node[data-status="processing"] .ws-text-prompt-anchor {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.ws-text-prompt-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 82px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid hsl(217 91% 68% / 0.28);
+  background: hsl(217 91% 60% / 0.14);
+  color: hsl(213 100% 88%);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow:
+    0 10px 22px hsl(217 91% 34% / 0.24),
+    0 0 0 1px hsl(217 91% 75% / 0.12);
+  transition:
+    border-color 140ms var(--ws-ease),
+    background 140ms var(--ws-ease),
+    color 140ms var(--ws-ease),
+    transform 120ms var(--ws-ease),
+    filter 120ms var(--ws-ease);
+}
+.ws-text-prompt-button:hover {
+  border-color: hsl(217 91% 78% / 0.42);
+  background: hsl(217 91% 60% / 0.2);
+  color: hsl(213 100% 94%);
+  filter: brightness(1.05);
+  transform: scale(1.03);
+}
+.ws-text-prompt-button.is-disabled {
+  cursor: default;
+  border-color: hsl(0 0% 28% / 0.7);
+  background: hsl(0 0% 12% / 0.76);
+  color: hsl(0 0% 55%);
+  box-shadow: 0 0 0 1px hsl(0 0% 100% / 0.04);
+  filter: none;
+  transform: none;
+}
+.ws-text-prompt-button svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
 .ws-compact-prompt-overlay {
   position: absolute;
   left: 14px;
@@ -957,14 +1044,17 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
    *
    *  Fallback `200px` covers the brief frame before the observer
    *  has fired so the prompt doesn't flash full-height. */
-  min-height: min(calc(3 * 1.5em), var(--ws-prompt-max-h, calc(3 * 1.5em))) !important;
+  min-height: min(
+    calc(3 * 1.5em),
+    var(--ws-prompt-max-h, calc(3 * 1.5em))
+  ) !important;
   max-height: var(--ws-prompt-max-h, 200px) !important;
   overflow-y: auto !important;
   /* Keep focused text fully opaque. The old top mask made the
    * first visible line look faded right after clicking into the
    * prompt, which made editing long prompts harder. */
   -webkit-mask-image: none;
-          mask-image: none;
+  mask-image: none;
 }
 
 /* ── Translucent scrollbar inside the focused prompt ───────
@@ -995,7 +1085,8 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   border: 2px solid transparent;
   background-clip: padding-box;
 }
-.ws-compact-prompt-overlay [contenteditable="true"]::-webkit-scrollbar-thumb:hover,
+.ws-compact-prompt-overlay
+  [contenteditable="true"]::-webkit-scrollbar-thumb:hover,
 .ws-compact-prompt-overlay textarea::-webkit-scrollbar-thumb:hover {
   background: hsl(0 0% 100% / 0.36);
   background-clip: padding-box;
@@ -1105,8 +1196,7 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
   height: 25px;
   line-height: 1;
   box-shadow: 0 1px 4px hsl(0 0% 0% / 0.4);
-  transition:
-    background 100ms var(--ws-ease);
+  transition: background 100ms var(--ws-ease);
 }
 .ws-mini-pill:hover {
   background: hsl(0 0% 14% / 0.85);
@@ -1276,12 +1366,14 @@ body[data-rfc="true"] .react-flow__node.selected .react-flow__handle.workspace-h
 
 /* ── Node state rings — glow per status ───────────────────── */
 .workspace-node-shell {
-  transition: box-shadow var(--ws-dur) var(--ws-ease),
-              border-color var(--ws-dur) var(--ws-ease);
+  transition:
+    box-shadow var(--ws-dur) var(--ws-ease),
+    border-color var(--ws-dur) var(--ws-ease);
 }
 .workspace-node-shell[data-state="selected"] {
-  box-shadow: 0 0 0 2px hsl(0 0% 90% / 0.4),
-              0 8px 24px -8px hsl(0 0% 0% / 0.6);
+  box-shadow:
+    0 0 0 2px hsl(0 0% 90% / 0.4),
+    0 8px 24px -8px hsl(0 0% 0% / 0.6);
 }
 
 /* Square-locked preview area — applied to nodes whose result is
@@ -1526,7 +1618,9 @@ body.ws-resizing * {
   border: 1.5px solid hsl(0 0% 80% / 0.7) !important;
   border-radius: 3px !important;
   box-shadow: 0 1px 3px hsl(0 0% 0% / 0.5);
-  transition: transform 150ms ease, background 150ms ease;
+  transition:
+    transform 150ms ease,
+    background 150ms ease;
 }
 .ws-group-resize-handle:hover {
   background: hsl(0 0% 90%) !important;
@@ -1616,8 +1710,14 @@ body.ws-resizing * {
 
 /* ── Quick toolbar — pop animation when selection changes ──── */
 @keyframes ws-quick-toolbar-in {
-  from { opacity: 0; transform: translate(-50%, calc(-100% - 4px)) scale(0.96); }
-  to   { opacity: 1; transform: translate(-50%, -100%) scale(1); }
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 4px)) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -100%) scale(1);
+  }
 }
 .ws-quick-toolbar {
   animation: ws-quick-toolbar-in 110ms cubic-bezier(0.2, 0.9, 0.3, 1);
@@ -1630,13 +1730,13 @@ body.ws-resizing * {
  * Apply `ws-scroll-hide` to any `overflow-y-auto` container that
  * should scroll silently. */
 .ws-scroll-hide {
-  scrollbar-width: none;       /* Firefox */
-  -ms-overflow-style: none;    /* IE / old Edge */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE / old Edge */
 }
 .ws-scroll-hide::-webkit-scrollbar {
   width: 0;
   height: 0;
-  display: none;               /* Chromium / Safari */
+  display: none; /* Chromium / Safari */
 }
 
 /* Compact canvas picker scrollbar. Keep it visible like the reference,
@@ -1677,21 +1777,26 @@ body.ws-resizing * {
   animation: ws-glow-blue 2s ease-in-out infinite;
 }
 .workspace-node-shell[data-state="done"] {
-  box-shadow: 0 0 0 1px hsl(160 84% 39% / 0.7),
-              0 0 18px -4px hsl(160 84% 39% / 0.45);
+  box-shadow:
+    0 0 0 1px hsl(160 84% 39% / 0.7),
+    0 0 18px -4px hsl(160 84% 39% / 0.45);
 }
 .workspace-node-shell[data-state="error"] {
-  box-shadow: 0 0 0 1px hsl(0 84% 60% / 0.7),
-              0 0 18px -4px hsl(0 84% 60% / 0.45);
+  box-shadow:
+    0 0 0 1px hsl(0 84% 60% / 0.7),
+    0 0 18px -4px hsl(0 84% 60% / 0.45);
 }
 @keyframes ws-glow-blue {
-  0%, 100% {
-    box-shadow: 0 0 0 1px hsl(217 91% 60% / 0.5),
-                0 0 14px -4px hsl(217 91% 60% / 0.3);
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px hsl(217 91% 60% / 0.5),
+      0 0 14px -4px hsl(217 91% 60% / 0.3);
   }
   50% {
-    box-shadow: 0 0 0 2px hsl(217 91% 60% / 0.8),
-                0 0 26px -2px hsl(217 91% 60% / 0.55);
+    box-shadow:
+      0 0 0 2px hsl(217 91% 60% / 0.8),
+      0 0 26px -2px hsl(217 91% 60% / 0.55);
   }
 }
 
@@ -1713,7 +1818,7 @@ body.ws-resizing * {
 /* touching PromptHint.tsx. Its parent is a flex row with 6      */
 /* children (TYPE, @, media, ·, #, vars) — drop children 4–6.    */
 /* Selector is scoped to the workspace canvas only.              */
-.workspace-root div.gap-1\.5.px-0\.5 > :nth-child(n+4) {
+.workspace-root div.gap-1\.5.px-0\.5 > :nth-child(n + 4) {
   display: none !important;
 }
 

@@ -22,7 +22,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import {
   ChevronLeft, ChevronRight, Film, Loader2, Pause, Play, RotateCw, Sparkles, Scissors, Combine, FileVideo,
-  Maximize2, Box, Image as ImageIcon, Music,
+  Maximize2, Box, Image as ImageIcon, Music, Info,
   type LucideIcon,
 } from "lucide-react";
 import { CLEAN_NODE_BODY_TOP_PX, PortIcon } from "./PortIcon";
@@ -2571,27 +2571,36 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     nodeCost < baseNodeCostDisplay &&
     costTotalDiscountPercent > 0;
 
-  const costDetailRows = useMemo(() => {
+  const costDiscountRows = useMemo(() => {
     if (!nodeCostQuote) return [];
-    const rows = [
-      `Original ${formatCreditAmount(nodeCostQuote.fullCost)}${costSuffix ?? ""} credits`,
-    ];
+    const rows: Array<{
+      label: string;
+      value: string;
+      className: string;
+    }> = [];
     if (nodeCostQuote.discountPercent > 0) {
-      rows.push(`Model -${nodeCostQuote.discountPercent}%`);
+      rows.push({
+        label: "Model",
+        value: `-${nodeCostQuote.discountPercent}%`,
+        className: "text-sky-300",
+      });
     }
     if (nodeCostQuote.packageDiscountPercent > 0) {
-      rows.push(
-        `${nodeCostQuote.packageDiscountLabel ?? "Package"} -${nodeCostQuote.packageDiscountPercent}%`,
-      );
+      rows.push({
+        label: nodeCostQuote.packageDiscountLabel ?? "Package",
+        value: `-${nodeCostQuote.packageDiscountPercent}%`,
+        className: "text-violet-300",
+      });
     }
-    if (nodeCostQuote.discountPercent <= 0 && nodeCostQuote.packageDiscountPercent <= 0) {
-      rows.push("No discount applied");
+    if (costTotalDiscountPercent > 0) {
+      rows.push({
+        label: "Total",
+        value: `-${costTotalDiscountPercent}%`,
+        className: "text-emerald-300",
+      });
     }
-    rows.push(
-      `Final ${formatCreditAmount(nodeCostQuote.finalCost)}${costSuffix ?? ""} credits`,
-    );
     return rows;
-  }, [costSuffix, nodeCostQuote]);
+  }, [costTotalDiscountPercent, nodeCostQuote]);
 
   const costSummaryLabel = creditCostsLoading
     ? "Loading cost..."
@@ -3296,8 +3305,12 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                     )}
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="top" align="end">
-                  <div className="flex flex-col gap-1 text-xs text-zinc-200">
+                <TooltipContent
+                  side="top"
+                  align="end"
+                  className="overflow-visible border-white/10 bg-[#151515] px-3 py-2 text-zinc-100 shadow-2xl shadow-black/40"
+                >
+                  <div className="flex flex-col gap-2 text-xs text-zinc-100">
                     <span>
                       {isViewer
                         ? "View only — runs disabled"
@@ -3308,10 +3321,10 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                             : "Run (Ctrl+Enter)"}
                     </span>
                     {!isViewer && (
-                      <span className="flex items-center gap-1.5 whitespace-nowrap text-zinc-200">
+                      <span className="flex items-center gap-1.5 whitespace-nowrap text-zinc-100">
                         {nodeCost != null && !creditCostsLoading ? (
-                          <span className="flex items-baseline gap-1.5 text-zinc-200">
-                            <span>Total</span>
+                          <span className="flex items-baseline gap-1.5 text-zinc-100">
+                            <span className="font-medium">Total</span>
                             <span className="font-semibold">
                               {formatCreditAmount(nodeCost)}
                               {costSuffix ?? ""}
@@ -3323,8 +3336,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                                   {formatCreditAmount(baseNodeCostDisplay)}
                                   {costSuffix ?? ""}
                                 </span>
-                                <span className="text-[10px] font-semibold leading-none text-zinc-200">
-                                  Total -{costTotalDiscountPercent}%
+                                <span className="text-[10px] font-semibold leading-none text-zinc-100">
+                                  -{costTotalDiscountPercent}%
                                 </span>
                               </>
                             )}
@@ -3332,18 +3345,21 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                         ) : (
                           <span>{costSummaryLabel}</span>
                         )}
-                        {costDetailRows.length > 0 && (
-                          <span className="group/cost relative inline-flex">
+                        {costDiscountRows.length > 0 && (
+                          <span className="group/cost relative inline-flex items-center">
                             <span
-                              className="inline-grid h-3 w-3 place-items-center rounded-full border border-zinc-200/60 text-[9px] font-bold leading-none text-zinc-200"
+                              className="inline-grid h-[15px] w-[15px] place-items-center rounded-full border border-zinc-100/45 text-zinc-100/90 transition-colors hover:border-zinc-100 hover:bg-white/10 hover:text-white"
                               aria-label="Cost details"
                             >
-                              !
+                              <Info className="h-[10px] w-[10px]" strokeWidth={2.4} />
                             </span>
-                            <span className="pointer-events-none absolute bottom-full right-0 z-50 mb-1 hidden w-max min-w-[160px] rounded-md border border-white/10 bg-[#151515] p-2 text-left text-[11px] leading-[15px] text-zinc-200 shadow-xl group-hover/cost:block">
-                              {costDetailRows.map((row) => (
-                                <span key={row} className="block text-zinc-200">
-                                  {row}
+                            <span className="pointer-events-none absolute bottom-full right-0 z-[70] mb-2 hidden w-[168px] rounded-md border border-white/10 bg-[#111] p-2 text-left text-[11px] leading-[16px] text-zinc-100 shadow-2xl shadow-black/50 group-hover/cost:block">
+                              {costDiscountRows.map((row) => (
+                                <span key={`${row.label}:${row.value}`} className="flex items-center justify-between gap-3">
+                                  <span className="truncate text-zinc-300">{row.label}</span>
+                                  <span className={cn("font-semibold", row.className)}>
+                                    {row.value}
+                                  </span>
                                 </span>
                               ))}
                             </span>

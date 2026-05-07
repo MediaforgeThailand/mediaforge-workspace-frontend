@@ -17,16 +17,21 @@
  */
 
 import { memo, useCallback, useMemo, useRef, useState } from "react";
-import {
-  type NodeProps,
-  useReactFlow,
-} from "@xyflow/react";
-import { Type, AtSign } from "lucide-react";
+import { type NodeProps, useReactFlow } from "@xyflow/react";
+import { AtSign, Loader2, Sparkles, Type } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import PromptMentionTextarea from "@/components/flow/nodes/PromptMentionTextarea";
 import { CLEAN_NODE_BODY_TOP_PX, PortIcon } from "./PortIcon";
 import { useLanguage } from "@/contexts/LanguageContext";
 import NodeQuickActionRail from "./NodeQuickActionRail";
+import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import { toast } from "sonner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface TextNodeData {
   label: string;
@@ -55,13 +60,273 @@ const MAX_H = 800;
  *  This subtraction lets the textarea fill the resized box exactly,
  *  with the inline-style cap from PromptMentionTextarea handling
  *  scroll when content exceeds visible height. */
-const BODY_CHROME_H = 40;
+const BODY_CHROME_H = 72;
+const PROMPT_OPTIMIZER_FUNCTION = "workspace-chat";
+const PROMPT_OPTIMIZER_MODEL = "gpt-5.5";
+const BRACKETED_TOKEN_RE = /([#@])\[([^\]]+)\]\(([^)]+)\)/g;
+const PLAIN_MENTION_RE = /@([A-Za-z0-9_][A-Za-z0-9_.-]*)/g;
+
+const TEXT_NODE_MENTION_TYPES = [
+  "assetNode",
+  "inputNode",
+  "elementNode",
+  "imageGenNode",
+  "videoGenNode",
+  "audioGenNode",
+  "videoToPromptNode",
+  "imageTo3dNode",
+  "removeBackgroundNode",
+  "mergeAudioNode",
+  "bananaProNode",
+  "klingVideoNode",
+  "chatAiNode",
+  "groupNode",
+];
+
+const PROMPT_OPTIMIZER_SYSTEM_PROMPT = `You are a MediaForge prompt optimization engine.
+Rewrite the user's rough instruction into one practical English prompt for image/video generation or editing.
+Return only the final prompt text. No markdown, no title, no commentary.
+Preserve every protected reference placeholder exactly, including spelling and brackets.
+Use concrete, production-ready language: subject, action, visual changes, composition, lighting, identity preservation, and constraints when relevant.
+Do not add new references. Do not invent unsupported model features.`;
+
+type MentionableNode = {
+  id: string;
+  type?: string;
+  data?: Record<string, unknown>;
+};
+
+type ProtectedToken = {
+  token: string;
+  placeholder: string;
+  label: string;
+};
+
+function textValue(v: unknown): string {
+  return typeof v === "string" ? v.trim() : "";
+}
+
+function getNodeLabel(node: MentionableNode): string {
+  const data = node.data ?? {};
+  const params = data.params as Record<string, unknown> | undefined;
+  return (
+    textValue(params?.nodeName) ||
+    textValue(data.nodeName) ||
+    textValue(data.label) ||
+    node.id
+  );
+}
+
+function safeMentionLabel(label: string): string {
+  return (
+    label
+      .replace(/[\]\(\)]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim() || "reference"
+  );
+}
+
+function normalizeMentionKey(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/^@/, "")
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function isPlainMentionBoundary(text: string, index: number): boolean {
+  if (index <= 0) return true;
+  return !/[A-Za-z0-9_.-]/.test(text[index - 1] ?? "");
+}
+
+function canonicalizePlainMentions(
+  prompt: string,
+  nodes: MentionableNode[],
+  currentNodeId: string,
+): string {
+  const candidates = nodes
+    .filter((node) => node.id !== currentNodeId)
+    .filter((node) => TEXT_NODE_MENTION_TYPES.includes(node.type ?? ""));
+  const byKey = new Map<string, MentionableNode>();
+
+  for (const node of candidates) {
+    const label = getNodeLabel(node);
+    const keys = [
+      normalizeMentionKey(label),
+      normalizeMentionKey(node.id),
+      normalizeMentionKey(label.replace(/\s+/g, "")),
+    ].filter(Boolean);
+    for (const key of keys) {
+      if (!byKey.has(key)) byKey.set(key, node);
+    }
+  }
+
+  return prompt.replace(
+    PLAIN_MENTION_RE,
+    (full, rawName: string, offset: number, text: string) => {
+      if (!isPlainMentionBoundary(text, offset)) return full;
+      const node = byKey.get(normalizeMentionKey(rawName));
+      if (!node) return full;
+      return `@[${safeMentionLabel(getNodeLabel(node))}](${node.id})`;
+    },
+  );
+}
+
+function rangeOverlaps(
+  range: { start: number; end: number },
+  ranges: Array<{ start: number; end: number }>,
+): boolean {
+  return ranges.some(
+    (existing) => range.start < existing.end && range.end > existing.start,
+  );
+}
+
+function protectPromptTokens(prompt: string): {
+  text: string;
+  tokens: ProtectedToken[];
+} {
+  const ranges: Array<{
+    start: number;
+    end: number;
+    token: string;
+    label: string;
+  }> = [];
+  let match: RegExpExecArray | null;
+  const bracketed = new RegExp(BRACKETED_TOKEN_RE.source, "g");
+  while ((match = bracketed.exec(prompt)) !== null) {
+    ranges.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      token: match[0],
+      label: match[2] ?? match[0],
+    });
+  }
+
+  const plain = new RegExp(PLAIN_MENTION_RE.source, "g");
+  while ((match = plain.exec(prompt)) !== null) {
+    const start = match.index;
+    const end = start + match[0].length;
+    if (!isPlainMentionBoundary(prompt, start)) continue;
+    if (rangeOverlaps({ start, end }, ranges)) continue;
+    ranges.push({
+      start,
+      end,
+      token: match[0],
+      label: match[1] ?? match[0],
+    });
+  }
+
+  ranges.sort((a, b) => a.start - b.start);
+  let cursor = 0;
+  let text = "";
+  const tokens: ProtectedToken[] = [];
+
+  ranges.forEach((range, index) => {
+    const placeholder = `[[MEDIAFORGE_REFERENCE_${index + 1}]]`;
+    text += prompt.slice(cursor, range.start);
+    text += placeholder;
+    cursor = range.end;
+    tokens.push({ token: range.token, placeholder, label: range.label });
+  });
+  text += prompt.slice(cursor);
+
+  return { text, tokens };
+}
+
+function stripPromptWrapper(text: string): string {
+  return text
+    .trim()
+    .replace(/^```(?:text|prompt)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .replace(/^(optimized prompt|final prompt|prompt)\s*:\s*/i, "")
+    .trim();
+}
+
+function restoreProtectedTokens(
+  text: string,
+  tokens: ProtectedToken[],
+): string {
+  let restored = stripPromptWrapper(text);
+  for (const token of tokens) {
+    restored = restored.split(token.placeholder).join(token.token);
+  }
+
+  const missing = tokens.filter((token) => !restored.includes(token.token));
+  if (missing.length > 0) {
+    const suffix = `Required references: ${missing.map((token) => token.token).join(", ")}.`;
+    restored = `${restored.replace(/\s+$/, "")}${restored.endsWith(".") ? "" : "."} ${suffix}`;
+  }
+  return restored.trim();
+}
+
+function buildOptimizerUserMessage(
+  prompt: string,
+  tokens: ProtectedToken[],
+): string {
+  const refs = tokens.length
+    ? tokens
+        .map((token) => `- ${token.placeholder} = ${token.label}`)
+        .join("\n")
+    : "- none";
+
+  return [
+    "Optimize this prompt for a real MediaForge generation node.",
+    "The prompt may be written in Thai or mixed Thai/English. Convert the intent into clear English.",
+    "Keep every reference placeholder in the final prompt exactly as listed.",
+    "",
+    "Protected references:",
+    refs,
+    "",
+    "User prompt:",
+    prompt,
+  ].join("\n");
+}
+
+function buildCanvasContext(
+  nodes: MentionableNode[],
+  edges: Array<{
+    source?: string;
+    target?: string;
+    sourceHandle?: string | null;
+    targetHandle?: string | null;
+  }>,
+) {
+  const state = useWorkspaceStore.getState();
+  const current = state.current;
+  const project = state.projects.find((p) => p.id === current?.projectId);
+  const workspace = state.workspaces.find((w) => w.id === current?.workspaceId);
+
+  return {
+    project_id: current?.projectId ?? null,
+    project_name: project?.name ?? null,
+    workspace_id: current?.workspaceId ?? null,
+    workspace_name: workspace?.name ?? null,
+    canvas_id: current?.id ?? null,
+    canvas_name: current?.name ?? null,
+    nodes: nodes.slice(0, 60).map((node) => {
+      const data = node.data ?? {};
+      const params = data.params as Record<string, unknown> | undefined;
+      return {
+        id: node.id,
+        type: node.type,
+        label: getNodeLabel(node),
+        model: textValue(params?.model_name) || undefined,
+      };
+    }),
+    edges: edges.slice(0, 80).map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceHandle ?? null,
+      targetHandle: edge.targetHandle ?? null,
+    })),
+  };
+}
 
 const TextNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as unknown as TextNodeData;
-  const { setNodes } = useReactFlow();
+  const { setNodes, getNodes, getEdges } = useReactFlow();
   const { t } = useLanguage();
   const [isHovered, setIsHovered] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
 
   const width = d.width ?? DEFAULT_W;
   const height = d.height ?? DEFAULT_H;
@@ -69,7 +334,9 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
   const updateField = useCallback(
     (field: "label" | "content", value: string) => {
       setNodes((ns) =>
-        ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, [field]: value } } : n)),
+        ns.map((n) =>
+          n.id === id ? { ...n, data: { ...n.data, [field]: value } } : n,
+        ),
       );
     },
     [id, setNodes],
@@ -79,6 +346,52 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
     (v: string) => updateField("content", v),
     [updateField],
   );
+
+  const optimizePrompt = useCallback(async () => {
+    const source = (d.content ?? "").trim();
+    if (!source || isOptimizing) return;
+
+    setIsOptimizing(true);
+    try {
+      const nodes = getNodes() as MentionableNode[];
+      const edges = getEdges();
+      const canonicalPrompt = canonicalizePlainMentions(source, nodes, id);
+      const protectedPrompt = protectPromptTokens(canonicalPrompt);
+      const userMessage = buildOptimizerUserMessage(
+        protectedPrompt.text,
+        protectedPrompt.tokens,
+      );
+
+      const { data: result, error } = await supabase.functions.invoke(
+        PROMPT_OPTIMIZER_FUNCTION,
+        {
+          body: {
+            model: PROMPT_OPTIMIZER_MODEL,
+            system_prompt: PROMPT_OPTIMIZER_SYSTEM_PROMPT,
+            messages: [{ role: "user", content: userMessage }],
+            canvas_context: buildCanvasContext(nodes, edges),
+          },
+        },
+      );
+
+      if (error) throw error;
+      const content =
+        typeof (result as { content?: unknown } | null)?.content === "string"
+          ? (result as { content: string }).content
+          : "";
+      if (!content.trim())
+        throw new Error(t("workspace.node.prompt_optimize_empty_error"));
+
+      const optimized = restoreProtectedTokens(content, protectedPrompt.tokens);
+      updateField("content", optimized);
+      toast.success(t("workspace.node.prompt_optimize_success"));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(message || t("workspace.node.prompt_optimize_failed"));
+    } finally {
+      setIsOptimizing(false);
+    }
+  }, [d.content, getEdges, getNodes, id, isOptimizing, t, updateField]);
 
   // Token count derived from serialised form — used by the footer chip.
   const onDeleteNode = useCallback(() => {
@@ -98,24 +411,47 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
    *  interpret the gesture as a node-drag. Width + height are
    *  committed to `node.data` on every move so undo/redo + live
    *  multiplayer overlays see the change in real time. */
-  const startSizeRef = useRef<{ w: number; h: number; x: number; y: number } | null>(null);
+  const startSizeRef = useRef<{
+    w: number;
+    h: number;
+    x: number;
+    y: number;
+  } | null>(null);
   const onResizeStart = useCallback(
     (e: React.PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
       const target = e.currentTarget as HTMLElement;
       target.setPointerCapture(e.pointerId);
-      startSizeRef.current = { w: width, h: height, x: e.clientX, y: e.clientY };
+      startSizeRef.current = {
+        w: width,
+        h: height,
+        x: e.clientX,
+        y: e.clientY,
+      };
 
       const onMove = (ev: PointerEvent) => {
         const start = startSizeRef.current;
         if (!start) return;
-        const nextW = Math.max(MIN_W, Math.min(MAX_W, start.w + (ev.clientX - start.x)));
-        const nextH = Math.max(MIN_H, Math.min(MAX_H, start.h + (ev.clientY - start.y)));
+        const nextW = Math.max(
+          MIN_W,
+          Math.min(MAX_W, start.w + (ev.clientX - start.x)),
+        );
+        const nextH = Math.max(
+          MIN_H,
+          Math.min(MAX_H, start.h + (ev.clientY - start.y)),
+        );
         setNodes((ns) =>
           ns.map((n) =>
             n.id === id
-              ? { ...n, data: { ...n.data, width: Math.round(nextW), height: Math.round(nextH) } }
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    width: Math.round(nextW),
+                    height: Math.round(nextH),
+                  },
+                }
               : n,
           ),
         );
@@ -141,6 +477,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
     <div
       className="ws-clean-node relative"
       data-state={selected ? "selected" : "idle"}
+      data-status={isOptimizing ? "processing" : "idle"}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{ width }}
@@ -175,43 +512,87 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
        *  so the box is a real container the textarea can fill. */}
       <div
         className={cn(
-          "workspace-node-shell ws-clean-body",
+          "workspace-node-shell ws-clean-body flex flex-col overflow-hidden",
           selected && "is-selected",
         )}
         data-state={selected ? "selected" : "idle"}
         style={{ height }}
       >
-        <PromptMentionTextarea
-          value={d.content ?? ""}
-          onChange={onContentChange}
-          placeholder={t("workspace.node.text_body_placeholder")}
-          excludeNodeId={id}
-          // Workspace assets show up under `assetNode`. Include the
-          // legacy `inputNode` so a flow imported from the main
-          // editor still resolves its mentions here.
-          allowedNodeTypes={["assetNode", "inputNode"]}
-          /* `leading-snug` (1.375) replaces `leading-relaxed`
-           *  (1.625). User reported the lines felt too far apart
-           *  on the Text node specifically — same fix as
-           *  StickyNote, slightly looser because the body text is
-           *  bigger (15.5px vs 13px) and benefits from a touch
-           *  more breathing room for Thai diacritics. */
-          className="ws-clean-textarea min-h-[80px] text-[15.5px] leading-snug text-zinc-100"
-          /* Cap the rendered textarea to the resized body height
-           *  minus the body's own padding + footer chip area.
-           *  Inline-style cap (set inside PromptMentionTextarea)
-           *  beats Tailwind's `max-h-[280px]` so the textarea
-           *  always fits the user's chosen height and scrolls
-           *  inside the box when content overflows. */
-          maxHeightPx={Math.max(60, height - BODY_CHROME_H)}
-        />
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <PromptMentionTextarea
+            value={d.content ?? ""}
+            onChange={onContentChange}
+            placeholder={t("workspace.node.text_body_placeholder")}
+            excludeNodeId={id}
+            // Workspace assets show up under `assetNode`. Include the
+            // legacy `inputNode` so a flow imported from the main
+            // editor still resolves its mentions here.
+            allowedNodeTypes={TEXT_NODE_MENTION_TYPES}
+            /* `leading-snug` (1.375) replaces `leading-relaxed`
+             *  (1.625). User reported the lines felt too far apart
+             *  on the Text node specifically — same fix as
+             *  StickyNote, slightly looser because the body text is
+             *  bigger (15.5px vs 13px) and benefits from a touch
+             *  more breathing room for Thai diacritics. */
+            className="ws-clean-textarea min-h-[48px] text-[15.5px] leading-snug text-zinc-100"
+            /* Cap the rendered textarea to the resized body height
+             *  minus the body's own padding + footer chip area.
+             *  Inline-style cap (set inside PromptMentionTextarea)
+             *  beats Tailwind's `max-h-[280px]` so the textarea
+             *  always fits the user's chosen height and scrolls
+             *  inside the box when content overflows. */
+            maxHeightPx={Math.max(48, height - BODY_CHROME_H)}
+          />
+        </div>
 
         {mentionCount > 0 && (
-          <div className="mt-1 flex items-center gap-1 text-[9px] text-zinc-500">
+          <div className="mt-1 flex shrink-0 items-center gap-1 pr-24 text-[9px] leading-none text-zinc-500">
             <AtSign className="h-2.5 w-2.5" />
-            {mentionCount} {mentionCount === 1 ? t("workspace.node.text_ref_singular") : t("workspace.node.text_ref_plural")}
+            {mentionCount}{" "}
+            {mentionCount === 1
+              ? t("workspace.node.text_ref_singular")
+              : t("workspace.node.text_ref_plural")}
           </div>
         )}
+
+        <div className="ws-text-prompt-anchor">
+          <Tooltip delayDuration={150}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void optimizePrompt();
+                }}
+                onPointerDownCapture={(e) => e.stopPropagation()}
+                onMouseDownCapture={(e) => e.stopPropagation()}
+                aria-disabled={isOptimizing || !(d.content ?? "").trim()}
+                aria-label={t("workspace.node.prompt_optimize_aria")}
+                className={cn(
+                  "ws-text-prompt-button nodrag nopan",
+                  (isOptimizing || !(d.content ?? "").trim()) && "is-disabled",
+                )}
+              >
+                {isOptimizing ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <Sparkles />
+                )}
+                <span>{t("workspace.node.prompt_optimize_label")}</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent
+              side="top"
+              align="end"
+              className="max-w-[220px] border-white/10 bg-[#151515] px-3 py-2 text-xs leading-snug text-zinc-100 shadow-2xl shadow-black/40"
+            >
+              {isOptimizing
+                ? t("workspace.node.prompt_optimize_running")
+                : t("workspace.node.prompt_optimize_tip")}
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </div>
 
       {/* Resize handle — tiny dot anchored at the bottom-right of

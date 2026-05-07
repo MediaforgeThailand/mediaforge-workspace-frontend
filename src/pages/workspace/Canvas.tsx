@@ -43,15 +43,7 @@ import WorkspaceCanvas from "@/components/workspace/WorkspaceCanvas";
 // fixed in commit "fix(workspace): React #185 — unstable array
 // props on <ReactFlow />". The bisect-disabled panels below were
 // false suspects; safe to restore now.
-//
-// Right sidebar — Assets panel + AI assistant — temporarily hidden
-// at the user's request (UI declutter). Code is intentionally KEPT
-// so we can flip it back on with a one-line uncomment; do not
-// delete the file or the import. The leading underscore silences
-// the unused-import warning while the JSX is commented out.
-import _WorkspaceRightSidebar from "@/components/workspace/WorkspaceRightSidebar";
 import WorkspaceCanvasMediaBridges from "@/components/workspace/WorkspaceCanvasMediaBridges";
-import WorkspacePromptAssistantLauncher from "@/components/workspace/WorkspacePromptAssistantLauncher";
 // DebugPanel still gated — its persisted Zustand store hasn't been
 // audited end-to-end and we don't need it for the demo. Bring back
 // in a follow-up commit after a focused review.
@@ -385,10 +377,6 @@ const WorkspaceCanvasPage = () => {
               />
             )}
           </main>
-          {/* Right sidebar (Assets panel + AI assistant) hidden per
-           *  user request. Restore by uncommenting + renaming the
-           *  import above back to `WorkspaceRightSidebar`. */}
-          {/* <WorkspaceRightSidebar /> */}
           {/* Always-mounted bridges so the canvas right-click menu's
            *  Upload / Assets / Stock entries keep working even while
            *  the right sidebar (which used to host them) is hidden. */}
@@ -404,7 +392,6 @@ const WorkspaceCanvasPage = () => {
          *  the popover surfaces in the same recoverable card the
          *  rest of the workspace uses. */}
         {hydrated && <WorkspaceCanvasPagePill />}
-        {hydrated && <WorkspacePromptAssistantLauncher />}
       </WorkspaceErrorBoundary>
     </div>
   );
