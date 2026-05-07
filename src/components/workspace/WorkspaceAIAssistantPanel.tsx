@@ -449,9 +449,17 @@ const WorkspaceAIAssistantPanel = ({ showHeader = true }: { showHeader?: boolean
             onKeyDown={onKeyDown}
             onPaste={onPaste}
             placeholder="Ask for a better prompt..."
-            rows={2}
+            rows={1}
             disabled={isStreaming}
-            className="min-h-[48px] flex-1 resize-none rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-zinc-600 disabled:opacity-50"
+            // Pixel-pinned sizing: rem-based `text-xs` was getting
+            // bumped to 16.7px by the global `.mf-readable` Thai-
+            // legibility rule in index.css, which inflated 2 rows of
+            // textarea to ~80px and made the input bar dominate the
+            // panel. `text-[14px]` escapes that bump (only 12.5/13/13.5
+            // are caught), `min-h-[36px]` matches the 36px send/attach
+            // buttons, and `max-h-[120px]` lets the box grow with a
+            // long draft but caps the takeover.
+            className="min-h-[36px] max-h-[120px] flex-1 resize-none rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-[14px] leading-tight text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-zinc-600 disabled:opacity-50"
           />
           <button
             type="button"
