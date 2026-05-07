@@ -84,7 +84,6 @@ import {
   Download as CtxDownloadIcon,
   Eye as CtxEyeIcon,
   FileArchive as CtxFileArchiveIcon,
-  FolderOpen as CtxFolderOpenIcon,
   Group as CtxGroupIcon,
   Trash2 as CtxTrash2Icon,
 } from "lucide-react";
@@ -1141,7 +1140,14 @@ const Inner = () => {
 
   const onCtxPreview = useCallback((node: Node) => {
     const all = useWorkspaceStore.getState().current?.nodes ?? [];
-    const p = getNodePreview(node, all);
+    /* Look up the node by id in the LATEST store snapshot rather
+     *  than trusting the captured `node` object that was attached
+     *  to the right-click event. The captured one can lag behind
+     *  generations that landed after the menu opened — using the
+     *  fresh row means clicking Preview right after a job
+     *  completes always finds the new asset. */
+    const fresh = all.find((n) => n.id === node.id) ?? node;
+    const p = getNodePreview(fresh, all);
     if (!p) {
       toast.error(t("workspace.canvas.noPreviewAvailable"));
       return;
@@ -1354,15 +1360,30 @@ const Inner = () => {
 
     if (targets.length === 1) {
       const node = targets[0];
-      const allNodes = useWorkspaceStore.getState().current?.nodes ?? [];
-      const previewPayload = getNodePreview(node, allNodes);
       const downloadable = getNodeDownloadable(node);
+      /* Preview row used to be `disabled: !getNodePreview(...)` —
+       *  but that snapshot was captured at MENU-OPEN time. If the
+       *  user right-clicked an empty tool node, the item would be
+       *  permanently greyed out for the lifetime of the menu, and
+       *  even if a generation landed before they got around to
+       *  clicking, the row stayed dead. The handler itself
+       *  (`onCtxPreview`) already re-checks the latest store state
+       *  and toasts "No preview available" when there's nothing to
+       *  show, so leaving the row enabled lets it work whenever a
+       *  preview becomes available without needing a re-open.
+       *  Matches the double-click path, which is how the user
+       *  expected this to behave.
+       *
+       *  Also dropped the "Move to Board" and "Copy to Board"
+       *  rows. Both were placeholders shipped `disabled: true`
+       *  with no implementation behind them — visible-but-greyed
+       *  cluttered the menu and signalled features that aren't
+       *  there. They can come back when the Boards UI ships. */
       const items: NodeContextMenuItem[] = [
         {
           key: "preview",
           label: "Preview",
           icon: CtxEyeIcon,
-          disabled: !previewPayload,
           onSelect: () => onCtxPreview(node),
         },
         {
@@ -1377,21 +1398,6 @@ const Inner = () => {
           label: t("workspace.nodemenu.duplicate"),
           icon: CtxCopyIcon,
           onSelect: () => onCtxDuplicate([node]),
-        },
-        {
-          key: "move-board",
-          label: "Move to Board",
-          icon: CtxFolderOpenIcon,
-          separatorBefore: true,
-          disabled: true,
-          onSelect: () => undefined,
-        },
-        {
-          key: "copy-board",
-          label: "Copy to Board",
-          icon: CtxCopyIcon,
-          disabled: true,
-          onSelect: () => undefined,
         },
         {
           key: "delete",
