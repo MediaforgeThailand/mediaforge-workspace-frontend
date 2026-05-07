@@ -265,17 +265,17 @@ function CostDiscountLine({ quote }: { quote?: CreatePanelCostQuote | null }) {
       <span className="line-through opacity-70">{quote.fullCost.toLocaleString()}</span>
       <span className="font-semibold text-white">{quote.finalCost.toLocaleString()} credits</span>
       {quote.modelDiscountPercent > 0 && (
-        <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-1.5 py-[1px] font-semibold text-emerald-200">
-          Model {quote.modelDiscountPercent}% off
+        <span className="font-medium text-emerald-200">
+          Model -{quote.modelDiscountPercent}%
         </span>
       )}
       {quote.packageDiscountPercent > 0 && (
-        <span className="rounded-full border border-sky-400/25 bg-sky-400/10 px-1.5 py-[1px] font-semibold text-sky-200">
-          {packageLabel} {quote.packageDiscountPercent}% off
+        <span className="font-medium text-sky-200">
+          {packageLabel} -{quote.packageDiscountPercent}%
         </span>
       )}
       {quote.totalDiscountPercent > 0 && (
-        <span className="text-neutral-500">{quote.totalDiscountPercent}% off total</span>
+        <span className="text-neutral-500">Total -{quote.totalDiscountPercent}%</span>
       )}
     </div>
   );

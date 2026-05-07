@@ -3057,18 +3057,18 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                                       {nodeCostQuote.finalCost.toLocaleString()}{costSuffix ?? ""} credits
                                     </span>
                                     {nodeCostQuote.discountPercent > 0 && (
-                                      <span className="rounded-full border border-emerald-500/40 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
-                                        Model {nodeCostQuote.discountPercent}% off
+                                      <span className="text-[10px] font-medium text-emerald-300">
+                                        Model -{nodeCostQuote.discountPercent}%
                                       </span>
                                     )}
                                     {nodeCostQuote.packageDiscountPercent > 0 && (
-                                      <span className="rounded-full border border-sky-500/40 bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300">
-                                        {nodeCostQuote.packageDiscountLabel ?? "Team"} {nodeCostQuote.packageDiscountPercent}% off
+                                      <span className="text-[10px] font-medium text-sky-300">
+                                        {nodeCostQuote.packageDiscountLabel ?? "Team"} -{nodeCostQuote.packageDiscountPercent}%
                                       </span>
                                     )}
                                     {nodeCostQuote.effectiveDiscountPercent > 0 && (
                                       <span className="text-[10px] text-muted-foreground">
-                                        {nodeCostQuote.effectiveDiscountPercent}% off total
+                                        Total -{nodeCostQuote.effectiveDiscountPercent}%
                                       </span>
                                     )}
                                   </span>
