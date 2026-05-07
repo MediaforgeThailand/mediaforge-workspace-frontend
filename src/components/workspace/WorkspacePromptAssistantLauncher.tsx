@@ -11,11 +11,18 @@ const WorkspacePromptAssistantLauncher = () => {
       {open && (
         <section
           className={cn(
+            // `prompt-assistant-panel` is the index.css opt-out that
+            // disables the global `.mf-readable` Thai-bump for this panel.
+            // Without it, text-[14px] gets promoted to 18.4px / 1.75rem
+            // line-height and the chat chrome inflates until each message
+            // bubble + code block line lands ~26px tall — see the rule in
+            // src/index.css next to the .standalone-setting-card opt-out.
+            "prompt-assistant-panel",
             // Taller window — was h-[min(640px,…)] which felt cramped
             // once the textarea + history got real use. 88vh leaves
             // ~6vh top + bottom on a tall screen, while the 820px cap
             // keeps it sane on a 4K display where 88vh would be huge.
-            "pointer-events-auto flex h-[min(820px,88vh)] w-[min(380px,calc(100vw-32px))] flex-col overflow-hidden",
+            "pointer-events-auto flex h-[min(820px,88vh)] w-[min(760px,calc(100vw-32px))] flex-col overflow-hidden",
             "rounded-2xl border border-zinc-800 bg-neutral-950 shadow-[0_24px_80px_rgba(0,0,0,0.55)]",
           )}
           aria-label="Prompt Assistant"

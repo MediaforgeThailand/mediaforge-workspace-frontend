@@ -354,7 +354,14 @@ const WorkspaceAIAssistantPanel = ({ showHeader = true }: { showHeader?: boolean
   );
 
   return (
-    <div className="flex h-full flex-col text-zinc-200">
+    // `prompt-assistant-panel` is the index.css opt-out for the global
+    // `.mf-readable` Thai-bump — without it text-[14px] gets promoted to
+    // 18.4px / 1.75rem line-height and the chat chrome inflates until
+    // each message bubble + code-block line renders ~26px tall and
+    // dwarfs the panel. The same class is duplicated on the launcher's
+    // <section> so the panel works whether it renders standalone (via
+    // showHeader) or wrapped by the launcher chrome.
+    <div className="prompt-assistant-panel flex h-full flex-col text-zinc-200">
       {showHeader && <div className="border-b border-zinc-800 px-3 py-2">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-400/12 text-emerald-300">
