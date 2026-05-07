@@ -63,8 +63,8 @@ const SEEDANCE_1080P_MODELS = [
 const SEEDANCE_720P_MAX_MODELS = [...SEEDANCE_VIDEO_REF_MODELS] as const;
 const REPLICATE_SEEDANCE_MODELS = [] as const;
 const REPLICATE_SEEDANCE_REF_MODELS = [...REPLICATE_SEEDANCE_MODELS] as const;
-const REPLICATE_KLING_FRAME_MODELS = ["replicate-kling-v3-pro", "replicate-kling-v3-omni"] as const;
-const REPLICATE_KLING_MOTION_MODELS = ["replicate-kling-v3-motion-pro"] as const;
+const REPLICATE_KLING_FRAME_MODELS = [] as const;
+const REPLICATE_KLING_MOTION_MODELS = [] as const;
 const REPLICATE_KLING_MODELS = [
   ...REPLICATE_KLING_FRAME_MODELS,
   ...REPLICATE_KLING_MOTION_MODELS,
@@ -75,13 +75,13 @@ const REPLICATE_KLING_MODELS = [
  *  https://ai.google.dev/gemini-api/docs/video — see backend
  *  `_shared/veo.ts` for the param contract. */
 const VEO_MODELS = ["veo-3.1-generate-001"] as const;
-const REPLICATE_VEO_MODELS = ["replicate-veo-3-1"] as const;
+const REPLICATE_VEO_MODELS = [] as const;
 const BANANA_MODELS = ["nano-banana-2", "nano-banana-pro"] as const;
-const REPLICATE_BANANA_MODELS = ["replicate-nano-banana-2", "replicate-nano-banana-pro"] as const;
+const REPLICATE_BANANA_MODELS = [] as const;
 /** Backend dispatches anything starting with "gpt-image" to OpenAI's
  *  /v1/images/edits or /v1/images/generations endpoint. */
 const OPENAI_IMAGE_MODELS = ["gpt-image-2"] as const;
-const REPLICATE_OPENAI_IMAGE_MODELS = ["replicate-gpt-image-2"] as const;
+const REPLICATE_OPENAI_IMAGE_MODELS = [] as const;
 const ELEVENLABS_TTS_MODELS = ["elevenlabs-multilingual-v2", "elevenlabs-turbo-v2-5"] as const;
 const GEMINI_TTS_MODELS = ["gemini-3.1-flash-tts-preview", "gemini-2.5-pro-preview-tts"] as const;
 /** All 30 official preset speakers shipped with Gemini 3.1 Flash TTS
@@ -182,13 +182,10 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         optionLabels: {
           "nano-banana-2": "Nano Banana 2",
           "nano-banana-pro": "Nano Banana Pro",
-          "replicate-nano-banana-2": "Nano Banana 2 (Replicate)",
-          "replicate-nano-banana-pro": "Nano Banana Pro (Replicate)",
           "seedream-5-0-260128": "SeedDream 5.0",
           "seedream-5-0-lite-260128": "SeedDream 5.0 Lite",
           "seedream-4-5-251128": "SeedDream 4.5",
           "gpt-image-2": "GPT Image 2",
-          "replicate-gpt-image-2": "GPT Image 2 (Replicate)",
         },
         default: "nano-banana-2",
         required: true,
@@ -217,7 +214,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         type: "select",
         options: ["1K", "2K"],
         default: "1K",
-        supportedModels: ["nano-banana-2", "replicate-nano-banana-2"],
+        supportedModels: ["nano-banana-2"],
       },
       // Banana Pro (gemini-3-pro-image-preview) adds 4K on top.
       {
@@ -226,7 +223,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         type: "select",
         options: ["1K", "2K", "4K"],
         default: "2K",
-        supportedModels: ["nano-banana-pro", "replicate-nano-banana-pro"],
+        supportedModels: ["nano-banana-pro"],
       },
       {
         key: "size",
@@ -524,7 +521,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         id: "ref_image",
         label: "ref_image",
         color: "cyan",
-        supportedModels: ["kling-v3-omni", "replicate-kling-v3-omni"],
+        supportedModels: ["kling-v3-omni"],
         maxConnections: 7,
       },
       {
@@ -544,7 +541,6 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           "kling-v3-motion-pro",
           ...REPLICATE_KLING_MOTION_MODELS,
           "kling-v3-omni",
-          "replicate-kling-v3-omni",
         ],
       },
       {
@@ -628,10 +624,6 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           "seedance-2-0-lite": "SeedDance 2.0 Fast",
           "seedance-2-0-pro": "SeedDance 2.0",
           "veo-3.1-generate-001": "Google Veo 3.1",
-          "replicate-veo-3-1": "Google Veo 3.1 (Replicate)",
-          "replicate-kling-v3-pro": "Kling 3.0 Pro (Replicate)",
-          "replicate-kling-v3-motion-pro": "Kling 3.0 Motion Pro (Replicate)",
-          "replicate-kling-v3-omni": "Kling 3.0 Omni (Replicate)",
         },
         default: "kling-v2-6-pro",
         required: true,
@@ -888,7 +880,6 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           "kling-v3-motion-pro",
           "kling-v3-omni",
           ...REPLICATE_KLING_MOTION_MODELS,
-          "replicate-kling-v3-omni",
         ],
       },
       {

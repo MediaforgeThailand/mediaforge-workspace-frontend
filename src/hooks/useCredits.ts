@@ -27,6 +27,8 @@ interface CreditBalance {
   shared_balance?: number | null;
   shared_total?: number | null;
   shared_used?: number | null;
+  package_discount_percent?: number;
+  package_discount_label?: string | null;
 }
 
 function unwrapCreditBalance(payload: unknown): CreditBalance | null {
@@ -52,6 +54,8 @@ function unwrapCreditBalance(payload: unknown): CreditBalance | null {
     shared_balance: row.shared_balance == null ? null : Number(row.shared_balance),
     shared_total: row.shared_total == null ? null : Number(row.shared_total),
     shared_used: row.shared_used == null ? null : Number(row.shared_used),
+    package_discount_percent: Number(row.package_discount_percent ?? 0),
+    package_discount_label: row.package_discount_label ?? null,
   };
 }
 

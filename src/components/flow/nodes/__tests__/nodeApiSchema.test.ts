@@ -12,31 +12,29 @@ import {
 } from "../nodeApiSchema";
 
 describe("KLING_MODELS constant", () => {
-  it("contains exactly 6 pro models (v2.6+)", () => {
-    expect(KLING_MODELS).toHaveLength(6);
+  it("contains only pro mode models", () => {
+    expect(KLING_MODELS.length).toBeGreaterThan(0);
     expect(KLING_MODELS.every((m) => m.mode === "pro")).toBe(true);
   });
 
-  it("includes all supported V2.6, V3 & Omni series", () => {
+  it("includes the V2.6, V3 & Omni series", () => {
     const values = KLING_MODELS.map((m) => m.value);
     expect(values).toEqual([
       "kling-v2-6-pro", "kling-v2-6-motion-pro",
       "kling-v3-pro", "kling-v3-motion-pro",
-      "kling-video-o1", "kling-v3-omni",
+      "kling-v3-omni",
     ]);
   });
 
   it("has human-readable labels", () => {
     expect(KLING_MODELS[0].label).toBe("Kling 2.6 Pro");
     expect(KLING_MODELS[2].label).toBe("Kling 3.0 Pro");
-    expect(KLING_MODELS[4].label).toBe("Kling Video O1");
-    expect(KLING_MODELS[5].label).toBe("Kling 3.0 Omni");
+    expect(KLING_MODELS[KLING_MODELS.length - 1].label).toBe("Kling 3.0 Omni");
   });
 
   it("KLING_MODEL_LOOKUP maps values to api_model + mode", () => {
     expect(KLING_MODEL_LOOKUP["kling-v2-6-pro"]).toEqual({ api_model: "kling-v2-6", mode: "pro" });
     expect(KLING_MODEL_LOOKUP["kling-v3-pro"]).toEqual({ api_model: "kling-v3", mode: "pro" });
-    expect(KLING_MODEL_LOOKUP["kling-video-o1"]).toEqual({ api_model: "kling-video-o1", mode: "pro" });
     expect(KLING_MODEL_LOOKUP["kling-v3-omni"]).toEqual({ api_model: "kling-v3-omni", mode: "pro" });
   });
 });
@@ -48,16 +46,17 @@ describe("NODE_API_SCHEMA.klingVideoNode", () => {
     expect(schema.defaultModel).toBe("kling-v2-6-pro");
   });
 
-  it("model_name param has optionLabels for all 6 models", () => {
+  it("model_name param has optionLabels for every Kling model", () => {
     const modelParam = schema.params.find((p) => p.key === "model_name")!;
     expect(modelParam.optionLabels).toBeDefined();
     expect(modelParam.optionLabels!["kling-v2-6-pro"]).toBe("Kling 2.6 Pro");
     expect(modelParam.optionLabels!["kling-v3-omni"]).toBe("Kling 3.0 Omni");
   });
 
-  it("has exactly 6 model options", () => {
+  it("model options match the KLING_MODELS list", () => {
     const modelParam = schema.params.find((p) => p.key === "model_name")!;
-    expect(modelParam.options).toHaveLength(6);
+    expect(modelParam.options).toHaveLength(KLING_MODELS.length);
+    expect(modelParam.options).toEqual(KLING_MODELS.map((m) => m.value));
   });
 
   it("exposes ref_image and ref_video handles for Omni models", () => {
@@ -65,10 +64,8 @@ describe("NODE_API_SCHEMA.klingVideoNode", () => {
     const refVideo = schema.inputs.find((h) => h.id === "ref_video");
     expect(refImage).toBeDefined();
     expect(refImage!.supportedModels).toContain("kling-v3-omni");
-    expect(refImage!.supportedModels).toContain("kling-video-o1");
     expect(refVideo).toBeDefined();
     expect(refVideo!.supportedModels).toContain("kling-v3-omni");
-    expect(refVideo!.supportedModels).toContain("kling-video-o1");
   });
 
   it("duration is dynamic: slider for Omni, select for standard", () => {
@@ -162,11 +159,10 @@ describe("getVisibleParams", () => {
 });
 
 describe("getParamOptions", () => {
-  it("returns 6 model options", () => {
+  it("returns the current KLING_MODELS as options", () => {
     const modelParam = NODE_API_SCHEMA.klingVideoNode.params.find((p) => p.key === "model_name")!;
-    expect(modelParam.options).toHaveLength(6);
+    expect(modelParam.options).toHaveLength(KLING_MODELS.length);
     expect(modelParam.options).toContain("kling-v3-pro");
-    expect(modelParam.options).toContain("kling-video-o1");
     expect(modelParam.options).toContain("kling-v3-omni");
     expect(modelParam.options).not.toContain("kling-v1-pro");
   });
@@ -187,12 +183,13 @@ describe("cleanParamsOnModelChange", () => {
   });
 
   it("keeps valid select values", () => {
+    // Switching to v3-pro turns duration into a slider, so "10" gets coerced to numeric 10
     const result = cleanParamsOnModelChange("klingVideoNode", "kling-v3-pro", {
       model_name: "kling-v2-6-pro",
       duration: "10",
       aspect_ratio: "9:16",
     });
-    expect(result.duration).toBe("10");
+    expect(result.duration).toBe(10);
     expect(result.aspect_ratio).toBe("9:16");
   });
 

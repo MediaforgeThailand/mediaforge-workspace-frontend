@@ -38,6 +38,11 @@ SUPABASE_CREDENTIALS.md
 
 screenshots
 
+# Playwright artifacts
+test-results
+playwright-report
+.playwright
+
 *.branches
 
 supabase/snippets

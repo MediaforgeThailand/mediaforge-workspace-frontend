@@ -26,12 +26,13 @@ vi.mock("react-router-dom", async () => {
 describe("ProtectedRoute", () => {
   it("shows loader when loading", () => {
     mockAuthState = { user: null, loading: true };
-    const { getByText, queryByText } = render(
+    const { getByRole, queryByText } = render(
       <MemoryRouter>
         <ProtectedRoute><div>Protected</div></ProtectedRoute>
       </MemoryRouter>
     );
-    expect(getByText("Loading...")).toBeInTheDocument();
+    // Loader exposes role="status" with aria-label "Loading..."
+    expect(getByRole("status", { name: "Loading..." })).toBeInTheDocument();
     expect(queryByText("Protected")).not.toBeInTheDocument();
   });
 

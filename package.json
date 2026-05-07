@@ -13,9 +13,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:edge": "deno test supabase/functions/ --allow-net --allow-env --allow-read --env-file=.env.local",
-    "test:edge:watch": "deno test supabase/functions/ --allow-net --allow-env --allow-read --env-file=.env.local --watch",
-    "edge:serve": "npx supabase functions serve --env-file .env.local"
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

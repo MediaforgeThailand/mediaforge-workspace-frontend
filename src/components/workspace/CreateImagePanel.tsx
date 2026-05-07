@@ -139,6 +139,7 @@ interface CreateImagePanelProps {
   extraControls?: React.ReactNode;
   onCreate?: () => void;
   createLabel?: string;
+  costQuote?: CreatePanelCostQuote | null;
   runningLabel?: string;
   running?: boolean;
   showQuantity?: boolean;
@@ -230,6 +231,7 @@ interface CreateVideoPanelProps {
   extraControls?: React.ReactNode;
   onCreate?: () => void;
   createLabel?: string;
+  costQuote?: CreatePanelCostQuote | null;
   runningLabel?: string;
   running?: boolean;
   quantity?: number;
@@ -241,6 +243,42 @@ interface CreateVideoPanelProps {
 interface ModelSettingTag {
   label: string;
   icon?: "reference" | "frames" | "audio" | "resolution" | "duration" | "multi";
+}
+
+export interface CreatePanelCostQuote {
+  fullCost: number;
+  modelCost: number;
+  finalCost: number;
+  modelDiscountPercent: number;
+  packageDiscountPercent: number;
+  packageDiscountLabel?: string | null;
+  totalDiscountPercent: number;
+}
+
+function CostDiscountLine({ quote }: { quote?: CreatePanelCostQuote | null }) {
+  if (!quote || quote.finalCost <= 0) return null;
+  const hasDiscount = quote.modelDiscountPercent > 0 || quote.packageDiscountPercent > 0;
+  if (!hasDiscount) return null;
+  const packageLabel = quote.packageDiscountLabel || "Team";
+  return (
+    <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 text-[10px] leading-[13px] text-neutral-400">
+      <span className="line-through opacity-70">{quote.fullCost.toLocaleString()}</span>
+      <span className="font-semibold text-white">{quote.finalCost.toLocaleString()} credits</span>
+      {quote.modelDiscountPercent > 0 && (
+        <span className="font-medium text-emerald-200">
+          Model -{quote.modelDiscountPercent}%
+        </span>
+      )}
+      {quote.packageDiscountPercent > 0 && (
+        <span className="font-medium text-sky-200">
+          {packageLabel} -{quote.packageDiscountPercent}%
+        </span>
+      )}
+      {quote.totalDiscountPercent > 0 && (
+        <span className="text-neutral-500">Total -{quote.totalDiscountPercent}%</span>
+      )}
+    </div>
+  );
 }
 
 export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
@@ -274,6 +312,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   extraControls,
   onCreate,
   createLabel,
+  costQuote,
   runningLabel,
   running = false,
   showQuantity = true,
@@ -534,21 +573,23 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
         </div>
         )}
 
-        {/* Create for Free */}
-        <button
-          onClick={handleCreate}
-          disabled={running}
-          className="standalone-generate-button group relative flex h-[48px] flex-1 items-center justify-center gap-[6px] overflow-hidden rounded-[12px] px-[8px] text-[15px] font-semibold leading-[20px] text-white transition-all hover:brightness-110 active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
-          style={{
-            background:
-              "linear-gradient(135deg, rgba(199,125,255,.52), rgba(155,77,224,.72) 48%, rgba(91,42,140,.82))",
-            boxShadow:
-              "inset 0 0 0 1px rgba(199,125,255,.22), inset 0 -8px 18px rgba(91,42,140,.48), 0 12px 34px -18px rgba(168,85,247,.9)",
-          }}
-        >
-          <span className="pointer-events-none absolute -left-8 top-1/2 h-20 w-28 -translate-y-1/2 rounded-full bg-[#C77DFF]/35 blur-2xl" />
-          <span className="relative">{running ? resolvedRunningLabel : resolvedCreateLabel}</span>
-        </button>
+        <div className="flex min-w-0 flex-1 flex-col gap-[4px]">
+          <CostDiscountLine quote={costQuote} />
+          <button
+            onClick={handleCreate}
+            disabled={running}
+            className="standalone-generate-button group relative flex h-[48px] w-full items-center justify-center gap-[6px] overflow-hidden rounded-[12px] px-[8px] text-[15px] font-semibold leading-[20px] text-white transition-all hover:brightness-110 active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
+            style={{
+              background:
+                "linear-gradient(135deg, rgba(199,125,255,.52), rgba(155,77,224,.72) 48%, rgba(91,42,140,.82))",
+              boxShadow:
+                "inset 0 0 0 1px rgba(199,125,255,.22), inset 0 -8px 18px rgba(91,42,140,.48), 0 12px 34px -18px rgba(168,85,247,.9)",
+            }}
+          >
+            <span className="pointer-events-none absolute -left-8 top-1/2 h-20 w-28 -translate-y-1/2 rounded-full bg-[#C77DFF]/35 blur-2xl" />
+            <span className="relative">{running ? resolvedRunningLabel : resolvedCreateLabel}</span>
+          </button>
+        </div>
       </div>
 
       {/* ===== BOTTOM NAV ===== */}
@@ -618,6 +659,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
   extraControls,
   onCreate,
   createLabel,
+  costQuote,
   runningLabel,
   running = false,
   quantity: controlledQuantity,
@@ -1003,22 +1045,25 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           </button>
         </div>
 
-        <button
-          type="button"
-          onClick={handleCreate}
-          disabled={running}
-          className="standalone-generate-button group relative flex h-[42px] flex-1 items-center justify-center gap-[6px] overflow-hidden rounded-[12px] px-[8px] text-[14px] font-semibold leading-[20px] text-white transition-all hover:brightness-110 active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
-          style={{
-            background:
-              "linear-gradient(135deg, rgba(199,125,255,.52), rgba(155,77,224,.72) 48%, rgba(91,42,140,.82))",
-            boxShadow:
-              "inset 0 1px 0 rgba(255,255,255,.34), inset 0 -8px 18px rgba(91,42,140,.48), 0 12px 34px -18px rgba(168,85,247,.9)",
-          }}
-        >
-          <span className="pointer-events-none absolute inset-x-4 top-0 h-[16px] rounded-b-full bg-white/25 blur-[10px]" />
-          <span className="pointer-events-none absolute -left-8 top-1/2 h-20 w-28 -translate-y-1/2 rounded-full bg-[#C77DFF]/35 blur-2xl" />
-          <span className="relative">{running ? resolvedRunningLabel : resolvedCreateLabel}</span>
-        </button>
+        <div className="flex min-w-0 flex-1 flex-col gap-[4px]">
+          <CostDiscountLine quote={costQuote} />
+          <button
+            type="button"
+            onClick={handleCreate}
+            disabled={running}
+            className="standalone-generate-button group relative flex h-[42px] w-full items-center justify-center gap-[6px] overflow-hidden rounded-[12px] px-[8px] text-[14px] font-semibold leading-[20px] text-white transition-all hover:brightness-110 active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
+            style={{
+              background:
+                "linear-gradient(135deg, rgba(199,125,255,.52), rgba(155,77,224,.72) 48%, rgba(91,42,140,.82))",
+              boxShadow:
+                "inset 0 1px 0 rgba(255,255,255,.34), inset 0 -8px 18px rgba(91,42,140,.48), 0 12px 34px -18px rgba(168,85,247,.9)",
+            }}
+          >
+            <span className="pointer-events-none absolute inset-x-4 top-0 h-[16px] rounded-b-full bg-white/25 blur-[10px]" />
+            <span className="pointer-events-none absolute -left-8 top-1/2 h-20 w-28 -translate-y-1/2 rounded-full bg-[#C77DFF]/35 blur-2xl" />
+            <span className="relative">{running ? resolvedRunningLabel : resolvedCreateLabel}</span>
+          </button>
+        </div>
       </div>
 
       <div className="hidden items-center justify-around border-t border-white/[0.04] px-[18px] py-[6px] md:flex">
