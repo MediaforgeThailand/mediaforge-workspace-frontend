@@ -96,7 +96,6 @@ const KLING_NODE_DEFS: Record<string, KlingNodeDef> = {
       { key: "cfg_scale", label: "cfg_scale", type: "stepper", default: 0.5, min: 0, max: 1, step: 0.1 },
       { key: "aspect_ratio", label: "aspect_ratio", type: "selector", options: ["16:9", "9:16", "1:1"], default: "16:9" },
       { key: "duration", label: "duration", type: "selector", options: ["5", "10"], default: "5" },
-      { key: "mode", label: "mode", type: "selector", options: ["pro", "std"], default: "pro" },
     ],
   },
   "ai/kling_2_6_camera": {
