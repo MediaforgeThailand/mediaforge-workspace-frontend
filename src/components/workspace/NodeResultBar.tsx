@@ -15,6 +15,7 @@ import { AudioPlayButton } from "./AudioPlayButton";
 import { downloadFromUrl } from "./downloadAsset";
 import MediaContextMenu from "./MediaContextMenu";
 import { buildMediaMenuItems } from "./mediaMenuItems";
+import { useMediaContextMenu } from "./useMediaContextMenu";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 export interface Generation {
@@ -44,7 +45,7 @@ const NodeResultBar = memo(
   ({ generations, selectedIndex = 0, onSelectIndex, width = 300 }: Props) => {
     const { t: i18n } = useLanguage();
     const [expanded, setExpanded] = useState(false);
-    const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+    const ctxMenu = useMediaContextMenu();
 
     const hasGens = !!generations && generations.length > 0;
     const current = hasGens ? (generations![selectedIndex] ?? generations![0]) : null;
@@ -71,15 +72,7 @@ const NodeResultBar = memo(
                 setExpanded(true);
               }}
               onMouseDown={(e) => e.stopPropagation()}
-              onContextMenu={
-                canUseMediaMenu
-                  ? (e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setContextMenu({ x: e.clientX, y: e.clientY });
-                    }
-                  : undefined
-              }
+              onContextMenu={canUseMediaMenu ? ctxMenu.openAt : undefined}
             >
               {current.type === "image" && current.url && (
                 <img src={current.url} className="block h-auto w-full" alt="" />
@@ -145,11 +138,11 @@ const NodeResultBar = memo(
             onSelect={onSelectIndex}
           />
         )}
-        {contextMenu && (
+        {ctxMenu.position && (
           <MediaContextMenu
-            position={contextMenu}
+            position={ctxMenu.position}
             items={contextMenuItems}
-            onClose={() => setContextMenu(null)}
+            onClose={ctxMenu.close}
           />
         )}
       </>

@@ -26,6 +26,7 @@ import { AudioPlayButton } from "./AudioPlayButton";
 import { downloadFromUrl } from "./downloadAsset";
 import MediaContextMenu from "./MediaContextMenu";
 import { buildMediaMenuItems } from "./mediaMenuItems";
+import { useMediaContextMenu } from "./useMediaContextMenu";
 import NodeQuickActionRail from "./NodeQuickActionRail";
 
 export interface AssetNodeData {
@@ -80,7 +81,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
   const { setNodes, getNode } = useReactFlow();
   const { t, t: i18n } = useLanguage();
   const [isHovered, setIsHovered] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const ctxMenu = useMediaContextMenu();
   // Re-sign the previewUrl on mount in case it was generated under
   // the old 24h TTL and has since expired. Falls back to the raw
   // URL untouched for blob:/data: URLs and non-Supabase sources.
@@ -220,9 +221,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
       onMouseLeave={() => setIsHovered(false)}
       onContextMenu={(event) => {
         if (!downloadableUrl) return;
-        event.preventDefault();
-        event.stopPropagation();
-        setContextMenu({ x: event.clientX, y: event.clientY });
+        ctxMenu.openAt(event);
       }}
       // Default tile width — 219 (200 → 230 → 219). Now also
       // user-resizable via the corner handle below; persists in
@@ -291,11 +290,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
             "group relative bg-black ws-preview-zone",
             !d.uploading && d.previewUrl && "cursor-pointer",
           )}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            setContextMenu({ x: event.clientX, y: event.clientY });
-          }}
+          onContextMenu={ctxMenu.openAt}
         >
         {livePreviewUrl ? (
           d.fieldType === "model3d" ? (
@@ -404,11 +399,11 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
         title={t("workspace.node.asset_drag_resize")}
         aria-label={t("workspace.node.asset_resize")}
       />
-      {contextMenu && (
+      {ctxMenu.position && (
         <MediaContextMenu
-          position={contextMenu}
+          position={ctxMenu.position}
           items={contextMenuItems}
-          onClose={() => setContextMenu(null)}
+          onClose={ctxMenu.close}
         />
       )}
     </div>

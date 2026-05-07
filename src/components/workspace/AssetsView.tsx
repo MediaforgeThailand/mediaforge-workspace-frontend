@@ -68,6 +68,7 @@ import NodePreviewLightbox, { type PreviewPayload } from "./NodePreviewLightbox"
 import { downloadFromUrl } from "./downloadAsset";
 import MediaContextMenu from "./MediaContextMenu";
 import { buildMediaMenuItems } from "./mediaMenuItems";
+import { useMediaContextMenu } from "./useMediaContextMenu";
 import {
   Dialog,
   DialogContent,
@@ -1186,7 +1187,7 @@ function AssetCard({
   const Icon = KIND_ICON[asset.kind];
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [hovered, setHovered] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const ctxMenu = useMediaContextMenu();
 
   // Lazily play / pause on hover so the grid doesn't choke on a
   // page full of <video autoplay loop>.
@@ -1239,11 +1240,7 @@ function AssetCard({
         tabIndex={0}
         title={t("workspace.assets.open_download")}
         onClick={() => onPreview(asset)}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          setContextMenu({ x: event.clientX, y: event.clientY });
-        }}
+        onContextMenu={ctxMenu.openAt}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
@@ -1340,11 +1337,11 @@ function AssetCard({
           </span>
         </div>
       </div>
-      {contextMenu && (
+      {ctxMenu.position && (
         <MediaContextMenu
-          position={contextMenu}
+          position={ctxMenu.position}
           items={contextMenuItems}
-          onClose={() => setContextMenu(null)}
+          onClose={ctxMenu.close}
         />
       )}
     </div>

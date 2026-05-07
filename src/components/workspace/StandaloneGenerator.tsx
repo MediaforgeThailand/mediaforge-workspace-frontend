@@ -96,6 +96,7 @@ import { useVoicePreview } from "@/hooks/useVoicePreview";
 import { orderModelsByRecommendation } from "./modelDisplay";
 import MediaContextMenu from "./MediaContextMenu";
 import { buildMediaMenuItems } from "./mediaMenuItems";
+import { useMediaContextMenu } from "./useMediaContextMenu";
 // Hardcoded voice catalogs (Gemini star names, Google Studio
 // labels, ElevenLabs default presets) were deleted in the
 // preset-purge cleanup. ElevenLabs voices come from a live
@@ -5421,7 +5422,7 @@ function CreationTile({
   onDelete: () => void;
 }) {
   const { language, t } = useLanguage();
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const ctxMenu = useMediaContextMenu();
   const result = job.result;
   const params = job.request?.params ?? {};
   const prompt = String(params.prompt ?? "");
@@ -5548,13 +5549,7 @@ function CreationTile({
         tabIndex={canOpenPreview ? 0 : undefined}
         onClick={canOpenPreview ? openMediaPreview : undefined}
         onContextMenu={
-          canOpenPreview || downloadUrl || canDelete
-            ? (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                setContextMenu({ x: event.clientX, y: event.clientY });
-              }
-            : undefined
+          canOpenPreview || downloadUrl || canDelete ? ctxMenu.openAt : undefined
         }
         onKeyDown={
           canOpenPreview
@@ -5691,11 +5686,11 @@ function CreationTile({
           </div>
         </div>
       )}
-      {contextMenu && (
+      {ctxMenu.position && (
         <MediaContextMenu
-          position={contextMenu}
+          position={ctxMenu.position}
           items={contextMenuItems}
-          onClose={() => setContextMenu(null)}
+          onClose={ctxMenu.close}
         />
       )}
     </article>
