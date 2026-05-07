@@ -51,8 +51,6 @@ import {
   ChevronDown,
   RefreshCcw,
   ExternalLink,
-  Eye,
-  Copy,
   Download,
   Trash2,
   AlertTriangle,
@@ -68,9 +66,8 @@ import { getSignedUrl } from "@/hooks/useSignedUrl";
 import { cn } from "@/lib/utils";
 import NodePreviewLightbox, { type PreviewPayload } from "./NodePreviewLightbox";
 import { downloadFromUrl } from "./downloadAsset";
-import MediaContextMenu, {
-  type MediaContextMenuItem,
-} from "./MediaContextMenu";
+import MediaContextMenu from "./MediaContextMenu";
+import { buildMediaMenuItems } from "./mediaMenuItems";
 import {
   Dialog,
   DialogContent,
@@ -1216,56 +1213,17 @@ function AssetCard({
       ? `${Math.round(asset.durationSec)}s`
       : null;
   const dateLabel = formatRelative(asset.createdAt, t);
-  const contextMenuItems: MediaContextMenuItem[] = [
-    {
-      key: "preview",
-      label: t("workspace.mediaMenu.preview"),
-      icon: Eye,
-      onSelect: () => onPreview(asset),
-    },
-    {
-      key: "download",
-      label: t("workspace.mediaMenu.download"),
-      icon: Download,
-      onSelect: () =>
-        void downloadFromUrl(
-          asset.url,
-          asset.source === "generation"
-            ? asset.prompt || t("workspace.assets.gen_fallback")
-            : asset.name,
-        ),
-    },
-    {
-      key: "duplicate",
-      label: t("workspace.mediaMenu.duplicate"),
-      icon: Copy,
-      disabled: true,
-      onSelect: () => undefined,
-    },
-    {
-      key: "move-board",
-      label: t("workspace.mediaMenu.moveToBoard"),
-      icon: Folder,
-      separatorBefore: true,
-      disabled: true,
-      onSelect: () => undefined,
-    },
-    {
-      key: "copy-board",
-      label: t("workspace.mediaMenu.copyToBoard"),
-      icon: Copy,
-      disabled: true,
-      onSelect: () => undefined,
-    },
-    {
-      key: "delete",
-      label: t("workspace.mediaMenu.delete"),
-      icon: Trash2,
-      separatorBefore: true,
-      danger: true,
-      onSelect: () => onDelete(asset),
-    },
-  ];
+  const contextMenuItems = buildMediaMenuItems(t, {
+    onPreview: () => onPreview(asset),
+    onDownload: () =>
+      void downloadFromUrl(
+        asset.url,
+        asset.source === "generation"
+          ? asset.prompt || t("workspace.assets.gen_fallback")
+          : asset.name,
+      ),
+    onDelete: () => onDelete(asset),
+  });
 
   return (
     <div

@@ -17,11 +17,6 @@ import {
   Music,
   Box,
   Loader2,
-  Eye,
-  Download,
-  Copy,
-  FolderOpen,
-  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFreshSignedUrl } from "./useFreshSignedUrl";
@@ -29,9 +24,8 @@ import { CLEAN_NODE_BODY_TOP_PX, PortIcon } from "./PortIcon";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { AudioPlayButton } from "./AudioPlayButton";
 import { downloadFromUrl } from "./downloadAsset";
-import MediaContextMenu, {
-  type MediaContextMenuItem,
-} from "./MediaContextMenu";
+import MediaContextMenu from "./MediaContextMenu";
+import { buildMediaMenuItems } from "./mediaMenuItems";
 import NodeQuickActionRail from "./NodeQuickActionRail";
 
 export interface AssetNodeData {
@@ -205,55 +199,13 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
     : d.fieldType === "model3d" ? Box
     : ImageIcon;
   const downloadableUrl = livePreviewUrl ?? d.previewUrl;
-  const contextMenuItems: MediaContextMenuItem[] = [
-    {
-      key: "preview",
-      label: i18n("workspace.mediaMenu.preview"),
-      icon: Eye,
-      disabled: true,
-      onSelect: () => undefined,
-    },
-    {
-      key: "download",
-      label: i18n("workspace.mediaMenu.download"),
-      icon: Download,
-      disabled: !downloadableUrl,
-      onSelect: () => {
-        if (downloadableUrl) {
-          void downloadFromUrl(downloadableUrl, d.fileName || d.label || "asset");
-        }
-      },
-    },
-    {
-      key: "duplicate",
-      label: i18n("workspace.mediaMenu.duplicate"),
-      icon: Copy,
-      onSelect: onDuplicateNode,
-    },
-    {
-      key: "move-board",
-      label: i18n("workspace.mediaMenu.moveToBoard"),
-      icon: FolderOpen,
-      separatorBefore: true,
-      disabled: true,
-      onSelect: () => undefined,
-    },
-    {
-      key: "copy-board",
-      label: i18n("workspace.mediaMenu.copyToBoard"),
-      icon: Copy,
-      disabled: true,
-      onSelect: () => undefined,
-    },
-    {
-      key: "delete",
-      label: i18n("workspace.mediaMenu.delete"),
-      icon: Trash2,
-      separatorBefore: true,
-      danger: true,
-      onSelect: onDeleteNode,
-    },
-  ];
+  const contextMenuItems = buildMediaMenuItems(i18n, {
+    onDownload: downloadableUrl
+      ? () => void downloadFromUrl(downloadableUrl, d.fileName || d.label || "asset")
+      : undefined,
+    onDuplicate: onDuplicateNode,
+    onDelete: onDeleteNode,
+  });
   // Title icon stays neutral grey across every node type — team
   // feedback was that a multi-coloured canvas was too noisy. The
   // glyph alone (Image vs Film vs Music vs Box) is what now signals

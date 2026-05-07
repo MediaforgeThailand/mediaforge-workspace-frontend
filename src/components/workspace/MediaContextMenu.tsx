@@ -1,17 +1,9 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { MediaContextMenuItem } from "./mediaMenuItems";
 
-export interface MediaContextMenuItem {
-  key: string;
-  label: string;
-  icon: LucideIcon;
-  onSelect: () => void;
-  disabled?: boolean;
-  danger?: boolean;
-  separatorBefore?: boolean;
-}
+export type { MediaContextMenuItem } from "./mediaMenuItems";
 
 interface MediaContextMenuProps {
   position: { x: number; y: number };
