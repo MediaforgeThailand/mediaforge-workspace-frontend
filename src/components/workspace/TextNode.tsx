@@ -37,11 +37,16 @@ interface TextNodeData {
 
 const TEXT_COLOR = "hsl(217 91% 60%)"; // blue — text output
 
-/* Resize bounds. The default is preserved at 260×default-content-h
- *  so existing nodes don't visibly jump after this change ships;
- *  the user can drag the corner handle to grow the box. */
-const DEFAULT_W = 260;
-const DEFAULT_H = 180;
+/* Resize bounds. Defaults bumped +30% (260→338, 180→234) per user
+ *  feedback that the Text node felt too small relative to other
+ *  canvas tiles — at 260×180 it read as a small annotation when
+ *  the whole point of TextNode is to be the prompt source for
+ *  multi-mention chains. Existing nodes already have a saved
+ *  `data.width` / `data.height`, so this only affects newly-
+ *  created nodes; the corner resize handle can still drag back
+ *  down to MIN. */
+const DEFAULT_W = 338;
+const DEFAULT_H = 234;
 const MIN_W = 200;
 const MIN_H = 120;
 const MAX_W = 900;
