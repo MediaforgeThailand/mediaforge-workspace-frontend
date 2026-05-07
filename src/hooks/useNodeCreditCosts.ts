@@ -33,6 +33,7 @@ export interface CreditCostRow {
   source_ratio?: number | null;
   provider_unit?: string | null;
   notes?: string | null;
+  discount_percent?: number | null;
 }
 
 const QUERY_KEY = ["node-credit-costs"] as const;

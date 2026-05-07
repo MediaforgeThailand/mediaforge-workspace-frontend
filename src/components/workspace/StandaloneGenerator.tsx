@@ -43,7 +43,7 @@ import {
   type CreateVideoPanelSetting,
 } from "@/components/workspace/CreateImagePanel";
 import InsufficientCreditsDialog from "@/components/InsufficientCreditsDialog";
-import { calculateNodeCost } from "@/lib/nodeCostCalculator";
+import { applyNodeCostDiscount, calculateNodeCostQuote } from "@/lib/nodeCostCalculator";
 import { useNodeCreditCosts } from "@/hooks/useNodeCreditCosts";
 import { useCredits } from "@/hooks/useCredits";
 import { DEFAULT_PROJECT_NAME } from "@/store/useWorkspaceStore";
@@ -1286,25 +1286,26 @@ export default function StandaloneGenerator({
     if (creditCostsLoading) return null;
     const params = buildCurrentParams(activeTool, form);
     if (!params) return null;
-    const baseCost = calculateNodeCost({
+    const quote = calculateNodeCostQuote({
       schemaKey: activeDef.nodeType,
       params,
       creditCosts,
     });
-    if (baseCost == null) return null;
+    if (!quote) return null;
     const runCount =
       activeTool === "image_gen"
         ? Math.min(4, Math.max(1, Number(form.imageCount) || 1))
         : activeTool === "video_gen"
           ? Math.min(4, Math.max(1, Number(form.videoCount) || 1))
         : 1;
-    if (baseCost <= 0) return 0;
+    if (quote.baseCost <= 0) return 0;
     const multiplier = workspaceCostMultiplierForTool(
       activeTool,
       form.model,
       workspaceCreditMultiplier,
     );
-    const perRunCost = Math.max(1, Math.ceil(baseCost * multiplier));
+    const fullRunCost = Math.max(1, Math.ceil(quote.baseCost * multiplier));
+    const perRunCost = applyNodeCostDiscount(fullRunCost, quote.discountPercent);
     return perRunCost * runCount;
   }, [
     activeDef.nodeType,

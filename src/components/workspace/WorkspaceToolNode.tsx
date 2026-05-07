@@ -36,7 +36,7 @@ import { friendlyError } from "@/lib/friendlyError";
 import { type ParamDef } from "@/components/flow/nodes/nodeApiSchema";
 import { useNodeCreditCosts as useCreatorCreditCosts } from "@/hooks/useNodeCreditCosts";
 import { useVoicePreview } from "@/hooks/useVoicePreview";
-import { calculateNodeCost } from "@/lib/nodeCostCalculator";
+import { applyNodeCostDiscount, calculateNodeCostQuote } from "@/lib/nodeCostCalculator";
 import PromptMentionTextarea from "@/components/flow/nodes/PromptMentionTextarea";
 import MultiShotBuilder, {
   type SceneBlock,
@@ -2279,7 +2279,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const isMotionModel = selectedModel.includes("motion");
   const showsDurationCost = DURATION_COST_MODELS.has(selectedModel);
 
-  const baseNodeCost = useMemo(() => {
+  const baseNodeQuote = useMemo(() => {
     if (!creditCosts || !schema) return null;
     if (isMotionModel) {
       const perSecond = creditCosts.find(
@@ -2288,21 +2288,40 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           r.model === selectedModel &&
           r.pricing_type === "per_second",
       );
-      return perSecond?.cost ?? null;
+      return perSecond
+        ? {
+            baseCost: perSecond.cost,
+            discountPercent: Number(perSecond.discount_percent ?? 0),
+          }
+        : null;
     }
-    return calculateNodeCost({ schemaKey, params, creditCosts });
+    return calculateNodeCostQuote({ schemaKey, params, creditCosts });
   }, [creditCosts, isMotionModel, params, schema, schemaKey, selectedModel]);
 
-  const nodeCost = useMemo(() => {
-    if (baseNodeCost == null) return null;
-    if (baseNodeCost <= 0) return 0;
+  const nodeCostQuote = useMemo(() => {
+    if (!baseNodeQuote) return null;
+    if (baseNodeQuote.baseCost <= 0) {
+      return {
+        fullCost: 0,
+        finalCost: 0,
+        discountPercent: 0,
+      };
+    }
     const multiplier = workspaceCostMultiplierForNode(
       schemaKey,
       selectedModel,
       workspaceCreditMultiplier,
     );
-    return Math.max(1, Math.ceil(baseNodeCost * multiplier));
-  }, [baseNodeCost, schemaKey, selectedModel, workspaceCreditMultiplier]);
+    const fullCost = Math.max(1, Math.ceil(baseNodeQuote.baseCost * multiplier));
+    const discountPercent = Math.max(0, Math.min(100, Number(baseNodeQuote.discountPercent) || 0));
+    return {
+      fullCost,
+      finalCost: applyNodeCostDiscount(fullCost, discountPercent),
+      discountPercent,
+    };
+  }, [baseNodeQuote, schemaKey, selectedModel, workspaceCreditMultiplier]);
+
+  const nodeCost = nodeCostQuote?.finalCost ?? null;
 
   const costSuffix = isMotionModel
     ? "/s"
@@ -3005,8 +3024,23 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                       <span className="text-muted-foreground">
                         {creditCostsLoading
                           ? "Loading cost…"
-                          : nodeCost != null
-                            ? `Cost: ${nodeCost}${costSuffix ?? ""} credits`
+                          : nodeCostQuote
+                            ? nodeCostQuote.discountPercent > 0
+                              ? (
+                                  <span className="flex flex-wrap items-center gap-1.5">
+                                    <span>Cost:</span>
+                                    <span className="line-through opacity-70">
+                                      {nodeCostQuote.fullCost.toLocaleString()}{costSuffix ?? ""}
+                                    </span>
+                                    <span className="font-semibold text-foreground">
+                                      {nodeCostQuote.finalCost.toLocaleString()}{costSuffix ?? ""} credits
+                                    </span>
+                                    <span className="rounded-full border border-emerald-500/40 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                                      {nodeCostQuote.discountPercent}% off
+                                    </span>
+                                  </span>
+                                )
+                              : `Cost: ${nodeCostQuote.finalCost.toLocaleString()}${costSuffix ?? ""} credits`
                             : "Pricing unavailable"}
                       </span>
                     )}
