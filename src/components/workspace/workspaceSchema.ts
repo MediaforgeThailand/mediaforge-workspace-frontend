@@ -515,7 +515,6 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           "kling-v2-6-pro", "kling-v3-pro", "kling-v3-omni",
           ...SEEDANCE_MODELS,
           ...REPLICATE_SEEDANCE_MODELS,
-          ...VEO_MODELS,
           ...REPLICATE_VEO_MODELS,
           ...REPLICATE_KLING_FRAME_MODELS,
         ],
@@ -597,7 +596,6 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         supportedModels: [
           "kling-v2-6-pro", "kling-v2-6-motion-pro",
           "kling-v3-pro", "kling-v3-motion-pro", "kling-v3-omni",
-          ...VEO_MODELS,
           ...REPLICATE_VEO_MODELS,
           ...REPLICATE_KLING_FRAME_MODELS,
         ],
