@@ -151,20 +151,6 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
         description: "Higher quality Banana with 4K support and Flex tier control.",
       },
       {
-        id: "replicate-nano-banana-2",
-        label: "Nano Banana 2",
-        provider: "Replicate",
-        badge: "Fallback",
-        description: "Replicate-routed Banana 2 with the same visible controls.",
-      },
-      {
-        id: "replicate-nano-banana-pro",
-        label: "Nano Banana Pro",
-        provider: "Replicate",
-        badge: "Fallback",
-        description: "Replicate-routed Banana Pro with the same visible controls.",
-      },
-      {
         id: "seedream-5-0-260128",
         label: "SeedDream 5.0",
         provider: "BytePlus",
@@ -191,13 +177,6 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
         provider: "OpenAI",
         badge: "4K",
         description: "Best for precise style and quality control.",
-      },
-      {
-        id: "replicate-gpt-image-2",
-        label: "GPT Image 2",
-        provider: "Replicate",
-        badge: "Fallback",
-        description: "Replicate-routed GPT Image 2 with the same visible controls.",
       },
     ],
   },
@@ -252,27 +231,6 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
         provider: "Kling",
         badge: "Omni",
         description: "Multi-input Kling 3 with audio and video reference.",
-      },
-      {
-        id: "replicate-kling-v3-pro",
-        label: "Kling 3.0 Pro",
-        provider: "Replicate",
-        badge: "Fallback",
-        description: "Replicate-routed Kling 3 Pro with the same visible controls.",
-      },
-      {
-        id: "replicate-kling-v3-motion-pro",
-        label: "Kling 3.0 Motion Pro",
-        provider: "Replicate",
-        badge: "Fallback",
-        description: "Replicate-routed Kling 3 motion control.",
-      },
-      {
-        id: "replicate-kling-v3-omni",
-        label: "Kling 3.0 Omni",
-        provider: "Replicate",
-        badge: "Fallback",
-        description: "Replicate-routed Kling 3 Omni with the same visible controls.",
       },
       // ── Seedance family ────────────────────────────────────
       {

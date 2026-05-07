@@ -32,12 +32,6 @@ const imageModels: ModelEntry[] = (NODE_API_SCHEMA.bananaProNode?.supportedModel
   const optionLabels = NODE_API_SCHEMA.bananaProNode?.params.find((p) => p.key === "model_name")?.optionLabels;
   return { slug, label: optionLabels?.[slug] ?? slug };
 });
-const replicateImageModels: ModelEntry[] = [
-  { slug: "replicate-nano-banana-2", label: "Nano Banana 2 (Replicate)" },
-  { slug: "replicate-nano-banana-pro", label: "Nano Banana Pro (Replicate)" },
-  { slug: "replicate-gpt-image-2", label: "GPT Image 2 (Replicate)" },
-];
-
 const removeBgModels: ModelEntry[] = (NODE_API_SCHEMA.removeBackgroundNode?.supportedModels ?? []).map((slug) => {
   const optionLabels = NODE_API_SCHEMA.removeBackgroundNode?.params.find((p) => p.key === "model_name")?.optionLabels;
   return { slug, label: optionLabels?.[slug] ?? slug };
@@ -60,15 +54,11 @@ const videoModels: ModelEntry[] = [
   }),
   // Google Veo (Standard tier only — Lite/Fast not yet wired in).
   { slug: "veo-3.1-generate-001", label: "Google Veo 3.1" },
-  { slug: "replicate-veo-3-1", label: "Google Veo 3.1 (Replicate)" },
-  { slug: "replicate-kling-v3-pro", label: "Kling 3.0 Pro (Replicate)" },
-  { slug: "replicate-kling-v3-motion-pro", label: "Kling 3.0 Motion Pro (Replicate)" },
-  { slug: "replicate-kling-v3-omni", label: "Kling 3.0 Omni (Replicate)" },
 ];
 
 export const AVAILABLE_MODELS: FeatureModels[] = [
   { feature: "chat_ai", featureLabel: "Chat AI", models: chatModels },
-  { feature: "generate_freepik_image", featureLabel: "Image Generation", models: [...imageModels, ...replicateImageModels] },
+  { feature: "generate_freepik_image", featureLabel: "Image Generation", models: imageModels },
   { feature: "generate_freepik_video", featureLabel: "Video Generation", models: videoModels },
   { feature: "remove_background", featureLabel: "Remove Background", models: removeBgModels },
   { feature: "merge_audio_video", featureLabel: "Merge Audio + Video", models: mergeAudioModels },
