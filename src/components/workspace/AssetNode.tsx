@@ -20,7 +20,6 @@ import {
   Eye,
   Download,
   Copy,
-  FolderOpen,
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -205,13 +204,34 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
     : d.fieldType === "model3d" ? Box
     : ImageIcon;
   const downloadableUrl = livePreviewUrl ?? d.previewUrl;
+  /* Preview from the right-click menu used to be hard-coded
+   *  `disabled: true` with `onSelect: () => undefined` — the row
+   *  rendered greyed out and clicking it did nothing on every
+   *  asset node. WorkspaceCanvas already listens for the
+   *  `workspace-open-node-preview` window event (see
+   *  WorkspaceCanvas.tsx ≈ line 1152) and looks the node up by
+   *  id, then runs `getNodePreview` against the live store
+   *  snapshot to open the lightbox. We dispatch that event here
+   *  instead of wiring a prop drill from WorkspaceCanvas down to
+   *  every node — same pattern double-click already uses.
+   *
+   *  Also dropped the "Move to Board" / "Copy to Board" rows
+   *  from this menu — both shipped as `disabled: true` placeholders
+   *  with no implementation behind them. They cluttered the menu
+   *  and signalled features that aren't there yet. They can come
+   *  back when the Boards UI ships. */
   const contextMenuItems: MediaContextMenuItem[] = [
     {
       key: "preview",
       label: i18n("workspace.mediaMenu.preview"),
       icon: Eye,
-      disabled: true,
-      onSelect: () => undefined,
+      onSelect: () => {
+        window.dispatchEvent(
+          new CustomEvent("workspace-open-node-preview", {
+            detail: { nodeId: id },
+          }),
+        );
+      },
     },
     {
       key: "download",
@@ -229,21 +249,6 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
       label: i18n("workspace.mediaMenu.duplicate"),
       icon: Copy,
       onSelect: onDuplicateNode,
-    },
-    {
-      key: "move-board",
-      label: i18n("workspace.mediaMenu.moveToBoard"),
-      icon: FolderOpen,
-      separatorBefore: true,
-      disabled: true,
-      onSelect: () => undefined,
-    },
-    {
-      key: "copy-board",
-      label: i18n("workspace.mediaMenu.copyToBoard"),
-      icon: Copy,
-      disabled: true,
-      onSelect: () => undefined,
     },
     {
       key: "delete",
