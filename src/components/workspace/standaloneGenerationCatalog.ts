@@ -536,7 +536,6 @@ export function videoSupportsStartEndFrames(model: string): boolean {
 }
 
 export function videoSupportsEndFrame(model: string): boolean {
-  if (model.startsWith("veo-")) return false;
   return videoSupportsStartEndFrames(model);
 }
 
