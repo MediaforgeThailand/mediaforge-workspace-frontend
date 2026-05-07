@@ -2010,6 +2010,14 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
    *  idempotent if the existing realtime path already delivered
    *  the row. */
   useEffect(() => {
+    // Don't sweep while runNode is actively running in this component.
+    // The sweep's `patchNodeDataNow({activeRunId: null, status: "done"})`
+    // would stomp the just-set "processing" state and runNode's
+    // pollJob would `__RUN_CANCELLED__` within 1s, vanishing the
+    // spinner and enabling the button while the backend job keeps
+    // going (the exact "spinner 1s then clickable + double charge"
+    // user reported).
+    if (runInFlightRef.current) return;
     let cancelled = false;
     const sweep = async () => {
       const current = useWorkspaceStore.getState().current;
@@ -2096,6 +2104,16 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   }, []);
 
   useEffect(() => {
+    // Same race as the sweep above: this effect's `applyCompletedJob`
+    // unconditionally patches `activeRunId: null` regardless of
+    // whether a fresh runNode is in flight. Before the user's click
+    // finishes enqueuing (knownJobId is still null), checkJob's
+    // node_id query returns the PREVIOUS completed run for this
+    // node and applyCompletedJob stomps the newly-set processing
+    // state. runNode's pollJob then sees `runStillActive()` flip
+    // to false within ~1s and rejects, clearing the spinner. Skip
+    // entirely while runNode owns the run.
+    if (runInFlightRef.current) return;
     const knownJobId = d.backgroundJobId ?? null;
     const activeRunStartedAt =
       typeof d.runStartedAt === "number" && Number.isFinite(d.runStartedAt)
