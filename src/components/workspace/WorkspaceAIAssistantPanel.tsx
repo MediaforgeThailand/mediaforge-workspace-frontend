@@ -360,19 +360,23 @@ const WorkspaceAIAssistantPanel = ({ showHeader = true }: { showHeader?: boolean
           <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-400/12 text-emerald-300">
             <Sparkles className="h-3.5 w-3.5" />
           </div>
+          {/* All text inside the panel uses pixel-pinned sizes
+           *  ≥14px to escape the global `.mf-readable` bump
+           *  (text-xs / text-[9-13.5px] all get inflated by index.css
+           *  for Thai legibility, which dwarfed the chat chrome). */}
           <div className="min-w-0">
-            <div className="truncate text-xs font-semibold text-zinc-100">Prompt Assistant</div>
-            <div className="truncate text-[10px] text-zinc-500">{projectName}</div>
+            <div className="truncate text-[14px] font-semibold text-zinc-100">Prompt Assistant</div>
+            <div className="truncate text-[14px] text-zinc-500">{projectName}</div>
           </div>
-          <span className="ml-auto rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
-            GPT-5.5
-          </span>
+          {/* Model badge intentionally hidden — implementation
+           *  detail; matches the launcher header. Keep the slot in
+           *  case we re-enable a model picker later. */}
         </div>
       </div>}
 
       <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto p-3">
         {messages.length === 0 && (
-          <div className="mt-8 text-center text-[11px] leading-relaxed text-zinc-500">
+          <div className="mt-8 text-center text-[14px] leading-snug text-zinc-500">
             <Sparkles className="mx-auto mb-2 h-5 w-5 text-zinc-600" />
             <div className="mx-auto max-w-[240px]">Describe the image, video, or edit you want.</div>
             <div className="mt-3 space-y-1.5 text-left text-zinc-600">
@@ -396,7 +400,7 @@ const WorkspaceAIAssistantPanel = ({ showHeader = true }: { showHeader?: boolean
         ))}
 
         {isStreaming && (
-          <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+          <div className="flex items-center gap-1.5 text-[14px] text-zinc-500">
             <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
             Thinking...
           </div>
@@ -471,7 +475,7 @@ const WorkspaceAIAssistantPanel = ({ showHeader = true }: { showHeader?: boolean
             <Send className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="mt-1.5 flex items-center justify-between text-[10px] text-zinc-600">
+        <div className="mt-1.5 flex items-center justify-between text-[14px] text-zinc-600">
           {!user ? (
             <span className="text-amber-600/80">{i18n("workspace.aiAssistant.guestNotSaved")}</span>
           ) : (
@@ -528,8 +532,15 @@ const MessageBubble = ({
 
   return (
     <div
+      // Pixel-pinned text size (`text-[14px]`) escapes the
+      // `.mf-readable` Thai-legibility bump in index.css that promoted
+      // the previous `text-xs` to 16.7px and made every assistant
+      // reply feel like an essay (each line rendered ~26px tall).
+      // 14px is small enough to fit a real conversation in the panel
+      // and large enough that Thai script stays legible without the
+      // global override kicking in.
       className={cn(
-        "rounded-lg px-3 py-2 text-xs leading-relaxed",
+        "rounded-lg px-3 py-2 text-[14px] leading-snug",
         isUser
           ? "ml-6 bg-zinc-800 text-zinc-100"
           : isError
@@ -537,7 +548,7 @@ const MessageBubble = ({
             : "bg-zinc-900 text-zinc-200",
       )}
     >
-      <div className="mb-1 flex items-center gap-1 text-[9px] uppercase tracking-wide text-zinc-500">
+      <div className="mb-1 flex items-center gap-1 text-[14px] font-semibold uppercase tracking-wide text-zinc-500">
         {isError && <AlertTriangle className="h-2.5 w-2.5" />}
         {isUser ? "You" : isError ? "System" : "Assistant"}
       </div>
@@ -601,8 +612,12 @@ const CodeBlock = ({ lang, text }: { lang?: string; text: string }) => {
       )}
     >
       <div
+        // Header strip ("PROMPT", "NEGATIVE", etc.) — text-[14px] so
+        // it escapes `.mf-readable` and renders at the literal size.
+        // The previous text-[9px] / text-[10px] mix got promoted to
+        // ~16px which made the strip taller than the prompt body.
         className={cn(
-          "flex items-center justify-between border-b px-2 py-1 text-[9px] font-mono uppercase tracking-wider",
+          "flex items-center justify-between border-b px-2 py-1 text-[14px] font-mono font-semibold uppercase tracking-wider",
           isPrompt && "border-emerald-900/60 text-emerald-400",
           isNegative && "border-rose-900/60 text-rose-400",
           !isPrompt && !isNegative && "border-zinc-800 text-zinc-500",
@@ -613,7 +628,7 @@ const CodeBlock = ({ lang, text }: { lang?: string; text: string }) => {
           type="button"
           onClick={onCopy}
           className={cn(
-            "flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] normal-case",
+            "flex items-center gap-1 rounded px-1.5 py-0.5 text-[14px] font-medium normal-case",
             copied
               ? "bg-emerald-500/20 text-emerald-300"
               : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200",
@@ -633,7 +648,11 @@ const CodeBlock = ({ lang, text }: { lang?: string; text: string }) => {
           )}
         </button>
       </div>
-      <pre className="overflow-x-auto whitespace-pre-wrap px-2.5 py-2 font-mono text-[11px] leading-relaxed text-zinc-100">
+      {/* Code block — `text-[14px]` keeps the prompt readable while
+       *  escaping the readability bump (text-[11px] would have been
+       *  pushed to 16.1px and dwarfed the message body). leading-snug
+       *  keeps multi-line prompts compact. */}
+      <pre className="overflow-x-auto whitespace-pre-wrap px-2.5 py-2 font-mono text-[14px] leading-snug text-zinc-100">
         {text}
       </pre>
     </div>

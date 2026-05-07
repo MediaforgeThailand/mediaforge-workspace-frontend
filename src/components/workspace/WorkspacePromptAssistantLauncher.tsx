@@ -20,18 +20,21 @@ const WorkspacePromptAssistantLauncher = () => {
           )}
           aria-label="Prompt Assistant"
         >
-          <div className="flex h-11 shrink-0 items-center gap-2 border-b border-zinc-800 px-3">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-400/12 text-emerald-300">
-              <Sparkles className="h-3.5 w-3.5" />
+          <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-zinc-800 px-3">
+            {/* Icon container — bumped to 32×32 + larger sparkle to
+             *  pair with the 14px title text. The previous 28×28 +
+             *  14px sparkle looked undersized once the title escaped
+             *  the global text bump. */}
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-300">
+              <Sparkles className="h-4 w-4" />
             </div>
             {/* Header text — model badge ("ChatGPT 5.5") removed
              *  because shipping the underlying model name to the user
-             *  is implementation detail that creators don't care about
-             *  and the visual sub-line crowded the title in compact
-             *  mode. The model is still hard-coded inside the panel
-             *  (CHAT_MODEL_SLUG) and configurable per code change. */}
+             *  is implementation detail. text-[14px] dodges the
+             *  `.mf-readable` Thai-bump rule (which would otherwise
+             *  promote text-xs to 16.7px and dwarf the icon). */}
             <div className="min-w-0">
-              <div className="truncate text-xs font-semibold text-zinc-100">Prompt Assistant</div>
+              <div className="truncate text-[14px] font-semibold text-zinc-100">Prompt Assistant</div>
             </div>
             <button
               type="button"
