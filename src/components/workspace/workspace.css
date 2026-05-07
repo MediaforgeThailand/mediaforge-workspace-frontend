@@ -1994,7 +1994,7 @@ body.ws-lightbox-open .react-flow__node .ws-clean-title {
 
 .node-quick-menu {
   position: absolute;
-  left: 31px;
+  right: calc(100% + 6px);
   top: 0;
   z-index: 2;
   width: 178px;
