@@ -20,6 +20,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type AssetSource = "generated" | "uploaded" | "element";
 type AssetType = "image" | "video" | "audio" | "model3d";
@@ -354,47 +360,58 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
         )}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-[64px] shrink-0 items-center gap-4 border-b border-[#2d2d2d] px-5">
-            <h2 className="w-[112px] shrink-0 text-[14px] font-semibold text-[#e8e8e8]">
+          {/* Header tightened from 64px → 48px to match every other
+           *  dialog header in the workspace. The fixed `w-[112px]`
+           *  on the title forced the search field off the natural
+           *  baseline because the title's font-size (14px) and the
+           *  search field's font-size (13px) sat in different
+           *  vertical anchors at 64px tall. New layout: shorter
+           *  bar, items center-aligned via the flex container, no
+           *  fixed-width title slot — the title takes its natural
+           *  width, gap-3 separates from the next control. */}
+          <header className="flex h-[48px] shrink-0 items-center gap-3 px-4">
+            <h2 className="shrink-0 text-[13.5px] font-semibold tracking-tight text-[#e8e8e8]">
               Media Browser
             </h2>
-            <div className="relative h-[28px] w-[240px]">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-[#9a9a9a]" />
+            <div className="relative h-[28px] w-[260px]">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-[14px] w-[14px] -translate-y-1/2 text-[#9a9a9a]" />
               <input
                 ref={searchRef}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={t("workspace.allAssets.searchPlaceholder")}
-                className="h-full w-full rounded-[4px] border border-[#2f2f2f] bg-[#181818] pl-8 pr-2 text-[13px] font-medium text-zinc-100 outline-none placeholder:text-[#777] focus:border-[#555]"
+                className="h-full w-full rounded-[4px] bg-[#181818] pl-8 pr-2 text-[13px] font-medium leading-none text-zinc-100 outline-none placeholder:text-[#777] focus:bg-[#1f1f1f]"
               />
             </div>
-            <button
-              type="button"
-              aria-pressed={viewMode === "grid"}
-              onClick={() => setViewMode("grid")}
-              className={cn(
-                "grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[4px] transition",
-                viewMode === "grid"
-                  ? "bg-violet-500 text-white"
-                  : "bg-transparent text-[#9b9b9b] hover:bg-[#242424] hover:text-white",
-              )}
-            >
-              <Grid2X2 className="h-[15px] w-[15px]" />
-            </button>
-            <button
-              type="button"
-              aria-pressed={viewMode === "list"}
-              onClick={() => setViewMode("list")}
-              className={cn(
-                "grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[4px] transition",
-                viewMode === "list"
-                  ? "bg-[#333] text-white"
-                  : "bg-transparent text-[#9b9b9b] hover:bg-[#242424] hover:text-white",
-              )}
-            >
-              <List className="h-[15px] w-[15px]" />
-            </button>
-            <span className="ml-auto shrink-0 text-[11px] font-medium text-[#8f8f8f]">
+            <div className="flex h-[28px] items-center rounded-[4px] bg-[#181818] p-[2px]">
+              <button
+                type="button"
+                aria-pressed={viewMode === "grid"}
+                onClick={() => setViewMode("grid")}
+                className={cn(
+                  "grid h-[24px] w-[28px] place-items-center rounded-[3px] transition",
+                  viewMode === "grid"
+                    ? "bg-violet-500 text-white"
+                    : "bg-transparent text-[#9b9b9b] hover:text-white",
+                )}
+              >
+                <Grid2X2 className="h-[14px] w-[14px]" />
+              </button>
+              <button
+                type="button"
+                aria-pressed={viewMode === "list"}
+                onClick={() => setViewMode("list")}
+                className={cn(
+                  "grid h-[24px] w-[28px] place-items-center rounded-[3px] transition",
+                  viewMode === "list"
+                    ? "bg-[#333] text-white"
+                    : "bg-transparent text-[#9b9b9b] hover:text-white",
+                )}
+              >
+                <List className="h-[14px] w-[14px]" />
+              </button>
+            </div>
+            <span className="ml-auto shrink-0 text-[11.5px] font-medium leading-none text-[#8f8f8f]">
               {visibleAssets.length} files
             </span>
             <button
@@ -403,38 +420,88 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
               className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-[#a7a7a7] transition hover:bg-[#242424] hover:text-white"
               title="Close"
             >
-              <X className="h-[18px] w-[18px]" />
+              <X className="h-[16px] w-[16px]" />
             </button>
           </header>
 
           <div className="flex min-h-0 flex-1">
-            <aside className="w-[170px] shrink-0 border-r border-[#303030] bg-[#202020] px-3 py-4">
+            <aside className="w-[180px] shrink-0 bg-[#202020] px-3 py-4">
               <div className="mb-4">
-                <p className="mb-3 text-[12px] font-semibold text-[#969696]">Board</p>
-                <label className="relative flex h-[30px] w-full items-center gap-2 rounded-[4px] px-2 text-left text-[13px] font-semibold text-[#dedede] hover:bg-[#303030]">
-                  <Layers className="h-[13px] w-[13px] shrink-0" />
-                  <select
-                    value={effectiveWorkspaceId ?? "__all__"}
-                    onChange={(event) => {
-                      setSelectedWorkspaceId(
-                        event.target.value === "__all__" ? null : event.target.value,
-                      );
-                      setSelectedId(null);
-                    }}
-                    className="min-w-0 flex-1 appearance-none bg-transparent pr-4 text-[13px] font-semibold text-[#dedede] outline-none"
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#7c7c7c]">
+                  Board
+                </p>
+                {/* Replaced the native `<select>` (which rendered the
+                 *  OS's default light dropdown — un-themed, mismatched
+                 *  fonts, looked broken on dark canvas) with our
+                 *  shared `DropdownMenu` so the picker matches the
+                 *  rest of the workspace chrome (zinc-on-dark,
+                 *  rounded, hover tint). The trigger is the existing
+                 *  pill; the popover is portaled by Radix so it
+                 *  escapes the dialog's overflow clipping. */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex h-[30px] w-full items-center gap-2 rounded-[4px] bg-[#262626] px-2 text-left text-[13px] font-medium text-[#dedede] outline-none transition hover:bg-[#303030] focus-visible:bg-[#303030]"
+                    >
+                      <Layers className="h-[13px] w-[13px] shrink-0 text-[#9a9a9a]" />
+                      <span className="min-w-0 flex-1 truncate">
+                        {boardOptions.find(
+                          (board) => board.id === effectiveWorkspaceId,
+                        )?.name ?? "Main Board"}
+                      </span>
+                      <ChevronDown className="h-[13px] w-[13px] shrink-0 text-[#8d8d8d]" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    sideOffset={4}
+                    className="min-w-[200px] max-h-[280px] overflow-y-auto rounded-[6px] bg-[#1c1c1c] p-1 shadow-[0_14px_30px_rgba(0,0,0,.55)]"
                   >
                     {boardOptions.length === 0 ? (
-                      <option value="__all__">Main Board</option>
+                      <DropdownMenuItem
+                        className="flex h-[30px] cursor-pointer items-center gap-2 rounded-[3px] px-2 text-[13px] text-[#dedede] focus:bg-[#2a2a2a]"
+                        onSelect={() => {
+                          setSelectedWorkspaceId(null);
+                          setSelectedId(null);
+                        }}
+                      >
+                        <Layers className="h-[13px] w-[13px] shrink-0 text-[#9a9a9a]" />
+                        Main Board
+                      </DropdownMenuItem>
                     ) : (
-                      boardOptions.map((board) => (
-                        <option key={board.id} value={board.id}>
-                          {board.name}
-                        </option>
-                      ))
+                      boardOptions.map((board) => {
+                        const isActive = board.id === effectiveWorkspaceId;
+                        return (
+                          <DropdownMenuItem
+                            key={board.id}
+                            className={cn(
+                              "flex h-[30px] cursor-pointer items-center gap-2 rounded-[3px] px-2 text-[13px] focus:bg-[#2a2a2a]",
+                              isActive
+                                ? "bg-violet-500/15 text-violet-100 focus:bg-violet-500/20"
+                                : "text-[#dedede]",
+                            )}
+                            onSelect={() => {
+                              setSelectedWorkspaceId(board.id);
+                              setSelectedId(null);
+                            }}
+                          >
+                            <Layers
+                              className={cn(
+                                "h-[13px] w-[13px] shrink-0",
+                                isActive ? "text-violet-300" : "text-[#9a9a9a]",
+                              )}
+                            />
+                            <span className="min-w-0 flex-1 truncate">{board.name}</span>
+                            {isActive && (
+                              <Check className="h-[13px] w-[13px] shrink-0 text-violet-300" />
+                            )}
+                          </DropdownMenuItem>
+                        );
+                      })
                     )}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-2 h-[13px] w-[13px] text-[#8d8d8d]" />
-                </label>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div>
