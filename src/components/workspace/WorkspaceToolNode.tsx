@@ -903,10 +903,16 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   }, [edges, id]);
   const isMultiShot = String(params.multi_shot) === "true";
   const storedRunStatus = d.status ?? "idle";
-  const optimisticRunActive =
-    !!optimisticRun &&
-    storedRunStatus !== "done" &&
-    storedRunStatus !== "error";
+  // The previous version also gated this on `storedRunStatus !==
+  // "done"/"error"` to avoid a stuck optimistic spinner if the
+  // post-run cleanup forgot to clear `optimisticRun`. That guard
+  // hid the spinner on click 1 whenever the node had already
+  // completed a previous run (the common case — the node carries
+  // status="done" from the prior generation), so the user thought
+  // nothing happened and clicked again. The cleanup IS guaranteed
+  // by the `finally` in `runNode` (and the orphan-completion sweep
+  // covers the page-reload case), so trust `!!optimisticRun` alone.
+  const optimisticRunActive = !!optimisticRun;
   const runStatus = optimisticRunActive ? "processing" : storedRunStatus;
   const isRunning = runStatus === "processing";
   const visibleRunStartedAt =
@@ -937,6 +943,19 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       toast.info(t("workspace.toolNode.viewOnlyRunsDisabled"));
       return;
     }
+
+    // Flip ref + optimistic run BEFORE validation. Previously these
+    // sat after the prompt-length block, so a node whose previous
+    // generation left status="done" had no spinner state during the
+    // microtask window before patchNodeDataNow committed — the user
+    // saw nothing happen and clicked again, which sometimes produced
+    // a duplicate paid run. Validation paths below `return` through
+    // the `finally` so these get cleared if we bail out.
+    runInFlightRef.current = true;
+    const runId = NEW_ID();
+    const runStartedAt = Date.now();
+    setOptimisticRun({ runId, startedAt: runStartedAt });
+    try {
 
     // ── Provider-side prompt-length guard ──
     // Some providers (Kling: 2500, Banana: 2000, …) enforce a hard
@@ -995,14 +1014,10 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       }
     }
 
-    runInFlightRef.current = true;
     const storeState = useWorkspaceStore.getState();
     const log = useDebugLogStore.getState().push;
     const nodeLabelForLog =
       (d.params?.nodeName as string) || schema?.displayName || schemaKey;
-    const runId = NEW_ID();
-    const runStartedAt = Date.now();
-    setOptimisticRun({ runId, startedAt: runStartedAt });
     const runStillActive = () => {
       const current =
         useWorkspaceStore.getState().current?.nodes.find((node) => node.id === id) ??
@@ -1840,7 +1855,12 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         // stays in console.error for the team.
         toast.error(userErrorMessage);
       }
+    }
     } finally {
+      // Outer finally — fires for every exit (validation bail,
+      // throw inside the inner try, or success). Replaces the
+      // previous inner-only finally so a `return` from the
+      // prompt-length validator no longer skipped cleanup.
       setOptimisticRun(null);
       runInFlightRef.current = false;
     }
