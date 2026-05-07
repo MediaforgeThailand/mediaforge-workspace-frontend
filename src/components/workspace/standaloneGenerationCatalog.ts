@@ -749,7 +749,7 @@ export function buildVideoParams(args: {
       aspect_ratio: aspect,
       resolution: res,
       duration: String(dur),
-      generate_audio: isReplicateVeoVideoModel(args.model) ? String(args.withAudio) : "true",
+      generate_audio: String(args.withAudio),
       person_generation:
         args.personGeneration === "allow_all" ? "allow_all" : "allow_adult",
     };
