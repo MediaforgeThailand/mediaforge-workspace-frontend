@@ -17,12 +17,17 @@ interface MediaContextMenuProps {
   position: { x: number; y: number };
   items: MediaContextMenuItem[];
   onClose: () => void;
+  /** Optional accessible name for the menu surface. Callers that
+   *  need an i18n'd aria-label (e.g. the per-node menu) pass it in;
+   *  the default media-asset call sites omit it. */
+  ariaLabel?: string;
 }
 
 export default function MediaContextMenu({
   position,
   items,
   onClose,
+  ariaLabel,
 }: MediaContextMenuProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
 
@@ -73,6 +78,7 @@ export default function MediaContextMenu({
     <div
       ref={panelRef}
       role="menu"
+      aria-label={ariaLabel}
       data-testid="media-context-menu"
       className={cn(
         "fixed z-[9999] w-[176px] overflow-hidden rounded-[8px] border border-[#2d2d2d] bg-[#171717] py-[5px] shadow-[0_14px_30px_rgba(0,0,0,.48)]",

@@ -76,9 +76,9 @@ import CanvasContextMenu, {
   type ContextMenuState,
   type ToolItem,
 } from "./CanvasContextMenu";
-import NodeContextMenu, {
-  type NodeContextMenuItem,
-} from "./NodeContextMenu";
+import MediaContextMenu, {
+  type MediaContextMenuItem,
+} from "./MediaContextMenu";
 import {
   Copy as CtxCopyIcon,
   Download as CtxDownloadIcon,
@@ -1308,7 +1308,7 @@ const Inner = () => {
   /** Build the action list for the current right-click target — used
    *  by the menu render below. Memo'd against the menu state so we
    *  don't recompute every parent render. */
-  const nodeContextMenuItems = useMemo<NodeContextMenuItem[]>(() => {
+  const nodeContextMenuItems = useMemo<MediaContextMenuItem[]>(() => {
     if (!nodeContextMenu) return [];
     const targets = nodeContextMenu.targetNodes;
     if (targets.length === 0) return [];
@@ -1318,7 +1318,7 @@ const Inner = () => {
       const allNodes = useWorkspaceStore.getState().current?.nodes ?? [];
       const previewPayload = getNodePreview(node, allNodes);
       const downloadable = getNodeDownloadable(node);
-      const items: NodeContextMenuItem[] = [
+      const items: MediaContextMenuItem[] = [
         {
           key: "preview",
           label: "Preview",
@@ -2403,10 +2403,11 @@ const Inner = () => {
         />
       )}
       {nodeContextMenu && nodeContextMenuItems.length > 0 && (
-        <NodeContextMenu
+        <MediaContextMenu
           position={nodeContextMenu.position}
           items={nodeContextMenuItems}
           onClose={() => setNodeContextMenu(null)}
+          ariaLabel={t("workspace.nodemenu.aria")}
         />
       )}
       {preview && (
