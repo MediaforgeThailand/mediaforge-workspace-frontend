@@ -378,12 +378,29 @@ function nextPageName(canvases: CanvasMeta[], workspaceId: string): string {
   return `Page ${max + 1}`;
 }
 
-/** Pre-fill params with each ParamDef.default so the node is usable immediately. */
+/** Pre-fill params with each ParamDef.default so the node is usable immediately.
+ *
+ *  Filter ParamDefs by `supportedModels` against the schema's `defaultModel`
+ *  before pre-filling. Several schemas (videoGenNode in particular) declare
+ *  the same param key multiple times — one entry per provider family, gated
+ *  by `supportedModels`. Without filtering, every variant's default lands in
+ *  `params`, so a fresh kling-v2-6-pro node carried `resolution: "720p"`
+ *  inherited from the Seedance/Veo entries. The backend then read that
+ *  stray field as a mode hint and downgraded the call to `mode: "std"`,
+ *  which Kling rejects when an end-frame is attached. */
 const defaultParamsFor = (nodeType: string): Record<string, unknown> => {
   const schema = getWorkspaceSchema(nodeType);
   if (!schema) return {};
+  const defaultModel =
+    typeof (schema as { defaultModel?: unknown }).defaultModel === "string"
+      ? ((schema as { defaultModel?: string }).defaultModel as string)
+      : undefined;
   const out: Record<string, unknown> = {};
-  for (const p of schema.params) out[p.key] = p.default;
+  for (const p of schema.params) {
+    const supported = (p as { supportedModels?: string[] }).supportedModels;
+    if (supported && defaultModel && !supported.includes(defaultModel)) continue;
+    out[p.key] = p.default;
+  }
   return out;
 };
 
