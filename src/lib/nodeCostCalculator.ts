@@ -48,6 +48,20 @@ export function applyNodeCostDiscount(fullCost: number, discountPercent: number)
   return Math.max(1, Math.ceil(full * (1 - pct / 100)));
 }
 
+export function applyPackageCostDiscount(modelDiscountedCost: number, discountPercent: number): number {
+  const amount = Math.max(0, Math.ceil(Number(modelDiscountedCost) || 0));
+  const pct = normaliseDiscountPercent(discountPercent);
+  if (amount <= 0 || pct <= 0) return amount;
+  return Math.max(1, Math.floor(amount * (100 - pct) / 100));
+}
+
+export function effectiveNodeDiscountPercent(fullCost: number, finalCost: number): number {
+  const full = Math.max(0, Math.ceil(Number(fullCost) || 0));
+  const final = Math.max(0, Math.ceil(Number(finalCost) || 0));
+  if (full <= 0 || final >= full) return 0;
+  return Math.round((1 - final / full) * 100);
+}
+
 function maxDiscountForRows(rows: CreditCostRow[]): number {
   return Math.max(0, ...rows.map((row) => normaliseDiscountPercent(row.discount_percent)));
 }

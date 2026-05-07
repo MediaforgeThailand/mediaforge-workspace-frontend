@@ -35,8 +35,14 @@ import { friendlyError } from "@/lib/friendlyError";
 
 import { type ParamDef } from "@/components/flow/nodes/nodeApiSchema";
 import { useNodeCreditCosts as useCreatorCreditCosts } from "@/hooks/useNodeCreditCosts";
+import { useCredits } from "@/hooks/useCredits";
 import { useVoicePreview } from "@/hooks/useVoicePreview";
-import { applyNodeCostDiscount, calculateNodeCostQuote } from "@/lib/nodeCostCalculator";
+import {
+  applyNodeCostDiscount,
+  applyPackageCostDiscount,
+  calculateNodeCostQuote,
+  effectiveNodeDiscountPercent,
+} from "@/lib/nodeCostCalculator";
 import PromptMentionTextarea from "@/components/flow/nodes/PromptMentionTextarea";
 import MultiShotBuilder, {
   type SceneBlock,
@@ -720,6 +726,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   // reach the user. Raw text still lands in console.error.
   const { language, t } = useLanguage();
   const currentWorkspaceId = useWorkspaceStore((s) => s.current?.workspaceId ?? null);
+  const { credits } = useCredits(currentWorkspaceId);
 
   // Shared voice-preview hook for the audio gen node. Mounted on
   // every node type (cheap — just a couple of useState refs until
@@ -2300,11 +2307,19 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
   const nodeCostQuote = useMemo(() => {
     if (!baseNodeQuote) return null;
+    const packageDiscountPercent = Math.max(
+      0,
+      Math.min(100, Number(credits?.package_discount_percent ?? 0) || 0),
+    );
     if (baseNodeQuote.baseCost <= 0) {
       return {
         fullCost: 0,
+        modelCost: 0,
         finalCost: 0,
         discountPercent: 0,
+        packageDiscountPercent,
+        packageDiscountLabel: credits?.package_discount_label ?? null,
+        effectiveDiscountPercent: 0,
       };
     }
     const multiplier = workspaceCostMultiplierForNode(
@@ -2314,12 +2329,18 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     );
     const fullCost = Math.max(1, Math.ceil(baseNodeQuote.baseCost * multiplier));
     const discountPercent = Math.max(0, Math.min(100, Number(baseNodeQuote.discountPercent) || 0));
+    const modelCost = applyNodeCostDiscount(fullCost, discountPercent);
+    const finalCost = applyPackageCostDiscount(modelCost, packageDiscountPercent);
     return {
       fullCost,
-      finalCost: applyNodeCostDiscount(fullCost, discountPercent),
+      modelCost,
+      finalCost,
       discountPercent,
+      packageDiscountPercent,
+      packageDiscountLabel: credits?.package_discount_label ?? null,
+      effectiveDiscountPercent: effectiveNodeDiscountPercent(fullCost, finalCost),
     };
-  }, [baseNodeQuote, schemaKey, selectedModel, workspaceCreditMultiplier]);
+  }, [baseNodeQuote, credits?.package_discount_label, credits?.package_discount_percent, schemaKey, selectedModel, workspaceCreditMultiplier]);
 
   const nodeCost = nodeCostQuote?.finalCost ?? null;
 
@@ -3025,7 +3046,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                         {creditCostsLoading
                           ? "Loading cost…"
                           : nodeCostQuote
-                            ? nodeCostQuote.discountPercent > 0
+                            ? nodeCostQuote.discountPercent > 0 || nodeCostQuote.packageDiscountPercent > 0
                               ? (
                                   <span className="flex flex-wrap items-center gap-1.5">
                                     <span>Cost:</span>
@@ -3035,9 +3056,21 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                                     <span className="font-semibold text-foreground">
                                       {nodeCostQuote.finalCost.toLocaleString()}{costSuffix ?? ""} credits
                                     </span>
-                                    <span className="rounded-full border border-emerald-500/40 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
-                                      {nodeCostQuote.discountPercent}% off
-                                    </span>
+                                    {nodeCostQuote.discountPercent > 0 && (
+                                      <span className="rounded-full border border-emerald-500/40 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                                        Model {nodeCostQuote.discountPercent}% off
+                                      </span>
+                                    )}
+                                    {nodeCostQuote.packageDiscountPercent > 0 && (
+                                      <span className="rounded-full border border-sky-500/40 bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300">
+                                        {nodeCostQuote.packageDiscountLabel ?? "Team"} {nodeCostQuote.packageDiscountPercent}% off
+                                      </span>
+                                    )}
+                                    {nodeCostQuote.effectiveDiscountPercent > 0 && (
+                                      <span className="text-[10px] text-muted-foreground">
+                                        {nodeCostQuote.effectiveDiscountPercent}% off total
+                                      </span>
+                                    )}
                                   </span>
                                 )
                               : `Cost: ${nodeCostQuote.finalCost.toLocaleString()}${costSuffix ?? ""} credits`

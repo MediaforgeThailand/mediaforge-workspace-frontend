@@ -43,7 +43,12 @@ import {
   type CreateVideoPanelSetting,
 } from "@/components/workspace/CreateImagePanel";
 import InsufficientCreditsDialog from "@/components/InsufficientCreditsDialog";
-import { applyNodeCostDiscount, calculateNodeCostQuote } from "@/lib/nodeCostCalculator";
+import {
+  applyNodeCostDiscount,
+  applyPackageCostDiscount,
+  calculateNodeCostQuote,
+  effectiveNodeDiscountPercent,
+} from "@/lib/nodeCostCalculator";
 import { useNodeCreditCosts } from "@/hooks/useNodeCreditCosts";
 import { useCredits } from "@/hooks/useCredits";
 import { DEFAULT_PROJECT_NAME } from "@/store/useWorkspaceStore";
@@ -1282,7 +1287,13 @@ export default function StandaloneGenerator({
     updateForm({ ...nextPatch, ...overridePatch });
   };
 
-  const estimatedCost = useMemo(() => {
+  const packageDiscountPercent = Math.max(
+    0,
+    Math.min(100, Number(credits?.package_discount_percent ?? 0) || 0),
+  );
+  const packageDiscountLabel = credits?.package_discount_label ?? null;
+
+  const estimatedCostQuote = useMemo(() => {
     if (creditCostsLoading) return null;
     const params = buildCurrentParams(activeTool, form);
     if (!params) return null;
@@ -1298,23 +1309,48 @@ export default function StandaloneGenerator({
         : activeTool === "video_gen"
           ? Math.min(4, Math.max(1, Number(form.videoCount) || 1))
         : 1;
-    if (quote.baseCost <= 0) return 0;
+    if (quote.baseCost <= 0) {
+      return {
+        fullCost: 0,
+        modelCost: 0,
+        finalCost: 0,
+        modelDiscountPercent: 0,
+        packageDiscountPercent,
+        packageDiscountLabel,
+        totalDiscountPercent: 0,
+      };
+    }
     const multiplier = workspaceCostMultiplierForTool(
       activeTool,
       form.model,
       workspaceCreditMultiplier,
     );
     const fullRunCost = Math.max(1, Math.ceil(quote.baseCost * multiplier));
-    const perRunCost = applyNodeCostDiscount(fullRunCost, quote.discountPercent);
-    return perRunCost * runCount;
+    const modelRunCost = applyNodeCostDiscount(fullRunCost, quote.discountPercent);
+    const finalRunCost = applyPackageCostDiscount(modelRunCost, packageDiscountPercent);
+    const fullCost = fullRunCost * runCount;
+    const modelCost = modelRunCost * runCount;
+    const finalCost = finalRunCost * runCount;
+    return {
+      fullCost,
+      modelCost,
+      finalCost,
+      modelDiscountPercent: quote.discountPercent,
+      packageDiscountPercent,
+      packageDiscountLabel,
+      totalDiscountPercent: effectiveNodeDiscountPercent(fullCost, finalCost),
+    };
   }, [
     activeDef.nodeType,
     activeTool,
     creditCosts,
     creditCostsLoading,
+    packageDiscountLabel,
+    packageDiscountPercent,
     form,
     workspaceCreditMultiplier,
   ]);
+  const estimatedCost = estimatedCostQuote?.finalCost ?? null;
 
   const openUpload = (slot: UploadSlot) => {
     pendingSlotRef.current = slot;
@@ -2237,6 +2273,7 @@ export default function StandaloneGenerator({
                 language,
                 estimatedCost,
               )}
+              costQuote={estimatedCostQuote}
               runningLabel={t("workspace.standalone.loading")}
               running={running || !!uploading}
               quantity={form.videoCount}
@@ -2324,6 +2361,7 @@ export default function StandaloneGenerator({
                 language,
                 estimatedCost,
               )}
+              costQuote={estimatedCostQuote}
               runningLabel={t("workspace.standalone.loading")}
               running={running || !!uploading}
               showQuantity={activeTool === "image_gen"}
