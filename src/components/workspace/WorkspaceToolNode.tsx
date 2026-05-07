@@ -105,6 +105,23 @@ const MAX_VISIBLE_RUN_MS = 60 * 60_000;
 const STALE_RUN_GRACE_MS = 30_000;
 const MULTI_GEN_MAX = 3;
 const MULTI_GEN_X_OFFSET = 480;
+const JOB_RECOVERY_LOOKBACK_MS = 5_000;
+const TERMINAL_JOB_STATUSES = new Set([
+  "completed",
+  "failed",
+  "permanent_failed",
+  "cancelled",
+  "canceled",
+]);
+
+function hasActiveWorkspaceJob(data?: NodeData | null): boolean {
+  if (!data) return false;
+  if (data.status === "processing") return true;
+  if (data.activeRunId || data.runStartedAt) return true;
+  if (!data.backgroundJobId) return false;
+  const jobStatus = String(data.jobStatus ?? "").toLowerCase();
+  return jobStatus !== "" && !TERMINAL_JOB_STATUSES.has(jobStatus);
+}
 const MULTI_GEN_NODE_TYPES = new Set([
   "imageGenNode",
   "videoGenNode",
@@ -933,8 +950,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     const current =
       useWorkspaceStore.getState().current?.nodes.find((node) => node.id === id) ??
       getNodes().find((node) => node.id === id);
-    const currentStatus = (current?.data as NodeData | undefined)?.status;
-    return currentStatus === "processing";
+    return hasActiveWorkspaceJob(current?.data as NodeData | undefined);
   }, [getNodes, id]);
 
   const runNode = useCallback(async () => {
@@ -2081,6 +2097,10 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
   useEffect(() => {
     const knownJobId = d.backgroundJobId ?? null;
+    const activeRunStartedAt =
+      typeof d.runStartedAt === "number" && Number.isFinite(d.runStartedAt)
+        ? d.runStartedAt
+        : null;
     const canRecoverByNode =
       !knownJobId &&
       (runStatus === "processing" ||
@@ -2094,12 +2114,22 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         d.activeRunId != null ||
         d.lastRunError != null);
     if ((!knownJobId && !canRecoverByNode) || d.jobStatus === "completed") return;
+    if (!knownJobId && runInFlightRef.current) return;
 
     let cancelled = false;
     let pollTimer: number | null = null;
 
     const applyCompletedJob = (job: Record<string, unknown>) => {
       const resolvedJobId = String(job.id ?? knownJobId ?? "");
+      const createdAtMs = Date.parse(String(job.created_at ?? ""));
+      if (
+        !knownJobId &&
+        activeRunStartedAt != null &&
+        Number.isFinite(createdAtMs) &&
+        createdAtMs < activeRunStartedAt - JOB_RECOVERY_LOOKBACK_MS
+      ) {
+        return;
+      }
       const result = job.result as {
         type?: "image" | "video" | "text" | "audio";
         url?: string;
@@ -2159,6 +2189,12 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         query = query.eq("node_id", id).order("created_at", { ascending: false }).limit(1);
         if (current?.id) query = query.eq("canvas_id", current.id);
         if (current?.workspaceId) query = query.eq("workspace_id", current.workspaceId);
+        if (activeRunStartedAt != null) {
+          query = query.gte(
+            "created_at",
+            new Date(Math.max(0, activeRunStartedAt - JOB_RECOVERY_LOOKBACK_MS)).toISOString(),
+          );
+        }
       }
 
       const { data: job, error } = await query.maybeSingle();
