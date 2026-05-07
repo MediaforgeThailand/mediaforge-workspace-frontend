@@ -61,18 +61,27 @@ const SEEDANCE_1080P_MODELS = [
   "seedance-1-5-pro-251215",
 ] as const;
 const SEEDANCE_720P_MAX_MODELS = [...SEEDANCE_VIDEO_REF_MODELS] as const;
-const REPLICATE_SEEDANCE_MODELS = ["replicate-seedance-2-0"] as const;
+const REPLICATE_SEEDANCE_MODELS = [] as const;
 const REPLICATE_SEEDANCE_REF_MODELS = [...REPLICATE_SEEDANCE_MODELS] as const;
+const REPLICATE_KLING_FRAME_MODELS = ["replicate-kling-v3-pro", "replicate-kling-v3-omni"] as const;
+const REPLICATE_KLING_MOTION_MODELS = ["replicate-kling-v3-motion-pro"] as const;
+const REPLICATE_KLING_MODELS = [
+  ...REPLICATE_KLING_FRAME_MODELS,
+  ...REPLICATE_KLING_MOTION_MODELS,
+] as const;
 /** Google Veo (Standard tier only). Backend dispatches anything
  *  starting with "veo-" to the Gemini API `predictLongRunning`
  *  endpoint. Real spec verified against
  *  https://ai.google.dev/gemini-api/docs/video — see backend
  *  `_shared/veo.ts` for the param contract. */
 const VEO_MODELS = ["veo-3.1-generate-001"] as const;
+const REPLICATE_VEO_MODELS = ["replicate-veo-3-1"] as const;
 const BANANA_MODELS = ["nano-banana-2", "nano-banana-pro"] as const;
+const REPLICATE_BANANA_MODELS = ["replicate-nano-banana-2", "replicate-nano-banana-pro"] as const;
 /** Backend dispatches anything starting with "gpt-image" to OpenAI's
  *  /v1/images/edits or /v1/images/generations endpoint. */
 const OPENAI_IMAGE_MODELS = ["gpt-image-2"] as const;
+const REPLICATE_OPENAI_IMAGE_MODELS = ["replicate-gpt-image-2"] as const;
 const ELEVENLABS_TTS_MODELS = ["elevenlabs-multilingual-v2", "elevenlabs-turbo-v2-5"] as const;
 const GEMINI_TTS_MODELS = ["gemini-3.1-flash-tts-preview", "gemini-2.5-pro-preview-tts"] as const;
 /** All 30 official preset speakers shipped with Gemini 3.1 Flash TTS
@@ -117,7 +126,13 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     displayName: "Image Generation",
     category: "AI PROCESS",
     accentColor: "violet",
-    supportedModels: [...BANANA_MODELS, ...SEEDREAM_MODELS, ...OPENAI_IMAGE_MODELS],
+    supportedModels: [
+      ...BANANA_MODELS,
+      ...REPLICATE_BANANA_MODELS,
+      ...SEEDREAM_MODELS,
+      ...OPENAI_IMAGE_MODELS,
+      ...REPLICATE_OPENAI_IMAGE_MODELS,
+    ],
     defaultModel: "nano-banana-2",
     inputs: [
       { id: "text", label: "text (prompt)", color: "sky" },
@@ -128,14 +143,14 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         id: "ref_image",
         label: "ref_image",
         color: "blue",
-        supportedModels: [...BANANA_MODELS],
+        supportedModels: [...BANANA_MODELS, ...REPLICATE_BANANA_MODELS],
         maxConnections: 14, // Gemini 3 image models — up to 14 refs
       },
       {
         id: "ref_image",
         label: "ref_image",
         color: "blue",
-        supportedModels: [...OPENAI_IMAGE_MODELS],
+        supportedModels: [...OPENAI_IMAGE_MODELS, ...REPLICATE_OPENAI_IMAGE_MODELS],
         maxConnections: 16, // OpenAI gpt-image /edits — up to 16 refs
       },
       {
@@ -157,14 +172,23 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         key: "model_name",
         label: "Model",
         type: "select",
-        options: [...BANANA_MODELS, ...SEEDREAM_MODELS, ...OPENAI_IMAGE_MODELS],
+        options: [
+          ...BANANA_MODELS,
+          ...REPLICATE_BANANA_MODELS,
+          ...SEEDREAM_MODELS,
+          ...OPENAI_IMAGE_MODELS,
+          ...REPLICATE_OPENAI_IMAGE_MODELS,
+        ],
         optionLabels: {
           "nano-banana-2": "Nano Banana 2",
           "nano-banana-pro": "Nano Banana Pro",
+          "replicate-nano-banana-2": "Nano Banana 2 (Replicate)",
+          "replicate-nano-banana-pro": "Nano Banana Pro (Replicate)",
           "seedream-5-0-260128": "SeedDream 5.0",
           "seedream-5-0-lite-260128": "SeedDream 5.0 Lite",
           "seedream-4-5-251128": "SeedDream 4.5",
           "gpt-image-2": "GPT Image 2",
+          "replicate-gpt-image-2": "GPT Image 2 (Replicate)",
         },
         default: "nano-banana-2",
         required: true,
@@ -183,7 +207,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         type: "select",
         options: ["Auto", "1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"],
         default: "Auto",
-        supportedModels: [...BANANA_MODELS],
+        supportedModels: [...BANANA_MODELS, ...REPLICATE_BANANA_MODELS],
       },
       // Gemini's `imageConfig.imageSize` — controls output resolution.
       // Banana 2 (gemini-3.x flash image) supports 1K and 2K.
@@ -193,7 +217,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         type: "select",
         options: ["1K", "2K"],
         default: "1K",
-        supportedModels: ["nano-banana-2"],
+        supportedModels: ["nano-banana-2", "replicate-nano-banana-2"],
       },
       // Banana Pro (gemini-3-pro-image-preview) adds 4K on top.
       {
@@ -202,7 +226,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         type: "select",
         options: ["1K", "2K", "4K"],
         default: "2K",
-        supportedModels: ["nano-banana-pro"],
+        supportedModels: ["nano-banana-pro", "replicate-nano-banana-pro"],
       },
       {
         key: "size",
@@ -273,7 +297,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           auto: "Auto Size",
         },
         default: "1024x1024",
-        supportedModels: [...OPENAI_IMAGE_MODELS],
+        supportedModels: [...OPENAI_IMAGE_MODELS, ...REPLICATE_OPENAI_IMAGE_MODELS],
       },
       {
         key: "quality",
@@ -286,7 +310,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           high: "High",
         },
         default: "medium",
-        supportedModels: [...OPENAI_IMAGE_MODELS],
+        supportedModels: [...OPENAI_IMAGE_MODELS, ...REPLICATE_OPENAI_IMAGE_MODELS],
       },
       {
         key: "output_format",
@@ -299,7 +323,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           webp: "WebP",
         },
         default: "png",
-        supportedModels: [...OPENAI_IMAGE_MODELS],
+        supportedModels: [...OPENAI_IMAGE_MODELS, ...REPLICATE_OPENAI_IMAGE_MODELS],
       },
       // OpenAI's `output_compression` — % quality for jpeg / webp
       // outputs. Ignored for png. Defaults to 100 (lossless / max).
@@ -317,7 +341,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           "70": "Compression: Low (70)",
         },
         default: "100",
-        supportedModels: [...OPENAI_IMAGE_MODELS],
+        supportedModels: [...OPENAI_IMAGE_MODELS, ...REPLICATE_OPENAI_IMAGE_MODELS],
         // Hide for PNG (lossless — no compression knob).
         visibleWhen: { output_format: "jpeg" },
       },
@@ -333,7 +357,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           opaque: "Opaque BG",
         },
         default: "auto",
-        supportedModels: [...OPENAI_IMAGE_MODELS],
+        supportedModels: [...OPENAI_IMAGE_MODELS, ...REPLICATE_OPENAI_IMAGE_MODELS],
       },
       {
         key: "moderation",
@@ -345,7 +369,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           low: "Moderation: Low (less strict)",
         },
         default: "auto",
-        supportedModels: [...OPENAI_IMAGE_MODELS],
+        supportedModels: [...OPENAI_IMAGE_MODELS, ...REPLICATE_OPENAI_IMAGE_MODELS],
       },
       {
         key: "sequential_image_generation",
@@ -456,6 +480,8 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
       ...SEEDANCE_MODELS,
       ...REPLICATE_SEEDANCE_MODELS,
       ...VEO_MODELS,
+      ...REPLICATE_VEO_MODELS,
+      ...REPLICATE_KLING_MODELS,
     ],
     defaultModel: "kling-v2-6-pro",
     inputs: [
@@ -472,13 +498,14 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           "kling-v2-6-pro", "kling-v2-6-motion-pro",
           "kling-v3-pro", "kling-v3-motion-pro", "kling-v3-omni",
           ...SEEDANCE_MODELS,
+          ...REPLICATE_KLING_FRAME_MODELS,
         ],
       },
       {
         id: "start_frame",
         label: "start_frame",
         color: "blue",
-        supportedModels: [...VEO_MODELS, ...REPLICATE_SEEDANCE_MODELS],
+        supportedModels: [...VEO_MODELS, ...REPLICATE_VEO_MODELS, ...REPLICATE_SEEDANCE_MODELS],
       },
       {
         id: "end_frame",
@@ -489,13 +516,15 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           ...SEEDANCE_MODELS,
           ...REPLICATE_SEEDANCE_MODELS,
           ...VEO_MODELS,
+          ...REPLICATE_VEO_MODELS,
+          ...REPLICATE_KLING_FRAME_MODELS,
         ],
       },
       {
         id: "ref_image",
         label: "ref_image",
         color: "cyan",
-        supportedModels: ["kling-v3-omni"],
+        supportedModels: ["kling-v3-omni", "replicate-kling-v3-omni"],
         maxConnections: 7,
       },
       {
@@ -513,7 +542,9 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         supportedModels: [
           "kling-v2-6-motion-pro",
           "kling-v3-motion-pro",
+          ...REPLICATE_KLING_MOTION_MODELS,
           "kling-v3-omni",
+          "replicate-kling-v3-omni",
         ],
       },
       {
@@ -534,14 +565,14 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         id: "elements",
         label: "elements",
         color: "rose",
-        supportedModels: ["kling-v3-pro", "kling-v3-omni"],
+        supportedModels: ["kling-v3-pro", "kling-v3-omni", ...REPLICATE_KLING_FRAME_MODELS],
         maxConnections: 4, // Kling VIDEO 3.0 / Omni support element refs
       },
       {
         id: "elements",
         label: "elements",
         color: "rose",
-        supportedModels: ["kling-v3-motion-pro"],
+        supportedModels: ["kling-v3-motion-pro", ...REPLICATE_KLING_MOTION_MODELS],
         maxConnections: 1,
       },
     ],
@@ -555,6 +586,8 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           "kling-v2-6-pro", "kling-v2-6-motion-pro",
           "kling-v3-pro", "kling-v3-motion-pro", "kling-v3-omni",
           ...VEO_MODELS,
+          ...REPLICATE_VEO_MODELS,
+          ...REPLICATE_KLING_MODELS,
         ],
       },
       {
@@ -565,6 +598,8 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           "kling-v2-6-pro", "kling-v2-6-motion-pro",
           "kling-v3-pro", "kling-v3-motion-pro", "kling-v3-omni",
           ...VEO_MODELS,
+          ...REPLICATE_VEO_MODELS,
+          ...REPLICATE_KLING_FRAME_MODELS,
         ],
       },
       {
@@ -584,6 +619,8 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           ...SEEDANCE_MODELS,
           ...REPLICATE_SEEDANCE_MODELS,
           ...VEO_MODELS,
+          ...REPLICATE_VEO_MODELS,
+          ...REPLICATE_KLING_MODELS,
         ],
         optionLabels: {
           ...KLING_LABELS,
@@ -592,8 +629,11 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           "seedance-1-5-pro-251215": "SeedDance 1.5 Pro",
           "seedance-2-0-lite": "SeedDance 2.0 Fast",
           "seedance-2-0-pro": "SeedDance 2.0",
-          "replicate-seedance-2-0": "Seedance 2.0 (Replicate)",
           "veo-3.1-generate-001": "Google Veo 3.1",
+          "replicate-veo-3-1": "Google Veo 3.1 (Replicate)",
+          "replicate-kling-v3-pro": "Kling 3.0 Pro (Replicate)",
+          "replicate-kling-v3-motion-pro": "Kling 3.0 Motion Pro (Replicate)",
+          "replicate-kling-v3-omni": "Kling 3.0 Omni (Replicate)",
         },
         default: "kling-v2-6-pro",
         required: true,
@@ -611,7 +651,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         type: "textarea",
         default: "",
         placeholder: "What to avoid…",
-        supportedModels: [...KLING_MODELS.map((m) => m.value)],
+        supportedModels: [...KLING_MODELS.map((m) => m.value), ...REPLICATE_KLING_MODELS],
       },
       {
         key: "aspect_ratio",
@@ -619,7 +659,12 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         type: "select",
         options: ["Auto", "16:9", "9:16", "1:1"],
         default: "Auto",
-        supportedModels: ["kling-v2-6-pro", "kling-v3-pro", "kling-v3-omni"],
+        supportedModels: [
+          "kling-v2-6-pro",
+          "kling-v3-pro",
+          "kling-v3-omni",
+          ...REPLICATE_KLING_FRAME_MODELS,
+        ],
       },
       {
         key: "ratio",
@@ -644,7 +689,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         type: "select",
         options: ["16:9", "9:16"],
         default: "16:9",
-        supportedModels: [...VEO_MODELS],
+        supportedModels: [...VEO_MODELS, ...REPLICATE_VEO_MODELS],
       },
       {
         key: "resolution",
@@ -678,7 +723,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         type: "select",
         options: ["720p", "1080p"],
         default: "720p",
-        supportedModels: [...VEO_MODELS],
+        supportedModels: [...VEO_MODELS, ...REPLICATE_VEO_MODELS],
       },
       {
         key: "duration",
@@ -702,7 +747,11 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         // `seedance-2-0-`) must be tested before the generic
         // `seedance-` fallback or 1.5 Pro would get the 1.0 Pro range.
         dynamicType: (model: string) => {
-          const isV3 = model === "kling-v3-omni" || model === "kling-v3-pro";
+          const isV3 =
+            model === "kling-v3-omni" ||
+            model === "kling-v3-pro" ||
+            model === "replicate-kling-v3-omni" ||
+            model === "replicate-kling-v3-pro";
           if (isV3)
             return { type: "slider" as const, min: 3, max: 15, step: 1, default: 5 };
 
@@ -716,7 +765,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
 
           // Veo 3.1 — only 4, 6, or 8 seconds are valid per Google's
           // generateVideos spec.
-          if (model.startsWith("veo-"))
+          if (model.startsWith("veo-") || model.startsWith("replicate-veo"))
             return {
               type: "select" as const,
               options: ["4", "6", "8"],
@@ -761,6 +810,8 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           ...SEEDANCE_MODELS,
           ...REPLICATE_SEEDANCE_MODELS,
           ...VEO_MODELS,
+          ...REPLICATE_VEO_MODELS,
+          ...REPLICATE_KLING_FRAME_MODELS,
         ],
       },
       {
@@ -776,7 +827,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           allow_all: "Allow children too",
         },
         default: "allow_adult",
-        supportedModels: [...VEO_MODELS],
+        supportedModels: [...VEO_MODELS, ...REPLICATE_VEO_MODELS],
       },
       {
         key: "has_audio",
@@ -785,7 +836,12 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         options: ["false", "true"],
         optionLabels: { "false": "No Audio", "true": "With Audio" },
         default: "false",
-        supportedModels: ["kling-v2-6-pro", "kling-v3-pro", "kling-v3-omni"],
+        supportedModels: [
+          "kling-v2-6-pro",
+          "kling-v3-pro",
+          "kling-v3-omni",
+          ...REPLICATE_KLING_FRAME_MODELS,
+        ],
       },
       {
         key: "generate_audio",
@@ -803,7 +859,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         options: ["false", "true"],
         optionLabels: { "false": "No Audio", "true": "With Audio" },
         default: "true",
-        supportedModels: [...REPLICATE_SEEDANCE_MODELS],
+        supportedModels: [...REPLICATE_SEEDANCE_MODELS, ...REPLICATE_VEO_MODELS, ...REPLICATE_KLING_FRAME_MODELS],
       },
       {
         key: "seed",
@@ -820,7 +876,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         options: ["image", "video"],
         optionLabels: { "image": "Follow Image", "video": "Follow Video" },
         default: "video",
-        supportedModels: ["kling-v2-6-motion-pro", "kling-v3-motion-pro"],
+        supportedModels: ["kling-v2-6-motion-pro", "kling-v3-motion-pro", ...REPLICATE_KLING_MOTION_MODELS],
       },
       {
         key: "keep_original_sound",
@@ -829,7 +885,13 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         options: ["no", "yes"],
         optionLabels: { "no": "No", "yes": "Yes" },
         default: "no",
-        supportedModels: ["kling-v2-6-motion-pro", "kling-v3-motion-pro", "kling-v3-omni"],
+        supportedModels: [
+          "kling-v2-6-motion-pro",
+          "kling-v3-motion-pro",
+          "kling-v3-omni",
+          ...REPLICATE_KLING_MOTION_MODELS,
+          "replicate-kling-v3-omni",
+        ],
       },
       {
         key: "multi_shot",
@@ -838,7 +900,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         options: ["false", "true"],
         optionLabels: { "false": "Off", "true": "Director Mode" },
         default: "false",
-        supportedModels: ["kling-v3-pro", "kling-v3-omni"],
+        supportedModels: ["kling-v3-pro", "kling-v3-omni", ...REPLICATE_KLING_FRAME_MODELS],
       },
       {
         key: "multi_prompt",
@@ -846,7 +908,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         type: "json",
         default: "",
         placeholder: '[{"prompt":"Scene 1…","duration":3}]',
-        supportedModels: ["kling-v3-pro", "kling-v3-omni"],
+        supportedModels: ["kling-v3-pro", "kling-v3-omni", ...REPLICATE_KLING_FRAME_MODELS],
         visibleWhen: { multi_shot: "true" },
       },
       {

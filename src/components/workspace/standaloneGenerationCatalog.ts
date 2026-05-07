@@ -312,13 +312,6 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
       },
       // ── Google Veo family (Standard tier only) ─────────────
       {
-        id: "replicate-seedance-2-0",
-        label: "SeedDance 2.0",
-        provider: "Replicate",
-        badge: "Fallback",
-        description: "Replicate-routed Seedance 2.0 with the same visible controls.",
-      },
-      {
         id: "replicate-veo-3-1",
         label: "Google Veo 3.1",
         provider: "Replicate",
