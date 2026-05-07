@@ -42,6 +42,12 @@ import MultiShotBuilder, {
   type SceneBlock,
 } from "@/components/flow/nodes/MultiShotBuilder";
 import {
+  countPromptChars,
+  findOverLimitScenes,
+  getPromptCharLimit,
+  KLING_MULTISHOT_SCENE_LIMIT,
+} from "@/lib/promptLimits";
+import {
   TogglePill,
   MiniSelect,
   MiniSlider,
@@ -918,6 +924,64 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       toast.info(t("workspace.toolNode.viewOnlyRunsDisabled"));
       return;
     }
+
+    // ── Provider-side prompt-length guard ──
+    // Some providers (Kling: 2500, Banana: 2000, …) enforce a hard
+    // character cap server-side. We have a soft warning UI in the
+    // textarea, but `maxLength` doesn't actually prevent typing/pasting
+    // past the cap on a contentEditable, so a 2540-char prompt would
+    // still fly through to Kling and come back as the cryptic
+    // `code:1201, "prompt: size must be between 0 and 2500"`. Bail
+    // here with a translated toast instead so the user knows what to
+    // shorten before any credit/processing state is touched.
+    {
+      const promptLimit = getPromptCharLimit(schemaKey, selectedModel, "prompt");
+      const negativeLimit = getPromptCharLimit(schemaKey, selectedModel, "negative_prompt");
+      const promptChars = countPromptChars(params.prompt as string | undefined);
+      const negativeChars = countPromptChars(params.negative_prompt as string | undefined);
+      const isKlingMultiShot =
+        schemaKey === "klingVideoNode" && String(params.multi_shot) === "true";
+      const overLimitScenes = isKlingMultiShot
+        ? findOverLimitScenes(
+            Array.isArray(params.multi_prompt)
+              ? (params.multi_prompt as SceneBlock[])
+              : null,
+          )
+        : [];
+
+      // In multi-shot mode each scene has its own 512-char cap and
+      // the top-level `prompt` field is unused — skip the main-prompt
+      // check so a stale value left in the field doesn't block the
+      // run when it won't be sent.
+      if (!isKlingMultiShot && promptLimit && promptChars > promptLimit) {
+        toast.error(
+          t("workspace.toolNode.promptTooLong", {
+            count: promptChars,
+            limit: promptLimit,
+          }),
+        );
+        return;
+      }
+      if (negativeLimit && negativeChars > negativeLimit) {
+        toast.error(
+          t("workspace.toolNode.negativePromptTooLong", {
+            count: negativeChars,
+            limit: negativeLimit,
+          }),
+        );
+        return;
+      }
+      if (overLimitScenes.length > 0) {
+        toast.error(
+          t("workspace.toolNode.multiShotSceneTooLong", {
+            scene: overLimitScenes[0] + 1,
+            limit: KLING_MULTISHOT_SCENE_LIMIT,
+          }),
+        );
+        return;
+      }
+    }
+
     runInFlightRef.current = true;
     const storeState = useWorkspaceStore.getState();
     const log = useDebugLogStore.getState().push;
