@@ -1817,6 +1817,7 @@ export default function StandaloneGenerator({
   const videoDurationOptions = videoDurationOptionsForSettings(
     form.model,
     form.videoResolution,
+    Boolean(form.videoEnd),
   ).map(String);
   const videoFrameSlots =
     activeTool === "video_gen"
@@ -3548,6 +3549,7 @@ function VideoControls({
   const durations = videoDurationOptionsForSettings(
     form.model,
     form.videoResolution,
+    Boolean(form.videoEnd),
   );
 
   useEffect(() => {
@@ -6312,7 +6314,7 @@ function buildCurrentParams(
       prompt: form.prompt,
       ratio: form.videoRatio,
       resolution: form.videoResolution,
-      duration: form.videoDuration,
+      duration: isVeoVideoModel(form.model) && form.videoEnd ? 8 : form.videoDuration,
       withAudio: form.videoWithAudio,
       characterOrientation: form.videoCharacterOrientation,
       keepOriginalSound: form.videoKeepOriginalSound,
@@ -6528,7 +6530,12 @@ function videoResolutionOptionsForModel(model: string): string[] {
   return [];
 }
 
-function videoDurationOptionsForSettings(model: string, resolution: string): number[] {
+function videoDurationOptionsForSettings(
+  model: string,
+  resolution: string,
+  hasEndFrame = false,
+): number[] {
+  if (isVeoVideoModel(model) && hasEndFrame) return [8];
   if (isVeoVideoModel(model) && resolution === "1080p") return [8];
   return videoDurationsForModel(model);
 }
