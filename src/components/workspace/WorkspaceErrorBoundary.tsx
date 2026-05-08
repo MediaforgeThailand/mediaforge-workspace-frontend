@@ -67,7 +67,7 @@ class WorkspaceErrorBoundary extends Component<Props, State> {
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="inline-flex items-center gap-1.5 rounded-md bg-violet-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-600"
+              className="inline-flex items-center gap-1.5 rounded-md bg-[#f4ff00] px-3 py-1.5 text-sm font-medium text-black hover:bg-[#d7e600]"
             >
               <RotateCw className="h-3.5 w-3.5" />
               {this.props.labels.reload}

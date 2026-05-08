@@ -544,7 +544,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
        *  unbreakable "word" extended off-screen as a single line
        *  with the X-button floating thousands of pixels to the
        *  right. Bumped to a generous 960×80vh reading box and
-       *  fixed the wrapping below. */
+       *  fixed the wrapping below. */}
       <div
         className={cn(
           "relative max-h-[86vh] max-w-[calc(90vw-88px)] overflow-visible",
@@ -607,11 +607,6 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
         )}
 
         {preview.type === "model3d" && preview.model_url && (
-          // Fullscreen 3D viewer — drag to rotate, scroll to zoom.
-          // `pointer-events: auto` and stopPropagation on the wrapper
-          // are NOT needed here because the lightbox's outer overlay
-          // already swallows pan-canvas gestures; the model-viewer
-          // owns the whole rectangle.
           <div className="relative aspect-square w-[min(900px,calc(90vw-88px))] overflow-hidden rounded-md bg-zinc-950 shadow-2xl shadow-black">
             <model-viewer
               ref={(el) => {

@@ -10,7 +10,7 @@ export interface AccentTone {
 }
 
 export const ACCENT: Record<string, AccentTone> = {
-  violet:  { c: "#a78bfa", glow: "rgba(167,139,250,0.35)", bg: "rgba(167,139,250,0.12)", bd: "rgba(167,139,250,0.30)" },
+  violet:  { c: "#f4ff00", glow: "rgba(238,255,0,0.35)", bg: "rgba(244,255,0,0.12)", bd: "rgba(244,255,0,0.30)" },
   sky:     { c: "#7dd3fc", glow: "rgba(125,211,252,0.32)", bg: "rgba(125,211,252,0.10)", bd: "rgba(125,211,252,0.28)" },
   amber:   { c: "#fbbf24", glow: "rgba(251,191,36,0.35)",  bg: "rgba(251,191,36,0.10)",  bd: "rgba(251,191,36,0.28)" },
   cyan:    { c: "#67e8f9", glow: "rgba(103,232,249,0.32)", bg: "rgba(103,232,249,0.10)", bd: "rgba(103,232,249,0.28)" },

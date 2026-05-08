@@ -1056,7 +1056,7 @@ export default function AssetsView({
       )}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && !deletingAsset && setDeleteTarget(null)}>
         <DialogContent className="w-[360px] gap-0 overflow-hidden rounded-[18px] border border-white/[0.08] bg-[#101113] p-0 text-white shadow-[0_24px_80px_rgba(0,0,0,.64)]">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-[#ff2fb3] via-[#8b5cf6] to-[#14b8ff]" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-[#F4FF00] via-[#F4FF00] to-[#f8ff66]" />
           <div className="px-5 pb-4 pt-5">
             <DialogHeader className="space-y-2 pr-5">
               <div className="flex items-center gap-3">

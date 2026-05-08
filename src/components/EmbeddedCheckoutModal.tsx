@@ -128,7 +128,7 @@ const PaymentForm = ({
       <Button
         type="submit"
         disabled={!stripe || submitting}
-        className="w-full bg-gradient-to-r from-violet-600 to-purple-500 text-white font-bold hover:scale-[1.01] transition-transform"
+        className="w-full bg-gradient-to-r from-[#f4ff00] to-[#b7d400] text-black font-bold hover:scale-[1.01] transition-transform"
       >
         {submitting ? (
           <>
@@ -266,22 +266,22 @@ const EmbeddedCheckoutModal = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-[460px] p-0 overflow-hidden border-violet-400/25 rounded-2xl backdrop-blur-2xl shadow-[0_20px_60px_-15px_rgba(139,92,246,0.45)]"
+        className="max-w-[460px] p-0 overflow-hidden border-yellow-400/25 rounded-2xl backdrop-blur-2xl shadow-[0_20px_60px_-15px_rgba(238,255,0,0.45)]"
         style={{
           background:
             "linear-gradient(145deg, rgba(45,20,90,0.78) 0%, rgba(20,14,38,0.72) 50%, rgba(76,29,149,0.55) 100%)",
         }}
       >
-        {/* Decorative violet glow */}
-        <div className="pointer-events-none absolute -top-24 -right-20 h-64 w-64 rounded-full bg-violet-500/30 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 -left-20 h-64 w-64 rounded-full bg-fuchsia-500/20 blur-3xl" />
+        {/* Decorative CI-yellow glow */}
+        <div className="pointer-events-none absolute -top-24 -right-20 h-64 w-64 rounded-full bg-yellow-500/30 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-20 h-64 w-64 rounded-full bg-yellow-500/20 blur-3xl" />
 
         <div className="relative px-6 pt-6 pb-2">
           <DialogHeader>
             <DialogTitle className="text-base font-semibold text-white">
               {t("checkout.embedded.title", { amount: amountLabel ? ` · ${amountLabel}` : "" })}
             </DialogTitle>
-            <DialogDescription className="text-xs text-violet-200/80">
+            <DialogDescription className="text-xs text-yellow-200/80">
               {t(isThaiCheckout ? "checkout.embedded.description" : "checkout.embedded.descriptionInternational")}
             </DialogDescription>
           </DialogHeader>
@@ -306,7 +306,7 @@ const EmbeddedCheckoutModal = ({
                       "inline-flex h-9 items-center justify-center gap-2 rounded-lg text-xs font-semibold transition",
                       selected
                         ? "bg-white text-zinc-950 shadow"
-                        : "text-violet-100/75 hover:bg-white/10 hover:text-white",
+                        : "text-yellow-100/75 hover:bg-white/10 hover:text-white",
                     ].join(" ")}
                   >
                     <Icon className="h-4 w-4" />
@@ -319,7 +319,7 @@ const EmbeddedCheckoutModal = ({
 
           {loading && (
             <div className="flex min-h-[180px] flex-col items-center justify-center gap-2">
-              <Loader2 className="h-6 w-6 animate-spin text-violet-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-yellow-400" />
               <p className="text-xs text-slate-400">{t("checkout.embedded.loading")}</p>
             </div>
           )}
@@ -374,18 +374,18 @@ const EmbeddedCheckoutModal = ({
                 <p className="text-sm font-semibold text-white">
                   {t("checkout.embedded.scanToPay", { amount: amountLabel || "" })}
                 </p>
-                <p className="mt-1 text-[11px] leading-5 text-violet-100/75">
+                <p className="mt-1 text-[11px] leading-5 text-yellow-100/75">
                   {t("checkout.embedded.promptPayWebhookNote")}
                 </p>
                 {expiresAt && (
-                  <p className="mt-1 text-[10px] text-violet-200/60">
+                  <p className="mt-1 text-[10px] text-yellow-200/60">
                     {t("checkout.embedded.qrExpires", { time: new Date(expiresAt * 1000).toLocaleTimeString() })}
                   </p>
                 )}
               </div>
               <Button
                 type="button"
-                className="w-full bg-gradient-to-r from-violet-600 to-purple-500 text-white font-bold"
+                className="w-full bg-gradient-to-r from-[#f4ff00] to-[#b7d400] text-black font-bold"
                 onClick={() => {
                   onSuccess?.();
                   onOpenChange(false);
@@ -401,15 +401,15 @@ const EmbeddedCheckoutModal = ({
           {!loading && !error && !success && paymentMethod === "card" && checkoutUrl && (
             <div className="space-y-4">
               <div className="rounded-xl bg-black/20 p-4 text-center">
-                <CreditCard className="mx-auto h-8 w-8 text-violet-200" />
+                <CreditCard className="mx-auto h-8 w-8 text-yellow-200" />
                 <p className="mt-3 text-sm font-semibold text-white">{t("checkout.embedded.cardTitle")}</p>
-                <p className="mt-1 text-[11px] leading-5 text-violet-100/75">
+                <p className="mt-1 text-[11px] leading-5 text-yellow-100/75">
                   {t("checkout.embedded.cardDescription")}
                 </p>
               </div>
               <Button
                 type="button"
-                className="w-full bg-white text-zinc-950 font-bold hover:bg-violet-50"
+                className="w-full bg-white text-zinc-950 font-bold hover:bg-yellow-50"
                 onClick={() => {
                   window.location.assign(checkoutUrl);
                 }}
@@ -428,7 +428,7 @@ const EmbeddedCheckoutModal = ({
                 appearance: {
                   theme: "night",
                   variables: {
-                    colorPrimary: "#a78bfa",
+                    colorPrimary: "#f4ff00",
                     colorBackground: "transparent",
                     colorText: "#ffffff",
                     colorTextSecondary: "#ddd6fe",
@@ -440,20 +440,20 @@ const EmbeddedCheckoutModal = ({
                   rules: {
                     ".Tab": {
                       backgroundColor: "rgba(255,255,255,0.04)",
-                      border: "1px solid rgba(167,139,250,0.18)",
+                      border: "1px solid rgba(238,255,0,0.18)",
                     },
                     ".Tab--selected": {
-                      backgroundColor: "rgba(139,92,246,0.18)",
-                      borderColor: "#a78bfa",
-                      boxShadow: "0 0 0 1px #a78bfa",
+                      backgroundColor: "rgba(238,255,0,0.18)",
+                      borderColor: "#f4ff00",
+                      boxShadow: "0 0 0 1px #f4ff00",
                     },
                     ".Input": {
                       backgroundColor: "rgba(255,255,255,0.04)",
-                      border: "1px solid rgba(167,139,250,0.18)",
+                      border: "1px solid rgba(238,255,0,0.18)",
                     },
                     ".Input:focus": {
-                      borderColor: "#a78bfa",
-                      boxShadow: "0 0 0 1px #a78bfa",
+                      borderColor: "#f4ff00",
+                      boxShadow: "0 0 0 1px #f4ff00",
                     },
                     ".Label": {
                       color: "#ddd6fe",

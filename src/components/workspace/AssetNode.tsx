@@ -72,7 +72,7 @@ export type ReferenceRole =
 
 const PORT_COLOR: Record<AssetNodeData["fieldType"], string> = {
   image: "hsl(160 84% 39%)",
-  video: "hsl(258 90% 66%)",
+  video: "hsl(64 100% 50%)",
   audio: "hsl(43 96% 56%)",
   model3d: "hsl(43 96% 56%)",
 };

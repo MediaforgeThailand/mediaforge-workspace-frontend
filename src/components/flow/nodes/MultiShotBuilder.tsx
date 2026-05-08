@@ -28,14 +28,14 @@ const stop = (e: React.MouseEvent | React.PointerEvent) => e.stopPropagation();
 
 const SCENE_GRADIENTS = [
   "linear-gradient(135deg,#f59e0b,#ef4444)",
-  "linear-gradient(135deg,#8b5cf6,#ec4899)",
-  "linear-gradient(135deg,#0ea5e9,#6366f1)",
+  "linear-gradient(135deg,#F4FF00,#F4FF00)",
+  "linear-gradient(135deg,#0ea5e9,#d7e600)",
   "linear-gradient(135deg,#10b981,#0ea5e9)",
   "linear-gradient(135deg,#f97316,#be185d)",
-  "linear-gradient(135deg,#6366f1,#0891b2)",
+  "linear-gradient(135deg,#d7e600,#0891b2)",
 ];
 
-const TIMELINE_COLORS = ["#ec4899", "#8b5cf6", "#0ea5e9", "#10b981", "#f59e0b", "#6366f1"];
+const TIMELINE_COLORS = ["#F4FF00", "#F4FF00", "#0ea5e9", "#10b981", "#f59e0b", "#d7e600"];
 
 const SceneThumb = memo(({ index }: { index: number }) => (
   <div
@@ -99,18 +99,18 @@ const MultiShotBuilder = memo(({ scenes, onChange, excludeNodeId }: MultiShotBui
     <div className="space-y-2.5">
       {/* Director Mode banner */}
       <div
-        className="flex items-center justify-between px-2.5 py-2 rounded-[10px] border border-violet-400/20"
+        className="flex items-center justify-between px-2.5 py-2 rounded-[10px] border border-yellow-400/20"
         style={{
           background:
-            "linear-gradient(90deg, rgba(167,139,250,0.08), rgba(167,139,250,0.02))",
+            "linear-gradient(90deg, rgba(238,255,0,0.08), rgba(238,255,0,0.02))",
         }}
       >
         <div className="flex items-center gap-2">
           <div
-            className="w-[22px] h-[22px] rounded-md flex items-center justify-center text-violet-300"
+            className="w-[22px] h-[22px] rounded-md flex items-center justify-center text-yellow-300"
             style={{
-              background: "rgba(167,139,250,0.15)",
-              border: "1px solid rgba(167,139,250,0.3)",
+              background: "rgba(238,255,0,0.15)",
+              border: "1px solid rgba(238,255,0,0.3)",
             }}
           >
             <Film className="w-2.5 h-2.5" />
@@ -122,7 +122,7 @@ const MultiShotBuilder = memo(({ scenes, onChange, excludeNodeId }: MultiShotBui
             </div>
           </div>
         </div>
-        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-400/15 text-violet-200 font-mono font-semibold text-[10.5px] tracking-[0.04em]">
+        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-400/15 text-yellow-200 font-mono font-semibold text-[10.5px] tracking-[0.04em]">
           <Clock className="w-2.5 h-2.5" />
           {t("multiShot.totalDuration", { seconds: totalDuration })}
         </div>
@@ -137,7 +137,7 @@ const MultiShotBuilder = memo(({ scenes, onChange, excludeNodeId }: MultiShotBui
               className="rounded-[2px] opacity-85"
               style={{
                 flex: Math.max(s.duration, 0.5),
-                background: `linear-gradient(90deg, #a78bfa, ${TIMELINE_COLORS[i % TIMELINE_COLORS.length]})`,
+                background: `linear-gradient(90deg, #f4ff00, ${TIMELINE_COLORS[i % TIMELINE_COLORS.length]})`,
               }}
             />
           ))}
@@ -153,14 +153,14 @@ const MultiShotBuilder = memo(({ scenes, onChange, excludeNodeId }: MultiShotBui
         {effectiveScenes.map((scene, idx) => (
           <div key={idx} className="fs-scene-card relative px-2.5 py-2 pl-3">
             {/* left accent bar */}
-            <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-violet-400/60 rounded-l" />
+            <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-yellow-400/60 rounded-l" />
             <div className="flex items-start gap-2.5">
               <SceneThumb index={idx} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5">
                     <GripVertical className="w-2.5 h-2.5 text-white/30" />
-                    <span className="font-mono text-[10px] font-semibold text-violet-300 tracking-[0.08em]">
+                    <span className="font-mono text-[10px] font-semibold text-yellow-300 tracking-[0.08em]">
                       {t("multiShot.sceneNumber", { number: String(idx + 1).padStart(2, "0") })}
                     </span>
                   </div>
@@ -221,8 +221,8 @@ const MultiShotBuilder = memo(({ scenes, onChange, excludeNodeId }: MultiShotBui
           onMouseDown={stop}
           onPointerDown={stop}
           className={cn(
-            "w-full flex items-center justify-center gap-1.5 py-2 rounded-[10px] border border-dashed transition-colors text-[11px] font-medium text-violet-300 nodrag",
-            "border-violet-400/30 bg-violet-500/[0.03] hover:bg-violet-500/[0.08] hover:border-violet-400/50",
+            "w-full flex items-center justify-center gap-1.5 py-2 rounded-[10px] border border-dashed transition-colors text-[11px] font-medium text-yellow-300 nodrag",
+            "border-yellow-400/30 bg-yellow-500/[0.03] hover:bg-[#e7ff12]/[0.08] hover:border-yellow-400/50",
           )}
         >
           <Plus className="w-3 h-3" />

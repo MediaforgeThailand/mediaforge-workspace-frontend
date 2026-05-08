@@ -85,7 +85,7 @@ function Hero() {
         className="absolute inset-0 opacity-80"
         style={{
           background:
-            "radial-gradient(70% 70% at 20% 10%, rgba(91,42,140,.55), transparent 62%), radial-gradient(65% 60% at 88% 34%, rgba(155,77,224,.38), transparent 64%)",
+            "radial-gradient(70% 70% at 20% 10%, rgba(244,255,0,.20), transparent 62%), radial-gradient(65% 60% at 88% 34%, rgba(238,255,0,.38), transparent 64%)",
         }}
       />
 
@@ -109,7 +109,7 @@ function Hero() {
         <div className="reveal mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
           <Link
             to="/auth"
-            className="inline-flex h-[50px] w-full items-center justify-center gap-2 rounded-full bg-[var(--brand-primary)] px-7 text-[15px] font-semibold text-white shadow-[0_12px_32px_-10px_rgba(155,77,224,.8)] transition hover:scale-[1.03] hover:bg-[var(--brand-hover)] sm:w-auto"
+            className="inline-flex h-[50px] w-full items-center justify-center gap-2 rounded-full bg-[var(--brand-primary)] px-7 text-[15px] font-semibold text-white shadow-[0_12px_32px_-10px_rgba(238,255,0,.8)] transition hover:scale-[1.03] hover:bg-[var(--brand-hover)] sm:w-auto"
           >
             Start for Free
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -168,7 +168,7 @@ function OneClick() {
         {oneClickItems.map((item) => (
           <article
             key={item.title}
-            className="group overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] transition duration-300 hover:-translate-y-1 hover:border-[rgba(155,77,224,.55)] hover:shadow-[0_28px_60px_-28px_rgba(155,77,224,.55)]"
+            className="group overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] transition duration-300 hover:-translate-y-1 hover:border-[rgba(238,255,0,.55)] hover:shadow-[0_28px_60px_-28px_rgba(238,255,0,.55)]"
           >
             <div className="aspect-[16/10] overflow-hidden">
               <img src={item.image} alt="" className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
@@ -228,16 +228,16 @@ function Features() {
           return (
             <article
               key={item.title}
-              className="group relative overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 transition duration-300 hover:-translate-y-1 hover:border-[rgba(155,77,224,.55)]"
+              className="group relative overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 transition duration-300 hover:-translate-y-1 hover:border-[rgba(238,255,0,.55)]"
             >
               <div
                 className="absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100"
                 style={{
-                  background: "radial-gradient(420px 220px at 50% 0%, rgba(155,77,224,.2), transparent 70%)",
+                  background: "radial-gradient(420px 220px at 50% 0%, rgba(238,255,0,.2), transparent 70%)",
                 }}
               />
               <div className="relative">
-                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg bg-[rgba(155,77,224,.16)] text-[var(--brand-soft)]">
+                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg bg-[rgba(238,255,0,.16)] text-[var(--brand-soft)]">
                   <Icon className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <h3 className="text-[22px] font-semibold">{item.title}</h3>

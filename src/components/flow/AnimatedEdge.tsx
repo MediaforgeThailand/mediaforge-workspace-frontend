@@ -1,6 +1,6 @@
 /**
  * AnimatedEdge — Test2 redesign.
- * Solid violet glow with subtle inner flow dash. No traveling dots.
+ * Solid CI-yellow glow with subtle inner flow dash. No traveling dots.
  */
 import { memo, useMemo } from "react";
 import { getBezierPath, type EdgeProps } from "@xyflow/react";
@@ -34,18 +34,18 @@ const AnimatedEdge = memo(({
 
   const glowFilterId = `edge-glow-${id}`;
 
-  // Single accent: violet (matches new design language)
+  // Single accent: MediaForge CI yellow.
   const colors = useMemo(() => {
     if (selected) {
       return {
-        core: "rgba(167,139,250,0.95)", // violet bright
-        glow: "rgba(167,139,250,0.45)",
+        core: "rgba(244,255,0,0.95)",
+        glow: "rgba(238,255,0,0.45)",
         flow: "rgba(255,255,255,0.55)",
       };
     }
     return {
-      core: "rgba(167,139,250,0.7)",
-      glow: "rgba(167,139,250,0.22)",
+      core: "rgba(244,255,0,0.7)",
+      glow: "rgba(238,255,0,0.22)",
       flow: "rgba(255,255,255,0.32)",
     };
   }, [selected]);

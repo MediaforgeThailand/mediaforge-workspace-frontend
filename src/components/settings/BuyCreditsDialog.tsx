@@ -282,7 +282,7 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
                   className={cn(
                     "rounded-full px-2.5 py-1 text-[11px] transition-colors ring-1 ring-inset",
                     amountThb === v
-                      ? "bg-violet-500/20 text-violet-100 ring-violet-400/30"
+                      ? "bg-yellow-500/20 text-yellow-100 ring-yellow-400/30"
                       : "bg-white/[0.04] text-zinc-300 ring-white/[0.08] hover:bg-white/[0.08]",
                   )}
                 >
@@ -317,7 +317,7 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
             <Button
               onClick={handleSubmit}
               disabled={submitting || !isAmountValid}
-              className="h-11 w-full bg-gradient-to-b from-violet-500 to-violet-700 text-[13.5px] font-semibold text-white hover:from-violet-400 hover:to-violet-600"
+              className="h-11 w-full bg-gradient-to-b from-[#f4ff00] to-[#9fb800] text-[13.5px] font-semibold text-black hover:from-yellow-400 hover:to-yellow-600"
             >
               {submitting ? (
                 <>
@@ -382,7 +382,7 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
             </div>
 
             <div className="flex items-center gap-2 text-[11px] text-zinc-400">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-400" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-yellow-400" />
               {i18n("settings.buyCredits.waitingForPayment")}
             </div>
           </div>
@@ -439,7 +439,7 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
                 setStep("form");
                 setErrorMsg(null);
               }}
-              className="h-11 w-full bg-violet-500 text-[13.5px] font-semibold text-white hover:bg-violet-400"
+              className="h-11 w-full bg-[#f4ff00] text-[13.5px] font-semibold text-black hover:bg-[#f8ff66]"
             >
               {i18n("settings.buyCredits.tryAgain")}
             </Button>

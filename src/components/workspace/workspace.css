@@ -16,7 +16,7 @@
   /* Edge colors by data type — keep in sync with PORT_COLORS in toolRegistry.ts */
   --ws-wire-text: hsl(217 91% 60%); /* blue   */
   --ws-wire-image: hsl(160 84% 39%); /* emerald */
-  --ws-wire-video: hsl(258 90% 66%); /* violet */
+  --ws-wire-video: hsl(64 100% 50%); /* CI yellow */
   --ws-wire-audio: hsl(43 96% 56%); /* amber */
   --ws-wire-number: hsl(0 0% 65%); /* zinc  */
 }
@@ -404,9 +404,9 @@ body[data-rfc="true"]
 .react-flow__edge.selected .react-flow__edge-path,
 .react-flow__edge:focus .react-flow__edge-path,
 .react-flow__edge:focus-visible .react-flow__edge-path {
-  stroke: hsl(258 88% 72%);
+  stroke: hsl(64 100% 60%);
   stroke-width: 2.25;
-  filter: drop-shadow(0 0 6px hsl(258 88% 72% / 0.4));
+  filter: drop-shadow(0 0 6px hsl(64 100% 60% / 0.4));
 }
 
 /* The invisible-but-clickable `interaction` overlay path React Flow
@@ -429,9 +429,9 @@ body[data-rfc="true"]
  * over both the canvas and any resting edges underneath. */
 .react-flow__connection-path,
 .react-flow__connectionline path {
-  stroke: hsl(258 88% 72%);
+  stroke: hsl(64 100% 60%);
   stroke-width: 2.25;
-  filter: drop-shadow(0 0 6px hsl(258 88% 72% / 0.45));
+  filter: drop-shadow(0 0 6px hsl(64 100% 60% / 0.45));
 }
 
 /* Edge drawing animation — used when a node is mid-run, so the user
@@ -445,7 +445,7 @@ body[data-rfc="true"]
   }
 }
 .react-flow__edge.animated .react-flow__edge-path {
-  stroke: hsl(258 88% 72%);
+  stroke: hsl(64 100% 60%);
   stroke-dasharray: 8 6;
   animation: ws-flow 1.2s linear infinite;
 }
@@ -751,24 +751,27 @@ body[data-rfc="true"]
   height: 28px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: linear-gradient(
-    135deg,
-    hsl(262 87% 62%) 0%,
-    hsl(263 86% 58%) 100%
-  );
-  color: hsl(0 0% 100%);
+  background: linear-gradient(135deg, #f4ff00 0%, #e7ff12 54%, #b7d400 100%);
+  color: #070707;
   border: none;
   cursor: pointer;
   box-shadow:
-    0 8px 18px hsl(263 86% 58% / 0.32),
-    0 0 0 1px hsl(262 87% 72% / 0.36);
+    inset 0 1px 0 rgba(255, 255, 255, .58),
+    inset 0 -4px 10px rgba(79, 90, 0, .22),
+    0 0 0 1px rgba(244, 255, 0, .38),
+    0 10px 22px rgba(238, 255, 0, .22);
   transition:
     transform 120ms var(--ws-ease),
     filter 120ms var(--ws-ease);
 }
 .ws-compact-run:hover {
-  filter: brightness(1.08);
+  filter: brightness(1.04);
   transform: scale(1.05);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .68),
+    inset 0 -4px 10px rgba(79, 90, 0, .18),
+    0 0 0 1px rgba(244, 255, 0, .54),
+    0 12px 28px rgba(238, 255, 0, .30);
 }
 .ws-compact-run:disabled {
   cursor: wait;

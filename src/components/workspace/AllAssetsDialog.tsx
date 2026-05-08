@@ -411,13 +411,13 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
         className={cn(
           "relative flex h-[600px] w-[900px] max-w-[calc(100vw-64px)] overflow-hidden rounded-[7px]",
           "border border-[#3a3a3a] bg-[#171717] text-[#d7d7d7] shadow-[0_24px_80px_rgba(0,0,0,.55)]",
-          draggingExternal && "ring-2 ring-violet-500/70",
+          draggingExternal && "ring-2 ring-yellow-500/70",
         )}
         onClick={(event) => event.stopPropagation()}
       >
         {draggingExternal && (
-          <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center bg-violet-500/12 text-violet-100">
-            <div className="flex items-center gap-2 rounded-md border border-violet-400/40 bg-black/70 px-4 py-2 text-sm font-semibold">
+          <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center bg-yellow-500/12 text-yellow-100">
+            <div className="flex items-center gap-2 rounded-md border border-yellow-400/40 bg-black/70 px-4 py-2 text-sm font-semibold">
               <UploadCloud className="h-4 w-4" />
               Drop files to upload
             </div>
@@ -484,7 +484,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
                         className={cn(
                           "flex h-[30px] cursor-pointer items-center gap-2 rounded-[3px] px-2 text-[13px] focus:bg-[#2a2a2a]",
                           isActive
-                            ? "bg-violet-500/15 text-violet-100 focus:bg-violet-500/20"
+                            ? "bg-yellow-500/15 text-yellow-100 focus:bg-yellow-500/20"
                             : "text-[#dedede]",
                         )}
                         onSelect={() => {
@@ -509,7 +509,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
                         )}
                         <span className="min-w-0 flex-1 truncate">{project.name}</span>
                         {isActive && (
-                          <Check className="h-[13px] w-[13px] shrink-0 text-violet-300" />
+                          <Check className="h-[13px] w-[13px] shrink-0 text-yellow-300" />
                         )}
                       </DropdownMenuItem>
                     );
@@ -535,7 +535,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
                 className={cn(
                   "grid h-[24px] w-[28px] place-items-center rounded-[3px] transition",
                   viewMode === "grid"
-                    ? "bg-violet-500 text-white"
+                    ? "bg-[#f4ff00] text-black"
                     : "bg-transparent text-[#9b9b9b] hover:text-white",
                 )}
               >
@@ -629,7 +629,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
                             className={cn(
                               "flex h-[30px] cursor-pointer items-center gap-2 rounded-[3px] px-2 text-[13px] focus:bg-[#2a2a2a]",
                               isActive
-                                ? "bg-violet-500/15 text-violet-100 focus:bg-violet-500/20"
+                                ? "bg-yellow-500/15 text-yellow-100 focus:bg-yellow-500/20"
                                 : "text-[#dedede]",
                             )}
                             onSelect={() => {
@@ -640,12 +640,12 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
                             <Layers
                               className={cn(
                                 "h-[13px] w-[13px] shrink-0",
-                                isActive ? "text-violet-300" : "text-[#9a9a9a]",
+                                isActive ? "text-yellow-300" : "text-[#9a9a9a]",
                               )}
                             />
                             <span className="min-w-0 flex-1 truncate">{board.name}</span>
                             {isActive && (
-                              <Check className="h-[13px] w-[13px] shrink-0 text-violet-300" />
+                              <Check className="h-[13px] w-[13px] shrink-0 text-yellow-300" />
                             )}
                           </DropdownMenuItem>
                         );
@@ -766,7 +766,7 @@ const AssetGridCard = ({
     className={cn(
       "group cursor-pointer overflow-hidden rounded-[6px] border bg-[#1b1b1b] transition",
       selected
-        ? "border-violet-500 shadow-[0_0_0_1px_rgba(168,85,247,.85)]"
+        ? "border-yellow-500 shadow-[0_0_0_1px_rgba(238,255,0,.85)]"
         : "border-[#3a3a3a] hover:border-[#666]",
     )}
   >
@@ -776,7 +776,7 @@ const AssetGridCard = ({
         <Play className="absolute bottom-2 left-2 h-[14px] w-[14px] text-white drop-shadow" />
       )}
       {selected && (
-        <div className="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-violet-500 text-white">
+        <div className="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-[#f4ff00] text-black">
           <Check className="h-3 w-3" />
         </div>
       )}
@@ -811,7 +811,7 @@ const AssetListRow = ({
     className={cn(
       "flex h-10 cursor-pointer items-center gap-3 rounded-[5px] border px-2 transition",
       selected
-        ? "border-violet-500 bg-violet-500/10"
+        ? "border-yellow-500 bg-yellow-500/10"
         : "border-transparent bg-[#1b1b1b] hover:border-[#444]",
     )}
   >

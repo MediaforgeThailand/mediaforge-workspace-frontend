@@ -67,7 +67,7 @@ const ResetPassword = () => {
   return (
     <div className="min-h-screen flex items-center justify-center p-8 relative overflow-hidden bg-background">
       <div className="absolute inset-0 bg-[length:400%_400%] opacity-30 animate-[gradient-move_8s_ease_infinite]" style={{
-        backgroundImage: 'linear-gradient(135deg, hsl(257 61% 47%), hsl(283 47% 45%), hsl(257 61% 55%), hsl(240 50% 35%), hsl(283 47% 45%))'
+        backgroundImage: 'linear-gradient(135deg, hsl(257 61% 47%), hsl(72 100% 42%), hsl(257 61% 55%), hsl(240 50% 35%), hsl(72 100% 42%))'
       }} />
 
       <div className="relative z-10 w-full max-w-md space-y-8">

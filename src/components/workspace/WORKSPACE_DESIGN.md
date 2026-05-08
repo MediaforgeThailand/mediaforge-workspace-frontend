@@ -84,7 +84,7 @@ the source port (handled in `WorkspaceCanvas.onConnect`). Color tokens:
 |-------|-------------------|-----------------------|
 | text  | `bg-blue-400`     | `hsl(217 91% 60%)`    |
 | image | `bg-emerald-400`  | `hsl(160 84% 39%)`    |
-| video | `bg-violet-400`   | `hsl(258 90% 66%)`    |
+| video | `bg-yellow-400`   | `hsl(64 100% 50%)`    |
 | audio | `bg-amber-400`    | `hsl(43 96% 56%)`     |
 | number| `bg-zinc-400`     | `hsl(0 0% 65%)`       |
 

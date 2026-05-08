@@ -81,18 +81,18 @@ const PricingCard = ({
       className={cn(
         "relative bg-[#171717] rounded-3xl px-5 pt-6 pb-5 w-[280px] xl:w-auto xl:flex-1 xl:max-w-[300px] flex flex-col gap-5 shrink-0 snap-center transition-all",
         isPopular
-          ? "ring-2 ring-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.3)]"
+          ? "ring-2 ring-yellow-400 shadow-[0_0_20px_rgba(238,255,0,0.3)]"
           : isCurrent
-            ? "ring-2 ring-purple-400/60"
+            ? "ring-2 ring-yellow-400/60"
             : "ring-1 ring-white/10"
       )}
     >
       {isCurrent ? (
-        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-purple-600 text-white text-xs font-medium px-4 py-1 rounded-full whitespace-nowrap z-10">
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#f4ff00] text-black text-xs font-medium px-4 py-1 rounded-full whitespace-nowrap z-10">
           {t("pricingCurrentPlan")}
         </div>
       ) : isPopular ? (
-        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-purple-600 text-white text-xs font-medium px-4 py-1 rounded-full whitespace-nowrap z-10">
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#f4ff00] text-black text-xs font-medium px-4 py-1 rounded-full whitespace-nowrap z-10">
           {t("pricingBestOffer")}
         </div>
       ) : null}
@@ -120,14 +120,14 @@ const PricingCard = ({
       {/* Credits */}
       {plan.upfront_credits > 0 && (
         isMultiMonth ? (
-          <div className="rounded-xl py-3 px-4 text-center bg-purple-500/10 border border-purple-400/30">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-purple-300 mb-0.5">
+          <div className="rounded-xl py-3 px-4 text-center bg-yellow-500/10 border border-yellow-400/30">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-yellow-300 mb-0.5">
               {t("pricingCard.receiveInstantly")}
             </div>
-            <div className="text-purple-200 font-black text-2xl tabular-nums leading-tight">
+            <div className="text-yellow-200 font-black text-2xl tabular-nums leading-tight">
               {plan.upfront_credits.toLocaleString()}
             </div>
-            <div className="text-purple-300/80 text-[10px] font-medium">
+            <div className="text-yellow-300/80 text-[10px] font-medium">
               {t("pricingCard.creditsNoDrip")}
             </div>
             <div className="text-neutral-500 text-[10px] mt-1.5">
@@ -145,7 +145,7 @@ const PricingCard = ({
       )}
 
       {plan.discount_official > 0 && (
-        <p className="text-sm font-medium text-violet-200">
+        <p className="text-sm font-medium text-yellow-200">
           {t("pricingCard.generationDiscount", {
             discount: plan.discount_official,
           })}
@@ -155,7 +155,7 @@ const PricingCard = ({
       <ul className="flex flex-col gap-3 flex-1">
         {features.map((f) => (
           <li key={f} className="flex gap-2 items-start">
-            <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+            <CheckCircle2 className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />
             <span className="text-neutral-300 text-sm">{f}</span>
           </li>
         ))}
@@ -167,7 +167,7 @@ const PricingCard = ({
           isCurrent
             ? "bg-neutral-700 cursor-default opacity-60"
             : isPopular
-              ? "bg-purple-600 hover:bg-purple-700"
+              ? "bg-[#f4ff00] hover:bg-[#d7e600]"
               : "bg-neutral-800 hover:bg-neutral-700 border border-neutral-700"
         )}
         disabled={isCurrent}

@@ -93,7 +93,7 @@ const CATEGORIES: StockCategory[] = [
     label: "Vectors",
     query: "modern vector illustration pack",
     Icon: Shapes,
-    swatch: "from-[#ff9f8f] via-[#f75f8f] to-[#461a6b]",
+    swatch: "from-[#f4ff00] via-[#d7e600] to-[#151515]",
     preview: "https://img.freepik.com/free-vector/hand-drawn-flat-design-people-pattern_23-2149251292.jpg",
   },
   {
@@ -101,7 +101,7 @@ const CATEGORIES: StockCategory[] = [
     label: "Photos",
     query: "premium editorial lifestyle photo",
     Icon: Camera,
-    swatch: "from-[#c8fff1] via-[#8ad2ff] to-[#365d8d]",
+    swatch: "from-[#ffffff] via-[#f4ff00] to-[#222222]",
     preview: "https://img.freepik.com/free-photo/beautiful-shot-sea-beach-sunrise_181624-3715.jpg",
   },
   {
@@ -109,7 +109,7 @@ const CATEGORIES: StockCategory[] = [
     label: "Illustrations",
     query: "surreal digital illustration portrait",
     Icon: Palette,
-    swatch: "from-[#d5ff82] via-[#ff85b8] to-[#6d46ff]",
+    swatch: "from-[#f8ff66] via-[#f4ff00] to-[#111111]",
     preview: "https://img.freepik.com/free-vector/gradient-abstract-colorful-background_23-2149131349.jpg",
   },
   {
@@ -117,7 +117,7 @@ const CATEGORIES: StockCategory[] = [
     label: "Templates",
     query: "brand presentation template",
     Icon: Layers3,
-    swatch: "from-[#7b7dff] via-[#ff5ca8] to-[#ffc837]",
+    swatch: "from-[#202020] via-[#f4ff00] to-[#ffffff]",
     preview: "https://img.freepik.com/free-vector/gradient-business-template-design_23-2149575947.jpg",
   },
   {
@@ -125,7 +125,7 @@ const CATEGORIES: StockCategory[] = [
     label: "PSDs",
     query: "poster psd template",
     Icon: FileImage,
-    swatch: "from-[#16171d] via-[#42435a] to-[#f7d2ff]",
+    swatch: "from-[#070707] via-[#303030] to-[#f4ff00]",
     preview: "https://img.freepik.com/free-psd/vertical-poster-template-fashion-sale_23-2149488890.jpg",
   },
   {
@@ -141,7 +141,7 @@ const CATEGORIES: StockCategory[] = [
     label: "Videos",
     query: "cinematic video thumbnail motion background",
     Icon: Video,
-    swatch: "from-[#ffd1f2] via-[#9ed8ff] to-[#354c86]",
+    swatch: "from-[#111111] via-[#f4ff00] to-[#f8ff66]",
     preview: "https://img.freepik.com/free-photo/beautiful-mountains-landscape_23-2150787887.jpg",
   },
   {
@@ -149,7 +149,7 @@ const CATEGORIES: StockCategory[] = [
     label: "Icons",
     query: "colorful icon set",
     Icon: Grid2X2,
-    swatch: "from-[#b8fff5] via-[#a78bfa] to-[#22c55e]",
+    swatch: "from-[#ffffff] via-[#f4ff00] to-[#9fb800]",
     preview: "https://img.freepik.com/free-vector/social-media-icons-set_98292-4250.jpg",
   },
   {
@@ -157,7 +157,7 @@ const CATEGORIES: StockCategory[] = [
     label: "Sound Effects",
     query: "audio waveform abstract",
     Icon: Mic,
-    swatch: "from-[#40115f] via-[#b51ea1] to-[#ff75d8]",
+    swatch: "from-[#111111] via-[#9fb800] to-[#f4ff00]",
     preview: "https://img.freepik.com/free-vector/colorful-sound-wave-equalizer-background_23-2148420765.jpg",
   },
   {
@@ -165,7 +165,7 @@ const CATEGORIES: StockCategory[] = [
     label: "Music",
     query: "music album visualizer cover",
     Icon: Music2,
-    swatch: "from-[#070707] via-[#b222ff] to-[#ff8d1a]",
+    swatch: "from-[#070707] via-[#f4ff00] to-[#ffffff]",
     preview: "https://img.freepik.com/free-vector/gradient-music-equalizer-background_23-2149039322.jpg",
   },
   {
@@ -181,7 +181,7 @@ const CATEGORIES: StockCategory[] = [
     label: "Fonts",
     query: "typography font poster lettering",
     Icon: Sparkles,
-    swatch: "from-[#d9fbff] via-[#ffffff] to-[#7dd3fc]",
+    swatch: "from-[#f4ff00] via-[#ffffff] to-[#c9d800]",
     preview: "https://img.freepik.com/free-vector/hand-drawn-lettering-quotes-collection_23-2149064656.jpg",
   },
 ];

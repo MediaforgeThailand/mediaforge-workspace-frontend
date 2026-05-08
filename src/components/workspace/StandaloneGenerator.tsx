@@ -2459,7 +2459,7 @@ export default function StandaloneGenerator({
             />
             )
           ) : (
-          <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-[var(--border-overlay)] bg-[var(--bg-sidebar)] shadow-[inset_0_1px_0_rgba(255,255,255,.05),0_22px_50px_-38px_rgba(168,85,247,.75)]">
+          <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-[var(--border-overlay)] bg-[var(--bg-sidebar)] shadow-[inset_0_1px_0_rgba(255,255,255,.05),0_22px_50px_-38px_rgba(238,255,0,.75)]">
             <div className="flex h-[56px] shrink-0 items-center justify-between border-b border-white/[0.04] px-4">
               <div className="flex min-w-0 items-center gap-3">
                 <button
@@ -2575,7 +2575,7 @@ export default function StandaloneGenerator({
         </aside>
 
         <main className="ws-scroll-hide min-h-0 flex-1 overflow-visible bg-[var(--bg-app)] px-3 pb-3 pt-3 md:px-4 lg:overflow-hidden lg:pb-0 lg:pl-2 lg:pr-3 lg:pt-0">
-          <section className="flex min-h-[560px] flex-1 flex-col overflow-hidden rounded-[20px] bg-[var(--bg-sidebar)] shadow-[inset_0_1px_0_rgba(255,255,255,.035),0_22px_50px_-38px_rgba(168,85,247,.45)] lg:h-full lg:min-h-0">
+          <section className="flex min-h-[560px] flex-1 flex-col overflow-hidden rounded-[20px] bg-[var(--bg-sidebar)] shadow-[inset_0_1px_0_rgba(255,255,255,.035),0_22px_50px_-38px_rgba(238,255,0,.45)] lg:h-full lg:min-h-0">
             <div className="ws-scroll-hide min-h-0 flex-1 overflow-y-auto px-3 py-3">
               <CreationFeed
                 jobs={filterJobsForTool(jobsQuery.data ?? [], activeTool)}
@@ -2596,7 +2596,7 @@ export default function StandaloneGenerator({
         onOpenChange={(open) => !open && !deletingReference && setDeleteReferenceTarget(null)}
       >
         <DialogContent className="w-[360px] gap-0 overflow-hidden rounded-[18px] border border-white/[0.08] bg-[#101113] p-0 text-white shadow-[0_24px_80px_rgba(0,0,0,.64)]">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-[#ff2fb3] via-[#8b5cf6] to-[#14b8ff]" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-[#F4FF00] via-[#F4FF00] to-[#f8ff66]" />
           <div className="px-5 pb-4 pt-5">
             <DialogHeader className="space-y-2 pr-5">
               <div className="flex items-center gap-3">
@@ -2663,7 +2663,7 @@ function ToolTabs({
     <footer
       className={cn(
         isMobile
-          ? "standalone-mobile-tool-tabs flex h-[42px] items-center justify-center gap-[8px] rounded-[14px] border border-white/[0.05] bg-[#151719] px-[8px] py-[4px] shadow-[inset_0_1px_0_rgba(255,255,255,.04),0_10px_24px_-20px_rgba(168,85,247,.75)]"
+          ? "standalone-mobile-tool-tabs flex h-[42px] items-center justify-center gap-[8px] rounded-[14px] border border-white/[0.05] bg-[#151719] px-[8px] py-[4px] shadow-[inset_0_1px_0_rgba(255,255,255,.04),0_10px_24px_-20px_rgba(238,255,0,.75)]"
           : "flex items-center justify-between gap-2 border-t border-white/[0.05] bg-[#17191b] px-4 py-3",
         className,
       )}
@@ -2681,12 +2681,12 @@ function ToolTabs({
               "relative flex min-w-0 items-center justify-center overflow-hidden rounded-full font-semibold outline-none transition-all duration-300 focus-visible:ring-2 focus-visible:ring-[var(--brand-soft)]/60",
               isMobile
                 ? active
-                  ? "h-[34px] min-w-[78px] px-[12px] text-[12px] bg-white text-black shadow-[0_0_18px_rgba(199,125,255,.5)]"
+                  ? "h-[34px] min-w-[78px] px-[12px] text-[12px] bg-white text-black shadow-[0_0_18px_rgba(244,255,0,.5)]"
                   : "h-[34px] w-[34px] px-0 text-[var(--text-default)] hover:bg-white/10 hover:text-white"
                 : cn(
                     "h-11 px-3 text-[13px]",
                     active
-                      ? "min-w-[112px] bg-white text-black shadow-[0_4px_20px_rgba(168,85,247,0.45)]"
+                      ? "min-w-[112px] bg-white text-black shadow-[0_4px_20px_rgba(238,255,0,0.45)]"
                       : "w-11 text-[var(--text-default)] hover:bg-white/10 hover:text-white",
                   ),
             )}
@@ -2986,7 +2986,7 @@ function ModelPicker({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="group flex h-[58px] w-full items-center overflow-hidden rounded-[14px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-3 transition-all duration-200 hover:border-[var(--brand-primary)]/40 hover:bg-[var(--bg-surface-2)] hover:shadow-[0_0_0_1px_rgba(168,85,247,.25),0_8px_24px_-12px_rgba(168,85,247,.4)]"
+        className="group flex h-[58px] w-full items-center overflow-hidden rounded-[14px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-3 transition-all duration-200 hover:border-[var(--brand-primary)]/40 hover:bg-[var(--bg-surface-2)] hover:shadow-[0_0_0_1px_rgba(238,255,0,.25),0_8px_24px_-12px_rgba(238,255,0,.4)]"
       >
         <span className="flex w-full items-center gap-3">
           <span
@@ -3208,10 +3208,10 @@ function modelVisualFor(model: {
     hash = (hash * 31 + seed.charCodeAt(i)) % 997;
   }
   const gradients = [
-    "linear-gradient(135deg,#5B2A8C,#9B4DE0 55%,#C77DFF)",
-    "linear-gradient(135deg,#3B2A8C,#7E35C9 55%,#A855F7)",
-    "linear-gradient(135deg,#202326,#5B2A8C 55%,#9B4DE0)",
-    "linear-gradient(135deg,#43286F,#8E4CC6 55%,#C77DFF)",
+    "linear-gradient(135deg,#9FB800,#F4FF00 55%,#F8FF66)",
+    "linear-gradient(135deg,#3B2A8C,#E7FF12 55%,#EEFF00)",
+    "linear-gradient(135deg,#202326,#9FB800 55%,#F4FF00)",
+    "linear-gradient(135deg,#9fb800,#e7ff12 55%,#F8FF66)",
   ];
   return {
     gradient: gradients[hash % gradients.length],
@@ -3330,7 +3330,7 @@ function ImagePromptPanel({
           type="button"
           onClick={onUpload}
           disabled={uploading || refs.length >= max}
-          className="group relative flex h-[58px] w-full items-center gap-3 overflow-hidden border border-[var(--brand-primary)]/70 bg-[radial-gradient(85%_160%_at_50%_-60%,rgba(199,125,255,.6),rgba(155,77,224,.24)_38%,rgba(10,10,11,0)_80%)] px-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,.12),0_0_24px_-10px_rgba(168,85,247,.9)] transition hover:border-[var(--brand-soft)] disabled:cursor-not-allowed disabled:opacity-70"
+          className="group relative flex h-[58px] w-full items-center gap-3 overflow-hidden border border-[var(--brand-primary)]/70 bg-[radial-gradient(85%_160%_at_50%_-60%,rgba(244,255,0,.6),rgba(238,255,0,.24)_38%,rgba(10,10,11,0)_80%)] px-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,.12),0_0_24px_-10px_rgba(238,255,0,.9)] transition hover:border-[var(--brand-soft)] disabled:cursor-not-allowed disabled:opacity-70"
         >
           <div className="flex h-8 w-[60px] shrink-0 items-center -space-x-3 overflow-hidden">
             {refs.length > 0 ? (
@@ -3344,9 +3344,9 @@ function ImagePromptPanel({
               ))
             ) : (
               <>
-                <span className="h-8 w-8 rounded-lg border border-white/20 bg-[linear-gradient(135deg,#9B4DE0,#C77DFF)] shadow-lg" />
-                <span className="h-8 w-8 rounded-lg border border-white/20 bg-[linear-gradient(135deg,#5B2A8C,#9B4DE0)] shadow-lg" />
-                <span className="h-8 w-8 rounded-lg border border-white/20 bg-[linear-gradient(135deg,#202326,#C77DFF)] shadow-lg" />
+                <span className="h-8 w-8 rounded-lg border border-white/20 bg-[linear-gradient(135deg,#F4FF00,#F8FF66)] shadow-lg" />
+                <span className="h-8 w-8 rounded-lg border border-white/20 bg-[linear-gradient(135deg,#9FB800,#F4FF00)] shadow-lg" />
+                <span className="h-8 w-8 rounded-lg border border-white/20 bg-[linear-gradient(135deg,#202326,#F8FF66)] shadow-lg" />
               </>
             )}
           </div>
@@ -3886,7 +3886,7 @@ function inferVoiceProvider(model: string): VoiceProviderKind {
  *  hash so each tile still gets a stable colour without needing to
  *  ship a static tint table. */
 const TINT_PALETTE: Record<string, string> = {
-  violet: "linear-gradient(135deg, hsl(258 75% 45%), hsl(258 65% 28%))",
+  violet: "linear-gradient(135deg, hsl(64 100% 42%), hsl(72 100% 28%))",
   rose:   "linear-gradient(135deg, hsl(345 75% 50%), hsl(345 65% 32%))",
   amber:  "linear-gradient(135deg, hsl(35 80% 50%), hsl(35 70% 32%))",
   emerald:"linear-gradient(135deg, hsl(160 65% 38%), hsl(160 60% 22%))",
@@ -4513,9 +4513,9 @@ function StandaloneMultiShotBuilder({
 
   return (
     <section className="shrink-0 rounded-[16px] border border-white/[0.025] bg-[#16181a] p-[9px] shadow-[inset_0_1px_0_rgba(255,255,255,.035)]">
-      <div className="flex items-center justify-between rounded-[12px] border border-violet-400/20 bg-[linear-gradient(90deg,rgba(168,85,247,.12),rgba(168,85,247,.035))] px-[10px] py-[8px]">
+      <div className="flex items-center justify-between rounded-[12px] border border-yellow-400/20 bg-[linear-gradient(90deg,rgba(238,255,0,.12),rgba(238,255,0,.035))] px-[10px] py-[8px]">
         <div className="flex min-w-0 items-center gap-[8px]">
-          <span className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[8px] border border-violet-300/30 bg-violet-400/15 text-violet-200">
+          <span className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[8px] border border-yellow-300/30 bg-yellow-400/15 text-yellow-200">
             <Film className="h-[13px] w-[13px]" />
           </span>
           <div className="min-w-0 leading-tight">
@@ -4530,7 +4530,7 @@ function StandaloneMultiShotBuilder({
             </div>
           </div>
         </div>
-        <span className="inline-flex shrink-0 items-center gap-[4px] rounded-full bg-violet-400/15 px-[8px] py-[3px] text-[10.5px] font-semibold leading-[14px] text-violet-100">
+        <span className="inline-flex shrink-0 items-center gap-[4px] rounded-full bg-yellow-400/15 px-[8px] py-[3px] text-[10.5px] font-semibold leading-[14px] text-yellow-100">
           <Clock className="h-[12px] w-[12px]" />
           {t("multiShot.totalDuration", { seconds: totalDuration })}
         </span>
@@ -4541,7 +4541,7 @@ function StandaloneMultiShotBuilder({
           {effectiveScenes.map((scene, index) => (
             <span
               key={`${index}-${scene.duration}`}
-              className="rounded-[2px] bg-violet-400/80"
+              className="rounded-[2px] bg-yellow-400/80"
               style={{ flex: Math.max(Number(scene.duration) || 1, 0.5) }}
             />
           ))}
@@ -4554,16 +4554,16 @@ function StandaloneMultiShotBuilder({
             key={index}
             className="relative overflow-hidden rounded-[12px] border border-white/[0.05] bg-[#121314] p-[8px] pl-[10px]"
           >
-            <span className="absolute left-0 top-0 h-full w-[3px] bg-violet-400/70" />
+            <span className="absolute left-0 top-0 h-full w-[3px] bg-yellow-400/70" />
             <div className="flex items-start gap-[8px]">
-              <div className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-[10px] border border-white/[0.08] bg-[linear-gradient(135deg,rgba(168,85,247,.75),rgba(236,72,153,.35))] text-[12px] font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,.16)]">
+              <div className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-[10px] border border-white/[0.08] bg-[linear-gradient(135deg,rgba(238,255,0,.75),rgba(244,255,0,.35))] text-[12px] font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,.16)]">
                 {String(index + 1).padStart(2, "0")}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="mb-[6px] flex items-center justify-between gap-[8px]">
                   <div className="flex min-w-0 items-center gap-[5px]">
                     <GripVertical className="h-[12px] w-[12px] shrink-0 text-white/30" />
-                    <span className="truncate text-[10.5px] font-semibold uppercase tracking-[0.08em] text-violet-200">
+                    <span className="truncate text-[10.5px] font-semibold uppercase tracking-[0.08em] text-yellow-200">
                       {t("multiShot.sceneNumber", {
                         number: String(index + 1).padStart(2, "0"),
                       })}
@@ -4610,7 +4610,7 @@ function StandaloneMultiShotBuilder({
                     scene: index + 1,
                   })}
                   mentionOptions={mentionOptions}
-                  className="min-h-[46px] max-h-[136px] rounded-[9px] border-white/[0.06] bg-[#0f1011] px-[8px] py-[7px] text-[12px] leading-[18px] text-white placeholder:text-neutral-500 focus:border-violet-400/50"
+                  className="min-h-[46px] max-h-[136px] rounded-[9px] border-white/[0.06] bg-[#0f1011] px-[8px] py-[7px] text-[12px] leading-[18px] text-white placeholder:text-neutral-500 focus:border-yellow-400/50"
                 />
               </div>
             </div>
@@ -4622,7 +4622,7 @@ function StandaloneMultiShotBuilder({
         <button
           type="button"
           onClick={addScene}
-          className="mt-[8px] flex h-[34px] w-full items-center justify-center gap-[6px] rounded-[10px] border border-dashed border-violet-400/30 bg-violet-500/[0.03] text-[12px] font-semibold text-violet-200 transition hover:border-violet-300/55 hover:bg-violet-500/[0.08]"
+          className="mt-[8px] flex h-[34px] w-full items-center justify-center gap-[6px] rounded-[10px] border border-dashed border-yellow-400/30 bg-yellow-500/[0.03] text-[12px] font-semibold text-yellow-200 transition hover:border-yellow-300/55 hover:bg-[#e7ff12]/[0.08]"
         >
           <Plus className="h-[14px] w-[14px]" />
           {t("multiShot.addScene", {
@@ -4698,7 +4698,7 @@ function PromptBox({
         onChange={(event) => onChange(event.target.value)}
         rows={minRows}
         placeholder={placeholder}
-        className="mt-2 min-h-[126px] w-full resize-none rounded-2xl border border-[var(--border-faint)] bg-[var(--bg-panel)] px-3 py-3 text-[13px] leading-relaxed text-zinc-100 outline-none placeholder:text-[var(--text-tertiary)] transition focus:border-[var(--brand-primary)]/40 focus:bg-[var(--bg-surface-2)] focus:shadow-[0_0_0_1px_rgba(168,85,247,.18),0_8px_24px_-16px_rgba(168,85,247,.45)]"
+        className="mt-2 min-h-[126px] w-full resize-none rounded-2xl border border-[var(--border-faint)] bg-[var(--bg-panel)] px-3 py-3 text-[13px] leading-relaxed text-zinc-100 outline-none placeholder:text-[var(--text-tertiary)] transition focus:border-[var(--brand-primary)]/40 focus:bg-[var(--bg-surface-2)] focus:shadow-[0_0_0_1px_rgba(238,255,0,.18),0_8px_24px_-16px_rgba(238,255,0,.45)]"
       />
     </div>
   );
@@ -4798,7 +4798,7 @@ function StyleReferenceTray({
 
   return (
     <div className="relative">
-      <div className="mt-2 rounded-2xl bg-gradient-to-br from-[var(--brand-primary)]/30 via-[var(--brand-deep)]/20 to-transparent p-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,.1),0_0_24px_-6px_rgba(168,85,247,.4)] ring-1 ring-[var(--brand-primary)]/50 transition-all duration-300 hover:ring-[var(--brand-soft)]/70">
+      <div className="mt-2 rounded-2xl bg-gradient-to-br from-[var(--brand-primary)]/30 via-[var(--brand-deep)]/20 to-transparent p-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,.1),0_0_24px_-6px_rgba(238,255,0,.4)] ring-1 ring-[var(--brand-primary)]/50 transition-all duration-300 hover:ring-[var(--brand-soft)]/70">
         <div className="flex items-center gap-3">
           <div className="flex min-w-0 flex-1 flex-col">
             <div className="flex items-center gap-2">
@@ -4823,7 +4823,7 @@ function StyleReferenceTray({
           className={cn(
             "flex h-[58px] w-[72px] flex-col items-center justify-center gap-1.5 overflow-hidden rounded-[12px] text-zinc-300 outline-none ring-1 ring-inset ring-[var(--brand-primary)]/10 transition-all duration-300 hover:bg-white/10 hover:text-white focus-visible:ring-[var(--brand-soft)]/60",
             selectedStyle.id !== "none"
-              ? "bg-[radial-gradient(40%_21%_at_50%_0%,rgba(255,255,255,.37)_0%,rgba(155,77,224,0)_100%),radial-gradient(64%_127%_at_51%_189%,rgba(155,77,224,.85)_0%,rgba(155,77,224,.14)_75%,rgba(155,77,224,0)_100%),var(--bg-panel)] text-white shadow-[inset_0_0_0_1px_rgba(168,85,247,.35),0_6px_24px_-8px_rgba(168,85,247,.55)]"
+              ? "bg-[radial-gradient(40%_21%_at_50%_0%,rgba(255,255,255,.37)_0%,rgba(238,255,0,0)_100%),radial-gradient(64%_127%_at_51%_189%,rgba(238,255,0,.85)_0%,rgba(238,255,0,.14)_75%,rgba(238,255,0,0)_100%),var(--bg-panel)] text-white shadow-[inset_0_0_0_1px_rgba(238,255,0,.35),0_6px_24px_-8px_rgba(238,255,0,.55)]"
               : "bg-white/[0.04]",
           )}
         >
@@ -4845,7 +4845,7 @@ function StyleReferenceTray({
           className={cn(
             "relative flex h-[58px] w-[72px] flex-col items-center justify-center gap-1.5 overflow-hidden rounded-[12px] text-zinc-300 outline-none ring-1 ring-inset ring-[var(--brand-primary)]/10 transition-all duration-300 focus-visible:ring-[var(--brand-soft)]/60 disabled:opacity-60",
             characterActive
-              ? "bg-[radial-gradient(40%_21%_at_50%_0%,rgba(255,255,255,.32)_0%,rgba(155,77,224,0)_100%),radial-gradient(62%_123%_at_56%_-62%,rgba(199,125,255,.65)_0%,rgba(199,125,255,.14)_75%,rgba(199,125,255,0)_100%),var(--bg-panel)] text-white shadow-[0_6px_24px_-8px_rgba(168,85,247,.55)]"
+              ? "bg-[radial-gradient(40%_21%_at_50%_0%,rgba(255,255,255,.32)_0%,rgba(238,255,0,0)_100%),radial-gradient(62%_123%_at_56%_-62%,rgba(244,255,0,.65)_0%,rgba(244,255,0,.14)_75%,rgba(244,255,0,0)_100%),var(--bg-panel)] text-white shadow-[0_6px_24px_-8px_rgba(238,255,0,.55)]"
               : "bg-white/[0.04] hover:bg-white/10 hover:text-white",
           )}
           title={
@@ -4900,13 +4900,13 @@ function StyleReferenceTray({
                   /* Visual thread: the badge on the thumbnail mirrors
                    *  the violet hue on the Character button so the
                    *  user can match thumb → role at a glance. */
-                  isCharacter && "ring-2 ring-violet-400/60",
+                  isCharacter && "ring-2 ring-yellow-400/60",
                 )}
               >
                 <img src={ref.url} alt="" className="h-full w-full object-cover" />
                 {isCharacter && (
                   <span
-                    className="absolute left-1 top-1 flex items-center gap-0.5 rounded bg-violet-500/85 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white"
+                    className="absolute left-1 top-1 flex items-center gap-0.5 rounded bg-[#f4ff00]/90 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-black"
                     title={t("workspace.standalone.character_reference_title")}
                   >
                     <UserRound className="h-2.5 w-2.5" />
@@ -4987,7 +4987,7 @@ function ToggleRow({
       <span
         className={cn(
           "relative h-5 w-9 rounded-full transition",
-          checked ? "bg-[var(--brand-primary)] shadow-[0_0_18px_-8px_rgba(168,85,247,.8)]" : "bg-zinc-700",
+          checked ? "bg-[var(--brand-primary)] shadow-[0_0_18px_-8px_rgba(238,255,0,.8)]" : "bg-zinc-700",
         )}
       >
         <span
@@ -5078,7 +5078,7 @@ function SingleReferenceButton({
       <FieldLabel label={label} />
       <div
         className={cn(
-          "mt-2 overflow-hidden rounded-2xl border border-[var(--brand-primary)]/30 bg-gradient-to-br from-[var(--brand-primary)]/18 via-[var(--brand-deep)]/12 to-transparent shadow-[inset_0_1px_0_0_rgba(255,255,255,.08),0_0_22px_-10px_rgba(168,85,247,.5)]",
+          "mt-2 overflow-hidden rounded-2xl border border-[var(--brand-primary)]/30 bg-gradient-to-br from-[var(--brand-primary)]/18 via-[var(--brand-deep)]/12 to-transparent shadow-[inset_0_1px_0_0_rgba(255,255,255,.08),0_0_22px_-10px_rgba(238,255,0,.5)]",
           tall ? "aspect-square" : "h-16",
         )}
       >

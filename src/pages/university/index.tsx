@@ -347,7 +347,7 @@ export default function UniversityMockup() {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="truncate text-xl font-semibold tracking-tight">PSC College Management</h1>
-                <Badge className="bg-fuchsia-600 text-white hover:bg-fuchsia-600">DMD</Badge>
+                <Badge className="bg-[#f4ff00] text-black hover:bg-[#f4ff00]">DMD</Badge>
               </div>
               <p className="mt-1 text-sm text-slate-500">Digital Media Design · MediaForge for Education</p>
             </div>
@@ -361,7 +361,7 @@ export default function UniversityMockup() {
               <Plus className="h-4 w-4" />
               เพิ่มนักเรียน
             </Button>
-            <Button onClick={() => setQrOpen(true)} className="h-11 gap-2 bg-fuchsia-600 text-white hover:bg-fuchsia-700">
+            <Button onClick={() => setQrOpen(true)} className="h-11 gap-2 bg-[#f4ff00] text-black hover:bg-[#d7e600]">
               <QrCode className="h-4 w-4" />
               สร้าง QR Code
             </Button>
@@ -373,7 +373,7 @@ export default function UniversityMockup() {
               <UserPlus className="h-4 w-4" />
               เพิ่มนักเรียน
             </Button>
-            <Button onClick={() => setQrOpen(true)} className="h-11 gap-2 bg-fuchsia-600 text-white hover:bg-fuchsia-700">
+            <Button onClick={() => setQrOpen(true)} className="h-11 gap-2 bg-[#f4ff00] text-black hover:bg-[#d7e600]">
               <QrCode className="h-4 w-4" />
               สร้าง QR
             </Button>
@@ -388,13 +388,13 @@ export default function UniversityMockup() {
               <Building2 className="h-4 w-4" />
               วิทยาลัย
             </div>
-            <button className="flex w-full items-center gap-3 rounded-lg border border-fuchsia-200 bg-fuchsia-50 p-3 text-left">
+            <button className="flex w-full items-center gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-left">
               <img src={dmdLogoSrc} alt="DMD" className="h-10 w-28 shrink-0 object-contain" />
               <div className="min-w-0 flex-1">
                 <div className="font-semibold">Digital Media Design</div>
                 <div className="text-xs text-slate-500">3 คลาส · 105 นักเรียน</div>
               </div>
-              <ChevronRight className="h-4 w-4 text-fuchsia-500" />
+              <ChevronRight className="h-4 w-4 text-yellow-500" />
             </button>
           </section>
 
@@ -418,7 +418,7 @@ export default function UniversityMockup() {
                     )}
                   >
                     <div className="flex items-center gap-2">
-                      <BookOpen className={cn("h-4 w-4", active ? "text-fuchsia-300" : "text-slate-400")} />
+                      <BookOpen className={cn("h-4 w-4", active ? "text-yellow-300" : "text-slate-400")} />
                       <span className="truncate text-sm font-medium">{item.name}</span>
                     </div>
                     <div className={cn("mt-1 text-xs", active ? "text-slate-300" : "text-slate-500")}>
@@ -465,7 +465,7 @@ export default function UniversityMockup() {
                   <UserPlus className="h-4 w-4" />
                   เพิ่มนักเรียน
                 </Button>
-                <Button onClick={() => setQrOpen(true)} className="h-11 gap-2 bg-fuchsia-600 text-white hover:bg-fuchsia-700">
+                <Button onClick={() => setQrOpen(true)} className="h-11 gap-2 bg-[#f4ff00] text-black hover:bg-[#d7e600]">
                   <QrCode className="h-4 w-4" />
                   สร้าง QR Code
                 </Button>
@@ -569,12 +569,12 @@ export default function UniversityMockup() {
                     <h3 className="font-semibold">Weekly Drip</h3>
                     <p className="text-sm text-slate-500">50 เครดิตต่อสัปดาห์ สะสมได้ต่อเนื่อง</p>
                   </div>
-                  {selectedClass.model === "Weekly Drip" && <Badge className="bg-fuchsia-600">Active</Badge>}
+                  {selectedClass.model === "Weekly Drip" && <Badge className="bg-[#f4ff00]">Active</Badge>}
                 </div>
                 <div className="flex h-48 items-end gap-2 rounded-md bg-slate-50 p-4">
                   {[50, 100, 150, 200, 250, 300, 350, 400].map((value, index) => (
                     <div key={value} className="flex flex-1 flex-col items-center gap-2">
-                      <div className="w-full rounded-t-md bg-fuchsia-500" style={{ height: `${(value / 400) * 150}px` }} />
+                      <div className="w-full rounded-t-md bg-yellow-500" style={{ height: `${(value / 400) * 150}px` }} />
                       <span className="text-[11px] text-slate-500">W{index + 1}</span>
                     </div>
                   ))}
@@ -679,7 +679,7 @@ function SmallStat({ label, value }: { label: string; value: string }) {
 function WorkflowTile({ icon: Icon, title, value }: { icon: LucideIcon; title: string; value: string }) {
   return (
     <div className="rounded-md border border-slate-200 p-3">
-      <Icon className="h-4 w-4 text-fuchsia-600" />
+      <Icon className="h-4 w-4 text-yellow-600" />
       <div className="mt-2 text-sm font-medium">{title}</div>
       <div className="text-xs text-slate-500">{value}</div>
     </div>
@@ -727,7 +727,7 @@ function StudentTable({
           </Button>
         </div>
       </div>
-      <div className="border-b border-slate-100 bg-fuchsia-50 px-5 py-3 text-sm text-fuchsia-700">
+      <div className="border-b border-slate-100 bg-yellow-50 px-5 py-3 text-sm text-yellow-700">
         กำลังเลือก: {selectedStudent.name} · {selectedStudent.email}
       </div>
       <div className="divide-y divide-slate-100 lg:hidden">
@@ -849,7 +849,7 @@ function StudentWorkspaceGrid({
               }}
               className={cn(
                 "group overflow-hidden rounded-lg border bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md",
-                active ? "border-fuchsia-400 ring-2 ring-fuchsia-100" : "border-slate-200",
+                active ? "border-yellow-400 ring-2 ring-yellow-100" : "border-slate-200",
               )}
             >
               <div className="bg-slate-950 p-3 text-white">
@@ -867,7 +867,7 @@ function StudentWorkspaceGrid({
                   <div className="col-span-2 rounded-md border border-slate-800 bg-slate-900 p-3">
                     <div className="h-2 w-20 rounded-full bg-slate-700" />
                     <div className="mt-3 h-2 w-28 rounded-full bg-slate-800" />
-                    <div className="mt-2 h-2 w-16 rounded-full bg-fuchsia-500/70" />
+                    <div className="mt-2 h-2 w-16 rounded-full bg-yellow-500/70" />
                   </div>
                   <WorkspaceMiniNode icon={ClipboardCheck} title="Review" highlight />
                 </div>
@@ -896,8 +896,8 @@ function StudentWorkspaceGrid({
 
 function WorkspaceMiniNode({ icon: Icon, title, highlight = false }: { icon: LucideIcon; title: string; highlight?: boolean }) {
   return (
-    <div className={cn("rounded-md border p-3", highlight ? "border-fuchsia-400 bg-fuchsia-500/15" : "border-slate-800 bg-slate-900")}>
-      <Icon className={cn("h-4 w-4", highlight ? "text-fuchsia-300" : "text-slate-400")} />
+    <div className={cn("rounded-md border p-3", highlight ? "border-yellow-400 bg-yellow-500/15" : "border-slate-800 bg-slate-900")}>
+      <Icon className={cn("h-4 w-4", highlight ? "text-yellow-300" : "text-slate-400")} />
       <div className="mt-3 truncate text-xs font-medium text-slate-200">{title}</div>
     </div>
   );
@@ -922,18 +922,18 @@ function CreditModelCard({
   points: string[];
 }) {
   return (
-    <section className={cn("rounded-lg border bg-white p-5 shadow-sm", selected ? "border-fuchsia-300" : "border-slate-200")}>
+    <section className={cn("rounded-lg border bg-white p-5 shadow-sm", selected ? "border-yellow-300" : "border-slate-200")}>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h3 className="font-semibold">{title}</h3>
           <p className="text-sm text-slate-500">{subtitle}</p>
         </div>
-        {selected && <Badge className="bg-fuchsia-600">Active</Badge>}
+        {selected && <Badge className="bg-[#f4ff00]">Active</Badge>}
       </div>
       <div className="space-y-3">
         {points.map((point) => (
           <div key={point} className="flex items-center gap-2 text-sm text-slate-600">
-            <RefreshCw className="h-4 w-4 text-fuchsia-500" />
+            <RefreshCw className="h-4 w-4 text-yellow-500" />
             {point}
           </div>
         ))}
@@ -945,7 +945,7 @@ function CreditModelCard({
 function ReportTile({ icon: Icon, title, value }: { icon: LucideIcon; title: string; value: string }) {
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <Icon className="h-5 w-5 text-fuchsia-600" />
+      <Icon className="h-5 w-5 text-yellow-600" />
       <div className="mt-4 text-sm text-slate-500">{title}</div>
       <div className="mt-1 text-xl font-semibold">{value}</div>
       <Button variant="outline" className="mt-4 h-9 gap-2">
@@ -961,7 +961,7 @@ function AlertLine({ tone, text }: { tone: "amber" | "emerald" | "slate" | "fuch
     amber: "bg-amber-50 text-amber-800",
     emerald: "bg-emerald-50 text-emerald-800",
     slate: "bg-slate-100 text-slate-700",
-    fuchsia: "bg-fuchsia-50 text-fuchsia-800",
+    fuchsia: "bg-yellow-50 text-black",
   }[tone];
   return <div className={cn("rounded-md px-3 py-2 text-sm", toneClass)}>{text}</div>;
 }
@@ -1071,7 +1071,7 @@ function QrDialog({
       <DialogContent className="max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-2xl overflow-y-auto border-slate-200 bg-white p-4 text-slate-950 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <QrCode className="h-5 w-5 text-fuchsia-600" />
+            <QrCode className="h-5 w-5 text-yellow-600" />
             QR Code เข้าเรียน · {selectedClass.name}
           </DialogTitle>
           <DialogDescription>ใช้เปิดหน้าจอหน้าห้องเรียนหรือส่งให้นักเรียนเข้าคลาสด้วยตัวเอง</DialogDescription>
@@ -1087,7 +1087,7 @@ function QrDialog({
             <div>
               <div className="text-xs uppercase tracking-[0.16em] text-slate-500">QR Code สำหรับเข้าคลาส</div>
               <div className="mt-1 text-2xl font-semibold">{selectedClass.name}</div>
-              <div className="font-mono text-sm text-fuchsia-600">{selectedClass.code}-X8K9</div>
+              <div className="font-mono text-sm text-yellow-600">{selectedClass.code}-X8K9</div>
             </div>
             <QrRow label="เครดิตเริ่มต้นต่อนักเรียน" value={modelCopy.title} />
             <QrRow label="โมเดลการให้เครดิต" value={selectedClass.model} />
@@ -1166,8 +1166,8 @@ function WorkspaceDialog({ open, onOpenChange, student }: { open: boolean; onOpe
 
 function CanvasNode({ icon: Icon, title, text, highlight = false }: { icon: LucideIcon; title: string; text: string; highlight?: boolean }) {
   return (
-    <div className={cn("rounded-lg border p-4", highlight ? "border-fuchsia-400 bg-fuchsia-500/10" : "border-slate-800 bg-slate-900")}>
-      <Icon className={cn("h-5 w-5", highlight ? "text-fuchsia-300" : "text-slate-400")} />
+    <div className={cn("rounded-lg border p-4", highlight ? "border-yellow-400 bg-yellow-500/10" : "border-slate-800 bg-slate-900")}>
+      <Icon className={cn("h-5 w-5", highlight ? "text-yellow-300" : "text-slate-400")} />
       <div className="mt-3 font-semibold">{title}</div>
       <div className="mt-1 text-sm text-slate-400">{text}</div>
     </div>
@@ -1177,7 +1177,7 @@ function CanvasNode({ icon: Icon, title, text, highlight = false }: { icon: Luci
 function QrRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start gap-3 rounded-md border border-slate-200 p-3">
-      <Clock3 className="mt-0.5 h-4 w-4 text-fuchsia-600" />
+      <Clock3 className="mt-0.5 h-4 w-4 text-yellow-600" />
       <div>
         <div className="text-xs text-slate-500">{label}</div>
         <div className="text-sm font-medium">{value}</div>

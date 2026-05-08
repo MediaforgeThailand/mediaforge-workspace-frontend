@@ -2589,7 +2589,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       rows.push({
         label: nodeCostQuote.packageDiscountLabel ?? "Package",
         value: `-${nodeCostQuote.packageDiscountPercent}%`,
-        className: "text-violet-300",
+        className: "text-yellow-300",
       });
     }
     if (costTotalDiscountPercent > 0) {
@@ -2617,9 +2617,9 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     sky: "hsl(217 91% 60%)",
     blue: "hsl(217 91% 60%)",
     emerald: "hsl(160 84% 39%)",
-    violet: "hsl(258 90% 66%)",
+    violet: "hsl(64 100% 50%)",
     amber: "hsl(43 96% 56%)",
-    pink: "hsl(328 86% 70%)",
+    pink: "hsl(64 100% 68%)",
     zinc: "hsl(0 0% 65%)",
   };
   const colorOf = (c: string) => PORT_COLORS[c] ?? PORT_COLORS.zinc;

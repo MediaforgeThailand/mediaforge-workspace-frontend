@@ -113,7 +113,7 @@ const CardForm = ({ onSaved, onClose }: { onSaved?: () => void; onClose: () => v
       <Button
         type="submit"
         disabled={!stripe || submitting}
-        className="w-full bg-violet-600 hover:bg-violet-500 text-white"
+        className="w-full bg-[#f4ff00] hover:bg-[#f4ff00] text-black"
       >
         {submitting ? (
           <>
@@ -184,7 +184,7 @@ const UpdatePaymentDialog = ({ open, onOpenChange, onSaved }: UpdatePaymentDialo
       appearance: {
         theme: "night",
         variables: {
-          colorPrimary: "#a78bfa",
+          colorPrimary: "#f4ff00",
           colorBackground: "#0c1020",
           colorText: "#e5e7eb",
           colorDanger: "#ef4444",
@@ -211,7 +211,7 @@ const UpdatePaymentDialog = ({ open, onOpenChange, onSaved }: UpdatePaymentDialo
 
         <Tabs defaultValue="card" className="px-6 pb-5">
           <TabsList className="bg-white/[0.06] mb-4">
-            <TabsTrigger value="card" className="text-xs data-[state=active]:bg-violet-500/20 data-[state=active]:text-violet-100">
+            <TabsTrigger value="card" className="text-xs data-[state=active]:bg-yellow-500/20 data-[state=active]:text-yellow-100">
               <CreditCard className="w-3.5 h-3.5 mr-1.5" />
               {i18n("settings.updatePayment.card")}
             </TabsTrigger>

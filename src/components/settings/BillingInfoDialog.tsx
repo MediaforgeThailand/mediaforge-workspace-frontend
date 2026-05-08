@@ -235,7 +235,7 @@ const BillingInfoDialog = ({
             size="sm"
             onClick={handleSave}
             disabled={saving}
-            className="bg-violet-600 hover:bg-violet-500 text-white"
+            className="bg-[#f4ff00] hover:bg-[#f4ff00] text-black"
           >
             {saving ? (
               <>

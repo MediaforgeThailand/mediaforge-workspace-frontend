@@ -476,7 +476,7 @@ function StatCard({
   const accentClass = {
     primary: "text-primary",
     emerald: "text-emerald-600 dark:text-emerald-400",
-    violet: "text-violet-600 dark:text-violet-400",
+    violet: "text-yellow-600 dark:text-yellow-400",
     amber: "text-amber-600 dark:text-amber-400",
   }[accent];
 
@@ -495,7 +495,7 @@ function StatCard({
               className={cn("h-1 rounded-full", {
                 "bg-primary":  accent === "primary",
                 "bg-emerald-500": accent === "emerald",
-                "bg-violet-500":  accent === "violet",
+                "bg-yellow-500":  accent === "violet",
                 "bg-amber-500":   accent === "amber",
               })}
               style={{ width: `${Math.min(progress, 100)}%` }}

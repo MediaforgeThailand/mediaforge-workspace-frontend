@@ -23,7 +23,7 @@ export default function TeamRegister() {
 
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
           <section className="rounded-2xl bg-white/[0.05] p-6">
-            <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-violet-500/15 text-violet-200">
+            <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-yellow-500/15 text-yellow-200">
               <Building2 className="h-5 w-5" />
             </div>
             <h1 className="text-2xl font-semibold">{i18n("teamRegistration.createTeamWorkspace")}</h1>

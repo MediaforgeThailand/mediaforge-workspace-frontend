@@ -128,7 +128,7 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
     nodeType: "imageGenNode",
     icon: ImageIcon,
     outputType: "image",
-    accent: "hsl(258 86% 64%)",
+    accent: "hsl(64 100% 50%)",
     defaultModel: "nano-banana-2",
     // Keep this list in sync with `imageGenNode.supportedModels` in
     // workspaceSchema.ts. The canvas image-gen node accepts the union

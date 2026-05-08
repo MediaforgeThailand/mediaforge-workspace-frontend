@@ -178,7 +178,7 @@ function BlogHero() {
     <section className="relative flex h-[62vh] min-h-[460px] items-center justify-center overflow-hidden px-5 text-center">
       <div className="absolute inset-0">
         <img src={mockArtworkFuture} alt="" className="h-full w-full scale-110 object-cover blur-[2px] animate-[mf-float_12s_ease-in-out_infinite]" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/46 via-[rgba(91,42,140,.48)] to-black/92" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/46 via-[rgba(244,255,0,.18)] to-black/92" />
       </div>
 
       <div className="relative z-10 mx-auto max-w-4xl pt-20">
@@ -211,7 +211,7 @@ function CategoryChips({ active, onChange }: { active: string; onChange: (catego
             onClick={() => onChange(category)}
             className={`h-[40px] rounded-full px-5 text-[14px] font-medium transition ${
               on
-                ? "scale-[1.04] bg-[var(--brand-primary)] text-white shadow-[0_8px_24px_-8px_rgba(155,77,224,.75)]"
+                ? "scale-[1.04] bg-[var(--brand-primary)] text-white shadow-[0_8px_24px_-8px_rgba(238,255,0,.75)]"
                 : "border border-white/10 bg-transparent text-[var(--text-default)] hover:border-white/30 hover:text-white"
             }`}
           >
@@ -262,12 +262,12 @@ function BlogCard({ post, large = false }: { post: Post; large?: boolean }) {
   return (
     <a
       href={post.url}
-      className="group reveal block overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] transition duration-500 hover:-translate-y-1 hover:border-[rgba(155,77,224,.55)] hover:shadow-[0_30px_60px_-22px_rgba(155,77,224,.45)]"
+      className="group reveal block overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] transition duration-500 hover:-translate-y-1 hover:border-[rgba(238,255,0,.55)] hover:shadow-[0_30px_60px_-22px_rgba(238,255,0,.45)]"
     >
       <div className={`relative overflow-hidden ${large ? "aspect-[16/9]" : "aspect-[16/10]"}`}>
         <img src={post.cover} alt="" className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/72 to-transparent" />
-        <span className="absolute left-3 top-3 rounded-md bg-[var(--brand-primary)] px-2 py-1 text-[10px] font-bold uppercase tracking-[.16em] text-white shadow-[0_4px_12px_rgba(155,77,224,.62)]">
+        <span className="absolute left-3 top-3 rounded-md bg-[var(--brand-primary)] px-2 py-1 text-[10px] font-bold uppercase tracking-[.16em] text-white shadow-[0_4px_12px_rgba(238,255,0,.62)]">
           Featured
         </span>
         <span className="absolute bottom-3 right-3 rounded-md border border-white/16 bg-black/35 px-2 py-1 text-[11px] font-semibold text-white/82 backdrop-blur">

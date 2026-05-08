@@ -563,6 +563,7 @@ const NodeQuickToolbar = memo(() => {
             icon={Play}
             label={t("workspace.quicktoolbar.run_ctrl_enter")}
             onClick={onRunSingle}
+            primary
           />
           {/* Multi-gen — Freepik-style x1/x2/x3 selector. Only
            *  surfaces on generator nodes (image / video / LLM)
@@ -607,11 +608,13 @@ function ToolbarBtn({
   label,
   onClick,
   danger,
+  primary,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   onClick: () => void;
   danger?: boolean;
+  primary?: boolean;
 }) {
   return (
     <button
@@ -621,9 +624,11 @@ function ToolbarBtn({
       aria-label={label}
       className={cn(
         "flex h-11 w-11 shrink-0 items-center justify-center rounded transition-colors lg:h-7 lg:w-7",
-        danger
-          ? "text-zinc-400 hover:bg-rose-500/15 hover:text-rose-300"
-          : "text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100",
+        primary
+          ? "bg-[linear-gradient(135deg,#f4ff00_0%,#e7ff12_54%,#b7d400_100%)] text-[#070707] shadow-[0_0_0_1px_rgba(244,255,0,.38),0_10px_22px_rgba(238,255,0,.18)] hover:bg-[linear-gradient(135deg,#fbff58_0%,#f0ff18_54%,#cae900_100%)] hover:text-black"
+          : danger
+            ? "text-zinc-400 hover:bg-rose-500/15 hover:text-rose-300"
+            : "text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100",
       )}
     >
       <Icon className="h-4 w-4" />

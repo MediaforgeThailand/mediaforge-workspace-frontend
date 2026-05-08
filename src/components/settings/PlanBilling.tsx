@@ -132,7 +132,7 @@ const compactOutlineButtonClass = cn(
 );
 const compactPrimaryButtonClass = cn(
   denseButtonClass,
-  "bg-violet-600 text-white hover:bg-violet-500",
+  "bg-[#f4ff00] text-black hover:bg-[#e7ff12]",
 );
 
 const PlanBilling = () => {
@@ -541,7 +541,7 @@ const PlanBilling = () => {
                 className={cn(
                   "flex items-center gap-[10px] rounded-lg border px-[12px] py-[9px]",
                   isDefault
-                    ? "border-violet-500/30 bg-violet-500/[0.05]"
+                    ? "border-yellow-500/30 bg-yellow-500/[0.05]"
                     : "border-white/10 bg-white/[0.02]",
                 )}
               >
@@ -563,7 +563,7 @@ const PlanBilling = () => {
                   )}
                 </div>
                 {isDefault && (
-                  <span className="rounded border border-violet-500/30 bg-violet-500/15 px-[6px] py-[2px] text-[10px] font-bold uppercase leading-[13px] text-violet-200">
+                  <span className="rounded border border-yellow-500/30 bg-yellow-500/15 px-[6px] py-[2px] text-[10px] font-bold uppercase leading-[13px] text-yellow-200">
                     <Star className="-mt-[2px] mr-[2px] inline h-[10px] w-[10px]" />
                     {i18n("settings.planBilling.default")}
                   </span>
@@ -678,7 +678,7 @@ const PlanBilling = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-violet-400" />
+              <Building2 className="w-5 h-5 text-yellow-400" />
               {i18n("settings.planBilling.teamFeatureShipsInNextWave")}
             </AlertDialogTitle>
             <AlertDialogDescription>

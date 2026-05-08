@@ -416,7 +416,7 @@ const Auth = ({ mode = "page", onClose, redirectPath }: AuthProps) => {
       aria-labelledby="auth-dialog-title"
       className="relative max-h-[calc(100vh-32px)] w-full max-w-[460px] overflow-y-auto rounded-[20px] border border-[var(--border-overlay)] bg-[var(--bg-overlay)] p-6 text-white shadow-[0_24px_80px_rgba(0,0,0,.58)]"
     >
-      <div className="pointer-events-none absolute inset-x-0 -top-24 h-44 bg-[radial-gradient(70%_70%_at_50%_0%,rgba(199,125,255,.28),rgba(155,77,224,.08)_52%,transparent_100%)]" />
+      <div className="pointer-events-none absolute inset-x-0 -top-24 h-44 bg-[radial-gradient(70%_70%_at_50%_0%,rgba(244,255,0,.28),rgba(238,255,0,.08)_52%,transparent_100%)]" />
       <div className="relative mb-6 flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 id="auth-dialog-title" className="text-[24px] font-semibold leading-tight text-white">

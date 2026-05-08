@@ -159,7 +159,7 @@ const CardForm = ({ threshold, amountThb, setupIntentId, onSuccess }: CardFormPr
       <button
         type="submit"
         disabled={!stripe || submitting}
-        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#f4ff00] px-4 text-[13px] font-semibold text-black transition-colors hover:bg-[#e7ff12] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {submitting ? (
           <>
@@ -239,7 +239,7 @@ export function AutoRefillSetupDialog({
       appearance: {
         theme: "night",
         variables: {
-          colorPrimary: "#a78bfa",
+          colorPrimary: "#f4ff00",
           colorBackground: "#0c1020",
           colorText: "#e5e7eb",
           colorDanger: "#ef4444",
@@ -282,7 +282,7 @@ export function AutoRefillSetupDialog({
                       Math.max(50, Math.min(10000, Number(e.target.value) || 100)),
                     )
                   }
-                  className="mt-1 w-full rounded-md bg-black/40 px-3 py-2 text-[13px] text-zinc-100 outline-none focus:border-violet-500/40"
+                  className="mt-1 w-full rounded-md bg-black/40 px-3 py-2 text-[13px] text-zinc-100 outline-none focus:border-yellow-500/40"
                 />
                 <p className="mt-1 text-[10.5px] text-zinc-500">
                   {t("autoRefill.thresholdHelp")}
@@ -307,7 +307,7 @@ export function AutoRefillSetupDialog({
                         Math.max(100, Math.min(10000, Number(e.target.value) || 500)),
                       )
                     }
-                    className="w-full rounded-md bg-black/40 py-2 pl-7 pr-3 text-[13px] text-zinc-100 outline-none focus:border-violet-500/40"
+                    className="w-full rounded-md bg-black/40 py-2 pl-7 pr-3 text-[13px] text-zinc-100 outline-none focus:border-yellow-500/40"
                   />
                 </div>
                 <p className="mt-1 text-[10.5px] text-zinc-500">
@@ -333,8 +333,8 @@ export function AutoRefillSetupDialog({
               className={cn(
                 "inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg px-4 text-[13px] font-semibold transition-colors",
                 loading
-                  ? "cursor-not-allowed bg-violet-500/40 text-white/60"
-                  : "bg-violet-600 text-white hover:bg-violet-500",
+                  ? "cursor-not-allowed bg-yellow-500/40 text-black/60"
+                  : "bg-[#f4ff00] text-black hover:bg-[#e7ff12]",
               )}
             >
               {loading ? (

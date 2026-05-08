@@ -94,7 +94,7 @@ export const NODE_PALETTE: PaletteNodeDef[] = [
     icon: Layers,
     category: "ai",
     description: "nodeDescImageGen",
-    highlight: "#a855f7",
+    highlight: "#F4FF00",
   },
   {
     type: "klingVideoNode",
@@ -111,7 +111,7 @@ export const NODE_PALETTE: PaletteNodeDef[] = [
     icon: Eraser,
     category: "ai",
     description: "nodeDescRemoveBg",
-    highlight: "#a855f7",
+    highlight: "#F4FF00",
   },
   {
     type: "seedDanceNode",
@@ -151,7 +151,7 @@ const CATEGORIES: Array<{
 }> = [
   { key: "user_input", labelKey: "nodePalette.category.userInput", dotColor: "#60a5fa", dotGlow: "0 0 8px rgba(96,165,250,0.5)" },
   { key: "creator_input", labelKey: "nodePalette.category.creatorInput", dotColor: "#f59e0b", dotGlow: "0 0 8px rgba(245,158,11,0.5)" },
-  { key: "ai", labelKey: "nodePalette.category.aiProcessing", dotColor: "#a855f7", dotGlow: "0 0 8px rgba(168,85,247,0.5)" },
+  { key: "ai", labelKey: "nodePalette.category.aiProcessing", dotColor: "#F4FF00", dotGlow: "0 0 8px rgba(238,255,0,0.5)" },
 ];
 
 interface NodePaletteProps {

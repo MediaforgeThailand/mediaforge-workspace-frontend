@@ -59,7 +59,7 @@ interface CreateProjectDialogProps {
   onCreate: (meta: CreateProjectMeta) => Promise<void> | void;
 }
 
-const FALLBACK_COLOR = "hsl(258 90% 66%)"; // violet — first swatch
+const FALLBACK_COLOR = "hsl(64 100% 50%)"; // violet — first swatch
 
 export function CreateProjectDialog({
   open,
@@ -162,7 +162,7 @@ export function CreateProjectDialog({
             /* 14px input + zinc-400 placeholder = readable on the
              * dark dialog bg AND legible on Thai (descenders/marks
              * need the extra row height). */
-            className="h-9 w-full rounded-md bg-black/40 px-3 text-[13px] leading-5 text-zinc-100 outline-none placeholder:text-zinc-500 focus:ring-1 focus:ring-violet-500/50"
+            className="h-9 w-full rounded-md bg-black/40 px-3 text-[13px] leading-5 text-zinc-100 outline-none placeholder:text-zinc-500 focus:ring-1 focus:ring-yellow-500/50"
           />
         </div>
 
@@ -178,7 +178,7 @@ export function CreateProjectDialog({
               className={cn(
                 "grid h-7 w-7 shrink-0 place-items-center rounded-md transition-colors",
                 isPrivate
-                  ? "bg-violet-500/20 text-violet-300"
+                  ? "bg-yellow-500/20 text-yellow-300"
                   : "bg-white/[0.05] text-zinc-400",
               )}
             >
@@ -230,7 +230,7 @@ export function CreateProjectDialog({
             type="button"
             onClick={handleSubmit}
             disabled={submitting}
-            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-violet-600 px-3.5 text-[13px] font-semibold text-white transition-colors hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-[#f4ff00] px-3.5 text-[13px] font-semibold text-black transition-colors hover:bg-[#e7ff12] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? (
               <>

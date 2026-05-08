@@ -34,7 +34,7 @@ type OutputType = "image" | "video" | "audio";
 
 const PORT_COLOR: Record<OutputType, string> = {
   image: "hsl(160 84% 39%)",
-  video: "hsl(258 90% 66%)",
+  video: "hsl(64 100% 50%)",
   audio: "hsl(43 96% 56%)",
 };
 

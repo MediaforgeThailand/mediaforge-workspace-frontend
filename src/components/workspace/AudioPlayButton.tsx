@@ -69,7 +69,7 @@ export function AudioPlayButton({
         aria-label={label}
         title={label}
         className={cn(
-          "grid h-12 w-12 place-items-center rounded-full bg-white text-zinc-950 shadow-[0_12px_30px_-14px_rgba(255,255,255,.85),0_0_24px_rgba(168,85,247,.28)] transition hover:scale-105 hover:bg-zinc-100 active:scale-95",
+          "grid h-12 w-12 place-items-center rounded-full bg-white text-zinc-950 shadow-[0_12px_30px_-14px_rgba(255,255,255,.85),0_0_24px_rgba(238,255,0,.28)] transition hover:scale-105 hover:bg-zinc-100 active:scale-95",
           buttonClassName,
         )}
       >

@@ -966,7 +966,7 @@ interface ProjectCardItem extends ProjectMeta {
 const PROJECT_COLOR_SWATCHES = [
   "hsl(35 90% 55%)",
   "hsl(210 90% 60%)",
-  "hsl(258 86% 64%)",
+  "hsl(64 100% 50%)",
   "hsl(156 72% 42%)",
   "hsl(38 92% 56%)",
 ];
@@ -3504,7 +3504,7 @@ function buildMinimapDataUri(
         </pattern>
       </defs>
       <rect x="${vbX}" y="${vbY}" width="${vbW}" height="${vbH}" fill="url(#${dotsId})" />
-      <g stroke="hsl(258 60% 65%)" stroke-opacity="0.55" stroke-width="${strokeW}" fill="none">${edgeSvg}</g>
+      <g stroke="hsl(64 100% 60%)" stroke-opacity="0.55" stroke-width="${strokeW}" fill="none">${edgeSvg}</g>
       <g>${nodeSvg}</g>
     </svg>`;
 
