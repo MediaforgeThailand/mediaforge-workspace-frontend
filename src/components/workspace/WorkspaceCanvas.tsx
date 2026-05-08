@@ -873,7 +873,7 @@ const Inner = () => {
         }
       }
 
-      // Re-use payload from WorkspaceAssetPanel — spawn an AssetNode
+      // Re-use payload from the asset library — spawn an AssetNode
       // pointing at the existing URL without re-uploading.
       const reuseRaw = e.dataTransfer.getData("application/reactflow-asset-reuse");
       if (reuseRaw) {
