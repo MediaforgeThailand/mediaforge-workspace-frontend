@@ -32,7 +32,7 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage, getLanguageLocale, type Language } from "@/contexts/LanguageContext";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
 import WorkspaceErrorBoundary from "@/components/workspace/WorkspaceErrorBoundary";
 import {
@@ -432,8 +432,8 @@ function timeAgo(ts: number): string {
 }
 
 /** "April 2026" — header for month-grouped grids. */
-function monthLabel(ts: number): string {
-  return new Date(ts).toLocaleDateString(undefined, {
+function monthLabel(ts: number, language: Language): string {
+  return new Date(ts).toLocaleDateString(getLanguageLocale(language), {
     month: "long",
     year: "numeric",
   });
@@ -443,6 +443,7 @@ function monthLabel(ts: number): string {
  *  newest-first; items within each group are sorted newest-first too. */
 function groupByMonth<T extends { updatedAt: number }>(
   items: T[],
+  language: Language,
 ): MonthBucket<T>[] {
   const map = new Map<string, MonthBucket<T>>();
   for (const it of items) {
@@ -451,7 +452,7 @@ function groupByMonth<T extends { updatedAt: number }>(
     let bucket = map.get(key);
     if (!bucket) {
       bucket = {
-        label: monthLabel(it.updatedAt),
+        label: monthLabel(it.updatedAt, language),
         ts: new Date(d.getFullYear(), d.getMonth(), 1).getTime(),
         items: [],
       };
@@ -2625,7 +2626,7 @@ const SpacesView = ({
   educationLockedStudent?: boolean;
 }) => {
   const navigate = useNavigate();
-  const { t, t: i18n } = useLanguage();
+  const { t, t: i18n, language } = useLanguage();
   const { user, loading: authLoading } = useAuth();
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const canvases = useWorkspaceStore((s) => s.canvases);
@@ -2770,8 +2771,9 @@ const SpacesView = ({
             educationSpaceStatuses,
           ),
         ),
+      language,
     );
-  }, [activeProjectId, educationLockedStudent, tab, user?.id, workspaces, canvasIndex, graphs, educationSpaceStatuses]);
+  }, [activeProjectId, educationLockedStudent, tab, user?.id, workspaces, canvasIndex, graphs, educationSpaceStatuses, language]);
 
   const handleRename = (id: string, currentName: string) => {
     const next = prompt(t("workspace.spaces.rename_prompt"), currentName);

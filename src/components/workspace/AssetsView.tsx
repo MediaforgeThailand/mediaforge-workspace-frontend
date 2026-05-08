@@ -62,7 +62,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage, getLanguageLocale, type Language } from "@/contexts/LanguageContext";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { getSignedUrl } from "@/hooks/useSignedUrl";
 import { cn } from "@/lib/utils";
@@ -246,7 +246,7 @@ export default function AssetsView({
   onOpenSidebar?: () => void;
 } = {}) {
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
   const projects = useWorkspaceStore((s) => s.projects);
   const projectIds = useMemo(
@@ -642,11 +642,12 @@ export default function AssetsView({
 
   /** Bucket grid by month for the section dividers. */
   const grouped = useMemo(() => {
+    const locale = getLanguageLocale(language);
     const out: Array<{ label: string; items: Asset[] }> = [];
     let cur: { label: string; items: Asset[] } | null = null;
     for (const a of filteredAssets) {
       const d = new Date(a.createdAt);
-      const label = d.toLocaleDateString(undefined, {
+      const label = d.toLocaleDateString(locale, {
         year: "numeric",
         month: "long",
       });
@@ -657,7 +658,7 @@ export default function AssetsView({
       cur.items.push(a);
     }
     return out;
-  }, [filteredAssets]);
+  }, [filteredAssets, language]);
 
   const loading = section === "uploads" ? uploadLoading : genLoading;
 
@@ -668,8 +669,8 @@ export default function AssetsView({
         : asset.name;
     const caption =
       asset.source === "generation"
-        ? [asset.modelLabel, formatRelative(asset.createdAt, t)].filter(Boolean).join(" · ")
-        : formatRelative(asset.createdAt, t);
+        ? [asset.modelLabel, formatRelative(asset.createdAt, t, language)].filter(Boolean).join(" · ")
+        : formatRelative(asset.createdAt, t, language);
 
     if (asset.kind === "3d") {
       setPreview({
@@ -687,9 +688,9 @@ export default function AssetsView({
                 asset.width && asset.height
                   ? { label: t("workspace.assets.meta_size"), value: `${asset.width}x${asset.height}` }
                   : null,
-                { label: t("workspace.assets.meta_created"), value: formatRelative(asset.createdAt, t) },
+                { label: t("workspace.assets.meta_created"), value: formatRelative(asset.createdAt, t, language) },
               ].filter(Boolean) as Array<{ label: string; value?: string }>
-            : [{ label: t("workspace.assets.meta_uploaded"), value: formatRelative(asset.createdAt, t) }],
+            : [{ label: t("workspace.assets.meta_uploaded"), value: formatRelative(asset.createdAt, t, language) }],
       });
       return;
     }
@@ -708,11 +709,11 @@ export default function AssetsView({
               asset.width && asset.height
                 ? { label: t("workspace.assets.meta_size"), value: `${asset.width}x${asset.height}` }
                 : null,
-              { label: t("workspace.assets.meta_created"), value: formatRelative(asset.createdAt, t) },
+              { label: t("workspace.assets.meta_created"), value: formatRelative(asset.createdAt, t, language) },
             ].filter(Boolean) as Array<{ label: string; value?: string }>
-          : [{ label: t("workspace.assets.meta_uploaded"), value: formatRelative(asset.createdAt, t) }],
+          : [{ label: t("workspace.assets.meta_uploaded"), value: formatRelative(asset.createdAt, t, language) }],
     });
-  }, [t]);
+  }, [t, language]);
 
   const requestDeleteAsset = useCallback((asset: Asset) => {
     setDeleteTarget(asset);
@@ -1185,7 +1186,7 @@ function AssetCard({
   onDelete: (asset: Asset) => void;
   onOpenCanvas: (asset: GenerationAsset) => void;
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const Icon = KIND_ICON[asset.kind];
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [hovered, setHovered] = useState(false);
@@ -1215,7 +1216,7 @@ function AssetCard({
     asset.source === "generation" && asset.durationSec
       ? `${Math.round(asset.durationSec)}s`
       : null;
-  const dateLabel = formatRelative(asset.createdAt, t);
+  const dateLabel = formatRelative(asset.createdAt, t, language);
   const contextMenuItems: MediaContextMenuItem[] = [
     {
       key: "preview",
@@ -1443,6 +1444,7 @@ function sectionTitle(
 function formatRelative(
   iso: string,
   t: (key: string, params?: Record<string, string | number>) => string,
+  language: Language,
 ): string {
   const d = new Date(iso);
   const diffMin = Math.floor((Date.now() - d.getTime()) / 60_000);
@@ -1452,5 +1454,5 @@ function formatRelative(
   if (h < 24) return t("workspace.assets.relative_hours", { n: h });
   const days = Math.floor(h / 24);
   if (days < 7) return t("workspace.assets.relative_days", { n: days });
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return d.toLocaleDateString(getLanguageLocale(language), { month: "short", day: "numeric" });
 }
