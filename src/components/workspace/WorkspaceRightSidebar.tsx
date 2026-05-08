@@ -1,6 +1,6 @@
 /**
  * Right sidebar shell — translucent floating panel that hosts the
- * Asset library and AI Assistant in a single column.
+ * Asset library in a compact floating column.
  *
  * Visual model:
  *   - Detached from the viewport edge (right margin) so it reads as
@@ -12,9 +12,6 @@
  *     where each tab is just an icon. Click an icon to expand back.
  *
  * Implementation notes:
- *   - Both panels stay mounted (display:none on the inactive one)
- *     so internal state — scroll position, draft chat input, filter
- *     selections — survives a tab flip.
  *   - The floating geometry means the canvas now extends UNDER the
  *     sidebar. Canvas controls clipped by the panel's footprint
  *     remain reachable: pan/zoom hits the surface and the right-
@@ -24,13 +21,10 @@
  */
 
 import { useState } from "react";
-import { Layers, Sparkles, ChevronRight, ChevronLeft } from "lucide-react";
+import { Layers, ChevronRight, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import WorkspaceAssetPanel from "./WorkspaceAssetPanel";
-import WorkspaceAIAssistantPanel from "./WorkspaceAIAssistantPanel";
 import { useLanguage } from "@/contexts/LanguageContext";
-
-type SidebarTab = "assets" | "ai";
 
 // Bridges for `workspace-open-all-assets` / `workspace-trigger-upload`
 // / `workspace-open-stock` are no longer hosted here — they live in
@@ -40,9 +34,8 @@ type SidebarTab = "assets" | "ai";
 
 const WorkspaceRightSidebar = () => {
   const { t: i18n } = useLanguage();
-  const [tab, setTab] = useState<SidebarTab>("assets");
-  // Collapsed = thin icon rail. Expand by clicking a tab icon (which
-  // also switches to that tab) or by clicking the toggle.
+  // Collapsed = thin icon rail. Expand by clicking the asset icon or
+  // by clicking the toggle.
   const [collapsed, setCollapsed] = useState(false);
 
   if (collapsed) {
@@ -61,20 +54,8 @@ const WorkspaceRightSidebar = () => {
       >
         <RailButton
           title={i18n("workspace.rightSidebar.expandAssets")}
-          onClick={() => {
-            setTab("assets");
-            setCollapsed(false);
-          }}
+          onClick={() => setCollapsed(false)}
           icon={Layers}
-        />
-        <RailButton
-          title={i18n("workspace.rightSidebar.expandAiAssistant")}
-          onClick={() => {
-            setTab("ai");
-            setCollapsed(false);
-          }}
-          icon={Sparkles}
-          accent="amber"
         />
         <div className="my-1 h-px w-6 bg-white/10" />
         <RailButton
@@ -139,22 +120,11 @@ const WorkspaceRightSidebar = () => {
        *  active tab instead. */}
       <div className="flex shrink-0 items-center gap-1 px-2 pt-2.5 pb-2">
         <PillTab
-          active={tab === "assets"}
-          onClick={() => setTab("assets")}
+          active
+          onClick={() => undefined}
           icon={Layers}
         >
           {i18n("common.assets")}
-        </PillTab>
-        <PillTab
-          active={tab === "ai"}
-          onClick={() => setTab("ai")}
-          icon={Sparkles}
-          accent="amber"
-        >
-          {i18n("workspace.rightSidebar.chatWithMax")}
-          <span className="ml-1.5 rounded-sm bg-amber-400/20 px-1 py-px font-mono text-[8px] uppercase tracking-wider text-amber-300">
-            {i18n("workspace.rightSidebar.beta")}
-          </span>
         </PillTab>
         <button
           type="button"
@@ -171,14 +141,8 @@ const WorkspaceRightSidebar = () => {
        *  without the heavy old border-b look. */}
       <div className="mx-3 h-px shrink-0 bg-white/8" />
 
-      {/* Panels — keep BOTH mounted so state survives tab switches. */}
       <div className="flex-1 overflow-hidden">
-        <div className={cn("h-full", tab !== "assets" && "hidden")}>
-          <WorkspaceAssetPanel />
-        </div>
-        <div className={cn("h-full", tab !== "ai" && "hidden")}>
-          <WorkspaceAIAssistantPanel />
-        </div>
+        <WorkspaceAssetPanel />
       </div>
     </aside>
   );

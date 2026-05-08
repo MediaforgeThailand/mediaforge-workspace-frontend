@@ -894,14 +894,14 @@ function TeamSettingsPanel() {
                   {i18n("settings.team.valueActiveSeats", { used: seatsUsed, purchased: seatsPurchased })}
                 </h3>
               </div>
-              <Button className="h-[34px] rounded-full bg-purple-500 px-[12px] text-[13px] hover:bg-purple-400" onClick={() => navigate("/app/pricing")}>
+              <Button className="h-[34px] rounded-full bg-yellow-500 px-[12px] text-[13px] hover:bg-[#f8ff66]" onClick={() => navigate("/app/pricing")}>
                 <Plus className="mr-[6px] h-[14px] w-[14px]" />
                 {i18n("settings.team.buySeats")}
               </Button>
             </div>
             <div className="mt-[10px] h-[6px] overflow-hidden rounded-full bg-zinc-800">
               <motion.div
-                className="h-full rounded-full bg-purple-400"
+                className="h-full rounded-full bg-yellow-400"
                 initial={{ width: 0 }}
                 animate={{ width: `${seatsPurchased > 0 ? Math.min(100, Math.round((seatsUsed / seatsPurchased) * 100)) : 0}%` }}
                 transition={{ duration: 0.45, ease: "easeOut" }}
@@ -928,7 +928,7 @@ function TeamSettingsPanel() {
             <div className="grid gap-[10px] lg:grid-cols-[minmax(0,1.45fr)_minmax(220px,0.9fr)]">
               <div>
                 <div className="mb-[7px] flex items-center gap-[7px] text-[13px] font-semibold text-zinc-200">
-                  <Mail className="h-[15px] w-[15px] text-purple-300" />
+                  <Mail className="h-[15px] w-[15px] text-yellow-300" />
                   {i18n("settings.team.inviteMember")}
                 </div>
                 <div className="flex flex-col gap-[8px] sm:flex-row">
@@ -1000,11 +1000,11 @@ function TeamSettingsPanel() {
           </div>
         </motion.div>
         <motion.div className="relative overflow-hidden rounded-[14px] bg-zinc-900/70 px-[14px] py-[12px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, delay: 0.03 }}>
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-violet-400/16 to-transparent" />
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-yellow-400/16 to-transparent" />
           <div className="relative flex items-center justify-between gap-[12px]">
             <div>
           <div className="flex items-center gap-[8px] text-[14px] font-medium leading-[18px] text-zinc-200">
-            <Building2 className="h-[17px] w-[17px] text-violet-300" />
+            <Building2 className="h-[17px] w-[17px] text-yellow-300" />
             {i18n("settings.team.teams")}
           </div>
           <div className="mt-[7px] text-[24px] font-semibold leading-[28px] text-zinc-50">

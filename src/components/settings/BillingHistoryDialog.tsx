@@ -86,7 +86,7 @@ const BillingHistoryDialog = ({ open, onOpenChange }: BillingHistoryDialogProps)
         <div className="px-6 pt-6 pb-3">
           <DialogHeader>
             <DialogTitle className="text-base font-semibold text-zinc-50 flex items-center gap-2">
-              <Receipt className="w-4 h-4 text-violet-300" />
+              <Receipt className="w-4 h-4 text-yellow-300" />
               {i18n("settings.billingHistory.billingHistory")}
             </DialogTitle>
             <DialogDescription className="text-[11px] text-zinc-400">

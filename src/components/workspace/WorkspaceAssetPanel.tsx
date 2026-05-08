@@ -642,9 +642,9 @@ const AssetTile = ({
           className={cn(
             "absolute left-1.5 top-1.5 flex items-center gap-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[8.5px] font-medium uppercase tracking-wider backdrop-blur",
             asset.source === "generated"
-              ? "text-violet-200"
+              ? "text-yellow-200"
               : asset.source === "element"
-                ? "text-pink-200"
+                ? "text-yellow-200"
                 : "text-sky-200",
           )}
         >
@@ -652,9 +652,9 @@ const AssetTile = ({
             className={cn(
               "h-1 w-1 rounded-full",
               asset.source === "generated"
-                ? "bg-violet-300"
+                ? "bg-yellow-300"
                 : asset.source === "element"
-                  ? "bg-pink-300"
+                  ? "bg-yellow-300"
                   : "bg-sky-300",
             )}
           />

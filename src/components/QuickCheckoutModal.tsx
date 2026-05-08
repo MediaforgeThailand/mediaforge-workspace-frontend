@@ -127,7 +127,7 @@ const QuickCheckoutModal = ({
           </div>
 
           {/* ── Hero Promo Offer ── */}
-          <div className="mx-4 mb-3 rounded-xl border border-amber-500/40 bg-gradient-to-br from-amber-500/[0.08] to-pink-500/[0.06] p-4 shadow-[0_0_24px_rgba(245,158,11,0.1)]">
+          <div className="mx-4 mb-3 rounded-xl border border-amber-500/40 bg-gradient-to-br from-amber-500/[0.08] to-yellow-500/[0.06] p-4 shadow-[0_0_24px_rgba(245,158,11,0.1)]">
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 mb-1">
@@ -155,7 +155,7 @@ const QuickCheckoutModal = ({
                 size="sm"
                 onClick={() => handlePurchase(HERO_TOPUP.id, "topup")}
                 disabled={loadingId === HERO_TOPUP.id}
-                className="bg-gradient-to-r from-amber-500 to-pink-500 text-white font-bold text-xs px-4 h-9 rounded-lg shadow-[0_0_16px_rgba(245,158,11,0.3)] hover:shadow-[0_0_24px_rgba(245,158,11,0.45)] hover:scale-[1.03] transition-all border-0"
+                className="bg-gradient-to-r from-[#f4ff00] to-[#d7e600] text-black font-bold text-xs px-4 h-9 rounded-lg shadow-[0_0_16px_rgba(245,158,11,0.3)] hover:shadow-[0_0_24px_rgba(245,158,11,0.45)] hover:scale-[1.03] transition-all border-0"
               >
                 {loadingId === HERO_TOPUP.id ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -184,8 +184,8 @@ const QuickCheckoutModal = ({
               className="w-full flex items-center justify-between p-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] transition-colors group"
             >
               <div className="flex items-center gap-2.5 text-left">
-                <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center flex-shrink-0">
-                  <Zap className="w-4 h-4 text-purple-400" />
+                <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center flex-shrink-0">
+                  <Zap className="w-4 h-4 text-yellow-400" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-white">
@@ -201,7 +201,7 @@ const QuickCheckoutModal = ({
                   ฿{STANDARD_TOPUP.price}
                 </span>
                 {loadingId === STANDARD_TOPUP.id && (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-yellow-400" />
                 )}
               </div>
             </button>
@@ -233,7 +233,7 @@ const QuickCheckoutModal = ({
                     ฿{proPlan.price}
                 </span>
                 {loadingId === PRO_SUB.id && (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-yellow-400" />
                 )}
               </div>
             </button>

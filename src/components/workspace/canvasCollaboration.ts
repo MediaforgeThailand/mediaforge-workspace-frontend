@@ -51,7 +51,7 @@ type CanvasCollaborationState = {
 const COLOR_PALETTE = [
   "#38bdf8",
   "#facc15",
-  "#a78bfa",
+  "#f4ff00",
   "#34d399",
   "#fb7185",
   "#f97316",

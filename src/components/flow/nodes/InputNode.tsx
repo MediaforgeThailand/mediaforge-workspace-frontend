@@ -347,7 +347,7 @@ const InputNode = memo(({ id, data, selected }: NodeProps) => {
           <div
             className={cn(
               "mt-1.5 rounded-lg border border-dashed p-2 transition-all cursor-pointer",
-              isExampleDragOver ? "border-violet-400/50 bg-violet-500/10" : "border-white/[0.08] bg-white/[0.02] hover:border-white/[0.15] hover:bg-white/[0.04]"
+              isExampleDragOver ? "border-yellow-400/50 bg-yellow-500/10" : "border-white/[0.08] bg-white/[0.02] hover:border-white/[0.15] hover:bg-white/[0.04]"
             )}
             onClick={() => exampleInputRef.current?.click()}
             onDrop={handleExampleDrop}
@@ -376,9 +376,9 @@ const InputNode = memo(({ id, data, selected }: NodeProps) => {
                     className="aspect-square rounded-md border-[1.5px] border-dashed border-white/[0.12] bg-white/[0.02] hover:bg-white/[0.05] flex items-center justify-center transition-colors"
                   >
                     {isUploadingExamples ? (
-                      <Loader2 className="w-3.5 h-3.5 text-violet-300 animate-spin" />
+                      <Loader2 className="w-3.5 h-3.5 text-yellow-300 animate-spin" />
                     ) : (
-                      <ImagePlus className="w-3.5 h-3.5 text-violet-300/70" />
+                      <ImagePlus className="w-3.5 h-3.5 text-yellow-300/70" />
                     )}
                   </button>
                 )}
@@ -388,7 +388,7 @@ const InputNode = memo(({ id, data, selected }: NodeProps) => {
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center gap-1 py-2">
-                <ImagePlus className="w-4 h-4 text-violet-300/70" />
+                <ImagePlus className="w-4 h-4 text-yellow-300/70" />
                 <p className="text-[10px] font-medium text-white/60">
                   {isUploadingExamples ? t("inputNode.uploadingRefs") : t("inputNode.clickOrDropRefImages")}
                 </p>

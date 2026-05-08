@@ -84,7 +84,7 @@ const PricingCompare = (_props: PricingCompareProps) => {
               className={cn(
                 "py-4 px-4 text-sm font-semibold text-center",
                 p === "growth"
-                  ? "text-purple-400 bg-purple-500/5 border-t-2 border-purple-500"
+                  ? "text-yellow-400 bg-yellow-500/5 border-t-2 border-yellow-500"
                   : "text-neutral-300"
               )}
             >
@@ -111,7 +111,7 @@ const PricingCompare = (_props: PricingCompareProps) => {
                     key={p}
                     className={cn(
                       "py-3 px-4 text-sm text-neutral-400 text-center",
-                      p === "growth" && "bg-purple-500/5"
+                      p === "growth" && "bg-yellow-500/5"
                     )}
                   >
                     <CellContent value={row[p]} />
@@ -132,18 +132,18 @@ const PricingCompare = (_props: PricingCompareProps) => {
               key={p}
               className={cn(
                 "rounded-2xl border overflow-hidden",
-                isGrowth ? "border-purple-500/50 bg-purple-500/5" : "border-neutral-800 bg-neutral-900/40"
+                isGrowth ? "border-yellow-500/50 bg-yellow-500/5" : "border-neutral-800 bg-neutral-900/40"
               )}
             >
               <div
                 className={cn(
                   "px-5 py-3 font-bold text-base flex items-center justify-between",
-                  isGrowth ? "text-purple-300 bg-purple-500/10" : "text-white bg-neutral-900/60"
+                  isGrowth ? "text-yellow-300 bg-yellow-500/10" : "text-white bg-neutral-900/60"
                 )}
               >
                 <span>{PLAN_LABELS[p]}</span>
                 {isGrowth && (
-                  <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-600 text-white">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#f4ff00] text-black">
                     {t("pricingCompare.popular")}
                   </span>
                 )}

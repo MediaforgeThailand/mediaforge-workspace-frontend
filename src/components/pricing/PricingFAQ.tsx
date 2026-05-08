@@ -31,7 +31,7 @@ const PricingFAQ = (_props: PricingFAQProps) => {
       <Accordion type="single" collapsible className="max-w-[800px] mx-auto">
         {FAQ_ITEMS.map((item, i) => (
           <AccordionItem key={i} value={`faq-${i}`} className="border-b border-neutral-800">
-            <AccordionTrigger className="text-left text-white hover:text-purple-400 py-5 text-sm md:text-base">
+            <AccordionTrigger className="text-left text-white hover:text-yellow-400 py-5 text-sm md:text-base">
               {t(item.q)}
             </AccordionTrigger>
             <AccordionContent className="text-neutral-400 text-sm pb-5">

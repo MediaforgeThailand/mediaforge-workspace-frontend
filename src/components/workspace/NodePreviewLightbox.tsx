@@ -535,11 +535,21 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
         </div>
       </div>
 
-      {/* Body — clicking the actual media doesn't bubble to backdrop */}
+      {/* Body — clicking the actual media doesn't bubble to backdrop.
+       *
+       *  Text previews previously used `w-[min(720px,...)]` and
+       *  relied solely on `whitespace-pre-wrap` for wrapping. That
+       *  works for prose but fails on glued-together strings (the
+       *  user's repro: typing "asdasdasd..." with no spaces) — the
+       *  unbreakable "word" extended off-screen as a single line
+       *  with the X-button floating thousands of pixels to the
+       *  right. Bumped to a generous 960×80vh reading box and
+       *  fixed the wrapping below. */}
       <div
         className={cn(
           "relative max-h-[86vh] max-w-[calc(90vw-88px)] overflow-visible",
-          preview.type === "text" && "w-[min(720px,calc(90vw-88px))]",
+          preview.type === "text" &&
+            "w-[min(960px,calc(90vw-88px))] max-h-[80vh]",
         )}
         onClick={(e) => e.stopPropagation()}
       >
@@ -576,7 +586,20 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
         )}
 
         {preview.type === "text" && (
-          <div className="rounded-md bg-zinc-900 p-6 text-[13px] leading-relaxed text-zinc-100 whitespace-pre-wrap">
+          /* Generous reading-card: 960×80vh max so the lightbox
+           *  feels like a proper text viewer, not a tooltip strip.
+           *
+           *  `break-words` (overflow-wrap: anywhere) makes
+           *  unbroken strings like "asdasdasd…" wrap at the box
+           *  edge instead of escaping horizontally — the bug the
+           *  user reported. `whitespace-pre-wrap` keeps the user's
+           *  newlines and runs of spaces intact for prose-style
+           *  paragraphs.
+           *
+           *  `overflow-y-auto` so a long note scrolls inside the
+           *  card. Slightly larger 14.5px font + 1.55 line-height
+           *  for comfortable reading on the dark surface. */
+          <div className="max-h-[80vh] w-full overflow-y-auto rounded-lg bg-zinc-900 p-7 text-[14.5px] leading-[1.55] text-zinc-100 whitespace-pre-wrap break-words shadow-2xl shadow-black">
             {preview.text || (
               <span className="italic text-zinc-500">{i18n("workspace.lightbox.emptyText")}</span>
             )}
@@ -584,11 +607,6 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
         )}
 
         {preview.type === "model3d" && preview.model_url && (
-          // Fullscreen 3D viewer — drag to rotate, scroll to zoom.
-          // `pointer-events: auto` and stopPropagation on the wrapper
-          // are NOT needed here because the lightbox's outer overlay
-          // already swallows pan-canvas gestures; the model-viewer
-          // owns the whole rectangle.
           <div className="relative aspect-square w-[min(900px,calc(90vw-88px))] overflow-hidden rounded-md bg-zinc-950 shadow-2xl shadow-black">
             <model-viewer
               ref={(el) => {

@@ -83,7 +83,7 @@ import {
   Download as CtxDownloadIcon,
   Eye as CtxEyeIcon,
   FileArchive as CtxFileArchiveIcon,
-  FolderOpen as CtxFolderOpenIcon,
+  Group as CtxGroupIcon,
   Trash2 as CtxTrash2Icon,
 } from "lucide-react";
 import { downloadFromUrl } from "./downloadAsset";
@@ -923,8 +923,14 @@ const Inner = () => {
     [uploadAsset, addSchemaNode, addAssetNode, screenToFlowPosition, reparentSpawned],
   );
 
+  const isNodeControlEvent = (event: React.MouseEvent): boolean =>
+    (event.target as HTMLElement | null)?.closest?.(
+      ".node-quick-action-rail, .node-quick-menu, .node-quick-action-button",
+    ) != null;
+
   const onNodeClick: NodeMouseHandler = useCallback(
-    (_e, node) => {
+    (e, node) => {
+      if (isNodeControlEvent(e)) return;
       setSelectedNode(node.id);
       publishSelection(node.id);
     },
@@ -1132,13 +1138,34 @@ const Inner = () => {
 
   const onCtxPreview = useCallback((node: Node) => {
     const all = useWorkspaceStore.getState().current?.nodes ?? [];
-    const p = getNodePreview(node, all);
+    /* Look up the node by id in the LATEST store snapshot rather
+     *  than trusting the captured `node` object that was attached
+     *  to the right-click event. The captured one can lag behind
+     *  generations that landed after the menu opened — using the
+     *  fresh row means clicking Preview right after a job
+     *  completes always finds the new asset. */
+    const fresh = all.find((n) => n.id === node.id) ?? node;
+    const p = getNodePreview(fresh, all);
     if (!p) {
       toast.error(t("workspace.canvas.noPreviewAvailable"));
       return;
     }
     setPreview(p);
   }, [t]);
+
+  useEffect(() => {
+    const handler = (evt: Event) => {
+      const nodeId = (evt as CustomEvent<{ nodeId?: string }>).detail?.nodeId;
+      if (!nodeId) return;
+      const all = useWorkspaceStore.getState().current?.nodes ?? [];
+      const node = all.find((n) => n.id === nodeId);
+      if (!node) return;
+      const p = getNodePreview(node, all);
+      if (p) setPreview(p);
+    };
+    window.addEventListener("workspace-open-node-preview", handler);
+    return () => window.removeEventListener("workspace-open-node-preview", handler);
+  }, []);
 
   const uploadTransformedFile = useCallback(
     async (file: File) => {
@@ -1303,6 +1330,24 @@ const Inner = () => {
     [setNodes, setEdges, pushHistory],
   );
 
+  const onCtxGroup = useCallback((nodes: Node[]) => {
+    const ids = new Set(nodes.map((n) => n.id));
+    useWorkspaceStore.setState((s) => {
+      if (!s.current) return s;
+      return {
+        ...s,
+        current: {
+          ...s.current,
+          nodes: s.current.nodes.map((n) => ({
+            ...n,
+            selected: ids.has(n.id),
+          })),
+        },
+      };
+    });
+    useWorkspaceStore.getState().groupSelectedNodes();
+  }, []);
+
   /** Build the action list for the current right-click target — used
    *  by the menu render below. Memo'd against the menu state so we
    *  don't recompute every parent render. */
@@ -1313,15 +1358,30 @@ const Inner = () => {
 
     if (targets.length === 1) {
       const node = targets[0];
-      const allNodes = useWorkspaceStore.getState().current?.nodes ?? [];
-      const previewPayload = getNodePreview(node, allNodes);
       const downloadable = getNodeDownloadable(node);
+      /* Preview row used to be `disabled: !getNodePreview(...)` —
+       *  but that snapshot was captured at MENU-OPEN time. If the
+       *  user right-clicked an empty tool node, the item would be
+       *  permanently greyed out for the lifetime of the menu, and
+       *  even if a generation landed before they got around to
+       *  clicking, the row stayed dead. The handler itself
+       *  (`onCtxPreview`) already re-checks the latest store state
+       *  and toasts "No preview available" when there's nothing to
+       *  show, so leaving the row enabled lets it work whenever a
+       *  preview becomes available without needing a re-open.
+       *  Matches the double-click path, which is how the user
+       *  expected this to behave.
+       *
+       *  Also dropped the "Move to Board" and "Copy to Board"
+       *  rows. Both were placeholders shipped `disabled: true`
+       *  with no implementation behind them — visible-but-greyed
+       *  cluttered the menu and signalled features that aren't
+       *  there. They can come back when the Boards UI ships. */
       const items: MediaContextMenuItem[] = [
         {
           key: "preview",
           label: "Preview",
           icon: CtxEyeIcon,
-          disabled: !previewPayload,
           onSelect: () => onCtxPreview(node),
         },
         {
@@ -1336,21 +1396,6 @@ const Inner = () => {
           label: t("workspace.nodemenu.duplicate"),
           icon: CtxCopyIcon,
           onSelect: () => onCtxDuplicate([node]),
-        },
-        {
-          key: "move-board",
-          label: "Move to Board",
-          icon: CtxFolderOpenIcon,
-          separatorBefore: true,
-          disabled: true,
-          onSelect: () => undefined,
-        },
-        {
-          key: "copy-board",
-          label: "Copy to Board",
-          icon: CtxCopyIcon,
-          disabled: true,
-          onSelect: () => undefined,
         },
         {
           key: "delete",
@@ -1369,7 +1414,18 @@ const Inner = () => {
       (acc, n) => acc + harvestAssetsFromNode(n).length,
       0,
     );
+    const groupable = targets.filter(
+      (n) => n.type !== "groupNode" && !n.parentId,
+    ).length;
     return [
+      {
+        key: "group",
+        label: "Group",
+        icon: CtxGroupIcon,
+        shortcut: "Ctrl+G",
+        disabled: groupable < 2,
+        onSelect: () => onCtxGroup(targets),
+      },
       {
         key: "download-zip",
         label: t("workspace.nodemenu.download_zip", { count: targets.length }),
@@ -1399,6 +1455,7 @@ const Inner = () => {
     onCtxDownloadZip,
     onCtxDuplicate,
     onCtxDelete,
+    onCtxGroup,
     t,
   ]);
 
@@ -1529,6 +1586,10 @@ const Inner = () => {
    *  the preview lightbox instead of letting them rename. */
   const onNodeDoubleClick = useCallback(
     (e: React.MouseEvent, node: Node) => {
+      if (isNodeControlEvent(e)) {
+        e.stopPropagation();
+        return;
+      }
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName ?? "";
       const isEditable =

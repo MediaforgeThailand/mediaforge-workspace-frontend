@@ -464,7 +464,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
               }}
               onDrop={handleReferenceDrop}
               className={clsx(
-                "flex items-center gap-[12px] px-[12px] py-[8px] rounded-[8px] border border-[#ff24c5]/95 bg-[#f8008d]/[0.08] shadow-[inset_0_-8px_24px_0_rgba(255,26,198,0.18),inset_0_2px_6px_0_rgba(255,26,198,0.18),inset_0_-4px_8px_0_rgba(255,26,198,0.3)] transition-all outline-none focus:ring-1 focus:ring-[#ff24c5]/70",
+                "flex items-center gap-[12px] px-[12px] py-[8px] rounded-[8px] border border-[#f4ff00]/95 bg-[#f4ff00]/[0.08] shadow-[inset_0_-8px_24px_0_rgba(238,255,0,0.18),inset_0_2px_6px_0_rgba(238,255,0,0.18),inset_0_-4px_8px_0_rgba(238,255,0,0.3)] transition-all outline-none focus:ring-1 focus:ring-[#f4ff00]/70",
                 onAddReferences || onReferenceFiles || onSelectReferenceAsset ? "cursor-pointer" : "cursor-default",
               )}
             >
@@ -530,7 +530,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
               onChange={updatePrompt}
               placeholder={resolvedPromptPlaceholder}
               mentionOptions={mentionOptions}
-              className="mt-[7px] min-h-[70px] max-h-[190px] rounded-[10px] border-white/[0.06] bg-[#121314] px-[10px] py-[8px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-[#ff24c5]/50"
+              className="mt-[7px] min-h-[70px] max-h-[190px] rounded-[10px] border-white/[0.06] bg-[#121314] px-[10px] py-[8px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-[#f4ff00]/50"
             />
           )}
         </section>
@@ -578,15 +578,10 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
           <button
             onClick={handleCreate}
             disabled={running}
-            className="standalone-generate-button group relative flex h-[48px] w-full items-center justify-center gap-[6px] overflow-hidden rounded-[12px] px-[8px] text-[15px] font-semibold leading-[20px] text-white transition-all hover:brightness-110 active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
-            style={{
-              background:
-                "linear-gradient(135deg, rgba(199,125,255,.52), rgba(155,77,224,.72) 48%, rgba(91,42,140,.82))",
-              boxShadow:
-                "inset 0 0 0 1px rgba(199,125,255,.22), inset 0 -8px 18px rgba(91,42,140,.48), 0 12px 34px -18px rgba(168,85,247,.9)",
-            }}
+            className="standalone-generate-button group relative flex h-[48px] w-full items-center justify-center gap-[6px] overflow-hidden rounded-[12px] bg-[linear-gradient(135deg,#f4ff00_0%,#e7ff12_54%,#b7d400_100%)] px-[8px] text-[15px] font-semibold leading-[20px] text-[#070707] shadow-[inset_0_1px_0_rgba(255,255,255,.58),inset_0_-5px_14px_rgba(79,90,0,.24),0_0_0_1px_rgba(244,255,0,.34),0_12px_34px_-16px_rgba(238,255,0,.86)] transition-all hover:bg-[linear-gradient(135deg,#fbff58_0%,#f0ff18_54%,#cae900_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,.68),inset_0_-5px_14px_rgba(79,90,0,.2),0_0_0_1px_rgba(244,255,0,.48),0_16px_40px_-14px_rgba(238,255,0,.92)] active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
           >
-            <span className="pointer-events-none absolute -left-8 top-1/2 h-20 w-28 -translate-y-1/2 rounded-full bg-[#C77DFF]/35 blur-2xl" />
+            <span className="pointer-events-none absolute inset-x-4 top-0 h-[16px] rounded-b-full bg-white/30 blur-[10px]" />
+            <span className="pointer-events-none absolute -left-8 top-1/2 h-20 w-28 -translate-y-1/2 rounded-full bg-[#f4ff00]/30 blur-2xl" />
             <span className="relative">{running ? resolvedRunningLabel : resolvedCreateLabel}</span>
           </button>
         </div>
@@ -925,7 +920,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
                     }}
                     onDrop={handleReferenceDrop}
                     className={clsx(
-                      "flex items-center gap-[12px] rounded-[8px] border border-[#ff24c5]/95 bg-[#f8008d]/[0.08] px-[12px] py-[8px] shadow-[inset_0_-8px_24px_0_rgba(255,26,198,0.18),inset_0_2px_6px_0_rgba(255,26,198,0.18),inset_0_-4px_8px_0_rgba(255,26,198,0.3)] transition-all outline-none focus:ring-1 focus:ring-[#ff24c5]/70",
+                      "flex items-center gap-[12px] rounded-[8px] border border-[#f4ff00]/95 bg-[#f4ff00]/[0.08] px-[12px] py-[8px] shadow-[inset_0_-8px_24px_0_rgba(238,255,0,0.18),inset_0_2px_6px_0_rgba(238,255,0,0.18),inset_0_-4px_8px_0_rgba(238,255,0,0.3)] transition-all outline-none focus:ring-1 focus:ring-[#f4ff00]/70",
                       onAddReferences || onReferenceFiles || onSelectReferenceAsset ? "cursor-pointer" : "cursor-default",
                     )}
                   >
@@ -999,7 +994,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
               onChange={updatePrompt}
               placeholder={resolvedPromptPlaceholder}
               mentionOptions={mentionOptions}
-              className="mt-[7px] min-h-[70px] max-h-[190px] rounded-[10px] border-white/[0.06] bg-[#121314] px-[10px] py-[8px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-[#ff24c5]/50"
+              className="mt-[7px] min-h-[70px] max-h-[190px] rounded-[10px] border-white/[0.06] bg-[#121314] px-[10px] py-[8px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-[#f4ff00]/50"
             />
           )}
         </section>
@@ -1051,16 +1046,10 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
             type="button"
             onClick={handleCreate}
             disabled={running}
-            className="standalone-generate-button group relative flex h-[42px] w-full items-center justify-center gap-[6px] overflow-hidden rounded-[12px] px-[8px] text-[14px] font-semibold leading-[20px] text-white transition-all hover:brightness-110 active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
-            style={{
-              background:
-                "linear-gradient(135deg, rgba(199,125,255,.52), rgba(155,77,224,.72) 48%, rgba(91,42,140,.82))",
-              boxShadow:
-                "inset 0 1px 0 rgba(255,255,255,.34), inset 0 -8px 18px rgba(91,42,140,.48), 0 12px 34px -18px rgba(168,85,247,.9)",
-            }}
+            className="standalone-generate-button group relative flex h-[42px] w-full items-center justify-center gap-[6px] overflow-hidden rounded-[12px] bg-[linear-gradient(135deg,#f4ff00_0%,#e7ff12_54%,#b7d400_100%)] px-[8px] text-[14px] font-semibold leading-[20px] text-[#070707] shadow-[inset_0_1px_0_rgba(255,255,255,.58),inset_0_-5px_14px_rgba(79,90,0,.24),0_0_0_1px_rgba(244,255,0,.34),0_12px_34px_-16px_rgba(238,255,0,.86)] transition-all hover:bg-[linear-gradient(135deg,#fbff58_0%,#f0ff18_54%,#cae900_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,.68),inset_0_-5px_14px_rgba(79,90,0,.2),0_0_0_1px_rgba(244,255,0,.48),0_16px_40px_-14px_rgba(238,255,0,.92)] active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
           >
-            <span className="pointer-events-none absolute inset-x-4 top-0 h-[16px] rounded-b-full bg-white/25 blur-[10px]" />
-            <span className="pointer-events-none absolute -left-8 top-1/2 h-20 w-28 -translate-y-1/2 rounded-full bg-[#C77DFF]/35 blur-2xl" />
+            <span className="pointer-events-none absolute inset-x-4 top-0 h-[16px] rounded-b-full bg-white/30 blur-[10px]" />
+            <span className="pointer-events-none absolute -left-8 top-1/2 h-20 w-28 -translate-y-1/2 rounded-full bg-[#f4ff00]/30 blur-2xl" />
             <span className="relative">{running ? resolvedRunningLabel : resolvedCreateLabel}</span>
           </button>
         </div>
@@ -1120,7 +1109,7 @@ function VideoModeCard({
         disabled
           ? "cursor-not-allowed bg-white/[0.015] text-neutral-600 ring-1 ring-inset ring-white/[0.03]"
           : active
-            ? "create-tab-active text-white ring-1 ring-inset ring-[#ff24c5]/30"
+            ? "create-tab-active text-white ring-1 ring-inset ring-[#f4ff00]/30"
             : "bg-transparent text-neutral-300 ring-1 ring-inset ring-white/[0.05] hover:bg-white/[0.04]",
       )}
     >
@@ -1148,9 +1137,9 @@ function VideoModeIcon({
         disabled
           ? "bg-[linear-gradient(135deg,#3a3d42_0%,#25272b_54%,#16181a_100%)] opacity-70 shadow-[inset_0_1px_0_rgba(255,255,255,.08)]"
           : isFrames
-            ? "bg-[linear-gradient(135deg,#35d6ff_0%,#7c4dff_48%,#ff4bcf_100%)]"
-            : "bg-[linear-gradient(135deg,#ff4bcf_0%,#9b4de0_48%,#38d7ff_100%)]",
-        active && !disabled && "scale-105 shadow-[0_0_18px_rgba(255,75,207,.35),inset_0_1px_0_rgba(255,255,255,.28)]",
+            ? "bg-[linear-gradient(135deg,#f8ff66_0%,#d7e600_48%,#f4ff00_100%)]"
+            : "bg-[linear-gradient(135deg,#f4ff00_0%,#9fb800_48%,#f8ff66_100%)]",
+        active && !disabled && "scale-105 shadow-[0_0_18px_rgba(238,255,0,.35),inset_0_1px_0_rgba(255,255,255,.28)]",
       )}
     >
       <div className={clsx("absolute inset-x-0 top-0 h-1/2 blur-[6px]", disabled ? "bg-white/5" : "bg-white/20")} />
@@ -1205,7 +1194,7 @@ function FrameReferenceSlot({
         event.stopPropagation();
       }}
       onDrop={handleFrameDrop}
-      className="group relative flex min-h-[82px] flex-col overflow-hidden rounded-[12px] border border-white/[0.055] bg-[linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012))] p-[6px] shadow-[inset_0_1px_0_rgba(255,255,255,.04),0_8px_22px_-18px_rgba(0,0,0,.9)] outline-none transition hover:border-[#c77dff]/45 hover:bg-[linear-gradient(180deg,rgba(199,125,255,.055),rgba(255,255,255,.012))] focus:border-[#c77dff]/45"
+      className="group relative flex min-h-[82px] flex-col overflow-hidden rounded-[12px] border border-white/[0.055] bg-[linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012))] p-[6px] shadow-[inset_0_1px_0_rgba(255,255,255,.04),0_8px_22px_-18px_rgba(0,0,0,.9)] outline-none transition hover:border-[#f4ff00]/45 hover:bg-[linear-gradient(180deg,rgba(244,255,0,.055),rgba(255,255,255,.012))] focus:border-[#f4ff00]/45"
     >
       <div className="pointer-events-none absolute inset-x-[10px] top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent opacity-70" />
       <button
@@ -1232,7 +1221,7 @@ function FrameReferenceSlot({
               <img src={refItem.url} alt="" className="h-[46px] w-[54px] shrink-0 rounded-[9px] object-cover ring-1 ring-white/[0.08]" />
             )}
             <span className="min-w-0 flex-1">
-              <span className="block text-[10px] font-medium uppercase leading-[13px] tracking-[0.04em] text-[#c77dff]">
+              <span className="block text-[10px] font-medium uppercase leading-[13px] tracking-[0.04em] text-[#f4ff00]">
                 {frameLabel}
               </span>
               <span className="block truncate text-[12px] font-semibold leading-[16px] text-white">
@@ -1258,7 +1247,7 @@ function FrameReferenceSlot({
           </>
         ) : (
           <>
-            <span className="relative grid h-[34px] w-[34px] shrink-0 place-items-center rounded-[10px] bg-[radial-gradient(circle_at_30%_15%,rgba(255,255,255,.2),transparent_42%),linear-gradient(135deg,rgba(155,77,224,.34),rgba(255,75,207,.16))] text-white ring-1 ring-[#c77dff]/25">
+            <span className="relative grid h-[34px] w-[34px] shrink-0 place-items-center rounded-[10px] bg-[radial-gradient(circle_at_30%_15%,rgba(255,255,255,.2),transparent_42%),linear-gradient(135deg,rgba(238,255,0,.34),rgba(244,255,0,.16))] text-white ring-1 ring-[#f4ff00]/25">
               {slot.uploading ? (
                 <span className="h-[14px] w-[14px] animate-spin rounded-full border-2 border-white/70 border-t-transparent" />
               ) : (
@@ -1271,7 +1260,7 @@ function FrameReferenceSlot({
               )}
             </span>
             <span className="min-w-0">
-              <span className="block text-[10px] font-medium uppercase leading-[13px] tracking-[0.04em] text-[#c77dff]">
+              <span className="block text-[10px] font-medium uppercase leading-[13px] tracking-[0.04em] text-[#f4ff00]">
                 {frameLabel}
               </span>
             </span>
@@ -1286,7 +1275,7 @@ function FrameReferenceSlot({
             event.stopPropagation();
             onHistory?.();
           }}
-          className="mx-auto mt-[4px] inline-flex h-[21px] min-w-[58px] items-center justify-center rounded-full border border-white/[0.06] bg-black/[0.18] px-[10px] text-center text-[10px] font-semibold leading-none text-neutral-400 transition hover:border-[#c77dff]/35 hover:bg-[#c77dff]/10 hover:text-white"
+          className="mx-auto mt-[4px] inline-flex h-[21px] min-w-[58px] items-center justify-center rounded-full border border-white/[0.06] bg-black/[0.18] px-[10px] text-center text-[10px] font-semibold leading-none text-neutral-400 transition hover:border-[#f4ff00]/35 hover:bg-[#f4ff00]/10 hover:text-white"
         >
           {slot.historyLabel}
         </button>
@@ -1339,7 +1328,7 @@ function MotionReferenceSlot({
         event.stopPropagation();
       }}
       onDrop={handleDrop}
-      className="group relative flex min-h-[76px] items-center gap-[10px] overflow-hidden rounded-[12px] border border-[#ff24c5]/55 bg-[#f8008d]/[0.06] p-[8px] outline-none shadow-[inset_0_-8px_22px_rgba(255,26,198,0.12),inset_0_1px_6px_rgba(255,255,255,0.04)] transition hover:border-[#ff24c5]/80 hover:bg-[#f8008d]/[0.1] focus:ring-1 focus:ring-[#ff24c5]/60"
+      className="group relative flex min-h-[76px] items-center gap-[10px] overflow-hidden rounded-[12px] border border-[#f4ff00]/55 bg-[#f4ff00]/[0.06] p-[8px] outline-none shadow-[inset_0_-8px_22px_rgba(238,255,0,0.12),inset_0_1px_6px_rgba(255,255,255,0.04)] transition hover:border-[#f4ff00]/80 hover:bg-[#f4ff00]/[0.1] focus:ring-1 focus:ring-[#f4ff00]/60"
     >
       <div className="grid h-[56px] w-[64px] shrink-0 place-items-center overflow-hidden rounded-[10px] bg-black/35 ring-1 ring-white/[0.08]">
         {refItem ? (
@@ -1492,7 +1481,7 @@ function VideoSettingSelectCard({
         className={clsx(
           "standalone-setting-card relative flex min-h-[44px] cursor-pointer items-center gap-[7px] rounded-[12px] border px-[7px] py-[6px] text-left transition",
           open
-            ? "border-[#ff24c5]/35 bg-[#1b1d1f] shadow-[0_0_0_1px_rgba(255,36,197,.18),0_14px_30px_-22px_rgba(255,36,197,.8)]"
+            ? "border-[#f4ff00]/35 bg-[#1b1d1f] shadow-[0_0_0_1px_rgba(238,255,0,.18),0_14px_30px_-22px_rgba(238,255,0,.8)]"
             : "border-white/[0.02] bg-[#16181a] hover:bg-[#1b1d1f]",
         )}
         aria-expanded={open}
@@ -1514,7 +1503,7 @@ function VideoSettingSelectCard({
             ref={menuRef}
             role="listbox"
             style={menuStyle}
-            className="fixed z-[10000] overflow-y-auto rounded-[12px] border border-white/[0.08] bg-[#1b1d1f]/95 p-[4px] text-white shadow-[0_18px_50px_-24px_rgba(0,0,0,.9),0_0_0_1px_rgba(255,36,197,.08)] backdrop-blur-xl"
+            className="fixed z-[10000] overflow-y-auto rounded-[12px] border border-white/[0.08] bg-[#1b1d1f]/95 p-[4px] text-white shadow-[0_18px_50px_-24px_rgba(0,0,0,.9),0_0_0_1px_rgba(238,255,0,.08)] backdrop-blur-xl"
           >
             {safeOptions.map((option) => {
               const selected = option.value === setting.value;
@@ -1531,12 +1520,12 @@ function VideoSettingSelectCard({
                   className={clsx(
                     "flex min-h-[30px] w-full items-center justify-between gap-[8px] rounded-[9px] px-[9px] py-[6px] text-left text-[12px] font-semibold leading-[16px] transition-colors",
                     selected
-                      ? "bg-[#ff24c5]/15 text-white ring-1 ring-[#ff24c5]/35"
+                      ? "bg-[#f4ff00]/15 text-white ring-1 ring-[#f4ff00]/35"
                       : "text-neutral-300 hover:bg-white/[0.06] hover:text-white",
                   )}
                 >
                   <span className="min-w-0 truncate">{option.label}</span>
-                  {selected && <Check className="h-[14px] w-[14px] shrink-0 text-[#ff24c5]" />}
+                  {selected && <Check className="h-[14px] w-[14px] shrink-0 text-[#f4ff00]" />}
                 </button>
               );
             })}
@@ -1552,7 +1541,7 @@ function VideoSwitch({ checked }: { checked: boolean }) {
     <span
       className={clsx(
         "relative h-[17px] w-[29px] shrink-0 rounded-full transition-colors",
-        checked ? "bg-[#ff24c5]" : "bg-neutral-600",
+        checked ? "bg-[#f4ff00]" : "bg-neutral-600",
       )}
     >
       <span
@@ -1583,7 +1572,7 @@ function VideoTextControlCard({ control }: { control: CreateVideoPanelTextContro
         placeholder={control.placeholder}
         rows={compact ? 1 : rows}
         className={clsx(
-          "w-full resize-none rounded-[10px] border border-white/[0.06] bg-[#121314] text-white outline-none placeholder:text-neutral-500 focus:border-[#ff24c5]/50",
+          "w-full resize-none rounded-[10px] border border-white/[0.06] bg-[#121314] text-white outline-none placeholder:text-neutral-500 focus:border-[#f4ff00]/50",
           compact
             ? "h-[38px] overflow-hidden px-[10px] py-[9px] text-[12px] leading-[18px]"
             : "min-h-[76px] px-[10px] py-[8px] text-[12px] leading-[18px]",
@@ -2043,8 +2032,8 @@ function ReferencePicker({
                   "group relative h-[126px] overflow-hidden rounded-[10px] bg-black text-left ring-1 transition",
                   isSelectingLocal && "cursor-wait opacity-70",
                   selected
-                    ? "ring-[#ff24c5]"
-                    : "ring-white/[0.06] hover:ring-[#ff24c5]/70",
+                    ? "ring-[#f4ff00]"
+                    : "ring-white/[0.06] hover:ring-[#f4ff00]/70",
                 )}
               >
                 {asset.mime?.startsWith("video/") ? (
@@ -2062,7 +2051,7 @@ function ReferencePicker({
                   <span className="block truncate text-[10px] font-semibold text-white">{label}</span>
                 </div>
                 {selected && (
-                  <span className="absolute left-[6px] top-[6px] grid h-[20px] w-[20px] place-items-center rounded-full bg-[#ff24c5] text-black">
+                  <span className="absolute left-[6px] top-[6px] grid h-[20px] w-[20px] place-items-center rounded-full bg-[#f4ff00] text-black">
                     <Check className="h-[13px] w-[13px]" />
                   </span>
                 )}
@@ -2106,7 +2095,7 @@ function ReferencePicker({
                       }
                       onDeleteAsset?.(asset);
                     }}
-                    className="absolute right-[6px] top-[6px] grid h-[26px] w-[26px] place-items-center rounded-full border border-white/[0.10] bg-black/70 text-white opacity-0 shadow-[0_8px_20px_rgba(0,0,0,.35)] backdrop-blur transition hover:border-rose-300/40 hover:bg-gradient-to-br hover:from-[#ff2f92] hover:to-[#8b5cf6] hover:text-white group-hover:opacity-100"
+                    className="absolute right-[6px] top-[6px] grid h-[26px] w-[26px] place-items-center rounded-full border border-white/[0.10] bg-black/70 text-white opacity-0 shadow-[0_8px_20px_rgba(0,0,0,.35)] backdrop-blur transition hover:border-red-300/40 hover:bg-red-500/90 hover:text-white group-hover:opacity-100"
                     aria-label={copy.deleteAsset}
                     title={copy.deleteAsset}
                   >
@@ -2328,7 +2317,7 @@ const RecommendedCard: React.FC<RecommendedCardProps> = ({
     className={clsx(
       "transition-all duration-300 ease-out shrink-0 rounded-[12px]",
       "h-[112px] w-[248px] p-[2px] cursor-pointer border-[1.5px] relative overflow-hidden",
-      selected ? "border-[#ff24c5]" : "border-transparent",
+      selected ? "border-[#f4ff00]" : "border-transparent",
     )}
   >
     <div
@@ -2377,7 +2366,7 @@ const ModelListItem: React.FC<ModelListItemProps> = ({ model, selected, onClick 
     className={clsx(
       "group flex min-h-[46px] w-full items-center gap-[8px] rounded-[10px] p-[6px]",
       "transition-colors text-left",
-      selected ? "bg-[#ff24c5]/[0.08] ring-1 ring-[#ff24c5]/40" : "hover:bg-white/[0.04]",
+      selected ? "bg-[#f4ff00]/[0.08] ring-1 ring-[#f4ff00]/40" : "hover:bg-white/[0.04]",
     )}
   >
     <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center overflow-hidden rounded-[8px] bg-white/[0.06]">
@@ -2409,7 +2398,7 @@ const ModelListItem: React.FC<ModelListItemProps> = ({ model, selected, onClick 
     </div>
 
     {selected && (
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#ff24c5] text-xs font-bold text-black">
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#f4ff00] text-xs font-bold text-black">
         <Check className="h-3 w-3" />
       </span>
     )}

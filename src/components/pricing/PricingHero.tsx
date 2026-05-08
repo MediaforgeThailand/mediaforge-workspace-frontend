@@ -65,8 +65,8 @@ const PricingHero = ({ view, onViewChange }: PricingHeroProps) => {
                     className={cn(
                       "text-xs sm:text-sm font-extrabold rounded-full px-2.5 sm:px-3 py-1 backdrop-blur-sm transition-all border",
                       active
-                        ? "bg-violet-500/20 text-violet-100 border-violet-300/60 shadow-lg shadow-violet-500/30 ring-1 ring-violet-300/40"
-                        : "bg-violet-500/10 text-violet-200 border-violet-400/30"
+                        ? "bg-yellow-500/20 text-yellow-100 border-yellow-300/60 shadow-lg shadow-yellow-500/30 ring-1 ring-yellow-300/40"
+                        : "bg-yellow-500/10 text-yellow-200 border-yellow-400/30"
                     )}
                   >
                     {seg.badge}
@@ -80,7 +80,7 @@ const PricingHero = ({ view, onViewChange }: PricingHeroProps) => {
 
       {/* Active save banner */}
       {activeSaveBannerKey && (
-        <p className="mt-3 text-xs text-violet-300">
+        <p className="mt-3 text-xs text-yellow-300">
           {t(activeSaveBannerKey)}
         </p>
       )}

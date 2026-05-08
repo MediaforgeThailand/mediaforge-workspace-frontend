@@ -26,7 +26,7 @@ import {
 //   - 4 self-contained cards, no comparison table below
 //   - monthly/annual toggle drives all prices + which Stripe price_id is used
 //   - Pro card: blue "BEST VALUE" ribbon + thicker blue border
-//   - Team card: purple "EXPERT CHOICE" ribbon + thicker purple border
+//   - Team card: CI-yellow "EXPERT CHOICE" ribbon + thicker highlighted border
 //   - Each card carries: NEW AVAILABLE pill, features list, GET UNLIMITED model
 //     section, "250M+ Premium assets" line for higher tiers.
 // Subscribe uses the redirect flow:
@@ -358,7 +358,7 @@ const Pricing = () => {
                 id="workspace-currency"
                 value={currency}
                 onChange={(event) => setCurrency(event.target.value as SupportedWorkspaceCurrency)}
-                className="h-[38px] rounded-full border border-white/10 bg-[#252525] px-4 text-[12.5px] font-semibold text-white outline-none transition-colors hover:bg-white/[0.08] focus:border-violet-400/70"
+                className="h-[38px] rounded-full border border-white/10 bg-[#252525] px-4 text-[12.5px] font-semibold text-white outline-none transition-colors hover:bg-white/[0.08] focus:border-yellow-400/70"
               >
                 {WORKSPACE_CURRENCIES.map((item) => (
                   <option key={item.currency} value={item.currency} className="bg-[#1b1b1b] text-white">
@@ -371,7 +371,7 @@ const Pricing = () => {
 
           {loading ? (
             <div className="flex justify-center py-24">
-              <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
+              <Loader2 className="h-8 w-8 animate-spin text-yellow-400" />
             </div>
           ) : orderedPlans.length === 0 ? (
             <p className="py-16 text-center text-neutral-500">
@@ -488,7 +488,7 @@ const PlanCard = ({ plan, cycle, ctaLabel, isCurrent, submitting, onSubscribe, t
   const borderClass = isPro
     ? "border-blue-400/85 shadow-[0_0_22px_rgba(59,130,246,0.22)]"
     : isTeam
-      ? "border-purple-400/85 shadow-[0_0_22px_rgba(168,85,247,0.22)]"
+      ? "border-yellow-400/85 shadow-[0_0_22px_rgba(238,255,0,0.22)]"
       : isCurrent
         ? "border-white/18"
         : "border-white/[0.055]";
@@ -621,7 +621,7 @@ const PlanCard = ({ plan, cycle, ctaLabel, isCurrent, submitting, onSubscribe, t
           <span
             className={cn(
               "font-semibold",
-              accent === "blue" ? "text-[#4f6cff]" : accent === "purple" ? "text-[#a855f7]" : "text-white"
+              accent === "blue" ? "text-[#4f6cff]" : accent === "purple" ? "text-[#F4FF00]" : "text-white"
             )}
           >
             {credits.toLocaleString()}{" "}
@@ -638,7 +638,7 @@ const PlanCard = ({ plan, cycle, ctaLabel, isCurrent, submitting, onSubscribe, t
         <div className="mt-[3px] grid gap-[5px] px-[2px]">
           <div className="flex items-center justify-between gap-[10px]">
             <div className="flex items-center gap-[6px] text-[12px] font-semibold leading-[13px] text-zinc-100">
-              <Users className="h-[13px] w-[13px] text-purple-300" />
+              <Users className="h-[13px] w-[13px] text-yellow-300" />
               {i18n("pricing.seats")}
             </div>
             <div className="flex h-[28px] items-center overflow-hidden rounded-full bg-white/[0.07]">
@@ -774,7 +774,7 @@ const ModelAvailabilityRow = ({
         <Sparkles
           className={cn(
             "h-[11px] w-[11px]",
-            accent === "purple" ? "text-[#a855f7]" : "text-[#4f6cff]",
+            accent === "purple" ? "text-[#F4FF00]" : "text-[#4f6cff]",
           )}
         />
         {label}
@@ -782,7 +782,7 @@ const ModelAvailabilityRow = ({
       <span
         className={cn(
           "text-[9px] font-black uppercase leading-none",
-          accent === "purple" ? "text-[#a855f7]" : "text-[#4f6cff]",
+          accent === "purple" ? "text-[#F4FF00]" : "text-[#4f6cff]",
         )}
       >
         {i18n("pricing.badge.nowAvailable")}

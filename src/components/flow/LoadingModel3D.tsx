@@ -48,7 +48,7 @@ export default function LoadingModel3D() {
         />
 
         {/* Subtle rim light */}
-        <pointLight position={[-2, 1, -2]} intensity={0.2} color="#8b5cf6" />
+        <pointLight position={[-2, 1, -2]} intensity={0.2} color="#F4FF00" />
         <pointLight position={[2, 1, -1]} intensity={0.15} color="#b4c5ff" />
 
         {/* Ground shadow */}

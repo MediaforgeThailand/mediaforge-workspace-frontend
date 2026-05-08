@@ -22,7 +22,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import {
   ChevronLeft, ChevronRight, Film, Loader2, Pause, Play, RotateCw, Sparkles, Scissors, Combine, FileVideo,
-  Maximize2, Box, Image as ImageIcon, Music,
+  Maximize2, Box, Image as ImageIcon, Music, Info,
   type LucideIcon,
 } from "lucide-react";
 import { CLEAN_NODE_BODY_TOP_PX, PortIcon } from "./PortIcon";
@@ -105,6 +105,23 @@ const MAX_VISIBLE_RUN_MS = 60 * 60_000;
 const STALE_RUN_GRACE_MS = 30_000;
 const MULTI_GEN_MAX = 3;
 const MULTI_GEN_X_OFFSET = 480;
+const JOB_RECOVERY_LOOKBACK_MS = 5_000;
+const TERMINAL_JOB_STATUSES = new Set([
+  "completed",
+  "failed",
+  "permanent_failed",
+  "cancelled",
+  "canceled",
+]);
+
+function hasActiveWorkspaceJob(data?: NodeData | null): boolean {
+  if (!data) return false;
+  if (data.status === "processing") return true;
+  if (data.activeRunId || data.runStartedAt) return true;
+  if (!data.backgroundJobId) return false;
+  const jobStatus = String(data.jobStatus ?? "").toLowerCase();
+  return jobStatus !== "" && !TERMINAL_JOB_STATUSES.has(jobStatus);
+}
 const MULTI_GEN_NODE_TYPES = new Set([
   "imageGenNode",
   "videoGenNode",
@@ -273,6 +290,12 @@ function workspaceCostMultiplierForNode(
   // standalone tools until that backend path is moved under workspace pricing.
   if (schemaKey === "audioGenNode" && model.startsWith("gemini-")) return 1;
   return workspaceMultiplier;
+}
+
+function formatCreditAmount(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 0,
+  }).format(Math.ceil(value));
 }
 
 const NEW_ID = (): string =>
@@ -897,10 +920,16 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   }, [edges, id]);
   const isMultiShot = String(params.multi_shot) === "true";
   const storedRunStatus = d.status ?? "idle";
-  const optimisticRunActive =
-    !!optimisticRun &&
-    storedRunStatus !== "done" &&
-    storedRunStatus !== "error";
+  // The previous version also gated this on `storedRunStatus !==
+  // "done"/"error"` to avoid a stuck optimistic spinner if the
+  // post-run cleanup forgot to clear `optimisticRun`. That guard
+  // hid the spinner on click 1 whenever the node had already
+  // completed a previous run (the common case — the node carries
+  // status="done" from the prior generation), so the user thought
+  // nothing happened and clicked again. The cleanup IS guaranteed
+  // by the `finally` in `runNode` (and the orphan-completion sweep
+  // covers the page-reload case), so trust `!!optimisticRun` alone.
+  const optimisticRunActive = !!optimisticRun;
   const runStatus = optimisticRunActive ? "processing" : storedRunStatus;
   const isRunning = runStatus === "processing";
   const visibleRunStartedAt =
@@ -921,8 +950,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     const current =
       useWorkspaceStore.getState().current?.nodes.find((node) => node.id === id) ??
       getNodes().find((node) => node.id === id);
-    const currentStatus = (current?.data as NodeData | undefined)?.status;
-    return currentStatus === "processing";
+    return hasActiveWorkspaceJob(current?.data as NodeData | undefined);
   }, [getNodes, id]);
 
   const runNode = useCallback(async () => {
@@ -931,6 +959,19 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       toast.info(t("workspace.toolNode.viewOnlyRunsDisabled"));
       return;
     }
+
+    // Flip ref + optimistic run BEFORE validation. Previously these
+    // sat after the prompt-length block, so a node whose previous
+    // generation left status="done" had no spinner state during the
+    // microtask window before patchNodeDataNow committed — the user
+    // saw nothing happen and clicked again, which sometimes produced
+    // a duplicate paid run. Validation paths below `return` through
+    // the `finally` so these get cleared if we bail out.
+    runInFlightRef.current = true;
+    const runId = NEW_ID();
+    const runStartedAt = Date.now();
+    setOptimisticRun({ runId, startedAt: runStartedAt });
+    try {
 
     // ── Provider-side prompt-length guard ──
     // Some providers (Kling: 2500, Banana: 2000, …) enforce a hard
@@ -989,14 +1030,10 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       }
     }
 
-    runInFlightRef.current = true;
     const storeState = useWorkspaceStore.getState();
     const log = useDebugLogStore.getState().push;
     const nodeLabelForLog =
       (d.params?.nodeName as string) || schema?.displayName || schemaKey;
-    const runId = NEW_ID();
-    const runStartedAt = Date.now();
-    setOptimisticRun({ runId, startedAt: runStartedAt });
     const runStillActive = () => {
       const current =
         useWorkspaceStore.getState().current?.nodes.find((node) => node.id === id) ??
@@ -1834,7 +1871,12 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         // stays in console.error for the team.
         toast.error(userErrorMessage);
       }
+    }
     } finally {
+      // Outer finally — fires for every exit (validation bail,
+      // throw inside the inner try, or success). Replaces the
+      // previous inner-only finally so a `return` from the
+      // prompt-length validator no longer skipped cleanup.
       setOptimisticRun(null);
       runInFlightRef.current = false;
     }
@@ -1948,17 +1990,164 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     [getEdges, getNodes, id, isNodeCurrentlyProcessing, isViewer, runNode, setEdges, setNodes],
   );
 
+  /* ── Orphaned-completion sweep (mount-only) ──
+   *  Production incident (run 14123ecb): user clicked Run, the
+   *  spinner repaint was lost to the synchronous-state race fixed
+   *  elsewhere in this file, the user closed the canvas, the
+   *  backend completed the job and charged 364 credits — but the
+   *  result never appeared on the node. The existing recovery
+   *  effect below only fires when `backgroundJobId` is set OR
+   *  `runStatus` is processing/error, and the node-id branch
+   *  picks the SINGLE latest row — so once even one earlier
+   *  generation is recorded on the node, any subsequent run that
+   *  failed to deliver client-side stays stranded forever.
+   *
+   *  The sweep below runs once per mount and reconciles the last
+   *  five completed jobs for this node against the local
+   *  `generations` array, applying any that are missing. Cost:
+   *  one indexed lookup per node mount (5 rows max) — paid once
+   *  per canvas open. Dedup by job_id / url / text keeps it
+   *  idempotent if the existing realtime path already delivered
+   *  the row. */
   useEffect(() => {
+    // Don't sweep while runNode is actively running in this component.
+    // The sweep's `patchNodeDataNow({activeRunId: null, status: "done"})`
+    // would stomp the just-set "processing" state and runNode's
+    // pollJob would `__RUN_CANCELLED__` within 1s, vanishing the
+    // spinner and enabling the button while the backend job keeps
+    // going (the exact "spinner 1s then clickable + double charge"
+    // user reported).
+    if (runInFlightRef.current) return;
+    let cancelled = false;
+    const sweep = async () => {
+      const current = useWorkspaceStore.getState().current;
+      if (!current?.id || !current?.workspaceId) return;
+      const { data: jobs, error } = await supabase
+        .from("workspace_generation_jobs")
+        .select("*")
+        .eq("node_id", id)
+        .eq("canvas_id", current.id)
+        .eq("workspace_id", current.workspaceId)
+        .eq("status", "completed")
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (cancelled || error || !jobs?.length) return;
+      const node =
+        useWorkspaceStore.getState().current?.nodes.find((n) => n.id === id) ??
+        getNodes().find((n) => n.id === id);
+      const existingGens = Array.isArray((node?.data as NodeData | undefined)?.generations)
+        ? ((node!.data as NodeData & {
+            generations?: Array<Record<string, unknown>>;
+          }).generations as Array<Record<string, unknown>>)
+        : [];
+      let recoveredJobId: string | null = null;
+      // Walk oldest → newest so addGeneration appends in
+      // chronological order; the existing UI sorts the carousel
+      // newest-first independently.
+      for (const job of [...jobs].reverse()) {
+        const result = (job as { result?: {
+          type?: "image" | "video" | "text" | "audio";
+          url?: string;
+          text?: string;
+          prompt_used?: string;
+          prompt_source?: string;
+          provider_meta?: { model_url?: string };
+        } | null }).result ?? null;
+        if (!result || (!result.url && !result.text)) continue;
+        const jobId = String((job as { id?: string }).id ?? "");
+        const dup = existingGens.some((g) =>
+          (!!jobId && g.job_id === jobId) ||
+          (!!result.url && g.url === result.url) ||
+          (!!result.text && g.text === result.text)
+        );
+        if (dup) continue;
+        useWorkspaceStore.getState().addGeneration(id, {
+          id: (globalThis.crypto?.randomUUID?.() ?? String(Date.now())),
+          job_id: jobId || undefined,
+          type: result.type ?? "image",
+          url: result.url,
+          text: result.text,
+          model_url: result.provider_meta?.model_url,
+          prompt_used: result.prompt_used,
+          prompt_source: result.prompt_source,
+          createdAt: Date.now(),
+        } as Record<string, unknown>);
+        useDebugLogStore.getState().push({
+          level: "info",
+          nodeId: id,
+          title: `Recovered orphaned completion · ${jobId.slice(0, 8)}`,
+        });
+        recoveredJobId = jobId || recoveredJobId;
+      }
+      if (recoveredJobId) {
+        // Pin to the newest completed row in the fetched window
+        // (jobs[0] thanks to the descending sort) regardless of
+        // which one we actually recovered — pinning to an older
+        // recovered row would silently roll back the
+        // backgroundJobId from a newer realtime-delivered job.
+        const newestJobId = String((jobs[0] as { id?: string })?.id ?? recoveredJobId);
+        patchNodeDataNow({
+          status: "done",
+          runStartedAt: null,
+          activeRunId: null,
+          backgroundJobId: newestJobId,
+          jobStatus: "completed",
+          lastRunError: null,
+        });
+      }
+    };
+    void sweep();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // Same race as the sweep above: this effect's `applyCompletedJob`
+    // unconditionally patches `activeRunId: null` regardless of
+    // whether a fresh runNode is in flight. Before the user's click
+    // finishes enqueuing (knownJobId is still null), checkJob's
+    // node_id query returns the PREVIOUS completed run for this
+    // node and applyCompletedJob stomps the newly-set processing
+    // state. runNode's pollJob then sees `runStillActive()` flip
+    // to false within ~1s and rejects, clearing the spinner. Skip
+    // entirely while runNode owns the run.
+    if (runInFlightRef.current) return;
     const knownJobId = d.backgroundJobId ?? null;
+    const activeRunStartedAt =
+      typeof d.runStartedAt === "number" && Number.isFinite(d.runStartedAt)
+        ? d.runStartedAt
+        : null;
     const canRecoverByNode =
-      !knownJobId && (runStatus === "processing" || runStatus === "error");
+      !knownJobId &&
+      (runStatus === "processing" ||
+        runStatus === "error" ||
+        // Broadened in the same incident: a stale-autosave race
+        // could leave `runStatus === "idle"` while persisted node
+        // fields (`runStartedAt`, `activeRunId`, `lastRunError`)
+        // still betray a half-finished run. Treat any of these as
+        // a signal to keep polling for the missed completion.
+        d.runStartedAt != null ||
+        d.activeRunId != null ||
+        d.lastRunError != null);
     if ((!knownJobId && !canRecoverByNode) || d.jobStatus === "completed") return;
+    if (!knownJobId && runInFlightRef.current) return;
 
     let cancelled = false;
     let pollTimer: number | null = null;
 
     const applyCompletedJob = (job: Record<string, unknown>) => {
       const resolvedJobId = String(job.id ?? knownJobId ?? "");
+      const createdAtMs = Date.parse(String(job.created_at ?? ""));
+      if (
+        !knownJobId &&
+        activeRunStartedAt != null &&
+        Number.isFinite(createdAtMs) &&
+        createdAtMs < activeRunStartedAt - JOB_RECOVERY_LOOKBACK_MS
+      ) {
+        return;
+      }
       const result = job.result as {
         type?: "image" | "video" | "text" | "audio";
         url?: string;
@@ -2018,6 +2207,12 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         query = query.eq("node_id", id).order("created_at", { ascending: false }).limit(1);
         if (current?.id) query = query.eq("canvas_id", current.id);
         if (current?.workspaceId) query = query.eq("workspace_id", current.workspaceId);
+        if (activeRunStartedAt != null) {
+          query = query.gte(
+            "created_at",
+            new Date(Math.max(0, activeRunStartedAt - JOB_RECOVERY_LOOKBACK_MS)).toISOString(),
+          );
+        }
       }
 
       const { data: job, error } = await query.maybeSingle();
@@ -2063,7 +2258,18 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       cancelled = true;
       if (pollTimer != null) window.clearInterval(pollTimer);
     };
-  }, [d.backgroundJobId, d.jobStatus, getNodes, id, language, runStatus, patchNodeDataNow]);
+  }, [
+    d.backgroundJobId,
+    d.jobStatus,
+    d.runStartedAt,
+    d.activeRunId,
+    d.lastRunError,
+    getNodes,
+    id,
+    language,
+    runStatus,
+    patchNodeDataNow,
+  ]);
 
   /* ── Listen for Ctrl+Enter / Ctrl+Shift+Enter shortcut ────
    * useWorkspaceShortcuts dispatches a `workspace-run-shortcut`
@@ -2350,6 +2556,58 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       ? ` (${params.duration ?? 5}s)`
       : undefined;
 
+  const baseNodeCostDisplay = useMemo(() => {
+    if (!nodeCostQuote) return null;
+    return Math.max(0, Math.ceil(nodeCostQuote.fullCost));
+  }, [nodeCostQuote]);
+
+  const costTotalDiscountPercent = useMemo(() => {
+    return nodeCostQuote?.effectiveDiscountPercent ?? 0;
+  }, [nodeCostQuote]);
+
+  const hasCostDiscount =
+    baseNodeCostDisplay != null &&
+    nodeCost != null &&
+    nodeCost < baseNodeCostDisplay &&
+    costTotalDiscountPercent > 0;
+
+  const costDiscountRows = useMemo(() => {
+    if (!nodeCostQuote) return [];
+    const rows: Array<{
+      label: string;
+      value: string;
+      className: string;
+    }> = [];
+    if (nodeCostQuote.discountPercent > 0) {
+      rows.push({
+        label: "Model",
+        value: `-${nodeCostQuote.discountPercent}%`,
+        className: "text-sky-300",
+      });
+    }
+    if (nodeCostQuote.packageDiscountPercent > 0) {
+      rows.push({
+        label: nodeCostQuote.packageDiscountLabel ?? "Package",
+        value: `-${nodeCostQuote.packageDiscountPercent}%`,
+        className: "text-yellow-300",
+      });
+    }
+    if (costTotalDiscountPercent > 0) {
+      rows.push({
+        label: "Total",
+        value: `-${costTotalDiscountPercent}%`,
+        className: "text-emerald-300",
+      });
+    }
+    return rows;
+  }, [costTotalDiscountPercent, nodeCostQuote]);
+
+  const costSummaryLabel = creditCostsLoading
+    ? "Loading cost..."
+    : nodeCost != null
+      ? `Total ${formatCreditAmount(nodeCost)}${costSuffix ?? ""} credits`
+      : "Pricing unavailable";
+
   const Icon = ICONS[schemaKey] ?? Sparkles;
 
   // ── Port colour palette ─────────────────────────────────────
@@ -2359,9 +2617,9 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     sky: "hsl(217 91% 60%)",
     blue: "hsl(217 91% 60%)",
     emerald: "hsl(160 84% 39%)",
-    violet: "hsl(258 90% 66%)",
+    violet: "hsl(64 100% 50%)",
     amber: "hsl(43 96% 56%)",
-    pink: "hsl(328 86% 70%)",
+    pink: "hsl(64 100% 68%)",
     zinc: "hsl(0 0% 65%)",
   };
   const colorOf = (c: string) => PORT_COLORS[c] ?? PORT_COLORS.zinc;
@@ -2719,7 +2977,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         <NodeQuickActionRail
           visible={selected || isHovered}
           selected={selected}
-          onDelete={!isViewer && selected ? onDeleteNode : undefined}
+          onDelete={!isViewer ? onDeleteNode : undefined}
           nodeId={id}
           mediaKind={
             currentGen?.type === "image" || currentGen?.type === "video" || currentGen?.type === "audio"
@@ -2771,6 +3029,23 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           ref={previewRef}
           className="ws-compact-preview ws-preview-zone"
           data-square={forceSquarePreview ? "true" : undefined}
+          onDoubleClick={(event) => {
+            const target = event.target as HTMLElement | null;
+            if (
+              target?.closest?.(
+                'button, input, textarea, select, [contenteditable="true"]',
+              )
+            ) {
+              return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            window.dispatchEvent(
+              new CustomEvent("workspace-open-node-preview", {
+                detail: { nodeId: id },
+              }),
+            );
+          }}
         >
           {/* 3D model output — render the rendered_image PNG as a
            *  static preview. Mounting `<model-viewer>` per node
@@ -3030,8 +3305,12 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                     )}
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="top" align="end">
-                  <div className="flex flex-col gap-0.5 text-xs">
+                <TooltipContent
+                  side="top"
+                  align="end"
+                  className="overflow-visible border-white/10 bg-[#151515] px-3 py-2 text-zinc-100 shadow-2xl shadow-black/40"
+                >
+                  <div className="flex flex-col gap-2 text-xs text-zinc-100">
                     <span>
                       {isViewer
                         ? "View only — runs disabled"
@@ -3042,39 +3321,50 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                             : "Run (Ctrl+Enter)"}
                     </span>
                     {!isViewer && (
-                      <span className="text-muted-foreground">
-                        {creditCostsLoading
-                          ? "Loading cost…"
-                          : nodeCostQuote
-                            ? nodeCostQuote.discountPercent > 0 || nodeCostQuote.packageDiscountPercent > 0
-                              ? (
-                                  <span className="flex flex-wrap items-center gap-1.5">
-                                    <span>Cost:</span>
-                                    <span className="line-through opacity-70">
-                                      {nodeCostQuote.fullCost.toLocaleString()}{costSuffix ?? ""}
-                                    </span>
-                                    <span className="font-semibold text-foreground">
-                                      {nodeCostQuote.finalCost.toLocaleString()}{costSuffix ?? ""} credits
-                                    </span>
-                                    {nodeCostQuote.discountPercent > 0 && (
-                                      <span className="text-[10px] font-medium text-emerald-300">
-                                        Model -{nodeCostQuote.discountPercent}%
-                                      </span>
-                                    )}
-                                    {nodeCostQuote.packageDiscountPercent > 0 && (
-                                      <span className="text-[10px] font-medium text-sky-300">
-                                        {nodeCostQuote.packageDiscountLabel ?? "Team"} -{nodeCostQuote.packageDiscountPercent}%
-                                      </span>
-                                    )}
-                                    {nodeCostQuote.effectiveDiscountPercent > 0 && (
-                                      <span className="text-[10px] text-muted-foreground">
-                                        Total -{nodeCostQuote.effectiveDiscountPercent}%
-                                      </span>
-                                    )}
+                      <span className="flex items-center gap-1.5 whitespace-nowrap text-zinc-100">
+                        {nodeCost != null && !creditCostsLoading ? (
+                          <span className="flex items-baseline gap-1.5 text-zinc-100">
+                            <span className="font-medium">Total</span>
+                            <span className="font-semibold">
+                              {formatCreditAmount(nodeCost)}
+                              {costSuffix ?? ""}
+                            </span>
+                            <span>credits</span>
+                            {hasCostDiscount && baseNodeCostDisplay != null && (
+                              <>
+                                <span className="text-[10px] leading-none text-zinc-200/65 line-through">
+                                  {formatCreditAmount(baseNodeCostDisplay)}
+                                  {costSuffix ?? ""}
+                                </span>
+                                <span className="text-[10px] font-semibold leading-none text-zinc-100">
+                                  -{costTotalDiscountPercent}%
+                                </span>
+                              </>
+                            )}
+                          </span>
+                        ) : (
+                          <span>{costSummaryLabel}</span>
+                        )}
+                        {costDiscountRows.length > 0 && (
+                          <span className="group/cost relative inline-flex items-center">
+                            <span
+                              className="inline-grid h-[15px] w-[15px] place-items-center rounded-full border border-zinc-100/45 text-zinc-100/90 transition-colors hover:border-zinc-100 hover:bg-white/10 hover:text-white"
+                              aria-label="Cost details"
+                            >
+                              <Info className="h-[10px] w-[10px]" strokeWidth={2.4} />
+                            </span>
+                            <span className="pointer-events-none absolute bottom-full right-0 z-[70] mb-2 hidden w-[168px] rounded-md border border-white/10 bg-[#111] p-2 text-left text-[11px] leading-[16px] text-zinc-100 shadow-2xl shadow-black/50 group-hover/cost:block">
+                              {costDiscountRows.map((row) => (
+                                <span key={`${row.label}:${row.value}`} className="flex items-center justify-between gap-3">
+                                  <span className="truncate text-zinc-300">{row.label}</span>
+                                  <span className={cn("font-semibold", row.className)}>
+                                    {row.value}
                                   </span>
-                                )
-                              : `Cost: ${nodeCostQuote.finalCost.toLocaleString()}${costSuffix ?? ""} credits`
-                            : "Pricing unavailable"}
+                                </span>
+                              ))}
+                            </span>
+                          </span>
+                        )}
                       </span>
                     )}
                   </div>

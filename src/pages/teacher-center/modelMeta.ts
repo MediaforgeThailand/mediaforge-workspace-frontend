@@ -39,7 +39,7 @@ const MODEL_META: Record<string, ModelMeta> = {
 };
 
 const CATEGORY_COLOR: Record<ModelCategory, string> = {
-  video: "#7c3aed",      // violet
+  video: "#E7FF12",      // violet
   image: "#0ea5e9",      // sky
   text:  "#10b981",      // emerald
   audio: "#f59e0b",      // amber

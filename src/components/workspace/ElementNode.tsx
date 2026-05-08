@@ -301,7 +301,7 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
                 "nodrag flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors",
                 creating
                   ? "cursor-wait bg-white/[0.06] text-white/60"
-                  : "bg-pink-500/20 text-pink-200 hover:bg-pink-500/30",
+                  : "bg-yellow-500/20 text-yellow-200 hover:bg-[#e7ff12]/30",
               )}
               title={i18n("workspace.elementNode.saveAsReUsableElementListed")}
             >
@@ -384,7 +384,7 @@ function ElementRefThumb({
       title={title}
       className={cn(
         "aspect-square w-full rounded object-cover",
-        accent ? "border border-pink-500/40" : "",
+        accent ? "border border-yellow-500/40" : "",
       )}
       draggable={false}
     />

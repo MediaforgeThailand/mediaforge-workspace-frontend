@@ -141,7 +141,7 @@ export { MODEL_API_MAP, KLING_NODE_DEFS };
 
 const CATEGORY_CONFIG: Record<string, { label: string; border: string; glow: string }> = {
   input: { label: "INPUT", border: "border-blue-500/25", glow: "shadow-[0_0_20px_-4px_rgba(59,130,246,0.15)]" },
-  ai: { label: "AI", border: "border-violet-500/25", glow: "shadow-[0_0_20px_-4px_rgba(139,92,246,0.15)]" },
+  ai: { label: "AI", border: "border-yellow-500/25", glow: "shadow-[0_0_20px_-4px_rgba(238,255,0,0.15)]" },
   transform: { label: "TRANSFORM", border: "border-amber-500/25", glow: "shadow-[0_0_20px_-4px_rgba(245,158,11,0.15)]" },
   output: { label: "OUTPUT", border: "border-emerald-500/25", glow: "shadow-[0_0_20px_-4px_rgba(16,185,129,0.15)]" },
 };

@@ -45,7 +45,7 @@ const ICON: Record<DebugLogLevel, LucideIcon> = {
 const COLOR: Record<DebugLogLevel, string> = {
   info: "text-zinc-400",
   send: "text-sky-400",
-  recv: "text-violet-400",
+  recv: "text-yellow-400",
   success: "text-emerald-400",
   error: "text-red-400",
 };

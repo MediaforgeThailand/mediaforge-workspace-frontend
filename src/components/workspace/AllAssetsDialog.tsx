@@ -20,6 +20,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type AssetSource = "generated" | "uploaded" | "element";
 type AssetType = "image" | "video" | "audio" | "model3d";
@@ -66,13 +72,34 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const canvases = useWorkspaceStore((s) => s.canvases);
   const current = useWorkspaceStore((s) => s.current);
+  const projects = useWorkspaceStore((s) => s.projects);
+  const activeProjectId = useWorkspaceStore((s) => s.activeProjectId);
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<LibraryTab>("board");
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [draggingExternal, setDraggingExternal] = useState(false);
   const searchRef = useRef<HTMLInputElement | null>(null);
+
+  /* Project selector state. Each Space (`workspace`) belongs to a
+   *  Project; up until now the Board sidebar showed every space
+   *  across every project, which the user reported was overwhelming
+   *  on accounts with many projects. We default the Project dropdown
+   *  to the currently-open project (current.projectId or activeProjectId)
+   *  so the user lands on the spaces they're actually in, then filter
+   *  `boardOptions` below by `workspace.projectId === selectedProjectId`.
+   *
+   *  `effectiveProjectId` falls back through current → active → first
+   *  available so we never end up showing "no spaces" because nothing
+   *  was selected yet. */
+  const effectiveProjectId =
+    selectedProjectId ??
+    current?.projectId ??
+    activeProjectId ??
+    projects[0]?.id ??
+    null;
 
   const canvasMetaById = useMemo(
     () => new Map(canvases.map((canvas) => [canvas.id, canvas] as const)),
@@ -85,23 +112,59 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
         .map((graph) => graph?.workspaceId ?? canvasMetaById.get(graph?.id ?? "")?.workspaceId)
         .filter((id): id is string => Boolean(id)),
     );
+    /* Filter by Project first — the Media Browser used to show every
+     *  space from every project, which the user reported was
+     *  overwhelming. Now only spaces belonging to the currently
+     *  selected project are listed; switching the project dropdown
+     *  in the header narrows the list to that project's spaces. */
     const options = workspaces
-      .filter((workspace) => idsWithGraphs.size === 0 || idsWithGraphs.has(workspace.id))
+      .filter(
+        (workspace) =>
+          (effectiveProjectId == null ||
+            workspace.projectId === effectiveProjectId) &&
+          (idsWithGraphs.size === 0 || idsWithGraphs.has(workspace.id)),
+      )
       .map((workspace) => ({
         id: workspace.id,
         name: workspace.name || "Untitled space",
       }));
+    /* Always surface the currently-open space at the top, even when
+     *  it lives in a different project than `effectiveProjectId` —
+     *  otherwise the user could lose access to the space they're
+     *  literally working in just by switching the dropdown. */
     if (current?.workspaceId && !options.some((option) => option.id === current.workspaceId)) {
-      options.unshift({
-        id: current.workspaceId,
-        name:
-          workspaces.find((workspace) => workspace.id === current.workspaceId)?.name ||
-          current.name ||
-          "Current space",
-      });
+      const currentSpace = workspaces.find((w) => w.id === current.workspaceId);
+      if (
+        effectiveProjectId == null ||
+        currentSpace?.projectId === effectiveProjectId
+      ) {
+        options.unshift({
+          id: current.workspaceId,
+          name:
+            currentSpace?.name ||
+            current.name ||
+            "Current space",
+        });
+      }
     }
     return options;
-  }, [allGraphs, canvasMetaById, current, workspaces]);
+  }, [allGraphs, canvasMetaById, current, workspaces, effectiveProjectId]);
+
+  /* Project dropdown options — every project the user owns / is in,
+   *  with their saved colour chip if any. Used by the header
+   *  dropdown that replaces the old "Media Browser" title text. */
+  const projectOptions = useMemo(
+    () =>
+      projects.map((project) => ({
+        id: project.id,
+        name: project.name || "Untitled project",
+        color: project.color ?? null,
+      })),
+    [projects],
+  );
+
+  const activeProjectName =
+    projectOptions.find((p) => p.id === effectiveProjectId)?.name ?? "All projects";
 
   const assets = useMemo<DialogAsset[]>(() => {
     const out: DialogAsset[] = [];
@@ -232,7 +295,15 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
     setSelectedId(null);
     setQuery("");
     setActiveTab("board");
-    setSelectedWorkspaceId(current?.workspaceId ?? boardOptions[0]?.id ?? null);
+    /* Default the project to whichever one the user is currently
+     *  in (current.projectId), falling back to the active project,
+     *  then to the first project they own. Reset the workspace
+     *  selection so the boardOptions effect below will pick the
+     *  first space from THAT project. */
+    setSelectedProjectId(
+      current?.projectId ?? activeProjectId ?? projects[0]?.id ?? null,
+    );
+    setSelectedWorkspaceId(current?.workspaceId ?? null);
     const id = window.setTimeout(() => searchRef.current?.focus(), 50);
     return () => window.clearTimeout(id);
   }, [open]);
@@ -340,13 +411,13 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
         className={cn(
           "relative flex h-[600px] w-[900px] max-w-[calc(100vw-64px)] overflow-hidden rounded-[7px]",
           "border border-[#3a3a3a] bg-[#171717] text-[#d7d7d7] shadow-[0_24px_80px_rgba(0,0,0,.55)]",
-          draggingExternal && "ring-2 ring-violet-500/70",
+          draggingExternal && "ring-2 ring-yellow-500/70",
         )}
         onClick={(event) => event.stopPropagation()}
       >
         {draggingExternal && (
-          <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center bg-violet-500/12 text-violet-100">
-            <div className="flex items-center gap-2 rounded-md border border-violet-400/40 bg-black/70 px-4 py-2 text-sm font-semibold">
+          <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center bg-yellow-500/12 text-yellow-100">
+            <div className="flex items-center gap-2 rounded-md border border-yellow-400/40 bg-black/70 px-4 py-2 text-sm font-semibold">
               <UploadCloud className="h-4 w-4" />
               Drop files to upload
             </div>
@@ -354,47 +425,137 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
         )}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-[64px] shrink-0 items-center gap-4 border-b border-[#2d2d2d] px-5">
-            <h2 className="w-[112px] shrink-0 text-[14px] font-semibold text-[#e8e8e8]">
-              Media Browser
-            </h2>
-            <div className="relative h-[28px] w-[240px]">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-[#9a9a9a]" />
+          {/* Header tightened from 64px → 48px to match every other
+           *  dialog header in the workspace. The fixed `w-[112px]`
+           *  on the title forced the search field off the natural
+           *  baseline because the title's font-size (14px) and the
+           *  search field's font-size (13px) sat in different
+           *  vertical anchors at 64px tall. New layout: shorter
+           *  bar, items center-aligned via the flex container, no
+           *  fixed-width title slot — the title takes its natural
+           *  width, gap-3 separates from the next control. */}
+          <header className="flex h-[48px] shrink-0 items-center gap-3 px-4">
+            {/* Project picker — replaces the static "Media Browser"
+             *  title because the user wants the dialog to scope to a
+             *  single project at a time (otherwise the Board sidebar
+             *  below dumps every space from every project, which is
+             *  too much on accounts with many projects). The active
+             *  project name shows on the trigger; the popover lists
+             *  the user's projects with their saved colour chip. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex h-[30px] shrink-0 items-center gap-2 rounded-[5px] bg-[#1f1f1f] px-2.5 text-left text-[13.5px] font-semibold tracking-tight text-[#e8e8e8] outline-none transition hover:bg-[#262626] focus-visible:bg-[#262626]"
+                  title="Switch project"
+                >
+                  {projectOptions.find((p) => p.id === effectiveProjectId)
+                    ?.color ? (
+                    <span
+                      className="h-[10px] w-[10px] shrink-0 rounded-full"
+                      style={{
+                        background: projectOptions.find((p) => p.id === effectiveProjectId)
+                          ?.color as string,
+                      }}
+                    />
+                  ) : null}
+                  <span className="max-w-[200px] truncate">{activeProjectName}</span>
+                  <ChevronDown className="h-[13px] w-[13px] shrink-0 text-[#8d8d8d]" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                sideOffset={4}
+                className="z-[1600] min-w-[220px] max-h-[320px] overflow-y-auto rounded-[6px] bg-[#1c1c1c] p-1 shadow-[0_14px_30px_rgba(0,0,0,.55)]"
+              >
+                {projectOptions.length === 0 ? (
+                  <DropdownMenuItem
+                    disabled
+                    className="flex h-[30px] items-center px-2 text-[13px] text-[#9a9a9a]"
+                  >
+                    No projects
+                  </DropdownMenuItem>
+                ) : (
+                  projectOptions.map((project) => {
+                    const isActive = project.id === effectiveProjectId;
+                    return (
+                      <DropdownMenuItem
+                        key={project.id}
+                        className={cn(
+                          "flex h-[30px] cursor-pointer items-center gap-2 rounded-[3px] px-2 text-[13px] focus:bg-[#2a2a2a]",
+                          isActive
+                            ? "bg-yellow-500/15 text-yellow-100 focus:bg-yellow-500/20"
+                            : "text-[#dedede]",
+                        )}
+                        onSelect={() => {
+                          setSelectedProjectId(project.id);
+                          /* Switching projects nukes the workspace
+                           *  selection so the auto-pick effect below
+                           *  picks the first space of the NEW
+                           *  project. Without this the dialog could
+                           *  hold a stale workspace id from the old
+                           *  project that no longer matches anything. */
+                          setSelectedWorkspaceId(null);
+                          setSelectedId(null);
+                        }}
+                      >
+                        {project.color ? (
+                          <span
+                            className="h-[10px] w-[10px] shrink-0 rounded-full"
+                            style={{ background: project.color }}
+                          />
+                        ) : (
+                          <span className="h-[10px] w-[10px] shrink-0 rounded-full bg-[#3a3a3a]" />
+                        )}
+                        <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                        {isActive && (
+                          <Check className="h-[13px] w-[13px] shrink-0 text-yellow-300" />
+                        )}
+                      </DropdownMenuItem>
+                    );
+                  })
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <div className="relative h-[28px] w-[260px]">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-[14px] w-[14px] -translate-y-1/2 text-[#9a9a9a]" />
               <input
                 ref={searchRef}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={t("workspace.allAssets.searchPlaceholder")}
-                className="h-full w-full rounded-[4px] border border-[#2f2f2f] bg-[#181818] pl-8 pr-2 text-[13px] font-medium text-zinc-100 outline-none placeholder:text-[#777] focus:border-[#555]"
+                className="h-full w-full rounded-[4px] bg-[#181818] pl-8 pr-2 text-[13px] font-medium leading-none text-zinc-100 outline-none placeholder:text-[#777] focus:bg-[#1f1f1f]"
               />
             </div>
-            <button
-              type="button"
-              aria-pressed={viewMode === "grid"}
-              onClick={() => setViewMode("grid")}
-              className={cn(
-                "grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[4px] transition",
-                viewMode === "grid"
-                  ? "bg-violet-500 text-white"
-                  : "bg-transparent text-[#9b9b9b] hover:bg-[#242424] hover:text-white",
-              )}
-            >
-              <Grid2X2 className="h-[15px] w-[15px]" />
-            </button>
-            <button
-              type="button"
-              aria-pressed={viewMode === "list"}
-              onClick={() => setViewMode("list")}
-              className={cn(
-                "grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[4px] transition",
-                viewMode === "list"
-                  ? "bg-[#333] text-white"
-                  : "bg-transparent text-[#9b9b9b] hover:bg-[#242424] hover:text-white",
-              )}
-            >
-              <List className="h-[15px] w-[15px]" />
-            </button>
-            <span className="ml-auto shrink-0 text-[11px] font-medium text-[#8f8f8f]">
+            <div className="flex h-[28px] items-center rounded-[4px] bg-[#181818] p-[2px]">
+              <button
+                type="button"
+                aria-pressed={viewMode === "grid"}
+                onClick={() => setViewMode("grid")}
+                className={cn(
+                  "grid h-[24px] w-[28px] place-items-center rounded-[3px] transition",
+                  viewMode === "grid"
+                    ? "bg-[#f4ff00] text-black"
+                    : "bg-transparent text-[#9b9b9b] hover:text-white",
+                )}
+              >
+                <Grid2X2 className="h-[14px] w-[14px]" />
+              </button>
+              <button
+                type="button"
+                aria-pressed={viewMode === "list"}
+                onClick={() => setViewMode("list")}
+                className={cn(
+                  "grid h-[24px] w-[28px] place-items-center rounded-[3px] transition",
+                  viewMode === "list"
+                    ? "bg-[#333] text-white"
+                    : "bg-transparent text-[#9b9b9b] hover:text-white",
+                )}
+              >
+                <List className="h-[14px] w-[14px]" />
+              </button>
+            </div>
+            <span className="ml-auto shrink-0 text-[11.5px] font-medium leading-none text-[#8f8f8f]">
               {visibleAssets.length} files
             </span>
             <button
@@ -403,38 +564,95 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
               className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-[#a7a7a7] transition hover:bg-[#242424] hover:text-white"
               title="Close"
             >
-              <X className="h-[18px] w-[18px]" />
+              <X className="h-[16px] w-[16px]" />
             </button>
           </header>
 
           <div className="flex min-h-0 flex-1">
-            <aside className="w-[170px] shrink-0 border-r border-[#303030] bg-[#202020] px-3 py-4">
+            <aside className="w-[180px] shrink-0 bg-[#202020] px-3 py-4">
               <div className="mb-4">
-                <p className="mb-3 text-[12px] font-semibold text-[#969696]">Board</p>
-                <label className="relative flex h-[30px] w-full items-center gap-2 rounded-[4px] px-2 text-left text-[13px] font-semibold text-[#dedede] hover:bg-[#303030]">
-                  <Layers className="h-[13px] w-[13px] shrink-0" />
-                  <select
-                    value={effectiveWorkspaceId ?? "__all__"}
-                    onChange={(event) => {
-                      setSelectedWorkspaceId(
-                        event.target.value === "__all__" ? null : event.target.value,
-                      );
-                      setSelectedId(null);
-                    }}
-                    className="min-w-0 flex-1 appearance-none bg-transparent pr-4 text-[13px] font-semibold text-[#dedede] outline-none"
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#7c7c7c]">
+                  Board
+                </p>
+                {/* Replaced the native `<select>` (which rendered the
+                 *  OS's default light dropdown — un-themed, mismatched
+                 *  fonts, looked broken on dark canvas) with our
+                 *  shared `DropdownMenu` so the picker matches the
+                 *  rest of the workspace chrome (zinc-on-dark,
+                 *  rounded, hover tint). The trigger is the existing
+                 *  pill; the popover is portaled by Radix so it
+                 *  escapes the dialog's overflow clipping. */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex h-[30px] w-full items-center gap-2 rounded-[4px] bg-[#262626] px-2 text-left text-[13px] font-medium text-[#dedede] outline-none transition hover:bg-[#303030] focus-visible:bg-[#303030]"
+                    >
+                      <Layers className="h-[13px] w-[13px] shrink-0 text-[#9a9a9a]" />
+                      <span className="min-w-0 flex-1 truncate">
+                        {boardOptions.find(
+                          (board) => board.id === effectiveWorkspaceId,
+                        )?.name ?? "Main Board"}
+                      </span>
+                      <ChevronDown className="h-[13px] w-[13px] shrink-0 text-[#8d8d8d]" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    sideOffset={4}
+                    /* z-[1600] beats the dialog backdrop's z-[1500].
+                     *  The shared `DropdownMenuContent` defaults to
+                     *  `z-50`, which Radix's Portal still respects
+                     *  even though it appends to <body> — so without
+                     *  this override the popover opened behind the
+                     *  dialog and looked like the trigger did
+                     *  nothing on click. */
+                    className="z-[1600] min-w-[200px] max-h-[280px] overflow-y-auto rounded-[6px] bg-[#1c1c1c] p-1 shadow-[0_14px_30px_rgba(0,0,0,.55)]"
                   >
                     {boardOptions.length === 0 ? (
-                      <option value="__all__">Main Board</option>
+                      <DropdownMenuItem
+                        className="flex h-[30px] cursor-pointer items-center gap-2 rounded-[3px] px-2 text-[13px] text-[#dedede] focus:bg-[#2a2a2a]"
+                        onSelect={() => {
+                          setSelectedWorkspaceId(null);
+                          setSelectedId(null);
+                        }}
+                      >
+                        <Layers className="h-[13px] w-[13px] shrink-0 text-[#9a9a9a]" />
+                        Main Board
+                      </DropdownMenuItem>
                     ) : (
-                      boardOptions.map((board) => (
-                        <option key={board.id} value={board.id}>
-                          {board.name}
-                        </option>
-                      ))
+                      boardOptions.map((board) => {
+                        const isActive = board.id === effectiveWorkspaceId;
+                        return (
+                          <DropdownMenuItem
+                            key={board.id}
+                            className={cn(
+                              "flex h-[30px] cursor-pointer items-center gap-2 rounded-[3px] px-2 text-[13px] focus:bg-[#2a2a2a]",
+                              isActive
+                                ? "bg-yellow-500/15 text-yellow-100 focus:bg-yellow-500/20"
+                                : "text-[#dedede]",
+                            )}
+                            onSelect={() => {
+                              setSelectedWorkspaceId(board.id);
+                              setSelectedId(null);
+                            }}
+                          >
+                            <Layers
+                              className={cn(
+                                "h-[13px] w-[13px] shrink-0",
+                                isActive ? "text-yellow-300" : "text-[#9a9a9a]",
+                              )}
+                            />
+                            <span className="min-w-0 flex-1 truncate">{board.name}</span>
+                            {isActive && (
+                              <Check className="h-[13px] w-[13px] shrink-0 text-yellow-300" />
+                            )}
+                          </DropdownMenuItem>
+                        );
+                      })
                     )}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-2 h-[13px] w-[13px] text-[#8d8d8d]" />
-                </label>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div>
@@ -548,7 +766,7 @@ const AssetGridCard = ({
     className={cn(
       "group cursor-pointer overflow-hidden rounded-[6px] border bg-[#1b1b1b] transition",
       selected
-        ? "border-violet-500 shadow-[0_0_0_1px_rgba(168,85,247,.85)]"
+        ? "border-yellow-500 shadow-[0_0_0_1px_rgba(238,255,0,.85)]"
         : "border-[#3a3a3a] hover:border-[#666]",
     )}
   >
@@ -558,7 +776,7 @@ const AssetGridCard = ({
         <Play className="absolute bottom-2 left-2 h-[14px] w-[14px] text-white drop-shadow" />
       )}
       {selected && (
-        <div className="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-violet-500 text-white">
+        <div className="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-[#f4ff00] text-black">
           <Check className="h-3 w-3" />
         </div>
       )}
@@ -593,7 +811,7 @@ const AssetListRow = ({
     className={cn(
       "flex h-10 cursor-pointer items-center gap-3 rounded-[5px] border px-2 transition",
       selected
-        ? "border-violet-500 bg-violet-500/10"
+        ? "border-yellow-500 bg-yellow-500/10"
         : "border-transparent bg-[#1b1b1b] hover:border-[#444]",
     )}
   >

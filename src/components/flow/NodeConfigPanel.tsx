@@ -163,8 +163,8 @@ const KlingNodeConfig = ({ node, onUpdate }: NodeConfigPanelProps) => {
   return (
     <div className="space-y-3">
       {/* Model info */}
-      <div className="rounded-lg bg-violet-500/5 border border-violet-500/10 p-2.5">
-        <p className="text-[10px] text-violet-300/70 font-medium">{def.title}</p>
+      <div className="rounded-lg bg-yellow-500/5 border border-yellow-500/10 p-2.5">
+        <p className="text-[10px] text-yellow-300/70 font-medium">{def.title}</p>
         <p className="text-[9px] text-white/30 mt-0.5 font-mono">API: {def.apiModel} / {def.apiMode}</p>
       </div>
 

@@ -740,18 +740,10 @@ const WorkspaceDashboardInner = () => {
 
   const handleDeleteProject = (projectId: string) => {
     const state = useWorkspaceStore.getState();
-    if (state.projects.length <= 1) {
-      toast.error(t("workspace.toast.keep_one_project"));
-      return;
-    }
     const project = state.projects.find((item) => item.id === projectId);
     if (!project) return;
     if (project.ownerId && project.ownerId !== user?.id) {
       toast.error(t("workspace.toast.couldnt_delete_shared_project"));
-      return;
-    }
-    if (project.name === DEFAULT_PROJECT_NAME) {
-      toast.error(t("workspace.toast.keep_one_project"));
       return;
     }
     deleteProject(projectId);
@@ -871,6 +863,7 @@ const WorkspaceDashboardInner = () => {
             activeProjectId={activeProjectId}
             projects={projects}
             onSelectProject={setActiveProject}
+            onCreateProject={handleCreateProject}
             onOpenSidebar={() => setMobileSidebarOpen(true)}
             educationLockedStudent={educationLockedStudent}
           />
@@ -973,7 +966,7 @@ interface ProjectCardItem extends ProjectMeta {
 const PROJECT_COLOR_SWATCHES = [
   "hsl(35 90% 55%)",
   "hsl(210 90% 60%)",
-  "hsl(258 86% 64%)",
+  "hsl(64 100% 50%)",
   "hsl(156 72% 42%)",
   "hsl(38 92% 56%)",
 ];
@@ -1356,6 +1349,11 @@ const HomeView = ({
       onSection("spaces");
       return;
     }
+    if (!activeProjectId) {
+      toast.error(t("workspace.toast.create_project_first_gen"));
+      onCreateProject();
+      return;
+    }
     const { workspaceId, canvasId } = createWorkspace(t("workspace.spaces.untitled_space"), activeProjectId);
     if (user?.id) {
       const result = await persistNewWorkspaceBundle(workspaceId, canvasId, user.id);
@@ -1645,7 +1643,6 @@ const ProjectsCard = ({
         ) : (
           <ul className="flex flex-col gap-0.5">
             {projects.map((p) => {
-              const isProtected = p.name === DEFAULT_PROJECT_NAME;
               const canManage = !p.ownerId || p.ownerId === userId;
               return (
                 <li key={p.id} className="group/proj relative">
@@ -1682,7 +1679,7 @@ const ProjectsCard = ({
                            * take its slot — but only when this row is
                            * actually deletable. The protected project
                            * keeps its badge full-strength on hover. */
-                          canManage && !isProtected && "group-hover/proj:opacity-0",
+                          canManage && "group-hover/proj:opacity-0",
                         )}
                       >
                         {t("workspace.home.active")}
@@ -1691,7 +1688,7 @@ const ProjectsCard = ({
                       <Lock
                         className={cn(
                           "h-2.5 w-2.5 text-zinc-600 transition-opacity",
-                          canManage && !isProtected && "group-hover/proj:opacity-0",
+                          canManage && "group-hover/proj:opacity-0",
                         )}
                       />
                     )}
@@ -1706,7 +1703,7 @@ const ProjectsCard = ({
                    * Hidden entirely on the protected "Default project"
                    * row — that's the server-side fallback every user
                    * gets, and we never want it deleted. */}
-                  {canManage && !isProtected && (
+                  {canManage && (
                     <button
                       type="button"
                       onPointerDown={(e) => e.stopPropagation()}
@@ -2348,9 +2345,15 @@ const ProjectsManagerView = ({
     : "Owned by you";
 
   const handleNewSpace = async () => {
+    const projectId = selectedProject?.id ?? activeProjectId;
+    if (!projectId) {
+      toast.error(t("workspace.toast.create_project_first_gen"));
+      onCreateProject();
+      return;
+    }
     const { workspaceId, canvasId } = createWorkspace(
       t("workspace.spaces.untitled_space"),
-      selectedProject?.id ?? activeProjectId,
+      projectId,
     );
     if (user?.id) {
       const result = await persistNewWorkspaceBundle(workspaceId, canvasId, user.id);
@@ -2463,7 +2466,6 @@ const ProjectsManagerView = ({
               {projectCards.map((project) => {
                 const active = selectedProject?.id === project.id;
                 const canManage = !project.ownerId || project.ownerId === user?.id;
-                const protectedProject = project.name === DEFAULT_PROJECT_NAME;
                 const teamProject = Boolean(project.ownerId && project.ownerId !== user?.id);
                 return (
                   <li key={project.id} className="group/project relative">
@@ -2495,7 +2497,7 @@ const ProjectsManagerView = ({
                         </span>
                       )}
                     </button>
-                    {canManage && !protectedProject && (
+                    {canManage && (
                       <button
                         type="button"
                         onClick={(event) => {
@@ -2611,12 +2613,14 @@ const SpacesView = ({
   activeProjectId,
   projects,
   onSelectProject,
+  onCreateProject,
   onOpenSidebar,
   educationLockedStudent = false,
 }: {
   activeProjectId: string | null;
   projects: ProjectMeta[];
   onSelectProject: (id: string | null) => void;
+  onCreateProject: () => void;
   onOpenSidebar?: () => void;
   educationLockedStudent?: boolean;
 }) => {
@@ -2701,6 +2705,11 @@ const SpacesView = ({
   const handleNew = async () => {
     if (educationLockedStudent) {
       toast.error(i18n("workspace.home.scanClassQrOrOpen"));
+      return;
+    }
+    if (!activeProjectId) {
+      toast.error(t("workspace.toast.create_project_first_gen"));
+      onCreateProject();
       return;
     }
     const { workspaceId, canvasId } = createWorkspace(t("workspace.spaces.untitled_space"), activeProjectId);
@@ -3495,7 +3504,7 @@ function buildMinimapDataUri(
         </pattern>
       </defs>
       <rect x="${vbX}" y="${vbY}" width="${vbW}" height="${vbH}" fill="url(#${dotsId})" />
-      <g stroke="hsl(258 60% 65%)" stroke-opacity="0.55" stroke-width="${strokeW}" fill="none">${edgeSvg}</g>
+      <g stroke="hsl(64 100% 60%)" stroke-opacity="0.55" stroke-width="${strokeW}" fill="none">${edgeSvg}</g>
       <g>${nodeSvg}</g>
     </svg>`;
 

@@ -17,6 +17,10 @@ import {
   Music,
   Box,
   Loader2,
+  Eye,
+  Download,
+  Copy,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFreshSignedUrl } from "./useFreshSignedUrl";
@@ -25,7 +29,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { AudioPlayButton } from "./AudioPlayButton";
 import { downloadFromUrl } from "./downloadAsset";
 import MediaContextMenu from "./MediaContextMenu";
-import { buildMediaMenuItems } from "./mediaMenuItems";
+import type { MediaContextMenuItem } from "./mediaMenuItems";
 import { useMediaContextMenu } from "./useMediaContextMenu";
 import NodeQuickActionRail from "./NodeQuickActionRail";
 
@@ -68,7 +72,7 @@ export type ReferenceRole =
 
 const PORT_COLOR: Record<AssetNodeData["fieldType"], string> = {
   image: "hsl(160 84% 39%)",
-  video: "hsl(258 90% 66%)",
+  video: "hsl(64 100% 50%)",
   audio: "hsl(43 96% 56%)",
   model3d: "hsl(43 96% 56%)",
 };
@@ -200,13 +204,49 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
     : d.fieldType === "model3d" ? Box
     : ImageIcon;
   const downloadableUrl = livePreviewUrl ?? d.previewUrl;
-  const contextMenuItems = buildMediaMenuItems(i18n, {
-    onDownload: downloadableUrl
-      ? () => void downloadFromUrl(downloadableUrl, d.fileName || d.label || "asset")
-      : undefined,
-    onDuplicate: onDuplicateNode,
-    onDelete: onDeleteNode,
-  });
+  /* Preview dispatches `workspace-open-node-preview` (handled in
+   *  WorkspaceCanvas) instead of wiring a prop drill — same pattern
+   *  double-click already uses. Move/Copy-to-Board rows are dropped
+   *  here; they ship disabled with no implementation behind them. */
+  const contextMenuItems: MediaContextMenuItem[] = [
+    {
+      key: "preview",
+      label: i18n("workspace.mediaMenu.preview"),
+      icon: Eye,
+      onSelect: () => {
+        window.dispatchEvent(
+          new CustomEvent("workspace-open-node-preview", {
+            detail: { nodeId: id },
+          }),
+        );
+      },
+    },
+    {
+      key: "download",
+      label: i18n("workspace.mediaMenu.download"),
+      icon: Download,
+      disabled: !downloadableUrl,
+      onSelect: () => {
+        if (downloadableUrl) {
+          void downloadFromUrl(downloadableUrl, d.fileName || d.label || "asset");
+        }
+      },
+    },
+    {
+      key: "duplicate",
+      label: i18n("workspace.mediaMenu.duplicate"),
+      icon: Copy,
+      onSelect: onDuplicateNode,
+    },
+    {
+      key: "delete",
+      label: i18n("workspace.mediaMenu.delete"),
+      icon: Trash2,
+      separatorBefore: true,
+      danger: true,
+      onSelect: onDeleteNode,
+    },
+  ];
   // Title icon stays neutral grey across every node type — team
   // feedback was that a multi-coloured canvas was too noisy. The
   // glyph alone (Image vs Film vs Music vs Box) is what now signals
@@ -237,7 +277,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
       <NodeQuickActionRail
         visible={selected || isHovered}
         selected={selected}
-        onDelete={selected ? onDeleteNode : undefined}
+        onDelete={onDeleteNode}
         nodeId={id}
         mediaKind={
           d.uploading
@@ -290,6 +330,23 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
             "group relative bg-black ws-preview-zone",
             !d.uploading && d.previewUrl && "cursor-pointer",
           )}
+          onDoubleClick={(event) => {
+            const target = event.target as HTMLElement | null;
+            if (
+              target?.closest?.(
+                'button, input, textarea, select, [contenteditable="true"]',
+              )
+            ) {
+              return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            window.dispatchEvent(
+              new CustomEvent("workspace-open-node-preview", {
+                detail: { nodeId: id },
+              }),
+            );
+          }}
           onContextMenu={ctxMenu.openAt}
         >
         {livePreviewUrl ? (

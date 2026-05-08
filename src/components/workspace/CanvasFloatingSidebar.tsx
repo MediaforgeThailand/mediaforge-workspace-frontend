@@ -20,6 +20,7 @@
 import { useEffect, useState } from "react";
 import {
   Plus,
+  Images,
   MousePointer2,
   Hand,
   Scissors,
@@ -48,6 +49,7 @@ interface Props {
 
 type ToolBtnLabelKey =
   | "workspace.tools.add_node"
+  | "workspace.tools.assets"
   | "workspace.tools.select"
   | "workspace.tools.hand"
   | "workspace.tools.cut_connector"
@@ -57,7 +59,7 @@ type ToolBtnLabelKey =
   | "workspace.tools.settings_shortcuts";
 
 interface ToolButton {
-  id: CanvasTool | "add" | "undo" | "redo" | "settings";
+  id: CanvasTool | "add" | "assets" | "undo" | "redo" | "settings";
   labelKey: ToolBtnLabelKey;
   shortcut?: string;
   icon: LucideIcon;
@@ -70,6 +72,13 @@ interface ToolButton {
 }
 
 const BUTTONS: ToolButton[] = [
+  /* Asset library shortcut — sits above the "+" button so it reads
+   *  as a one-click way into the user's existing media (uploaded
+   *  images, generated outputs, stock). The dialog is owned by
+   *  WorkspaceCanvasMediaBridges; we just dispatch the existing
+   *  `workspace-open-all-assets` window event the right-click
+   *  Media menu already uses. */
+  { id: "assets", labelKey: "workspace.tools.assets", icon: Images },
   { id: "add", labelKey: "workspace.tools.add_node", shortcut: "N", icon: Plus },
   { id: "select", labelKey: "workspace.tools.select", shortcut: "V", icon: MousePointer2, isMode: true, divider: true },
   { id: "hand", labelKey: "workspace.tools.hand", shortcut: "H", icon: Hand, isMode: true },
@@ -164,6 +173,16 @@ const CanvasFloatingSidebar = ({ onAddNode, onOpenSettings }: Props) => {
       // happened near the right edge of the viewport.
       const rect = e.currentTarget.getBoundingClientRect();
       onAddNode({ x: rect.right + 8, y: rect.top });
+      return;
+    }
+    if (b.id === "assets") {
+      /* Asset library uses the same window-event bridge as the
+       *  right-click Media menu — `WorkspaceCanvasMediaBridges`
+       *  listens for `workspace-open-all-assets` and pops the
+       *  AllAssetsDialog. Going through the event keeps the dialog
+       *  state in one place and avoids prop-drilling another open
+       *  callback through Canvas.tsx → CanvasFloatingSidebar. */
+      window.dispatchEvent(new CustomEvent("workspace-open-all-assets"));
       return;
     }
     if (b.id === "undo") return undo();

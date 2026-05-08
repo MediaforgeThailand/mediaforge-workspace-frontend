@@ -54,12 +54,8 @@ import { supabase } from "@/integrations/supabase/client";
 import OrgCreditBadge from "@/components/OrgCreditBadge";
 import ActiveClassPicker from "@/components/ActiveClassPicker";
 import AllAssetsDialog from "@/components/workspace/AllAssetsDialog";
+import { DEFAULT_BRAND_LOGO, DEFAULT_BRAND_NAME } from "@/components/workspace/brandAssets";
 import type { ProjectMeta } from "@/store/useWorkspaceStore";
-
-// Default brand (no tenant subdomain match). Centralised so the
-// org-admin branding preview can re-use the exact same fallback.
-export const DEFAULT_BRAND_LOGO = "/mascot-logo.png";
-export const DEFAULT_BRAND_NAME = "Workspace";
 
 export type SectionKey =
   | "home"
@@ -199,6 +195,7 @@ export default function WorkspaceSidebar({
   const branding = useOrgBranding();
   const brandLogo = branding?.logoUrl ?? DEFAULT_BRAND_LOGO;
   const brandName = branding?.shortName ?? DEFAULT_BRAND_NAME;
+  const usingDefaultBrand = !branding?.logoUrl;
   const projectOptions = [...projects].sort(
     (a, b) =>
       Number(b.id === activeProjectId) - Number(a.id === activeProjectId) ||
@@ -226,9 +223,9 @@ export default function WorkspaceSidebar({
         className="mf-readable ws-scroll-hide flex h-full w-[230px] flex-col gap-[4px] overflow-y-auto rounded-[20px] border border-transparent px-[4px] py-[12px] text-[#b0b4ba]"
         style={{
           background:
-            "linear-gradient(#000, #000) padding-box, linear-gradient(145deg, rgba(255,255,255,.28), rgba(155,77,224,.22) 36%, rgba(91,42,140,.16) 70%, rgba(0,0,0,.2)) border-box",
+            "linear-gradient(#000, #000) padding-box, linear-gradient(145deg, rgba(255,255,255,.28), rgba(238,255,0,.24) 38%, rgba(244,255,0,.08) 72%, rgba(0,0,0,.2)) border-box",
           boxShadow:
-            "inset 0 1px 0 rgba(255,255,255,.06), inset 0 -1px 0 rgba(155,77,224,.06), 0 0 24px -20px rgba(155,77,224,.8), 0 0 38px -32px rgba(91,42,140,.85)",
+            "inset 0 1px 0 rgba(255,255,255,.06), inset 0 -1px 0 rgba(238,255,0,.06), 0 0 24px -20px rgba(238,255,0,.8), 0 0 38px -32px rgba(244,255,0,.48)",
         }}
       >
       {/* ── Brand row — PSC : Digital Media ──────────────────────
@@ -242,15 +239,18 @@ export default function WorkspaceSidebar({
           onClick={() => navigate("/app/workspace")}
           className="flex min-w-0 items-center gap-[8px] text-[18px] font-bold text-white transition-colors hover:text-white"
         >
-          {/* Brand logo — defaults to the workspace mascot, swapped
+          {/* Brand logo — defaults to the MediaForge mark, swapped
            *  to the tenant org logo when the user is on a claimed
-           *  subdomain (e.g. dmd.mediaforge.co → DMD logo). The
-           *  square slot uses object-contain so wide wordmark logos
-           *  don't get squashed. */}
+           *  subdomain (e.g. dmd.mediaforge.co → DMD logo). */}
           <img
             src={brandLogo}
             alt={brandName}
-            className="h-[26px] w-[26px] shrink-0 select-none rounded-full bg-white object-contain"
+            className={cn(
+              "shrink-0 select-none object-contain",
+              usingDefaultBrand
+                ? "h-[28px] w-[42px]"
+                : "h-[26px] w-[26px] rounded-full bg-white",
+            )}
             draggable={false}
           />
           <span className="truncate leading-tight">{brandName}</span>
@@ -261,7 +261,7 @@ export default function WorkspaceSidebar({
         <button
           type="button"
           onClick={onCreate}
-          className="mx-[8px] mb-[6px] flex h-[36px] shrink-0 items-center justify-center gap-[8px] rounded-xl bg-[linear-gradient(135deg,rgba(155,77,224,.92),rgba(199,125,255,.7),rgba(91,42,140,.92))] px-[12px] text-[12px] font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,.22),inset_0_-5px_12px_rgba(91,42,140,.45),0_10px_24px_-18px_rgba(199,125,255,.95)] transition hover:brightness-110 active:translate-y-px"
+          className="mx-[8px] mb-[6px] flex h-[36px] shrink-0 items-center justify-center gap-[8px] rounded-xl bg-[linear-gradient(135deg,rgba(244,255,0,.98),rgba(231,255,18,.86),rgba(183,212,0,.92))] px-[12px] text-[12px] font-semibold text-[#070707] shadow-[inset_0_1px_0_rgba(255,255,255,.32),inset_0_-5px_12px_rgba(79,90,0,.26),0_10px_24px_-18px_rgba(244,255,0,.95)] transition hover:brightness-110 active:translate-y-px"
           title={t("workspace.standalone.create_project")}
         >
           <Plus className="h-[15px] w-[15px] shrink-0" strokeWidth={2.2} />
@@ -510,7 +510,7 @@ const NavLink = ({
       compact && variant === "tool" && "mx-0 flex-1 gap-[6px] px-[6px] text-[11px]",
       compact && variant === "list" && "mx-[12px]",
       active && variant === "tool"
-        ? "rounded-[10px] border border-[#b98ccc] bg-[#0b0c0d] text-white"
+        ? "rounded-[10px] border border-[#f4ff00]/45 bg-[#0b0c0d] text-white"
         : active
           ? "text-white"
           : variant === "tool"
@@ -522,7 +522,7 @@ const NavLink = ({
       <span className="pointer-events-none absolute inset-0 rounded-lg bg-[linear-gradient(170deg,rgba(211,237,248,.18)_0%,rgba(211,237,248,0)_20%,rgba(211,237,248,0)_80%,rgba(211,237,248,.14)_100%)] transition-opacity group-hover:opacity-0" />
     )}
     {variant === "tool" && active && (
-      <span className="pointer-events-none absolute inset-[-1px] rounded-[10px] shadow-[inset_0_-3px_8px_0_#9050a0,inset_0_2px_8px_0_rgba(255,255,255,.32),0_0_12px_rgba(96,48,128,.62)]" />
+      <span className="pointer-events-none absolute inset-[-1px] rounded-[10px] shadow-[inset_0_-3px_8px_0_rgba(244,255,0,.34),inset_0_2px_8px_0_rgba(255,255,255,.28),0_0_12px_rgba(244,255,0,.34)]" />
     )}
     <Icon className="relative h-[16px] w-[16px] shrink-0" />
     <span className="relative min-w-0 truncate">{label}</span>

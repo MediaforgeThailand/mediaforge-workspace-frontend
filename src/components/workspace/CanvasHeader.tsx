@@ -37,6 +37,7 @@ import ShareDialog from "@/components/workspace/ShareDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { CollaborationPresencePill } from "@/components/workspace/CanvasCollaborationOverlay";
 import OrgCreditBadge from "@/components/OrgCreditBadge";
+import { DEFAULT_BRAND_LOGO, DEFAULT_BRAND_NAME } from "@/components/workspace/brandAssets";
 
 const CanvasHeader = () => {
   const { t } = useLanguage();
@@ -86,6 +87,13 @@ const CanvasHeader = () => {
         >
           <ChevronLeft className="h-[16px] w-[16px]" />
         </Link>
+
+        <img
+          src={DEFAULT_BRAND_LOGO}
+          alt={DEFAULT_BRAND_NAME}
+          className="h-[24px] w-[36px] shrink-0 select-none object-contain"
+          draggable={false}
+        />
 
         {/* Project chip — coloured square + label */}
         <button

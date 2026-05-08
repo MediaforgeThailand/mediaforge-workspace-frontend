@@ -35,7 +35,7 @@ const buttonVariants = cva(
           "text-foreground hover:bg-white/[0.06]",
         link: "text-primary underline-offset-4 hover:underline",
         gradient:
-          "bg-gradient-to-b from-violet-500 to-violet-600 text-white shadow-[0_4px_14px_-4px_rgba(124,58,237,0.55)] hover:from-violet-400 hover:to-violet-500",
+          "bg-gradient-to-b from-yellow-300 to-yellow-500 text-black shadow-[0_4px_14px_-4px_rgba(238,255,0,0.55)] hover:from-yellow-200 hover:to-yellow-400",
       },
       size: {
         default: "h-9 px-4",

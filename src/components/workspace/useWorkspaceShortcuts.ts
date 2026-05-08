@@ -10,6 +10,7 @@
  *     Ctrl+Shift+V            paste without connections
  *     Ctrl+D                  duplicate
  *     Ctrl+Shift+D            duplicate without connections
+ *     Ctrl+G                  group selected nodes
  *     Ctrl+A                  select all
  *     Ctrl+Z / Ctrl+Shift+Z   undo / redo (best-effort, history is shallow)
  *
@@ -332,6 +333,11 @@ export function useWorkspaceShortcuts({
         if (lower === "d") {
           e.preventDefault();
           duplicateSelection(!shift);
+          return;
+        }
+        if (lower === "g") {
+          e.preventDefault();
+          useWorkspaceStore.getState().groupSelectedNodes();
           return;
         }
         if (lower === "0") {
