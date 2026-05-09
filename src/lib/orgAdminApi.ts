@@ -260,7 +260,14 @@ export async function enrollInClass(code: string, studentCode?: string): Promise
   project_id?: string;
   canvas_id?: string;
 }> {
-  const { data: sess } = await supabase.auth.getSession();
+  const sessionTimeout = new Promise<null>((resolve) => {
+    window.setTimeout(() => resolve(null), 8_000);
+  });
+  const sess = await Promise.race([
+    supabase.auth.getSession().then(({ data }) => data),
+    sessionTimeout,
+  ]);
+  if (!sess) return { ok: false, error: "auth_session_timeout" };
   const token = sess?.session?.access_token;
   if (!token) return { ok: false, error: "not_signed_in" };
 

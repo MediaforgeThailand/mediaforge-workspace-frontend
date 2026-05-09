@@ -66,11 +66,20 @@ export default function ClassEnroll() {
     redeemStarted.current = true;
 
     let cancelled = false;
+    let timedOut = false;
+    const failsafe = window.setTimeout(() => {
+      if (!cancelled) {
+        timedOut = true;
+        setStatus({ phase: "error", error: "enrollment_timeout" });
+      }
+    }, 30_000);
+
     const redeem = async () => {
       try {
         setStatus({ phase: "redeeming" });
         const res = await enrollInClass(code);
-        if (cancelled) return;
+        if (cancelled || timedOut) return;
+        window.clearTimeout(failsafe);
 
         if (!res.ok) {
           setStatus({ phase: "error", error: res.error ?? "unknown_error" });
@@ -100,6 +109,7 @@ export default function ClassEnroll() {
           redirectToWorkspace(res.workspace_id, res.already_enrolled ? 1400 : 1800);
         }
       } catch (error) {
+        window.clearTimeout(failsafe);
         if (!cancelled) {
           setStatus({
             phase: "error",
@@ -112,6 +122,7 @@ export default function ClassEnroll() {
     void redeem();
     return () => {
       cancelled = true;
+      window.clearTimeout(failsafe);
     };
   }, [authLoading, code, navigate, qc, refreshProfile, retryNonce, user]);
 
@@ -133,6 +144,8 @@ export default function ClassEnroll() {
         return "This class does not have enough pool credits for this QR code. Ask your teacher to add credits to the class pool.";
       case "not_signed_in":
         return i18n("classEnroll.error.notSignedIn");
+      case "auth_session_timeout":
+        return "Could not read your signed-in session. Please refresh this page or sign in again.";
       case "invalid_code":
         return i18n("classEnroll.error.invalidCode");
       case "student_code_required":
