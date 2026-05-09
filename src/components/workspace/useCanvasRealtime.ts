@@ -97,8 +97,22 @@ function positionsFingerprint(nodes: WorkspaceNode[]): string {
   );
 }
 
+function stableJson(value: unknown): string {
+  const normalize = (item: unknown): unknown => {
+    if (Array.isArray(item)) return item.map((entry) => normalize(entry));
+    if (!item || typeof item !== "object") return item;
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(item as Record<string, unknown>).sort()) {
+      const normalized = normalize((item as Record<string, unknown>)[key]);
+      if (normalized !== undefined) out[key] = normalized;
+    }
+    return out;
+  };
+  return JSON.stringify(normalize(value));
+}
+
 function graphFingerprint(graph: CanvasGraph): string {
-  return JSON.stringify({
+  return stableJson({
     id: graph.id,
     nodes: graph.nodes,
     edges: graph.edges,
@@ -214,7 +228,6 @@ export function useCanvasRealtime() {
       },
       (payload) => {
         const row = payload.new as Record<string, unknown>;
-        if (row.updated_by === user.id) return;
         const graph = toGraph(row);
         if (!graph) return;
         const currentGraph = useWorkspaceStore.getState().graphs[canvasId];

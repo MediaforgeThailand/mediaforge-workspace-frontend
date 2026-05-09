@@ -169,7 +169,6 @@ export function useCanvasAutosave(): SaveState {
           setState("saved");
         }
       });
-      flushSaveOnUnload(c, user.id);
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
