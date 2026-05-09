@@ -48,7 +48,7 @@ export default function ClassEnroll() {
   const { user, refreshProfile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const redeemStarted = useRef(false);
+  const redeemStarted = useRef<string | null>(null);
 
   const [studentCode, setStudentCode] = useState("");
   const [retryNonce, setRetryNonce] = useState(0);
@@ -62,8 +62,10 @@ export default function ClassEnroll() {
   };
 
   useEffect(() => {
-    if (authLoading || !user || !code || redeemStarted.current) return;
-    redeemStarted.current = true;
+    if (authLoading || !user?.id || !code) return;
+    const redeemKey = `${user.id}:${code}:${retryNonce}`;
+    if (redeemStarted.current === redeemKey) return;
+    redeemStarted.current = redeemKey;
 
     let cancelled = false;
     let timedOut = false;
@@ -124,7 +126,7 @@ export default function ClassEnroll() {
       cancelled = true;
       window.clearTimeout(failsafe);
     };
-  }, [authLoading, code, navigate, qc, refreshProfile, retryNonce, user]);
+  }, [authLoading, code, retryNonce, user?.id]);
 
   const errorLabel = (error: string) => {
     switch (error) {
@@ -297,7 +299,7 @@ export default function ClassEnroll() {
               <Button
                 variant="outline"
                 onClick={() => {
-                  redeemStarted.current = false;
+                  redeemStarted.current = null;
                   setStatus({ phase: "idle" });
                   setRetryNonce((value) => value + 1);
                 }}
