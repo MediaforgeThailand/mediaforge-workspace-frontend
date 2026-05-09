@@ -154,6 +154,8 @@ export default function ClassEnroll() {
         return i18n("classEnroll.error.studentCodeRequired");
       case "email_domain_not_allowed":
         return "Use your college email account to join this class. Sign out and sign in again with the registered school domain.";
+      case "school_domain_not_configured":
+        return "This class is missing a verified school email domain. Ask the university admin or MediaForge support to add the institution domain before students join.";
       case "enrollment_timeout":
         return "Joining this class took too long. Please check your connection and try again.";
       case "enrollment_network_error":
