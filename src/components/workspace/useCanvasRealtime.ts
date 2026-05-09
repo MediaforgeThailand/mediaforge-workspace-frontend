@@ -44,6 +44,7 @@ type PatchPayload =
 
 const BROADCAST_EVENT = "canvas_patch";
 const CURSOR_EVENT = "canvas_cursor";
+const SELF_UPDATE_ACTIVE_EDIT_IGNORE_MS = 15_000;
 
 type CursorPayload = CursorBroadcast & {
   clientId: string;
@@ -201,6 +202,7 @@ export function useCanvasRealtime() {
   const lastGraphRef = useRef<CanvasGraph | null>(null);
   const remoteApplyingRef = useRef(false);
   const pendingTimerRef = useRef<number | null>(null);
+  const lastLocalEditAtRef = useRef(0);
   const clientId = useMemo(tabClientId, []);
   const localCollaborator = useMemo(
     () => (user ? userCollaborator(user, clientId) : null),
@@ -232,6 +234,12 @@ export function useCanvasRealtime() {
         if (!graph) return;
         const currentGraph = useWorkspaceStore.getState().graphs[canvasId];
         if (currentGraph && graphFingerprint(currentGraph) === graphFingerprint(graph)) return;
+        if (
+          row.updated_by === user.id &&
+          Date.now() - lastLocalEditAtRef.current < SELF_UPDATE_ACTIVE_EDIT_IGNORE_MS
+        ) {
+          return;
+        }
         remoteApplyingRef.current = true;
         replaceCanvasGraph(graph);
       },
@@ -398,6 +406,10 @@ export function useCanvasRealtime() {
       remoteApplyingRef.current = false;
       lastGraphRef.current = current;
       return;
+    }
+
+    if (graphFingerprint(previous) !== graphFingerprint(current)) {
+      lastLocalEditAtRef.current = Date.now();
     }
 
     const channel = collaborationChannelRef.current;
