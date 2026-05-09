@@ -23,7 +23,7 @@
  * Zustand's local persist still saves their work locally.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   useWorkspaceStore,
@@ -53,16 +53,42 @@ const MAX_WAIT_SAVE_MS = 30_000;
 const HIDDEN_SAVE_MS = 2_000;
 const SAVED_FLASH_MS = 1500;
 
+function stripEphemeralNodeState(nodes: CanvasGraph["nodes"]): CanvasGraph["nodes"] {
+  return nodes.map((node) => {
+    const {
+      selected: _selected,
+      dragging: _dragging,
+      resizing: _resizing,
+      positionAbsolute: _positionAbsolute,
+      ...persisted
+    } = node as CanvasGraph["nodes"][number] & {
+      selected?: boolean;
+      dragging?: boolean;
+      resizing?: boolean;
+      positionAbsolute?: unknown;
+    };
+    return persisted as CanvasGraph["nodes"][number];
+  }) as CanvasGraph["nodes"];
+}
+
+function toPersistableGraph(g: CanvasGraph): CanvasGraph {
+  return {
+    ...g,
+    nodes: stripEphemeralNodeState(g.nodes),
+  };
+}
+
 /** Fingerprint a graph for change-detection — stable JSON of the
  *  bits we actually persist. Avoids saving when only ephemeral
  *  selection state changed. */
 function fingerprint(g: CanvasGraph): string {
+  const persistable = toPersistableGraph(g);
   return JSON.stringify({
-    id: g.id,
-    name: g.name,
-    nodes: g.nodes,
-    edges: g.edges,
-    viewport: g.viewport ?? null,
+    id: persistable.id,
+    name: persistable.name,
+    nodes: persistable.nodes,
+    edges: persistable.edges,
+    viewport: persistable.viewport ?? null,
   });
 }
 
@@ -115,16 +141,18 @@ export function useCanvasAutosave(): SaveState {
     flashRef.current = null;
   };
 
-  const flushLatestOnUnload = () => {
-    const graph = currentRef.current;
-    const userId = userIdRef.current;
+  const flushGraphOnUnload = useCallback((graph: CanvasGraph | null | undefined, userId = userIdRef.current) => {
     if (!graph?.id || !userId || !canPersistRef.current) return;
     const fp = fingerprint(graph);
     if (fp === lastSavedRef.current.get(graph.id)) return;
-    clearIdleTimer();
-    clearMaxTimer();
-    flushSaveOnUnload(graph, userId);
-  };
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+    timerRef.current = null;
+    if (maxTimerRef.current) window.clearTimeout(maxTimerRef.current);
+    maxTimerRef.current = null;
+    maxTimerCanvasRef.current = null;
+    flushSaveOnUnload(toPersistableGraph(graph), userId);
+    lastSavedRef.current.set(graph.id, fp);
+  }, []);
 
   scheduleSaveRef.current = (delayMs: number, reason: string) => {
     clearIdleTimer();
@@ -151,7 +179,7 @@ export function useCanvasAutosave(): SaveState {
       return;
     }
 
-    const saveGraph = graph;
+    const saveGraph = toPersistableGraph(graph);
     const saveFp = fp;
     inFlightRef.current = true;
     rerunAfterInFlightRef.current = false;
@@ -166,7 +194,7 @@ export function useCanvasAutosave(): SaveState {
 
       if (res.ok) {
         lastSavedRef.current.set(saveGraph.id, saveFp);
-        if (latestFp === saveFp && !rerunAfterInFlightRef.current) {
+        if (latestFp === saveFp) {
           dirtySinceRef.current.delete(saveGraph.id);
           clearMaxTimer();
           clearFlashTimer();
@@ -218,6 +246,14 @@ export function useCanvasAutosave(): SaveState {
     }
     const fp = fingerprint(current);
     const prev = lastSavedRef.current.get(current.id);
+    if (prev === undefined && current.ownerId) {
+      lastSavedRef.current.set(current.id, fp);
+      dirtySinceRef.current.delete(current.id);
+      clearIdleTimer();
+      clearMaxTimer();
+      setState("idle");
+      return;
+    }
     if (fp === prev) {
       dirtySinceRef.current.delete(current.id);
       clearIdleTimer();
@@ -258,19 +294,27 @@ export function useCanvasAutosave(): SaveState {
    * hasn't fired yet. We use fetch keepalive (handled in
    * flushSaveOnUnload) to send the final state on the way out. */
   useEffect(() => {
-    if (!user?.id) return;
+    const canvasId = current?.id;
+    const effectUserId = user?.id;
+    if (!canvasId || !effectUserId) return;
     if (!canPersist) return; // viewer / editor — no server flushes
+    const flushEffectCanvas = () => {
+      const graph =
+        useWorkspaceStore.getState().graphs[canvasId] ??
+        (currentRef.current?.id === canvasId ? currentRef.current : null);
+      flushGraphOnUnload(graph, effectUserId);
+    };
     const onUnload = () => {
-      flushLatestOnUnload();
+      flushEffectCanvas();
     };
     window.addEventListener("beforeunload", onUnload);
     window.addEventListener("pagehide", onUnload);
     return () => {
       window.removeEventListener("beforeunload", onUnload);
       window.removeEventListener("pagehide", onUnload);
-      flushLatestOnUnload();
+      flushEffectCanvas();
     };
-  }, [user?.id, canPersist]);
+  }, [current?.id, user?.id, canPersist, flushGraphOnUnload]);
 
   /* ── Visibility flush — tab blur saves shortly after hiding ──── */
   useEffect(() => {

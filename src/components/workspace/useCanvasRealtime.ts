@@ -44,7 +44,6 @@ type PatchPayload =
 
 const BROADCAST_EVENT = "canvas_patch";
 const CURSOR_EVENT = "canvas_cursor";
-const SELF_UPDATE_ACTIVE_EDIT_IGNORE_MS = 15_000;
 
 type CursorPayload = CursorBroadcast & {
   clientId: string;
@@ -112,10 +111,28 @@ function stableJson(value: unknown): string {
   return JSON.stringify(normalize(value));
 }
 
+function stripEphemeralNodeState(nodes: WorkspaceNode[]): WorkspaceNode[] {
+  return nodes.map((node) => {
+    const {
+      selected: _selected,
+      dragging: _dragging,
+      resizing: _resizing,
+      positionAbsolute: _positionAbsolute,
+      ...persisted
+    } = node as WorkspaceNode & {
+      positionAbsolute?: XYPosition;
+      selected?: boolean;
+      dragging?: boolean;
+      resizing?: boolean;
+    };
+    return persisted as WorkspaceNode;
+  });
+}
+
 function graphFingerprint(graph: CanvasGraph): string {
   return stableJson({
     id: graph.id,
-    nodes: graph.nodes,
+    nodes: stripEphemeralNodeState(graph.nodes),
     edges: graph.edges,
     viewport: graph.viewport ?? null,
   });
@@ -234,10 +251,7 @@ export function useCanvasRealtime() {
         if (!graph) return;
         const currentGraph = useWorkspaceStore.getState().graphs[canvasId];
         if (currentGraph && graphFingerprint(currentGraph) === graphFingerprint(graph)) return;
-        if (
-          row.updated_by === user.id &&
-          Date.now() - lastLocalEditAtRef.current < SELF_UPDATE_ACTIVE_EDIT_IGNORE_MS
-        ) {
+        if (row.updated_by === user.id && graph.updatedAt <= lastLocalEditAtRef.current) {
           return;
         }
         remoteApplyingRef.current = true;
