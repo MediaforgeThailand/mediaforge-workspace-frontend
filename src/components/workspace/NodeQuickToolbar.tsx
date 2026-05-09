@@ -625,7 +625,7 @@ function ToolbarBtn({
       className={cn(
         "flex h-11 w-11 shrink-0 items-center justify-center rounded transition-colors lg:h-7 lg:w-7",
         primary
-          ? "bg-[linear-gradient(135deg,#f4ff00_0%,#e7ff12_54%,#b7d400_100%)] text-[#070707] shadow-[0_0_0_1px_rgba(244,255,0,.38),0_10px_22px_rgba(238,255,0,.18)] hover:bg-[linear-gradient(135deg,#fbff58_0%,#f0ff18_54%,#cae900_100%)] hover:text-black"
+          ? "ci-gloss-button rounded-full"
           : danger
             ? "text-zinc-400 hover:bg-rose-500/15 hover:text-rose-300"
             : "text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100",

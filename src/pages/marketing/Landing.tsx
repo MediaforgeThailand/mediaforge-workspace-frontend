@@ -109,7 +109,7 @@ function Hero() {
         <div className="reveal mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
           <Link
             to="/auth"
-            className="inline-flex h-[50px] w-full items-center justify-center gap-2 rounded-full bg-[var(--brand-primary)] px-7 text-[15px] font-semibold text-white shadow-[0_12px_32px_-10px_rgba(238,255,0,.8)] transition hover:scale-[1.03] hover:bg-[var(--brand-hover)] sm:w-auto"
+            className="ci-gloss-button inline-flex h-[50px] w-full items-center justify-center gap-2 rounded-full px-7 text-[15px] font-semibold transition hover:scale-[1.03] sm:w-auto"
           >
             Start for Free
             <ArrowRight className="h-4 w-4" aria-hidden="true" />

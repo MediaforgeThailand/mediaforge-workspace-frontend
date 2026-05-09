@@ -25,6 +25,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
 const CACHE = new Map<string, { url: string; signedAt: number }>();
@@ -63,6 +64,8 @@ export function useFreshSignedUrl(
   input: string | null | undefined,
   transform?: FreshSignedUrlTransform,
 ): string | null {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const initial = typeof input === "string" && input.length > 0 ? input : null;
   const transformKey = useMemo(
     () => (transform ? JSON.stringify(transform) : ""),
@@ -83,6 +86,17 @@ export function useFreshSignedUrl(
 
     const parsed = parseStorageUrl(initial);
     if (!parsed) return; // not a Supabase URL, leave the caller's URL alone
+    if (!userId) return; // no JWT yet, so a private re-sign cannot succeed
+
+    const ownUserAsset =
+      parsed.bucket === "user_assets" &&
+      (parsed.path.startsWith(`${userId}/`) || parsed.path.startsWith(`tts/${userId}/`));
+    const ownAiMedia =
+      parsed.bucket === "ai-media" &&
+      (parsed.path.startsWith(`${userId}/`) || parsed.path.startsWith(`tripo3d-mirror/${userId}/`));
+    if ((parsed.bucket === "user_assets" && !ownUserAsset) || (parsed.bucket === "ai-media" && !ownAiMedia)) {
+      return;
+    }
 
     // Cache hit (and still fresh) → use it without a round-trip.
     const cacheKey = `${parsed.bucket}:${parsed.path}:${transformKey}`;
@@ -134,7 +148,7 @@ export function useFreshSignedUrl(
     return () => {
       cancelled = true;
     };
-  }, [initial, normalizedTransform, transformKey]);
+  }, [initial, normalizedTransform, transformKey, userId]);
 
   return url;
 }

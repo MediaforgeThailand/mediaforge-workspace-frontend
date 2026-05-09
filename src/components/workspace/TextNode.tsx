@@ -18,7 +18,7 @@
 
 import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { type NodeProps, useReactFlow } from "@xyflow/react";
-import { AtSign, Loader2, Sparkles, Type } from "lucide-react";
+import { AtSign, Loader2, Play, Type } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import PromptMentionTextarea from "@/components/flow/nodes/PromptMentionTextarea";
@@ -60,7 +60,7 @@ const MAX_H = 800;
  *  This subtraction lets the textarea fill the resized box exactly,
  *  with the inline-style cap from PromptMentionTextarea handling
  *  scroll when content exceeds visible height. */
-const BODY_CHROME_H = 72;
+const BODY_CHROME_H = 58;
 const PROMPT_OPTIMIZER_FUNCTION = "workspace-chat";
 const PROMPT_OPTIMIZER_MODEL = "gpt-5.5";
 const BRACKETED_TOKEN_RE = /([#@])\[([^\]]+)\]\(([^)]+)\)/g;
@@ -546,12 +546,14 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
         </div>
 
         {mentionCount > 0 && (
-          <div className="mt-1 flex shrink-0 items-center gap-1 pr-24 text-[9px] leading-none text-zinc-500">
-            <AtSign className="h-2.5 w-2.5" />
-            {mentionCount}{" "}
-            {mentionCount === 1
-              ? t("workspace.node.text_ref_singular")
-              : t("workspace.node.text_ref_plural")}
+          <div className="mt-0.5 flex shrink-0 items-center gap-1 pr-[86px] text-[9px] font-medium leading-none text-zinc-400/90">
+            <AtSign className="h-2.5 w-2.5 text-zinc-500" />
+            <span>
+              {mentionCount}{" "}
+              {mentionCount === 1
+                ? t("workspace.node.text_ref_singular")
+                : t("workspace.node.text_ref_plural")}
+            </span>
           </div>
         )}
 
@@ -577,7 +579,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
                 {isOptimizing ? (
                   <Loader2 className="animate-spin" />
                 ) : (
-                  <Sparkles />
+                  <Play className="fill-current" />
                 )}
                 <span>{t("workspace.node.prompt_optimize_label")}</span>
               </button>

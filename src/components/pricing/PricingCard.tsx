@@ -27,8 +27,8 @@ interface PricingCardProps {
 
 const TITLE_COLORS: Record<string, string> = {
   Starter: "#FAFAFA",
-  Growth: "#A78BFA",
-  Professional: "#4ADE80",
+  Growth: "#F4FF00",
+  Professional: "#F8FF66",
   Enterprise: "#FACC15",
 };
 
@@ -163,11 +163,11 @@ const PricingCard = ({
 
       <button
         className={cn(
-          "w-full py-3 rounded-xl font-medium text-white transition-colors",
+          "w-full py-3 rounded-full border font-medium text-white transition-all",
           isCurrent
             ? "bg-neutral-700 cursor-default opacity-60"
             : isPopular
-              ? "bg-[#f4ff00] hover:bg-[#d7e600]"
+              ? "ci-gloss-button text-black"
               : "bg-neutral-800 hover:bg-neutral-700 border border-neutral-700"
         )}
         disabled={isCurrent}

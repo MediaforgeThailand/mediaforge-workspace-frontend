@@ -361,7 +361,7 @@ export default function UniversityMockup() {
               <Plus className="h-4 w-4" />
               เพิ่มนักเรียน
             </Button>
-            <Button onClick={() => setQrOpen(true)} className="h-11 gap-2 bg-[#f4ff00] text-black hover:bg-[#d7e600]">
+            <Button onClick={() => setQrOpen(true)} className="ci-gloss-button h-11 gap-2 rounded-full">
               <QrCode className="h-4 w-4" />
               สร้าง QR Code
             </Button>
@@ -373,7 +373,7 @@ export default function UniversityMockup() {
               <UserPlus className="h-4 w-4" />
               เพิ่มนักเรียน
             </Button>
-            <Button onClick={() => setQrOpen(true)} className="h-11 gap-2 bg-[#f4ff00] text-black hover:bg-[#d7e600]">
+            <Button onClick={() => setQrOpen(true)} className="ci-gloss-button h-11 gap-2 rounded-full">
               <QrCode className="h-4 w-4" />
               สร้าง QR
             </Button>
@@ -465,7 +465,7 @@ export default function UniversityMockup() {
                   <UserPlus className="h-4 w-4" />
                   เพิ่มนักเรียน
                 </Button>
-                <Button onClick={() => setQrOpen(true)} className="h-11 gap-2 bg-[#f4ff00] text-black hover:bg-[#d7e600]">
+                <Button onClick={() => setQrOpen(true)} className="ci-gloss-button h-11 gap-2 rounded-full">
                   <QrCode className="h-4 w-4" />
                   สร้าง QR Code
                 </Button>

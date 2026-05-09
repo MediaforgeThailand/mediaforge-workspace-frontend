@@ -230,7 +230,7 @@ export function CreateProjectDialog({
             type="button"
             onClick={handleSubmit}
             disabled={submitting}
-            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-[#f4ff00] px-3.5 text-[13px] font-semibold text-black transition-colors hover:bg-[#e7ff12] disabled:cursor-not-allowed disabled:opacity-60"
+            className="ci-gloss-button inline-flex h-8 items-center justify-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? (
               <>

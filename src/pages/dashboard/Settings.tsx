@@ -112,23 +112,19 @@ const Settings = () => {
 
     let cancelled = false;
     const loadStudentProfiles = async () => {
-      const { data, error } = await supabase
-        .from("class_members" as any)
-        .select("class_id, student_code, classes(id, name, code, status)")
-        .eq("user_id", user.id)
-        .eq("role", "student")
-        .eq("status", "active");
+      const { data, error } = await supabase.rpc("workspace_education_credit_scope" as any, {
+        p_user_id: user.id,
+      });
       if (cancelled || error) return;
 
-      const rows = ((data ?? []) as any[]).map((row) => {
-        const cls = Array.isArray(row.classes) ? row.classes[0] : row.classes;
-        return {
+      const rows = ((data ?? []) as any[])
+        .filter((row) => row.class_role === "student" || row.role === "student")
+        .map((row) => ({
           class_id: String(row.class_id),
-          class_name: String(cls?.name ?? "Class"),
-          class_code: cls?.code ? String(cls.code) : null,
+          class_name: String(row.class_name ?? "Class"),
+          class_code: row.class_code ? String(row.class_code) : null,
           student_code: row.student_code ? String(row.student_code) : null,
-        };
-      });
+        }));
       const drafts: Record<string, string> = {};
       for (const row of rows) drafts[row.class_id] = row.student_code ?? "";
       setStudentClassProfiles(rows);

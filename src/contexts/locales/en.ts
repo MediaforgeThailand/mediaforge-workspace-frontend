@@ -3001,8 +3001,8 @@ export const en = {
   "workspace.node.text_name_placeholder": "Text name…",
   "workspace.node.text_body_placeholder":
     'Try "Happy dog with sunglasses and floating ring"',
-  "workspace.node.text_ref_singular": "ref",
-  "workspace.node.text_ref_plural": "refs",
+  "workspace.node.text_ref_singular": "reference",
+  "workspace.node.text_ref_plural": "references",
   "workspace.node.text_output": "Text output",
   "workspace.node.prompt_optimize_label": "Prompt",
   "workspace.node.prompt_optimize_aria": "Optimize prompt",

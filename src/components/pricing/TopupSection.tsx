@@ -89,10 +89,10 @@ const TopupSection = ({ topupPackages, onTopup, currentBalance = 0 }: TopupSecti
             return (
               <div
                 key={pkg.id}
-                className="relative overflow-hidden rounded-3xl border-2 border-amber-500/40 bg-gradient-to-br from-amber-500/[0.12] via-yellow-500/[0.08] to-yellow-500/[0.10] p-6 shadow-[0_0_40px_rgba(245,158,11,0.15)]"
+                className="relative overflow-hidden rounded-3xl border-2 border-yellow-300/40 bg-gradient-to-br from-yellow-300/[0.12] via-yellow-500/[0.08] to-[#f4ff00]/[0.10] p-6 shadow-[0_0_40px_rgba(238,255,0,0.15)]"
               >
                 {/* Glow accents */}
-                <div className="absolute -top-12 -right-12 w-40 h-40 bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -top-12 -right-12 w-40 h-40 bg-[#f4ff00]/20 rounded-full blur-3xl pointer-events-none" />
                 <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-yellow-500/20 rounded-full blur-3xl pointer-events-none" />
 
                 <div className="relative">
@@ -122,7 +122,7 @@ const TopupSection = ({ topupPackages, onTopup, currentBalance = 0 }: TopupSecti
 
                   {/* Credits — big number with strikethrough original */}
                   <div className="flex items-end gap-3 mb-1">
-                    <span className="text-4xl font-black bg-gradient-to-r from-amber-400 via-yellow-400 to-yellow-400 bg-clip-text text-transparent leading-none">
+                    <span className="text-4xl font-black bg-gradient-to-r from-[#f4ff00] via-yellow-300 to-white bg-clip-text text-transparent leading-none">
                       {pkg.credits.toLocaleString()}
                     </span>
                     <span className="text-sm font-semibold text-muted-foreground pb-1">
@@ -153,7 +153,7 @@ const TopupSection = ({ topupPackages, onTopup, currentBalance = 0 }: TopupSecti
                   <Button
                     onClick={() => !isRedeemed && onTopup(pkg)}
                     disabled={isRedeemed}
-                    className="w-full bg-gradient-to-r from-[#f4ff00] to-[#b7d400] hover:from-[#f8ff66] hover:to-[#e7ff12] text-black font-bold border-0 shadow-[0_0_20px_rgba(245,158,11,0.3)] hover:shadow-[0_0_28px_rgba(245,158,11,0.5)] transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:from-emerald-600 disabled:to-emerald-600"
+                    className="ci-gloss-button w-full rounded-full font-bold transition-all disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isRedeemed ? (
                       <>

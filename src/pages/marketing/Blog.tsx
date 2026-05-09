@@ -211,7 +211,7 @@ function CategoryChips({ active, onChange }: { active: string; onChange: (catego
             onClick={() => onChange(category)}
             className={`h-[40px] rounded-full px-5 text-[14px] font-medium transition ${
               on
-                ? "scale-[1.04] bg-[var(--brand-primary)] text-white shadow-[0_8px_24px_-8px_rgba(238,255,0,.75)]"
+                ? "scale-[1.04] bg-[var(--brand-primary)] text-black shadow-[0_8px_24px_-8px_rgba(238,255,0,.75)]"
                 : "border border-white/10 bg-transparent text-[var(--text-default)] hover:border-white/30 hover:text-white"
             }`}
           >
@@ -267,7 +267,7 @@ function BlogCard({ post, large = false }: { post: Post; large?: boolean }) {
       <div className={`relative overflow-hidden ${large ? "aspect-[16/9]" : "aspect-[16/10]"}`}>
         <img src={post.cover} alt="" className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/72 to-transparent" />
-        <span className="absolute left-3 top-3 rounded-md bg-[var(--brand-primary)] px-2 py-1 text-[10px] font-bold uppercase tracking-[.16em] text-white shadow-[0_4px_12px_rgba(238,255,0,.62)]">
+        <span className="absolute left-3 top-3 rounded-md bg-[var(--brand-primary)] px-2 py-1 text-[10px] font-bold uppercase tracking-[.16em] text-black shadow-[0_4px_12px_rgba(238,255,0,.62)]">
           Featured
         </span>
         <span className="absolute bottom-3 right-3 rounded-md border border-white/16 bg-black/35 px-2 py-1 text-[11px] font-semibold text-white/82 backdrop-blur">
