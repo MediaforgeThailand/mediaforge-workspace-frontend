@@ -265,15 +265,31 @@ export async function enrollInClass(code: string, studentCode?: string): Promise
   if (!token) return { ok: false, error: "not_signed_in" };
 
   const url = `${SUPABASE_URL}/functions/v1/mf-um-class-enroll`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ code, student_code: studentCode }),
-  });
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 20_000);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ code, student_code: studentCode }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof DOMException && error.name === "AbortError"
+        ? "enrollment_timeout"
+        : "enrollment_network_error",
+    };
+  } finally {
+    window.clearTimeout(timeout);
+  }
+
   try {
     return await res.json();
   } catch {

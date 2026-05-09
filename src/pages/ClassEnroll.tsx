@@ -67,34 +67,45 @@ export default function ClassEnroll() {
 
     let cancelled = false;
     const redeem = async () => {
-      setStatus({ phase: "redeeming" });
-      const res = await enrollInClass(code);
-      if (cancelled) return;
+      try {
+        setStatus({ phase: "redeeming" });
+        const res = await enrollInClass(code);
+        if (cancelled) return;
 
-      if (!res.ok) {
-        setStatus({ phase: "error", error: res.error ?? "unknown_error" });
-        return;
-      }
+        if (!res.ok) {
+          setStatus({ phase: "error", error: res.error ?? "unknown_error" });
+          return;
+        }
 
-      const next = {
-        phase: "ok" as const,
-        class_name: res.class_name ?? "your class",
-        balance: res.starting_balance ?? 0,
-        class_id: res.class_id ?? "",
-        workspace_id: res.workspace_id,
-        student_code: res.student_code ?? null,
-        already_enrolled: Boolean(res.already_enrolled),
-      };
-      setStatus(next);
+        const next = {
+          phase: "ok" as const,
+          class_name: res.class_name ?? "your class",
+          balance: res.starting_balance ?? 0,
+          class_id: res.class_id ?? "",
+          workspace_id: res.workspace_id,
+          student_code: res.student_code ?? null,
+          already_enrolled: Boolean(res.already_enrolled),
+        };
+        setStatus(next);
 
-      if (res.class_id) setActiveClassId(res.class_id);
-      qc.invalidateQueries({ queryKey: ["mf-um-class-memberships"] });
-      qc.invalidateQueries({ queryKey: ["class-memberships"] });
-      qc.invalidateQueries({ queryKey: ["education-student-lock"] });
-      await refreshProfile();
+        if (res.class_id) setActiveClassId(res.class_id);
+        qc.invalidateQueries({ queryKey: ["mf-um-class-memberships"] });
+        qc.invalidateQueries({ queryKey: ["class-memberships"] });
+        qc.invalidateQueries({ queryKey: ["education-student-lock"] });
+        void refreshProfile().catch((error) => {
+          console.warn("[ClassEnroll] profile refresh failed after enrollment", error);
+        });
 
-      if (res.already_enrolled || res.student_code) {
-        redirectToWorkspace(res.workspace_id, res.already_enrolled ? 1400 : 1800);
+        if (res.already_enrolled || res.student_code) {
+          redirectToWorkspace(res.workspace_id, res.already_enrolled ? 1400 : 1800);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setStatus({
+            phase: "error",
+            error: error instanceof Error ? error.message : "enrollment_failed",
+          });
+        }
       }
     };
 
@@ -128,6 +139,12 @@ export default function ClassEnroll() {
         return i18n("classEnroll.error.studentCodeRequired");
       case "email_domain_not_allowed":
         return "Use your college email account to join this class. Sign out and sign in again with the registered school domain.";
+      case "enrollment_timeout":
+        return "Joining this class took too long. Please check your connection and try again.";
+      case "enrollment_network_error":
+        return "Could not reach the class enrollment service. Please try again.";
+      case "internal_error":
+        return "Class enrollment failed on the server. Please try again, or ask the teacher to refresh the QR code.";
       default:
         return error;
     }
