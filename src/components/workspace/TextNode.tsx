@@ -16,7 +16,7 @@
  *   }
  */
 
-import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type Edge, type NodeProps, useEdges, useNodes, useReactFlow } from "@xyflow/react";
 import { AtSign, Loader2, Play, Type } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -257,6 +257,35 @@ function canonicalizePlainMentions(
   );
 }
 
+function compactMentionWhitespace(text: string): string {
+  return text
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+([,.;:!?])/g, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function stripDisconnectedImageMentions(
+  prompt: string,
+  allowedImageNodeIds: ReadonlySet<string>,
+): { text: string; removedLabels: string[] } {
+  const removedLabels: string[] = [];
+  const bracketed = new RegExp(BRACKETED_TOKEN_RE.source, "g");
+  const text = prompt.replace(
+    bracketed,
+    (full: string, sigil: string, label: string, nodeId: string) => {
+      if (sigil !== "@") return full;
+      if (allowedImageNodeIds.has(nodeId)) return full;
+      removedLabels.push(label || nodeId);
+      return "";
+    },
+  );
+  return {
+    text: compactMentionWhitespace(text),
+    removedLabels,
+  };
+}
+
 function rangeOverlaps(
   range: { start: number; end: number },
   ranges: Array<{ start: number; end: number }>,
@@ -269,6 +298,13 @@ function rangeOverlaps(
 function protectPromptTokens(prompt: string): {
   text: string;
   tokens: ProtectedToken[];
+};
+function protectPromptTokens(
+  prompt: string,
+  allowedImageNodeIds?: ReadonlySet<string>,
+): {
+  text: string;
+  tokens: ProtectedToken[];
 } {
   const ranges: Array<{
     start: number;
@@ -279,6 +315,11 @@ function protectPromptTokens(prompt: string): {
   let match: RegExpExecArray | null;
   const bracketed = new RegExp(BRACKETED_TOKEN_RE.source, "g");
   while ((match = bracketed.exec(prompt)) !== null) {
+    const sigil = match[1] ?? "";
+    const nodeId = match[3] ?? "";
+    if (sigil === "@" && allowedImageNodeIds && !allowedImageNodeIds.has(nodeId)) {
+      continue;
+    }
     ranges.push({
       start: match.index,
       end: match.index + match[0].length,
@@ -287,18 +328,20 @@ function protectPromptTokens(prompt: string): {
     });
   }
 
-  const plain = new RegExp(PLAIN_MENTION_RE.source, "g");
-  while ((match = plain.exec(prompt)) !== null) {
-    const start = match.index;
-    const end = start + match[0].length;
-    if (!isPlainMentionBoundary(prompt, start)) continue;
-    if (rangeOverlaps({ start, end }, ranges)) continue;
-    ranges.push({
-      start,
-      end,
-      token: match[0],
-      label: match[1] ?? match[0],
-    });
+  if (!allowedImageNodeIds) {
+    const plain = new RegExp(PLAIN_MENTION_RE.source, "g");
+    while ((match = plain.exec(prompt)) !== null) {
+      const start = match.index;
+      const end = start + match[0].length;
+      if (!isPlainMentionBoundary(prompt, start)) continue;
+      if (rangeOverlaps({ start, end }, ranges)) continue;
+      ranges.push({
+        start,
+        end,
+        token: match[0],
+        label: match[1] ?? match[0],
+      });
+    }
   }
 
   ranges.sort((a, b) => a.start - b.start);
@@ -445,6 +488,23 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
     [edges, graphNodes, id],
   );
 
+  const connectedImageMentionNodeIds = useMemo(
+    () => new Set(connectedImageMentionOptions.map((option) => option.nodeId)),
+    [connectedImageMentionOptions],
+  );
+
+  useEffect(() => {
+    const current = d.content ?? "";
+    if (!current.includes("@[")) return;
+    const { text, removedLabels } = stripDisconnectedImageMentions(
+      current,
+      connectedImageMentionNodeIds,
+    );
+    if (removedLabels.length > 0 && text !== current) {
+      updateField("content", text);
+    }
+  }, [connectedImageMentionNodeIds, d.content, updateField]);
+
   const optimizePrompt = useCallback(async () => {
     const source = (d.content ?? "").trim();
     if (!source || isOptimizing) return;
@@ -453,11 +513,23 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
     try {
       const nodes = getNodes() as MentionableNode[];
       const edges = getEdges();
+      const { text: connectedOnlySource, removedLabels } =
+        stripDisconnectedImageMentions(source, connectedImageMentionNodeIds);
+      if (removedLabels.length > 0 && connectedOnlySource !== source) {
+        updateField("content", connectedOnlySource);
+        toast.info("Removed old image refs that are no longer connected to this Text node.");
+      }
+      if (!connectedOnlySource.trim()) {
+        throw new Error("Connect an image ref or write a prompt before optimizing.");
+      }
       const canonicalPrompt = canonicalizePlainMentions(
-        source,
+        connectedOnlySource,
         connectedImageMentionOptions,
       );
-      const protectedPrompt = protectPromptTokens(canonicalPrompt);
+      const protectedPrompt = protectPromptTokens(
+        canonicalPrompt,
+        connectedImageMentionNodeIds,
+      );
       const userMessage = buildOptimizerUserMessage(
         protectedPrompt.text,
         protectedPrompt.tokens,
@@ -493,6 +565,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
       setIsOptimizing(false);
     }
   }, [
+    connectedImageMentionNodeIds,
     connectedImageMentionOptions,
     d.content,
     getEdges,
