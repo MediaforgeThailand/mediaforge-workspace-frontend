@@ -21,6 +21,7 @@ import { type Edge, type NodeProps, useEdges, useNodes, useReactFlow } from "@xy
 import { AtSign, Loader2, Play, Type } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { getSignedUrl } from "@/hooks/useSignedUrl";
 import PromptMentionTextarea from "@/components/flow/nodes/PromptMentionTextarea";
 import { CLEAN_NODE_BODY_TOP_PX, PortIcon } from "./PortIcon";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -105,6 +106,16 @@ type TextImageMentionOption = {
   type?: string;
   icon?: "image" | "video" | "text" | "ai" | "textvar";
   previewUrl?: string;
+  sourceUrl?: string;
+};
+
+type PromptOptimizerAttachment = {
+  imageUrl?: string;
+  dataUrl?: string;
+  mime?: string;
+  detail?: "low" | "high" | "auto";
+  label?: string;
+  sourceNodeId?: string;
 };
 
 type ProtectedToken = {
@@ -162,6 +173,32 @@ function imagePreviewForNode(node: MentionableNode): string | undefined {
   return undefined;
 }
 
+function imageSourceForPromptOptimizer(node: MentionableNode): string | undefined {
+  const data = node.data ?? {};
+  const params = data.params as Record<string, unknown> | undefined;
+  const generation = selectedGeneration(data);
+  if (generation?.type === "image" && typeof generation.url === "string") {
+    return generation.url;
+  }
+
+  const candidates = [
+    data.storagePath,
+    data.imageUrl,
+    data.image_url,
+    data.previewUrl,
+    data.preview_url,
+    data.thumbnailUrl,
+    data.thumbnail_url,
+    data.url,
+    params?.image_url,
+    params?.previewUrl,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) return candidate;
+  }
+  return undefined;
+}
+
 function nodeCanProvideImageMention(
   node: MentionableNode | undefined,
   sourceHandle: string | null | undefined,
@@ -197,6 +234,7 @@ function buildConnectedImageMentionOptions(
       type: source.type ?? "assetNode",
       icon: "image",
       previewUrl: imagePreviewForNode(source),
+      sourceUrl: imageSourceForPromptOptimizer(source),
     });
   }
   return Array.from(byNode.values());
@@ -387,13 +425,73 @@ function restoreProtectedTokens(
   return restored.trim();
 }
 
+function inferDataUrlMime(dataUrl: string): string | undefined {
+  const match = /^data:([^;]+);base64,/i.exec(dataUrl);
+  return match?.[1];
+}
+
+async function buildPromptOptimizerAttachments(
+  refs: TextImageMentionOption[],
+): Promise<PromptOptimizerAttachment[]> {
+  const seen = new Set<string>();
+  const attachments: PromptOptimizerAttachment[] = [];
+
+  for (const ref of refs) {
+    const sourceUrl = ref.sourceUrl ?? ref.previewUrl;
+    if (!sourceUrl) continue;
+
+    if (/^blob:/i.test(sourceUrl)) {
+      throw new Error(
+        `Image reference "${ref.label}" is still uploading. Wait for it to finish, then click Prompt again.`,
+      );
+    }
+
+    if (/^data:/i.test(sourceUrl)) {
+      const key = `${ref.nodeId}:data`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      attachments.push({
+        dataUrl: sourceUrl,
+        mime: inferDataUrlMime(sourceUrl),
+        detail: "low",
+        label: ref.label,
+        sourceNodeId: ref.nodeId,
+      });
+      continue;
+    }
+
+    const imageUrl = await getSignedUrl(sourceUrl);
+    const key = imageUrl || `${ref.nodeId}:${sourceUrl}`;
+    if (!imageUrl || seen.has(key)) continue;
+    seen.add(key);
+    attachments.push({
+      imageUrl,
+      detail: "low",
+      label: ref.label,
+      sourceNodeId: ref.nodeId,
+    });
+  }
+
+  return attachments;
+}
+
 function buildOptimizerUserMessage(
   prompt: string,
   tokens: ProtectedToken[],
+  attachments: PromptOptimizerAttachment[] = [],
 ): string {
   const refs = tokens.length
     ? tokens
         .map((token) => `- ${token.placeholder} = ${token.label}`)
+        .join("\n")
+    : "- none";
+  const attachedRefs = attachments.length
+    ? attachments
+        .map((attachment, index) => {
+          const label = attachment.label ?? attachment.sourceNodeId ?? "image reference";
+          const nodeId = attachment.sourceNodeId ? ` (${attachment.sourceNodeId})` : "";
+          return `- image input ${index + 1}: ${label}${nodeId}`;
+        })
         .join("\n")
     : "- none";
 
@@ -401,9 +499,14 @@ function buildOptimizerUserMessage(
     "Optimize this prompt for a real MediaForge generation node.",
     "The prompt may be written in Thai or mixed Thai/English. Convert the intent into clear English.",
     "Keep every reference placeholder in the final prompt exactly as listed.",
+    "Actual connected image inputs may be attached to this request. Use them to understand visual details, identity, style, and composition.",
+    "If an attached image is not explicitly represented by a protected placeholder, use it only as visual context and do not invent a new placeholder for it.",
     "",
     "Protected references:",
     refs,
+    "",
+    "Attached connected images:",
+    attachedRefs,
     "",
     "User prompt:",
     prompt,
@@ -530,9 +633,13 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
         canonicalPrompt,
         connectedImageMentionNodeIds,
       );
+      const attachments = await buildPromptOptimizerAttachments(
+        connectedImageMentionOptions,
+      );
       const userMessage = buildOptimizerUserMessage(
         protectedPrompt.text,
         protectedPrompt.tokens,
+        attachments,
       );
 
       const { data: result, error } = await supabase.functions.invoke(
@@ -541,7 +648,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
           body: {
             model: PROMPT_OPTIMIZER_MODEL,
             system_prompt: PROMPT_OPTIMIZER_SYSTEM_PROMPT,
-            messages: [{ role: "user", content: userMessage }],
+            messages: [{ role: "user", content: userMessage, attachments }],
             canvas_context: buildCanvasContext(nodes, edges),
           },
         },
