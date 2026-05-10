@@ -17,7 +17,7 @@
  */
 
 import { memo, useCallback, useMemo, useRef, useState } from "react";
-import { type NodeProps, useReactFlow } from "@xyflow/react";
+import { type Edge, type NodeProps, useEdges, useNodes, useReactFlow } from "@xyflow/react";
 import { AtSign, Loader2, Play, Type } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +27,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import NodeQuickActionRail from "./NodeQuickActionRail";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { toast } from "sonner";
+import { portTypeFromHandleId } from "./workspaceSchema";
 import {
   Tooltip,
   TooltipContent,
@@ -83,6 +84,8 @@ const TEXT_NODE_MENTION_TYPES = [
   "groupNode",
 ];
 
+const TEXT_NODE_IMAGE_INPUT_HANDLE = "ref_image";
+
 const PROMPT_OPTIMIZER_SYSTEM_PROMPT = `You are a MediaForge prompt optimization engine.
 Rewrite the user's rough instruction into one practical English prompt for image/video generation or editing.
 Return only the final prompt text. No markdown, no title, no commentary.
@@ -94,6 +97,14 @@ type MentionableNode = {
   id: string;
   type?: string;
   data?: Record<string, unknown>;
+};
+
+type TextImageMentionOption = {
+  nodeId: string;
+  label: string;
+  type?: string;
+  icon?: "image" | "video" | "text" | "ai" | "textvar";
+  previewUrl?: string;
 };
 
 type ProtectedToken = {
@@ -117,10 +128,84 @@ function getNodeLabel(node: MentionableNode): string {
   );
 }
 
+function selectedGeneration(data: Record<string, unknown>) {
+  const generations = Array.isArray(data.generations)
+    ? (data.generations as Array<Record<string, unknown>>)
+    : [];
+  const selectedIndex =
+    typeof data.selectedGenIndex === "number" ? data.selectedGenIndex : 0;
+  return generations[selectedIndex] ?? generations[0];
+}
+
+function imagePreviewForNode(node: MentionableNode): string | undefined {
+  const data = node.data ?? {};
+  const params = data.params as Record<string, unknown> | undefined;
+  const candidates = [
+    data.previewUrl,
+    data.preview_url,
+    data.thumbnailUrl,
+    data.thumbnail_url,
+    data.imageUrl,
+    data.image_url,
+    data.storagePath,
+    data.url,
+    params?.previewUrl,
+    params?.image_url,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) return candidate;
+  }
+  const generation = selectedGeneration(data);
+  if (generation?.type === "image" && typeof generation.url === "string") {
+    return generation.url;
+  }
+  return undefined;
+}
+
+function nodeCanProvideImageMention(
+  node: MentionableNode | undefined,
+  sourceHandle: string | null | undefined,
+): boolean {
+  if (!node) return false;
+  const data = node.data ?? {};
+  if (node.type === "assetNode" || node.type === "inputNode") {
+    const fieldType = typeof data.fieldType === "string" ? data.fieldType : "image";
+    return fieldType === "image";
+  }
+  if (node.type === "groupNode") return false;
+  if (sourceHandle && portTypeFromHandleId(sourceHandle) !== "image") return false;
+  const generation = selectedGeneration(data);
+  if (generation) return generation.type === "image" && typeof generation.url === "string";
+  return ["imageGenNode", "removeBackgroundNode", "bananaProNode"].includes(node.type ?? "");
+}
+
+function buildConnectedImageMentionOptions(
+  textNodeId: string,
+  nodes: MentionableNode[],
+  edges: Edge[],
+): TextImageMentionOption[] {
+  const byNode = new Map<string, TextImageMentionOption>();
+  for (const edge of edges) {
+    if (edge.target !== textNodeId) continue;
+    if ((edge.targetHandle ?? "") !== TEXT_NODE_IMAGE_INPUT_HANDLE) continue;
+    const source = nodes.find((node) => node.id === edge.source);
+    if (!nodeCanProvideImageMention(source, edge.sourceHandle)) continue;
+    if (!source || byNode.has(source.id)) continue;
+    byNode.set(source.id, {
+      nodeId: source.id,
+      label: getNodeLabel(source),
+      type: source.type ?? "assetNode",
+      icon: "image",
+      previewUrl: imagePreviewForNode(source),
+    });
+  }
+  return Array.from(byNode.values());
+}
+
 function safeMentionLabel(label: string): string {
   return (
     label
-      .replace(/[\]\(\)]/g, " ")
+      .replace(/[\]()]/g, " ")
       .replace(/\s+/g, " ")
       .trim() || "reference"
   );
@@ -140,16 +225,17 @@ function isPlainMentionBoundary(text: string, index: number): boolean {
 
 function canonicalizePlainMentions(
   prompt: string,
-  nodes: MentionableNode[],
-  currentNodeId: string,
+  candidates: TextImageMentionOption[],
 ): string {
-  const candidates = nodes
-    .filter((node) => node.id !== currentNodeId)
-    .filter((node) => TEXT_NODE_MENTION_TYPES.includes(node.type ?? ""));
   const byKey = new Map<string, MentionableNode>();
 
-  for (const node of candidates) {
-    const label = getNodeLabel(node);
+  for (const option of candidates) {
+    const node: MentionableNode = {
+      id: option.nodeId,
+      type: option.type,
+      data: { label: option.label },
+    };
+    const label = option.label;
     const keys = [
       normalizeMentionKey(label),
       normalizeMentionKey(node.id),
@@ -324,6 +410,8 @@ function buildCanvasContext(
 const TextNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as unknown as TextNodeData;
   const { setNodes, getNodes, getEdges } = useReactFlow();
+  const graphNodes = useNodes();
+  const edges = useEdges();
   const { t } = useLanguage();
   const [isHovered, setIsHovered] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
@@ -347,6 +435,16 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
     [updateField],
   );
 
+  const connectedImageMentionOptions = useMemo(
+    () =>
+      buildConnectedImageMentionOptions(
+        id,
+        graphNodes as MentionableNode[],
+        edges,
+      ),
+    [edges, graphNodes, id],
+  );
+
   const optimizePrompt = useCallback(async () => {
     const source = (d.content ?? "").trim();
     if (!source || isOptimizing) return;
@@ -355,7 +453,10 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
     try {
       const nodes = getNodes() as MentionableNode[];
       const edges = getEdges();
-      const canonicalPrompt = canonicalizePlainMentions(source, nodes, id);
+      const canonicalPrompt = canonicalizePlainMentions(
+        source,
+        connectedImageMentionOptions,
+      );
       const protectedPrompt = protectPromptTokens(canonicalPrompt);
       const userMessage = buildOptimizerUserMessage(
         protectedPrompt.text,
@@ -391,7 +492,15 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
     } finally {
       setIsOptimizing(false);
     }
-  }, [d.content, getEdges, getNodes, id, isOptimizing, t, updateField]);
+  }, [
+    connectedImageMentionOptions,
+    d.content,
+    getEdges,
+    getNodes,
+    isOptimizing,
+    t,
+    updateField,
+  ]);
 
   // Token count derived from serialised form — used by the footer chip.
   const onDeleteNode = useCallback(() => {
@@ -528,6 +637,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
             // legacy `inputNode` so a flow imported from the main
             // editor still resolves its mentions here.
             allowedNodeTypes={TEXT_NODE_MENTION_TYPES}
+            mentionOptionsOverride={connectedImageMentionOptions}
             /* `leading-snug` (1.375) replaces `leading-relaxed`
              *  (1.625). User reported the lines felt too far apart
              *  on the Text node specifically — same fix as
@@ -610,6 +720,17 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
           title="Drag to resize"
         />
       )}
+
+      {/* Image refs wired here are the only nodes exposed in @mention. */}
+      <PortIcon
+        dir="target"
+        handleId={TEXT_NODE_IMAGE_INPUT_HANDLE}
+        label={t("workspace.port.ref_image")}
+        portType="image"
+        color={TEXT_COLOR}
+        index={0}
+        bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
+      />
 
       {/* Output handle — text-typed icon at the top-right cluster. */}
       <PortIcon

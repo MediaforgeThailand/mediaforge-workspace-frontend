@@ -70,7 +70,9 @@ export function portTypeOf(
   const t = node.type ?? "";
 
   // Workspace-native node sources / sinks.
-  if (t === "textNode") return "text";
+  if (t === "textNode") {
+    return isOutput ? "text" : handleId === "ref_image" ? "image" : "text";
+  }
   if (t === "elementNode") return "element";
   if (t === "assetNode") {
     const ft = (node.data as { fieldType?: string } | undefined)?.fieldType;
@@ -128,7 +130,14 @@ const CATALOG: CatalogEntry[] = [
     labelKey: "workspace.toolnames.text",
     defaultLabel: "Text",
     icon: "Type",
-    inputs: [],
+    inputs: [
+      {
+        id: "ref_image",
+        type: "image",
+        hint: "→ image ref",
+        hintKey: "workspace.picker.port.to_ref_image",
+      },
+    ],
     outputs: [{ id: "default", type: "text", hint: "text", hintKey: "workspace.picker.port.text" }],
   },
   {
