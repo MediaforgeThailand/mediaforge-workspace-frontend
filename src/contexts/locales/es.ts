@@ -3167,7 +3167,7 @@ export const es = {
     "Solo local (aplicar migración para habilitar el guardado automático en la nube)",
   "workspace.save.saving_short": "Ahorro",
 
-  // ─── Quick toolbar (NodeQuickActionRail) ───────────────────────────
+  // ─── Quick toolbar (NodeQuickToolbar) ───────────────────────────
   "workspace.quicktoolbar.group_selection": "Selección de grupo",
   "workspace.quicktoolbar.arrange_grid": "Organizar como cuadrícula",
   "workspace.quicktoolbar.download_zip": "Descargar todo ({count}) como ZIP",
