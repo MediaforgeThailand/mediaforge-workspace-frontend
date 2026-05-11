@@ -2808,7 +2808,7 @@ export const hi = {
     "किसी वर्ण या ऑब्जेक्ट को पुन: प्रयोज्य Kling ओमनी तत्व के रूप में सहेजें। 4 रेफरी + 1 फ्रंटल।",
   "workspace.toolnames.remove_bg": "बीजी हटाएँ",
   "workspace.toolnames.remove_bg_desc":
-    "किसी छवि से पृष्ठभूमि निकालें (रेप्लिकेट के माध्य से BiRefNet)।",
+    "Freepik/Magnific से किसी छवि की पृष्ठभूमि निकालें।",
   "workspace.toolnames.image_to_3d": "3D में छवि",
   "workspace.toolnames.image_to_3d_desc":
     "Tripo3D के माध्यम से एक संदर्भ छवि को GLB में बदलें।",

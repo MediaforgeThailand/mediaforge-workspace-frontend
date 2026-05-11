@@ -104,7 +104,8 @@ function modelDiscountPercent({ schemaKey, params, creditCosts }: NodeCostParams
     return maxDiscountForRows(rowsForFeatureModels(creditCosts, "generate_freepik_image", keys));
   }
   if (schemaKey === "removeBackgroundNode") {
-    return maxDiscountForRows(rowsForFeatureModels(creditCosts, "remove_background", [modelName || "replicate-birefnet"]));
+    const apiModel = modelName || "freepik-remove-bg";
+    return maxDiscountForRows(rowsForFeatureModels(creditCosts, "remove_background", [apiModel, "freepik-remove-bg", "replicate-birefnet"]));
   }
   if (schemaKey === "mergeAudioNode") {
     return maxDiscountForRows(rowsForFeatureModels(creditCosts, "merge_audio_video", [modelName || "shotstack"]));
@@ -229,11 +230,12 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
     return match?.cost ?? null;
   }
 
-  // ── Background Removal (Replicate) ──
+  // Background Removal (Freepik/Magnific; legacy Replicate alias supported)
   if (schemaKey === "removeBackgroundNode") {
-    const apiModel = modelName || "replicate-birefnet";
+    const apiModel = modelName || "freepik-remove-bg";
+    const aliases = [apiModel, "freepik-remove-bg", "replicate-birefnet"];
     const match = creditCosts.find(
-      (r) => r.feature === "remove_background" && r.model === apiModel,
+      (r) => r.feature === "remove_background" && aliases.includes(r.model ?? ""),
     );
     return match?.cost ?? null;
   }
@@ -355,7 +357,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
       if (exactFixed) return exactFixed.cost;
 
       // 2. per_second — strict match including audio
-      let perSecondMatch = creditCosts.find(
+      const perSecondMatch = creditCosts.find(
         (r) =>
           r.feature === "generate_freepik_video" &&
           r.model === pricingModel &&
@@ -393,7 +395,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
         );
         if (stdExact) return stdExact.cost;
 
-        let stdPerSec = creditCosts.find(
+        const stdPerSec = creditCosts.find(
           (r) =>
             r.feature === "generate_freepik_video" &&
             r.model === model &&
@@ -502,7 +504,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
     if (durationMatch) return durationMatch.cost;
 
     // 3. per_second — strict match including audio with smart fallback
-    let stdPerSecondMatch = creditCosts.find(
+    const stdPerSecondMatch = creditCosts.find(
       (r) =>
         r.feature === "generate_freepik_video" &&
         modelAliases.includes(r.model) &&

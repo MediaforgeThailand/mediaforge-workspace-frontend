@@ -2810,7 +2810,7 @@ export const ja = {
     "キャラクターまたはオブジェクトを再利用可能な Kling Omni 要素として保存します。レフト4枚+フロント1枚。",
   "workspace.toolnames.remove_bg": "BG を削除",
   "workspace.toolnames.remove_bg_desc":
-    "画像から背景を取り除きます (Replicate 経由の BiRefNet)。",
+    "Freepik/Magnific で画像から背景を取り除きます。",
   "workspace.toolnames.image_to_3d": "画像を 3D に変換",
   "workspace.toolnames.image_to_3d_desc":
     "Tripo3D を介して参照画像を GLB に変換します。",

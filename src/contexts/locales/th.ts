@@ -2930,7 +2930,7 @@ export const th = {
     "บันทึกตัวละคร/วัตถุเป็น Kling Omni element ใช้ซ้ำได้ · 4 ref + 1 frontal",
   "workspace.toolnames.remove_bg": "ลบพื้นหลัง",
   "workspace.toolnames.remove_bg_desc":
-    "ลบพื้นหลังออกจากภาพ (BiRefNet ผ่าน Replicate)",
+    "ลบพื้นหลังออกจากภาพด้วย Freepik/Magnific",
   "workspace.toolnames.image_to_3d": "ภาพเป็น 3D",
   "workspace.toolnames.image_to_3d_desc":
     "เปลี่ยนภาพ reference เป็น GLB ผ่าน Tripo3D",

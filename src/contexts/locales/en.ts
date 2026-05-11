@@ -2977,7 +2977,7 @@ export const en = {
     "Save a character or object as a reusable Kling Omni element. 4 ref + 1 frontal.",
   "workspace.toolnames.remove_bg": "Remove BG",
   "workspace.toolnames.remove_bg_desc":
-    "Strip the background from an image (BiRefNet via Replicate).",
+    "Strip the background from an image with Freepik/Magnific.",
   "workspace.toolnames.image_to_3d": "Image to 3D",
   "workspace.toolnames.image_to_3d_desc":
     "Turn a reference image into a GLB via Tripo3D.",
