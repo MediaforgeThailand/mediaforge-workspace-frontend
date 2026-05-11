@@ -106,6 +106,18 @@ const MAPPINGS: ErrorMapping[] = [
     ja: "AI サービスが一時的に利用できません。チームが対応中です。",
   },
   {
+    match: /model[^\n]*does not exist|do not have access to (?:it|the model)|model_not_found|model[^\n]*not (?:available|enabled|accessible)|invalid[^\n]*model id/i,
+    th: "โมเดล AI ที่ตั้งไว้ไม่พร้อมใช้งานในขณะนี้ — อาจอยู่ระหว่าง rollout หรือ account ยังไม่ได้รับสิทธิ์ ลองอีกครั้งใน 5–15 นาที หากยังไม่ได้ติดต่อทีมงาน",
+    en: "The configured AI model isn't available right now — it may be in staged rollout or your account doesn't have access yet. Try again in 5–15 minutes; contact support if it persists.",
+    ja: "設定された AI モデルが現在利用できません。段階的なロールアウト中か、アカウントにアクセス権がない可能性があります。5〜15 分後に再試行し、続く場合はサポートにお問い合わせください。",
+  },
+  {
+    match: /unknown parameter|unsupported parameter|parameter[^\n]*not supported|invalid[^\n]*parameter for (?:this )?model/i,
+    th: "การตั้งค่าคำขอไม่เข้ากับโมเดล AI นี้ ทีมงานจะแก้ — รบกวนส่ง error message นี้ให้ทีมด้วย",
+    en: "The request shape doesn't match this AI model. Our team will fix — please share this error message.",
+    ja: "リクエスト形式がこの AI モデルと一致しません。チームが修正します。このエラーメッセージを共有してください。",
+  },
+  {
     match: /Seedance rejected the reference media|verified real-human assets|asset:\/\/|real person|privacy-sensitive|PrivacyInformation|SensitiveContentDetected/i,
     th: "Seedance 2.0 ปฏิเสธภาพคนจริงใน route นี้ ถ้าต้องใช้คนจริงให้ใช้ asset ที่ยืนยันสิทธิ์แล้ว หรือเลือกโมเดล/ผู้ให้บริการอื่นครับ",
     en: "Seedance 2.0 blocked the real-person reference on this route. Use a verified real-human asset, or choose another model/provider.",

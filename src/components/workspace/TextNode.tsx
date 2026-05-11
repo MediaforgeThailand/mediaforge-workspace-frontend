@@ -29,7 +29,7 @@ import NodeQuickActionRail from "./NodeQuickActionRail";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { toast } from "sonner";
 import { portTypeFromHandleId } from "./workspaceSchema";
-import { functionErrorMessage } from "@/lib/friendlyError";
+import { friendlyErrorOr, functionErrorMessage } from "@/lib/friendlyError";
 import {
   Tooltip,
   TooltipContent,
@@ -65,7 +65,7 @@ const MAX_H = 800;
  *  scroll when content exceeds visible height. */
 const BODY_CHROME_H = 58;
 const PROMPT_OPTIMIZER_FUNCTION = "workspace-chat";
-const PROMPT_OPTIMIZER_MODEL = "gpt-5-mini";
+const PROMPT_OPTIMIZER_MODEL = "gpt-5.5";
 const WORKSPACE_MEDIA_BUCKET = "ai-media";
 const BRACKETED_TOKEN_RE = /([#@])\[([^\]]+)\]\(([^)]+)\)/g;
 const PLAIN_MENTION_RE = /@([A-Za-z0-9_][A-Za-z0-9_.-]*)/g;
@@ -593,7 +593,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
   const { setNodes, getNodes, getEdges } = useReactFlow();
   const graphNodes = useNodes();
   const edges = useEdges();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [isHovered, setIsHovered] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
 
@@ -703,8 +703,9 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
       updateField("content", optimized);
       toast.success(t("workspace.node.prompt_optimize_success"));
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      toast.error(message || t("workspace.node.prompt_optimize_failed"));
+      const raw = err instanceof Error ? err.message : String(err);
+      const fallback = raw || t("workspace.node.prompt_optimize_failed");
+      toast.error(friendlyErrorOr(err, language, fallback));
     } finally {
       setIsOptimizing(false);
     }
@@ -714,6 +715,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
     getEdges,
     getNodes,
     isOptimizing,
+    language,
     t,
     updateField,
   ]);
