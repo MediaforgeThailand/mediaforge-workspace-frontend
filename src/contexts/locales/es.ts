@@ -3106,13 +3106,13 @@ export const es = {
   "workspace.node.prompt_optimize_failed": "No se pudo optimizar el prompt",
   "workspace.node.prompt_optimize_empty_error":
     "El optimizador no devolvió contenido",
-  "workspace.node.media_prompt_label": "Prompt desde media",
+  "workspace.node.media_prompt_label": "Image/VDO to prompt",
   "workspace.node.media_prompt_aria":
-    "Crear un prompt desde una imagen o video conectado",
+    "Crear un prompt desde refs de imagen o VDO conectadas",
   "workspace.node.media_prompt_tip_off":
-    "Actívalo para que la IA lea imágenes/videos conectados y ayude a crear el prompt.",
+    "OFF: Result conserva @mentions para pasar refs al siguiente nodo.",
   "workspace.node.media_prompt_tip_on":
-    "Activado: el prompt se creará desde las imágenes/videos conectados.",
+    "ON: Crea un prompt nuevo desde refs de imagen/VDO sin @mentions ni tokens de ref. Ideal para una pieza nueva inspirada en esas refs.",
   "workspace.node.asset_name_placeholder": "Nombre…",
   "workspace.node.asset_resize": "Cambiar el tamaño de la tarjeta de recurso",
   "workspace.node.asset_drag_resize": "Arrastra para cambiar el tamaño",

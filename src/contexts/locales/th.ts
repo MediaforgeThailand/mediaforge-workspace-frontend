@@ -2965,12 +2965,13 @@ export const th = {
   "workspace.node.prompt_optimize_failed": "ปรับปรุงพรอมป์ไม่สำเร็จ",
   "workspace.node.prompt_optimize_empty_error":
     "ตัวปรับปรุงพรอมป์ไม่ส่งข้อความกลับมา",
-  "workspace.node.media_prompt_label": "Prompt จากรูป/วิดีโอ",
-  "workspace.node.media_prompt_aria": "สร้างพรอมป์จากรูปหรือวิดีโอที่เชื่อมไว้",
+  "workspace.node.media_prompt_label": "Image/VDO to prompt",
+  "workspace.node.media_prompt_aria":
+    "สร้าง prompt จาก image/VDO ref ที่เชื่อมไว้",
   "workspace.node.media_prompt_tip_off":
-    "เปิดเพื่อให้ AI อ่านรูป/วิดีโอที่เชื่อมไว้ แล้วช่วยสร้างพรอมป์ให้เข้าใจง่ายขึ้น",
+    "OFF: Result จะคง @mentions เพื่อส่ง ref ต่อไปยัง node ถัดไป",
   "workspace.node.media_prompt_tip_on":
-    "เปิดอยู่: จะสร้างพรอมป์จากรูป/วิดีโอที่เชื่อมไว้",
+    "ON: สร้าง prompt ใหม่จาก image/VDO ref โดยไม่ใส่ @mention หรือ ref token เหมาะกับงานใหม่ที่แค่คล้าย ref",
   "workspace.node.asset_name_placeholder": "ชื่อ…",
   "workspace.node.asset_resize": "ปรับขนาดการ์ดไฟล์",
   "workspace.node.asset_drag_resize": "ลากเพื่อปรับขนาด",

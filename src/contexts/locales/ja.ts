@@ -2841,13 +2841,13 @@ export const ja = {
   "workspace.node.prompt_optimize_failed": "プロンプトを最適化できませんでした",
   "workspace.node.prompt_optimize_empty_error":
     "プロンプト最適化から内容が返りませんでした",
-  "workspace.node.media_prompt_label": "画像/動画からPrompt",
+  "workspace.node.media_prompt_label": "Image/VDO to prompt",
   "workspace.node.media_prompt_aria":
-    "接続した画像または動画からプロンプトを作成",
+    "接続した画像または VDO ref から Prompt を作成",
   "workspace.node.media_prompt_tip_off":
-    "オンにすると、接続した画像/動画をAIが読み取り、プロンプト作成を支援します。",
+    "OFF: Result は @mentions を保持し、ref を次のノードへ渡します。",
   "workspace.node.media_prompt_tip_on":
-    "オン: 接続した画像/動画からプロンプトを作成します。",
+    "ON: 画像/VDO ref から @mention や ref token なしの新しい Prompt を作ります。ref に近い新規作品向けです。",
   "workspace.node.asset_name_placeholder": "名前…",
   "workspace.node.asset_resize": "アセットカードのサイズを変更する",
   "workspace.node.asset_drag_resize": "ドラッグしてサイズを変更します",

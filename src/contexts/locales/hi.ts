@@ -2839,13 +2839,13 @@ export const hi = {
   "workspace.node.prompt_optimize_failed": "प्रॉम्प्ट बेहतर नहीं हो सका",
   "workspace.node.prompt_optimize_empty_error":
     "प्रॉम्प्ट ऑप्टिमाइज़र ने खाली उत्तर दिया",
-  "workspace.node.media_prompt_label": "इमेज/वीडियो से Prompt",
+  "workspace.node.media_prompt_label": "Image/VDO to prompt",
   "workspace.node.media_prompt_aria":
-    "जुड़ी हुई इमेज या वीडियो से प्रॉम्प्ट बनाएं",
+    "जुड़ी हुई image या VDO refs से Prompt बनाएं",
   "workspace.node.media_prompt_tip_off":
-    "AI को जुड़ी हुई इमेज/वीडियो पढ़ने और प्रॉम्प्ट बनाने में मदद करने के लिए चालू करें।",
+    "OFF: Result @mentions रखता है, ताकि refs अगले node में जा सकें।",
   "workspace.node.media_prompt_tip_on":
-    "चालू: प्रॉम्प्ट जुड़ी हुई इमेज/वीडियो से बनेगा।",
+    "ON: image/VDO refs से @mentions या ref tokens के बिना नया Prompt बनाता है। refs से inspired नया काम बनाने के लिए बेहतर।",
   "workspace.node.asset_name_placeholder": "नाम...",
   "workspace.node.asset_resize": "एसेट कार्ड का आकार बदलें",
   "workspace.node.asset_drag_resize": "आकार बदलने के लिए खींचें",

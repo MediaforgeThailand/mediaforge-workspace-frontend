@@ -3013,13 +3013,13 @@ export const en = {
   "workspace.node.prompt_optimize_failed": "Could not optimize prompt",
   "workspace.node.prompt_optimize_empty_error":
     "Prompt optimizer returned empty content",
-  "workspace.node.media_prompt_label": "Prompt from media",
+  "workspace.node.media_prompt_label": "Image/VDO to prompt",
   "workspace.node.media_prompt_aria":
-    "Create a prompt from connected image or video",
+    "Create a prompt from connected image or VDO refs",
   "workspace.node.media_prompt_tip_off":
-    "Turn on to let AI read connected images/videos and help create the prompt.",
+    "OFF: Result keeps @mentions, so refs pass to the next node.",
   "workspace.node.media_prompt_tip_on":
-    "On: Prompt will be created from the connected images/videos.",
+    "ON: Creates a new prompt from image/VDO refs without @mentions or ref tokens. Best for a new piece inspired by the refs.",
   "workspace.node.asset_name_placeholder": "Name…",
   "workspace.node.asset_resize": "Resize asset card",
   "workspace.node.asset_drag_resize": "Drag to resize",

@@ -820,6 +820,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
   const { t, language } = useLanguage();
   const [isHovered, setIsHovered] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const [mediaPromptTooltipOpen, setMediaPromptTooltipOpen] = useState(false);
 
   const width = d.width ?? DEFAULT_W;
   const height = d.height ?? DEFAULT_H;
@@ -1218,7 +1219,13 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
               Result prompt
             </button>
           </div>
-          <Tooltip delayDuration={150}>
+          <Tooltip
+            delayDuration={150}
+            open={mediaPromptTooltipOpen}
+            onOpenChange={(open) => {
+              if (open) setMediaPromptTooltipOpen(true);
+            }}
+          >
             <TooltipTrigger asChild>
               <button
                 type="button"
@@ -1229,11 +1236,19 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  setMediaPromptTooltipOpen(true);
                   updateData({
                     mediaUnderstandingEnabled: !mediaUnderstandingEnabled,
                   });
                 }}
-                onPointerDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  setMediaPromptTooltipOpen(true);
+                }}
+                onPointerEnter={() => setMediaPromptTooltipOpen(true)}
+                onPointerLeave={() => setMediaPromptTooltipOpen(false)}
+                onFocus={() => setMediaPromptTooltipOpen(true)}
+                onBlur={() => setMediaPromptTooltipOpen(false)}
                 aria-pressed={mediaUnderstandingEnabled}
                 aria-label={t("workspace.node.media_prompt_aria")}
               >
@@ -1249,11 +1264,26 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
             <TooltipContent
               side="top"
               align="end"
-              className="max-w-[240px] border-white/10 bg-[#151515] px-3 py-2 text-xs leading-snug text-zinc-100 shadow-2xl shadow-black/40"
+              className="ws-text-media-prompt-tooltip border-white/10 bg-[#151515] text-zinc-100 shadow-2xl shadow-black/40"
             >
-              {mediaUnderstandingEnabled
-                ? t("workspace.node.media_prompt_tip_on")
-                : t("workspace.node.media_prompt_tip_off")}
+              <div className="ws-text-media-prompt-tooltip-list">
+                <p
+                  className={cn(
+                    "ws-text-media-prompt-tooltip-row",
+                    mediaUnderstandingEnabled && "is-current",
+                  )}
+                >
+                  {t("workspace.node.media_prompt_tip_on")}
+                </p>
+                <p
+                  className={cn(
+                    "ws-text-media-prompt-tooltip-row",
+                    !mediaUnderstandingEnabled && "is-current",
+                  )}
+                >
+                  {t("workspace.node.media_prompt_tip_off")}
+                </p>
+              </div>
             </TooltipContent>
           </Tooltip>
         </div>
