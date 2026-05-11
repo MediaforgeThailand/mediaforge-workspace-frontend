@@ -29,6 +29,7 @@ import NodeQuickActionRail from "./NodeQuickActionRail";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { toast } from "sonner";
 import { portTypeFromHandleId } from "./workspaceSchema";
+import { functionErrorMessage } from "@/lib/friendlyError";
 import {
   Tooltip,
   TooltipContent,
@@ -181,8 +182,15 @@ function imageSourceForPromptOptimizer(node: MentionableNode): string | undefine
     return generation.url;
   }
 
+  /* `data.storagePath` is a raw bucket-relative path with no bucket
+   *  name, e.g. "<userId>/foo.png". `getSignedUrl` can't tell which
+   *  bucket it belongs to so it defaults to user_assets — wrong for
+   *  ai-media-stored generations, the sign call fails, and the silent
+   *  fallback hands the raw path back. OpenAI then rejects it as
+   *  "invalid URL format". Stick to candidates that are already a
+   *  fully-qualified URL or blob; AssetNode always sets `previewUrl`
+   *  alongside `storagePath`, so we don't lose any real cases. */
   const candidates = [
-    data.storagePath,
     data.imageUrl,
     data.image_url,
     data.previewUrl,
@@ -461,8 +469,17 @@ async function buildPromptOptimizerAttachments(
     }
 
     const imageUrl = await getSignedUrl(sourceUrl);
-    const key = imageUrl || `${ref.nodeId}:${sourceUrl}`;
-    if (!imageUrl || seen.has(key)) continue;
+    /* getSignedUrl falls back to the raw input string on failure
+     *  (e.g. wrong-bucket guess, missing object). OpenAI then rejects
+     *  it as "invalid URL format". Validate up front so the user gets
+     *  an actionable error tied to the specific reference. */
+    if (!imageUrl || !/^https?:\/\//i.test(imageUrl)) {
+      throw new Error(
+        `Image reference "${ref.label}" could not be resolved to a fetchable URL. The asset may be missing or the upload didn't finish — try removing and re-adding it.`,
+      );
+    }
+    const key = imageUrl;
+    if (seen.has(key)) continue;
     seen.add(key);
     attachments.push({
       imageUrl,
@@ -642,7 +659,13 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
         },
       );
 
-      if (error) throw error;
+      if (error) {
+        /* supabase-js wraps non-2xx as a generic "Edge Function returned
+         *  a non-2xx status code". The real message (e.g. the OpenAI
+         *  error text the function threw) lives on `error.context` —
+         *  surface it so the toast says *why*, not just *that*. */
+        throw new Error(await functionErrorMessage(error));
+      }
       const content =
         typeof (result as { content?: unknown } | null)?.content === "string"
           ? (result as { content: string }).content
