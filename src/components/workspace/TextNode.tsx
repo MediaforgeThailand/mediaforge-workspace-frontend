@@ -64,7 +64,7 @@ const MAX_H = 800;
  *  scroll when content exceeds visible height. */
 const BODY_CHROME_H = 58;
 const PROMPT_OPTIMIZER_FUNCTION = "workspace-chat";
-const PROMPT_OPTIMIZER_MODEL = "gpt-5.5";
+const PROMPT_OPTIMIZER_MODEL = "gpt-5-mini";
 const BRACKETED_TOKEN_RE = /([#@])\[([^\]]+)\]\(([^)]+)\)/g;
 const PLAIN_MENTION_RE = /@([A-Za-z0-9_][A-Za-z0-9_.-]*)/g;
 
