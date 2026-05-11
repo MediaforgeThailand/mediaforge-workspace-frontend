@@ -98,6 +98,22 @@ describe("getWsVisibleParams", () => {
     const visible = getWsVisibleParams("klingVideoNode", "kling-v3-omni");
     expect(visible.some((p) => !p.supportedModels)).toBe(true);
   });
+
+  it("keeps video audio-generation controls silent by default", () => {
+    const seedanceAudio = getWsVisibleParams("videoGenNode", "seedance-1-5-pro-251215")
+      .find((p) => p.key === "generate_audio");
+    const klingAudio = getWsVisibleParams("videoGenNode", "kling-v3-pro")
+      .find((p) => p.key === "has_audio");
+    const allAudioParams = (getWorkspaceSchema("videoGenNode")?.params ?? [])
+      .filter((p) => p.key === "generate_audio" || p.key === "has_audio");
+
+    expect(seedanceAudio?.default).toBe("false");
+    expect(klingAudio?.default).toBe("false");
+    expect(allAudioParams.length).toBeGreaterThan(0);
+    for (const param of allAudioParams) {
+      expect(param.default).toBe("false");
+    }
+  });
 });
 
 describe("getWsVisibleInputs", () => {

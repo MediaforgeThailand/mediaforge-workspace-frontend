@@ -879,7 +879,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         type: "select",
         options: ["false", "true"],
         optionLabels: { "false": "No Audio", "true": "With Audio" },
-        default: "true",
+        default: "false",
         supportedModels: [...REPLICATE_SEEDANCE_MODELS, ...REPLICATE_VEO_MODELS, ...REPLICATE_KLING_FRAME_MODELS],
       },
       {
