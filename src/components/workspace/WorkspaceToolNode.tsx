@@ -2820,6 +2820,23 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const currentGen = generations.length > 0
     ? (generations[selectedGenIndex] ?? generations[0])
     : null;
+  // Mirrors the render branches at 3247-3326. If a generation lands
+  // without any of the fields a branch needs (e.g. SeedDream used to
+  // commit `{type: "image", url: undefined}` because the executor
+  // didn't set `result_url`), every branch falls through AND the
+  // `!currentGen` placeholder check below also fails — the preview
+  // area renders zero children and collapses to a thin line. Treat
+  // those rows the same as "no gen yet" so the empty placeholder
+  // shows.
+  const hasRenderableContent = !!(
+    currentGen &&
+    (currentGen.model_url ||
+      ((currentGen.type === "image" ||
+        currentGen.type === "video" ||
+        currentGen.type === "audio") &&
+        currentGen.url) ||
+      (currentGen.type === "text" && currentGen.text))
+  );
   const imagePreviewTransform = useMemo(
     () => ({
       width: Math.max(
@@ -3357,7 +3374,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               </div>
             </div>
           )}
-          {!currentGen && <div className="ws-compact-preview-empty" />}
+          {!hasRenderableContent && <div className="ws-compact-preview-empty" />}
 
           {/* Top-right info badge */}
           {previewBadge && (
