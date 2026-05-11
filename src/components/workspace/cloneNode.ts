@@ -3,7 +3,7 @@
  *
  * Two consumers today:
  *   • Alt+drag         (WorkspaceCanvas.onNodeDragStart)
- *   • Ctrl+D / button  (NodeQuickToolbar.onDuplicate)
+ *   • Ctrl+D / button  (NodeQuickActionRail.onDuplicate)
  *
  * The clone is a faithful deep copy of the original's content with
  * only transient run-state reset, so:
