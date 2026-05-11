@@ -16,7 +16,7 @@
  *   }
  */
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { type Edge, type NodeProps, useEdges, useNodes, useReactFlow } from "@xyflow/react";
 import { AtSign, Loader2, Play, Type } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,7 @@ import NodeQuickActionRail from "./NodeQuickActionRail";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { toast } from "sonner";
 import { portTypeFromHandleId } from "./workspaceSchema";
+import { functionErrorMessage } from "@/lib/friendlyError";
 import {
   Tooltip,
   TooltipContent,
@@ -64,7 +65,7 @@ const MAX_H = 800;
  *  scroll when content exceeds visible height. */
 const BODY_CHROME_H = 58;
 const PROMPT_OPTIMIZER_FUNCTION = "workspace-chat";
-const PROMPT_OPTIMIZER_MODEL = "gpt-5.5";
+const PROMPT_OPTIMIZER_MODEL = "gpt-5-mini";
 const BRACKETED_TOKEN_RE = /([#@])\[([^\]]+)\]\(([^)]+)\)/g;
 const PLAIN_MENTION_RE = /@([A-Za-z0-9_][A-Za-z0-9_.-]*)/g;
 
@@ -181,8 +182,15 @@ function imageSourceForPromptOptimizer(node: MentionableNode): string | undefine
     return generation.url;
   }
 
+  /* `data.storagePath` is a raw bucket-relative path with no bucket
+   *  name, e.g. "<userId>/foo.png". `getSignedUrl` can't tell which
+   *  bucket it belongs to so it defaults to user_assets — wrong for
+   *  ai-media-stored generations, the sign call fails, and the silent
+   *  fallback hands the raw path back. OpenAI then rejects it as
+   *  "invalid URL format". Stick to candidates that are already a
+   *  fully-qualified URL or blob; AssetNode always sets `previewUrl`
+   *  alongside `storagePath`, so we don't lose any real cases. */
   const candidates = [
-    data.storagePath,
     data.imageUrl,
     data.image_url,
     data.previewUrl,
@@ -461,8 +469,17 @@ async function buildPromptOptimizerAttachments(
     }
 
     const imageUrl = await getSignedUrl(sourceUrl);
-    const key = imageUrl || `${ref.nodeId}:${sourceUrl}`;
-    if (!imageUrl || seen.has(key)) continue;
+    /* getSignedUrl falls back to the raw input string on failure
+     *  (e.g. wrong-bucket guess, missing object). OpenAI then rejects
+     *  it as "invalid URL format". Validate up front so the user gets
+     *  an actionable error tied to the specific reference. */
+    if (!imageUrl || !/^https?:\/\//i.test(imageUrl)) {
+      throw new Error(
+        `Image reference "${ref.label}" could not be resolved to a fetchable URL. The asset may be missing or the upload didn't finish — try removing and re-adding it.`,
+      );
+    }
+    const key = imageUrl;
+    if (seen.has(key)) continue;
     seen.add(key);
     attachments.push({
       imageUrl,
@@ -596,18 +613,6 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
     [connectedImageMentionOptions],
   );
 
-  useEffect(() => {
-    const current = d.content ?? "";
-    if (!current.includes("@[")) return;
-    const { text, removedLabels } = stripDisconnectedImageMentions(
-      current,
-      connectedImageMentionNodeIds,
-    );
-    if (removedLabels.length > 0 && text !== current) {
-      updateField("content", text);
-    }
-  }, [connectedImageMentionNodeIds, d.content, updateField]);
-
   const optimizePrompt = useCallback(async () => {
     const source = (d.content ?? "").trim();
     if (!source || isOptimizing) return;
@@ -654,7 +659,13 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
         },
       );
 
-      if (error) throw error;
+      if (error) {
+        /* supabase-js wraps non-2xx as a generic "Edge Function returned
+         *  a non-2xx status code". The real message (e.g. the OpenAI
+         *  error text the function threw) lives on `error.context` —
+         *  surface it so the toast says *why*, not just *that*. */
+        throw new Error(await functionErrorMessage(error));
+      }
       const content =
         typeof (result as { content?: unknown } | null)?.content === "string"
           ? (result as { content: string }).content
@@ -689,9 +700,11 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
 
   const mentionCount = useMemo(() => {
     const text = d.content ?? "";
-    const matches = text.match(/@\[[^\]]+\]\([^)]+\)/g);
-    return matches?.length ?? 0;
-  }, [d.content]);
+    const matches = [...text.matchAll(/@\[[^\]]+\]\(([^)]+)\)/g)];
+    if (matches.length === 0) return 0;
+    const liveNodeIds = new Set(graphNodes.map((n) => n.id));
+    return matches.filter((m) => liveNodeIds.has(m[1])).length;
+  }, [d.content, graphNodes]);
 
   /* Drag-to-resize from the bottom-right corner. Pointer-event based
    *  so it covers mouse + pen + touch with one handler. Pointer

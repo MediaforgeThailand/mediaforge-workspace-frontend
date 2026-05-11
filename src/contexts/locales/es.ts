@@ -3071,7 +3071,7 @@ export const es = {
     "Guarda un personaje u objeto como un elemento Omni Kling reutilizable. 4 ref + 1 frontal.",
   "workspace.toolnames.remove_bg": "Eliminar glucemia",
   "workspace.toolnames.remove_bg_desc":
-    "Quite el fondo de una imagen (BiRefNet a través de Replicate).",
+    "Quite el fondo de una imagen con Freepik/Magnific.",
   "workspace.toolnames.image_to_3d": "Imagen a 3D",
   "workspace.toolnames.image_to_3d_desc":
     "Convierta una imagen de referencia en una GLB mediante Tripo3D.",

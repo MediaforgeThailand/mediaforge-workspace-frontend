@@ -117,15 +117,15 @@ export const NODE_API_SCHEMA: Record<string, NodeApiDef> = {
    * Banana Pro Node — Image generation via Banana API
    */
   /**
-   * Remove Background Node — Strips background using Replicate BiRefNet.
+   * Remove Background Node - Strips background using Freepik/Magnific.
    * Returns transparent PNG.
    */
   removeBackgroundNode: {
     displayName: "Remove Background",
     category: "AI PROCESS",
     accentColor: "violet",
-    supportedModels: ["replicate-birefnet"],
-    defaultModel: "replicate-birefnet",
+    supportedModels: ["freepik-remove-bg"],
+    defaultModel: "freepik-remove-bg",
     inputs: [
       { id: "image", label: "image", color: "emerald", required: true },
     ],
@@ -137,11 +137,11 @@ export const NODE_API_SCHEMA: Record<string, NodeApiDef> = {
         key: "model_name",
         label: "Model",
         type: "select",
-        options: ["replicate-birefnet"],
+        options: ["freepik-remove-bg"],
         optionLabels: {
-          "replicate-birefnet": "BiRefNet (Replicate)",
+          "freepik-remove-bg": "Freepik Remove Background",
         },
-        default: "replicate-birefnet",
+        default: "freepik-remove-bg",
         required: true,
       },
     ],
