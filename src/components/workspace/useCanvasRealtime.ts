@@ -251,7 +251,13 @@ export function useCanvasRealtime() {
         if (!graph) return;
         const currentGraph = useWorkspaceStore.getState().graphs[canvasId];
         if (currentGraph && graphFingerprint(currentGraph) === graphFingerprint(graph)) return;
-        if (row.updated_by === user.id && graph.updatedAt <= lastLocalEditAtRef.current) {
+        /* Ignore our own writes unconditionally. The previous timestamp
+         *  guard fell through when autosave (~5s debounce) was still
+         *  in flight while the user kept typing — server `updated_at`
+         *  beat `lastLocalEditAtRef`, so the echo overwrote in-progress
+         *  local content and the text node flickered back. Trade-off:
+         *  same-user two-tab live sync is lost until reload. */
+        if (row.updated_by === user.id) {
           return;
         }
         remoteApplyingRef.current = true;
