@@ -113,7 +113,7 @@ const CardForm = ({ onSaved, onClose }: { onSaved?: () => void; onClose: () => v
       <Button
         type="submit"
         disabled={!stripe || submitting}
-        className="w-full bg-[#f4ff00] hover:bg-[#f4ff00] text-black"
+        className="ci-gloss-button w-full rounded-full"
       >
         {submitting ? (
           <>

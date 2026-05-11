@@ -155,7 +155,7 @@ const QuickCheckoutModal = ({
                 size="sm"
                 onClick={() => handlePurchase(HERO_TOPUP.id, "topup")}
                 disabled={loadingId === HERO_TOPUP.id}
-                className="bg-gradient-to-r from-[#f4ff00] to-[#d7e600] text-black font-bold text-xs px-4 h-9 rounded-lg shadow-[0_0_16px_rgba(245,158,11,0.3)] hover:shadow-[0_0_24px_rgba(245,158,11,0.45)] hover:scale-[1.03] transition-all border-0"
+                className="ci-gloss-button h-9 rounded-full px-4 text-xs font-bold transition-all hover:scale-[1.03]"
               >
                 {loadingId === HERO_TOPUP.id ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />

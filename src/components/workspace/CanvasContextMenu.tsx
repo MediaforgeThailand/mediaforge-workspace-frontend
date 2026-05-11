@@ -38,13 +38,15 @@ export type ToolCategory =
   | "text"
   | "addon";
 
-type ToolSection = "basics" | "media" | "references";
+type ToolSection = "basics" | "media" | "video" | "threed" | "tools";
 
-const SECTION_ORDER: ToolSection[] = ["basics", "media", "references"];
+const SECTION_ORDER: ToolSection[] = ["basics", "media", "video", "threed", "tools"];
 const SECTION_LABELS: Record<ToolSection, string> = {
   basics: "BASICS",
   media: "MEDIA",
-  references: "REFERENCES",
+  video: "VIDEO",
+  threed: "3D",
+  tools: "TOOLS",
 };
 
 const CATEGORY_TABS: Array<{
@@ -167,7 +169,7 @@ const CATALOG: ToolItem[] = [
     labelKey: "workspace.toolnames.kling_element",
     descriptionKey: "workspace.toolnames.kling_element_desc",
     defaultLabel: "Kling Element",
-    section: "references",
+    section: "video",
     category: "addon",
     icon: Users,
     tint: "rose",
@@ -178,7 +180,7 @@ const CATALOG: ToolItem[] = [
     labelKey: "workspace.toolnames.remove_bg",
     descriptionKey: "workspace.toolnames.remove_bg_desc",
     defaultLabel: "Remove Background",
-    section: "references",
+    section: "tools",
     category: "image",
     icon: Scissors,
     tint: "emerald",
@@ -189,7 +191,7 @@ const CATALOG: ToolItem[] = [
     labelKey: "workspace.toolnames.image_to_3d",
     descriptionKey: "workspace.toolnames.image_to_3d_desc",
     defaultLabel: "Image to 3D",
-    section: "references",
+    section: "threed",
     category: "threed",
     icon: Box,
     tint: "violet",

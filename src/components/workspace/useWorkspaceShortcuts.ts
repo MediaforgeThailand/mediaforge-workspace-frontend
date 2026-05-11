@@ -76,6 +76,14 @@ export function useWorkspaceShortcuts({
     return () => window.removeEventListener("mousemove", onMove);
   }, []);
 
+  useEffect(() => {
+    const clearInternalClipboard = () => {
+      clipboardRef.current = null;
+    };
+    window.addEventListener("blur", clearInternalClipboard);
+    return () => window.removeEventListener("blur", clearInternalClipboard);
+  }, []);
+
   /* ── Selection ───────────────────────────────────────────── */
   const selectAll = useCallback(() => {
     rf.setNodes((nds) => nds.map((n) => ({ ...n, selected: true })));
@@ -326,6 +334,13 @@ export function useWorkspaceShortcuts({
           return;
         }
         if (lower === "v") {
+          if (!clipboardRef.current) {
+            // Let the native paste event continue so screenshots/images
+            // copied from other apps can reach WorkspaceCanvas. Blocking
+            // here made Ctrl+V a no-op unless the user had copied a node
+            // inside this canvas first.
+            return;
+          }
           e.preventDefault();
           pasteFromClipboard(!shift);
           return;

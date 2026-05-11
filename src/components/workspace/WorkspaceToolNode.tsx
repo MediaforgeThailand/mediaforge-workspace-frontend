@@ -431,6 +431,7 @@ function resolveMentions(
   text: string | undefined,
   allNodes: ReadonlyArray<{ id: string; type?: string; data?: unknown }>,
   allEdges: ReadonlyArray<{ source: string; target: string; targetHandle?: string | null }> = [],
+  allowedNodeIds?: ReadonlySet<string>,
 ): { cleanText: string; mentioned: MentionedAsset[] } {
   const src = text ?? "";
   const mentioned: MentionedAsset[] = [];
@@ -440,9 +441,10 @@ function resolveMentions(
     label: string,
     node: { id: string; type?: string; data?: unknown },
   ) => {
+    if (allowedNodeIds && !allowedNodeIds.has(node.id)) return;
     if (seen.has(node.id)) return;
     const d = (node.data ?? {}) as any;
-    if (node.type === "assetNode") {
+    if (node.type === "assetNode" || node.type === "inputNode") {
       seen.add(node.id);
       mentioned.push({
         kind: "asset",
@@ -450,7 +452,7 @@ function resolveMentions(
         label,
         nodeId: node.id,
         url: d.previewUrl ?? d.storagePath ?? null,
-        fieldType: d.fieldType ?? null,
+        fieldType: d.fieldType ?? "image",
       });
       return;
     }
@@ -525,13 +527,70 @@ function resolveMentions(
     const name = m[1];
     const node = allNodes.find((x) => {
       const d = (x.data ?? {}) as any;
-      const matchType = x.type === "assetNode" || x.type === "elementNode";
+      const matchType =
+        x.type === "assetNode" || x.type === "inputNode" || x.type === "elementNode";
       return matchType && (d?.label === name || d?.nodeName === name);
     });
     if (node) pushMention(name, node);
   }
 
   return { cleanText: src, mentioned };
+}
+
+function selectedNodeGeneration(data: Record<string, unknown>) {
+  const generations = Array.isArray(data.generations)
+    ? (data.generations as Array<{ url?: string; type?: string; model_url?: string }>)
+    : [];
+  const selectedIndex =
+    typeof data.selectedGenIndex === "number" ? (data.selectedGenIndex as number) : 0;
+  return generations[selectedIndex] ?? generations[0];
+}
+
+function nodeCanProvideImageMentionRef(
+  node: { id: string; type?: string; data?: unknown } | undefined,
+  sourceHandle: string | null | undefined,
+): boolean {
+  if (!node) return false;
+  const data = (node.data ?? {}) as Record<string, unknown>;
+  if (node.type === "assetNode" || node.type === "inputNode") {
+    const fieldType = typeof data.fieldType === "string" ? data.fieldType : "image";
+    return fieldType === "image";
+  }
+  if (node.type === "groupNode") return false;
+  if (sourceHandle && portTypeFromHandleId(sourceHandle) !== "image") return false;
+  const generation = selectedNodeGeneration(data);
+  if (generation) return generation.type === "image" && typeof generation.url === "string";
+  return ["imageGenNode", "removeBackgroundNode", "bananaProNode"].includes(node.type ?? "");
+}
+
+function connectedTextNodeImageSourceIds(
+  textNodeId: string,
+  allNodes: ReadonlyArray<{ id: string; type?: string; data?: unknown }>,
+  allEdges: ReadonlyArray<{ source: string; target: string; sourceHandle?: string | null; targetHandle?: string | null }>,
+): Set<string> {
+  const ids = new Set<string>();
+  for (const edge of allEdges) {
+    if (edge.target !== textNodeId) continue;
+    if ((edge.targetHandle ?? "") !== "ref_image") continue;
+    const source = allNodes.find((node) => node.id === edge.source);
+    if (nodeCanProvideImageMentionRef(source, edge.sourceHandle)) ids.add(edge.source);
+  }
+  return ids;
+}
+
+function extractMentionNodeIds(text: string | undefined): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  const re = new RegExp(MENTION_REGEX.source, "g");
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text ?? "")) !== null) {
+    const nodeId = match[2];
+    if (!seen.has(nodeId)) {
+      seen.add(nodeId);
+      ids.push(nodeId);
+    }
+  }
+  return ids;
 }
 
 /**
@@ -569,10 +628,31 @@ function resolveInputs(nodeId: string): {
     if (e.target !== nodeId) continue;
     const src = nodes.find((n) => n.id === e.source);
     if (!src) continue;
-    const srcData = src.data as any;
+    const srcData = (src.data ?? {}) as Record<string, unknown>;
     const key = e.targetHandle ?? "default";
     if (src.type === "textNode") {
-      const { cleanText, mentioned } = resolveMentions(srcData?.content ?? "", nodes, edges);
+      const textContent = typeof srcData.content === "string" ? srcData.content : "";
+      const allowedImageIds = connectedTextNodeImageSourceIds(src.id, nodes, edges);
+      const tokenNodeIds = extractMentionNodeIds(textContent);
+      const disconnected = tokenNodeIds.filter((nodeId) => !allowedImageIds.has(nodeId));
+      if (disconnected.length > 0) {
+        throw new Error(
+          "Text node has @mentions that are not wired into its image-ref input. Connect those image nodes to the Text node first, or remove the stale mention chips.",
+        );
+      }
+      const { cleanText, mentioned } = resolveMentions(
+        textContent,
+        nodes,
+        edges,
+        allowedImageIds,
+      );
+      const resolvedMentionIds = new Set(mentioned.map((m) => m.nodeId));
+      const unresolved = tokenNodeIds.filter((nodeId) => !resolvedMentionIds.has(nodeId));
+      if (unresolved.length > 0) {
+        throw new Error(
+          "Text node has @mentions whose image output is not ready yet. Upload or generate those image refs first.",
+        );
+      }
       pushAt(key, cleanText);
       textMentioned.push(...mentioned);
     } else if (src.type === "assetNode") {
@@ -584,13 +664,13 @@ function resolveInputs(nodeId: string): {
       // wired Kling node 200 ms later, the bucket upload is still
       // in flight, the request goes out with the blob URL, and
       // refund happens 5 minutes later via the sweep cron.
-      if (srcData?.uploading === true) {
+      if (srcData.uploading === true) {
         throw new Error(
           "ไฟล์อ้างอิงยังอัปโหลดไม่เสร็จ — รอสักครู่แล้วกด Run อีกครั้ง / " +
             "Reference asset is still uploading — wait a moment and click Run again",
         );
       }
-      pushAt(key, srcData?.previewUrl ?? srcData?.storagePath ?? null);
+      pushAt(key, srcData.previewUrl ?? srcData.storagePath ?? null);
     } else if (src.type === "elementNode") {
       // Both saved (cached refs) + creator (walk edges) modes share the
       // same logic now — collectElementRefs handles both.
@@ -658,21 +738,119 @@ function resolveInputs(nodeId: string): {
         if (url && urlType === wantedType) childUrls.push(url);
       }
       for (const u of childUrls) pushAt(key, u);
-    } else if (Array.isArray(srcData?.generations) && srcData.generations.length > 0) {
+    } else if (Array.isArray(srcData.generations) && srcData.generations.length > 0) {
       // Tool nodes (Image Gen, Video Gen, BG Remove, Audio Merge, …)
       // store their Run output under `data.generations` — array of
       // { id, type, url?, text?, createdAt }, latest at index 0.
       // Wire the most-recently-selected generation's URL/text into
       // the downstream node's input.
+      const generations = srcData.generations as Array<{
+        url?: string;
+        text?: string;
+      }>;
       const idx =
         typeof srcData.selectedGenIndex === "number"
           ? (srcData.selectedGenIndex as number)
           : 0;
-      const gen = srcData.generations[idx] ?? srcData.generations[0];
+      const gen = generations[idx] ?? generations[0];
       pushAt(key, gen?.url ?? gen?.text ?? null);
     }
   }
   return { inputs: out, textMentioned };
+}
+
+function inputValueCount(value: unknown): number {
+  if (Array.isArray(value)) {
+    return value.filter((item) => typeof item === "string" && item.length > 0).length;
+  }
+  return typeof value === "string" && value.length > 0 ? 1 : 0;
+}
+
+function visibleImageRefHandles(schemaKey: string, selectedModel: string) {
+  return getWsVisibleInputs(schemaKey, selectedModel).filter((input) => {
+    if (!["ref_image", "reference_image", "image_input", "image", "start_frame"].includes(input.id)) {
+      return false;
+    }
+    return portTypeFromHandleId(input.id) === "image";
+  });
+}
+
+function imageMentionLimitForTarget(
+  schemaKey: string,
+  selectedModel: string,
+  inputs: Record<string, unknown>,
+): { supported: boolean; max: number; label: string; reason?: string } {
+  const model = selectedModel.toLowerCase();
+  if (
+    schemaKey === "videoGenNode" &&
+    (model.startsWith("seedance-2-0") || model.startsWith("dreamina-seedance-2-0")) &&
+    (inputs.start_frame || inputs.end_frame)
+  ) {
+    return {
+      supported: false,
+      max: 0,
+      label: "Seedance 2.0",
+      reason:
+        "Seedance 2.0 cannot mix start/end frames with Text-node image mentions. Remove one mode first.",
+    };
+  }
+
+  const handles = visibleImageRefHandles(schemaKey, selectedModel);
+  if (handles.length === 0) {
+    return { supported: false, max: 0, label: selectedModel };
+  }
+
+  if (schemaKey === "videoGenNode" && model.startsWith("veo-")) {
+    return { supported: true, max: 1, label: "Veo start frame" };
+  }
+
+  const preferred =
+    handles.find((handle) => handle.id === "ref_image") ??
+    handles.find((handle) => handle.id === "reference_image") ??
+    handles[0];
+  return {
+    supported: true,
+    max: preferred.maxConnections ?? 1,
+    label: preferred.label ?? preferred.id,
+  };
+}
+
+function validateMentionedImageRefsForTarget(args: {
+  schemaKey: string;
+  selectedModel: string;
+  inputs: Record<string, unknown>;
+  mentioned: MentionedAsset[];
+}): string | null {
+  const mentionedUrls = args.mentioned
+    .filter((m) => m.kind === "asset" && m.fieldType === "image" && typeof m.url === "string" && m.url)
+    .map((m) => m.url as string);
+  if (mentionedUrls.length === 0) return null;
+
+  const capability = imageMentionLimitForTarget(
+    args.schemaKey,
+    args.selectedModel,
+    args.inputs,
+  );
+  if (!capability.supported) {
+    return capability.reason ?? `${args.selectedModel || args.schemaKey} does not support image refs from Text-node mentions.`;
+  }
+
+  const handles = visibleImageRefHandles(args.schemaKey, args.selectedModel);
+  const explicitUrls = handles.flatMap((handle) => {
+    const value = args.inputs[handle.id];
+    if (Array.isArray(value)) {
+      return value.filter((item): item is string => typeof item === "string" && item.length > 0);
+    }
+    return typeof value === "string" && value.length > 0 ? [value] : [];
+  });
+  const total = new Set([...explicitUrls, ...mentionedUrls]).size;
+  if (total > capability.max) {
+    return `${args.selectedModel || args.schemaKey} accepts max ${capability.max} image ref(s), but this run has ${total} from direct wires + Text-node @mentions.`;
+  }
+  if (capability.max === 1 && inputValueCount(args.inputs.start_frame) + inputValueCount(args.inputs.image) > 0 && mentionedUrls.length > 0) {
+    return `${args.selectedModel || args.schemaKey} already has a single image input wired. Remove the extra Text-node image mention or the direct image input.`;
+  }
+  return null;
 }
 
 /**
@@ -1112,6 +1290,17 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         if (!mentionedMap.has(m.nodeId)) mentionedMap.set(m.nodeId, m);
       }
       const mentioned = Array.from(mentionedMap.values());
+
+      const imageRefValidationError = validateMentionedImageRefsForTarget({
+        schemaKey,
+        selectedModel,
+        inputs,
+        mentioned,
+      });
+      if (imageRefValidationError) {
+        toast.error(imageRefValidationError);
+        return;
+      }
 
       // Merge mention-resolved URLs into inputs as a fallback ref_image
       // (only for asset/image — so the backend can pick a primary

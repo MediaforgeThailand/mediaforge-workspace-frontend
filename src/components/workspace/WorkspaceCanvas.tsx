@@ -342,9 +342,16 @@ const PRO_OPTIONS = { hideAttribution: true } as const;
 const PASTE_FILE_EXT_BY_MIME: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
+  "image/jpg": "jpg",
   "image/webp": "webp",
   "image/gif": "gif",
   "image/svg+xml": "svg",
+  "video/mp4": "mp4",
+  "video/webm": "webm",
+  "audio/mpeg": "mp3",
+  "audio/mp3": "mp3",
+  "audio/wav": "wav",
+  "audio/webm": "webm",
 };
 
 function isClipboardMediaType(type: string): boolean {
@@ -354,6 +361,26 @@ function isClipboardMediaType(type: string): boolean {
     lower.startsWith("video/") ||
     lower.startsWith("audio/")
   );
+}
+
+function isClipboardMediaFile(file: File): boolean {
+  if (isClipboardMediaType(file.type)) return true;
+  return /\.(png|jpe?g|webp|gif|svg|mp4|webm|mov|mp3|wav|m4a)$/i.test(
+    file.name,
+  );
+}
+
+function inferClipboardMimeFromName(name: string): string {
+  const lower = name.toLowerCase();
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".gif")) return "image/gif";
+  if (lower.endsWith(".svg")) return "image/svg+xml";
+  if (lower.endsWith(".mp4")) return "video/mp4";
+  if (lower.endsWith(".webm")) return lower.includes("audio") ? "audio/webm" : "video/webm";
+  if (lower.endsWith(".mp3")) return "audio/mpeg";
+  if (lower.endsWith(".wav")) return "audio/wav";
+  return "image/png";
 }
 
 function pastedFileName(type: string, index: number): string {
@@ -371,9 +398,10 @@ function pastedFileName(type: string, index: number): string {
 }
 
 function normalizeClipboardFile(file: File, index: number): File {
-  if (file.name && file.name.trim()) return file;
-  return new File([file], pastedFileName(file.type || "image/png", index), {
-    type: file.type || "image/png",
+  const inferredType = file.type || inferClipboardMimeFromName(file.name);
+  if (file.name && file.name.trim() && file.type) return file;
+  return new File([file], file.name?.trim() || pastedFileName(inferredType, index), {
+    type: inferredType,
     lastModified: Date.now(),
   });
 }
@@ -411,6 +439,42 @@ async function asyncClipboardFiles(): Promise<File[]> {
   } catch {
     return [];
   }
+}
+
+function clipboardHtmlImageSources(event: ClipboardEvent): string[] {
+  const html = event.clipboardData?.getData("text/html")?.trim();
+  if (!html) return [];
+  try {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    return Array.from(doc.querySelectorAll("img"))
+      .map((img) => img.getAttribute("src")?.trim() ?? "")
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+async function clipboardHtmlFiles(event: ClipboardEvent): Promise<File[]> {
+  const sources = clipboardHtmlImageSources(event);
+  const files: File[] = [];
+  for (const source of sources) {
+    try {
+      const response = await fetch(source);
+      if (!response.ok) continue;
+      const blob = await response.blob();
+      if (!isClipboardMediaType(blob.type)) continue;
+      files.push(
+        new File([blob], pastedFileName(blob.type, files.length), {
+          type: blob.type,
+          lastModified: Date.now(),
+        }),
+      );
+    } catch {
+      // Cross-origin image URLs and foreign blob: URLs are not always
+      // readable. Keep trying other clipboard representations.
+    }
+  }
+  return files;
 }
 
 const nodeTypes = {
@@ -1790,11 +1854,30 @@ const Inner = () => {
     const onPaste = (event: ClipboardEvent) => {
       if (isViewer) return;
       const files = clipboardFiles(event).filter((file) =>
-        isClipboardMediaType(file.type),
+        isClipboardMediaFile(file),
       );
       if (files.length > 0) {
         event.preventDefault();
         pasteFilesAtViewportCentre(files);
+        return;
+      }
+
+      const htmlSources = clipboardHtmlImageSources(event);
+      if (htmlSources.length > 0) {
+        event.preventDefault();
+        void (async () => {
+          const asyncFiles = (await asyncClipboardFiles()).filter((file) =>
+            isClipboardMediaFile(file),
+          );
+          if (asyncFiles.length > 0) {
+            pasteFilesAtViewportCentre(asyncFiles);
+            return;
+          }
+          const htmlFiles = (await clipboardHtmlFiles(event)).filter((file) =>
+            isClipboardMediaFile(file),
+          );
+          if (htmlFiles.length > 0) pasteFilesAtViewportCentre(htmlFiles);
+        })();
         return;
       }
 
@@ -1803,7 +1886,7 @@ const Inner = () => {
       // so copied screenshots paste just like copied files.
       void asyncClipboardFiles().then((asyncFiles) => {
         const mediaFiles = asyncFiles.filter((file) =>
-          isClipboardMediaType(file.type),
+          isClipboardMediaFile(file),
         );
         if (mediaFiles.length === 0) return;
         pasteFilesAtViewportCentre(mediaFiles);

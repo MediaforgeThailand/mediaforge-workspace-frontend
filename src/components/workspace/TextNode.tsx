@@ -16,17 +16,19 @@
  *   }
  */
 
-import { memo, useCallback, useMemo, useRef, useState } from "react";
-import { type NodeProps, useReactFlow } from "@xyflow/react";
-import { AtSign, Loader2, Sparkles, Type } from "lucide-react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type Edge, type NodeProps, useEdges, useNodes, useReactFlow } from "@xyflow/react";
+import { AtSign, Loader2, Play, Type } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { getSignedUrl } from "@/hooks/useSignedUrl";
 import PromptMentionTextarea from "@/components/flow/nodes/PromptMentionTextarea";
 import { CLEAN_NODE_BODY_TOP_PX, PortIcon } from "./PortIcon";
 import { useLanguage } from "@/contexts/LanguageContext";
 import NodeQuickActionRail from "./NodeQuickActionRail";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { toast } from "sonner";
+import { portTypeFromHandleId } from "./workspaceSchema";
 import {
   Tooltip,
   TooltipContent,
@@ -60,7 +62,7 @@ const MAX_H = 800;
  *  This subtraction lets the textarea fill the resized box exactly,
  *  with the inline-style cap from PromptMentionTextarea handling
  *  scroll when content exceeds visible height. */
-const BODY_CHROME_H = 72;
+const BODY_CHROME_H = 58;
 const PROMPT_OPTIMIZER_FUNCTION = "workspace-chat";
 const PROMPT_OPTIMIZER_MODEL = "gpt-5.5";
 const BRACKETED_TOKEN_RE = /([#@])\[([^\]]+)\]\(([^)]+)\)/g;
@@ -83,6 +85,8 @@ const TEXT_NODE_MENTION_TYPES = [
   "groupNode",
 ];
 
+const TEXT_NODE_IMAGE_INPUT_HANDLE = "ref_image";
+
 const PROMPT_OPTIMIZER_SYSTEM_PROMPT = `You are a MediaForge prompt optimization engine.
 Rewrite the user's rough instruction into one practical English prompt for image/video generation or editing.
 Return only the final prompt text. No markdown, no title, no commentary.
@@ -94,6 +98,24 @@ type MentionableNode = {
   id: string;
   type?: string;
   data?: Record<string, unknown>;
+};
+
+type TextImageMentionOption = {
+  nodeId: string;
+  label: string;
+  type?: string;
+  icon?: "image" | "video" | "text" | "ai" | "textvar";
+  previewUrl?: string;
+  sourceUrl?: string;
+};
+
+type PromptOptimizerAttachment = {
+  imageUrl?: string;
+  dataUrl?: string;
+  mime?: string;
+  detail?: "low" | "high" | "auto";
+  label?: string;
+  sourceNodeId?: string;
 };
 
 type ProtectedToken = {
@@ -117,10 +139,111 @@ function getNodeLabel(node: MentionableNode): string {
   );
 }
 
+function selectedGeneration(data: Record<string, unknown>) {
+  const generations = Array.isArray(data.generations)
+    ? (data.generations as Array<Record<string, unknown>>)
+    : [];
+  const selectedIndex =
+    typeof data.selectedGenIndex === "number" ? data.selectedGenIndex : 0;
+  return generations[selectedIndex] ?? generations[0];
+}
+
+function imagePreviewForNode(node: MentionableNode): string | undefined {
+  const data = node.data ?? {};
+  const params = data.params as Record<string, unknown> | undefined;
+  const candidates = [
+    data.previewUrl,
+    data.preview_url,
+    data.thumbnailUrl,
+    data.thumbnail_url,
+    data.imageUrl,
+    data.image_url,
+    data.storagePath,
+    data.url,
+    params?.previewUrl,
+    params?.image_url,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) return candidate;
+  }
+  const generation = selectedGeneration(data);
+  if (generation?.type === "image" && typeof generation.url === "string") {
+    return generation.url;
+  }
+  return undefined;
+}
+
+function imageSourceForPromptOptimizer(node: MentionableNode): string | undefined {
+  const data = node.data ?? {};
+  const params = data.params as Record<string, unknown> | undefined;
+  const generation = selectedGeneration(data);
+  if (generation?.type === "image" && typeof generation.url === "string") {
+    return generation.url;
+  }
+
+  const candidates = [
+    data.storagePath,
+    data.imageUrl,
+    data.image_url,
+    data.previewUrl,
+    data.preview_url,
+    data.thumbnailUrl,
+    data.thumbnail_url,
+    data.url,
+    params?.image_url,
+    params?.previewUrl,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) return candidate;
+  }
+  return undefined;
+}
+
+function nodeCanProvideImageMention(
+  node: MentionableNode | undefined,
+  sourceHandle: string | null | undefined,
+): boolean {
+  if (!node) return false;
+  const data = node.data ?? {};
+  if (node.type === "assetNode" || node.type === "inputNode") {
+    const fieldType = typeof data.fieldType === "string" ? data.fieldType : "image";
+    return fieldType === "image";
+  }
+  if (node.type === "groupNode") return false;
+  if (sourceHandle && portTypeFromHandleId(sourceHandle) !== "image") return false;
+  const generation = selectedGeneration(data);
+  if (generation) return generation.type === "image" && typeof generation.url === "string";
+  return ["imageGenNode", "removeBackgroundNode", "bananaProNode"].includes(node.type ?? "");
+}
+
+function buildConnectedImageMentionOptions(
+  textNodeId: string,
+  nodes: MentionableNode[],
+  edges: Edge[],
+): TextImageMentionOption[] {
+  const byNode = new Map<string, TextImageMentionOption>();
+  for (const edge of edges) {
+    if (edge.target !== textNodeId) continue;
+    if ((edge.targetHandle ?? "") !== TEXT_NODE_IMAGE_INPUT_HANDLE) continue;
+    const source = nodes.find((node) => node.id === edge.source);
+    if (!nodeCanProvideImageMention(source, edge.sourceHandle)) continue;
+    if (!source || byNode.has(source.id)) continue;
+    byNode.set(source.id, {
+      nodeId: source.id,
+      label: getNodeLabel(source),
+      type: source.type ?? "assetNode",
+      icon: "image",
+      previewUrl: imagePreviewForNode(source),
+      sourceUrl: imageSourceForPromptOptimizer(source),
+    });
+  }
+  return Array.from(byNode.values());
+}
+
 function safeMentionLabel(label: string): string {
   return (
     label
-      .replace(/[\]\(\)]/g, " ")
+      .replace(/[\]()]/g, " ")
       .replace(/\s+/g, " ")
       .trim() || "reference"
   );
@@ -140,16 +263,17 @@ function isPlainMentionBoundary(text: string, index: number): boolean {
 
 function canonicalizePlainMentions(
   prompt: string,
-  nodes: MentionableNode[],
-  currentNodeId: string,
+  candidates: TextImageMentionOption[],
 ): string {
-  const candidates = nodes
-    .filter((node) => node.id !== currentNodeId)
-    .filter((node) => TEXT_NODE_MENTION_TYPES.includes(node.type ?? ""));
   const byKey = new Map<string, MentionableNode>();
 
-  for (const node of candidates) {
-    const label = getNodeLabel(node);
+  for (const option of candidates) {
+    const node: MentionableNode = {
+      id: option.nodeId,
+      type: option.type,
+      data: { label: option.label },
+    };
+    const label = option.label;
     const keys = [
       normalizeMentionKey(label),
       normalizeMentionKey(node.id),
@@ -171,6 +295,35 @@ function canonicalizePlainMentions(
   );
 }
 
+function compactMentionWhitespace(text: string): string {
+  return text
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+([,.;:!?])/g, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function stripDisconnectedImageMentions(
+  prompt: string,
+  allowedImageNodeIds: ReadonlySet<string>,
+): { text: string; removedLabels: string[] } {
+  const removedLabels: string[] = [];
+  const bracketed = new RegExp(BRACKETED_TOKEN_RE.source, "g");
+  const text = prompt.replace(
+    bracketed,
+    (full: string, sigil: string, label: string, nodeId: string) => {
+      if (sigil !== "@") return full;
+      if (allowedImageNodeIds.has(nodeId)) return full;
+      removedLabels.push(label || nodeId);
+      return "";
+    },
+  );
+  return {
+    text: compactMentionWhitespace(text),
+    removedLabels,
+  };
+}
+
 function rangeOverlaps(
   range: { start: number; end: number },
   ranges: Array<{ start: number; end: number }>,
@@ -183,6 +336,13 @@ function rangeOverlaps(
 function protectPromptTokens(prompt: string): {
   text: string;
   tokens: ProtectedToken[];
+};
+function protectPromptTokens(
+  prompt: string,
+  allowedImageNodeIds?: ReadonlySet<string>,
+): {
+  text: string;
+  tokens: ProtectedToken[];
 } {
   const ranges: Array<{
     start: number;
@@ -193,6 +353,11 @@ function protectPromptTokens(prompt: string): {
   let match: RegExpExecArray | null;
   const bracketed = new RegExp(BRACKETED_TOKEN_RE.source, "g");
   while ((match = bracketed.exec(prompt)) !== null) {
+    const sigil = match[1] ?? "";
+    const nodeId = match[3] ?? "";
+    if (sigil === "@" && allowedImageNodeIds && !allowedImageNodeIds.has(nodeId)) {
+      continue;
+    }
     ranges.push({
       start: match.index,
       end: match.index + match[0].length,
@@ -201,18 +366,20 @@ function protectPromptTokens(prompt: string): {
     });
   }
 
-  const plain = new RegExp(PLAIN_MENTION_RE.source, "g");
-  while ((match = plain.exec(prompt)) !== null) {
-    const start = match.index;
-    const end = start + match[0].length;
-    if (!isPlainMentionBoundary(prompt, start)) continue;
-    if (rangeOverlaps({ start, end }, ranges)) continue;
-    ranges.push({
-      start,
-      end,
-      token: match[0],
-      label: match[1] ?? match[0],
-    });
+  if (!allowedImageNodeIds) {
+    const plain = new RegExp(PLAIN_MENTION_RE.source, "g");
+    while ((match = plain.exec(prompt)) !== null) {
+      const start = match.index;
+      const end = start + match[0].length;
+      if (!isPlainMentionBoundary(prompt, start)) continue;
+      if (rangeOverlaps({ start, end }, ranges)) continue;
+      ranges.push({
+        start,
+        end,
+        token: match[0],
+        label: match[1] ?? match[0],
+      });
+    }
   }
 
   ranges.sort((a, b) => a.start - b.start);
@@ -258,13 +425,73 @@ function restoreProtectedTokens(
   return restored.trim();
 }
 
+function inferDataUrlMime(dataUrl: string): string | undefined {
+  const match = /^data:([^;]+);base64,/i.exec(dataUrl);
+  return match?.[1];
+}
+
+async function buildPromptOptimizerAttachments(
+  refs: TextImageMentionOption[],
+): Promise<PromptOptimizerAttachment[]> {
+  const seen = new Set<string>();
+  const attachments: PromptOptimizerAttachment[] = [];
+
+  for (const ref of refs) {
+    const sourceUrl = ref.sourceUrl ?? ref.previewUrl;
+    if (!sourceUrl) continue;
+
+    if (/^blob:/i.test(sourceUrl)) {
+      throw new Error(
+        `Image reference "${ref.label}" is still uploading. Wait for it to finish, then click Prompt again.`,
+      );
+    }
+
+    if (/^data:/i.test(sourceUrl)) {
+      const key = `${ref.nodeId}:data`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      attachments.push({
+        dataUrl: sourceUrl,
+        mime: inferDataUrlMime(sourceUrl),
+        detail: "low",
+        label: ref.label,
+        sourceNodeId: ref.nodeId,
+      });
+      continue;
+    }
+
+    const imageUrl = await getSignedUrl(sourceUrl);
+    const key = imageUrl || `${ref.nodeId}:${sourceUrl}`;
+    if (!imageUrl || seen.has(key)) continue;
+    seen.add(key);
+    attachments.push({
+      imageUrl,
+      detail: "low",
+      label: ref.label,
+      sourceNodeId: ref.nodeId,
+    });
+  }
+
+  return attachments;
+}
+
 function buildOptimizerUserMessage(
   prompt: string,
   tokens: ProtectedToken[],
+  attachments: PromptOptimizerAttachment[] = [],
 ): string {
   const refs = tokens.length
     ? tokens
         .map((token) => `- ${token.placeholder} = ${token.label}`)
+        .join("\n")
+    : "- none";
+  const attachedRefs = attachments.length
+    ? attachments
+        .map((attachment, index) => {
+          const label = attachment.label ?? attachment.sourceNodeId ?? "image reference";
+          const nodeId = attachment.sourceNodeId ? ` (${attachment.sourceNodeId})` : "";
+          return `- image input ${index + 1}: ${label}${nodeId}`;
+        })
         .join("\n")
     : "- none";
 
@@ -272,9 +499,14 @@ function buildOptimizerUserMessage(
     "Optimize this prompt for a real MediaForge generation node.",
     "The prompt may be written in Thai or mixed Thai/English. Convert the intent into clear English.",
     "Keep every reference placeholder in the final prompt exactly as listed.",
+    "Actual connected image inputs may be attached to this request. Use them to understand visual details, identity, style, and composition.",
+    "If an attached image is not explicitly represented by a protected placeholder, use it only as visual context and do not invent a new placeholder for it.",
     "",
     "Protected references:",
     refs,
+    "",
+    "Attached connected images:",
+    attachedRefs,
     "",
     "User prompt:",
     prompt,
@@ -324,6 +556,8 @@ function buildCanvasContext(
 const TextNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as unknown as TextNodeData;
   const { setNodes, getNodes, getEdges } = useReactFlow();
+  const graphNodes = useNodes();
+  const edges = useEdges();
   const { t } = useLanguage();
   const [isHovered, setIsHovered] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
@@ -347,6 +581,33 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
     [updateField],
   );
 
+  const connectedImageMentionOptions = useMemo(
+    () =>
+      buildConnectedImageMentionOptions(
+        id,
+        graphNodes as MentionableNode[],
+        edges,
+      ),
+    [edges, graphNodes, id],
+  );
+
+  const connectedImageMentionNodeIds = useMemo(
+    () => new Set(connectedImageMentionOptions.map((option) => option.nodeId)),
+    [connectedImageMentionOptions],
+  );
+
+  useEffect(() => {
+    const current = d.content ?? "";
+    if (!current.includes("@[")) return;
+    const { text, removedLabels } = stripDisconnectedImageMentions(
+      current,
+      connectedImageMentionNodeIds,
+    );
+    if (removedLabels.length > 0 && text !== current) {
+      updateField("content", text);
+    }
+  }, [connectedImageMentionNodeIds, d.content, updateField]);
+
   const optimizePrompt = useCallback(async () => {
     const source = (d.content ?? "").trim();
     if (!source || isOptimizing) return;
@@ -355,11 +616,30 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
     try {
       const nodes = getNodes() as MentionableNode[];
       const edges = getEdges();
-      const canonicalPrompt = canonicalizePlainMentions(source, nodes, id);
-      const protectedPrompt = protectPromptTokens(canonicalPrompt);
+      const { text: connectedOnlySource, removedLabels } =
+        stripDisconnectedImageMentions(source, connectedImageMentionNodeIds);
+      if (removedLabels.length > 0 && connectedOnlySource !== source) {
+        updateField("content", connectedOnlySource);
+        toast.info("Removed old image refs that are no longer connected to this Text node.");
+      }
+      if (!connectedOnlySource.trim()) {
+        throw new Error("Connect an image ref or write a prompt before optimizing.");
+      }
+      const canonicalPrompt = canonicalizePlainMentions(
+        connectedOnlySource,
+        connectedImageMentionOptions,
+      );
+      const protectedPrompt = protectPromptTokens(
+        canonicalPrompt,
+        connectedImageMentionNodeIds,
+      );
+      const attachments = await buildPromptOptimizerAttachments(
+        connectedImageMentionOptions,
+      );
       const userMessage = buildOptimizerUserMessage(
         protectedPrompt.text,
         protectedPrompt.tokens,
+        attachments,
       );
 
       const { data: result, error } = await supabase.functions.invoke(
@@ -368,7 +648,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
           body: {
             model: PROMPT_OPTIMIZER_MODEL,
             system_prompt: PROMPT_OPTIMIZER_SYSTEM_PROMPT,
-            messages: [{ role: "user", content: userMessage }],
+            messages: [{ role: "user", content: userMessage, attachments }],
             canvas_context: buildCanvasContext(nodes, edges),
           },
         },
@@ -391,7 +671,16 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
     } finally {
       setIsOptimizing(false);
     }
-  }, [d.content, getEdges, getNodes, id, isOptimizing, t, updateField]);
+  }, [
+    connectedImageMentionNodeIds,
+    connectedImageMentionOptions,
+    d.content,
+    getEdges,
+    getNodes,
+    isOptimizing,
+    t,
+    updateField,
+  ]);
 
   // Token count derived from serialised form — used by the footer chip.
   const onDeleteNode = useCallback(() => {
@@ -528,6 +817,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
             // legacy `inputNode` so a flow imported from the main
             // editor still resolves its mentions here.
             allowedNodeTypes={TEXT_NODE_MENTION_TYPES}
+            mentionOptionsOverride={connectedImageMentionOptions}
             /* `leading-snug` (1.375) replaces `leading-relaxed`
              *  (1.625). User reported the lines felt too far apart
              *  on the Text node specifically — same fix as
@@ -546,12 +836,14 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
         </div>
 
         {mentionCount > 0 && (
-          <div className="mt-1 flex shrink-0 items-center gap-1 pr-24 text-[9px] leading-none text-zinc-500">
-            <AtSign className="h-2.5 w-2.5" />
-            {mentionCount}{" "}
-            {mentionCount === 1
-              ? t("workspace.node.text_ref_singular")
-              : t("workspace.node.text_ref_plural")}
+          <div className="mt-0.5 flex shrink-0 items-center gap-1 pr-[86px] text-[9px] font-medium leading-none text-zinc-400/90">
+            <AtSign className="h-2.5 w-2.5 text-zinc-500" />
+            <span>
+              {mentionCount}{" "}
+              {mentionCount === 1
+                ? t("workspace.node.text_ref_singular")
+                : t("workspace.node.text_ref_plural")}
+            </span>
           </div>
         )}
 
@@ -577,7 +869,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
                 {isOptimizing ? (
                   <Loader2 className="animate-spin" />
                 ) : (
-                  <Sparkles />
+                  <Play className="fill-current" />
                 )}
                 <span>{t("workspace.node.prompt_optimize_label")}</span>
               </button>
@@ -608,6 +900,17 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
           title="Drag to resize"
         />
       )}
+
+      {/* Image refs wired here are the only nodes exposed in @mention. */}
+      <PortIcon
+        dir="target"
+        handleId={TEXT_NODE_IMAGE_INPUT_HANDLE}
+        label={t("workspace.port.ref_image")}
+        portType="image"
+        color={TEXT_COLOR}
+        index={0}
+        bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
+      />
 
       {/* Output handle — text-typed icon at the top-right cluster. */}
       <PortIcon

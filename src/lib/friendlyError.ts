@@ -158,6 +158,24 @@ const MAPPINGS: ErrorMapping[] = [
 
   // ── Validation ─────────────────────────────────────────────
   {
+    match: /Text node has @mentions that are not wired into its image-ref input|stale mention chips|not wired into its image-ref/i,
+    th: "Text node มีรูปอ้างอิงเก่าที่ไม่ได้เชื่อมต่อแล้ว กรุณาลบ mention เก่าหรือเลือก mention จากรูปที่เชื่อมเข้า Text node อยู่ตอนนี้",
+    en: "This Text node still contains an old image mention. Remove it or choose a reference that is currently connected to the Text node.",
+    ja: "この Text node には接続されていない古い画像参照が残っています。削除するか、現在接続されている参照を選んでください。",
+  },
+  {
+    match: /Text node has @mentions whose image output is not ready yet|image output is not ready/i,
+    th: "รูปอ้างอิงใน Text node ยังไม่พร้อม กรุณารอให้อัปโหลดหรือเจนรูปนั้นเสร็จก่อน",
+    en: "One of the image references in the Text node is not ready yet. Wait for the upload or generation to finish first.",
+    ja: "Text node の画像参照がまだ準備できていません。アップロードまたは生成が完了してから実行してください。",
+  },
+  {
+    match: /Text-node @mentions|image refs from Text-node mentions|accepts max \d+ image ref|direct wires \+ Text-node @mentions/i,
+    th: "จำนวนรูปอ้างอิงเกินกว่าที่โมเดลนี้รองรับ กรุณาลดรูปที่เชื่อมตรงหรือ mention ใน Text node ก่อนเจน",
+    en: "This model cannot accept that many image references. Remove extra direct wires or Text-node mentions before generating.",
+    ja: "このモデルが受け取れる画像参照数を超えています。直接接続または Text node の参照を減らしてください。",
+  },
+  {
     match: /still[\s_-]*uploading|asset[\s_-]*not[\s_-]*ready/i,
     th: "ไฟล์อ้างอิงยังอัปโหลดไม่เสร็จ รอสักครู่แล้วกด Run อีกครั้ง",
     en: "Reference file is still uploading — wait a moment and click Run again.",

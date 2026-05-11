@@ -48,7 +48,7 @@ export default function ClassEnroll() {
   const { user, refreshProfile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const redeemStarted = useRef(false);
+  const redeemStarted = useRef<string | null>(null);
 
   const [studentCode, setStudentCode] = useState("");
   const [retryNonce, setRetryNonce] = useState(0);
@@ -62,47 +62,71 @@ export default function ClassEnroll() {
   };
 
   useEffect(() => {
-    if (authLoading || !user || !code || redeemStarted.current) return;
-    redeemStarted.current = true;
+    if (authLoading || !user?.id || !code) return;
+    const redeemKey = `${user.id}:${code}:${retryNonce}`;
+    if (redeemStarted.current === redeemKey) return;
+    redeemStarted.current = redeemKey;
 
     let cancelled = false;
-    const redeem = async () => {
-      setStatus({ phase: "redeeming" });
-      const res = await enrollInClass(code);
-      if (cancelled) return;
-
-      if (!res.ok) {
-        setStatus({ phase: "error", error: res.error ?? "unknown_error" });
-        return;
+    let timedOut = false;
+    const failsafe = window.setTimeout(() => {
+      if (!cancelled) {
+        timedOut = true;
+        setStatus({ phase: "error", error: "enrollment_timeout" });
       }
+    }, 30_000);
 
-      const next = {
-        phase: "ok" as const,
-        class_name: res.class_name ?? "your class",
-        balance: res.starting_balance ?? 0,
-        class_id: res.class_id ?? "",
-        workspace_id: res.workspace_id,
-        student_code: res.student_code ?? null,
-        already_enrolled: Boolean(res.already_enrolled),
-      };
-      setStatus(next);
+    const redeem = async () => {
+      try {
+        setStatus({ phase: "redeeming" });
+        const res = await enrollInClass(code);
+        if (cancelled || timedOut) return;
+        window.clearTimeout(failsafe);
 
-      if (res.class_id) setActiveClassId(res.class_id);
-      qc.invalidateQueries({ queryKey: ["mf-um-class-memberships"] });
-      qc.invalidateQueries({ queryKey: ["class-memberships"] });
-      qc.invalidateQueries({ queryKey: ["education-student-lock"] });
-      await refreshProfile();
+        if (!res.ok) {
+          setStatus({ phase: "error", error: res.error ?? "unknown_error" });
+          return;
+        }
 
-      if (res.already_enrolled || res.student_code) {
-        redirectToWorkspace(res.workspace_id, res.already_enrolled ? 1400 : 1800);
+        const next = {
+          phase: "ok" as const,
+          class_name: res.class_name ?? "your class",
+          balance: res.starting_balance ?? 0,
+          class_id: res.class_id ?? "",
+          workspace_id: res.workspace_id,
+          student_code: res.student_code ?? null,
+          already_enrolled: Boolean(res.already_enrolled),
+        };
+        setStatus(next);
+
+        if (res.class_id) setActiveClassId(res.class_id);
+        qc.invalidateQueries({ queryKey: ["mf-um-class-memberships"] });
+        qc.invalidateQueries({ queryKey: ["class-memberships"] });
+        qc.invalidateQueries({ queryKey: ["education-student-lock"] });
+        void refreshProfile().catch((error) => {
+          console.warn("[ClassEnroll] profile refresh failed after enrollment", error);
+        });
+
+        if (res.already_enrolled || res.student_code) {
+          redirectToWorkspace(res.workspace_id, res.already_enrolled ? 1400 : 1800);
+        }
+      } catch (error) {
+        window.clearTimeout(failsafe);
+        if (!cancelled) {
+          setStatus({
+            phase: "error",
+            error: error instanceof Error ? error.message : "enrollment_failed",
+          });
+        }
       }
     };
 
     void redeem();
     return () => {
       cancelled = true;
+      window.clearTimeout(failsafe);
     };
-  }, [authLoading, code, navigate, qc, refreshProfile, retryNonce, user]);
+  }, [authLoading, code, retryNonce, user?.id]);
 
   const errorLabel = (error: string) => {
     switch (error) {
@@ -122,12 +146,22 @@ export default function ClassEnroll() {
         return "This class does not have enough pool credits for this QR code. Ask your teacher to add credits to the class pool.";
       case "not_signed_in":
         return i18n("classEnroll.error.notSignedIn");
+      case "auth_session_timeout":
+        return "Could not read your signed-in session. Please refresh this page or sign in again.";
       case "invalid_code":
         return i18n("classEnroll.error.invalidCode");
       case "student_code_required":
         return i18n("classEnroll.error.studentCodeRequired");
       case "email_domain_not_allowed":
         return "Use your college email account to join this class. Sign out and sign in again with the registered school domain.";
+      case "school_domain_not_configured":
+        return "This class is missing a verified school email domain. Ask the university admin or MediaForge support to add the institution domain before students join.";
+      case "enrollment_timeout":
+        return "Joining this class took too long. Please check your connection and try again.";
+      case "enrollment_network_error":
+        return "Could not reach the class enrollment service. Please try again.";
+      case "internal_error":
+        return "Class enrollment failed on the server. Please try again, or ask the teacher to refresh the QR code.";
       default:
         return error;
     }
@@ -267,7 +301,7 @@ export default function ClassEnroll() {
               <Button
                 variant="outline"
                 onClick={() => {
-                  redeemStarted.current = false;
+                  redeemStarted.current = null;
                   setStatus({ phase: "idle" });
                   setRetryNonce((value) => value + 1);
                 }}

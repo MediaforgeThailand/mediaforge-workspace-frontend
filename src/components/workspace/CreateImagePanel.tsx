@@ -578,10 +578,10 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
           <button
             onClick={handleCreate}
             disabled={running}
-            className="standalone-generate-button group relative flex h-[48px] w-full items-center justify-center gap-[6px] overflow-hidden rounded-[12px] bg-[linear-gradient(135deg,#f4ff00_0%,#e7ff12_54%,#b7d400_100%)] px-[8px] text-[15px] font-semibold leading-[20px] text-[#070707] shadow-[inset_0_1px_0_rgba(255,255,255,.58),inset_0_-5px_14px_rgba(79,90,0,.24),0_0_0_1px_rgba(244,255,0,.34),0_12px_34px_-16px_rgba(238,255,0,.86)] transition-all hover:bg-[linear-gradient(135deg,#fbff58_0%,#f0ff18_54%,#cae900_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,.68),inset_0_-5px_14px_rgba(79,90,0,.2),0_0_0_1px_rgba(244,255,0,.48),0_16px_40px_-14px_rgba(238,255,0,.92)] active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
+            className="standalone-generate-button ci-gloss-button group relative flex h-[48px] w-full items-center justify-center gap-[6px] overflow-hidden rounded-full border px-[8px] text-[15px] font-semibold leading-[20px] transition-all active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
           >
             <span className="pointer-events-none absolute inset-x-4 top-0 h-[16px] rounded-b-full bg-white/30 blur-[10px]" />
-            <span className="pointer-events-none absolute -left-8 top-1/2 h-20 w-28 -translate-y-1/2 rounded-full bg-[#f4ff00]/30 blur-2xl" />
+            <span className="pointer-events-none absolute -right-8 top-1/2 h-20 w-28 -translate-y-1/2 rounded-full bg-sky-200/25 blur-2xl" />
             <span className="relative">{running ? resolvedRunningLabel : resolvedCreateLabel}</span>
           </button>
         </div>
@@ -1046,10 +1046,10 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
             type="button"
             onClick={handleCreate}
             disabled={running}
-            className="standalone-generate-button group relative flex h-[42px] w-full items-center justify-center gap-[6px] overflow-hidden rounded-[12px] bg-[linear-gradient(135deg,#f4ff00_0%,#e7ff12_54%,#b7d400_100%)] px-[8px] text-[14px] font-semibold leading-[20px] text-[#070707] shadow-[inset_0_1px_0_rgba(255,255,255,.58),inset_0_-5px_14px_rgba(79,90,0,.24),0_0_0_1px_rgba(244,255,0,.34),0_12px_34px_-16px_rgba(238,255,0,.86)] transition-all hover:bg-[linear-gradient(135deg,#fbff58_0%,#f0ff18_54%,#cae900_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,.68),inset_0_-5px_14px_rgba(79,90,0,.2),0_0_0_1px_rgba(244,255,0,.48),0_16px_40px_-14px_rgba(238,255,0,.92)] active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
+            className="standalone-generate-button ci-gloss-button group relative flex h-[42px] w-full items-center justify-center gap-[6px] overflow-hidden rounded-full border px-[8px] text-[14px] font-semibold leading-[20px] transition-all active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
           >
             <span className="pointer-events-none absolute inset-x-4 top-0 h-[16px] rounded-b-full bg-white/30 blur-[10px]" />
-            <span className="pointer-events-none absolute -left-8 top-1/2 h-20 w-28 -translate-y-1/2 rounded-full bg-[#f4ff00]/30 blur-2xl" />
+            <span className="pointer-events-none absolute -right-8 top-1/2 h-20 w-28 -translate-y-1/2 rounded-full bg-sky-200/25 blur-2xl" />
             <span className="relative">{running ? resolvedRunningLabel : resolvedCreateLabel}</span>
           </button>
         </div>
@@ -2429,9 +2429,9 @@ function ModelSettingChip({ setting }: { setting: ModelSettingTag }) {
 
 const recommendedGradientFor = (index: number) => {
   const gradients = [
-    "bg-[radial-gradient(circle_at_20%_15%,rgba(80,210,255,.9),transparent_32%),linear-gradient(135deg,#0a4f86,#6d32d8_52%,#111113)]",
-    "bg-[radial-gradient(circle_at_55%_20%,rgba(255,211,92,.95),transparent_28%),linear-gradient(135deg,#4e1d76,#c0598b_50%,#17191b)]",
-    "bg-[radial-gradient(circle_at_70%_22%,rgba(255,126,54,.95),transparent_28%),linear-gradient(135deg,#19346e,#7c3bd8_48%,#111113)]",
+    "bg-[radial-gradient(circle_at_20%_15%,rgba(248,255,102,.82),transparent_32%),linear-gradient(135deg,#1a1a1a,#9fb800_52%,#111113)]",
+    "bg-[radial-gradient(circle_at_55%_20%,rgba(244,255,0,.86),transparent_28%),linear-gradient(135deg,#202326,#d7e600_50%,#17191b)]",
+    "bg-[radial-gradient(circle_at_70%_22%,rgba(255,255,255,.72),transparent_28%),linear-gradient(135deg,#111113,#9fb800_48%,#111113)]",
   ];
   return gradients[index % gradients.length];
 };

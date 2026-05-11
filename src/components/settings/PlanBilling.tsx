@@ -132,7 +132,7 @@ const compactOutlineButtonClass = cn(
 );
 const compactPrimaryButtonClass = cn(
   denseButtonClass,
-  "bg-[#f4ff00] text-black hover:bg-[#e7ff12]",
+  "ci-gloss-button rounded-full",
 );
 
 const PlanBilling = () => {

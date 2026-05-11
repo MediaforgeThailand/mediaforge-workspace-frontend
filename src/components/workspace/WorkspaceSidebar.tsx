@@ -218,7 +218,7 @@ export default function WorkspaceSidebar({
   //     panel from the main content (different elevation).
   //   • Width tightened 198 → 192 keeps the visual rhythm.
   return (
-    <div className="ws-scroll-hide h-full shrink-0 bg-black py-0 pl-0">
+    <div className="ws-scroll-hide h-full shrink-0 bg-black py-2 pl-0">
       <aside
         className="mf-readable ws-scroll-hide flex h-full w-[230px] flex-col gap-[4px] overflow-y-auto rounded-[20px] border border-transparent px-[4px] py-[12px] text-[#b0b4ba]"
         style={{
@@ -261,7 +261,7 @@ export default function WorkspaceSidebar({
         <button
           type="button"
           onClick={onCreate}
-          className="mx-[8px] mb-[6px] flex h-[36px] shrink-0 items-center justify-center gap-[8px] rounded-xl bg-[linear-gradient(135deg,rgba(244,255,0,.98),rgba(231,255,18,.86),rgba(183,212,0,.92))] px-[12px] text-[12px] font-semibold text-[#070707] shadow-[inset_0_1px_0_rgba(255,255,255,.32),inset_0_-5px_12px_rgba(79,90,0,.26),0_10px_24px_-18px_rgba(244,255,0,.95)] transition hover:brightness-110 active:translate-y-px"
+          className="ci-gloss-button mx-[8px] mb-[7px] flex h-[36px] shrink-0 items-center justify-center gap-[8px] rounded-full px-[13px] text-[12px] font-semibold transition hover:-translate-y-px active:translate-y-px"
           title={t("workspace.standalone.create_project")}
         >
           <Plus className="h-[15px] w-[15px] shrink-0" strokeWidth={2.2} />

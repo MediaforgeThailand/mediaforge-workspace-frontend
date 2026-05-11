@@ -97,10 +97,42 @@ function positionsFingerprint(nodes: WorkspaceNode[]): string {
   );
 }
 
+function stableJson(value: unknown): string {
+  const normalize = (item: unknown): unknown => {
+    if (Array.isArray(item)) return item.map((entry) => normalize(entry));
+    if (!item || typeof item !== "object") return item;
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(item as Record<string, unknown>).sort()) {
+      const normalized = normalize((item as Record<string, unknown>)[key]);
+      if (normalized !== undefined) out[key] = normalized;
+    }
+    return out;
+  };
+  return JSON.stringify(normalize(value));
+}
+
+function stripEphemeralNodeState(nodes: WorkspaceNode[]): WorkspaceNode[] {
+  return nodes.map((node) => {
+    const {
+      selected: _selected,
+      dragging: _dragging,
+      resizing: _resizing,
+      positionAbsolute: _positionAbsolute,
+      ...persisted
+    } = node as WorkspaceNode & {
+      positionAbsolute?: XYPosition;
+      selected?: boolean;
+      dragging?: boolean;
+      resizing?: boolean;
+    };
+    return persisted as WorkspaceNode;
+  });
+}
+
 function graphFingerprint(graph: CanvasGraph): string {
-  return JSON.stringify({
+  return stableJson({
     id: graph.id,
-    nodes: graph.nodes,
+    nodes: stripEphemeralNodeState(graph.nodes),
     edges: graph.edges,
     viewport: graph.viewport ?? null,
   });
@@ -187,6 +219,7 @@ export function useCanvasRealtime() {
   const lastGraphRef = useRef<CanvasGraph | null>(null);
   const remoteApplyingRef = useRef(false);
   const pendingTimerRef = useRef<number | null>(null);
+  const lastLocalEditAtRef = useRef(0);
   const clientId = useMemo(tabClientId, []);
   const localCollaborator = useMemo(
     () => (user ? userCollaborator(user, clientId) : null),
@@ -214,11 +247,13 @@ export function useCanvasRealtime() {
       },
       (payload) => {
         const row = payload.new as Record<string, unknown>;
-        if (row.updated_by === user.id) return;
         const graph = toGraph(row);
         if (!graph) return;
         const currentGraph = useWorkspaceStore.getState().graphs[canvasId];
         if (currentGraph && graphFingerprint(currentGraph) === graphFingerprint(graph)) return;
+        if (row.updated_by === user.id && graph.updatedAt <= lastLocalEditAtRef.current) {
+          return;
+        }
         remoteApplyingRef.current = true;
         replaceCanvasGraph(graph);
       },
@@ -385,6 +420,10 @@ export function useCanvasRealtime() {
       remoteApplyingRef.current = false;
       lastGraphRef.current = current;
       return;
+    }
+
+    if (graphFingerprint(previous) !== graphFingerprint(current)) {
+      lastLocalEditAtRef.current = Date.now();
     }
 
     const channel = collaborationChannelRef.current;

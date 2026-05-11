@@ -317,7 +317,7 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
             <Button
               onClick={handleSubmit}
               disabled={submitting || !isAmountValid}
-              className="h-11 w-full bg-gradient-to-b from-[#f4ff00] to-[#9fb800] text-[13.5px] font-semibold text-black hover:from-yellow-400 hover:to-yellow-600"
+              className="ci-gloss-button h-11 w-full rounded-full text-[13.5px] font-semibold"
             >
               {submitting ? (
                 <>
@@ -439,7 +439,7 @@ const BuyCreditsDialog = ({ open, onOpenChange, onSuccess }: BuyCreditsDialogPro
                 setStep("form");
                 setErrorMsg(null);
               }}
-              className="h-11 w-full bg-[#f4ff00] text-[13.5px] font-semibold text-black hover:bg-[#f8ff66]"
+              className="ci-gloss-button h-11 w-full rounded-full text-[13.5px] font-semibold"
             >
               {i18n("settings.buyCredits.tryAgain")}
             </Button>

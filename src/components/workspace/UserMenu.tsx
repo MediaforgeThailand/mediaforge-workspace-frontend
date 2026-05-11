@@ -374,7 +374,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
                 <button
                   type="button"
                   onClick={() => navigate("/app/pricing")}
-                  className="flex h-[30px] w-full items-center justify-center gap-[7px] rounded-[8px] bg-[#5367f5] px-[10px] text-[12px] font-semibold leading-none text-white transition-colors hover:bg-[#6274ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70"
+                  className="ci-gloss-button flex h-[30px] w-full items-center justify-center gap-[7px] rounded-full px-[10px] text-[12px] font-semibold leading-none transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200/80"
                 >
                   <Sparkles className="h-[13px] w-[13px]" />
                   {t("workspace.usermenu.upgrade")}
@@ -454,7 +454,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
                 <button
                   type="button"
                   onClick={(event) => event.stopPropagation()}
-                  className="flex h-[30px] min-w-[116px] items-center justify-between gap-2 rounded-[8px] border border-white/[0.12] bg-white/[0.04] px-[9px] text-[12px] font-semibold leading-none text-white transition hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/60"
+                  className="flex h-[30px] min-w-[116px] items-center justify-between gap-2 rounded-[8px] border border-white/[0.12] bg-white/[0.04] px-[9px] text-[12px] font-semibold leading-none text-white transition hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-200/70"
                   aria-expanded={languageMenuOpen}
                   aria-haspopup="listbox"
                 >
@@ -484,7 +484,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
                     onChange={(event) => setLanguageQuery(event.target.value)}
                     onKeyDown={(event) => event.stopPropagation()}
                     placeholder={t("workspace.userMenu.languageSearch")}
-                    className="h-[34px] w-full rounded-[8px] border border-white/[0.12] bg-white/[0.04] pl-8 pr-2.5 text-[12px] text-white outline-none placeholder:text-white/45 focus:border-sky-300/50"
+                    className="h-[34px] w-full rounded-[8px] border border-white/[0.12] bg-white/[0.04] pl-8 pr-2.5 text-[12px] text-white outline-none placeholder:text-white/45 focus:border-yellow-200/60"
                   />
                 </div>
                 <div className="mt-2 max-h-[156px] overflow-y-auto overscroll-contain pr-1" role="listbox">
@@ -508,11 +508,11 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
                         }}
                         className={cn(
                           "flex h-[34px] w-full items-center justify-between rounded-[8px] px-2 text-left text-[12px] font-medium text-white/85 transition hover:bg-white/[0.06]",
-                          option === language && "text-[#5b6df8]",
+                          option === language && "text-[#f4ff00]",
                         )}
                       >
                         <span>{getLanguageNativeLabel(option)}</span>
-                        {option === language && <Check className="h-[14px] w-[14px] text-[#5b6df8]" />}
+                        {option === language && <Check className="h-[14px] w-[14px] text-[#f4ff00]" />}
                       </button>
                     ))
                   )}

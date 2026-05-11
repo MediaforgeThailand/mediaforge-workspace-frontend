@@ -218,6 +218,44 @@ const WorkspaceCanvasPage = () => {
 
     /* ── Already have a target canvas locally — render now ── */
     if (targetCanvasId) {
+      if (authLoading) return;
+      if (user?.id) {
+        (async () => {
+          try {
+            const serverCanvases =
+              await loadCanvasesByWorkspaceFromServer(routeId);
+            if (cancelled) return;
+
+            if (serverCanvases && serverCanvases.length > 0) {
+              for (const g of serverCanvases) {
+                replaceCanvasGraph(g);
+              }
+              const freshest = serverCanvases[0]; // already sorted desc
+              const localTargetUpdatedAt =
+                useWorkspaceStore
+                  .getState()
+                  .canvases.find((c) => c.id === targetCanvasId)?.updatedAt ?? 0;
+              openCanvas(
+                freshest &&
+                  freshest.id !== targetCanvasId &&
+                  freshest.updatedAt > localTargetUpdatedAt
+                  ? freshest.id
+                  : targetCanvasId,
+              );
+              setHydrated(true);
+              return;
+            }
+          } catch {
+            // Offline / table missing: fall through to the local cache.
+          }
+
+          openCanvas(targetCanvasId);
+          setHydrated(true);
+        })();
+        return () => {
+          cancelled = true;
+        };
+      }
       openCanvas(targetCanvasId);
       setHydrated(true);
       // Refresh the WHOLE workspace from server in the background.

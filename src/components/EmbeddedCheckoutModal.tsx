@@ -128,7 +128,7 @@ const PaymentForm = ({
       <Button
         type="submit"
         disabled={!stripe || submitting}
-        className="w-full bg-gradient-to-r from-[#f4ff00] to-[#b7d400] text-black font-bold hover:scale-[1.01] transition-transform"
+        className="ci-gloss-button w-full rounded-full font-bold hover:scale-[1.01] transition-transform"
       >
         {submitting ? (
           <>
@@ -385,7 +385,7 @@ const EmbeddedCheckoutModal = ({
               </div>
               <Button
                 type="button"
-                className="w-full bg-gradient-to-r from-[#f4ff00] to-[#b7d400] text-black font-bold"
+                className="ci-gloss-button w-full rounded-full font-bold"
                 onClick={() => {
                   onSuccess?.();
                   onOpenChange(false);

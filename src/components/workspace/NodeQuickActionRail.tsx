@@ -19,7 +19,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage, getLanguageLocale, type Language } from "@/contexts/LanguageContext";
 
 type NodeQuickActionRailProps = {
   visible: boolean;
@@ -83,11 +83,11 @@ function formatBytes(bytes: number | null | undefined): string {
   return `${value.toFixed(precision)} ${units[unitIndex]}`;
 }
 
-function formatAddedDate(value: number | string | null | undefined): string {
+function formatAddedDate(value: number | string | null | undefined, language: Language): string {
   if (value == null) return UNKNOWN_VALUE;
   const date = typeof value === "number" ? new Date(value) : new Date(value);
   if (Number.isNaN(date.getTime())) return UNKNOWN_VALUE;
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return date.toLocaleDateString(getLanguageLocale(language), { month: "short", day: "numeric" });
 }
 
 function getFormatFromSource(
@@ -177,7 +177,7 @@ export default function NodeQuickActionRail({
   const [resolvedInfo, setResolvedInfo] = useState<MediaInfo | null>(null);
   const [infoLoading, setInfoLoading] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const canShowInfo =
     !!mediaUrl && (mediaKind === "image" || mediaKind === "video" || mediaKind === "model3d");
 
@@ -198,9 +198,9 @@ export default function NodeQuickActionRail({
       format: getFormatFromSource(mediaUrl, mediaFileName, mediaKind),
       size: formatBytes(mediaSizeBytes),
       dimensions: UNKNOWN_VALUE,
-      added: formatAddedDate(mediaCreatedAt),
+      added: formatAddedDate(mediaCreatedAt, language),
     }),
-    [mediaCreatedAt, mediaFileName, mediaKind, mediaSizeBytes, mediaUrl],
+    [mediaCreatedAt, mediaFileName, mediaKind, mediaSizeBytes, mediaUrl, language],
   );
 
   useEffect(() => {

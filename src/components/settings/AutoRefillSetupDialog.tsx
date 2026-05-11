@@ -159,7 +159,7 @@ const CardForm = ({ threshold, amountThb, setupIntentId, onSuccess }: CardFormPr
       <button
         type="submit"
         disabled={!stripe || submitting}
-        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#f4ff00] px-4 text-[13px] font-semibold text-black transition-colors hover:bg-[#e7ff12] disabled:cursor-not-allowed disabled:opacity-60"
+        className="ci-gloss-button inline-flex h-10 w-full items-center justify-center gap-2 rounded-full px-4 text-[13px] font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-60"
       >
         {submitting ? (
           <>
@@ -334,7 +334,7 @@ export function AutoRefillSetupDialog({
                 "inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg px-4 text-[13px] font-semibold transition-colors",
                 loading
                   ? "cursor-not-allowed bg-yellow-500/40 text-black/60"
-                  : "bg-[#f4ff00] text-black hover:bg-[#e7ff12]",
+                  : "ci-gloss-button rounded-full",
               )}
             >
               {loading ? (
