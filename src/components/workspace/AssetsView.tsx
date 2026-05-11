@@ -51,6 +51,8 @@ import {
   ChevronDown,
   RefreshCcw,
   ExternalLink,
+  Eye,
+  Copy,
   Download,
   Trash2,
   AlertTriangle,
@@ -66,9 +68,9 @@ import { getSignedUrl } from "@/hooks/useSignedUrl";
 import { cn } from "@/lib/utils";
 import NodePreviewLightbox, { type PreviewPayload } from "./NodePreviewLightbox";
 import { downloadFromUrl } from "./downloadAsset";
-import MediaContextMenu from "./MediaContextMenu";
-import { buildMediaMenuItems } from "./mediaMenuItems";
-import { useMediaContextMenu } from "./useMediaContextMenu";
+import MediaContextMenu, {
+  type MediaContextMenuItem,
+} from "./MediaContextMenu";
 import {
   Dialog,
   DialogContent,
@@ -1188,7 +1190,7 @@ function AssetCard({
   const Icon = KIND_ICON[asset.kind];
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [hovered, setHovered] = useState(false);
-  const ctxMenu = useMediaContextMenu();
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   // Lazily play / pause on hover so the grid doesn't choke on a
   // page full of <video autoplay loop>.
@@ -1215,17 +1217,56 @@ function AssetCard({
       ? `${Math.round(asset.durationSec)}s`
       : null;
   const dateLabel = formatRelative(asset.createdAt, t, language);
-  const contextMenuItems = buildMediaMenuItems(t, {
-    onPreview: () => onPreview(asset),
-    onDownload: () =>
-      void downloadFromUrl(
-        asset.url,
-        asset.source === "generation"
-          ? asset.prompt || t("workspace.assets.gen_fallback")
-          : asset.name,
-      ),
-    onDelete: () => onDelete(asset),
-  });
+  const contextMenuItems: MediaContextMenuItem[] = [
+    {
+      key: "preview",
+      label: t("workspace.mediaMenu.preview"),
+      icon: Eye,
+      onSelect: () => onPreview(asset),
+    },
+    {
+      key: "download",
+      label: t("workspace.mediaMenu.download"),
+      icon: Download,
+      onSelect: () =>
+        void downloadFromUrl(
+          asset.url,
+          asset.source === "generation"
+            ? asset.prompt || t("workspace.assets.gen_fallback")
+            : asset.name,
+        ),
+    },
+    {
+      key: "duplicate",
+      label: t("workspace.mediaMenu.duplicate"),
+      icon: Copy,
+      disabled: true,
+      onSelect: () => undefined,
+    },
+    {
+      key: "move-board",
+      label: t("workspace.mediaMenu.moveToBoard"),
+      icon: Folder,
+      separatorBefore: true,
+      disabled: true,
+      onSelect: () => undefined,
+    },
+    {
+      key: "copy-board",
+      label: t("workspace.mediaMenu.copyToBoard"),
+      icon: Copy,
+      disabled: true,
+      onSelect: () => undefined,
+    },
+    {
+      key: "delete",
+      label: t("workspace.mediaMenu.delete"),
+      icon: Trash2,
+      separatorBefore: true,
+      danger: true,
+      onSelect: () => onDelete(asset),
+    },
+  ];
 
   return (
     <div
@@ -1241,7 +1282,11 @@ function AssetCard({
         tabIndex={0}
         title={t("workspace.assets.open_download")}
         onClick={() => onPreview(asset)}
-        onContextMenu={ctxMenu.openAt}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          setContextMenu({ x: event.clientX, y: event.clientY });
+        }}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
@@ -1338,11 +1383,11 @@ function AssetCard({
           </span>
         </div>
       </div>
-      {ctxMenu.position && (
+      {contextMenu && (
         <MediaContextMenu
-          position={ctxMenu.position}
+          position={contextMenu}
           items={contextMenuItems}
-          onClose={ctxMenu.close}
+          onClose={() => setContextMenu(null)}
         />
       )}
     </div>

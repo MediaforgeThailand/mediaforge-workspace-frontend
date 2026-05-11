@@ -1,10 +1,11 @@
 /**
  * WorkspaceCanvasPagePill — floating bottom-left page switcher.
  *
- * Floating bottom-left page switcher. The pill shows the active
- * page's name + autosave state; clicking it opens a popover
+ * Replaces the old top-row WorkspaceTabBar. The pill shows the
+ * active page's name + autosave state; clicking it opens a popover
  * (anchored ABOVE the pill) that lists every page in the current
- * workspace with rename / delete / new-page affordances.
+ * workspace with the same rename / delete / new-page affordances
+ * the tab bar had.
  *
  * Layout:
  *   - Fixed at bottom-left of the viewport.
@@ -40,7 +41,7 @@ import { selectCanMutate, useWorkspaceShareRole } from "@/store/useWorkspaceShar
 
 const WorkspaceCanvasPagePill = () => {
   const { t } = useLanguage();
-  /* ── Store wiring ─────────────────────────────────────────── */
+  /* ── Store wiring (mirrors WorkspaceTabBar) ───────────────── */
   const allCanvases = useWorkspaceStore((s) => s.canvases);
   const currentWorkspaceId = useWorkspaceStore(
     (s) => s.current?.workspaceId ?? null,
@@ -70,7 +71,7 @@ const WorkspaceCanvasPagePill = () => {
     }
   }, [editingId]);
 
-  /* ── Actions ──────────────────────────────────────────────── */
+  /* ── Actions (verbatim copy of WorkspaceTabBar handlers) ─── */
   const openTab = (id: string) => {
     if (id !== currentId) openCanvasAction(id);
     setOpen(false);
