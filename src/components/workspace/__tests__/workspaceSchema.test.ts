@@ -12,6 +12,9 @@ import {
   gptImage2ResolutionsFor,
   splitGptImageSize,
   composeGptImageSize,
+  isVideoFrameImageOutputHandle,
+  textNodeImageOutputHandle,
+  textNodeVideoOutputHandle,
 } from "../workspaceSchema";
 
 describe("portTypeFromHandleId", () => {
@@ -48,6 +51,16 @@ describe("portTypeFromHandleId", () => {
     expect(portTypeFromHandleId("ref_image")).toBe("image");
     expect(portTypeFromHandleId("start_frame")).toBe("image");
     expect(portTypeFromHandleId("output_image")).toBe("image");
+    expect(portTypeFromHandleId("output_start_frame")).toBe("image");
+    expect(portTypeFromHandleId("output_end_frame")).toBe("image");
+    expect(portTypeFromHandleId(textNodeImageOutputHandle("node-1"))).toBe("image");
+    expect(portTypeFromHandleId(textNodeVideoOutputHandle("node-2"))).toBe("video");
+  });
+
+  it("identifies video asset frame outputs as image handles", () => {
+    expect(isVideoFrameImageOutputHandle("output_start_frame")).toBe(true);
+    expect(isVideoFrameImageOutputHandle("output_end_frame")).toBe(true);
+    expect(isVideoFrameImageOutputHandle("output_video")).toBe(false);
   });
 
   it("falls back to 'image' for unknown ids (most workspace ports are images)", () => {

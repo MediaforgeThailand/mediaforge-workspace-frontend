@@ -66,7 +66,15 @@ import NodePreviewLightbox, {
   type PreviewPayload,
 } from "./NodePreviewLightbox";
 import { ImageCropTool } from "./ImageCropTool";
-import { getWorkspaceSchema, portTypeFromHandleId } from "./workspaceSchema";
+import {
+  getWorkspaceSchema,
+  getWsVisibleInputs,
+  isTextNodeImageOutputHandle,
+  isTextNodeVideoOutputHandle,
+  isVideoFrameImageOutputHandle,
+  portTypeFromHandleId,
+  textNodeVideoOutputHandle,
+} from "./workspaceSchema";
 import { inheritParamsFromSource } from "./inheritParams";
 import CanvasNodePicker, {
   type CanvasNodePickerState,
@@ -298,6 +306,56 @@ function hasSeedanceV2ModeConflict(args: {
     return mode !== null && mode !== nextMode;
   });
   return hasOppositeMode;
+}
+
+function availableVideoTargetHandlesForNode(
+  targetNode: Node | undefined,
+  edgeList: ReadonlyArray<Edge>,
+): string[] {
+  if (!targetNode?.type) return [];
+  const schema = getWorkspaceSchema(targetNode.type);
+  if (!schema) return [];
+  const selectedModel = nodeModelName(targetNode, schema.defaultModel);
+  return getWsVisibleInputs(targetNode.type, selectedModel)
+    .filter((input) => VIDEO_TARGETS.has(input.id))
+    .filter((input) => {
+      const max = input.maxConnections ?? 1;
+      const existing = edgeList.filter(
+        (edge) => edge.target === targetNode.id && edge.targetHandle === input.id,
+      ).length;
+      return existing < max;
+    })
+    .map((input) => input.id);
+}
+
+function textNodeConnectedVideoSourceIds(
+  textNodeId: string,
+  nodeList: ReadonlyArray<Node>,
+  edgeList: ReadonlyArray<Edge>,
+): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const edge of edgeList) {
+    if (edge.target !== textNodeId) continue;
+    if ((edge.targetHandle ?? "") !== "ref_video") continue;
+    const source = nodeList.find((node) => node.id === edge.source);
+    const sourceType = source?.type ?? "";
+    const sourceData = (source?.data ?? {}) as AssetNodeData & { generations?: Array<{ type?: string; url?: string }> };
+    const fieldType = sourceType === "assetNode" || sourceType === "inputNode"
+      ? sourceData.fieldType
+      : undefined;
+    const generation = Array.isArray(sourceData.generations)
+      ? sourceData.generations[0]
+      : undefined;
+    const isVideoSource =
+      fieldType === "video" ||
+      portTypeFromHandleId(edge.sourceHandle ?? "") === "video" ||
+      (generation?.type === "video" && typeof generation.url === "string");
+    if (!isVideoSource || seen.has(edge.source)) continue;
+    seen.add(edge.source);
+    ids.push(edge.source);
+  }
+  return ids;
 }
 
 /**
@@ -694,6 +752,60 @@ const Inner = () => {
   const onNodesChange = useWorkspaceStore((s) => s.onNodesChange);
   const onEdgesChange = useWorkspaceStore((s) => s.onEdgesChange);
   const onConnect = useWorkspaceStore((s) => s.onConnect);
+  const onConnectWithTextVideoPassthrough = useCallback(
+    (connection: Connection) => {
+      onConnect(connection);
+
+      const sourceHandle = connection.sourceHandle ?? "default";
+      const targetHandle = connection.targetHandle ?? "";
+      if (
+        sourceHandle !== "default" ||
+        !connection.source ||
+        !connection.target ||
+        !TEXT_TARGETS.has(targetHandle)
+      ) {
+        return;
+      }
+
+      let state = useWorkspaceStore.getState();
+      let nodeList = state.current?.nodes ?? [];
+      let edgeList = state.current?.edges ?? [];
+      const sourceNode = nodeList.find((node) => node.id === connection.source);
+      const targetNode = nodeList.find((node) => node.id === connection.target);
+      if (sourceNode?.type !== "textNode" || !targetNode) return;
+
+      const videoSourceIds = textNodeConnectedVideoSourceIds(
+        sourceNode.id,
+        nodeList,
+        edgeList,
+      );
+      if (videoSourceIds.length === 0) return;
+
+      for (const videoSourceId of videoSourceIds) {
+        state = useWorkspaceStore.getState();
+        nodeList = state.current?.nodes ?? [];
+        edgeList = state.current?.edges ?? [];
+        const nextHandle = availableVideoTargetHandlesForNode(targetNode, edgeList)[0];
+        if (!nextHandle) break;
+        const videoOutputHandle = textNodeVideoOutputHandle(videoSourceId);
+        const duplicate = edgeList.some(
+          (edge) =>
+            edge.source === sourceNode.id &&
+            edge.sourceHandle === videoOutputHandle &&
+            edge.target === targetNode.id &&
+            edge.targetHandle === nextHandle,
+        );
+        if (duplicate) continue;
+        onConnect({
+          source: sourceNode.id,
+          sourceHandle: videoOutputHandle,
+          target: targetNode.id,
+          targetHandle: nextHandle,
+        });
+      }
+    },
+    [onConnect],
+  );
   const addSchemaNode = useWorkspaceStore((s) => s.addSchemaNode);
   const addAssetNode = useWorkspaceStore((s) => s.addAssetNode);
   const updateNodeData = useWorkspaceStore((s) => s.updateNodeData);
@@ -2184,10 +2296,18 @@ const Inner = () => {
               // Generic source → describe the type mismatch in plain
               // language. Pull source type from src's data / schema.
               let srcKind: string = "media";
-              if (src?.type === "textNode") srcKind = "text";
+              if (src?.type === "textNode") {
+                srcKind = isTextNodeImageOutputHandle(start.handleId)
+                  ? "image"
+                  : isTextNodeVideoOutputHandle(start.handleId)
+                    ? "video"
+                    : "text";
+              }
               else if (src?.type === "elementNode") srcKind = "element";
               else if (src?.type === "assetNode") {
-                srcKind = assetFieldType(src) ?? "media";
+                srcKind = isVideoFrameImageOutputHandle(start.handleId)
+                  ? "image"
+                  : assetFieldType(src) ?? "media";
               } else if (src?.type) {
                 const sh = start.handleId ?? "";
                 if (sh === "output_video" || sh === "video") srcKind = "video";
@@ -2271,11 +2391,11 @@ const Inner = () => {
               target: picker.fromNode.id,
               targetHandle: picker.fromHandleId || null,
             };
-        onConnect(conn);
+        onConnectWithTextVideoPassthrough(conn);
       }
       setPicker(null);
     },
-    [picker, addSchemaNode, onConnect],
+    [picker, addSchemaNode, onConnectWithTextVideoPassthrough],
   );
 
   /**
@@ -2303,11 +2423,19 @@ const Inner = () => {
      * unknown handle ids are rejected and surface a toast so we can fix
      * the schema instead of silently accepting garbage edges. */
     let typeOk = false;
-    if (srcType === "textNode") typeOk = TEXT_TARGETS.has(th);
+    if (srcType === "textNode") {
+      const sh = conn.sourceHandle ?? "default";
+      typeOk = isTextNodeImageOutputHandle(sh)
+        ? IMAGE_TARGETS.has(th)
+        : isTextNodeVideoOutputHandle(sh)
+          ? VIDEO_TARGETS.has(th)
+          : TEXT_TARGETS.has(th);
+    }
     else if (srcType === "elementNode") typeOk = ELEMENT_TARGETS.has(th);
     else if (srcType === "assetNode") {
       const ft = assetFieldType(src);
-      if (ft === "image") typeOk = IMAGE_TARGETS.has(th);
+      if (isVideoFrameImageOutputHandle(conn.sourceHandle)) typeOk = IMAGE_TARGETS.has(th);
+      else if (ft === "image") typeOk = IMAGE_TARGETS.has(th);
       else if (ft === "video") typeOk = VIDEO_TARGETS.has(th);
       else if (ft === "audio") typeOk = AUDIO_TARGETS.has(th);
       else if (ft === "model3d") typeOk = MODEL3D_TARGETS.has(th);
@@ -2461,7 +2589,7 @@ const Inner = () => {
         nodeTypes={memoNodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
+        onConnect={onConnectWithTextVideoPassthrough}
         onConnectStart={onConnectStart}
         onConnectEnd={onConnectEnd}
         onMoveEnd={onMoveEnd}

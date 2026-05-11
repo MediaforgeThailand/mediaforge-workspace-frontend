@@ -9,8 +9,8 @@
  * Only has an output handle — assets are sources, not sinks.
  */
 
-import { memo, useCallback, useMemo, useState } from "react";
-import { type NodeProps, useReactFlow } from "@xyflow/react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { type NodeProps, useEdges, useReactFlow } from "@xyflow/react";
 import {
   Image as ImageIcon,
   Film,
@@ -32,6 +32,8 @@ import MediaContextMenu, {
   type MediaContextMenuItem,
 } from "./MediaContextMenu";
 import NodeQuickActionRail from "./NodeQuickActionRail";
+import { supabase } from "@/integrations/supabase/client";
+import { isVideoFrameImageOutputHandle } from "./workspaceSchema";
 
 export interface AssetNodeData {
   /** Editable label — this is what @-mentions reference. */
@@ -47,6 +49,14 @@ export interface AssetNodeData {
   fileName?: string;
   /** Supabase storage path, populated after upload completes. */
   storagePath?: string;
+  /** Extracted JPEG frames for video assets. These are image outputs,
+   *  not video outputs, so they can connect to start/end image inputs. */
+  startFrameUrl?: string;
+  endFrameUrl?: string;
+  frameSourceKey?: string;
+  frameExtractionUrlKey?: string;
+  extractingVideoFrames?: boolean;
+  frameExtractionError?: string;
   uploading?: boolean;
   /**
    * Creator-picked role for this reference. Drives the per-image
@@ -79,10 +89,128 @@ const PORT_COLOR: Record<AssetNodeData["fieldType"], string> = {
 
 const WORKSPACE_NODE_UI_SCALE = 1.15;
 const DEFAULT_ASSET_NODE_WIDTH = 219;
+const STORAGE_BUCKET = "ai-media";
+const SIGNED_URL_TTL_SEC = 60 * 60 * 24 * 365;
+
+function safeStorageSegment(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 96) || "asset";
+}
+
+function waitForVideoEvent(
+  video: HTMLVideoElement,
+  eventName: "loadedmetadata" | "loadeddata" | "seeked",
+  timeoutMs = 15_000,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error(`Timed out waiting for video ${eventName}`));
+    }, timeoutMs);
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      video.removeEventListener(eventName, onReady);
+      video.removeEventListener("error", onError);
+    };
+    const onReady = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error("Could not load video for frame extraction"));
+    };
+    video.addEventListener(eventName, onReady, { once: true });
+    video.addEventListener("error", onError, { once: true });
+  });
+}
+
+async function seekVideo(video: HTMLVideoElement, time: number): Promise<void> {
+  if (video.readyState < 2) {
+    await waitForVideoEvent(video, "loadeddata");
+  }
+  if (Math.abs(video.currentTime - time) < 0.02) return;
+  const seeked = waitForVideoEvent(video, "seeked");
+  video.currentTime = time;
+  await seeked;
+}
+
+async function captureVideoFrameBlob(
+  sourceUrl: string,
+  position: "start" | "end",
+): Promise<Blob> {
+  const video = document.createElement("video");
+  video.crossOrigin = "anonymous";
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "auto";
+
+  const metadataReady = waitForVideoEvent(video, "loadedmetadata");
+  video.src = sourceUrl;
+  video.load();
+  await metadataReady;
+
+  const duration = Number.isFinite(video.duration) && video.duration > 0
+    ? video.duration
+    : 0;
+  const nudge = duration > 0 ? Math.min(0.12, Math.max(0.04, duration * 0.02)) : 0;
+  const targetTime =
+    position === "end"
+      ? Math.max(0, duration - nudge)
+      : Math.min(duration > 0 ? nudge : 0, 0.05);
+
+  await seekVideo(video, targetTime);
+
+  const width = video.videoWidth || 1;
+  const height = video.videoHeight || 1;
+  const scale = Math.min(1, 1920 / Math.max(width, height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not prepare video frame canvas");
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  video.removeAttribute("src");
+  video.load();
+
+  return new Promise<Blob>((resolve, reject) => {
+    try {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error("Could not capture video frame"));
+        },
+        "image/jpeg",
+        0.88,
+      );
+    } catch (error) {
+      reject(error instanceof Error ? error : new Error(String(error)));
+    }
+  });
+}
+
+async function uploadExtractedFrame(blob: Blob, path: string): Promise<string> {
+  const { error: uploadError } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .upload(path, blob, {
+      contentType: "image/jpeg",
+      cacheControl: "31536000",
+      upsert: true,
+    });
+  if (uploadError) throw uploadError;
+
+  const { data, error } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .createSignedUrl(path, SIGNED_URL_TTL_SEC);
+  if (error || !data?.signedUrl) {
+    throw error ?? new Error("Could not sign extracted video frame");
+  }
+  return data.signedUrl;
+}
 
 const AssetNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as unknown as AssetNodeData;
   const { setNodes, getNode } = useReactFlow();
+  const edges = useEdges();
   const { t, t: i18n } = useLanguage();
   const [isHovered, setIsHovered] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -120,6 +248,111 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
     d.posterUrl,
     d.fieldType === "model3d" ? imagePreviewTransform : undefined,
   );
+  const videoFrameSourceKey = d.storagePath ?? d.previewUrl ?? null;
+  const videoFrameUrlKey = livePreviewUrl ? `${videoFrameSourceKey ?? ""}|${livePreviewUrl}` : "";
+  const hasVideoFrameOutputEdge = useMemo(
+    () =>
+      edges.some(
+        (edge) => edge.source === id && isVideoFrameImageOutputHandle(edge.sourceHandle),
+      ),
+    [edges, id],
+  );
+  const shouldPrepareVideoFrames =
+    d.fieldType === "video" && (selected || isHovered || hasVideoFrameOutputEdge);
+
+  useEffect(() => {
+    if (!shouldPrepareVideoFrames) return;
+    if (d.fieldType !== "video") return;
+    if (d.uploading) return;
+    if (!livePreviewUrl || !videoFrameSourceKey) return;
+    if (d.extractingVideoFrames && d.frameSourceKey === videoFrameSourceKey) return;
+    if (
+      d.frameSourceKey === videoFrameSourceKey &&
+      (d.startFrameUrl && d.endFrameUrl)
+    ) {
+      return;
+    }
+    if (
+      d.frameSourceKey === videoFrameSourceKey &&
+      d.frameExtractionError &&
+      d.frameExtractionUrlKey === videoFrameUrlKey
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    const patchNode = (patch: Partial<AssetNodeData>) => {
+      if (cancelled) return;
+      setNodes((nodes) =>
+        nodes.map((node) =>
+          node.id === id ? { ...node, data: { ...node.data, ...patch } } : node,
+        ),
+      );
+    };
+
+    patchNode({
+      extractingVideoFrames: true,
+      frameSourceKey: videoFrameSourceKey,
+      frameExtractionUrlKey: videoFrameUrlKey,
+      frameExtractionError: "",
+    });
+
+    void (async () => {
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData.user?.id;
+      if (!userId) throw new Error("Login is required before extracting video frames");
+
+      const safeNodeId = safeStorageSegment(id);
+      const [startBlob, endBlob] = await Promise.all([
+        captureVideoFrameBlob(livePreviewUrl, "start"),
+        captureVideoFrameBlob(livePreviewUrl, "end"),
+      ]);
+      const basePath = `${userId}/video-frames/${safeNodeId}`;
+      const [startFrameUrl, endFrameUrl] = await Promise.all([
+        uploadExtractedFrame(startBlob, `${basePath}/start.jpg`),
+        uploadExtractedFrame(endBlob, `${basePath}/end.jpg`),
+      ]);
+
+      patchNode({
+        startFrameUrl,
+        endFrameUrl,
+        frameSourceKey: videoFrameSourceKey,
+        frameExtractionUrlKey: videoFrameUrlKey,
+        extractingVideoFrames: false,
+        frameExtractionError: "",
+      });
+    })().catch((error) => {
+      patchNode({
+        extractingVideoFrames: false,
+        frameSourceKey: videoFrameSourceKey,
+        frameExtractionUrlKey: videoFrameUrlKey,
+        frameExtractionError:
+          error instanceof Error ? error.message : "Could not extract video frames",
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    d.endFrameUrl,
+    d.extractingVideoFrames,
+    d.fieldType,
+    d.frameExtractionError,
+    d.frameExtractionUrlKey,
+    d.frameSourceKey,
+    hasVideoFrameOutputEdge,
+    d.startFrameUrl,
+    d.uploading,
+    id,
+    isHovered,
+    livePreviewUrl,
+    selected,
+    setNodes,
+    shouldPrepareVideoFrames,
+    videoFrameSourceKey,
+    videoFrameUrlKey,
+  ]);
 
   const onLabelChange = useCallback(
     (label: string) => {
@@ -463,6 +696,28 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
         index={0}
         bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
       />
+      {d.fieldType === "video" && (
+        <>
+          <PortIcon
+            dir="source"
+            handleId="output_start_frame"
+            label="start frame image"
+            portType="image"
+            color={PORT_COLOR.image}
+            index={1}
+            bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
+          />
+          <PortIcon
+            dir="source"
+            handleId="output_end_frame"
+            label="end frame image"
+            portType="image"
+            color={PORT_COLOR.image}
+            index={2}
+            bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
+          />
+        </>
+      )}
 
       {/* Bottom-right corner resize handle — drag to scale the
        *  asset card uniformly. Same gesture / styling as the AI-gen

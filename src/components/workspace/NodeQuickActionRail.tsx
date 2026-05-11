@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type SyntheticEvent,
+} from "react";
 import {
   ChevronRight,
   Clock3,
@@ -14,12 +20,15 @@ import {
   Volume2,
   VolumeX,
   Image as ImageIcon,
-  ScanSearch,
   X,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useLanguage, getLanguageLocale, type Language } from "@/contexts/LanguageContext";
+import {
+  useLanguage,
+  getLanguageLocale,
+  type Language,
+} from "@/contexts/LanguageContext";
 
 type NodeQuickActionRailProps = {
   visible: boolean;
@@ -61,7 +70,12 @@ const MENU_ITEMS: MenuItem[] = [
   { label: "Compress", icon: Minimize2, disabled: true },
   { label: "Convert", icon: RefreshCw, chevron: true, disabled: true },
   { label: "Safe", icon: Shield, chevron: true, disabled: true },
-  { label: "Export audio", icon: Volume2, action: "export-audio", separatorBefore: true },
+  {
+    label: "Export audio",
+    icon: Volume2,
+    action: "export-audio",
+    separatorBefore: true,
+  },
   { label: "Remove audio", icon: VolumeX, action: "remove-audio" },
   { label: "Extract frame", icon: ImageIcon, disabled: true },
 ];
@@ -83,11 +97,17 @@ function formatBytes(bytes: number | null | undefined): string {
   return `${value.toFixed(precision)} ${units[unitIndex]}`;
 }
 
-function formatAddedDate(value: number | string | null | undefined, language: Language): string {
+function formatAddedDate(
+  value: number | string | null | undefined,
+  language: Language,
+): string {
   if (value == null) return UNKNOWN_VALUE;
   const date = typeof value === "number" ? new Date(value) : new Date(value);
   if (Number.isNaN(date.getTime())) return UNKNOWN_VALUE;
-  return date.toLocaleDateString(getLanguageLocale(language), { month: "short", day: "numeric" });
+  return date.toLocaleDateString(getLanguageLocale(language), {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function getFormatFromSource(
@@ -179,7 +199,9 @@ export default function NodeQuickActionRail({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const { t, language } = useLanguage();
   const canShowInfo =
-    !!mediaUrl && (mediaKind === "image" || mediaKind === "video" || mediaKind === "model3d");
+    !!mediaUrl &&
+    (mediaKind === "image" || mediaKind === "video" || mediaKind === "model3d");
+  const isTextRail = mediaKind === "text";
 
   useEffect(() => {
     if (!menuOpen && !infoOpen) return;
@@ -200,7 +222,14 @@ export default function NodeQuickActionRail({
       dimensions: UNKNOWN_VALUE,
       added: formatAddedDate(mediaCreatedAt, language),
     }),
-    [mediaCreatedAt, mediaFileName, mediaKind, mediaSizeBytes, mediaUrl, language],
+    [
+      mediaCreatedAt,
+      mediaFileName,
+      mediaKind,
+      mediaSizeBytes,
+      mediaUrl,
+      language,
+    ],
   );
 
   useEffect(() => {
@@ -214,7 +243,9 @@ export default function NodeQuickActionRail({
     setInfoLoading(true);
     const loadInfo = async () => {
       const [bytes, dimensions] = await Promise.all([
-        mediaSizeBytes ? Promise.resolve(mediaSizeBytes) : readContentLength(mediaUrl),
+        mediaSizeBytes
+          ? Promise.resolve(mediaSizeBytes)
+          : readContentLength(mediaUrl),
         mediaKind === "video"
           ? readVideoDimensions(mediaUrl)
           : mediaKind === "image" || mediaKind === "model3d"
@@ -279,62 +310,52 @@ export default function NodeQuickActionRail({
       onDoubleClick={stopNodeGesture}
     >
       <div className="node-quick-action-stack">
-        <button
-          type="button"
-          draggable={false}
-          className="node-quick-action-button"
-          aria-label={t("workspace.nodeRail.openTools")}
-          aria-expanded={menuOpen}
-          onPointerDownCapture={stopControlGesture}
-          onMouseDownCapture={stopControlGesture}
-          onPointerDown={stopControlGesture}
-          onMouseDown={stopControlGesture}
-          onClick={(event) => {
-            stopControlGesture(event);
-            setInfoOpen(false);
-            setMenuOpen((open) => !open);
-          }}
-          onDoubleClick={stopControlGesture}
-        >
-          <MoreVertical className="h-[15px] w-[15px]" />
-        </button>
-        <button
-          type="button"
-          draggable={false}
-          className={cn(
-            "node-quick-action-button",
-            !canShowInfo && "is-disabled",
-          )}
-          aria-label={t("workspace.nodeRail.nodeInfo")}
-          aria-expanded={infoOpen}
-          disabled={!canShowInfo}
-          onPointerDownCapture={stopControlGesture}
-          onMouseDownCapture={stopControlGesture}
-          onPointerDown={stopControlGesture}
-          onMouseDown={stopControlGesture}
-          onClick={(event) => {
-            stopControlGesture(event);
-            setMenuOpen(false);
-            setInfoOpen((open) => !open);
-          }}
-          onDoubleClick={stopControlGesture}
-        >
-          <Info className="h-[14px] w-[14px]" />
-        </button>
-        <button
-          type="button"
-          draggable={false}
-          className="node-quick-action-button is-disabled"
-          aria-label={t("workspace.nodeRail.focusNode")}
-          disabled
-          onPointerDownCapture={stopControlGesture}
-          onMouseDownCapture={stopControlGesture}
-          onPointerDown={stopControlGesture}
-          onMouseDown={stopControlGesture}
-          onDoubleClick={stopControlGesture}
-        >
-          <ScanSearch className="h-[14px] w-[14px]" />
-        </button>
+        {!isTextRail && (
+          <>
+            <button
+              type="button"
+              draggable={false}
+              className="node-quick-action-button"
+              aria-label={t("workspace.nodeRail.openTools")}
+              aria-expanded={menuOpen}
+              onPointerDownCapture={stopControlGesture}
+              onMouseDownCapture={stopControlGesture}
+              onPointerDown={stopControlGesture}
+              onMouseDown={stopControlGesture}
+              onClick={(event) => {
+                stopControlGesture(event);
+                setInfoOpen(false);
+                setMenuOpen((open) => !open);
+              }}
+              onDoubleClick={stopControlGesture}
+            >
+              <MoreVertical className="h-[15px] w-[15px]" />
+            </button>
+            <button
+              type="button"
+              draggable={false}
+              className={cn(
+                "node-quick-action-button",
+                !canShowInfo && "is-disabled",
+              )}
+              aria-label={t("workspace.nodeRail.nodeInfo")}
+              aria-expanded={infoOpen}
+              disabled={!canShowInfo}
+              onPointerDownCapture={stopControlGesture}
+              onMouseDownCapture={stopControlGesture}
+              onPointerDown={stopControlGesture}
+              onMouseDown={stopControlGesture}
+              onClick={(event) => {
+                stopControlGesture(event);
+                setMenuOpen(false);
+                setInfoOpen((open) => !open);
+              }}
+              onDoubleClick={stopControlGesture}
+            >
+              <Info className="h-[14px] w-[14px]" />
+            </button>
+          </>
+        )}
         <button
           type="button"
           draggable={false}
@@ -393,12 +414,17 @@ export default function NodeQuickActionRail({
 
       {infoOpen && canShowInfo && (
         <div className="node-media-info-card" role="status">
-          {([
-            ["FORMAT", (resolvedInfo ?? baseInfo).format],
-            ["SIZE", infoLoading ? "..." : (resolvedInfo ?? baseInfo).size],
-            ["DIMENSIONS", infoLoading ? "..." : (resolvedInfo ?? baseInfo).dimensions],
-            ["ADDED", (resolvedInfo ?? baseInfo).added],
-          ] as const).map(([label, value]) => (
+          {(
+            [
+              ["FORMAT", (resolvedInfo ?? baseInfo).format],
+              ["SIZE", infoLoading ? "..." : (resolvedInfo ?? baseInfo).size],
+              [
+                "DIMENSIONS",
+                infoLoading ? "..." : (resolvedInfo ?? baseInfo).dimensions,
+              ],
+              ["ADDED", (resolvedInfo ?? baseInfo).added],
+            ] as const
+          ).map(([label, value]) => (
             <div key={label} className="node-media-info-field">
               <span>{label}</span>
               <strong>{value}</strong>

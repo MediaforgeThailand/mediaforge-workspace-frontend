@@ -2841,6 +2841,13 @@ export const ja = {
   "workspace.node.prompt_optimize_failed": "プロンプトを最適化できませんでした",
   "workspace.node.prompt_optimize_empty_error":
     "プロンプト最適化から内容が返りませんでした",
+  "workspace.node.media_prompt_label": "画像/動画からPrompt",
+  "workspace.node.media_prompt_aria":
+    "接続した画像または動画からプロンプトを作成",
+  "workspace.node.media_prompt_tip_off":
+    "オンにすると、接続した画像/動画をAIが読み取り、プロンプト作成を支援します。",
+  "workspace.node.media_prompt_tip_on":
+    "オン: 接続した画像/動画からプロンプトを作成します。",
   "workspace.node.asset_name_placeholder": "名前…",
   "workspace.node.asset_resize": "アセットカードのサイズを変更する",
   "workspace.node.asset_drag_resize": "ドラッグしてサイズを変更します",

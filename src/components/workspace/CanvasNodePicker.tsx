@@ -15,7 +15,12 @@ import { createPortal } from "react-dom";
 import * as Lucide from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Node } from "@xyflow/react";
-import { getWorkspaceSchema } from "./workspaceSchema";
+import {
+  getWorkspaceSchema,
+  isTextNodeImageOutputHandle,
+  isTextNodeVideoOutputHandle,
+  isVideoFrameImageOutputHandle,
+} from "./workspaceSchema";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { TranslationKey } from "@/contexts/locales/en";
 
@@ -71,10 +76,15 @@ export function portTypeOf(
 
   // Workspace-native node sources / sinks.
   if (t === "textNode") {
-    return isOutput ? "text" : handleId === "ref_image" ? "image" : "text";
+    if (isOutput && isTextNodeImageOutputHandle(handleId)) return "image";
+    if (isOutput && isTextNodeVideoOutputHandle(handleId)) return "video";
+    if (!isOutput && handleId === "ref_image") return "image";
+    if (!isOutput && handleId === "ref_video") return "video";
+    return isOutput ? "text" : "text";
   }
   if (t === "elementNode") return "element";
   if (t === "assetNode") {
+    if (isOutput && isVideoFrameImageOutputHandle(handleId)) return "image";
     const ft = (node.data as { fieldType?: string } | undefined)?.fieldType;
     if (ft === "video") return "video";
     if (ft === "audio") return "audio";
@@ -136,6 +146,12 @@ const CATALOG: CatalogEntry[] = [
         type: "image",
         hint: "→ image ref",
         hintKey: "workspace.picker.port.to_ref_image",
+      },
+      {
+        id: "ref_video",
+        type: "video",
+        hint: "→ video ref",
+        hintKey: "workspace.picker.port.to_ref_video",
       },
     ],
     outputs: [{ id: "default", type: "text", hint: "text", hintKey: "workspace.picker.port.text" }],

@@ -3013,6 +3013,13 @@ export const en = {
   "workspace.node.prompt_optimize_failed": "Could not optimize prompt",
   "workspace.node.prompt_optimize_empty_error":
     "Prompt optimizer returned empty content",
+  "workspace.node.media_prompt_label": "Prompt from media",
+  "workspace.node.media_prompt_aria":
+    "Create a prompt from connected image or video",
+  "workspace.node.media_prompt_tip_off":
+    "Turn on to let AI read connected images/videos and help create the prompt.",
+  "workspace.node.media_prompt_tip_on":
+    "On: Prompt will be created from the connected images/videos.",
   "workspace.node.asset_name_placeholder": "Name…",
   "workspace.node.asset_resize": "Resize asset card",
   "workspace.node.asset_drag_resize": "Drag to resize",

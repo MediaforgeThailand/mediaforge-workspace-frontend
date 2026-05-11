@@ -1305,6 +1305,48 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
  */
 export type WirePortType = "text" | "image" | "video" | "audio" | "element" | "model3d";
 
+export const TEXT_NODE_IMAGE_OUTPUT_HANDLE_PREFIX = "image_ref:";
+export const TEXT_NODE_VIDEO_OUTPUT_HANDLE_PREFIX = "video_ref:";
+
+export function isTextNodeImageOutputHandle(id: string | null | undefined): boolean {
+  return typeof id === "string" && id.startsWith(TEXT_NODE_IMAGE_OUTPUT_HANDLE_PREFIX);
+}
+
+export function isTextNodeVideoOutputHandle(id: string | null | undefined): boolean {
+  return typeof id === "string" && id.startsWith(TEXT_NODE_VIDEO_OUTPUT_HANDLE_PREFIX);
+}
+
+export function textNodeImageOutputHandle(nodeId: string): string {
+  return `${TEXT_NODE_IMAGE_OUTPUT_HANDLE_PREFIX}${nodeId}`;
+}
+
+export function textNodeVideoOutputHandle(nodeId: string): string {
+  return `${TEXT_NODE_VIDEO_OUTPUT_HANDLE_PREFIX}${nodeId}`;
+}
+
+export function textNodeImageOutputNodeId(id: string | null | undefined): string | null {
+  if (!isTextNodeImageOutputHandle(id)) return null;
+  return String(id).slice(TEXT_NODE_IMAGE_OUTPUT_HANDLE_PREFIX.length) || null;
+}
+
+export function textNodeVideoOutputNodeId(id: string | null | undefined): string | null {
+  if (!isTextNodeVideoOutputHandle(id)) return null;
+  return String(id).slice(TEXT_NODE_VIDEO_OUTPUT_HANDLE_PREFIX.length) || null;
+}
+
+export type VideoFrameImageOutputHandle = "output_start_frame" | "output_end_frame";
+
+export const VIDEO_FRAME_IMAGE_OUTPUT_HANDLES = new Set<VideoFrameImageOutputHandle>([
+  "output_start_frame",
+  "output_end_frame",
+]);
+
+export function isVideoFrameImageOutputHandle(
+  id: string | null | undefined,
+): id is VideoFrameImageOutputHandle {
+  return typeof id === "string" && VIDEO_FRAME_IMAGE_OUTPUT_HANDLES.has(id as VideoFrameImageOutputHandle);
+}
+
 const TEXT_HANDLE_IDS = new Set([
   "text",
   "context",
@@ -1356,6 +1398,8 @@ const MODEL3D_HANDLE_IDS = new Set([
  *  unknown ids since most workspace ports are image-shaped; the
  *  isValidConnection layer is the real safety net. */
 export function portTypeFromHandleId(id: string): WirePortType {
+  if (isTextNodeImageOutputHandle(id)) return "image";
+  if (isTextNodeVideoOutputHandle(id)) return "video";
   if (TEXT_HANDLE_IDS.has(id)) return "text";
   if (VIDEO_HANDLE_IDS.has(id)) return "video";
   if (AUDIO_HANDLE_IDS.has(id)) return "audio";

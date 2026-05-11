@@ -94,8 +94,11 @@ import {
   getWsVisibleParams,
   GPT_IMAGE_2_ASPECT_RATIOS,
   gptImage2ResolutionsFor,
+  isVideoFrameImageOutputHandle,
   portTypeFromHandleId,
   splitGptImageSize,
+  textNodeImageOutputNodeId,
+  textNodeVideoOutputNodeId,
 } from "./workspaceSchema";
 import { cleanModelLabelMap } from "./modelDisplay";
 
@@ -362,7 +365,7 @@ interface MentionedAsset {
 function collectElementRefs(
   node: { id: string; data?: unknown },
   allNodes: ReadonlyArray<{ id: string; type?: string; data?: unknown }>,
-  allEdges: ReadonlyArray<{ source: string; target: string; targetHandle?: string | null }>,
+  allEdges: ReadonlyArray<{ source: string; target: string; sourceHandle?: string | null; targetHandle?: string | null }>,
 ): {
   name: string;
   reference_image_urls: string[];
@@ -399,7 +402,7 @@ function collectElementRefs(
     const refSrc = allNodes.find((n) => n.id === e.source);
     if (!refSrc || refSrc.type !== "assetNode") continue;
     const refData = (refSrc.data ?? {}) as any;
-    const url = refData?.previewUrl ?? refData?.storagePath;
+    const url = assetUrlForSourceHandle(refData, e.sourceHandle);
     if (typeof url !== "string" || !url) continue;
     const slot = e.targetHandle ?? "";
     if (slot === "frontal") frontalUrl = url;
@@ -546,6 +549,39 @@ function selectedNodeGeneration(data: Record<string, unknown>) {
   return generations[selectedIndex] ?? generations[0];
 }
 
+function assetUrlForSourceHandle(
+  data: Record<string, unknown>,
+  sourceHandle: string | null | undefined,
+): string | null {
+  if (data.uploading === true) {
+    throw new Error(
+      "Reference asset is still uploading - wait a moment and click Run again",
+    );
+  }
+
+  if (isVideoFrameImageOutputHandle(sourceHandle)) {
+    const key = sourceHandle === "output_start_frame" ? "startFrameUrl" : "endFrameUrl";
+    const url = data[key];
+    if (typeof url === "string" && url.length > 0) return url;
+    if (data.extractingVideoFrames === true) {
+      throw new Error(
+        "Video frame image is still preparing. Wait a moment and click Run again.",
+      );
+    }
+    const detail =
+      typeof data.frameExtractionError === "string" && data.frameExtractionError
+        ? ` ${data.frameExtractionError}`
+        : "";
+    throw new Error(`Video frame image is not ready yet.${detail}`);
+  }
+
+  return typeof data.previewUrl === "string"
+    ? data.previewUrl
+    : typeof data.storagePath === "string"
+      ? data.storagePath
+      : null;
+}
+
 function nodeCanProvideImageMentionRef(
   node: { id: string; type?: string; data?: unknown } | undefined,
   sourceHandle: string | null | undefined,
@@ -553,6 +589,7 @@ function nodeCanProvideImageMentionRef(
   if (!node) return false;
   const data = (node.data ?? {}) as Record<string, unknown>;
   if (node.type === "assetNode" || node.type === "inputNode") {
+    if (node.type === "assetNode" && isVideoFrameImageOutputHandle(sourceHandle)) return true;
     const fieldType = typeof data.fieldType === "string" ? data.fieldType : "image";
     return fieldType === "image";
   }
@@ -561,6 +598,71 @@ function nodeCanProvideImageMentionRef(
   const generation = selectedNodeGeneration(data);
   if (generation) return generation.type === "image" && typeof generation.url === "string";
   return ["imageGenNode", "removeBackgroundNode", "bananaProNode"].includes(node.type ?? "");
+}
+
+function nodeCanProvideVideoMentionRef(
+  node: { id: string; type?: string; data?: unknown } | undefined,
+  sourceHandle: string | null | undefined,
+): boolean {
+  if (!node) return false;
+  const data = (node.data ?? {}) as Record<string, unknown>;
+  if (node.type === "assetNode" || node.type === "inputNode") {
+    const fieldType = typeof data.fieldType === "string" ? data.fieldType : "image";
+    return fieldType === "video";
+  }
+  if (node.type === "groupNode") return false;
+  if (sourceHandle && portTypeFromHandleId(sourceHandle) !== "video") return false;
+  const generation = selectedNodeGeneration(data);
+  if (generation) return generation.type === "video" && typeof generation.url === "string";
+  return ["videoGenNode", "klingVideoNode"].includes(node.type ?? "");
+}
+
+function imageUrlFromWorkspaceNode(
+  node: { id: string; type?: string; data?: unknown } | undefined,
+  sourceHandle?: string | null,
+): string | null {
+  if (!node) return null;
+  const data = (node.data ?? {}) as Record<string, unknown>;
+  if (node.type === "assetNode" || node.type === "inputNode") {
+    return assetUrlForSourceHandle(data, sourceHandle);
+  }
+  const generation = selectedNodeGeneration(data);
+  if (generation?.type === "image" && typeof generation.url === "string") {
+    return generation.url;
+  }
+  const fallback =
+    typeof data.previewUrl === "string"
+      ? data.previewUrl
+      : typeof data.imageUrl === "string"
+        ? data.imageUrl
+        : typeof data.image_url === "string"
+          ? data.image_url
+          : null;
+  return fallback;
+}
+
+function videoUrlFromWorkspaceNode(
+  node: { id: string; type?: string; data?: unknown } | undefined,
+  sourceHandle?: string | null,
+): string | null {
+  if (!node) return null;
+  const data = (node.data ?? {}) as Record<string, unknown>;
+  if (node.type === "assetNode" || node.type === "inputNode") {
+    return assetUrlForSourceHandle(data, sourceHandle);
+  }
+  const generation = selectedNodeGeneration(data);
+  if (generation?.type === "video" && typeof generation.url === "string") {
+    return generation.url;
+  }
+  const fallback =
+    typeof data.previewUrl === "string"
+      ? data.previewUrl
+      : typeof data.videoUrl === "string"
+        ? data.videoUrl
+        : typeof data.video_url === "string"
+          ? data.video_url
+          : null;
+  return fallback;
 }
 
 function connectedTextNodeImageSourceIds(
@@ -576,6 +678,32 @@ function connectedTextNodeImageSourceIds(
     if (nodeCanProvideImageMentionRef(source, edge.sourceHandle)) ids.add(edge.source);
   }
   return ids;
+}
+
+function connectedTextNodeVideoSourceIds(
+  textNodeId: string,
+  allNodes: ReadonlyArray<{ id: string; type?: string; data?: unknown }>,
+  allEdges: ReadonlyArray<{ source: string; target: string; sourceHandle?: string | null; targetHandle?: string | null }>,
+): Set<string> {
+  const ids = new Set<string>();
+  for (const edge of allEdges) {
+    if (edge.target !== textNodeId) continue;
+    if ((edge.targetHandle ?? "") !== "ref_video") continue;
+    const source = allNodes.find((node) => node.id === edge.source);
+    if (nodeCanProvideVideoMentionRef(source, edge.sourceHandle)) ids.add(edge.source);
+  }
+  return ids;
+}
+
+function connectedTextNodeMediaSourceIds(
+  textNodeId: string,
+  allNodes: ReadonlyArray<{ id: string; type?: string; data?: unknown }>,
+  allEdges: ReadonlyArray<{ source: string; target: string; sourceHandle?: string | null; targetHandle?: string | null }>,
+): Set<string> {
+  return new Set([
+    ...connectedTextNodeImageSourceIds(textNodeId, allNodes, allEdges),
+    ...connectedTextNodeVideoSourceIds(textNodeId, allNodes, allEdges),
+  ]);
 }
 
 function extractMentionNodeIds(text: string | undefined): string[] {
@@ -631,26 +759,74 @@ function resolveInputs(nodeId: string): {
     const srcData = (src.data ?? {}) as Record<string, unknown>;
     const key = e.targetHandle ?? "default";
     if (src.type === "textNode") {
+      const imageSourceNodeId = textNodeImageOutputNodeId(e.sourceHandle);
+      if (imageSourceNodeId) {
+        const allowedImageIds = connectedTextNodeImageSourceIds(src.id, nodes, edges);
+        if (!allowedImageIds.has(imageSourceNodeId)) {
+          throw new Error(
+            "Text node image output is no longer connected to that reference. Reconnect the image into the Text node, or remove the stale wire.",
+          );
+        }
+        const imageNode = nodes.find((n) => n.id === imageSourceNodeId);
+        const imageEdge = edges.find(
+          (edge) =>
+            edge.source === imageSourceNodeId &&
+            edge.target === src.id &&
+            (edge.targetHandle ?? "") === "ref_image",
+        );
+        const imageUrl = imageUrlFromWorkspaceNode(imageNode, imageEdge?.sourceHandle);
+        if (!imageUrl) {
+          throw new Error(
+            "Text node image output is not ready yet. Upload or generate that image ref first.",
+          );
+        }
+        pushAt(key, imageUrl);
+        continue;
+      }
+      const videoSourceNodeId = textNodeVideoOutputNodeId(e.sourceHandle);
+      if (videoSourceNodeId) {
+        const allowedVideoIds = connectedTextNodeVideoSourceIds(src.id, nodes, edges);
+        if (!allowedVideoIds.has(videoSourceNodeId)) {
+          throw new Error(
+            "Text node video output is no longer connected to that reference. Reconnect the video into the Text node, or remove the stale wire.",
+          );
+        }
+        const videoNode = nodes.find((n) => n.id === videoSourceNodeId);
+        const videoEdge = edges.find(
+          (edge) =>
+            edge.source === videoSourceNodeId &&
+            edge.target === src.id &&
+            (edge.targetHandle ?? "") === "ref_video",
+        );
+        const videoUrl = videoUrlFromWorkspaceNode(videoNode, videoEdge?.sourceHandle);
+        if (!videoUrl) {
+          throw new Error(
+            "Text node video output is not ready yet. Upload or generate that video ref first.",
+          );
+        }
+        pushAt(key, videoUrl);
+        continue;
+      }
       const textContent = typeof srcData.content === "string" ? srcData.content : "";
-      const allowedImageIds = connectedTextNodeImageSourceIds(src.id, nodes, edges);
+      const allowedMediaIds = connectedTextNodeMediaSourceIds(src.id, nodes, edges);
       const tokenNodeIds = extractMentionNodeIds(textContent);
-      const disconnected = tokenNodeIds.filter((nodeId) => !allowedImageIds.has(nodeId));
+      const disconnected = tokenNodeIds.filter((nodeId) => !allowedMediaIds.has(nodeId));
       if (disconnected.length > 0) {
         throw new Error(
-          "Text node has @mentions that are not wired into its image-ref input. Connect those image nodes to the Text node first, or remove the stale mention chips.",
+          "Text node has @mentions that are not wired into its media-ref input. Connect those media nodes to the Text node first, or remove the stale mention chips.",
         );
       }
       const { cleanText, mentioned } = resolveMentions(
         textContent,
         nodes,
         edges,
-        allowedImageIds,
+        allowedMediaIds,
       );
       const resolvedMentionIds = new Set(mentioned.map((m) => m.nodeId));
       const unresolved = tokenNodeIds.filter((nodeId) => !resolvedMentionIds.has(nodeId));
       if (unresolved.length > 0) {
         throw new Error(
-          "Text node has @mentions whose image output is not ready yet. Upload or generate those image refs first.",
+          "Text node has @mentions whose media output is not ready yet. Upload or generate those media refs first.",
         );
       }
       pushAt(key, cleanText);
@@ -670,7 +846,7 @@ function resolveInputs(nodeId: string): {
             "Reference asset is still uploading — wait a moment and click Run again",
         );
       }
-      pushAt(key, srcData.previewUrl ?? srcData.storagePath ?? null);
+      pushAt(key, assetUrlForSourceHandle(srcData, e.sourceHandle));
     } else if (src.type === "elementNode") {
       // Both saved (cached refs) + creator (walk edges) modes share the
       // same logic now — collectElementRefs handles both.
@@ -843,11 +1019,17 @@ function validateMentionedImageRefsForTarget(args: {
     }
     return typeof value === "string" && value.length > 0 ? [value] : [];
   });
+  const explicitUrlSet = new Set(explicitUrls);
+  const additionalMentionedUrls = mentionedUrls.filter((url) => !explicitUrlSet.has(url));
   const total = new Set([...explicitUrls, ...mentionedUrls]).size;
   if (total > capability.max) {
     return `${args.selectedModel || args.schemaKey} accepts max ${capability.max} image ref(s), but this run has ${total} from direct wires + Text-node @mentions.`;
   }
-  if (capability.max === 1 && inputValueCount(args.inputs.start_frame) + inputValueCount(args.inputs.image) > 0 && mentionedUrls.length > 0) {
+  if (
+    capability.max === 1 &&
+    inputValueCount(args.inputs.start_frame) + inputValueCount(args.inputs.image) > 0 &&
+    additionalMentionedUrls.length > 0
+  ) {
     return `${args.selectedModel || args.schemaKey} already has a single image input wired. Remove the extra Text-node image mention or the direct image input.`;
   }
   return null;
@@ -1298,8 +1480,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         mentioned,
       });
       if (imageRefValidationError) {
-        toast.error(imageRefValidationError);
-        return;
+        throw new Error(imageRefValidationError);
       }
 
       // Merge mention-resolved URLs into inputs as a fallback ref_image

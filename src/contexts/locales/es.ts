@@ -3106,6 +3106,13 @@ export const es = {
   "workspace.node.prompt_optimize_failed": "No se pudo optimizar el prompt",
   "workspace.node.prompt_optimize_empty_error":
     "El optimizador no devolvió contenido",
+  "workspace.node.media_prompt_label": "Prompt desde media",
+  "workspace.node.media_prompt_aria":
+    "Crear un prompt desde una imagen o video conectado",
+  "workspace.node.media_prompt_tip_off":
+    "Actívalo para que la IA lea imágenes/videos conectados y ayude a crear el prompt.",
+  "workspace.node.media_prompt_tip_on":
+    "Activado: el prompt se creará desde las imágenes/videos conectados.",
   "workspace.node.asset_name_placeholder": "Nombre…",
   "workspace.node.asset_resize": "Cambiar el tamaño de la tarjeta de recurso",
   "workspace.node.asset_drag_resize": "Arrastra para cambiar el tamaño",

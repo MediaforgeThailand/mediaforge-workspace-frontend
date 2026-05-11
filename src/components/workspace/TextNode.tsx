@@ -10,15 +10,31 @@
  *
  * Data shape:
  *   { label: string     // editable; other nodes can @-mention it
- *   , content: string   // raw payload, contains @[Label](nodeId) tokens
+ *   , inputContent?: string // human draft sent to the prompt optimizer
+ *   , content: string   // result/output prompt sent to downstream nodes
+ *   , activePromptTab?: "input" | "result"
+ *   , resultPromptReady?: boolean
  *   , width?: number    // drag-resized box width (px); falls back to default
  *   , height?: number   // drag-resized box height (px); falls back to default
  *   }
  */
 
-import { memo, useCallback, useMemo, useRef, useState } from "react";
-import { type Edge, type NodeProps, useEdges, useNodes, useReactFlow } from "@xyflow/react";
-import { AtSign, Loader2, Play, Type } from "lucide-react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type Edge,
+  type NodeProps,
+  useEdges,
+  useNodes,
+  useReactFlow,
+} from "@xyflow/react";
+import {
+  AtSign,
+  Film,
+  Image as ImageIcon,
+  Loader2,
+  Play,
+  Type,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { getSignedUrl } from "@/hooks/useSignedUrl";
@@ -28,7 +44,11 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import NodeQuickActionRail from "./NodeQuickActionRail";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { toast } from "sonner";
-import { portTypeFromHandleId } from "./workspaceSchema";
+import {
+  portTypeFromHandleId,
+  textNodeImageOutputHandle,
+  textNodeVideoOutputHandle,
+} from "./workspaceSchema";
 import { friendlyErrorOr, functionErrorMessage } from "@/lib/friendlyError";
 import {
   Tooltip,
@@ -39,6 +59,10 @@ import {
 interface TextNodeData {
   label: string;
   content: string;
+  inputContent?: string;
+  activePromptTab?: "input" | "result";
+  resultPromptReady?: boolean;
+  mediaUnderstandingEnabled?: boolean;
   width?: number;
   height?: number;
 }
@@ -63,9 +87,10 @@ const MAX_H = 800;
  *  This subtraction lets the textarea fill the resized box exactly,
  *  with the inline-style cap from PromptMentionTextarea handling
  *  scroll when content exceeds visible height. */
-const BODY_CHROME_H = 58;
+const BODY_CHROME_H = 88;
 const PROMPT_OPTIMIZER_FUNCTION = "workspace-chat";
 const PROMPT_OPTIMIZER_MODEL = "gpt-5.5";
+const PROMPT_OPTIMIZER_MEDIA_MODEL = "gemini-3-pro-preview";
 const WORKSPACE_MEDIA_BUCKET = "ai-media";
 const BRACKETED_TOKEN_RE = /([#@])\[([^\]]+)\]\(([^)]+)\)/g;
 const PLAIN_MENTION_RE = /@([A-Za-z0-9_][A-Za-z0-9_.-]*)/g;
@@ -88,13 +113,18 @@ const TEXT_NODE_MENTION_TYPES = [
 ];
 
 const TEXT_NODE_IMAGE_INPUT_HANDLE = "ref_image";
+const TEXT_NODE_VIDEO_INPUT_HANDLE = "ref_video";
 
 const PROMPT_OPTIMIZER_SYSTEM_PROMPT = `You are a MediaForge prompt optimization engine.
 Rewrite the user's rough instruction into one practical English prompt for image/video generation or editing.
-Return only the final prompt text. No markdown, no title, no commentary.
 Preserve every protected reference placeholder exactly, including spelling and brackets.
 Use concrete, production-ready language: subject, action, visual changes, composition, lighting, identity preservation, and constraints when relevant.
 Do not add new references. Do not invent unsupported model features.`;
+
+const PROMPT_MEDIA_UNDERSTANDING_SYSTEM_PROMPT = `You are a MediaForge visual understanding prompt writer.
+Use attached images and videos only as source material to understand subject, identity, scene, style, motion, composition, and mood.
+Help the user turn their intent and the attached media into a useful prompt.
+Follow the user's requested language, format, and level of detail when possible.`;
 
 type MentionableNode = {
   id: string;
@@ -102,10 +132,11 @@ type MentionableNode = {
   data?: Record<string, unknown>;
 };
 
-type TextImageMentionOption = {
+type TextMediaMentionOption = {
   nodeId: string;
   label: string;
   type?: string;
+  mediaKind: "image" | "video";
   icon?: "image" | "video" | "text" | "ai" | "textvar";
   previewUrl?: string;
   sourceUrl?: string;
@@ -118,6 +149,7 @@ type PromptOptimizerAttachment = {
   detail?: "low" | "high" | "auto";
   label?: string;
   sourceNodeId?: string;
+  mediaKind?: "image" | "video";
 };
 
 type ProtectedToken = {
@@ -183,7 +215,9 @@ function imagePreviewForNode(node: MentionableNode): string | undefined {
   return undefined;
 }
 
-function imageSourceForPromptOptimizer(node: MentionableNode): string | undefined {
+function imageSourceForPromptOptimizer(
+  node: MentionableNode,
+): string | undefined {
   const data = node.data ?? {};
   const params = data.params as Record<string, unknown> | undefined;
   const generation = selectedGeneration(data);
@@ -221,6 +255,67 @@ function imageSourceForPromptOptimizer(node: MentionableNode): string | undefine
   return undefined;
 }
 
+function videoPreviewForNode(node: MentionableNode): string | undefined {
+  const data = node.data ?? {};
+  const params = data.params as Record<string, unknown> | undefined;
+  const candidates = [
+    data.previewUrl,
+    data.preview_url,
+    data.thumbnailUrl,
+    data.thumbnail_url,
+    data.videoUrl,
+    data.video_url,
+    data.storagePath,
+    data.url,
+    params?.previewUrl,
+    params?.video_url,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) return candidate;
+  }
+  const generation = selectedGeneration(data);
+  if (generation?.type === "video" && typeof generation.url === "string") {
+    return generation.url;
+  }
+  return undefined;
+}
+
+function videoSourceForPromptOptimizer(
+  node: MentionableNode,
+): string | undefined {
+  const data = node.data ?? {};
+  const params = data.params as Record<string, unknown> | undefined;
+  const generation = selectedGeneration(data);
+  if (generation?.type === "video" && typeof generation.url === "string") {
+    return generation.url;
+  }
+
+  const candidates = [
+    data.videoUrl,
+    data.video_url,
+    data.previewUrl,
+    data.preview_url,
+    data.url,
+    params?.video_url,
+    params?.previewUrl,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) return candidate;
+  }
+  const storageCandidates = [
+    data.storagePath,
+    data.storage_path,
+    params?.storagePath,
+    params?.storage_path,
+  ];
+  for (const candidate of storageCandidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return storageBucketUrl(WORKSPACE_MEDIA_BUCKET, candidate);
+    }
+  }
+  return undefined;
+}
+
 function nodeCanProvideImageMention(
   node: MentionableNode | undefined,
   sourceHandle: string | null | undefined,
@@ -228,13 +323,36 @@ function nodeCanProvideImageMention(
   if (!node) return false;
   const data = node.data ?? {};
   if (node.type === "assetNode" || node.type === "inputNode") {
-    const fieldType = typeof data.fieldType === "string" ? data.fieldType : "image";
+    const fieldType =
+      typeof data.fieldType === "string" ? data.fieldType : "image";
     return fieldType === "image";
   }
   if (node.type === "groupNode") return false;
-  if (sourceHandle && portTypeFromHandleId(sourceHandle) !== "image") return false;
+  if (sourceHandle && portTypeFromHandleId(sourceHandle) !== "image")
+    return false;
   const generation = selectedGeneration(data);
-  if (generation) return generation.type === "image" && typeof generation.url === "string";
+  if (generation)
+    return generation.type === "image" && typeof generation.url === "string";
+  return false;
+}
+
+function nodeCanProvideVideoMention(
+  node: MentionableNode | undefined,
+  sourceHandle: string | null | undefined,
+): boolean {
+  if (!node) return false;
+  const data = node.data ?? {};
+  if (node.type === "assetNode" || node.type === "inputNode") {
+    const fieldType =
+      typeof data.fieldType === "string" ? data.fieldType : "image";
+    return fieldType === "video";
+  }
+  if (node.type === "groupNode") return false;
+  if (sourceHandle && portTypeFromHandleId(sourceHandle) !== "video")
+    return false;
+  const generation = selectedGeneration(data);
+  if (generation)
+    return generation.type === "video" && typeof generation.url === "string";
   return false;
 }
 
@@ -242,8 +360,8 @@ function buildConnectedImageMentionOptions(
   textNodeId: string,
   nodes: MentionableNode[],
   edges: Edge[],
-): TextImageMentionOption[] {
-  const byNode = new Map<string, TextImageMentionOption>();
+): TextMediaMentionOption[] {
+  const byNode = new Map<string, TextMediaMentionOption>();
   for (const edge of edges) {
     if (edge.target !== textNodeId) continue;
     if ((edge.targetHandle ?? "") !== TEXT_NODE_IMAGE_INPUT_HANDLE) continue;
@@ -254,9 +372,35 @@ function buildConnectedImageMentionOptions(
       nodeId: source.id,
       label: getNodeLabel(source),
       type: source.type ?? "assetNode",
+      mediaKind: "image",
       icon: "image",
       previewUrl: imagePreviewForNode(source),
       sourceUrl: imageSourceForPromptOptimizer(source),
+    });
+  }
+  return Array.from(byNode.values());
+}
+
+function buildConnectedVideoMentionOptions(
+  textNodeId: string,
+  nodes: MentionableNode[],
+  edges: Edge[],
+): TextMediaMentionOption[] {
+  const byNode = new Map<string, TextMediaMentionOption>();
+  for (const edge of edges) {
+    if (edge.target !== textNodeId) continue;
+    if ((edge.targetHandle ?? "") !== TEXT_NODE_VIDEO_INPUT_HANDLE) continue;
+    const source = nodes.find((node) => node.id === edge.source);
+    if (!nodeCanProvideVideoMention(source, edge.sourceHandle)) continue;
+    if (!source || byNode.has(source.id)) continue;
+    byNode.set(source.id, {
+      nodeId: source.id,
+      label: getNodeLabel(source),
+      type: source.type ?? "assetNode",
+      mediaKind: "video",
+      icon: "video",
+      previewUrl: videoPreviewForNode(source),
+      sourceUrl: videoSourceForPromptOptimizer(source),
     });
   }
   return Array.from(byNode.values());
@@ -285,7 +429,7 @@ function isPlainMentionBoundary(text: string, index: number): boolean {
 
 function canonicalizePlainMentions(
   prompt: string,
-  candidates: TextImageMentionOption[],
+  candidates: TextMediaMentionOption[],
 ): string {
   const byKey = new Map<string, MentionableNode>();
 
@@ -325,9 +469,9 @@ function compactMentionWhitespace(text: string): string {
     .trim();
 }
 
-function stripDisconnectedImageMentions(
+function stripDisconnectedMediaMentions(
   prompt: string,
-  allowedImageNodeIds: ReadonlySet<string>,
+  allowedMediaNodeIds: ReadonlySet<string>,
 ): { text: string; removedLabels: string[] } {
   const removedLabels: string[] = [];
   const bracketed = new RegExp(BRACKETED_TOKEN_RE.source, "g");
@@ -335,7 +479,7 @@ function stripDisconnectedImageMentions(
     bracketed,
     (full: string, sigil: string, label: string, nodeId: string) => {
       if (sigil !== "@") return full;
-      if (allowedImageNodeIds.has(nodeId)) return full;
+      if (allowedMediaNodeIds.has(nodeId)) return full;
       removedLabels.push(label || nodeId);
       return "";
     },
@@ -377,7 +521,11 @@ function protectPromptTokens(
   while ((match = bracketed.exec(prompt)) !== null) {
     const sigil = match[1] ?? "";
     const nodeId = match[3] ?? "";
-    if (sigil === "@" && allowedImageNodeIds && !allowedImageNodeIds.has(nodeId)) {
+    if (
+      sigil === "@" &&
+      allowedImageNodeIds &&
+      !allowedImageNodeIds.has(nodeId)
+    ) {
       continue;
     }
     ranges.push({
@@ -430,6 +578,35 @@ function stripPromptWrapper(text: string): string {
     .trim();
 }
 
+function stripAllMediaMentionTokens(text: string): string {
+  const bracketed = new RegExp(BRACKETED_TOKEN_RE.source, "g");
+  const withoutBracketed = text.replace(
+    bracketed,
+    (full: string, sigil: string) => (sigil === "@" ? "" : full),
+  );
+  return compactMentionWhitespace(
+    withoutBracketed.replace(
+      new RegExp(PLAIN_MENTION_RE.source, "g"),
+      (full: string, _name: string, offset: number, source: string) =>
+        isPlainMentionBoundary(source, offset) ? "" : full,
+    ),
+  );
+}
+
+function inferMediaMime(
+  ref: TextMediaMentionOption,
+  url: string,
+): string | undefined {
+  if (ref.mediaKind === "image") return undefined;
+  const lower = url.toLowerCase();
+  if (lower.includes(".webm")) return "video/webm";
+  if (lower.includes(".mov") || lower.includes(".quicktime"))
+    return "video/quicktime";
+  if (lower.includes(".m4v")) return "video/x-m4v";
+  if (lower.includes(".mkv")) return "video/x-matroska";
+  return "video/mp4";
+}
+
 function restoreProtectedTokens(
   text: string,
   tokens: ProtectedToken[],
@@ -453,7 +630,7 @@ function inferDataUrlMime(dataUrl: string): string | undefined {
 }
 
 async function buildPromptOptimizerAttachments(
-  refs: TextImageMentionOption[],
+  refs: TextMediaMentionOption[],
 ): Promise<PromptOptimizerAttachment[]> {
   const seen = new Set<string>();
   const attachments: PromptOptimizerAttachment[] = [];
@@ -462,13 +639,13 @@ async function buildPromptOptimizerAttachments(
     const sourceUrl = ref.sourceUrl ?? ref.previewUrl;
     if (!sourceUrl) {
       throw new Error(
-        `Image reference "${ref.label}" has no finished image URL yet. Generate or re-add that image, then click Prompt again.`,
+        `${ref.mediaKind === "video" ? "Video" : "Image"} reference "${ref.label}" has no finished URL yet. Generate or re-add that media, then click Prompt again.`,
       );
     }
 
     if (/^blob:/i.test(sourceUrl)) {
       throw new Error(
-        `Image reference "${ref.label}" is still uploading. Wait for it to finish, then click Prompt again.`,
+        `${ref.mediaKind === "video" ? "Video" : "Image"} reference "${ref.label}" is still uploading. Wait for it to finish, then click Prompt again.`,
       );
     }
 
@@ -478,10 +655,11 @@ async function buildPromptOptimizerAttachments(
       seen.add(key);
       attachments.push({
         dataUrl: sourceUrl,
-        mime: inferDataUrlMime(sourceUrl),
+        mime: inferDataUrlMime(sourceUrl) ?? inferMediaMime(ref, sourceUrl),
         detail: "low",
         label: ref.label,
         sourceNodeId: ref.nodeId,
+        mediaKind: ref.mediaKind,
       });
       continue;
     }
@@ -501,9 +679,11 @@ async function buildPromptOptimizerAttachments(
     seen.add(key);
     attachments.push({
       imageUrl,
+      mime: inferMediaMime(ref, imageUrl),
       detail: "low",
       label: ref.label,
       sourceNodeId: ref.nodeId,
+      mediaKind: ref.mediaKind,
     });
   }
 
@@ -523,8 +703,11 @@ function buildOptimizerUserMessage(
   const attachedRefs = attachments.length
     ? attachments
         .map((attachment, index) => {
-          const label = attachment.label ?? attachment.sourceNodeId ?? "image reference";
-          const nodeId = attachment.sourceNodeId ? ` (${attachment.sourceNodeId})` : "";
+          const label =
+            attachment.label ?? attachment.sourceNodeId ?? "image reference";
+          const nodeId = attachment.sourceNodeId
+            ? ` (${attachment.sourceNodeId})`
+            : "";
           return `- image input ${index + 1}: ${label}${nodeId}`;
         })
         .join("\n")
@@ -545,6 +728,47 @@ function buildOptimizerUserMessage(
     "",
     "User prompt:",
     prompt,
+  ].join("\n");
+}
+
+function buildMediaUnderstandingUserMessage(
+  prompt: string,
+  mediaRefs: TextMediaMentionOption[],
+  attachments: PromptOptimizerAttachment[] = [],
+): string {
+  const attachedRefs = attachments.length
+    ? attachments
+        .map((attachment, index) => {
+          const mediaKind = attachment.mediaKind ?? "image";
+          const label =
+            attachment.label ??
+            attachment.sourceNodeId ??
+            `${mediaKind} reference`;
+          return `- ${mediaKind} input ${index + 1}: ${label}`;
+        })
+        .join("\n")
+    : "- none";
+  const requestedRefs = mediaRefs.length
+    ? mediaRefs
+        .map((ref) => `- ${ref.mediaKind}: ${ref.label} (${ref.nodeId})`)
+        .join("\n")
+    : "- none";
+
+  return [
+    "Create or improve a generation prompt from the user's intent and the attached media.",
+    "The user may write Thai or mixed Thai/English. Match the user's requested language or format when they specify one.",
+    "Use the attached media to understand visual/video details such as subject, identity, scene, composition, lighting, style, action, and camera/motion.",
+    "If the user wants a reusable prompt, describe the media naturally instead of relying on node labels or filenames.",
+    "Describe the subject, identity cues, scene, composition, lighting, style, action, and camera/motion details naturally.",
+    "",
+    "Connected media selected by the user:",
+    requestedRefs,
+    "",
+    "Attached media available to inspect:",
+    attachedRefs,
+    "",
+    "User instruction with mention tokens removed:",
+    prompt || "Create a new generation prompt from the attached media.",
   ].join("\n");
 }
 
@@ -599,21 +823,56 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
 
   const width = d.width ?? DEFAULT_W;
   const height = d.height ?? DEFAULT_H;
+  const activePromptTab = d.activePromptTab === "result" ? "result" : "input";
+  const resultPrompt = d.content ?? "";
+  const hasExplicitInput = typeof d.inputContent === "string";
+  const resultPromptReady =
+    d.resultPromptReady === true ||
+    (!hasExplicitInput && resultPrompt.trim().length > 0);
+  const visibleResultPrompt = resultPromptReady ? resultPrompt : "";
+  const humanPrompt = typeof d.inputContent === "string" ? d.inputContent : "";
+  const activePromptText =
+    activePromptTab === "result" ? visibleResultPrompt : humanPrompt;
+  const mediaUnderstandingEnabled = d.mediaUnderstandingEnabled === true;
 
-  const updateField = useCallback(
-    (field: "label" | "content", value: string) => {
+  const updateData = useCallback(
+    (patch: Partial<TextNodeData>) => {
       setNodes((ns) =>
         ns.map((n) =>
-          n.id === id ? { ...n, data: { ...n.data, [field]: value } } : n,
+          n.id === id ? { ...n, data: { ...n.data, ...patch } } : n,
         ),
       );
     },
     [id, setNodes],
   );
 
-  const onContentChange = useCallback(
-    (v: string) => updateField("content", v),
-    [updateField],
+  const updateField = useCallback(
+    <K extends keyof TextNodeData>(field: K, value: TextNodeData[K]) => {
+      updateData({ [field]: value } as Partial<TextNodeData>);
+    },
+    [updateData],
+  );
+
+  const onPromptTextChange = useCallback(
+    (value: string) => {
+      if (activePromptTab === "result") {
+        updateData({
+          content: value,
+          resultPromptReady: value.trim().length > 0,
+        });
+        return;
+      }
+
+      // Prompt and Result are separate: typing human text must not
+      // create/update the downstream output. If this node was edited
+      // during the earlier mirrored behavior, clear that mirrored
+      // result so the Result tab stays empty until Prompt succeeds.
+      updateData({
+        inputContent: value,
+        ...(!resultPromptReady && resultPrompt ? { content: "" } : {}),
+      });
+    },
+    [activePromptTab, resultPrompt, resultPromptReady, updateData],
   );
 
   const connectedImageMentionOptions = useMemo(
@@ -626,59 +885,131 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
     [edges, graphNodes, id],
   );
 
-  const connectedImageMentionNodeIds = useMemo(
-    () => new Set(connectedImageMentionOptions.map((option) => option.nodeId)),
-    [connectedImageMentionOptions],
+  const connectedVideoMentionOptions = useMemo(
+    () =>
+      buildConnectedVideoMentionOptions(
+        id,
+        graphNodes as MentionableNode[],
+        edges,
+      ),
+    [edges, graphNodes, id],
   );
 
+  const connectedMediaMentionOptions = useMemo(
+    () => [...connectedImageMentionOptions, ...connectedVideoMentionOptions],
+    [connectedImageMentionOptions, connectedVideoMentionOptions],
+  );
+
+  const connectedMediaMentionNodeIds = useMemo(
+    () => new Set(connectedMediaMentionOptions.map((option) => option.nodeId)),
+    [connectedMediaMentionOptions],
+  );
+
+  useEffect(() => {
+    const cleanedInput = stripDisconnectedMediaMentions(
+      humanPrompt,
+      connectedMediaMentionNodeIds,
+    );
+    const cleanedResult = stripDisconnectedMediaMentions(
+      visibleResultPrompt,
+      connectedMediaMentionNodeIds,
+    );
+    const patch: Partial<TextNodeData> = {};
+    if (
+      cleanedInput.removedLabels.length > 0 &&
+      cleanedInput.text !== humanPrompt
+    ) {
+      patch.inputContent = cleanedInput.text;
+    }
+    if (
+      resultPromptReady &&
+      cleanedResult.removedLabels.length > 0 &&
+      cleanedResult.text !== resultPrompt
+    ) {
+      patch.content = cleanedResult.text;
+    }
+    if (Object.keys(patch).length > 0) updateData(patch);
+  }, [
+    connectedMediaMentionNodeIds,
+    humanPrompt,
+    resultPrompt,
+    resultPromptReady,
+    updateData,
+    visibleResultPrompt,
+  ]);
+
   const optimizePrompt = useCallback(async () => {
-    const source = (d.content ?? "").trim();
+    const source = humanPrompt.trim();
     if (!source || isOptimizing) return;
 
     setIsOptimizing(true);
     try {
       const nodes = getNodes() as MentionableNode[];
       const edges = getEdges();
-      const freshConnectedOptions = buildConnectedImageMentionOptions(
+      const freshImageOptions = buildConnectedImageMentionOptions(
         id,
         nodes,
         edges,
       );
+      const freshVideoOptions = buildConnectedVideoMentionOptions(
+        id,
+        nodes,
+        edges,
+      );
+      const freshConnectedOptions = mediaUnderstandingEnabled
+        ? [...freshImageOptions, ...freshVideoOptions]
+        : freshImageOptions;
       const freshConnectedNodeIds = new Set(
         freshConnectedOptions.map((option) => option.nodeId),
       );
       const { text: connectedOnlySource, removedLabels } =
-        stripDisconnectedImageMentions(source, freshConnectedNodeIds);
+        stripDisconnectedMediaMentions(source, freshConnectedNodeIds);
       if (removedLabels.length > 0 && connectedOnlySource !== source) {
-        updateField("content", connectedOnlySource);
-        toast.info("Removed old image refs that are no longer connected to this Text node.");
+        updateData({ inputContent: connectedOnlySource });
+        toast.info(
+          "Removed old media refs that are no longer connected to this Text node.",
+        );
       }
-      if (!connectedOnlySource.trim()) {
-        throw new Error("Connect an image ref or write a prompt before optimizing.");
+      if (!connectedOnlySource.trim() && freshConnectedOptions.length === 0) {
+        throw new Error(
+          "Connect a media ref or write a prompt before optimizing.",
+        );
       }
       const canonicalPrompt = canonicalizePlainMentions(
         connectedOnlySource,
         freshConnectedOptions,
       );
-      const protectedPrompt = protectPromptTokens(
-        canonicalPrompt,
-        freshConnectedNodeIds,
-      );
       const attachments = await buildPromptOptimizerAttachments(
         freshConnectedOptions,
       );
-      const userMessage = buildOptimizerUserMessage(
-        protectedPrompt.text,
-        protectedPrompt.tokens,
-        attachments,
-      );
+      const protectedPrompt = mediaUnderstandingEnabled
+        ? {
+            text: stripAllMediaMentionTokens(canonicalPrompt),
+            tokens: [] as ProtectedToken[],
+          }
+        : protectPromptTokens(canonicalPrompt, freshConnectedNodeIds);
+      const userMessage = mediaUnderstandingEnabled
+        ? buildMediaUnderstandingUserMessage(
+            protectedPrompt.text,
+            freshConnectedOptions,
+            attachments,
+          )
+        : buildOptimizerUserMessage(
+            protectedPrompt.text,
+            protectedPrompt.tokens,
+            attachments,
+          );
 
       const { data: result, error } = await supabase.functions.invoke(
         PROMPT_OPTIMIZER_FUNCTION,
         {
           body: {
-            model: PROMPT_OPTIMIZER_MODEL,
-            system_prompt: PROMPT_OPTIMIZER_SYSTEM_PROMPT,
+            model: mediaUnderstandingEnabled
+              ? PROMPT_OPTIMIZER_MEDIA_MODEL
+              : PROMPT_OPTIMIZER_MODEL,
+            system_prompt: mediaUnderstandingEnabled
+              ? PROMPT_MEDIA_UNDERSTANDING_SYSTEM_PROMPT
+              : PROMPT_OPTIMIZER_SYSTEM_PROMPT,
             messages: [{ role: "user", content: userMessage, attachments }],
             canvas_context: buildCanvasContext(nodes, edges),
           },
@@ -699,8 +1030,14 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
       if (!content.trim())
         throw new Error(t("workspace.node.prompt_optimize_empty_error"));
 
-      const optimized = restoreProtectedTokens(content, protectedPrompt.tokens);
-      updateField("content", optimized);
+      const optimized = mediaUnderstandingEnabled
+        ? stripAllMediaMentionTokens(stripPromptWrapper(content))
+        : restoreProtectedTokens(content, protectedPrompt.tokens);
+      updateData({
+        content: optimized,
+        activePromptTab: "result",
+        resultPromptReady: true,
+      });
       toast.success(t("workspace.node.prompt_optimize_success"));
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
@@ -710,14 +1047,15 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
       setIsOptimizing(false);
     }
   }, [
-    d.content,
+    humanPrompt,
     id,
     getEdges,
     getNodes,
     isOptimizing,
     language,
+    mediaUnderstandingEnabled,
     t,
-    updateField,
+    updateData,
   ]);
 
   // Token count derived from serialised form — used by the footer chip.
@@ -726,11 +1064,11 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
   }, [id, setNodes]);
 
   const mentionCount = useMemo(() => {
-    const text = d.content ?? "";
+    const text = activePromptText;
     const matches = [...text.matchAll(/@\[[^\]]+\]\(([^)]+)\)/g)];
     if (matches.length === 0) return 0;
-    return matches.filter((m) => connectedImageMentionNodeIds.has(m[1])).length;
-  }, [connectedImageMentionNodeIds, d.content]);
+    return matches.filter((m) => connectedMediaMentionNodeIds.has(m[1])).length;
+  }, [activePromptText, connectedMediaMentionNodeIds]);
 
   /* Drag-to-resize from the bottom-right corner. Pointer-event based
    *  so it covers mouse + pen + touch with one handler. Pointer
@@ -815,7 +1153,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
       <NodeQuickActionRail
         visible={selected || isHovered}
         selected={selected}
-        onDelete={selected ? onDeleteNode : undefined}
+        onDelete={onDeleteNode}
         nodeId={id}
         mediaKind="text"
         bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
@@ -841,29 +1179,107 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
       <div
         className={cn(
           "workspace-node-shell ws-clean-body flex flex-col overflow-hidden",
+          "ws-text-node-body",
           selected && "is-selected",
         )}
         data-state={selected ? "selected" : "idle"}
         style={{ height }}
       >
+        <div className="ws-text-top-row nodrag nopan">
+          <div className="ws-text-tabs">
+            <button
+              type="button"
+              className={cn(
+                "ws-text-tab",
+                activePromptTab === "input" && "is-active",
+              )}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                updateData({ activePromptTab: "input" });
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              Prompt
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "ws-text-tab",
+                activePromptTab === "result" && "is-active",
+              )}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                updateData({ activePromptTab: "result" });
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              Result prompt
+            </button>
+          </div>
+          <Tooltip delayDuration={150}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "ws-text-understand-toggle",
+                  mediaUnderstandingEnabled && "is-active",
+                )}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  updateData({
+                    mediaUnderstandingEnabled: !mediaUnderstandingEnabled,
+                  });
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                aria-pressed={mediaUnderstandingEnabled}
+                aria-label={t("workspace.node.media_prompt_aria")}
+              >
+                <span className="ws-text-understand-icons" aria-hidden="true">
+                  <ImageIcon />
+                  <Film />
+                </span>
+                <span className="ws-text-understand-label">
+                  {t("workspace.node.media_prompt_label")}
+                </span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent
+              side="top"
+              align="end"
+              className="max-w-[240px] border-white/10 bg-[#151515] px-3 py-2 text-xs leading-snug text-zinc-100 shadow-2xl shadow-black/40"
+            >
+              {mediaUnderstandingEnabled
+                ? t("workspace.node.media_prompt_tip_on")
+                : t("workspace.node.media_prompt_tip_off")}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+
         <div className="min-h-0 flex-1 overflow-hidden">
           <PromptMentionTextarea
-            value={d.content ?? ""}
-            onChange={onContentChange}
-            placeholder={t("workspace.node.text_body_placeholder")}
+            value={activePromptText}
+            onChange={onPromptTextChange}
+            placeholder={
+              activePromptTab === "input"
+                ? t("workspace.node.text_body_placeholder")
+                : "Generated prompt sent to connected nodes"
+            }
             excludeNodeId={id}
             // Workspace assets show up under `assetNode`. Include the
             // legacy `inputNode` so a flow imported from the main
             // editor still resolves its mentions here.
             allowedNodeTypes={TEXT_NODE_MENTION_TYPES}
-            mentionOptionsOverride={connectedImageMentionOptions}
+            mentionOptionsOverride={connectedMediaMentionOptions}
             /* `leading-snug` (1.375) replaces `leading-relaxed`
              *  (1.625). User reported the lines felt too far apart
              *  on the Text node specifically — same fix as
              *  StickyNote, slightly looser because the body text is
              *  bigger (15.5px vs 13px) and benefits from a touch
              *  more breathing room for Thai diacritics. */
-            className="ws-clean-textarea min-h-[48px] text-[15.5px] leading-snug text-zinc-100"
+            className="ws-clean-textarea ws-text-node-editor min-h-[48px] text-zinc-100"
             /* Cap the rendered textarea to the resized body height
              *  minus the body's own padding + footer chip area.
              *  Inline-style cap (set inside PromptMentionTextarea)
@@ -874,9 +1290,16 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
           />
         </div>
 
-        {mentionCount > 0 && (
-          <div className="mt-0.5 flex shrink-0 items-center gap-1 pr-[86px] text-[9px] font-medium leading-none text-zinc-400/90">
-            <AtSign className="h-2.5 w-2.5 text-zinc-500" />
+        <div className="ws-text-ref-footer pr-[92px]">
+          <div
+            className={cn(
+              "ws-text-ref-count",
+              mentionCount === 0 &&
+                connectedMediaMentionOptions.length === 0 &&
+                "is-empty",
+            )}
+          >
+            <AtSign className="h-3 w-3" />
             <span>
               {mentionCount}{" "}
               {mentionCount === 1
@@ -884,7 +1307,34 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
                 : t("workspace.node.text_ref_plural")}
             </span>
           </div>
-        )}
+          {connectedMediaMentionOptions.length > 0 && (
+            <div
+              className="ws-text-ref-strip"
+              aria-label="Connected media refs"
+            >
+              {connectedMediaMentionOptions.slice(0, 3).map((option) => (
+                <div
+                  key={option.nodeId}
+                  className="ws-text-ref-thumb"
+                  title={option.label}
+                >
+                  {option.mediaKind === "image" && option.previewUrl ? (
+                    <img src={option.previewUrl} alt="" draggable={false} />
+                  ) : option.mediaKind === "video" ? (
+                    <Film className="h-3 w-3" />
+                  ) : (
+                    <ImageIcon className="h-3 w-3" />
+                  )}
+                </div>
+              ))}
+              {connectedMediaMentionOptions.length > 3 && (
+                <span className="ws-text-ref-more">
+                  +{connectedMediaMentionOptions.length - 3}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
 
         <div className="ws-text-prompt-anchor">
           <Tooltip delayDuration={150}>
@@ -898,11 +1348,11 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
                 }}
                 onPointerDownCapture={(e) => e.stopPropagation()}
                 onMouseDownCapture={(e) => e.stopPropagation()}
-                aria-disabled={isOptimizing || !(d.content ?? "").trim()}
+                aria-disabled={isOptimizing || !humanPrompt.trim()}
                 aria-label={t("workspace.node.prompt_optimize_aria")}
                 className={cn(
                   "ws-text-prompt-button nodrag nopan",
-                  (isOptimizing || !(d.content ?? "").trim()) && "is-disabled",
+                  (isOptimizing || !humanPrompt.trim()) && "is-disabled",
                 )}
               >
                 {isOptimizing ? (
@@ -951,6 +1401,16 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
         bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
       />
 
+      <PortIcon
+        dir="target"
+        handleId={TEXT_NODE_VIDEO_INPUT_HANDLE}
+        label={t("workspace.port.ref_video")}
+        portType="video"
+        color={TEXT_COLOR}
+        index={1}
+        bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
+      />
+
       {/* Output handle — text-typed icon at the top-right cluster. */}
       <PortIcon
         dir="source"
@@ -961,6 +1421,31 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
         index={0}
         bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
       />
+
+      {connectedImageMentionOptions.map((option, index) => (
+        <PortIcon
+          key={option.nodeId}
+          dir="source"
+          handleId={textNodeImageOutputHandle(option.nodeId)}
+          label={`Image ref: ${option.label}`}
+          portType="image"
+          color={TEXT_COLOR}
+          index={index + 1}
+          bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
+        />
+      ))}
+      {connectedVideoMentionOptions.map((option, index) => (
+        <PortIcon
+          key={option.nodeId}
+          dir="source"
+          handleId={textNodeVideoOutputHandle(option.nodeId)}
+          label={`Video ref: ${option.label}`}
+          portType="video"
+          color={TEXT_COLOR}
+          index={connectedImageMentionOptions.length + index + 1}
+          bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
+        />
+      ))}
     </div>
   );
 });
