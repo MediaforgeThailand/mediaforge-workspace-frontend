@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Camera,
@@ -244,6 +244,16 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<StockResource | null>(null);
+  const resultsRef = useRef<HTMLElement>(null);
+  const isInitialSearch = useRef(true);
+
+  useEffect(() => {
+    if (isInitialSearch.current) {
+      isInitialSearch.current = false;
+      return;
+    }
+    resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [submittedQuery]);
 
   const heroImages = useMemo(() => {
     const apiImages = items
@@ -440,7 +450,7 @@ export default function StockView({ onOpenSidebar }: { onOpenSidebar?: () => voi
           ))}
         </section>
 
-        <section className="mt-16">
+        <section ref={resultsRef} className="mt-16 scroll-mt-24">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
               <h2 className="text-[28px] font-semibold tracking-tight text-white">
