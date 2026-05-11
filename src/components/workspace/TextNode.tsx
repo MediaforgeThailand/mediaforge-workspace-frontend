@@ -16,7 +16,7 @@
  *   }
  */
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { type Edge, type NodeProps, useEdges, useNodes, useReactFlow } from "@xyflow/react";
 import { AtSign, Loader2, Play, Type } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -596,18 +596,6 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
     [connectedImageMentionOptions],
   );
 
-  useEffect(() => {
-    const current = d.content ?? "";
-    if (!current.includes("@[")) return;
-    const { text, removedLabels } = stripDisconnectedImageMentions(
-      current,
-      connectedImageMentionNodeIds,
-    );
-    if (removedLabels.length > 0 && text !== current) {
-      updateField("content", text);
-    }
-  }, [connectedImageMentionNodeIds, d.content, updateField]);
-
   const optimizePrompt = useCallback(async () => {
     const source = (d.content ?? "").trim();
     if (!source || isOptimizing) return;
@@ -689,9 +677,11 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
 
   const mentionCount = useMemo(() => {
     const text = d.content ?? "";
-    const matches = text.match(/@\[[^\]]+\]\([^)]+\)/g);
-    return matches?.length ?? 0;
-  }, [d.content]);
+    const matches = [...text.matchAll(/@\[[^\]]+\]\(([^)]+)\)/g)];
+    if (matches.length === 0) return 0;
+    const liveNodeIds = new Set(graphNodes.map((n) => n.id));
+    return matches.filter((m) => liveNodeIds.has(m[1])).length;
+  }, [d.content, graphNodes]);
 
   /* Drag-to-resize from the bottom-right corner. Pointer-event based
    *  so it covers mouse + pen + touch with one handler. Pointer
