@@ -66,6 +66,7 @@ const MAX_H = 800;
 const BODY_CHROME_H = 58;
 const PROMPT_OPTIMIZER_FUNCTION = "workspace-chat";
 const PROMPT_OPTIMIZER_MODEL = "gpt-5-mini";
+const WORKSPACE_MEDIA_BUCKET = "ai-media";
 const BRACKETED_TOKEN_RE = /([#@])\[([^\]]+)\]\(([^)]+)\)/g;
 const PLAIN_MENTION_RE = /@([A-Za-z0-9_][A-Za-z0-9_.-]*)/g;
 
@@ -149,6 +150,14 @@ function selectedGeneration(data: Record<string, unknown>) {
   return generations[selectedIndex] ?? generations[0];
 }
 
+function storageBucketUrl(bucket: string, rawPath: string): string {
+  const path = rawPath.trim().replace(/^\/+/, "");
+  if (!path) return "";
+  if (/^(https?:|blob:|data:)/i.test(path)) return path;
+  if (path.startsWith(`${bucket}/`)) return `/${path}`;
+  return `/${bucket}/${path}`;
+}
+
 function imagePreviewForNode(node: MentionableNode): string | undefined {
   const data = node.data ?? {};
   const params = data.params as Record<string, unknown> | undefined;
@@ -182,14 +191,8 @@ function imageSourceForPromptOptimizer(node: MentionableNode): string | undefine
     return generation.url;
   }
 
-  /* `data.storagePath` is a raw bucket-relative path with no bucket
-   *  name, e.g. "<userId>/foo.png". `getSignedUrl` can't tell which
-   *  bucket it belongs to so it defaults to user_assets — wrong for
-   *  ai-media-stored generations, the sign call fails, and the silent
-   *  fallback hands the raw path back. OpenAI then rejects it as
-   *  "invalid URL format". Stick to candidates that are already a
-   *  fully-qualified URL or blob; AssetNode always sets `previewUrl`
-   *  alongside `storagePath`, so we don't lose any real cases. */
+  /* Prefer already-fetchable URLs, then fall back to raw canvas
+   *  storage paths by explicitly pinning them to the ai-media bucket. */
   const candidates = [
     data.imageUrl,
     data.image_url,
@@ -203,6 +206,17 @@ function imageSourceForPromptOptimizer(node: MentionableNode): string | undefine
   ];
   for (const candidate of candidates) {
     if (typeof candidate === "string" && candidate.trim()) return candidate;
+  }
+  const storageCandidates = [
+    data.storagePath,
+    data.storage_path,
+    params?.storagePath,
+    params?.storage_path,
+  ];
+  for (const candidate of storageCandidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return storageBucketUrl(WORKSPACE_MEDIA_BUCKET, candidate);
+    }
   }
   return undefined;
 }
@@ -221,7 +235,7 @@ function nodeCanProvideImageMention(
   if (sourceHandle && portTypeFromHandleId(sourceHandle) !== "image") return false;
   const generation = selectedGeneration(data);
   if (generation) return generation.type === "image" && typeof generation.url === "string";
-  return ["imageGenNode", "removeBackgroundNode", "bananaProNode"].includes(node.type ?? "");
+  return false;
 }
 
 function buildConnectedImageMentionOptions(
@@ -446,7 +460,11 @@ async function buildPromptOptimizerAttachments(
 
   for (const ref of refs) {
     const sourceUrl = ref.sourceUrl ?? ref.previewUrl;
-    if (!sourceUrl) continue;
+    if (!sourceUrl) {
+      throw new Error(
+        `Image reference "${ref.label}" has no finished image URL yet. Generate or re-add that image, then click Prompt again.`,
+      );
+    }
 
     if (/^blob:/i.test(sourceUrl)) {
       throw new Error(
@@ -621,8 +639,16 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
     try {
       const nodes = getNodes() as MentionableNode[];
       const edges = getEdges();
+      const freshConnectedOptions = buildConnectedImageMentionOptions(
+        id,
+        nodes,
+        edges,
+      );
+      const freshConnectedNodeIds = new Set(
+        freshConnectedOptions.map((option) => option.nodeId),
+      );
       const { text: connectedOnlySource, removedLabels } =
-        stripDisconnectedImageMentions(source, connectedImageMentionNodeIds);
+        stripDisconnectedImageMentions(source, freshConnectedNodeIds);
       if (removedLabels.length > 0 && connectedOnlySource !== source) {
         updateField("content", connectedOnlySource);
         toast.info("Removed old image refs that are no longer connected to this Text node.");
@@ -632,14 +658,14 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
       }
       const canonicalPrompt = canonicalizePlainMentions(
         connectedOnlySource,
-        connectedImageMentionOptions,
+        freshConnectedOptions,
       );
       const protectedPrompt = protectPromptTokens(
         canonicalPrompt,
-        connectedImageMentionNodeIds,
+        freshConnectedNodeIds,
       );
       const attachments = await buildPromptOptimizerAttachments(
-        connectedImageMentionOptions,
+        freshConnectedOptions,
       );
       const userMessage = buildOptimizerUserMessage(
         protectedPrompt.text,
@@ -683,9 +709,8 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
       setIsOptimizing(false);
     }
   }, [
-    connectedImageMentionNodeIds,
-    connectedImageMentionOptions,
     d.content,
+    id,
     getEdges,
     getNodes,
     isOptimizing,
@@ -702,9 +727,8 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
     const text = d.content ?? "";
     const matches = [...text.matchAll(/@\[[^\]]+\]\(([^)]+)\)/g)];
     if (matches.length === 0) return 0;
-    const liveNodeIds = new Set(graphNodes.map((n) => n.id));
-    return matches.filter((m) => liveNodeIds.has(m[1])).length;
-  }, [d.content, graphNodes]);
+    return matches.filter((m) => connectedImageMentionNodeIds.has(m[1])).length;
+  }, [connectedImageMentionNodeIds, d.content]);
 
   /* Drag-to-resize from the bottom-right corner. Pointer-event based
    *  so it covers mouse + pen + touch with one handler. Pointer

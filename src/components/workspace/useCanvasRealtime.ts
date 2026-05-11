@@ -44,6 +44,7 @@ type PatchPayload =
 
 const BROADCAST_EVENT = "canvas_patch";
 const CURSOR_EVENT = "canvas_cursor";
+const OWN_WRITE_ECHO_GRACE_MS = 12_000;
 
 type CursorPayload = CursorBroadcast & {
   clientId: string;
@@ -251,13 +252,14 @@ export function useCanvasRealtime() {
         if (!graph) return;
         const currentGraph = useWorkspaceStore.getState().graphs[canvasId];
         if (currentGraph && graphFingerprint(currentGraph) === graphFingerprint(graph)) return;
-        /* Ignore our own writes unconditionally. The previous timestamp
-         *  guard fell through when autosave (~5s debounce) was still
-         *  in flight while the user kept typing — server `updated_at`
-         *  beat `lastLocalEditAtRef`, so the echo overwrote in-progress
-         *  local content and the text node flickered back. Trade-off:
-         *  same-user two-tab live sync is lost until reload. */
-        if (row.updated_by === user.id) {
+        /* Ignore only the short echo window from this tab's own
+         *  autosave. A permanent user-id ignore fixes rollback but
+         *  breaks same-account multi-tab sync; this keeps active
+         *  typing safe while letting idle tabs pick up newer edits. */
+        if (
+          row.updated_by === user.id &&
+          Date.now() - lastLocalEditAtRef.current < OWN_WRITE_ECHO_GRACE_MS
+        ) {
           return;
         }
         remoteApplyingRef.current = true;
