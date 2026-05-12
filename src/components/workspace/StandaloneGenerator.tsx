@@ -4180,7 +4180,7 @@ function VoiceSettingsControls({
             </div>
           )}
           {elevenVoices && elevenVoices.length > 0 && (
-            <div className="standalone-voice-controls ws-scroll-hide mt-[6px] grid max-h-[184px] grid-cols-2 gap-[5px] overflow-y-auto pr-0.5">
+            <div className="standalone-voice-controls ws-scroll-hide mt-[6px] grid max-h-[122px] grid-cols-2 gap-[5px] overflow-y-auto pr-0.5">
               {elevenVoices.map((voice) => {
                 const active = voice.id === form.voice;
                 return (
@@ -4189,7 +4189,7 @@ function VoiceSettingsControls({
                     type="button"
                     onClick={() => onChange({ voice: voice.id })}
                     className={cn(
-                      "standalone-voice-card flex min-h-[50px] flex-col items-start justify-between rounded-lg border border-dashed px-[9px] py-[6px] text-left transition",
+                      "standalone-voice-card flex min-h-[42px] flex-col items-start justify-between rounded-[10px] border border-dashed px-[8px] py-[5px] text-left transition",
                       active
                         ? "border-amber-300/50 bg-amber-300/10"
                         : "border-white/[0.12] bg-[#242424] hover:bg-[#2d2d2d]",
@@ -4294,7 +4294,7 @@ function GeminiVoicePicker({
         label="Voice"
         meta={`${GEMINI_TTS_VOICES.length} preset speakers`}
       />
-      <div className="standalone-voice-controls ws-scroll-hide mt-[6px] grid max-h-[184px] grid-cols-3 gap-[5px] overflow-y-auto pr-0.5">
+      <div className="standalone-voice-controls ws-scroll-hide mt-[6px] grid max-h-[122px] grid-cols-3 gap-[5px] overflow-y-auto pr-0.5">
         {GEMINI_TTS_VOICES.map((voiceName) => {
           const active = value === voiceName;
           const isPlaying = playingId === voiceName;
@@ -4305,7 +4305,7 @@ function GeminiVoicePicker({
               type="button"
               onClick={() => onChange(voiceName)}
               className={cn(
-                "standalone-voice-card relative flex min-h-[44px] flex-col items-start justify-center rounded-lg border border-dashed px-[9px] py-[5px] pr-[32px] text-left transition",
+                "standalone-voice-card relative flex min-h-[38px] flex-col items-start justify-center rounded-[10px] border border-dashed px-[8px] py-[4px] pr-[30px] text-left transition",
                 active
                   ? "border-amber-300/50 bg-amber-300/10"
                   : "border-white/[0.12] bg-[#242424] hover:bg-[#2d2d2d]",
@@ -4342,7 +4342,7 @@ function GeminiVoicePicker({
                   }
                 }}
                 className={cn(
-                  "absolute right-[7px] top-[7px] grid h-[25px] w-[25px] cursor-pointer place-items-center rounded-full transition",
+                  "absolute right-[5px] top-[6px] grid h-[24px] w-[24px] cursor-pointer place-items-center rounded-full transition",
                   "bg-white/[0.08] text-zinc-200 hover:bg-white/[0.16] hover:text-white",
                   isPlaying && "bg-amber-300/30 text-amber-200",
                 )}
@@ -4397,11 +4397,11 @@ function GeminiAudioTagsPanel({
   };
   const prefix = composeGeminiAudioTagPrefix({ emotion, personality, speed });
   return (
-    <div className="standalone-voice-controls rounded-[12px] bg-white/[0.04] px-[10px] py-[8px]">
+    <div className="standalone-voice-controls ws-scroll-hide max-h-[210px] overflow-y-auto rounded-[12px] bg-white/[0.04] px-[9px] py-[7px]">
       <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
         Audio tags
       </div>
-      <p className="mt-[3px] text-[11.5px] leading-[14px] text-zinc-500">
+      <p className="mt-[2px] text-[11.5px] leading-[14px] text-zinc-500">
         เลือกอารมณ์ / บุคลิก / ความเร็ว — Gemini จะใช้ tag ในวงเล็บเพื่อปรับการอ่าน
       </p>
 
@@ -4418,11 +4418,11 @@ function GeminiAudioTagsPanel({
         onToggle={(tag) => toggle(personality, tag, onChangePersonality)}
       />
 
-      <div className="mt-[7px]">
+      <div className="mt-[6px]">
         <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
           ความเร็ว / Speed
         </div>
-        <div className="mt-[5px] inline-flex min-h-[32px] w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[12px]">
+        <div className="mt-[4px] inline-flex min-h-[28px] w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[12px]">
           {GEMINI_SPEED_OPTIONS.map((opt) => {
             const active = speed === opt.id;
             return (
@@ -4431,7 +4431,7 @@ function GeminiAudioTagsPanel({
                 type="button"
                 onClick={() => onChangeSpeed(opt.id)}
                 className={cn(
-                  "flex-1 rounded-md px-2 py-[5px] text-center leading-[13px] transition-colors",
+                  "flex-1 rounded-md px-2 py-[3px] text-center leading-[13px] transition-colors",
                   active
                     ? "bg-white/[0.10] text-zinc-50"
                     : "text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100",
@@ -4445,11 +4445,11 @@ function GeminiAudioTagsPanel({
       </div>
 
       {prefix ? (
-        <div className="mt-[7px] rounded-md bg-black/35 px-2.5 py-1.5 font-mono text-[11px] leading-[13px] text-amber-200/90">
+        <div className="mt-[6px] rounded-md bg-black/35 px-2 py-1 font-mono text-[11px] leading-[13px] text-amber-200/90">
           {prefix} <span className="text-zinc-500">+ script</span>
         </div>
       ) : (
-        <div className="mt-[7px] text-[11px] leading-[14px] italic text-zinc-600">
+        <div className="mt-[6px] text-[11px] leading-[14px] italic text-zinc-600">
           (ยังไม่ได้เลือก audio tag — Gemini จะอ่านตาม voice ที่เลือกอย่างเดียว)
         </div>
       )}
@@ -4469,11 +4469,11 @@ function TagChipRow({
   onToggle: (tag: string) => void;
 }) {
   return (
-    <div className="mt-[7px]">
+    <div className="mt-[6px]">
       <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
         {title}
       </div>
-      <div className="mt-[5px] flex flex-wrap gap-[5px]">
+      <div className="mt-[4px] flex flex-wrap gap-[4px]">
         {items.map((item) => {
           const active = selected.includes(item.tag);
           return (
@@ -4483,7 +4483,7 @@ function TagChipRow({
               onClick={() => onToggle(item.tag)}
               title={item.sub}
               className={cn(
-                "rounded-full px-[9px] py-[5px] text-[12px] font-medium leading-[13px] transition-colors",
+                "rounded-full px-[8px] py-[3px] text-[12px] font-medium leading-[13px] transition-colors",
                 active
                   ? "bg-amber-300/20 text-amber-200 ring-1 ring-amber-300/30"
                   : "bg-white/[0.05] text-zinc-300 hover:bg-white/[0.10] hover:text-white",

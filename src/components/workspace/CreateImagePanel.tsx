@@ -552,8 +552,8 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
       {/* ===== SCROLLABLE CONTENT ===== */}
       <div
         className={clsx(
-          "flex flex-1 min-h-0 flex-col overflow-y-auto px-[12px] pb-[12px]",
-          compactVoice ? "gap-[7px]" : "gap-[12px]",
+          "flex flex-1 min-h-0 flex-col overflow-y-auto px-[12px]",
+          compactVoice ? "gap-[7px] pb-[56px]" : "gap-[12px] pb-[12px]",
         )}
       >
         {/* Model Selector */}
@@ -595,7 +595,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
         <section
           className={clsx(
             "shrink-0 rounded-[16px] border border-white/[0.05] bg-[#151719] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]",
-            compactVoice ? "p-[8px]" : "p-[10px]",
+            compactVoice ? "max-h-[154px] p-[8px]" : "p-[10px]",
           )}
           onPasteCapture={handlePromptPaste}
           onDragEnterCapture={handlePromptDragOver}
@@ -704,10 +704,11 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
               onChange={updatePrompt}
               placeholder={resolvedPromptPlaceholder}
               mentionOptions={mentionOptions}
+              maxHeightPx={compactVoice ? 74 : undefined}
               className={clsx(
                 "mt-[8px] rounded-none border-transparent bg-transparent px-[4px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-transparent focus:ring-0",
                 compactVoice
-                  ? "min-h-[82px] max-h-[140px] py-[5px]"
+                  ? "min-h-[44px] max-h-[74px] py-[4px]"
                   : "min-h-[116px] max-h-[230px] py-[8px]",
               )}
             />
@@ -777,8 +778,8 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
       {/* ===== FOOTER ===== */}
       <div
         className={clsx(
-          "flex w-full flex-row items-center justify-between px-[12px]",
-          compactVoice ? "gap-[10px] pb-[8px]" : "gap-[16px] pb-[12px]",
+          "relative z-10 flex w-full flex-row items-center justify-between bg-[#121314] px-[12px]",
+          compactVoice ? "gap-[10px] pb-[8px] pt-[4px]" : "gap-[16px] pb-[12px]",
         )}
       >
         {/* Quantity stepper */}
@@ -805,7 +806,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
             disabled={running}
             className={clsx(
               "standalone-generate-button ci-gloss-button group relative flex w-full items-center justify-center gap-[6px] overflow-hidden rounded-full border px-[8px] font-semibold transition-all active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70",
-              compactVoice ? "h-[42px] text-[14px] leading-[18px]" : "h-[48px] text-[15px] leading-[20px]",
+              compactVoice ? "h-[38px] text-[13.5px] leading-[18px]" : "h-[48px] text-[15px] leading-[20px]",
             )}
           >
             <span className="pointer-events-none absolute inset-x-4 top-0 h-[16px] rounded-b-full bg-white/30 blur-[10px]" />
@@ -1924,12 +1925,14 @@ export function StandalonePromptMentionTextarea({
   onChange,
   placeholder,
   mentionOptions,
+  maxHeightPx,
   className,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   mentionOptions: CreateImagePanelReference[];
+  maxHeightPx?: number;
   className?: string;
 }) {
   return (
@@ -1939,6 +1942,7 @@ export function StandalonePromptMentionTextarea({
         onChange={onChange}
         placeholder={placeholder}
         mentionOptions={mentionOptions}
+        maxHeightPx={maxHeightPx}
         className={className}
       />
     </ReactFlowProvider>
@@ -1950,12 +1954,14 @@ function StandalonePromptMentionTextareaInner({
   onChange,
   placeholder,
   mentionOptions,
+  maxHeightPx,
   className,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   mentionOptions: CreateImagePanelReference[];
+  maxHeightPx?: number;
   className?: string;
 }) {
   const { setNodes } = useReactFlow();
@@ -2001,6 +2007,7 @@ function StandalonePromptMentionTextareaInner({
         icon: node.data?.fieldType === "video" ? "video" : "image",
         previewUrl: typeof node.data?.previewUrl === "string" ? node.data.previewUrl : undefined,
       }))}
+      maxHeightPx={maxHeightPx}
       className={className}
     />
   );

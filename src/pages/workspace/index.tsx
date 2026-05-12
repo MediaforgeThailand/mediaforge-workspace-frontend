@@ -1265,7 +1265,7 @@ const HomeFeatureShowcase = ({ onSection }: { onSection: (section: Section) => v
             >
               <span
                 className={cn(
-                  "absolute bottom-0 left-1/2 h-[99px] w-[78%] -translate-x-1/2 rounded-[22px] border border-white/10 bg-gradient-to-br opacity-70 transition duration-300 group-hover:border-[#eeff15]/50 group-focus-visible:border-[#eeff15]/50 sm:h-[117px] sm:w-[74%] xl:h-[101px] xl:w-[72%]",
+                  "absolute bottom-0 left-1/2 h-[129px] w-full -translate-x-1/2 rounded-[22px] border border-white/10 bg-gradient-to-br opacity-70 transition duration-300 group-hover:border-[#eeff15]/50 group-focus-visible:border-[#eeff15]/50 sm:h-[152px] sm:w-[96%] xl:h-[131px] xl:w-[94%]",
                   item.tint,
                 )}
               />
@@ -1273,7 +1273,7 @@ const HomeFeatureShowcase = ({ onSection }: { onSection: (section: Section) => v
                 src={item.tileImage}
                 alt=""
                 className={cn(
-                  "absolute left-1/2 bottom-[30px] h-[130px] w-[88%] -translate-x-1/2 rounded-[14px] object-contain object-center drop-shadow-[0_18px_22px_rgba(0,0,0,0.48)] transition duration-300 ease-out sm:h-[156px] sm:w-[84%] xl:h-[138px] xl:w-[82%]",
+                  "absolute left-1/2 bottom-[42px] h-[104px] w-[88%] -translate-x-1/2 rounded-[14px] object-contain object-center drop-shadow-[0_18px_22px_rgba(0,0,0,0.48)] transition duration-300 ease-out sm:h-[125px] sm:w-[84%] xl:h-[110px] xl:w-[82%]",
                   isActive
                     ? "scale-[2.35] group-hover:scale-[2.8] group-focus-visible:scale-[2.8]"
                     : "scale-[2] group-hover:scale-[2.8] group-focus-visible:scale-[2.8]",
@@ -1281,7 +1281,7 @@ const HomeFeatureShowcase = ({ onSection }: { onSection: (section: Section) => v
                 loading="lazy"
                 decoding="async"
               />
-              <span className="pointer-events-none absolute bottom-0 left-1/2 h-[73px] w-[78%] -translate-x-1/2 rounded-b-[22px] bg-gradient-to-t from-black/72 via-black/24 to-transparent sm:w-[74%] xl:w-[72%]" />
+              <span className="pointer-events-none absolute bottom-0 left-1/2 h-[95px] w-full -translate-x-1/2 rounded-b-[22px] bg-gradient-to-t from-black/72 via-black/24 to-transparent sm:w-[96%] xl:w-[94%]" />
               <span className="absolute inset-x-3 bottom-2.5 text-center text-[15px] font-semibold leading-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.62)] sm:text-[17px] xl:text-[14px]">
                 {item.title}
               </span>

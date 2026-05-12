@@ -1574,6 +1574,11 @@ body {
   line-height: 20px !important;
 }
 
+.mf-readable .standalone-create-panel-voice .standalone-generate-button {
+  font-size: 13.5px !important;
+  line-height: 18px !important;
+}
+
 .mf-readable .standalone-mobile-tool-tabs :where([class*="text-[12px]"], .text-xs, .text-sm) {
   font-size: 12px !important;
   line-height: 14px !important;
