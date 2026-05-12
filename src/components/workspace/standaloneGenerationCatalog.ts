@@ -367,32 +367,11 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
         description: "Previous-gen Tripo v3 — solid baseline.",
       },
       {
-        id: "tripo3d-turbo",
-        label: "Tripo Turbo v1.0",
-        provider: "Tripo3D",
-        badge: "Fast",
-        description: "Faster drafts for 3D concept checks.",
-      },
-      {
         id: "tripo3d-v2.5",
         label: "Tripo v2.5",
         provider: "Tripo3D",
         badge: "v2.5",
         description: "Tripo v2.5 — legacy model.",
-      },
-      {
-        id: "tripo3d-v2.0",
-        label: "Tripo v2.0",
-        provider: "Tripo3D",
-        badge: "v2",
-        description: "Tripo v2.0 — legacy model.",
-      },
-      {
-        id: "tripo3d-v1.4",
-        label: "Tripo v1.4",
-        provider: "Tripo3D",
-        badge: "v1",
-        description: "Oldest Tripo model kept for compatibility.",
       },
       // ── Hyper3D family ────────────────────────────────────
       {

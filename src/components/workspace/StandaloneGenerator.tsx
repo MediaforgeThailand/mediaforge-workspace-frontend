@@ -94,7 +94,7 @@ import {
 } from "./standaloneGenerationCatalog";
 import { GEMINI_TTS_VOICES, DEFAULT_GEMINI_TTS_VOICE } from "./workspaceSchema";
 import { useVoicePreview } from "@/hooks/useVoicePreview";
-import { orderModelsByRecommendation } from "./modelDisplay";
+import { modelLogoFor, orderModelsByRecommendation } from "./modelDisplay";
 import MediaContextMenu, {
   type MediaContextMenuItem,
 } from "./MediaContextMenu";
@@ -751,10 +751,7 @@ const STANDALONE_MODEL_DESCRIPTION_KEYS = {
   "tripo3d-p1": "workspace.standalone.model.tripo3d_p1.desc",
   "tripo3d-v3.1": "workspace.standalone.model.tripo3d_v3_1.desc",
   "tripo3d-v3.0": "workspace.standalone.model.tripo3d_v3_0.desc",
-  "tripo3d-turbo": "workspace.standalone.model.tripo3d_turbo.desc",
   "tripo3d-v2.5": "workspace.standalone.model.tripo3d_v2_5.desc",
-  "tripo3d-v2.0": "workspace.standalone.model.tripo3d_v2_0.desc",
-  "tripo3d-v1.4": "workspace.standalone.model.tripo3d_v1_4.desc",
   "hyper3d-gen2-260112": "workspace.standalone.model.hyper3d_gen2.desc",
 } as const satisfies Record<string, TranslationKey>;
 
@@ -1120,7 +1117,6 @@ export default function StandaloneGenerator({
     activeDef.models.find((model) => model.id === form.model) ??
     activeDef.models[0] ??
     null;
-  const selectedModelVisual = selectedModel ? modelVisualFor(selectedModel) : null;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pendingSlotRef = useRef<UploadSlot>("image-ref");
   const activeProject =
@@ -2308,11 +2304,11 @@ export default function StandaloneGenerator({
               onPromptChange={(prompt) => updateForm({ prompt })}
               showPromptInput={!standaloneMultiShotActive}
               modelLabel={selectedModel?.label ?? "SeedDance 2.0 Pro"}
-              modelInitial={selectedModelVisual?.initial ?? "S"}
               modelValue={form.model}
               modelOptions={activeDef.models.filter((model) => model.id !== "google-tts-studio").map((model) => ({
                 id: model.id,
                 label: model.label,
+                provider: model.provider,
                 settings: videoModelSettingTags(model.id, language),
               }))}
               onModelChange={setToolModel}
@@ -2378,11 +2374,11 @@ export default function StandaloneGenerator({
               onPromptChange={updatePanelPrompt}
               showPromptInput={activeTool !== "image_to_3d"}
               modelLabel={selectedModel?.label ?? "Nano Banana Pro"}
-              modelInitial={selectedModelVisual?.initial ?? "G"}
               modelValue={form.model}
               modelOptions={activeDef.models.filter((model) => model.id !== "google-tts-studio").map((model) => ({
                 id: model.id,
                 label: model.label,
+                provider: model.provider,
                 settings:
                   activeTool === "image_gen"
                     ? imageModelSettingTags(model.id, language)
@@ -2970,7 +2966,6 @@ function ModelPicker({
     0,
     Math.min(3, models.length),
   );
-  const selectedVisual = modelVisualFor(selected);
   const uiText = {
     recommended: language === "th" ? "แนะนำ" : "Recommended",
     allModels: language === "th" ? "โมเดลทั้งหมด" : "All models",
@@ -2989,12 +2984,7 @@ function ModelPicker({
         className="group flex h-[58px] w-full items-center overflow-hidden rounded-[14px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-3 transition-all duration-200 hover:border-[var(--brand-primary)]/40 hover:bg-[var(--bg-surface-2)] hover:shadow-[0_0_0_1px_rgba(238,255,0,.25),0_8px_24px_-12px_rgba(238,255,0,.4)]"
       >
         <span className="flex w-full items-center gap-3">
-          <span
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] text-[15px] font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,.16)]"
-            style={{ background: selectedVisual.gradient }}
-          >
-            {selectedVisual.initial}
-          </span>
+          <StandaloneModelLogo model={selected} size="lg" />
           <span className="min-w-0 flex-1 text-left">
             <span className="block text-[12px] font-medium text-[var(--text-tertiary)]">
               {t("workspace.standalone.model")}
@@ -3064,9 +3054,6 @@ function ModelPicker({
                         style={{ background: visual.gradient }}
                       >
                         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
-                        <div className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-lg bg-white/15 text-base font-black text-white backdrop-blur-sm">
-                          {visual.initial}
-                        </div>
                         <div className="absolute bottom-0 left-0 right-0 min-w-0 p-3">
                           <div className="truncate font-semibold text-white">
                             {model.label}
@@ -3123,7 +3110,6 @@ function ModelPicker({
             <div className="relative flex-1 overflow-y-auto px-3 pb-4 pt-2">
               {filteredModels.map((model, index) => {
                 const active = model.id === value;
-                const visual = modelVisualFor(model);
                 return (
                   <button
                     key={model.id}
@@ -3138,12 +3124,7 @@ function ModelPicker({
                       active && "bg-white/[0.06]",
                     )}
                   >
-                    <span
-                      className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-sm font-black text-white"
-                      style={{ background: visual.gradient }}
-                    >
-                      {visual.initial}
-                    </span>
+                    <StandaloneModelLogo model={model} size="xl" />
                     <span className="min-w-0 flex-1">
                       <span className="block min-w-0">
                         <span className="block line-clamp-2 font-medium leading-5 text-white">
@@ -3194,6 +3175,60 @@ function ModelBadge({
       )}
     >
       {children}
+    </span>
+  );
+}
+
+function StandaloneModelLogo({
+  model,
+  size = "lg",
+  className,
+}: {
+  model: { id?: string; label?: string; name?: string; provider?: string };
+  size?: "lg" | "xl";
+  className?: string;
+}) {
+  const logo = modelLogoFor(model);
+  const markLength = logo.mark.length;
+  const markClass =
+    markLength > 5
+      ? "text-[7px]"
+      : markLength > 4
+        ? "text-[8px]"
+        : markLength > 3
+          ? "text-[9px]"
+          : markLength > 2
+            ? "text-[10px]"
+            : "text-[15px]";
+
+  return (
+    <span
+      aria-label={`${logo.label} logo`}
+      title={logo.label}
+      className={cn(
+        "flex shrink-0 items-center justify-center overflow-hidden border font-black uppercase leading-none tracking-normal",
+        size === "xl" ? "h-10 w-10 rounded-lg" : "h-9 w-9 rounded-[10px]",
+        className,
+      )}
+      style={{
+        background: logo.background,
+        color: logo.color,
+        borderColor: logo.borderColor,
+        boxShadow: logo.shadow,
+      }}
+    >
+      {logo.imageSrc ? (
+        <img
+          src={logo.imageSrc}
+          alt=""
+          className="h-full w-full object-contain p-[5px]"
+          draggable={false}
+        />
+      ) : (
+        <span className={cn("max-w-full truncate px-[2px]", markClass)}>
+          {logo.mark}
+        </span>
+      )}
     </span>
   );
 }
@@ -6640,7 +6675,6 @@ const TRIPO_MULTIVIEW_3D_MODELS = new Set([
   "tripo3d-v3.1",
   "tripo3d-v3.0",
   "tripo3d-v2.5",
-  "tripo3d-v2.0",
 ]);
 
 function max3dRefsForModel(model: string): number {

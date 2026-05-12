@@ -3,7 +3,7 @@ import {
   Minus, Plus,
   Video, Image as ImageIcon, Box, Music, ChevronRight,
   FileText,
-  X, ChevronDown, Layers, Check, Upload, Clipboard,
+  X, ChevronDown, Check, Upload, Clipboard,
   SlidersHorizontal, Trash2,
 } from "lucide-react";
 import { ReactFlowProvider, useReactFlow, type Node } from "@xyflow/react";
@@ -16,6 +16,7 @@ import sampleRefTwo from "@/assets/mock-packshot-perfume.jpg";
 import sampleRefThree from "@/assets/pro-trend-space-cat.jpg";
 import {
   cleanModelDisplayName,
+  modelLogoFor,
   orderModelsByRecommendation,
   recommendationRankForModel,
 } from "./modelDisplay";
@@ -104,6 +105,7 @@ interface LocalPickerUpload extends CreateImagePanelReference {
 interface CreateImagePanelModel {
   id: string;
   label: string;
+  provider?: string;
   settings?: ModelSettingTag[];
 }
 
@@ -290,7 +292,6 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   onPromptChange,
   showPromptInput = true,
   modelLabel = "Nano Banana Pro",
-  modelInitial = "G",
   modelValue,
   modelOptions = [],
   onModelChange,
@@ -405,9 +406,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
           onClick={() => setModelOpen(true)}
           className="standalone-model-card group relative inline-flex min-h-[50px] w-full shrink-0 items-center gap-[10px] overflow-hidden rounded-[14px] border border-white/[0.02] bg-[#16181a] py-[6px] pl-[8px] pr-[10px] transition-colors hover:bg-[#1c1f22]"
         >
-          <div className="h-[34px] w-[34px] rounded-[10px] bg-white flex items-center justify-center text-[15px] leading-[20px] font-bold">
-            {modelInitial}
-          </div>
+          <ModelLogoBadge model={{ id: selectedModelId, label: modelLabel }} size="md" />
           <div className="flex-1 flex flex-col items-start min-w-0">
             <span className="text-[12px] leading-[16px] text-neutral-400">{resolvedModelCaption}</span>
             <span className="text-[14px] leading-[20px] font-semibold text-white">{cleanModelDisplayName(modelLabel)}</span>
@@ -627,7 +626,6 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
   onPromptChange,
   showPromptInput = true,
   modelLabel = "Kling 2.6 Pro",
-  modelInitial = "K",
   modelValue,
   modelOptions = [],
   onModelChange,
@@ -803,9 +801,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           onClick={() => setModelOpen(true)}
           className="standalone-model-card group relative inline-flex min-h-[54px] w-full shrink-0 items-center gap-[10px] overflow-hidden rounded-[14px] border border-white/[0.02] bg-[#16181a] py-[6px] pl-[8px] pr-[10px] transition-colors hover:bg-[#1c1f22]"
         >
-          <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px] bg-white text-[15px] font-bold leading-[20px]">
-            {modelInitial}
-          </div>
+          <ModelLogoBadge model={{ id: selectedModelId, label: modelLabel }} size="lg" />
           <div className="flex min-w-0 flex-1 flex-col items-start">
             <span className="text-[12px] leading-[16px] text-neutral-400">{resolvedModelCaption}</span>
             <span className="truncate text-[14px] font-semibold leading-[20px] text-white">{cleanModelDisplayName(modelLabel)}</span>
@@ -2122,6 +2118,7 @@ interface Model {
   id: string;
   name: string;
   description: string;
+  provider?: string;
   iconSrc?: string;
   coverSrc?: string;
   badge?: string;
@@ -2150,6 +2147,7 @@ const buildModels = (
   return orderModelsByRecommendation(source).map((model) => ({
     id: model.id,
     name: cleanModelDisplayName(model.label),
+    provider: model.provider,
     description: modelDescriptionFor(model.id, model.label, copy),
     badge: modelBadgeFor(model.id, model.label, copy),
     settings: model.settings ?? [],
@@ -2193,6 +2191,60 @@ const modelBadgeFor = (id: string, name: string, copy: ReturnType<typeof usePane
   }
   return undefined;
 };
+
+function ModelLogoBadge({
+  model,
+  size = "md",
+  className,
+}: {
+  model: { id?: string; label?: string; name?: string; provider?: string };
+  size?: "md" | "lg";
+  className?: string;
+}) {
+  const logo = modelLogoFor(model);
+  const markLength = logo.mark.length;
+  const markClass =
+    markLength > 5
+      ? "text-[7px]"
+      : markLength > 4
+        ? "text-[8px]"
+        : markLength > 3
+          ? "text-[9px]"
+          : markLength > 2
+            ? "text-[10px]"
+            : "text-[14px]";
+
+  return (
+    <span
+      aria-label={`${logo.label} logo`}
+      title={logo.label}
+      className={clsx(
+        "flex shrink-0 items-center justify-center overflow-hidden border font-black uppercase leading-none tracking-normal",
+        size === "lg" ? "h-[38px] w-[38px] rounded-[10px]" : "h-[34px] w-[34px] rounded-[8px]",
+        className,
+      )}
+      style={{
+        background: logo.background,
+        color: logo.color,
+        borderColor: logo.borderColor,
+        boxShadow: logo.shadow,
+      }}
+    >
+      {logo.imageSrc ? (
+        <img
+          src={logo.imageSrc}
+          alt=""
+          className="h-full w-full object-contain p-[5px]"
+          draggable={false}
+        />
+      ) : (
+        <span className={clsx("max-w-full truncate px-[2px]", markClass)}>
+          {logo.mark}
+        </span>
+      )}
+    </span>
+  );
+}
 
 export const ModelsPopover: React.FC<ModelsPopoverProps> = ({
   open,
@@ -2369,13 +2421,13 @@ const ModelListItem: React.FC<ModelListItemProps> = ({ model, selected, onClick 
       selected ? "bg-[#f4ff00]/[0.08] ring-1 ring-[#f4ff00]/40" : "hover:bg-white/[0.04]",
     )}
   >
-    <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center overflow-hidden rounded-[8px] bg-white/[0.06]">
-      {model.iconSrc ? (
+    {model.iconSrc ? (
+      <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center overflow-hidden rounded-[8px] bg-white/[0.06]">
         <img src={model.iconSrc} alt={model.name} className="w-full h-full object-cover" />
-      ) : (
-        <Layers className="h-[18px] w-[18px] text-neutral-300" />
-      )}
-    </div>
+      </div>
+    ) : (
+      <ModelLogoBadge model={model} size="md" />
+    )}
 
     <div className="flex min-w-0 flex-1 flex-col gap-[4px]">
       <div className="flex items-center gap-[8px]">
