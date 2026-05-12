@@ -2796,7 +2796,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   }, [id, runNode]);
 
   /* ── Multi-gen auto-run on mount ──────────────────────────
-   * When NodeQuickToolbar's "x2 / x3" multi-gen picker clones
+   * When NodeQuickActionRail's "x2 / x3" multi-gen picker clones
    * the source node, each clone is stamped with
    * `data.runOnMount = true`. The toolbar can't dispatch the
    * run-shortcut event right after `setNodes(...)` because

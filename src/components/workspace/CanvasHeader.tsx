@@ -1,7 +1,7 @@
 /**
  * Canvas-page top header — solid-black breadcrumb bar.
  *
- * Sits above WorkspaceTabBar on the canvas page. Shape mirrors the
+ * Sits above WorkspaceCanvasPagePill on the canvas page. Shape mirrors the
  * Magnific reference the team sent over:
  *
  *   ◀  [project chip]  >  Untitled Space            [ Share ] [👤]

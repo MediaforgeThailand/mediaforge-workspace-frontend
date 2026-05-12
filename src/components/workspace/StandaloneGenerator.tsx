@@ -9,9 +9,7 @@ import {
   ChevronRight,
   Clock,
   Crop,
-  Copy,
   Download,
-  Eye,
   ExternalLink,
   Film,
   FolderOpen,
@@ -97,9 +95,9 @@ import { GEMINI_TTS_VOICES, DEFAULT_GEMINI_TTS_VOICE } from "./workspaceSchema";
 import { useVoicePreview } from "@/hooks/useVoicePreview";
 import { modelLogoFor, orderModelsByRecommendation } from "./modelDisplay";
 import { getProjectAvatar } from "./projectAvatars";
-import MediaContextMenu, {
-  type MediaContextMenuItem,
-} from "./MediaContextMenu";
+import MediaContextMenu from "./MediaContextMenu";
+import { buildMediaMenuItems } from "./mediaMenuItems";
+import { useMediaContextMenu } from "./useMediaContextMenu";
 // Hardcoded voice catalogs (Gemini star names, Google Studio
 // labels, ElevenLabs default presets) were deleted in the
 // preset-purge cleanup. ElevenLabs voices come from a live
@@ -5690,7 +5688,7 @@ function CreationTile({
   onDelete: () => void;
 }) {
   const { language, t } = useLanguage();
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const ctxMenu = useMediaContextMenu();
   const result = job.result;
   const params = job.request?.params ?? {};
   const prompt = String(params.prompt ?? "");
@@ -5798,55 +5796,13 @@ function CreationTile({
       });
     }
   };
-  const contextMenuItems: MediaContextMenuItem[] = [
-    {
-      key: "preview",
-      label: "Preview",
-      icon: Eye,
-      disabled: !canOpenPreview,
-      onSelect: openMediaPreview,
-    },
-    {
-      key: "download",
-      label: "Download",
-      icon: Download,
-      disabled: !downloadUrl,
-      onSelect: () => {
-        if (downloadUrl) void downloadFromUrl(downloadUrl, downloadName);
-      },
-    },
-    {
-      key: "duplicate",
-      label: "Duplicate",
-      icon: Copy,
-      disabled: true,
-      onSelect: () => undefined,
-    },
-    {
-      key: "move-board",
-      label: "Move to Board",
-      icon: FolderOpen,
-      separatorBefore: true,
-      disabled: true,
-      onSelect: () => undefined,
-    },
-    {
-      key: "copy-board",
-      label: "Copy to Board",
-      icon: Copy,
-      disabled: true,
-      onSelect: () => undefined,
-    },
-    {
-      key: "delete",
-      label: "Delete",
-      icon: Trash2,
-      separatorBefore: true,
-      danger: true,
-      disabled: !canDelete,
-      onSelect: onDelete,
-    },
-  ];
+  const contextMenuItems = buildMediaMenuItems(t, {
+    onPreview: canOpenPreview ? openMediaPreview : undefined,
+    onDownload: downloadUrl
+      ? () => void downloadFromUrl(downloadUrl, downloadName)
+      : undefined,
+    onDelete: canDelete ? onDelete : undefined,
+  });
   return (
     <article className="group relative flex h-[230px] max-w-full overflow-hidden rounded-[10px] bg-black/40 shadow-[inset_0_0_0_1px_rgba(255,255,255,.04)]">
       <div
@@ -5859,13 +5815,7 @@ function CreationTile({
         tabIndex={canOpenPreview ? 0 : undefined}
         onClick={canOpenPreview ? openMediaPreview : undefined}
         onContextMenu={
-          canOpenPreview || downloadUrl || canDelete
-            ? (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                setContextMenu({ x: event.clientX, y: event.clientY });
-              }
-            : undefined
+          canOpenPreview || downloadUrl || canDelete ? ctxMenu.openAt : undefined
         }
         onKeyDown={
           canOpenPreview
@@ -6002,11 +5952,11 @@ function CreationTile({
           </div>
         </div>
       )}
-      {contextMenu && (
+      {ctxMenu.position && (
         <MediaContextMenu
-          position={contextMenu}
+          position={ctxMenu.position}
           items={contextMenuItems}
-          onClose={() => setContextMenu(null)}
+          onClose={ctxMenu.close}
         />
       )}
     </article>

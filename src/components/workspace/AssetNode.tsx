@@ -28,9 +28,9 @@ import { CLEAN_NODE_BODY_TOP_PX, PortIcon } from "./PortIcon";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { AudioPlayButton } from "./AudioPlayButton";
 import { downloadFromUrl } from "./downloadAsset";
-import MediaContextMenu, {
-  type MediaContextMenuItem,
-} from "./MediaContextMenu";
+import MediaContextMenu from "./MediaContextMenu";
+import type { MediaContextMenuItem } from "./mediaMenuItems";
+import { useMediaContextMenu } from "./useMediaContextMenu";
 import NodeQuickActionRail from "./NodeQuickActionRail";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -105,7 +105,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
   const allNodes = useNodes();
   const { t, t: i18n } = useLanguage();
   const [isHovered, setIsHovered] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const ctxMenu = useMediaContextMenu();
   // Re-sign the previewUrl on mount in case it was generated under
   // the old 24h TTL and has since expired. Falls back to the raw
   // URL untouched for blob:/data: URLs and non-Supabase sources.
@@ -340,22 +340,10 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
     : d.fieldType === "model3d" ? Box
     : ImageIcon;
   const downloadableUrl = livePreviewUrl ?? d.previewUrl;
-  /* Preview from the right-click menu used to be hard-coded
-   *  `disabled: true` with `onSelect: () => undefined` — the row
-   *  rendered greyed out and clicking it did nothing on every
-   *  asset node. WorkspaceCanvas already listens for the
-   *  `workspace-open-node-preview` window event (see
-   *  WorkspaceCanvas.tsx ≈ line 1152) and looks the node up by
-   *  id, then runs `getNodePreview` against the live store
-   *  snapshot to open the lightbox. We dispatch that event here
-   *  instead of wiring a prop drill from WorkspaceCanvas down to
-   *  every node — same pattern double-click already uses.
-   *
-   *  Also dropped the "Move to Board" / "Copy to Board" rows
-   *  from this menu — both shipped as `disabled: true` placeholders
-   *  with no implementation behind them. They cluttered the menu
-   *  and signalled features that aren't there yet. They can come
-   *  back when the Boards UI ships. */
+  /* Preview dispatches `workspace-open-node-preview` (handled in
+   *  WorkspaceCanvas) instead of wiring a prop drill — same pattern
+   *  double-click already uses. Move/Copy-to-Board rows are dropped
+   *  here; they ship disabled with no implementation behind them. */
   const contextMenuItems: MediaContextMenuItem[] = [
     {
       key: "preview",
@@ -409,9 +397,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
       onMouseLeave={() => setIsHovered(false)}
       onContextMenu={(event) => {
         if (!downloadableUrl) return;
-        event.preventDefault();
-        event.stopPropagation();
-        setContextMenu({ x: event.clientX, y: event.clientY });
+        ctxMenu.openAt(event);
       }}
       // Default tile width — 219 (200 → 230 → 219). Now also
       // user-resizable via the corner handle below; persists in
@@ -497,11 +483,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
               }),
             );
           }}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            setContextMenu({ x: event.clientX, y: event.clientY });
-          }}
+          onContextMenu={ctxMenu.openAt}
         >
         {livePreviewUrl ? (
           d.fieldType === "model3d" ? (
@@ -632,11 +614,11 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
         title={t("workspace.node.asset_drag_resize")}
         aria-label={t("workspace.node.asset_resize")}
       />
-      {contextMenu && (
+      {ctxMenu.position && (
         <MediaContextMenu
-          position={contextMenu}
+          position={ctxMenu.position}
           items={contextMenuItems}
-          onClose={() => setContextMenu(null)}
+          onClose={ctxMenu.close}
         />
       )}
     </div>
