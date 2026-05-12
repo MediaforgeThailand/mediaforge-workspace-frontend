@@ -190,11 +190,8 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
     outputType: "video",
     accent: "hsl(156 72% 42%)",
     defaultModel: "seedance-2-0-pro",
-    // Keep in sync with KLING_MODELS + SEEDANCE_MODELS in
-    // nodeApiSchema.ts / workspaceSchema.ts. The canvas video node
-    // accepts all 5 Kling SKUs + all 5 Seedance SKUs — the standalone
-    // surface previously surfaced only 4 which is why the
-    // user-reported list was "incomplete".
+    // Keep in sync with KLING_MODELS + current SEEDANCE_MODELS in
+    // nodeApiSchema.ts / workspaceSchema.ts.
     models: [
       // ── Kling family ───────────────────────────────────────
       {
@@ -233,20 +230,6 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
         description: "Multi-input Kling 3 with audio and video reference.",
       },
       // ── Seedance family ────────────────────────────────────
-      {
-        id: "seedance-1-0-pro-250528",
-        label: "SeedDance 1.0 Pro",
-        provider: "BytePlus",
-        badge: "Pro",
-        description: "Original Seedance Pro pipeline.",
-      },
-      {
-        id: "seedance-1-0-pro-fast-251015",
-        label: "SeedDance 1.0 Pro Fast",
-        provider: "BytePlus",
-        badge: "Fast",
-        description: "Faster Seedance 1.0 for drafts and social clips.",
-      },
       {
         id: "seedance-1-5-pro-251215",
         label: "SeedDance 1.5 Pro",
@@ -539,16 +522,6 @@ export function videoDurationsForModel(model: string): number[] {
   }
   if (model.startsWith("seedance-1-5")) {
     return [4, 5, 6, 7, 8, 9, 10, 11, 12];
-  }
-  if (model.startsWith("seedance-1-0-lite")) {
-    return [5, 10];
-  }
-  if (
-    model.startsWith("seedance-1-0-pro") ||
-    model.startsWith("seedance-1-0-fast") ||
-    isSeedanceVideoModel(model)
-  ) {
-    return [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
   }
   return [5, 10];
 }

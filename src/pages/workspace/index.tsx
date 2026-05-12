@@ -62,11 +62,11 @@ import {
   WalletCards,
   ChevronDown,
   ChevronRight,
+  ArrowRight,
   List,
   SlidersHorizontal,
   UserCircle2,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -109,6 +109,19 @@ import {
   type ClassMembershipInfo,
 } from "@/hooks/useIsOrgUser";
 import ActiveClassPicker from "@/components/ActiveClassPicker";
+import { getProjectAvatar } from "@/components/workspace/projectAvatars";
+import academyHeaderWorkspace from "@/assets/academy-header-workspace.png";
+import homeFeatureWorkspaceHero from "@/assets/home-feature-workspace-hero.png";
+import homeFeatureCinematicHero from "@/assets/home-feature-cinematic-hero.png";
+import homeFeature3dHero from "@/assets/home-feature-3d-model.webp";
+import homeFeatureEditingHero from "@/assets/home-feature-editing.png";
+import homeFeatureSoundHero from "@/assets/home-feature-sound-voice-hero.png";
+import homeFeatureAcademyImage from "@/assets/home-feature-academy.png";
+import academyHeaderCinematic from "@/assets/academy-header-cinematic.png";
+import academyHeader3d from "@/assets/academy-header-3d.png";
+import academyHeaderEditing from "@/assets/academy-header-editing.png";
+import academyHeaderVoiceSound from "@/assets/academy-header-voice-sound.png";
+import academyHeaderAcademy from "@/assets/academy-header-academy.png";
 
 /* ════════════════════════════════════════════════════════════
  * Types + helpers
@@ -1078,6 +1091,235 @@ const HOME_INSPIRATIONS: HomeInspiration[] = [
   },
 ];
 
+interface HomeFeatureShowcaseItem {
+  id: string;
+  title: string;
+  kicker: string;
+  description: string;
+  bullets: string[];
+  tileImage: string;
+  heroImage: string;
+  tint: string;
+  actionLabel: string;
+  actionSection?: Section;
+  actionAnchor?: string;
+}
+
+const HOME_FEATURE_SHOWCASE: HomeFeatureShowcaseItem[] = [
+  {
+    id: "workspace",
+    title: "Workspace",
+    kicker: "One canvas for every AI workflow.",
+    description:
+      "Build connected boards for image, video, voice, and 3D work without losing context between tools.",
+    bullets: [
+      "Drag, paste, and connect assets directly on the canvas",
+      "Chain outputs into the next AI tool with visible context",
+      "Organize ideas by project, space, and board",
+    ],
+    tileImage: academyHeaderWorkspace,
+    heroImage: homeFeatureWorkspaceHero,
+    tint: "from-[#eeff15]/95 via-lime-300/65 to-white/40",
+    actionLabel: "Explore More",
+    actionSection: "spaces",
+  },
+  {
+    id: "cinematic",
+    title: "Cinematic",
+    kicker: "Create story visuals, shots, and video concepts.",
+    description:
+      "Shape cinematic scenes from prompt, image references, and storyboard assets in one production flow.",
+    bullets: [
+      "Generate keyframes, shot ideas, and visual references",
+      "Move image concepts into video generation cleanly",
+      "Keep scene boards readable for clients and teams",
+    ],
+    tileImage: academyHeaderCinematic,
+    heroImage: homeFeatureCinematicHero,
+    tint: "from-[#eeff15]/95 via-yellow-200/55 to-white/35",
+    actionLabel: "Explore More",
+    actionSection: "video_gen",
+  },
+  {
+    id: "3d",
+    title: "3D",
+    kicker: "Turn references into 3D-ready creative direction.",
+    description:
+      "Move from a sketch or reference image into model, material, and animation-ready exploration.",
+    bullets: [
+      "Use references to generate model-ready ideas",
+      "Preview visual direction before exporting assets",
+      "Keep character, material, and scene references together",
+    ],
+    tileImage: academyHeader3d,
+    heroImage: homeFeature3dHero,
+    tint: "from-[#eeff15]/90 via-amber-200/55 to-white/35",
+    actionLabel: "Explore More",
+    actionSection: "image_to_3d",
+  },
+  {
+    id: "editing",
+    title: "Editing",
+    kicker: "Refine images into production-ready assets.",
+    description:
+      "Crop, remix, restyle, and rebuild visual ideas while keeping source material close to the workflow.",
+    bullets: [
+      "Open generated images for review and edits",
+      "Use references to guide variations without losing context",
+      "Move edited assets back into canvas workflows",
+    ],
+    tileImage: academyHeaderEditing,
+    heroImage: homeFeatureEditingHero,
+    tint: "from-[#eeff15]/90 via-cyan-100/45 to-white/30",
+    actionLabel: "Explore More",
+    actionSection: "image_gen",
+  },
+  {
+    id: "sound",
+    title: "Sound & Voice",
+    kicker: "Create voice, narration, and audio layers.",
+    description:
+      "Turn scripts into usable voice assets and keep audio connected with the images, scenes, and videos around it.",
+    bullets: [
+      "Generate voice from scripts and direction",
+      "Keep audio assets available beside visual boards",
+      "Route sound into video and production workflows",
+    ],
+    tileImage: academyHeaderVoiceSound,
+    heroImage: homeFeatureSoundHero,
+    tint: "from-[#eeff15]/90 via-emerald-100/45 to-white/30",
+    actionLabel: "Explore More",
+    actionSection: "voice_gen",
+  },
+  {
+    id: "academy",
+    title: "Academy",
+    kicker: "Learn workflows directly inside the product.",
+    description:
+      "Discover guided examples, creative recipes, and practical workflows for building better AI projects.",
+    bullets: [
+      "Browse learning content from the home surface",
+      "Use examples as a starting point for real projects",
+      "Keep product learning close to the tools",
+    ],
+    tileImage: academyHeaderAcademy,
+    heroImage: homeFeatureAcademyImage,
+    tint: "from-[#eeff15]/90 via-orange-100/45 to-white/30",
+    actionLabel: "Explore More",
+    actionAnchor: "workspace-inspirations",
+  },
+];
+
+const HomeFeatureShowcase = ({ onSection }: { onSection: (section: Section) => void }) => {
+  const [activeId, setActiveId] = useState(HOME_FEATURE_SHOWCASE[0].id);
+  const activeFeature =
+    HOME_FEATURE_SHOWCASE.find((item) => item.id === activeId) ??
+    HOME_FEATURE_SHOWCASE[0];
+  const handleAction = () => {
+    if (activeFeature.actionSection) {
+      onSection(activeFeature.actionSection);
+      return;
+    }
+    if (activeFeature.actionAnchor) {
+      document.getElementById(activeFeature.actionAnchor)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  };
+
+  return (
+    <section className="rounded-[34px] bg-[#0b0b0b] px-4 py-6 shadow-[0_22px_90px_rgba(0,0,0,0.38)] sm:px-6 md:px-8 lg:px-10 lg:py-8">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:gap-3 xl:grid-cols-6">
+        {HOME_FEATURE_SHOWCASE.map((item) => {
+          const isActive = item.id === activeFeature.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setActiveId(item.id)}
+              onPointerEnter={() => setActiveId(item.id)}
+              onMouseEnter={() => setActiveId(item.id)}
+              onFocus={() => setActiveId(item.id)}
+              className={cn(
+                "group relative h-[148px] overflow-visible rounded-[22px] border border-transparent p-0 text-left transition duration-300 ease-out sm:h-[172px] xl:h-[158px]",
+                isActive
+                  ? "z-10"
+                  : "hover:z-10",
+              )}
+            >
+              <span
+                className={cn(
+                  "absolute bottom-0 left-1/2 h-[76px] w-[78%] -translate-x-1/2 rounded-[22px] border border-white/10 bg-gradient-to-br opacity-70 transition duration-300 group-hover:border-[#eeff15]/50 group-focus-visible:border-[#eeff15]/50 sm:h-[90px] sm:w-[74%] xl:h-[78px] xl:w-[72%]",
+                  item.tint,
+                )}
+              />
+              <img
+                src={item.tileImage}
+                alt=""
+                className={cn(
+                  "absolute left-1/2 bottom-[24px] h-[100px] w-[88%] -translate-x-1/2 rounded-[14px] object-contain object-center drop-shadow-[0_18px_22px_rgba(0,0,0,0.48)] transition duration-300 ease-out sm:h-[120px] sm:w-[84%] xl:h-[106px] xl:w-[82%]",
+                  isActive ? "scale-[2]" : "scale-[1.86] group-hover:scale-[2] group-focus-visible:scale-[2]",
+                )}
+                loading="lazy"
+                decoding="async"
+              />
+              <span className="pointer-events-none absolute bottom-0 left-1/2 h-[56px] w-[78%] -translate-x-1/2 rounded-b-[22px] bg-gradient-to-t from-black/72 via-black/24 to-transparent sm:w-[74%] xl:w-[72%]" />
+              <span className="absolute inset-x-3 bottom-2.5 text-center text-[15px] font-semibold leading-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.62)] sm:text-[17px] xl:text-[14px]">
+                {item.title}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-7 grid gap-7 lg:grid-cols-2 lg:items-start">
+        <div className="min-w-0">
+          <h2 className="text-[42px] font-semibold leading-[0.92] tracking-[-0.02em] text-white sm:text-[56px] lg:text-[62px]">
+            {activeFeature.title}
+          </h2>
+          <p className="mt-3 max-w-[560px] text-[15px] font-semibold leading-5 text-[#eeff15]">
+            {activeFeature.kicker}
+          </p>
+          <p className="mt-4 max-w-[620px] text-[15px] leading-5 text-white/76">
+            {activeFeature.description}
+          </p>
+          <ul className="mt-4 space-y-2">
+            {activeFeature.bullets.map((bullet) => (
+              <li key={bullet} className="flex items-start gap-3 text-[14px] font-medium leading-5 text-white/86">
+                <span className="mt-0.5 grid h-5 w-5 flex-none place-items-center rounded-full bg-[#eeff15] text-black">
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </span>
+                <span>{bullet}</span>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={handleAction}
+            className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,#f6ff25_0%,#e5cf35_48%,#fff57a_100%)] px-7 text-[15px] font-semibold text-black shadow-[0_0_24px_rgba(238,255,21,0.24),inset_0_1px_0_rgba(255,255,255,0.72)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_34px_rgba(238,255,21,0.34),inset_0_1px_0_rgba(255,255,255,0.8)]"
+          >
+            {activeFeature.actionLabel}
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="relative overflow-hidden rounded-[18px] bg-[#111] shadow-[0_24px_70px_rgba(0,0,0,0.42)]">
+          <img
+            key={activeFeature.heroImage}
+            src={activeFeature.heroImage}
+            alt={activeFeature.title}
+            className="aspect-[16/10] w-full object-cover transition duration-500"
+            loading="lazy"
+            decoding="async"
+          />
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0)_45%,rgba(0,0,0,0.28)_100%)]" />
+        </div>
+      </div>
+    </section>
+  );
+};
+
 interface AcademyVideo {
   id: string;
   title: string;
@@ -1393,7 +1635,7 @@ const HomeView = ({
           </div>
         </section>
 
-        <div className="mx-auto min-w-0 w-full max-w-[1680px] px-4 pb-16 pt-10 md:px-7 lg:px-10 lg:pt-12">
+        <div className="mx-auto min-w-0 w-full max-w-[1680px] px-4 pb-16 pt-3 md:px-7 md:pt-4 lg:px-10 lg:pt-4">
           {activeClass && (
             <EducationClassDashboard
               active={activeClass}
@@ -1402,7 +1644,9 @@ const HomeView = ({
             />
           )}
 
-          <section className="mt-14">
+          <HomeFeatureShowcase onSection={onSection} />
+
+          <section id="workspace-inspirations" className="mt-12 scroll-mt-8">
             <div className="flex items-center justify-between gap-4">
               <h2 className="text-[26px] font-semibold leading-tight text-white md:text-[30px]">
                 {t("workspace.home.inspirations")}
@@ -1911,9 +2155,10 @@ const ProjectQuickSwitch = ({
               Number(a.id === activeProjectId) ||
             b.updatedAt - a.updatedAt,
         )
-        .map((project, index) => {
+        .map((project) => {
           const active = activeProjectId === project.id;
           const teamProject = Boolean(project.ownerId && project.ownerId !== user?.id);
+          const avatar = getProjectAvatar(project);
           return (
             <button
               key={project.id}
@@ -1926,13 +2171,16 @@ const ProjectQuickSwitch = ({
                   : "bg-white/[0.03] text-zinc-400 ring-white/[0.06] hover:bg-white/[0.07] hover:text-zinc-100",
               )}
             >
-              <span
-                className="h-2.5 w-2.5 rounded-full"
-                style={{
-                  background:
-                    project.color ?? PROJECT_COLOR_SWATCHES[index % PROJECT_COLOR_SWATCHES.length],
-                }}
-              />
+              <span className="h-5 w-5 shrink-0 overflow-hidden rounded-full bg-[#0b0d0d] ring-1 ring-white/12">
+                <img
+                  src={avatar}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                  draggable={false}
+                />
+              </span>
               <span className="max-w-[150px] truncate">{project.name}</span>
               {teamProject && (
                 <span className="rounded bg-sky-400/15 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-sky-200">

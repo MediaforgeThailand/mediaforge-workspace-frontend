@@ -3,10 +3,11 @@
  * Placeholder buttons only at this stage.
  */
 
-import { ChevronLeft, Save, Play, FlaskConical } from "lucide-react";
+import { ChevronLeft, Save, FlaskConical } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useLanguage } from "@/contexts/LanguageContext";
+import GenerateIcon from "@/components/GenerateIcon";
 
 /** Tool node types that support the generation history feature. */
 const TOOL_NODE_TYPES = new Set([
@@ -99,7 +100,7 @@ const WorkspaceTopBar = () => {
         className="flex items-center gap-1 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-300"
         title={t("workspace.topbar.run_not_wired")}
       >
-        <Play className="h-3.5 w-3.5" /> {t("workspace.topbar.run")}
+        <GenerateIcon className="h-3.5 w-3.5" /> {t("workspace.topbar.run")}
       </button>
     </header>
   );

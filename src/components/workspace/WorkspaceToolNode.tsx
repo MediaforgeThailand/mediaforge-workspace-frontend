@@ -76,6 +76,7 @@ import NodeResultDialog from "./NodeResultDialog";
 import { RunTimer } from "./RunTimer";
 import type { Generation } from "./NodeResultBar";
 import { AudioPlayButton } from "./AudioPlayButton";
+import GenerateIcon from "@/components/GenerateIcon";
 // Voice catalog imports were removed when the hardcoded preset
 // lists were deleted. Audio gen nodes no longer surface a voice
 // picker on the canvas — backend uses its own per-provider default.
@@ -3825,16 +3826,16 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                     ) : runStatus === "error" ? (
                       <RotateCw />
                     ) : (
-                      <Play className="fill-current" />
+                      <GenerateIcon className="h-[18px] w-[18px]" />
                     )}
                   </button>
                 </TooltipTrigger>
                 <TooltipContent
                   side="top"
                   align="end"
-                  className="overflow-visible border-white/10 bg-[#151515] px-3 py-2 text-zinc-100 shadow-2xl shadow-black/40"
+                  className="ws-ui-copy-tooltip ws-run-summary-tooltip overflow-visible border-white/10 bg-[#151515] text-zinc-100 shadow-2xl shadow-black/40"
                 >
-                  <div className="flex flex-col gap-2 text-xs text-zinc-100">
+                  <div className="flex flex-col gap-1.5 text-zinc-100">
                     <span>
                       {isViewer
                         ? "View only — runs disabled"

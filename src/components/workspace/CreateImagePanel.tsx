@@ -14,6 +14,7 @@ import { useLanguage, type Language } from "@/contexts/LanguageContext";
 import sampleRefOne from "@/assets/showcase-cat-astronaut.jpg";
 import sampleRefTwo from "@/assets/mock-packshot-perfume.jpg";
 import sampleRefThree from "@/assets/pro-trend-space-cat.jpg";
+import GenerateIcon from "@/components/GenerateIcon";
 import {
   cleanModelDisplayName,
   modelLogoFor,
@@ -116,6 +117,11 @@ interface CreateImagePanelProps {
   promptLabel?: string;
   promptPlaceholder?: string;
   onPromptChange?: (prompt: string) => void;
+  autoPromptLabel?: string;
+  autoPromptTitle?: string;
+  onAutoPrompt?: () => void;
+  autoPromptRunning?: boolean;
+  autoPromptDisabled?: boolean;
   showPromptInput?: boolean;
   modelLabel?: string;
   modelInitial?: string;
@@ -149,6 +155,7 @@ interface CreateImagePanelProps {
   onQuantityChange?: (quantity: number) => void;
   bottom?: BottomTab;
   onBottomChange?: (tab: BottomTab) => void;
+  density?: "default" | "voice";
 }
 
 type VideoInputMode = "frames" | "reference";
@@ -203,6 +210,11 @@ interface CreateVideoPanelProps {
   promptLabel?: string;
   promptPlaceholder?: string;
   onPromptChange?: (prompt: string) => void;
+  autoPromptLabel?: string;
+  autoPromptTitle?: string;
+  onAutoPrompt?: () => void;
+  autoPromptRunning?: boolean;
+  autoPromptDisabled?: boolean;
   showPromptInput?: boolean;
   modelLabel?: string;
   modelInitial?: string;
@@ -283,6 +295,101 @@ function CostDiscountLine({ quote }: { quote?: CreatePanelCostQuote | null }) {
   );
 }
 
+function fileMatchesAccept(file: File, accept: string): boolean {
+  return fileLikeMatchesAccept(file.type, file.name, accept);
+}
+
+function fileLikeMatchesAccept(typeValue: string, nameValue: string, accept: string): boolean {
+  const rules = accept
+    .split(",")
+    .map((rule) => rule.trim().toLowerCase())
+    .filter(Boolean);
+  if (rules.length === 0) return true;
+
+  const type = typeValue.toLowerCase();
+  const name = nameValue.toLowerCase();
+  return rules.some((rule) => {
+    if (rule === "*/*") return true;
+    if (rule.endsWith("/*")) return type.startsWith(rule.slice(0, -1));
+    if (rule.startsWith(".")) return name.endsWith(rule);
+    return type === rule;
+  });
+}
+
+function referenceFilesFromTransfer(
+  data: DataTransfer | null,
+  accept: string,
+): File[] {
+  if (!data) return [];
+  const files: File[] = [];
+  const seen = new Set<string>();
+  const push = (file: File | null) => {
+    if (!file || !fileMatchesAccept(file, accept)) return;
+    const key = `${file.name}:${file.size}:${file.type}:${file.lastModified}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    files.push(file);
+  };
+
+  Array.from(data.items ?? []).forEach((item) => {
+    if (item.kind !== "file") return;
+    push(item.getAsFile());
+  });
+  Array.from(data.files ?? []).forEach(push);
+  return files;
+}
+
+function transferMayContainReferenceFiles(
+  data: DataTransfer | null,
+  accept: string,
+): boolean {
+  if (!data) return false;
+  if (referenceFilesFromTransfer(data, accept).length > 0) return true;
+  return Array.from(data.items ?? []).some((item) => {
+    if (item.kind !== "file") return false;
+    if (!item.type) return true;
+    return fileLikeMatchesAccept(item.type, "", accept);
+  });
+}
+
+function AutoPromptButton({
+  label = "Auto Prompt",
+  title,
+  running,
+  disabled,
+  onClick,
+}: {
+  label?: string;
+  title?: string;
+  running?: boolean;
+  disabled?: boolean;
+  onClick?: () => void;
+}) {
+  if (!onClick) return null;
+  const resolvedTitle = title ?? label;
+
+  return (
+    <button
+      type="button"
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onClick}
+      disabled={disabled || running}
+      title={resolvedTitle}
+      aria-label={resolvedTitle}
+      className="ci-gloss-button group relative inline-flex h-[34px] min-w-[134px] items-center justify-center gap-[6px] overflow-hidden rounded-full border px-[12px] text-[12px] font-semibold leading-[16px] transition-all active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-65"
+    >
+      <span className="pointer-events-none absolute inset-x-4 top-0 h-[14px] rounded-b-full bg-white/30 blur-[9px]" />
+      <span className="pointer-events-none absolute -right-7 top-1/2 h-16 w-24 -translate-y-1/2 rounded-full bg-sky-200/25 blur-2xl" />
+      {running ? (
+        <span className="relative h-[13px] w-[13px] shrink-0 animate-spin rounded-full border-2 border-black/55 border-t-transparent" />
+      ) : (
+        <GenerateIcon className="relative h-4 w-4 shrink-0" />
+      )}
+      <span className="relative truncate">{label}</span>
+    </button>
+  );
+}
+
 export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   title,
   modelCaption,
@@ -290,6 +397,11 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   promptLabel,
   promptPlaceholder,
   onPromptChange,
+  autoPromptLabel = "Auto Prompt",
+  autoPromptTitle,
+  onAutoPrompt,
+  autoPromptRunning = false,
+  autoPromptDisabled = false,
   showPromptInput = true,
   modelLabel = "Nano Banana Pro",
   modelValue,
@@ -299,6 +411,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   maxReferences = 10,
   showReferences = true,
   referenceTitle,
+  referenceBadge,
   referenceHint,
   referenceAccept = "image/*",
   referenceAssets = [],
@@ -321,6 +434,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   onQuantityChange,
   bottom: controlledBottom,
   onBottomChange,
+  density = "default",
 }) => {
   const copy = usePanelCopy();
   const resolvedTitle = title ?? copy.defaultImageTitle;
@@ -340,6 +454,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   const bottom = controlledBottom ?? bottomState;
   const qty = controlledQuantity ?? qtyState;
   const selectedModelId = modelValue ?? modelOptions[0]?.id ?? "selected";
+  const compactVoice = density === "voice";
 
   const updatePrompt = (nextPrompt: string) => {
     setPromptState(nextPrompt);
@@ -370,7 +485,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   };
 
   const handleReferencePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
-    const files = Array.from(event.clipboardData.files ?? []);
+    const files = referenceFilesFromTransfer(event.clipboardData, referenceAccept);
     if (files.length === 0) return;
     event.preventDefault();
     event.stopPropagation();
@@ -380,7 +495,33 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   const handleReferenceDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    addDroppedReferenceFiles(event.dataTransfer.files);
+    addDroppedReferenceFiles(referenceFilesFromTransfer(event.dataTransfer, referenceAccept));
+  };
+
+  const handlePromptPaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    if (!showReferences || !onReferenceFiles) return;
+    const files = referenceFilesFromTransfer(event.clipboardData, referenceAccept);
+    if (files.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    addDroppedReferenceFiles(files);
+  };
+
+  const handlePromptDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!showReferences || !onReferenceFiles) return;
+    if (!transferMayContainReferenceFiles(event.dataTransfer, referenceAccept)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "copy";
+  };
+
+  const handlePromptDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!showReferences || !onReferenceFiles) return;
+    const files = referenceFilesFromTransfer(event.dataTransfer, referenceAccept);
+    if (files.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    addDroppedReferenceFiles(files);
   };
 
   const handleCreate = () => {
@@ -389,8 +530,18 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
     onCreate?.();
   };
 
+  const clearReferences = () => {
+    if (!onRemoveReference) return;
+    references.forEach((reference) => onRemoveReference(reference.id));
+  };
+
   return (
-    <div className="standalone-create-panel flex h-full w-full max-w-[480px] flex-col overflow-hidden bg-[#121314] rounded-[20px] border border-white/[0.02]">
+    <div
+      className={clsx(
+        "standalone-create-panel flex h-full w-full max-w-[480px] flex-col overflow-hidden bg-[#121314] rounded-[20px] border border-white/[0.02]",
+        compactVoice && "standalone-create-panel-voice",
+      )}
+    >
       {/* ===== HEADER ===== */}
       <header className="flex h-[56px] shrink-0 items-center px-[20px]">
         <h1 className="flex min-w-0 flex-1 items-center text-[16px] font-semibold leading-[24px] tracking-[-0.12px] text-white">
@@ -399,7 +550,12 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
       </header>
 
       {/* ===== SCROLLABLE CONTENT ===== */}
-      <div className="flex flex-1 min-h-0 flex-col gap-[12px] overflow-y-auto px-[12px] pb-[12px]">
+      <div
+        className={clsx(
+          "flex flex-1 min-h-0 flex-col overflow-y-auto px-[12px] pb-[12px]",
+          compactVoice ? "gap-[9px]" : "gap-[12px]",
+        )}
+      >
         {/* Model Selector */}
         <button
           type="button"
@@ -432,95 +588,114 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
           onFiles={onReferenceFiles}
           onSelectAsset={onSelectReferenceAsset}
           onDeleteAsset={onDeleteReferenceAsset}
+          onRemoveReference={onRemoveReference}
         />
 
         {/* Prompt box */}
-        <section className="shrink-0 rounded-[16px] border border-white/[0.02] bg-[#16181a] p-[7px]">
-          <div className="mb-[6px] flex items-center px-[2px]">
+        <section
+          className={clsx(
+            "shrink-0 rounded-[16px] border border-white/[0.05] bg-[#151719] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]",
+            compactVoice ? "p-[9px]" : "p-[10px]",
+          )}
+          onPasteCapture={handlePromptPaste}
+          onDragEnterCapture={handlePromptDragOver}
+          onDragOverCapture={handlePromptDragOver}
+          onDropCapture={handlePromptDrop}
+        >
+          <div className="flex items-center justify-between gap-[10px]">
             <span className="standalone-section-title text-[14px] font-semibold leading-[20px] text-white">{resolvedPromptLabel}</span>
+            {showReferences && (
+              <button
+                type="button"
+                onClick={openReferencePicker}
+                className="grid h-[28px] w-[28px] place-items-center rounded-[8px] border border-white/[0.08] bg-white/[0.03] text-white/70 transition hover:border-[#f4ff00]/45 hover:text-[#f4ff00]"
+                aria-label={resolvedReferenceTitle}
+                title={resolvedReferenceTitle}
+              >
+                <ImageIcon className="h-[14px] w-[14px]" />
+              </button>
+            )}
           </div>
 
-          {/* Visual references box (PINK glow border) */}
           {showReferences && (
-          <div className="relative rounded-[8px] overflow-hidden mt-[4px]">
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={openReferencePicker}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter" && event.key !== " ") return;
-                event.preventDefault();
-                openReferencePicker();
-              }}
-              onPaste={handleReferencePaste}
-              onDragEnter={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-              }}
-              onDragOver={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-              }}
-              onDrop={handleReferenceDrop}
-              className={clsx(
-                "flex items-center gap-[12px] px-[12px] py-[8px] rounded-[8px] border border-[#f4ff00]/95 bg-[#f4ff00]/[0.08] shadow-[inset_0_-8px_24px_0_rgba(238,255,0,0.18),inset_0_2px_6px_0_rgba(238,255,0,0.18),inset_0_-4px_8px_0_rgba(238,255,0,0.3)] transition-all outline-none focus:ring-1 focus:ring-[#f4ff00]/70",
-                onAddReferences || onReferenceFiles || onSelectReferenceAsset ? "cursor-pointer" : "cursor-default",
-              )}
-            >
-              <div className="flex -space-x-[8px]">
-                {references.length > 0 ? (
-                  references.slice(0, 3).map((reference) => (
-                    reference.mime?.startsWith("video/") ? (
-                      <div
-                        key={reference.id}
-                        className="grid h-[40px] w-[40px] place-items-center rounded-[4px] bg-[#16181a] ring-2 ring-[#121314]"
-                      >
-                        <Video className="h-[18px] w-[18px] text-white/80" />
-                      </div>
-                    ) : (
-                      <img
-                        key={reference.id}
-                        src={reference.url}
-                        alt=""
-                        className="h-[40px] w-[40px] rounded-[4px] object-cover ring-2 ring-[#121314]"
-                      />
-                    )
-                  ))
-                ) : (
-                  DEFAULT_REFERENCE_THUMBS.map((src) => (
-                    <img
-                      key={src}
-                      src={src}
-                      alt=""
-                      className="h-[40px] w-[40px] rounded-[4px] object-cover ring-2 ring-[#121314]"
-                    />
-                  ))
+            <div className="relative mt-[8px] overflow-hidden rounded-[10px]">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={openReferencePicker}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  openReferencePicker();
+                }}
+                onPaste={handleReferencePaste}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                onDrop={handleReferenceDrop}
+                className={clsx(
+                  "relative flex min-h-[58px] items-center gap-[10px] rounded-[10px] border border-[#f4ff00]/80 bg-[radial-gradient(circle_at_18%_50%,rgba(244,255,0,0.18),rgba(244,255,0,0.06)_48%,rgba(0,0,0,0)_100%)] px-[10px] py-[8px] shadow-[0_0_20px_rgba(244,255,0,0.14),inset_0_0_18px_rgba(244,255,0,0.1)] transition-all outline-none focus:ring-1 focus:ring-[#f4ff00]/70",
+                  onAddReferences || onReferenceFiles || onSelectReferenceAsset ? "cursor-pointer" : "cursor-default",
                 )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex min-w-0 items-center gap-[8px]">
-                  <span className="standalone-reference-title truncate text-[14px] leading-[20px] font-semibold text-white">{resolvedReferenceTitle}</span>
+              >
+                <div className="flex shrink-0 -space-x-[7px]">
+                  {references.length > 0 ? (
+                    references.slice(0, 3).map((reference) => (
+                      reference.mime?.startsWith("video/") ? (
+                        <div
+                          key={reference.id}
+                          className="grid h-[34px] w-[34px] place-items-center rounded-[5px] bg-[#16181a] ring-2 ring-[#121314]"
+                        >
+                          <Video className="h-[15px] w-[15px] text-white/80" />
+                        </div>
+                      ) : (
+                        <img
+                          key={reference.id}
+                          src={reference.url}
+                          alt=""
+                          className="h-[34px] w-[34px] rounded-[5px] object-cover ring-2 ring-[#121314]"
+                        />
+                      )
+                    ))
+                  ) : (
+                    DEFAULT_REFERENCE_THUMBS.map((src) => (
+                      <img
+                        key={src}
+                        src={src}
+                        alt=""
+                        className="h-[34px] w-[34px] rounded-[5px] object-cover ring-2 ring-[#121314]"
+                      />
+                    ))
+                  )}
                 </div>
-                <p className="standalone-reference-hint text-[12px] leading-[16px] text-neutral-400 mt-[2px]">{resolvedReferenceHint}</p>
+                <div className="min-w-0 flex-1 pr-[38px]">
+                  <div className="flex min-w-0 items-center gap-[6px]">
+                    <span className="standalone-reference-title truncate text-[13px] font-semibold leading-[18px] text-white">{resolvedReferenceTitle}</span>
+                    {referenceBadge && (
+                      <span className="shrink-0 rounded-full border border-white/10 bg-white/10 px-[5px] py-[1px] text-[10px] font-semibold leading-[12px] text-white/70">
+                        {referenceBadge}
+                      </span>
+                    )}
+                  </div>
+                  <p className="standalone-reference-hint mt-[2px] truncate text-[11px] leading-[15px] text-neutral-400">{resolvedReferenceHint}</p>
+                </div>
+                <span className="absolute right-[9px] top-[7px] text-[11px] font-semibold leading-[14px] text-white">
+                  {references.length}/{maxReferences}
+                </span>
               </div>
-              <span className="text-[12px] leading-[16px] text-neutral-300 self-start">
-                {references.length}/{maxReferences}
-              </span>
             </div>
-          </div>
           )}
 
           {showReferences && references.length > 0 && (
-            <div className="mt-[8px] flex flex-wrap gap-[8px]">
-              {references.map((reference, index) => (
-                <SelectedReferenceThumb
-                  key={reference.id}
-                  reference={reference}
-                  index={index}
-                  onRemove={onRemoveReference}
-                />
-              ))}
-            </div>
+            <SelectedReferenceStrip
+              references={references}
+              onRemove={onRemoveReference}
+            />
           )}
 
           {showPromptInput && (
@@ -529,13 +704,54 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
               onChange={updatePrompt}
               placeholder={resolvedPromptPlaceholder}
               mentionOptions={mentionOptions}
-              className="mt-[7px] min-h-[70px] max-h-[190px] rounded-[10px] border-white/[0.06] bg-[#121314] px-[10px] py-[8px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-[#f4ff00]/50"
+              className={clsx(
+                "mt-[8px] rounded-none border-transparent bg-transparent px-[4px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-transparent focus:ring-0",
+                compactVoice
+                  ? "min-h-[94px] max-h-[170px] py-[6px]"
+                  : "min-h-[116px] max-h-[230px] py-[8px]",
+              )}
             />
           )}
+
+          <div className="mt-[5px] flex items-center justify-between gap-[10px]">
+            <div className="flex items-center gap-[6px]">
+              {showReferences && (
+                <button
+                  type="button"
+                  onClick={openReferencePicker}
+                  className="grid h-[26px] w-[26px] place-items-center rounded-[8px] text-white/55 transition hover:bg-white/[0.06] hover:text-white"
+                  aria-label={resolvedReferenceTitle}
+                  title={resolvedReferenceTitle}
+                >
+                  <Clipboard className="h-[14px] w-[14px]" />
+                </button>
+              )}
+              {showReferences && references.length > 0 && onRemoveReference && (
+                <button
+                  type="button"
+                  onClick={clearReferences}
+                  className="grid h-[26px] w-[26px] place-items-center rounded-[8px] text-white/40 transition hover:bg-red-500/10 hover:text-red-300"
+                  aria-label={copy.removeReference}
+                  title={copy.removeReference}
+                >
+                  <Trash2 className="h-[14px] w-[14px]" />
+                </button>
+              )}
+            </div>
+            {showPromptInput && (
+              <AutoPromptButton
+                label={autoPromptLabel}
+                title={autoPromptTitle}
+                running={autoPromptRunning}
+                disabled={autoPromptDisabled}
+                onClick={onAutoPrompt}
+              />
+            )}
+          </div>
         </section>
 
         {settings.length > 0 && (
-          <div className="grid shrink-0 grid-cols-2 gap-[6px]">
+          <div className="grid shrink-0 grid-cols-2 gap-[5px]">
             {settings.map((setting) => (
               <VideoSettingCard key={setting.id} setting={setting} />
             ))}
@@ -547,7 +763,12 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
         ))}
 
         {extraControls && (
-          <div className="flex shrink-0 flex-col gap-[10px]">
+          <div
+            className={clsx(
+              "flex shrink-0 flex-col",
+              compactVoice ? "gap-[8px]" : "gap-[10px]",
+            )}
+          >
             {extraControls}
           </div>
         )}
@@ -581,6 +802,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
           >
             <span className="pointer-events-none absolute inset-x-4 top-0 h-[16px] rounded-b-full bg-white/30 blur-[10px]" />
             <span className="pointer-events-none absolute -right-8 top-1/2 h-20 w-28 -translate-y-1/2 rounded-full bg-sky-200/25 blur-2xl" />
+            {!running && <GenerateIcon className="relative h-4 w-4" />}
             <span className="relative">{running ? resolvedRunningLabel : resolvedCreateLabel}</span>
           </button>
         </div>
@@ -624,6 +846,11 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
   promptLabel,
   promptPlaceholder,
   onPromptChange,
+  autoPromptLabel = "Auto Prompt",
+  autoPromptTitle,
+  onAutoPrompt,
+  autoPromptRunning = false,
+  autoPromptDisabled = false,
   showPromptInput = true,
   modelLabel = "Kling 2.6 Pro",
   modelValue,
@@ -750,7 +977,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
   };
 
   const handleReferencePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
-    const files = Array.from(event.clipboardData.files ?? []);
+    const files = referenceFilesFromTransfer(event.clipboardData, referenceAccept);
     if (files.length === 0) return;
     event.preventDefault();
     event.stopPropagation();
@@ -760,7 +987,33 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
   const handleReferenceDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    addDroppedReferenceFiles(event.dataTransfer.files);
+    addDroppedReferenceFiles(referenceFilesFromTransfer(event.dataTransfer, referenceAccept));
+  };
+
+  const handlePromptPaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    if (!onReferenceFiles) return;
+    const files = referenceFilesFromTransfer(event.clipboardData, referenceAccept);
+    if (files.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    addDroppedReferenceFiles(files);
+  };
+
+  const handlePromptDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!onReferenceFiles) return;
+    if (!transferMayContainReferenceFiles(event.dataTransfer, referenceAccept)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "copy";
+  };
+
+  const handlePromptDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!onReferenceFiles) return;
+    const files = referenceFilesFromTransfer(event.dataTransfer, referenceAccept);
+    if (files.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    addDroppedReferenceFiles(files);
   };
 
   const handleCreate = () => {
@@ -828,6 +1081,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           onFiles={onReferenceFiles}
           onSelectAsset={onSelectReferenceAsset}
           onDeleteAsset={onDeleteReferenceAsset}
+          onRemoveReference={onRemoveReference}
         />
         <ReferencePicker
           open={!!activeReferenceSlot}
@@ -843,6 +1097,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           onFiles={activeReferenceSlot?.onFiles}
           onSelectAsset={activeReferenceSlot?.onSelectAsset}
           onDeleteAsset={onDeleteReferenceAsset}
+          onRemoveReference={() => activeReferenceSlot?.onRemove?.()}
           closeOnSelect
         />
         <ReferencePicker
@@ -855,6 +1110,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           onFiles={historySlot?.onHistoryFiles}
           onSelectAsset={historySlot?.onSelectHistoryAsset}
           onDeleteAsset={onDeleteReferenceAsset}
+          onRemoveReference={() => historySlot?.onRemove?.()}
           closeOnSelect
         />
 
@@ -970,34 +1226,45 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
               )}
 
               {visibleReferenceSlots.length === 0 && references.length > 0 && (
-                <div className="mt-[8px] flex flex-wrap gap-[8px]">
-                  {references.map((reference, index) => (
-                    <SelectedReferenceThumb
-                      key={reference.id}
-                      reference={reference}
-                      index={index}
-                      onRemove={onRemoveReference}
-                    />
-                  ))}
-                </div>
+                <SelectedReferenceStrip
+                  references={references}
+                  onRemove={onRemoveReference}
+                />
               )}
             </>
           )}
 
           {showPromptInput && (
-            <StandalonePromptMentionTextarea
-              value={prompt}
-              onChange={updatePrompt}
-              placeholder={resolvedPromptPlaceholder}
-              mentionOptions={mentionOptions}
-              className="mt-[7px] min-h-[70px] max-h-[190px] rounded-[10px] border-white/[0.06] bg-[#121314] px-[10px] py-[8px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-[#f4ff00]/50"
-            />
+            <div
+              className="mt-[7px] flex flex-col gap-[6px]"
+              onPasteCapture={handlePromptPaste}
+              onDragEnterCapture={handlePromptDragOver}
+              onDragOverCapture={handlePromptDragOver}
+              onDropCapture={handlePromptDrop}
+            >
+              <StandalonePromptMentionTextarea
+                value={prompt}
+                onChange={updatePrompt}
+                placeholder={resolvedPromptPlaceholder}
+                mentionOptions={mentionOptions}
+                className="min-h-[70px] max-h-[190px] rounded-[10px] border-white/[0.06] bg-[#121314] px-[10px] py-[8px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-[#f4ff00]/50"
+              />
+              <div className="flex justify-end">
+                <AutoPromptButton
+                  label={autoPromptLabel}
+                  title={autoPromptTitle}
+                  running={autoPromptRunning}
+                  disabled={autoPromptDisabled}
+                  onClick={onAutoPrompt}
+                />
+              </div>
+            </div>
           )}
         </section>
         )}
 
         {settings.length > 0 && (
-          <div className="grid shrink-0 grid-cols-2 gap-[6px]">
+          <div className="grid shrink-0 grid-cols-2 gap-[5px]">
             {settings.map((setting) => (
               <VideoSettingCard key={setting.id} setting={setting} />
             ))}
@@ -1046,6 +1313,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           >
             <span className="pointer-events-none absolute inset-x-4 top-0 h-[16px] rounded-b-full bg-white/30 blur-[10px]" />
             <span className="pointer-events-none absolute -right-8 top-1/2 h-20 w-28 -translate-y-1/2 rounded-full bg-sky-200/25 blur-2xl" />
+            {!running && <GenerateIcon className="relative h-4 w-4" />}
             <span className="relative">{running ? resolvedRunningLabel : resolvedCreateLabel}</span>
           </button>
         </div>
@@ -1367,12 +1635,12 @@ function VideoSettingCard({ setting }: { setting: CreateVideoPanelSetting }) {
     setting.value;
   const content = (
     <>
-      <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-[8px] bg-white/[0.045] text-neutral-300">
+      <span className="grid h-[24px] w-[24px] shrink-0 place-items-center rounded-[7px] bg-white/[0.045] text-neutral-300">
         <SlidersHorizontal className="h-[14px] w-[14px]" />
       </span>
       <span className="flex min-w-0 flex-1 flex-col items-start">
-        <span className="standalone-setting-label text-[11px] leading-[14px] text-neutral-400">{setting.label}</span>
-        <span className="standalone-setting-value max-w-full truncate text-[13px] font-semibold leading-[16px] text-white">{displayValue}</span>
+        <span className="standalone-setting-label text-[13px] leading-[14px] text-neutral-400">{setting.label}</span>
+        <span className="standalone-setting-value max-w-full truncate text-[15px] font-semibold leading-[16px] text-white">{displayValue}</span>
       </span>
     </>
   );
@@ -1382,7 +1650,7 @@ function VideoSettingCard({ setting }: { setting: CreateVideoPanelSetting }) {
       <button
         type="button"
         onClick={() => setting.onToggle?.(!setting.checked)}
-        className="standalone-setting-card flex min-h-[44px] items-center gap-[7px] rounded-[12px] border border-white/[0.02] bg-[#16181a] px-[7px] py-[6px] text-left transition hover:bg-[#1b1d1f]"
+        className="standalone-setting-card flex min-h-[38px] items-center gap-[6px] rounded-[10px] border border-white/[0.02] bg-[#16181a] px-[7px] py-[3px] text-left transition hover:bg-[#1b1d1f]"
       >
         {content}
         <VideoSwitch checked={!!setting.checked} />
@@ -1392,7 +1660,7 @@ function VideoSettingCard({ setting }: { setting: CreateVideoPanelSetting }) {
 
   if (kind === "readonly" || !setting.options?.length) {
     return (
-      <div className="standalone-setting-card flex min-h-[44px] items-center gap-[7px] rounded-[12px] border border-white/[0.02] bg-[#16181a] px-[7px] py-[6px] text-left">
+      <div className="standalone-setting-card flex min-h-[38px] items-center gap-[6px] rounded-[10px] border border-white/[0.02] bg-[#16181a] px-[7px] py-[3px] text-left">
         {content}
       </div>
     );
@@ -1423,7 +1691,7 @@ function VideoSettingSelectCard({
 
       const rect = trigger.getBoundingClientRect();
       const viewportPadding = 10;
-      const estimatedHeight = Math.min(220, safeOptions.length * 32 + 8);
+      const estimatedHeight = Math.min(230, safeOptions.length * 34 + 8);
       const openUp = rect.bottom + 6 + estimatedHeight > window.innerHeight - viewportPadding;
       const top = openUp
         ? Math.max(viewportPadding, rect.top - estimatedHeight - 6)
@@ -1438,7 +1706,7 @@ function VideoSettingSelectCard({
         left,
         top,
         width,
-        maxHeight: Math.min(220, window.innerHeight - top - viewportPadding),
+        maxHeight: Math.min(230, window.innerHeight - top - viewportPadding),
       });
     };
 
@@ -1475,7 +1743,7 @@ function VideoSettingSelectCard({
         type="button"
         onClick={() => setOpen((next) => !next)}
         className={clsx(
-          "standalone-setting-card relative flex min-h-[44px] cursor-pointer items-center gap-[7px] rounded-[12px] border px-[7px] py-[6px] text-left transition",
+          "standalone-setting-card relative flex min-h-[38px] cursor-pointer items-center gap-[6px] rounded-[10px] border px-[7px] py-[3px] text-left transition",
           open
             ? "border-[#f4ff00]/35 bg-[#1b1d1f] shadow-[0_0_0_1px_rgba(238,255,0,.18),0_14px_30px_-22px_rgba(238,255,0,.8)]"
             : "border-white/[0.02] bg-[#16181a] hover:bg-[#1b1d1f]",
@@ -1487,7 +1755,7 @@ function VideoSettingSelectCard({
         {content}
         <ChevronDown
           className={clsx(
-            "h-[13px] w-[13px] shrink-0 text-neutral-500 transition-transform",
+            "h-[14px] w-[14px] shrink-0 text-neutral-500 transition-transform",
             open && "rotate-180 text-neutral-300",
           )}
         />
@@ -1514,7 +1782,7 @@ function VideoSettingSelectCard({
                     setOpen(false);
                   }}
                   className={clsx(
-                    "flex min-h-[30px] w-full items-center justify-between gap-[8px] rounded-[9px] px-[9px] py-[6px] text-left text-[12px] font-semibold leading-[16px] transition-colors",
+                    "flex min-h-[34px] w-full items-center justify-between gap-[8px] rounded-[9px] px-[9px] py-[6px] text-left text-[14px] font-semibold leading-[18px] transition-colors",
                     selected
                       ? "bg-[#f4ff00]/15 text-white ring-1 ring-[#f4ff00]/35"
                       : "text-neutral-300 hover:bg-white/[0.06] hover:text-white",
@@ -1561,7 +1829,7 @@ function VideoTextControlCard({ control }: { control: CreateVideoPanelTextContro
         compact ? "gap-[6px] px-[10px] py-[8px]" : "gap-[8px] p-[10px]",
       )}
     >
-      <span className="standalone-text-control-label text-[12px] font-semibold leading-[16px] text-white">{control.label}</span>
+      <span className="standalone-text-control-label text-[14px] font-semibold leading-[18px] text-white">{control.label}</span>
       <textarea
         value={control.value}
         onChange={(event) => control.onChange(event.target.value)}
@@ -1570,8 +1838,8 @@ function VideoTextControlCard({ control }: { control: CreateVideoPanelTextContro
         className={clsx(
           "w-full resize-none rounded-[10px] border border-white/[0.06] bg-[#121314] text-white outline-none placeholder:text-neutral-500 focus:border-[#f4ff00]/50",
           compact
-            ? "h-[38px] overflow-hidden px-[10px] py-[9px] text-[12px] leading-[18px]"
-            : "min-h-[76px] px-[10px] py-[8px] text-[12px] leading-[18px]",
+            ? "h-[40px] overflow-hidden px-[10px] py-[8px] text-[14px] leading-[20px]"
+            : "min-h-[82px] px-[10px] py-[8px] text-[14px] leading-[20px]",
         )}
       />
     </label>
@@ -1725,33 +1993,67 @@ function StandalonePromptMentionTextareaInner({
   );
 }
 
+function SelectedReferenceStrip({
+  references,
+  onRemove,
+}: {
+  references: CreateImagePanelReference[];
+  onRemove?: (id: string) => void;
+}) {
+  return (
+    <div className="mt-[8px] overflow-x-auto pb-[2px] ws-scroll-hide">
+      <div className="flex min-w-max gap-[7px]">
+        {references.map((reference, index) => (
+          <SelectedReferenceThumb
+            key={reference.id}
+            reference={reference}
+            index={index}
+            onRemove={onRemove}
+            compact
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SelectedReferenceThumb({
   reference,
   index,
   onRemove,
+  compact = false,
 }: {
   reference: CreateImagePanelReference;
   index: number;
   onRemove?: (id: string) => void;
+  compact?: boolean;
 }) {
   const copy = usePanelCopy();
   const isVideo = reference.mime?.startsWith("video/");
-  const label = referenceDisplayLabel(reference, index, 10);
+  const label = referenceDisplayLabel(reference, index, compact ? 8 : 10);
   const fullLabel = referenceBaseName(reference, index);
   return (
     <div
-      className="group relative h-[82px] w-[82px] overflow-hidden rounded-[8px] bg-black ring-1 ring-white/10"
+      className={clsx(
+        "group relative shrink-0 overflow-hidden bg-black ring-1 ring-white/10 transition hover:ring-[#f4ff00]/60",
+        compact
+          ? "h-[56px] w-[56px] rounded-[8px] ring-[#f4ff00]/45"
+          : "h-[82px] w-[82px] rounded-[8px]",
+      )}
       title={fullLabel}
     >
       {isVideo ? (
         <div className="grid h-full w-full place-items-center bg-[#16181a]">
-          <Video className="h-[22px] w-[22px] text-white/80" />
+          <Video className={clsx("text-white/80", compact ? "h-[17px] w-[17px]" : "h-[22px] w-[22px]")} />
         </div>
       ) : (
         <img src={reference.url} alt="" className="h-full w-full object-cover" />
       )}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-[6px] pb-[5px] pt-[22px]">
-        <span className="block truncate text-[10px] font-semibold leading-none text-white">
+      <div className={clsx(
+        "absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-[5px]",
+        compact ? "pb-[4px] pt-[18px]" : "pb-[5px] pt-[22px]",
+      )}>
+        <span className={clsx("block truncate font-semibold leading-none text-white", compact ? "text-[9px]" : "text-[10px]")}>
           {label}
         </span>
       </div>
@@ -1762,10 +2064,15 @@ function SelectedReferenceThumb({
             event.stopPropagation();
             onRemove(reference.id);
           }}
-          className="absolute right-[4px] top-[4px] grid h-[20px] w-[20px] place-items-center rounded-full bg-black/70 text-white opacity-0 backdrop-blur transition-opacity hover:bg-white hover:text-black group-hover:opacity-100"
+          className={clsx(
+            "absolute grid place-items-center rounded-full bg-black/72 text-white backdrop-blur transition hover:bg-white hover:text-black",
+            compact
+              ? "right-[3px] top-[3px] h-[18px] w-[18px] opacity-100"
+              : "right-[4px] top-[4px] h-[20px] w-[20px] opacity-0 group-hover:opacity-100",
+          )}
           aria-label={copy.removeReference}
         >
-          <X className="h-[12px] w-[12px]" />
+          <X className={compact ? "h-[10px] w-[10px]" : "h-[12px] w-[12px]"} />
         </button>
       )}
     </div>
@@ -1782,6 +2089,7 @@ function ReferencePicker({
   onFiles,
   onSelectAsset,
   onDeleteAsset,
+  onRemoveReference,
   closeOnSelect = false,
 }: {
   open: boolean;
@@ -1793,6 +2101,7 @@ function ReferencePicker({
   onFiles?: (files: File[]) => MaybePromise<void>;
   onSelectAsset?: (reference: CreateImagePanelReference) => MaybePromise<void>;
   onDeleteAsset?: (reference: CreateImagePanelReference) => MaybePromise<void>;
+  onRemoveReference?: (id: string) => void;
   closeOnSelect?: boolean;
 }) {
   const copy = usePanelCopy();
@@ -1803,7 +2112,14 @@ function ReferencePicker({
   const [tab, setTab] = useState<"creations" | "uploads">("creations");
   const [localUploads, setLocalUploads] = useState<LocalPickerUpload[]>([]);
   const [selectingLocalUploadId, setSelectingLocalUploadId] = useState<string | null>(null);
-  const selectedKeys = new Set(references.map(pickerReferenceKey));
+  const selectedReferenceByKey = useMemo(() => {
+    const map = new Map<string, CreateImagePanelReference>();
+    references.forEach((reference) => {
+      map.set(pickerReferenceKey(reference), reference);
+    });
+    return map;
+  }, [references]);
+  const selectedKeys = new Set(selectedReferenceByKey.keys());
   const acceptsImages = accept.includes("image");
   const acceptsVideos = accept.includes("video");
   const pickerAssets = useMemo(() => {
@@ -1911,6 +2227,12 @@ function ReferencePicker({
   };
 
   const selectAsset = async (asset: CreateImagePanelReference) => {
+    const selectedReference = selectedReferenceByKey.get(pickerReferenceKey(asset));
+    if (selectedReference && onRemoveReference) {
+      onRemoveReference(selectedReference.id);
+      if (closeOnSelect) onClose();
+      return;
+    }
     await onSelectAsset?.(asset);
     if (closeOnSelect) onClose();
   };

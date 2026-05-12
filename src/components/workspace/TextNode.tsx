@@ -19,7 +19,15 @@
  *   }
  */
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   type Edge,
   type NodeProps,
@@ -32,13 +40,13 @@ import {
   Film,
   Image as ImageIcon,
   Loader2,
-  Play,
   Type,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { getSignedUrl } from "@/hooks/useSignedUrl";
 import PromptMentionTextarea from "@/components/flow/nodes/PromptMentionTextarea";
+import GenerateIcon from "@/components/GenerateIcon";
 import { CLEAN_NODE_BODY_TOP_PX, PortIcon } from "./PortIcon";
 import { useLanguage } from "@/contexts/LanguageContext";
 import NodeQuickActionRail from "./NodeQuickActionRail";
@@ -814,13 +822,23 @@ function buildCanvasContext(
 
 const TextNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as unknown as TextNodeData;
-  const { setNodes, getNodes, getEdges } = useReactFlow();
+  const { setNodes, getNodes, getEdges, screenToFlowPosition } = useReactFlow();
   const graphNodes = useNodes();
   const edges = useEdges();
+  const onNodesChange = useWorkspaceStore((s) => s.onNodesChange);
   const { t, language } = useLanguage();
   const [isHovered, setIsHovered] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [mediaPromptTooltipOpen, setMediaPromptTooltipOpen] = useState(false);
+  const manualDragRef = useRef<{
+    pointerId: number;
+    startFlowX: number;
+    startFlowY: number;
+    startNodeX: number;
+    startNodeY: number;
+    currentNodeX: number;
+    currentNodeY: number;
+  } | null>(null);
 
   const width = d.width ?? DEFAULT_W;
   const height = d.height ?? DEFAULT_H;
@@ -874,6 +892,95 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
       });
     },
     [activePromptTab, resultPrompt, resultPromptReady, updateData],
+  );
+
+  const startManualDrag = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      if (event.button !== 0) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest(
+          "button,input,textarea,select,[contenteditable='true'],.nodrag,.react-flow__handle",
+        )
+      ) {
+        return;
+      }
+
+      const node = getNodes().find((n) => n.id === id);
+      if (!node) return;
+
+      const flowPoint = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      manualDragRef.current = {
+        pointerId: event.pointerId,
+        startFlowX: flowPoint.x,
+        startFlowY: flowPoint.y,
+        startNodeX: node.position.x,
+        startNodeY: node.position.y,
+        currentNodeX: node.position.x,
+        currentNodeY: node.position.y,
+      };
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      onNodesChange([
+        { id, type: "select", selected: true },
+        { id, type: "position", position: node.position, dragging: true },
+      ]);
+    },
+    [getNodes, id, onNodesChange, screenToFlowPosition],
+  );
+
+  const moveManualDrag = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      const drag = manualDragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+
+      const flowPoint = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      const nextX = drag.startNodeX + (flowPoint.x - drag.startFlowX);
+      const nextY = drag.startNodeY + (flowPoint.y - drag.startFlowY);
+      drag.currentNodeX = nextX;
+      drag.currentNodeY = nextY;
+
+      event.preventDefault();
+      event.stopPropagation();
+      onNodesChange([
+        {
+          id,
+          type: "position",
+          position: { x: nextX, y: nextY },
+          dragging: true,
+        },
+      ]);
+    },
+    [id, onNodesChange, screenToFlowPosition],
+  );
+
+  const endManualDrag = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      const drag = manualDragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+
+      manualDragRef.current = null;
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.releasePointerCapture?.(event.pointerId);
+      onNodesChange([
+        {
+          id,
+          type: "position",
+          position: { x: drag.currentNodeX, y: drag.currentNodeY },
+          dragging: false,
+        },
+      ]);
+    },
+    [id, onNodesChange],
   );
 
   const connectedImageMentionOptions = useMemo(
@@ -1186,12 +1293,18 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
         data-state={selected ? "selected" : "idle"}
         style={{ height }}
       >
-        <div className="ws-text-top-row nodrag nopan">
+        <div
+          className="ws-text-top-row"
+          onPointerDown={startManualDrag}
+          onPointerMove={moveManualDrag}
+          onPointerUp={endManualDrag}
+          onPointerCancel={endManualDrag}
+        >
           <div className="ws-text-tabs">
             <button
               type="button"
               className={cn(
-                "ws-text-tab",
+                "ws-text-tab nodrag nopan",
                 activePromptTab === "input" && "is-active",
               )}
               onClick={(e) => {
@@ -1206,7 +1319,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
             <button
               type="button"
               className={cn(
-                "ws-text-tab",
+                "ws-text-tab nodrag nopan",
                 activePromptTab === "result" && "is-active",
               )}
               onClick={(e) => {
@@ -1230,7 +1343,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
               <button
                 type="button"
                 className={cn(
-                  "ws-text-understand-toggle",
+                  "ws-text-understand-toggle nodrag nopan",
                   mediaUnderstandingEnabled && "is-active",
                 )}
                 onClick={(e) => {
@@ -1264,7 +1377,7 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
             <TooltipContent
               side="top"
               align="end"
-              className="ws-text-media-prompt-tooltip border-white/10 bg-[#151515] text-zinc-100 shadow-2xl shadow-black/40"
+              className="ws-ui-copy-tooltip ws-text-media-prompt-tooltip border-white/10 bg-[#151515] text-zinc-100 shadow-2xl shadow-black/40"
             >
               <div className="ws-text-media-prompt-tooltip-list">
                 <p
@@ -1388,15 +1501,16 @@ const TextNode = memo(({ id, data, selected }: NodeProps) => {
                 {isOptimizing ? (
                   <Loader2 className="animate-spin" />
                 ) : (
-                  <Play className="fill-current" />
+                  <GenerateIcon className="h-[15px] w-[15px]" />
                 )}
                 <span>{t("workspace.node.prompt_optimize_label")}</span>
               </button>
             </TooltipTrigger>
             <TooltipContent
-              side="top"
+              side="bottom"
               align="end"
-              className="max-w-[220px] border-white/10 bg-[#151515] px-3 py-2 text-xs leading-snug text-zinc-100 shadow-2xl shadow-black/40"
+              sideOffset={8}
+              className="ws-ui-copy-tooltip ws-text-action-tooltip border-white/10 bg-[#151515] text-zinc-100 shadow-2xl shadow-black/40"
             >
               {isOptimizing
                 ? t("workspace.node.prompt_optimize_running")

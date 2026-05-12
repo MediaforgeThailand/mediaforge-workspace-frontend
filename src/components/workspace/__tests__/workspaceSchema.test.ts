@@ -16,6 +16,12 @@ import {
   textNodeImageOutputHandle,
   textNodeVideoOutputHandle,
 } from "../workspaceSchema";
+import { STANDALONE_TOOLS } from "../standaloneGenerationCatalog";
+
+const DEPRECATED_SEEDANCE_1_MODELS = [
+  "seedance-1-0-pro-250528",
+  "seedance-1-0-pro-fast-251015",
+];
 
 describe("portTypeFromHandleId", () => {
   it("returns 'text' for text-family handles", () => {
@@ -113,6 +119,22 @@ describe("getWsVisibleParams", () => {
     for (const param of allAudioParams) {
       expect(param.default).toBe("false");
     }
+  });
+
+  it("does not expose deprecated SeedDance 1.0 models in selectors", () => {
+    const videoSchema = getWorkspaceSchema("videoGenNode");
+    const workspaceModelParam = videoSchema?.params.find((p) => p.key === "model_name");
+    const standaloneVideoModels = STANDALONE_TOOLS.video_gen.models.map((model) => model.id);
+
+    expect(videoSchema?.supportedModels ?? []).not.toEqual(
+      expect.arrayContaining(DEPRECATED_SEEDANCE_1_MODELS),
+    );
+    expect(workspaceModelParam?.options ?? []).not.toEqual(
+      expect.arrayContaining(DEPRECATED_SEEDANCE_1_MODELS),
+    );
+    expect(standaloneVideoModels).not.toEqual(
+      expect.arrayContaining(DEPRECATED_SEEDANCE_1_MODELS),
+    );
   });
 });
 

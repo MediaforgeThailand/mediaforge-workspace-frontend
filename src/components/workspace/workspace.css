@@ -574,6 +574,13 @@ body[data-rfc="true"]
   justify-content: space-between;
   gap: 8px;
   margin: -2px 0 7px;
+  cursor: grab;
+}
+.ws-text-top-row:active {
+  cursor: grabbing;
+}
+.ws-text-top-row :is(button, input, textarea, select, [contenteditable="true"], .nodrag) {
+  cursor: auto;
 }
 .ws-text-tabs {
   display: inline-flex;
@@ -664,24 +671,46 @@ body[data-rfc="true"]
     0 0 18px rgba(238, 255, 21, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
+.ws-ui-copy-tooltip {
+  width: max-content !important;
+  max-width: min(560px, calc(100vw - 32px)) !important;
+  padding: 10px 13px !important;
+  border-radius: 16px !important;
+  overflow: visible !important;
+  font-size: 12.5px !important;
+  font-weight: 520 !important;
+  line-height: 1.58 !important;
+  letter-spacing: 0 !important;
+  text-align: left !important;
+  white-space: normal !important;
+  text-wrap: pretty;
+}
+.ws-ui-copy-tooltip :where(p) {
+  margin: 0;
+}
+.ws-text-action-tooltip {
+  width: min(280px, calc(100vw - 32px)) !important;
+  max-width: min(280px, calc(100vw - 32px)) !important;
+  overflow-wrap: break-word;
+}
+.ws-run-summary-tooltip {
+  max-width: min(380px, calc(100vw - 32px)) !important;
+}
 .ws-text-media-prompt-tooltip {
-  max-width: 430px !important;
-  padding: 7px 10px 8px !important;
-  font-size: 14px !important;
-  line-height: 1.34 !important;
-  text-align: left;
-  white-space: normal;
+  max-width: min(560px, calc(100vw - 32px)) !important;
 }
 .ws-text-media-prompt-tooltip-list {
   display: grid;
-  gap: 4px;
+  gap: 6px;
 }
 .ws-text-media-prompt-tooltip-row {
   margin: 0;
   color: hsl(0 0% 74%);
+  font-weight: 560;
 }
 .ws-text-media-prompt-tooltip-row.is-current {
   color: hsl(0 0% 100%);
+  font-weight: 760;
 }
 .ws-text-node-editor {
   font-size: 14px !important;
@@ -968,9 +997,11 @@ body[data-rfc="true"]
   background: hsl(0 84% 60%);
   color: hsl(0 0% 100%);
 }
-.ws-compact-run svg {
+.ws-compact-run svg,
+.ws-compact-run img {
   width: 12px;
   height: 12px;
+  flex-shrink: 0;
 }
 
 /* Run button anchor — pinned at the bottom-right corner of the
@@ -1084,7 +1115,8 @@ body[data-rfc="true"]
   filter: none;
   transform: none;
 }
-.ws-text-prompt-button svg {
+.ws-text-prompt-button svg,
+.ws-text-prompt-button img {
   width: 12px;
   height: 12px;
   flex-shrink: 0;

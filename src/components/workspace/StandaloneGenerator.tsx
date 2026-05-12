@@ -67,6 +67,7 @@ import NodePreviewLightbox, { type PreviewPayload } from "./NodePreviewLightbox"
 import { useFreshSignedUrl } from "./useFreshSignedUrl";
 import { getSignedUrl } from "@/hooks/useSignedUrl";
 import { AudioPlayButton } from "./AudioPlayButton";
+import GenerateIcon from "@/components/GenerateIcon";
 import {
   build3dParams,
   buildAudioParams,
@@ -95,6 +96,7 @@ import {
 import { GEMINI_TTS_VOICES, DEFAULT_GEMINI_TTS_VOICE } from "./workspaceSchema";
 import { useVoicePreview } from "@/hooks/useVoicePreview";
 import { modelLogoFor, orderModelsByRecommendation } from "./modelDisplay";
+import { getProjectAvatar } from "./projectAvatars";
 import MediaContextMenu, {
   type MediaContextMenuItem,
 } from "./MediaContextMenu";
@@ -111,6 +113,13 @@ import MediaContextMenu, {
 const DEFAULT_VOICE_ID = "";
 
 const RUN_EDGE_FUNCTION = "workspace-run-node";
+const AUTO_PROMPT_EDGE_FUNCTION = "workspace-chat";
+const AUTO_PROMPT_MODEL = "gpt-5.5";
+const AUTO_PROMPT_SYSTEM_PROMPT = `You help MediaForge users create production-ready prompts for the active generation tool.
+Turn rough human language into a clear prompt that can be used immediately.
+Preserve every @mention token exactly as provided, including label and id.
+If selected references are listed, include the relevant @mention tokens when they should be passed into generation.
+Do not invent references, models, parameters, or provider capabilities.`;
 const STANDALONE_CANVAS_ID = "standalone";
 const STORAGE_BUCKET = "ai-media";
 const SIGNED_URL_TTL_SEC = 60 * 60 * 24 * 365;
@@ -738,8 +747,6 @@ const STANDALONE_MODEL_DESCRIPTION_KEYS = {
   "kling-v3-pro": "workspace.standalone.model.kling_v3_pro.desc",
   "kling-v3-motion-pro": "workspace.standalone.model.kling_v3_motion_pro.desc",
   "kling-v3-omni": "workspace.standalone.model.kling_v3_omni.desc",
-  "seedance-1-0-pro-250528": "workspace.standalone.model.seedance_1_0_pro.desc",
-  "seedance-1-0-pro-fast-251015": "workspace.standalone.model.seedance_1_0_pro_fast.desc",
   "seedance-1-5-pro-251215": "workspace.standalone.model.seedance_1_5_pro.desc",
   "seedance-2-0-lite": "workspace.standalone.model.seedance_2_0_lite.desc",
   "seedance-2-0-pro": "workspace.standalone.model.seedance_2_0_pro.desc",
@@ -1096,6 +1103,7 @@ export default function StandaloneGenerator({
   const [forms, setForms] =
     useState<Record<StandaloneToolKey, StandaloneFormState>>(INITIAL_FORMS);
   const [running, setRunning] = useState(false);
+  const [autoPrompting, setAutoPrompting] = useState(false);
   // Synchronous double-click guard. `setRunning` is async — between
   // a rapid second click and React committing the disabled-button
   // re-render, the second click would fly through validation and
@@ -1907,6 +1915,76 @@ export default function StandaloneGenerator({
     if (activeTool !== "image_gen" && activeTool !== "video_gen") return [];
     return mergeReferenceOptions(panelReferences, 16);
   }, [activeTool, panelReferences]);
+  const autoPromptTitle = standaloneAutoPromptTitle(language);
+  const autoPromptDisabled =
+    running || !!uploading || activeJobsForCurrentTool > 0 || !activeProject;
+  const runAutoPrompt = async () => {
+    if (autoPrompting || autoPromptDisabled) return;
+
+    const source = panelPrompt.trim();
+    const referenceOptions = panelMentionOptions;
+    if (!source && referenceOptions.length === 0) {
+      toast.info(
+        language === "th"
+          ? "พิมพ์ไอเดียหรือใส่รูป/วิดีโออ้างอิงก่อนใช้ Auto Prompt"
+          : "Add a rough idea or media reference before using Auto Prompt.",
+      );
+      return;
+    }
+
+    setAutoPrompting(true);
+    try {
+      const userMessage = buildStandaloneAutoPromptUserMessage({
+        prompt: source,
+        tool: activeTool,
+        toolLabel: standaloneCreateActionTitle(activeTool, language),
+        modelLabel: selectedModel?.label ?? form.model,
+        references: referenceOptions,
+        language,
+      });
+      const { data: result, error } = await supabase.functions.invoke(
+        AUTO_PROMPT_EDGE_FUNCTION,
+        {
+          body: {
+            model: AUTO_PROMPT_MODEL,
+            system_prompt: AUTO_PROMPT_SYSTEM_PROMPT,
+            messages: [{ role: "user", content: userMessage }],
+            canvas_context: {
+              project_id: activeProject?.id ?? null,
+              project_name: activeProject?.name ?? null,
+              workspace_id: null,
+              canvas_id: activeProject
+                ? standaloneCanvasId(activeProject.id)
+                : STANDALONE_CANVAS_ID,
+            },
+          },
+        },
+      );
+
+      if (error) throw new Error(await functionErrorMessage(error));
+      const content =
+        typeof (result as { content?: unknown } | null)?.content === "string"
+          ? (result as { content: string }).content
+          : "";
+      const optimized = cleanStandaloneAutoPromptResponse(content);
+      if (!optimized) {
+        throw new Error(
+          language === "th"
+            ? "Auto Prompt ยังไม่ได้ส่ง prompt กลับมา"
+            : "Auto Prompt did not return a prompt.",
+        );
+      }
+
+      updatePanelPrompt(optimized);
+      toast.success(
+        language === "th" ? "สร้าง Auto Prompt แล้ว" : "Auto Prompt ready",
+      );
+    } catch (err) {
+      toast.error(friendlyError(err, language === "th" ? "th" : "en"));
+    } finally {
+      setAutoPrompting(false);
+    }
+  };
 
   const videoRatioOptions = videoRatioOptionsForModel(form.model);
   const videoResolutionOptions = videoResolutionOptionsForModel(form.model);
@@ -2302,6 +2380,11 @@ export default function StandaloneGenerator({
                 language,
               )}
               onPromptChange={(prompt) => updateForm({ prompt })}
+              autoPromptLabel="Auto Prompt"
+              autoPromptTitle={autoPromptTitle}
+              onAutoPrompt={() => void runAutoPrompt()}
+              autoPromptRunning={autoPrompting}
+              autoPromptDisabled={autoPromptDisabled}
               showPromptInput={!standaloneMultiShotActive}
               modelLabel={selectedModel?.label ?? "SeedDance 2.0 Pro"}
               modelValue={form.model}
@@ -2363,6 +2446,7 @@ export default function StandaloneGenerator({
                 if (tab === "3d") onToolChange("image_to_3d");
                 if (tab === "audio") onToolChange("voice_gen");
               }}
+              density={activeTool === "voice_gen" ? "voice" : "default"}
             />
             ) : (
             <CreateImagePanel
@@ -2372,6 +2456,11 @@ export default function StandaloneGenerator({
               promptLabel={panelPromptLabel}
               promptPlaceholder={panelPromptPlaceholder}
               onPromptChange={updatePanelPrompt}
+              autoPromptLabel="Auto Prompt"
+              autoPromptTitle={autoPromptTitle}
+              onAutoPrompt={() => void runAutoPrompt()}
+              autoPromptRunning={autoPrompting}
+              autoPromptDisabled={autoPromptDisabled}
               showPromptInput={activeTool !== "image_to_3d"}
               modelLabel={selectedModel?.label ?? "Nano Banana Pro"}
               modelValue={form.model}
@@ -2553,7 +2642,7 @@ export default function StandaloneGenerator({
                   {running || activeJobsForCurrentTool > 0 ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Sparkles className="h-4 w-4" />
+                    <GenerateIcon className="h-4 w-4" />
                   )}
                   {standaloneCreateButtonLabel(activeTool, language, estimatedCost)}
                 </button>
@@ -2812,6 +2901,7 @@ function ProjectPicker({
   const { t } = useLanguage();
   const projectName =
     activeProject?.name?.trim() || t("workspace.standalone.create_project");
+  const projectAvatar = getProjectAvatar(activeProject ?? { id: "new-project", name: projectName });
 
   return (
     <div className="relative min-w-0">
@@ -2831,7 +2921,16 @@ function ProjectPicker({
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        <span className="h-3 w-3 shrink-0 rounded bg-amber-400" />
+        <span className="h-5 w-5 shrink-0 overflow-hidden rounded-full bg-[#0b0d0d] ring-1 ring-white/12">
+          <img
+            src={projectAvatar}
+            alt=""
+            className="h-full w-full object-cover"
+            loading="lazy"
+            decoding="async"
+            draggable={false}
+          />
+        </span>
         <span className="truncate">{projectName}</span>
         <ChevronDown className="h-3 w-3 shrink-0 text-zinc-500" />
       </button>
@@ -2851,6 +2950,7 @@ function ProjectPicker({
             {projects.map((project) => {
               const active = project.id === activeProject?.id;
               const canDelete = Boolean(onDeleteProject);
+              const avatar = getProjectAvatar(project);
               return (
                 <div
                   key={project.id}
@@ -2870,7 +2970,16 @@ function ProjectPicker({
                     }}
                     className="flex min-w-0 flex-1 items-center gap-2 text-left"
                   >
-                      <span className="h-2.5 w-2.5 shrink-0 rounded bg-amber-400" />
+                    <span className="h-6 w-6 shrink-0 overflow-hidden rounded-full bg-[#0b0d0d] ring-1 ring-white/12">
+                      <img
+                        src={avatar}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                        draggable={false}
+                      />
+                    </span>
                     <span className="min-w-0 flex-1 truncate">{project.name}</span>
                     {active && (
                       <span className="rounded bg-white/[0.08] px-1.5 py-0.5 text-[9px] uppercase text-zinc-400">
@@ -3555,16 +3664,16 @@ function ImageOutputSettings({
     : copy.standard;
 
   return (
-    <div className="grid grid-cols-2 gap-[6px]">
-      <div className="standalone-setting-card flex min-h-[44px] items-center gap-[7px] rounded-[12px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-[7px] py-[6px]">
-        <div className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-[8px] bg-white/[0.05] text-white">
+    <div className="grid grid-cols-2 gap-[5px]">
+      <div className="standalone-setting-card flex min-h-[38px] items-center gap-[6px] rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-[7px] py-[3px]">
+        <div className="grid h-[24px] w-[24px] shrink-0 place-items-center rounded-[7px] bg-white/[0.05] text-white">
           <SlidersHorizontal className="h-[14px] w-[14px]" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] font-medium leading-[14px] text-[var(--text-tertiary)]">
+          <div className="text-[13px] font-medium leading-[14px] text-[var(--text-tertiary)]">
             {copy.output}
           </div>
-          <div className="relative mt-[2px] min-w-0 truncate text-[13px] font-bold leading-[16px] text-white">
+          <div className="relative min-w-0 truncate text-[15px] font-bold leading-[16px] text-white">
             {outputLabel}
             {!isSeedream && (
               <InvisibleSelectOverlay
@@ -3619,18 +3728,18 @@ function ImageOutputSettings({
             )}
           </div>
         </div>
-        <ChevronRight className="h-[13px] w-[13px] shrink-0 text-[var(--text-tertiary)]" />
+        <ChevronRight className="h-[12px] w-[12px] shrink-0 text-[var(--text-tertiary)]" />
       </div>
 
-      <div className="standalone-setting-card flex min-h-[44px] items-center gap-[7px] rounded-[12px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-[7px] py-[6px]">
-        <div className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-[8px] bg-white/[0.05] text-white">
+      <div className="standalone-setting-card flex min-h-[38px] items-center gap-[6px] rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-[7px] py-[3px]">
+        <div className="grid h-[24px] w-[24px] shrink-0 place-items-center rounded-[7px] bg-white/[0.05] text-white">
           <SlidersHorizontal className="h-[14px] w-[14px]" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] font-medium leading-[14px] text-[var(--text-tertiary)]">
+          <div className="text-[13px] font-medium leading-[14px] text-[var(--text-tertiary)]">
             {copy.quality}
           </div>
-          <div className="relative mt-[2px] min-w-0 truncate text-[13px] font-bold leading-[16px] text-white">
+          <div className="relative min-w-0 truncate text-[15px] font-bold leading-[16px] text-white">
             {qualityLabel}
             {isGpt ? (
               <>
@@ -3653,7 +3762,7 @@ function ImageOutputSettings({
             ) : null}
           </div>
         </div>
-        <ChevronRight className="h-[13px] w-[13px] shrink-0 text-[var(--text-tertiary)]" />
+        <ChevronRight className="h-[12px] w-[12px] shrink-0 text-[var(--text-tertiary)]" />
       </div>
     </div>
   );
@@ -4059,7 +4168,7 @@ function VoiceSettingsControls({
             </div>
           )}
           {elevenVoices && elevenVoices.length > 0 && (
-            <div className="ws-scroll-hide mt-2 grid max-h-[270px] grid-cols-2 gap-2 overflow-y-auto pr-0.5">
+            <div className="standalone-voice-controls ws-scroll-hide mt-2 grid max-h-[224px] grid-cols-2 gap-[6px] overflow-y-auto pr-0.5">
               {elevenVoices.map((voice) => {
                 const active = voice.id === form.voice;
                 return (
@@ -4068,14 +4177,14 @@ function VoiceSettingsControls({
                     type="button"
                     onClick={() => onChange({ voice: voice.id })}
                     className={cn(
-                      "flex min-h-[72px] flex-col items-start justify-between rounded-lg border border-dashed px-3 py-3 text-left transition",
+                      "standalone-voice-card flex min-h-[58px] flex-col items-start justify-between rounded-lg border border-dashed px-[10px] py-[8px] text-left transition",
                       active
                         ? "border-amber-300/50 bg-amber-300/10"
                         : "border-white/[0.12] bg-[#242424] hover:bg-[#2d2d2d]",
                     )}
                   >
                     <span
-                      className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"
+                      className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"
                       style={{
                         background:
                           TINT_PALETTE[voice.tint] ?? TINT_PALETTE.zinc,
@@ -4084,10 +4193,10 @@ function VoiceSettingsControls({
                       {voice.name.charAt(0)}
                     </span>
                     <span className="min-w-0 w-full">
-                      <span className="block truncate text-[11px] font-bold text-white">
+                      <span className="block truncate text-[12px] font-bold leading-[15px] text-white">
                         {voice.name}
                       </span>
-                      <span className="block truncate text-[10px] text-zinc-500">
+                      <span className="block truncate text-[10.5px] leading-[13px] text-zinc-500">
                         {voice.characteristic}
                       </span>
                     </span>
@@ -4173,7 +4282,7 @@ function GeminiVoicePicker({
         label="Voice"
         meta={`${GEMINI_TTS_VOICES.length} preset speakers`}
       />
-      <div className="ws-scroll-hide mt-2 grid max-h-[270px] grid-cols-3 gap-2 overflow-y-auto pr-0.5">
+      <div className="standalone-voice-controls ws-scroll-hide mt-2 grid max-h-[224px] grid-cols-3 gap-[6px] overflow-y-auto pr-0.5">
         {GEMINI_TTS_VOICES.map((voiceName) => {
           const active = value === voiceName;
           const isPlaying = playingId === voiceName;
@@ -4184,14 +4293,14 @@ function GeminiVoicePicker({
               type="button"
               onClick={() => onChange(voiceName)}
               className={cn(
-                "relative flex min-h-[58px] flex-col items-start justify-center rounded-lg border border-dashed px-3 py-2 pr-9 text-left transition",
+                "standalone-voice-card relative flex min-h-[50px] flex-col items-start justify-center rounded-lg border border-dashed px-[10px] py-[7px] pr-[34px] text-left transition",
                 active
                   ? "border-amber-300/50 bg-amber-300/10"
                   : "border-white/[0.12] bg-[#242424] hover:bg-[#2d2d2d]",
               )}
             >
               <span
-                className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"
+                className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"
                 style={{
                   background:
                     TINT_PALETTE[pickTintFromName(voiceName)] ?? TINT_PALETTE.zinc,
@@ -4199,7 +4308,7 @@ function GeminiVoicePicker({
               >
                 {voiceName.charAt(0)}
               </span>
-              <span className="mt-1.5 block w-full truncate text-[11px] font-bold text-white">
+              <span className="mt-[5px] block w-full truncate text-[12px] font-bold leading-[15px] text-white">
                 {voiceName}
               </span>
               {/* Preview ▶ — sits in the top-right of the card. We
@@ -4221,7 +4330,7 @@ function GeminiVoicePicker({
                   }
                 }}
                 className={cn(
-                  "absolute right-2 top-2 grid h-6 w-6 cursor-pointer place-items-center rounded-full transition",
+                  "absolute right-[7px] top-[7px] grid h-[25px] w-[25px] cursor-pointer place-items-center rounded-full transition",
                   "bg-white/[0.08] text-zinc-200 hover:bg-white/[0.16] hover:text-white",
                   isPlaying && "bg-amber-300/30 text-amber-200",
                 )}
@@ -4276,11 +4385,11 @@ function GeminiAudioTagsPanel({
   };
   const prefix = composeGeminiAudioTagPrefix({ emotion, personality, speed });
   return (
-    <div className="rounded-xl bg-white/[0.04] px-3 py-3">
-      <div className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+    <div className="standalone-voice-controls rounded-[14px] bg-white/[0.04] px-[11px] py-[10px]">
+      <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
         Audio tags
       </div>
-      <p className="mt-1 text-[11.5px] text-zinc-500">
+      <p className="mt-[4px] text-[11.5px] leading-[15px] text-zinc-500">
         เลือกอารมณ์ / บุคลิก / ความเร็ว — Gemini จะใช้ tag ในวงเล็บเพื่อปรับการอ่าน
       </p>
 
@@ -4297,11 +4406,11 @@ function GeminiAudioTagsPanel({
         onToggle={(tag) => toggle(personality, tag, onChangePersonality)}
       />
 
-      <div className="mt-3">
-        <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+      <div className="mt-[9px]">
+        <div className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-zinc-500">
           ความเร็ว / Speed
         </div>
-        <div className="mt-1.5 inline-flex w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[11.5px]">
+        <div className="mt-[6px] inline-flex min-h-[38px] w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[12px]">
           {GEMINI_SPEED_OPTIONS.map((opt) => {
             const active = speed === opt.id;
             return (
@@ -4310,7 +4419,7 @@ function GeminiAudioTagsPanel({
                 type="button"
                 onClick={() => onChangeSpeed(opt.id)}
                 className={cn(
-                  "flex-1 rounded-md px-2 py-1.5 text-center transition-colors",
+                  "flex-1 rounded-md px-2 py-[7px] text-center leading-[14px] transition-colors",
                   active
                     ? "bg-white/[0.10] text-zinc-50"
                     : "text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100",
@@ -4324,11 +4433,11 @@ function GeminiAudioTagsPanel({
       </div>
 
       {prefix ? (
-        <div className="mt-3 rounded-md bg-black/35 px-2.5 py-1.5 font-mono text-[11px] text-amber-200/90">
+        <div className="mt-[9px] rounded-md bg-black/35 px-2.5 py-1.5 font-mono text-[11px] leading-[14px] text-amber-200/90">
           {prefix} <span className="text-zinc-500">+ script</span>
         </div>
       ) : (
-        <div className="mt-3 text-[11px] italic text-zinc-600">
+        <div className="mt-[9px] text-[11px] leading-[15px] italic text-zinc-600">
           (ยังไม่ได้เลือก audio tag — Gemini จะอ่านตาม voice ที่เลือกอย่างเดียว)
         </div>
       )}
@@ -4348,11 +4457,11 @@ function TagChipRow({
   onToggle: (tag: string) => void;
 }) {
   return (
-    <div className="mt-3">
-      <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+    <div className="mt-[9px]">
+      <div className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-zinc-500">
         {title}
       </div>
-      <div className="mt-1.5 flex flex-wrap gap-1.5">
+      <div className="mt-[6px] flex flex-wrap gap-[6px]">
         {items.map((item) => {
           const active = selected.includes(item.tag);
           return (
@@ -4362,7 +4471,7 @@ function TagChipRow({
               onClick={() => onToggle(item.tag)}
               title={item.sub}
               className={cn(
-                "rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
+                "rounded-full px-[10px] py-[6px] text-[12px] font-medium leading-[14px] transition-colors",
                 active
                   ? "bg-amber-300/20 text-amber-200 ring-1 ring-amber-300/30"
                   : "bg-white/[0.05] text-zinc-300 hover:bg-white/[0.10] hover:text-white",
@@ -4396,11 +4505,11 @@ function ElevenLabsVoiceParams({
   ];
 
   return (
-    <div className="rounded-xl bg-white/[0.04] px-3 py-3">
-      <div className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+    <div className="standalone-voice-controls rounded-[14px] bg-white/[0.04] px-[11px] py-[10px]">
+      <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
         {t("workspace.standalone.voice_style")}
       </div>
-      <div className="mt-2 inline-flex w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[11px]">
+      <div className="mt-[7px] inline-flex min-h-[36px] w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[12px]">
         {presets.map((p) => {
           const active = form.voiceStylePreset === p.id;
           return (
@@ -4409,7 +4518,7 @@ function ElevenLabsVoiceParams({
               type="button"
               onClick={() => onChange({ voiceStylePreset: p.id })}
               className={cn(
-                "flex-1 rounded-md px-2 py-1 text-center transition-colors",
+                "flex-1 rounded-md px-2 py-[6px] text-center leading-[14px] transition-colors",
                 active
                   ? "bg-white/[0.10] text-zinc-50"
                   : "text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100",
@@ -4489,8 +4598,8 @@ function RangeSlider({
   onChange: (v: number) => void;
 }) {
   return (
-    <div className="mt-3">
-      <div className="flex items-center justify-between text-[10.5px] font-medium text-zinc-300">
+    <div className="mt-[9px]">
+      <div className="flex items-center justify-between text-[11px] font-medium leading-[14px] text-zinc-300">
         <span>{label}</span>
         {meta && <span className="text-zinc-500">{meta}</span>}
       </div>
@@ -4501,7 +4610,7 @@ function RangeSlider({
         step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="mt-1.5 h-1 w-full cursor-pointer appearance-none rounded-full bg-white/[0.08] accent-amber-300 outline-none"
+        className="mt-[6px] h-1 w-full cursor-pointer appearance-none rounded-full bg-white/[0.08] accent-amber-300 outline-none"
       />
     </div>
   );
@@ -6353,6 +6462,92 @@ function fieldTypeForReference(
   if (reference.mime?.startsWith("video/")) return "video";
   if (reference.mime?.startsWith("audio/")) return "audio";
   return "image";
+}
+
+function standaloneAutoPromptTitle(language: string): string {
+  return language === "th"
+    ? "สร้างหรือปรับ prompt ให้พร้อมใช้กับ tool นี้"
+    : "Create or improve a prompt for the current tool";
+}
+
+function autoPromptReferenceLabel(
+  reference: Pick<PanelReferenceAsset, "name" | "id">,
+  index: number,
+): string {
+  const raw = (reference.name || reference.id || `ref-${index + 1}`).trim();
+  const withoutQuery = raw.split("?")[0] ?? raw;
+  const parts = withoutQuery.split(/[\\/]/);
+  const fileName = parts[parts.length - 1] || withoutQuery;
+  return fileName.length > 28 ? `${fileName.slice(0, 25)}...` : fileName;
+}
+
+function autoPromptReferenceToken(
+  reference: Pick<PanelReferenceAsset, "id" | "name">,
+  index: number,
+): string {
+  return `@[${autoPromptReferenceLabel(reference, index)}](${reference.id})`;
+}
+
+function buildStandaloneAutoPromptUserMessage({
+  prompt,
+  tool,
+  toolLabel,
+  modelLabel,
+  references,
+  language,
+}: {
+  prompt: string;
+  tool: StandaloneToolKey;
+  toolLabel: string;
+  modelLabel: string;
+  references: PanelReferenceAsset[];
+  language: string;
+}): string {
+  const referenceLines = references.length
+    ? references
+        .map((reference, index) => {
+          const mediaKind = reference.mime?.startsWith("video/")
+            ? "video"
+            : reference.mime?.startsWith("audio/")
+              ? "audio"
+              : "image";
+          return `- ${mediaKind} ${index + 1}: ${autoPromptReferenceToken(reference, index)}`;
+        })
+        .join("\n")
+    : "- none";
+  const toolInstruction =
+    tool === "voice_gen"
+      ? "For voice generation, write a clean speakable script and preserve the intended spoken language."
+      : tool === "video_gen"
+        ? "For video generation, include subject, action, scene, camera/motion, timing, lighting, and continuity when useful."
+        : "For image generation or editing, include subject, action/edit intent, composition, lighting, style, and constraints when useful.";
+
+  return [
+    "The UI will paste your answer directly into the prompt box.",
+    "Answer with the prompt text itself.",
+    `Active tool: ${toolLabel} (${tool})`,
+    `Active model: ${modelLabel}`,
+    `User UI language: ${language}`,
+    toolInstruction,
+    "For image/video tools, write clear English unless the user explicitly requests another language.",
+    "Keep every @mention token exactly as written. Do not change labels or ids inside mention tokens.",
+    "If selected references should be passed into generation, include their exact @mention tokens in the prompt.",
+    "",
+    "Selected reference mention tokens:",
+    referenceLines,
+    "",
+    "User draft:",
+    prompt || "(empty)",
+  ].join("\n");
+}
+
+function cleanStandaloneAutoPromptResponse(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^```(?:text|prompt)?\s*/i, "")
+    .replace(/```$/i, "")
+    .replace(/^(auto prompt|optimized prompt|final prompt|prompt)\s*:\s*/i, "")
+    .trim();
 }
 
 function resolveStandaloneMentionedAssets(

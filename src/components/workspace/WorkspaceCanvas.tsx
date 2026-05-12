@@ -1555,13 +1555,16 @@ const Inner = () => {
        *  with no implementation behind them — visible-but-greyed
        *  cluttered the menu and signalled features that aren't
        *  there. They can come back when the Boards UI ships. */
-      const items: NodeContextMenuItem[] = [
-        {
+      const items: NodeContextMenuItem[] = [];
+      if (node.type !== "textNode") {
+        items.push({
           key: "preview",
           label: "Preview",
           icon: CtxEyeIcon,
           onSelect: () => onCtxPreview(node),
-        },
+        });
+      }
+      items.push(
         {
           key: "download",
           label: t("workspace.nodemenu.download"),
@@ -1583,7 +1586,7 @@ const Inner = () => {
           danger: true,
           onSelect: () => onCtxDelete([node]),
         },
-      ];
+      );
       return items;
     }
 
@@ -1764,6 +1767,10 @@ const Inner = () => {
    *  the preview lightbox instead of letting them rename. */
   const onNodeDoubleClick = useCallback(
     (e: React.MouseEvent, node: Node) => {
+      if (node.type === "textNode") {
+        e.stopPropagation();
+        return;
+      }
       if (isNodeControlEvent(e)) {
         e.stopPropagation();
         return;

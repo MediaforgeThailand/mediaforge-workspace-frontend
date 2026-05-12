@@ -43,7 +43,8 @@ import {
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -55,6 +56,7 @@ import OrgCreditBadge from "@/components/OrgCreditBadge";
 import ActiveClassPicker from "@/components/ActiveClassPicker";
 import AllAssetsDialog from "@/components/workspace/AllAssetsDialog";
 import { DEFAULT_BRAND_LOGO, DEFAULT_BRAND_NAME } from "@/components/workspace/brandAssets";
+import { getProjectAvatar } from "@/components/workspace/projectAvatars";
 import type { ProjectMeta } from "@/store/useWorkspaceStore";
 
 export type SectionKey =
@@ -89,6 +91,7 @@ type NavItem = {
     | "workspace.sidebar.video_gen"
     | "workspace.sidebar.voice_gen"
     | "workspace.sidebar.threed_gen";
+  displayLabel?: string;
   icon: LucideIcon;
   width?: "full" | "half";
 };
@@ -110,12 +113,12 @@ const NAV_SECTIONS: SidebarSection[] = [
     labelKey: "workspace.sidebar.create",
     variant: "tool",
     rows: [
-      [{ id: "video_gen", labelKey: "workspace.sidebar.video_gen", icon: Video, width: "full" }],
+      [{ id: "video_gen", labelKey: "workspace.sidebar.video_gen", displayLabel: "Video", icon: Video, width: "full" }],
       [
-        { id: "image_gen", labelKey: "workspace.sidebar.image_gen", icon: ImageIcon },
-        { id: "voice_gen", labelKey: "workspace.sidebar.voice_gen", icon: Mic2 },
+        { id: "image_gen", labelKey: "workspace.sidebar.image_gen", displayLabel: "Image", icon: ImageIcon },
+        { id: "voice_gen", labelKey: "workspace.sidebar.voice_gen", displayLabel: "Audio", icon: Mic2 },
       ],
-      [{ id: "image_to_3d", labelKey: "workspace.sidebar.threed_gen", icon: Box, width: "half" }],
+      [{ id: "image_to_3d", labelKey: "workspace.sidebar.threed_gen", displayLabel: "3D Generator", icon: Box, width: "full" }],
     ],
   },
   {
@@ -205,6 +208,10 @@ export default function WorkspaceSidebar({
     activeProjectId && projectOptions.some((project) => project.id === activeProjectId)
       ? activeProjectId
       : projectOptions[0]?.id ?? "";
+  const selectedProject =
+    projectOptions.find((project) => project.id === selectedProjectId) ??
+    projectOptions[0] ??
+    null;
 
   const handleClick = (s: SectionKey) => {
     if (onNavigate) onNavigate(s);
@@ -218,14 +225,14 @@ export default function WorkspaceSidebar({
   //     panel from the main content (different elevation).
   //   • Width tightened 198 → 192 keeps the visual rhythm.
   return (
-    <div className="ws-scroll-hide h-full shrink-0 bg-black py-2 pl-0">
+    <div className="ws-scroll-hide h-full shrink-0 bg-[#070808] py-2 pl-0">
       <aside
-        className="mf-readable ws-scroll-hide flex h-full w-[230px] flex-col gap-[4px] overflow-y-auto rounded-[20px] border border-transparent px-[4px] py-[12px] text-[#b0b4ba]"
+        className="mf-readable ws-scroll-hide flex h-full w-[230px] flex-col gap-[4px] overflow-y-auto rounded-[18px] border border-white/[0.10] px-[6px] py-[12px] text-[#b0b4ba]"
         style={{
           background:
-            "linear-gradient(#000, #000) padding-box, linear-gradient(145deg, rgba(255,255,255,.28), rgba(238,255,0,.24) 38%, rgba(244,255,0,.08) 72%, rgba(0,0,0,.2)) border-box",
+            "radial-gradient(95% 70% at 50% -10%, rgba(234,255,0,.04), transparent 50%), linear-gradient(180deg, #171a19 0%, #111313 46%, #0c0d0d 100%)",
           boxShadow:
-            "inset 0 1px 0 rgba(255,255,255,.06), inset 0 -1px 0 rgba(238,255,0,.06), 0 0 24px -20px rgba(238,255,0,.8), 0 0 38px -32px rgba(244,255,0,.48)",
+            "inset 0 1px 0 rgba(255,255,255,.08), inset 0 -1px 0 rgba(255,255,255,.035), 0 24px 64px -52px rgba(0,0,0,.95), 0 0 28px -26px rgba(234,255,0,.72)",
         }}
       >
       {/* ── Brand row — PSC : Digital Media ──────────────────────
@@ -257,41 +264,19 @@ export default function WorkspaceSidebar({
         </button>
       </div>
 
-      {onCreate && (
-        <button
-          type="button"
-          onClick={onCreate}
-          className="ci-gloss-button mx-[8px] mb-[7px] flex h-[36px] shrink-0 items-center justify-center gap-[8px] rounded-full px-[13px] text-[12px] font-semibold transition hover:-translate-y-px active:translate-y-px"
-          title={t("workspace.standalone.create_project")}
-        >
-          <Plus className="h-[15px] w-[15px] shrink-0" strokeWidth={2.2} />
-          <span className="truncate">{t("workspace.standalone.create_project")}</span>
-        </button>
+      {(onSelectProject || onCreate) && (
+        <SidebarProjectPicker
+          projects={projectOptions}
+          activeProject={selectedProject}
+          onSelectProject={(id) => onSelectProject?.(id)}
+          onCreateProject={onCreate}
+          projectLabel={t("workspace.standalone.projects")}
+          newProjectLabel={t("workspace.standalone.new_project")}
+          createProjectLabel={t("workspace.standalone.create_project")}
+        />
       )}
 
       {/* ── Top nav group ──────────────────────────────────────── */}
-      {onSelectProject && projectOptions.length > 0 && (
-        <label className="relative mx-[8px] mb-[8px] block">
-          <span className="sr-only">{t("workspace.home.projects")}</span>
-          <select
-            value={selectedProjectId}
-            onChange={(event) => onSelectProject(event.target.value || null)}
-            className="w-full appearance-none rounded-md border border-white/[0.08] bg-white/[0.045] py-[6px] pl-[10px] pr-[28px] text-[12px] font-semibold leading-none text-white outline-none transition hover:bg-white/[0.07] focus:border-white/[0.18] focus:bg-white/[0.08]"
-            title={
-              projectOptions.find((project) => project.id === selectedProjectId)?.name ??
-              t("workspace.home.projects")
-            }
-          >
-            {projectOptions.map((project) => (
-              <option key={project.id} value={project.id} className="bg-zinc-950 text-white">
-                {project.name}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-[9px] top-1/2 h-[13px] w-[13px] -translate-y-1/2 text-zinc-400" />
-        </label>
-      )}
-
       <nav className="flex flex-col gap-[4px]">
         {NAV_TOP.map((it) => (
           <NavLink
@@ -353,6 +338,187 @@ export default function WorkspaceSidebar({
       </div>
       <AllAssetsDialog open={libraryOpen} onClose={() => setLibraryOpen(false)} />
       </aside>
+    </div>
+  );
+}
+
+function SidebarProjectPicker({
+  projects,
+  activeProject,
+  onSelectProject,
+  onCreateProject,
+  projectLabel,
+  newProjectLabel,
+  createProjectLabel,
+}: {
+  projects: ProjectMeta[];
+  activeProject: ProjectMeta | null;
+  onSelectProject: (id: string) => void;
+  onCreateProject?: () => void;
+  projectLabel: string;
+  newProjectLabel: string;
+  createProjectLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ left: 0, top: 0 });
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const projectName = activeProject?.name?.trim() || createProjectLabel;
+  const projectAvatar = getProjectAvatar(activeProject ?? { id: "new-project", name: projectName });
+
+  useEffect(() => {
+    if (!open) return;
+
+    const updatePosition = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const gutter = 10;
+      const margin = 12;
+      const menuWidth = 306;
+      const rightSideLeft = rect.right + gutter;
+      const hasRoomOnRight = rightSideLeft + menuWidth + margin <= window.innerWidth;
+      const fallbackLeft = Math.min(
+        Math.max(margin, rect.left),
+        Math.max(margin, window.innerWidth - menuWidth - margin),
+      );
+      setMenuPosition({
+        left: hasRoomOnRight ? rightSideLeft : fallbackLeft,
+        top: hasRoomOnRight ? Math.max(margin, rect.top - 2) : rect.bottom + 8,
+      });
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [open]);
+
+  const menu =
+    open && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            ref={menuRef}
+            className="fixed z-[1000] w-[306px] rounded-[14px] border border-[#eaff00]/20 bg-[#101211]/95 p-[10px] text-white shadow-[0_28px_80px_-36px_rgba(0,0,0,.98),0_0_42px_-22px_rgba(234,255,0,.9)] backdrop-blur-xl"
+            style={{
+              left: menuPosition.left,
+              top: menuPosition.top,
+            }}
+            role="menu"
+          >
+            <div className="flex items-center justify-between px-[8px] pb-[9px] pt-[2px]">
+              <span className="text-[11px] font-semibold text-zinc-400">
+                {projectLabel}
+              </span>
+              <span className="h-[5px] w-[5px] rounded-full bg-[#eaff00] shadow-[0_0_14px_rgba(234,255,0,.9)]" />
+            </div>
+            <div className="flex max-h-[256px] flex-col gap-[7px] overflow-y-auto pr-[1px]">
+              {projects.map((project) => {
+                const active = project.id === activeProject?.id;
+                const avatar = getProjectAvatar(project);
+                return (
+                  <button
+                    key={project.id}
+                    type="button"
+                    onClick={() => {
+                      onSelectProject(project.id);
+                      setOpen(false);
+                    }}
+                    className={cn(
+                      "group flex h-[46px] items-center gap-[10px] rounded-[10px] border px-[11px] text-left transition duration-150",
+                      active
+                        ? "border-[#eaff00]/70 bg-black text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.08),0_0_20px_-8px_rgba(234,255,0,.92)]"
+                        : "border-white/[0.075] bg-[#171917] text-zinc-200 hover:border-[#eaff00]/35 hover:bg-[#20231c] hover:text-white",
+                    )}
+                    role="menuitem"
+                  >
+                    <span className="grid h-[30px] w-[30px] shrink-0 place-items-center overflow-hidden rounded-full bg-[#0b0d0d] ring-1 ring-white/12">
+                      <img
+                        src={avatar}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                        draggable={false}
+                      />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-[-0.01em]">
+                      {project.name}
+                    </span>
+                    {active && (
+                      <span className="h-[6px] w-[6px] rounded-full bg-[#eaff00] shadow-[0_0_12px_rgba(234,255,0,.95)]" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            {onCreateProject && (
+              <button
+                type="button"
+                onClick={() => {
+                  onCreateProject();
+                  setOpen(false);
+                }}
+                className="ci-gloss-button mt-[10px] flex h-[40px] w-full items-center justify-center gap-[9px] rounded-[10px] px-[14px] text-[13px] font-bold transition hover:-translate-y-px active:translate-y-px"
+                role="menuitem"
+              >
+                <span className="grid h-[19px] w-[19px] place-items-center rounded-full bg-black/90 text-[#eaff00] shadow-[inset_0_0_0_1px_rgba(234,255,0,.22)]">
+                  <Plus className="h-[12px] w-[12px]" strokeWidth={2.5} />
+                </span>
+                {newProjectLabel}
+              </button>
+            )}
+          </div>,
+          document.body,
+        )
+      : null;
+
+  return (
+    <div className="relative mx-[6px] mb-[10px]">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className={cn(
+          "flex h-[43px] w-full items-center gap-[10px] rounded-[10px] border border-white/[0.09] bg-[#1a1d1d] px-[10px] text-left text-white outline-none transition",
+          "shadow-[inset_0_1px_0_rgba(255,255,255,.045)] hover:border-[#eaff00]/36 hover:bg-[#202321] focus-visible:ring-1 focus-visible:ring-[#eaff00]/70",
+          open && "border-[#eaff00]/70 bg-[#141710] shadow-[0_0_22px_-14px_rgba(234,255,0,.9),inset_0_0_0_1px_rgba(255,255,255,.06)]",
+        )}
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <span className="grid h-[30px] w-[30px] shrink-0 place-items-center overflow-hidden rounded-full bg-[#0b0d0d] ring-1 ring-white/12">
+          <img
+            src={projectAvatar}
+            alt=""
+            className="h-full w-full object-cover"
+            loading="lazy"
+            decoding="async"
+            draggable={false}
+          />
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
+          {projectName}
+        </span>
+        <ChevronDown
+          className={cn(
+            "h-[14px] w-[14px] shrink-0 text-zinc-500 transition-transform",
+            open && "rotate-180 text-zinc-300",
+          )}
+        />
+      </button>
+      {menu}
     </div>
   );
 }
@@ -447,11 +613,16 @@ const SidebarNavSection = ({
   onSelect: (s: SectionKey) => void;
   translate: (key: NavItem["labelKey"]) => string;
 }) => (
-  <div className="pt-[16px]">
-    <div className="px-[16px] pb-[6px] text-[12px] font-semibold uppercase tracking-[0.05px] text-[#43484e]">
+  <div className={cn("pt-[16px]", variant === "tool" && "pt-[18px]")}>
+    <div
+      className={cn(
+        "px-[16px] pb-[6px] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#555b61]",
+        variant === "tool" && "px-[18px] pb-[7px] text-[#4e5559]",
+      )}
+    >
       {label}
     </div>
-    <div className="flex flex-col gap-[4px]">
+    <div className={cn("flex flex-col gap-[4px]", variant === "tool" && "gap-[5px] px-[10px]")}>
       {rows.map((row, rowIndex) => {
         const splitToolRow =
           variant === "tool" && row.some((item) => item.width === "half");
@@ -460,12 +631,15 @@ const SidebarNavSection = ({
         return (
           <div
             key={`${label}-${rowIndex}`}
-            className={cn((row.length > 1 || splitToolRow) && "flex gap-[4px] px-[4px]")}
+            className={cn(
+              variant === "tool" && "flex gap-[5px]",
+              variant !== "tool" && (row.length > 1 || splitToolRow) && "flex gap-[4px] px-[4px]",
+            )}
           >
             {row.map((item) => (
               <NavLink
                 key={item.id}
-                label={translate(item.labelKey)}
+                label={item.displayLabel ?? translate(item.labelKey)}
                 icon={item.icon}
                 active={active === item.id}
                 onClick={() => onSelect(item.id)}
@@ -504,27 +678,27 @@ const NavLink = ({
        *  is enough now that the sidebar is a Layer-1 panel. */
       "group relative flex h-[32px] min-w-0 items-center gap-[10px] text-left text-[12px] font-medium transition-colors",
       variant === "tool"
-        ? "mx-[8px] overflow-hidden rounded-lg bg-[rgba(216,244,246,.04)] px-[8px]"
+        ? "overflow-hidden rounded-[7px] border border-white/[0.075] bg-[#171a19] px-[8px] shadow-[inset_0_1px_0_rgba(255,255,255,.035)]"
         : "mx-[12px] rounded-md bg-transparent px-[4px]",
-      variant === "tool" && !compact && "w-[calc(100%-16px)]",
-      compact && variant === "tool" && "mx-0 flex-1 gap-[6px] px-[6px] text-[11px]",
+      variant === "tool" && !compact && "w-full",
+      compact && variant === "tool" && "mx-0 flex-1 gap-[7px] px-[7px] text-[12px]",
       compact && variant === "list" && "mx-[12px]",
       active && variant === "tool"
-        ? "rounded-[10px] border border-[#f4ff00]/45 bg-[#0b0c0d] text-white"
+        ? "border-[#eaff00]/70 bg-[#121411] text-white shadow-[0_0_16px_-8px_rgba(234,255,0,.95),inset_0_0_0_1px_rgba(255,255,255,.05)]"
         : active
           ? "text-white"
           : variant === "tool"
-            ? "text-[#d8dce2] hover:bg-white/12 hover:text-white"
+            ? "text-[#e4e7e9] hover:border-[#eaff00]/30 hover:bg-[#20231f] hover:text-white"
             : "text-[#b0b4ba] hover:text-white",
     )}
   >
     {variant === "tool" && !active && (
-      <span className="pointer-events-none absolute inset-0 rounded-lg bg-[linear-gradient(170deg,rgba(211,237,248,.18)_0%,rgba(211,237,248,0)_20%,rgba(211,237,248,0)_80%,rgba(211,237,248,.14)_100%)] transition-opacity group-hover:opacity-0" />
+      <span className="pointer-events-none absolute inset-0 rounded-[7px] bg-[linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0)_44%),radial-gradient(90%_120%_at_0%_0%,rgba(234,255,0,.045),transparent_42%)] transition-opacity group-hover:opacity-0" />
     )}
     {variant === "tool" && active && (
-      <span className="pointer-events-none absolute inset-[-1px] rounded-[10px] shadow-[inset_0_-3px_8px_0_rgba(244,255,0,.34),inset_0_2px_8px_0_rgba(255,255,255,.28),0_0_12px_rgba(244,255,0,.34)]" />
+      <span className="pointer-events-none absolute inset-[-1px] rounded-[8px] shadow-[inset_0_-3px_8px_0_rgba(234,255,0,.30),inset_0_1px_8px_0_rgba(255,255,255,.16),0_0_12px_rgba(234,255,0,.32)]" />
     )}
-    <Icon className="relative h-[16px] w-[16px] shrink-0" />
+    <Icon className={cn("relative shrink-0", variant === "tool" ? "h-[15px] w-[15px]" : "h-[16px] w-[16px]")} />
     <span className="relative min-w-0 truncate">{label}</span>
   </button>
 );

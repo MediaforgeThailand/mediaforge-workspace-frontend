@@ -3,11 +3,12 @@ import { Handle, Position, type NodeProps, useReactFlow } from "@xyflow/react";
 import {
   ImagePlus, Video, Type, ListFilter, Sparkles, Film, Mic,
   MessageSquare, Scissors, Maximize, Combine, Music, Clapperboard,
-  FileText, Image, Volume2, Lock, Play, Settings, ChevronDown,
+  FileText, Image, Volume2, Lock, Settings, ChevronDown,
   Plus, Minus, Move, Camera, Coins, AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
+import GenerateIcon from "@/components/GenerateIcon";
 
 /* ─── Icon map ─── */
 const ICON_MAP: Record<string, typeof Sparkles> = {
@@ -637,7 +638,7 @@ const RichNode = ({ id, nodeType, label, category, isMockup, selected, config, n
             "w-6 h-6 rounded-full flex items-center justify-center transition-colors",
             "bg-white/10 hover:bg-white/20"
           )}>
-            <Play className="w-3 h-3 text-white/80 ml-0.5" />
+            <GenerateIcon className="h-3 w-3" />
           </button>
         </div>
 

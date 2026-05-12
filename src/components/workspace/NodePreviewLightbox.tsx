@@ -10,7 +10,6 @@
  *   - elementNode (saved)    → reference_images[0] / thumbnail_url
  *   - elementNode (creator)  → walks own input edges for refs
  *   - any tool node          → currently-selected generation's URL
- *   - textNode               → big text pane
  *   - groupNode              → contact sheet of every child
  *
  * Closing: click backdrop, hit Esc, or press `A` again.
@@ -40,7 +39,7 @@ export interface PreviewPayload {
   type: "image" | "video" | "audio" | "text" | "grid" | "model3d";
   /** image / video / audio source URL */
   url?: string;
-  /** plain-text payload (textNode, chat output, video-to-prompt) */
+  /** plain-text payload (chat output, video-to-prompt, etc.) */
   text?: string;
   /** Multi-image preview (group node = contact sheet). */
   urls?: string[];
@@ -987,13 +986,11 @@ export function getNodePreview(
     return null;
   }
 
-  // ── TextNode — big text pane ──
+  // TextNode is an editor/control node, not a renderable output.
+  // Double-clicking it should select/edit the node instead of opening
+  // an empty text lightbox.
   if (node.type === "textNode") {
-    return {
-      type: "text",
-      text: (d.content as string | undefined) ?? "",
-      label: labelOf("text"),
-    };
+    return null;
   }
 
   // ── GroupNode — contact sheet of children ──

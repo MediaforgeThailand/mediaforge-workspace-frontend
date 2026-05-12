@@ -494,8 +494,6 @@ export const NODE_API_SCHEMA: Record<string, NodeApiDef> = {
     category: "AI PROCESS",
     accentColor: "teal",
     supportedModels: [
-      "seedance-1-0-pro-250528",
-      "seedance-1-0-pro-fast-251015",
       "seedance-1-5-pro-251215",
     ],
     defaultModel: "seedance-1-5-pro-251215",
@@ -513,13 +511,9 @@ export const NODE_API_SCHEMA: Record<string, NodeApiDef> = {
         label: "Model",
         type: "select",
         options: [
-          "seedance-1-0-pro-250528",
-          "seedance-1-0-pro-fast-251015",
           "seedance-1-5-pro-251215",
         ],
         optionLabels: {
-          "seedance-1-0-pro-250528": "SeedDance 1.0 Pro",
-          "seedance-1-0-pro-fast-251015": "SeedDance 1.0 Pro Fast",
           "seedance-1-5-pro-251215": "SeedDance 1.5 Pro",
         },
         default: "seedance-1-5-pro-251215",
