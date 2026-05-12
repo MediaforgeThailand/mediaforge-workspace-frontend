@@ -50,10 +50,11 @@ export default defineConfig(({ mode }) => ({
       output: {
         // Split heavy vendors into their own chunks so they can be
         // cached independently and so the main app chunk doesn't
-        // balloon to ~1.1 MB. xyflow / three / drei / framer-motion
-        // are all large and only needed on the canvas page; keeping
+        // balloon to ~1.1 MB. three / drei / framer-motion are
+        // all large and only needed on the canvas page; keeping
         // them in separate chunks lets Rollup tree-share them across
         // routes that import them dynamically.
+        // NOTE: do NOT split `@xyflow/react` into its own chunk — it reads React hooks at module-init and crashes with `useState` of undefined when separated from `vendor-react`.
         manualChunks: {
           "vendor-react": ["react", "react-dom", "react-router-dom"],
           "vendor-radix": [
@@ -85,7 +86,6 @@ export default defineConfig(({ mode }) => ({
             "@radix-ui/react-toggle-group",
             "@radix-ui/react-tooltip",
           ],
-          "vendor-xyflow": ["@xyflow/react"],
           "vendor-three": ["three", "@react-three/drei", "@react-three/fiber"],
           "vendor-framer": ["framer-motion"],
         },
