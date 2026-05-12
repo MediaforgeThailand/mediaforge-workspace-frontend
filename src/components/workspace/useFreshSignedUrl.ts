@@ -31,6 +31,21 @@ import { supabase } from "@/integrations/supabase/client";
 const CACHE = new Map<string, { url: string; signedAt: number }>();
 const REFRESH_AFTER_MS = 1000 * 60 * 60 * 12; // 12h — well inside any TTL
 
+// Negative cache: paths we already know are gone. Keyed by
+// `${bucket}:${path}` (without transform) because deleted-ness is a
+// property of the underlying object, not the rendition. Without this,
+// every re-render of N broken assets re-fires createSignedUrl + the
+// workspace-run-node fallback — a 403 storm that wedges the canvas.
+// TTL is short on purpose: a 5-minute cool-down lets a re-upload or
+// RLS fix recover automatically.
+const NEGATIVE_CACHE = new Map<string, number>(); // value = expiresAt (ms epoch)
+const NEGATIVE_TTL_MS = 1000 * 60 * 5;
+
+function isObjectMissingError(err: { message?: string } | null | undefined): boolean {
+  const msg = err?.message ?? "";
+  return /object not found|not[_ ]?found|\b404\b/i.test(msg);
+}
+
 export interface FreshSignedUrlTransform {
   width?: number;
   height?: number;
@@ -98,8 +113,20 @@ export function useFreshSignedUrl(
       return;
     }
 
-    // Cache hit (and still fresh) → use it without a round-trip.
     const cacheKey = `${parsed.bucket}:${parsed.path}:${transformKey}`;
+    const negKey = `${parsed.bucket}:${parsed.path}`;
+
+    // Check NEGATIVE_CACHE first. If the object was deleted but a
+    // stale signed URL is still in CACHE from before deletion,
+    // returning the stale URL would just trigger a 403 on render —
+    // skipping outright is the correct UX.
+    const negativeUntil = NEGATIVE_CACHE.get(negKey);
+    if (negativeUntil !== undefined) {
+      if (negativeUntil > Date.now()) return; // known-gone, don't re-fire
+      NEGATIVE_CACHE.delete(negKey);
+    }
+
+    // Cache hit (and still fresh) → use it without a round-trip.
     const cached = CACHE.get(cacheKey);
     if (cached && Date.now() - cached.signedAt < REFRESH_AFTER_MS) {
       setUrl(cached.url);
@@ -120,6 +147,13 @@ export function useFreshSignedUrl(
           // Re-sign failed — leave the caller's URL in place. Worst
           // case the image still 403s (same as today), no regression.
           if (error) console.warn("[useFreshSignedUrl]", error);
+          if (isObjectMissingError(error)) {
+            // Object is gone — the edge-function fallback would hit
+            // the same 404. Mark negative so subsequent renders skip
+            // the round-trip entirely.
+            NEGATIVE_CACHE.set(negKey, Date.now() + NEGATIVE_TTL_MS);
+            return;
+          }
           void supabase.functions
             .invoke("workspace-run-node", {
               body: { action: "refresh_storage_url", url: initial },
@@ -134,6 +168,7 @@ export function useFreshSignedUrl(
                     : null;
               if (refreshError || !signedUrl) {
                 if (refreshError) console.warn("[useFreshSignedUrl:fallback]", refreshError);
+                NEGATIVE_CACHE.set(negKey, Date.now() + NEGATIVE_TTL_MS);
                 return;
               }
               CACHE.set(cacheKey, { url: signedUrl, signedAt: Date.now() });
@@ -156,11 +191,15 @@ export function useFreshSignedUrl(
 /** Sync variant for code that's already resolved a fresh URL via
  *  the hook OR for places that just need the parser. Returns the
  *  cached URL if present, falls back to the input. Won't trigger a
- *  network request. */
+ *  network request. Returns `null` for paths we've negative-cached
+ *  so callers can short-circuit broken-image fetches. */
 export function getCachedFreshUrl(input: string | null | undefined): string | null {
   if (!input) return null;
   const parsed = parseStorageUrl(input);
   if (!parsed) return input;
-  const cached = CACHE.get(`${parsed.bucket}:${parsed.path}`);
+  const negKey = `${parsed.bucket}:${parsed.path}`;
+  const negativeUntil = NEGATIVE_CACHE.get(negKey);
+  if (negativeUntil !== undefined && negativeUntil > Date.now()) return null;
+  const cached = CACHE.get(negKey);
   return cached?.url ?? input;
 }

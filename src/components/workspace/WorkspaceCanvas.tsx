@@ -11,7 +11,7 @@
  * `data.generations` is populated — there's no shared HOC anymore.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ConnectionLineType,
   ReactFlow,
@@ -64,6 +64,9 @@ import NodePreviewLightbox, {
   getNodeDownloadable,
   type PreviewPayload,
 } from "./NodePreviewLightbox";
+// ImageCropTool stays eager: NodePreviewLightbox imports it eagerly,
+// so a lazy() here would still land in the main canvas chunk.
+// Follow-up: lazy inside NPL too, then flip this to lazy.
 import { ImageCropTool } from "./ImageCropTool";
 import {
   getWorkspaceSchema,
@@ -79,13 +82,15 @@ import CanvasNodePicker, {
   type CanvasNodePickerState,
   type PickerOption,
 } from "./CanvasNodePicker";
-import CanvasContextMenu, {
-  type ContextMenuState,
-  type ToolItem,
-} from "./CanvasContextMenu";
-import MediaContextMenu, {
-  type MediaContextMenuItem,
-} from "./MediaContextMenu";
+import type { ContextMenuState, ToolItem } from "./CanvasContextMenu";
+// Lazy: CanvasContextMenu only renders on canvas right-click. No other
+// file imports it eagerly, so Vite carves it into its own chunk.
+const CanvasContextMenu = lazy(() => import("./CanvasContextMenu"));
+// MediaContextMenu stays eager: AssetNode, NodeResultBar, AssetsView,
+// and StandaloneGenerator all import it eagerly, so a lazy() here
+// would be cosmetic — it'd still land in the main canvas chunk.
+// Follow-up: lazy those sites too, then flip this to lazy.
+import MediaContextMenu, { type MediaContextMenuItem } from "./MediaContextMenu";
 import {
   Copy as CtxCopyIcon,
   Download as CtxDownloadIcon,
@@ -103,10 +108,12 @@ import {
 } from "./videoAudioActions";
 import { bundleNodesAsZip, harvestAssetsFromNode } from "./bundleNodes";
 import CanvasFloatingSidebar from "./CanvasFloatingSidebar";
-import ShortcutsDialog from "./ShortcutsDialog";
+// Lazy: dialog only opens via keyboard shortcut or settings button.
+const ShortcutsDialog = lazy(() => import("./ShortcutsDialog"));
 // VoicePickerDialog was removed when the hardcoded preset voice
 // lists were deleted. The canvas no longer hosts a voice picker —
 // audio nodes use the backend's per-provider default voice.
+import { useCanvasJobsRecovery } from "@/store/useCanvasJobsRecovery";
 import { useCanvasToolStore } from "./useCanvasToolStore";
 import { useWorkspaceShortcuts } from "./useWorkspaceShortcuts";
 import { useCanvasAutosave } from "./useCanvasAutosave";
@@ -743,6 +750,18 @@ const Inner = () => {
   }, [saveState]);
 
   const canvasId = useWorkspaceStore((s) => s.current?.id);
+  const canvasWorkspaceId = useWorkspaceStore((s) => s.current?.workspaceId);
+
+  // Batched canvas-wide load of completed jobs for orphan recovery.
+  // Replaces the per-WorkspaceToolNode select that fired N times on
+  // mount; tool nodes now read their slice from useCanvasJobsRecovery.
+  useEffect(() => {
+    if (!canvasId || !canvasWorkspaceId) return;
+    void useCanvasJobsRecovery
+      .getState()
+      .loadForCanvas(canvasId, canvasWorkspaceId);
+  }, [canvasId, canvasWorkspaceId]);
+
   // STABLE_EMPTY_* — see comment near the top of this file. Returning a
   // fresh `[]` literal each call would loop the store-snapshot check.
   const nodes = useWorkspaceStore((s) => (s.current?.nodes as Node[] | undefined) ?? STABLE_EMPTY_NODES);
@@ -2671,13 +2690,21 @@ const Inner = () => {
           onClose={() => setPicker(null)}
         />
       )}
+      {/* Per-surface Suspense boundaries — one shared boundary would
+       *  suspend ALL four whenever any single chunk is in flight,
+       *  visibly delaying unrelated UI (open shortcuts ⇒ context
+       *  menu also goes blank). Each gets its own. Null fallback is
+       *  right for modal/menu surfaces where a transient empty frame
+       *  is invisible (vs. a spinner that would flash). */}
       {contextMenu && (
-        <CanvasContextMenu
-          state={contextMenu}
-          onPick={onContextMenuPick}
-          onAction={onContextMenuAction}
-          onClose={() => setContextMenu(null)}
-        />
+        <Suspense fallback={null}>
+          <CanvasContextMenu
+            state={contextMenu}
+            onPick={onContextMenuPick}
+            onAction={onContextMenuAction}
+            onClose={() => setContextMenu(null)}
+          />
+        </Suspense>
       )}
       {nodeContextMenu && nodeContextMenuItems.length > 0 && (
         <MediaContextMenu
@@ -2730,10 +2757,14 @@ const Inner = () => {
         onAddNode={openContextMenuAtAnchor}
         onOpenSettings={() => setSettingsOpen(true)}
       />
-      <ShortcutsDialog
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-      />
+      {settingsOpen && (
+        <Suspense fallback={null}>
+          <ShortcutsDialog
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+          />
+        </Suspense>
+      )}
       {/* VoicePickerDialog render removed — the dialog and its
        *  hardcoded preset catalog are gone. */}
     </div>
