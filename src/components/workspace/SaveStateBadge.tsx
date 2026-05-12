@@ -6,9 +6,9 @@
  * state changes. Renders nothing for "idle" / "guest" so the badge
  * stays out of sight when there's no relevant news to convey.
  *
- * Extracted from the (now deprecated) WorkspaceTabBar so the new
- * floating page pill can render the same indicator without
- * duplicating the listener logic.
+ * Used by the floating page pill (WorkspaceCanvasPagePill) and the
+ * canvas header to surface autosave state in one place without each
+ * caller re-implementing the listener.
  */
 
 import { useEffect, useState } from "react";

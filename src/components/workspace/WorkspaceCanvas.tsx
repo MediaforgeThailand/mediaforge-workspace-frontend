@@ -6,10 +6,9 @@
  * shared schema + handles Kling custom logic when it applies.
  *
  * Simple AI tools (BG remove, Merge audio) still use their legacy
- * per-tool components directly.
- *
- * All are wrapped with `withResultHistory` so they gain the result-
- * bar / history-dialog affordance when `data.generations` is populated.
+ * per-tool components directly. The result bar / history dialog is
+ * now rendered directly inside each node component when
+ * `data.generations` is populated — there's no shared HOC anymore.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -84,9 +83,9 @@ import CanvasContextMenu, {
   type ContextMenuState,
   type ToolItem,
 } from "./CanvasContextMenu";
-import NodeContextMenu, {
-  type NodeContextMenuItem,
-} from "./NodeContextMenu";
+import MediaContextMenu, {
+  type MediaContextMenuItem,
+} from "./MediaContextMenu";
 import {
   Copy as CtxCopyIcon,
   Download as CtxDownloadIcon,
@@ -539,10 +538,9 @@ async function clipboardHtmlFiles(event: ClipboardEvent): Promise<File[]> {
 const nodeTypes = {
   // All schema-driven tools route through WorkspaceToolNode — that's
   // the only place where the V2 Run button + workspace-run-node
-  // dispatcher live. WorkspaceToolNode now uses the preview-first
+  // dispatcher live. WorkspaceToolNode uses the preview-first
   // compact layout (see CompactParamWidgets / workspace.css), so the
   // result strip and history dialog are baked into the node itself.
-  // The previous `withResultHistory` HOC is no longer needed here.
   imageGenNode: WorkspaceToolNode,
   videoGenNode: WorkspaceToolNode,
   audioGenNode: WorkspaceToolNode,
@@ -1051,7 +1049,7 @@ const Inner = () => {
         }
       }
 
-      // Re-use payload from WorkspaceAssetPanel — spawn an AssetNode
+      // Re-use payload from the asset library — spawn an AssetNode
       // pointing at the existing URL without re-uploading.
       const reuseRaw = e.dataTransfer.getData("application/reactflow-asset-reuse");
       if (reuseRaw) {
@@ -1529,7 +1527,7 @@ const Inner = () => {
   /** Build the action list for the current right-click target — used
    *  by the menu render below. Memo'd against the menu state so we
    *  don't recompute every parent render. */
-  const nodeContextMenuItems = useMemo<NodeContextMenuItem[]>(() => {
+  const nodeContextMenuItems = useMemo<MediaContextMenuItem[]>(() => {
     if (!nodeContextMenu) return [];
     const targets = nodeContextMenu.targetNodes;
     if (targets.length === 0) return [];
@@ -1555,7 +1553,7 @@ const Inner = () => {
        *  with no implementation behind them — visible-but-greyed
        *  cluttered the menu and signalled features that aren't
        *  there. They can come back when the Boards UI ships. */
-      const items: NodeContextMenuItem[] = [];
+      const items: MediaContextMenuItem[] = [];
       if (node.type !== "textNode") {
         items.push({
           key: "preview",
@@ -2682,10 +2680,11 @@ const Inner = () => {
         />
       )}
       {nodeContextMenu && nodeContextMenuItems.length > 0 && (
-        <NodeContextMenu
+        <MediaContextMenu
           position={nodeContextMenu.position}
           items={nodeContextMenuItems}
           onClose={() => setNodeContextMenu(null)}
+          ariaLabel={t("workspace.nodemenu.aria")}
         />
       )}
       {preview && (

@@ -3077,7 +3077,7 @@ export const en = {
     "Local-only (apply migration to enable cloud autosave)",
   "workspace.save.saving_short": "Saving",
 
-  // ─── Quick toolbar (NodeQuickToolbar) ───────────────────────────
+  // ─── Quick toolbar (NodeQuickActionRail) ───────────────────────────
   "workspace.quicktoolbar.group_selection": "Group selection",
   "workspace.quicktoolbar.arrange_grid": "Arrange as grid",
   "workspace.quicktoolbar.download_zip": "Download all ({count}) as ZIP",

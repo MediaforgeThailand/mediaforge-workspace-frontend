@@ -9,13 +9,13 @@
  */
 
 import { memo, useState } from "react";
-import { Copy, Download, Eye, FolderOpen, Maximize2, Trash2 } from "lucide-react";
+import { Maximize2 } from "lucide-react";
 import NodeResultDialog from "./NodeResultDialog";
 import { AudioPlayButton } from "./AudioPlayButton";
 import { downloadFromUrl } from "./downloadAsset";
-import MediaContextMenu, {
-  type MediaContextMenuItem,
-} from "./MediaContextMenu";
+import MediaContextMenu from "./MediaContextMenu";
+import { buildMediaMenuItems } from "./mediaMenuItems";
+import { useMediaContextMenu } from "./useMediaContextMenu";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 export interface Generation {
@@ -53,61 +53,18 @@ const NodeResultBar = memo(
   ({ generations, selectedIndex = 0, onSelectIndex, width = 300 }: Props) => {
     const { t: i18n } = useLanguage();
     const [expanded, setExpanded] = useState(false);
-    const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+    const ctxMenu = useMediaContextMenu();
 
     const hasGens = !!generations && generations.length > 0;
     const current = hasGens ? (generations![selectedIndex] ?? generations![0]) : null;
     const canUseMediaMenu =
       !!current?.url && (current.type === "image" || current.type === "video");
-    const contextMenuItems: MediaContextMenuItem[] = [
-      {
-        key: "preview",
-        label: i18n("workspace.mediaMenu.preview"),
-        icon: Eye,
-        disabled: !current,
-        onSelect: () => setExpanded(true),
-      },
-      {
-        key: "download",
-        label: i18n("workspace.mediaMenu.download"),
-        icon: Download,
-        disabled: !current?.url,
-        onSelect: () => {
-          if (current?.url) void downloadFromUrl(current.url, current.id);
-        },
-      },
-      {
-        key: "duplicate",
-        label: i18n("workspace.mediaMenu.duplicate"),
-        icon: Copy,
-        disabled: true,
-        onSelect: () => undefined,
-      },
-      {
-        key: "move-board",
-        label: i18n("workspace.mediaMenu.moveToBoard"),
-        icon: FolderOpen,
-        separatorBefore: true,
-        disabled: true,
-        onSelect: () => undefined,
-      },
-      {
-        key: "copy-board",
-        label: i18n("workspace.mediaMenu.copyToBoard"),
-        icon: Copy,
-        disabled: true,
-        onSelect: () => undefined,
-      },
-      {
-        key: "delete",
-        label: i18n("workspace.mediaMenu.delete"),
-        icon: Trash2,
-        separatorBefore: true,
-        danger: true,
-        disabled: true,
-        onSelect: () => undefined,
-      },
-    ];
+    const contextMenuItems = buildMediaMenuItems(i18n, {
+      onPreview: current ? () => setExpanded(true) : undefined,
+      onDownload: current?.url
+        ? () => void downloadFromUrl(current.url!, current.id)
+        : undefined,
+    });
 
     return (
       <>
@@ -123,15 +80,7 @@ const NodeResultBar = memo(
                 setExpanded(true);
               }}
               onMouseDown={(e) => e.stopPropagation()}
-              onContextMenu={
-                canUseMediaMenu
-                  ? (e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setContextMenu({ x: e.clientX, y: e.clientY });
-                    }
-                  : undefined
-              }
+              onContextMenu={canUseMediaMenu ? ctxMenu.openAt : undefined}
             >
               {current.type === "image" && current.url && (
                 <img src={current.url} className="block h-auto w-full" alt="" />
@@ -197,11 +146,11 @@ const NodeResultBar = memo(
             onSelect={onSelectIndex}
           />
         )}
-        {contextMenu && (
+        {ctxMenu.position && (
           <MediaContextMenu
-            position={contextMenu}
+            position={ctxMenu.position}
             items={contextMenuItems}
-            onClose={() => setContextMenu(null)}
+            onClose={ctxMenu.close}
           />
         )}
       </>

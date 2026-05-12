@@ -422,12 +422,10 @@ const WorkspaceCanvasPage = () => {
         </div>
         {/* <WorkspaceDebugPanel /> — kept disabled until persist
          *   middleware is audited (not blocking demo). */}
-        {/* Floating page switcher — bottom-left of the canvas.
-         *  Replaced the old WorkspaceTabBar (top-row strip) so the
-         *  canvas gets a full row of vertical space back. The pill
-         *  is fixed-positioned, so its JSX order doesn't matter — we
-         *  keep it inside the error boundary so a render fault in
-         *  the popover surfaces in the same recoverable card the
+        {/* Floating page switcher — bottom-left of the canvas. The
+         *  pill is fixed-positioned, so its JSX order doesn't matter
+         *  — we keep it inside the error boundary so a render fault
+         *  in the popover surfaces in the same recoverable card the
          *  rest of the workspace uses. */}
         {hydrated && <WorkspaceCanvasPagePill />}
       </WorkspaceErrorBoundary>

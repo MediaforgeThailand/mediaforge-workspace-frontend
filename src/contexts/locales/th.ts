@@ -3029,7 +3029,7 @@ export const th = {
     "ออฟไลน์เท่านั้น (ติดตั้ง migration เพื่อเปิด cloud autosave)",
   "workspace.save.saving_short": "กำลังบันทึก",
 
-  // ─── Quick toolbar (NodeQuickToolbar) ───────────────────────────
+  // ─── Quick toolbar (NodeQuickActionRail) ───────────────────────────
   "workspace.quicktoolbar.group_selection": "จัดกลุ่ม",
   "workspace.quicktoolbar.arrange_grid": "จัดเป็นตาราง",
   "workspace.quicktoolbar.download_zip": "ดาวน์โหลดทั้งหมด ({count}) เป็น ZIP",
