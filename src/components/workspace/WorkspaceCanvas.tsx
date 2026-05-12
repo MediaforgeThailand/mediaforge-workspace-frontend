@@ -64,11 +64,10 @@ import NodePreviewLightbox, {
   getNodeDownloadable,
   type PreviewPayload,
 } from "./NodePreviewLightbox";
-// Lazy: only rendered when user crops from a node's quick action.
-// Avoids paying its bundle weight on canvas mount.
-const ImageCropTool = lazy(() =>
-  import("./ImageCropTool").then((m) => ({ default: m.ImageCropTool })),
-);
+// ImageCropTool stays eager: NodePreviewLightbox imports it eagerly,
+// so a lazy() here would still land in the main canvas chunk.
+// Follow-up: lazy inside NPL too, then flip this to lazy.
+import { ImageCropTool } from "./ImageCropTool";
 import {
   getWorkspaceSchema,
   getWsVisibleInputs,
@@ -84,11 +83,14 @@ import CanvasNodePicker, {
   type PickerOption,
 } from "./CanvasNodePicker";
 import type { ContextMenuState, ToolItem } from "./CanvasContextMenu";
-import type { MediaContextMenuItem } from "./MediaContextMenu";
-// Lazy: context menus only render on right-click. Cost-of-mount win is
-// the eager dropdown/icon-set imports inside these files.
+// Lazy: CanvasContextMenu only renders on canvas right-click. No other
+// file imports it eagerly, so Vite carves it into its own chunk.
 const CanvasContextMenu = lazy(() => import("./CanvasContextMenu"));
-const MediaContextMenu = lazy(() => import("./MediaContextMenu"));
+// MediaContextMenu stays eager: AssetNode, NodeResultBar, AssetsView,
+// and StandaloneGenerator all import it eagerly, so a lazy() here
+// would be cosmetic — it'd still land in the main canvas chunk.
+// Follow-up: lazy those sites too, then flip this to lazy.
+import MediaContextMenu, { type MediaContextMenuItem } from "./MediaContextMenu";
 import {
   Copy as CtxCopyIcon,
   Download as CtxDownloadIcon,
@@ -2704,14 +2706,13 @@ const Inner = () => {
           />
         </Suspense>
       )}
-        <Suspense fallback={null}>
-          <MediaContextMenu
-            position={nodeContextMenu.position}
-            items={nodeContextMenuItems}
-            onClose={() => setNodeContextMenu(null)}
-            ariaLabel={t("workspace.nodemenu.aria")}
-          />
-        </Suspense>
+      {nodeContextMenu && nodeContextMenuItems.length > 0 && (
+        <MediaContextMenu
+          position={nodeContextMenu.position}
+          items={nodeContextMenuItems}
+          onClose={() => setNodeContextMenu(null)}
+          ariaLabel={t("workspace.nodemenu.aria")}
+        />
       )}
       {preview && (
         <NodePreviewLightbox
@@ -2738,21 +2739,19 @@ const Inner = () => {
         />
       )}
       {quickCrop && (
-        <Suspense fallback={null}>
-          <ImageCropTool
-            src={quickCrop.src}
-            suggestedFilename={`${quickCrop.label}.png`}
-            onCancel={() => setQuickCrop(null)}
-            onCropConfirmed={async (blob, filename) => {
-              const file = new File([blob], filename, {
-                type: blob.type || "image/png",
-              });
-              await uploadTransformedFile(file);
-              setQuickCrop(null);
-              toast.success(t("workspace.crop.toast_added_canvas"));
-            }}
-          />
-        </Suspense>
+        <ImageCropTool
+          src={quickCrop.src}
+          suggestedFilename={`${quickCrop.label}.png`}
+          onCancel={() => setQuickCrop(null)}
+          onCropConfirmed={async (blob, filename) => {
+            const file = new File([blob], filename, {
+              type: blob.type || "image/png",
+            });
+            await uploadTransformedFile(file);
+            setQuickCrop(null);
+            toast.success(t("workspace.crop.toast_added_canvas"));
+          }}
+        />
       )}
       <CanvasFloatingSidebar
         onAddNode={openContextMenuAtAnchor}
