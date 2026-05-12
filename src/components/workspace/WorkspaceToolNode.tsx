@@ -16,6 +16,7 @@ import {
   type Node,
   type NodeProps,
   useEdges,
+  useNodes,
   useReactFlow,
   useUpdateNodeInternals,
 } from "@xyflow/react";
@@ -94,6 +95,7 @@ import {
   getWsVisibleParams,
   GPT_IMAGE_2_ASPECT_RATIOS,
   gptImage2ResolutionsFor,
+  isNodeMentionedAnywhere,
   isVideoFrameImageOutputHandle,
   portTypeFromHandleId,
   splitGptImageSize,
@@ -351,6 +353,14 @@ interface MentionedAsset {
   url: string | null;
   /** Asset-only: drives whether mention becomes `@Image` or `@Video`. */
   fieldType: "image" | "video" | "audio" | null;
+  /** Asset-only: browser-extracted end-frame JPEG for video sources.
+   *  Set when the user @-mentions a video node in an image-gen prompt
+   *  so the backend can substitute the JPG URL for the raw video
+   *  URL — Gemini / Banana otherwise rejects an .mp4 ref with HTTP
+   *  400 "Unable to process input image". Populated by the video
+   *  source node's frame-extraction effect; falls back to null if
+   *  the frame hasn't been captured yet. */
+  imageFrameUrl?: string | null;
   /** Asset-only: creator-picked reference role (subject/scene/style/…).
    *  Drives backend's Banana/OpenAI `[Context: …]` block. */
   role?: string;
@@ -360,6 +370,20 @@ interface MentionedAsset {
   reference_image_urls?: string[];
   frontal_image_url?: string;
   brand_element_id?: string;
+}
+
+/**
+ * Resolve a mention's image URL for image-gen consumers. Returns the
+ * raw `url` for native image mentions, or `imageFrameUrl` for video
+ * mentions that carry a browser-extracted end-frame. Returns null for
+ * anything else (audio mentions, element mentions, videos with no
+ * frame yet) so callers can short-circuit cleanly.
+ */
+function effectiveMentionImageRefUrl(m: MentionedAsset): string | null {
+  if (m.kind !== "asset") return null;
+  if (m.fieldType === "image" && typeof m.url === "string" && m.url) return m.url;
+  if (m.fieldType === "video" && typeof m.imageFrameUrl === "string" && m.imageFrameUrl) return m.imageFrameUrl;
+  return null;
 }
 
 /** Walk an ElementNode's data + canvas edges to produce the Kling Omni
@@ -453,13 +477,19 @@ function resolveMentions(
     const d = (node.data ?? {}) as any;
     if (node.type === "assetNode" || node.type === "inputNode") {
       seen.add(node.id);
+      const fieldType = d.fieldType ?? "image";
       mentioned.push({
         kind: "asset",
         role: typeof d.referenceType === "string" ? d.referenceType : "general",
         label,
         nodeId: node.id,
         url: d.previewUrl ?? d.storagePath ?? null,
-        fieldType: d.fieldType ?? "image",
+        fieldType,
+        // Uploaded videos: surface the captured end-frame JPG so the
+        // mention can target image-gen prompts. extractAndUploadVideoFrames
+        // populated d.endFrameUrl as soon as the node was selected /
+        // hovered / wired or mentioned.
+        imageFrameUrl: fieldType === "video" ? (d.endFrameUrl ?? null) : null,
       });
       return;
     }
@@ -489,7 +519,7 @@ function resolveMentions(
     // and have the brand image flow into the video model as a
     // reference frame.
     const gens = Array.isArray(d?.generations)
-      ? (d.generations as Array<{ url?: string; type?: string; model_url?: string }>)
+      ? (d.generations as Array<{ url?: string; type?: string; model_url?: string; endFrameUrl?: string }>)
       : [];
     if (gens.length > 0) {
       seen.add(node.id);
@@ -510,6 +540,13 @@ function resolveMentions(
         nodeId: node.id,
         url,
         fieldType,
+        // AI-generated videos: surface the captured end-frame JPG so
+        // an image-gen prompt mentioning this node receives a real
+        // image ref via the backend's mention fallback. Frame
+        // extraction is kicked off by the video tool node's
+        // useEffect when it sees an outgoing frame edge or detects
+        // it has been mentioned anywhere.
+        imageFrameUrl: fieldType === "video" ? (g.endFrameUrl ?? null) : null,
       });
     }
   };
@@ -1024,8 +1061,8 @@ function validateMentionedImageRefsForTarget(args: {
   mentioned: MentionedAsset[];
 }): string | null {
   const mentionedUrls = args.mentioned
-    .filter((m) => m.kind === "asset" && m.fieldType === "image" && typeof m.url === "string" && m.url)
-    .map((m) => m.url as string);
+    .map((m) => effectiveMentionImageRefUrl(m))
+    .filter((u): u is string => u !== null);
   if (mentionedUrls.length === 0) return null;
 
   const capability = imageMentionLimitForTarget(
@@ -1232,6 +1269,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
    * browser, upload as JPEGs, and stash the signed URLs back onto the
    * current generation object so `resolveInputs` can hand them to
    * downstream nodes. */
+  const allNodesForMentionScan = useNodes();
   const frameExtractionInFlightFor = useRef<string | null>(null);
   useEffect(() => {
     const d = data as NodeData | undefined;
@@ -1247,7 +1285,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       (edge) =>
         edge.source === id && isVideoFrameImageOutputHandle(edge.sourceHandle),
     );
-    if (!hasFrameEdge) return;
+    // Also extract when this video gen is referenced via a chip in any
+    // other node's prompt — the mention path needs the JPG just as
+    // much as a wired frame port does.
+    const isMentionedAnywhere = isNodeMentionedAnywhere(id, allNodesForMentionScan);
+    if (!hasFrameEdge && !isMentionedAnywhere) return;
     if (frameExtractionInFlightFor.current === gen.id) return;
     frameExtractionInFlightFor.current = gen.id;
 
@@ -1283,7 +1325,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     return () => {
       cancelled = true;
     };
-  }, [data, edges, id, setNodes]);
+  }, [allNodesForMentionScan, data, edges, id, setNodes]);
 
   /* ── Publish preview height as `--ws-preview-h` ──
    *
@@ -1573,21 +1615,27 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       }
 
       // Merge mention-resolved URLs into inputs as a fallback ref_image
-      // (only for asset/image — so the backend can pick a primary
-      // reference if no explicit ref_image edge is connected). Element
-      // mentions don't enter this fallback path; they go straight into
-      // `body.elements[]` server-side.
-      const mentionedImage = mentioned.find(
-        (m) => m.kind === "asset" && m.fieldType === "image" && m.url,
-      );
-      if (mentionedImage) {
+      // (asset/image AND asset/video-with-extracted-frame — so the
+      // backend can pick a primary reference if no explicit ref_image
+      // edge is connected). Element mentions don't enter this
+      // fallback path; they go straight into `body.elements[]`
+      // server-side.
+      let mentionedImageRefUrl: string | null = null;
+      for (const m of mentioned) {
+        const u = effectiveMentionImageRefUrl(m);
+        if (u) {
+          mentionedImageRefUrl = u;
+          break;
+        }
+      }
+      if (mentionedImageRefUrl) {
         if (schemaKey === "videoGenNode" && isSeedanceV2VideoModel(selectedModel)) {
           const alreadyInKeyframeMode = Boolean(inputs.start_frame || inputs.end_frame);
           if (!alreadyInKeyframeMode && !inputs.reference_image) {
-            inputs.reference_image = mentionedImage.url;
+            inputs.reference_image = mentionedImageRefUrl;
           }
         } else if (!inputs.ref_image) {
-          inputs.ref_image = mentionedImage.url;
+          inputs.ref_image = mentionedImageRefUrl;
         }
       }
 

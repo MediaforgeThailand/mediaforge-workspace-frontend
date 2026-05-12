@@ -1339,6 +1339,31 @@ export function isVideoFrameImageOutputHandle(
   return typeof id === "string" && VIDEO_FRAME_IMAGE_OUTPUT_HANDLES.has(id as VideoFrameImageOutputHandle);
 }
 
+/**
+ * Does any node on the canvas reference `nodeId` via an
+ * `@[Label](nodeId)` mention chip in its prompt or text content?
+ *
+ * Used by video-source nodes (uploaded AssetNode, AI-gen Video Gen
+ * node) to decide whether to eagerly capture start/end frames — a
+ * mention in a downstream image-gen prompt needs the JPG even when
+ * there is no direct wire from a frame port.
+ */
+export function isNodeMentionedAnywhere(
+  nodeId: string,
+  nodes: ReadonlyArray<{ data?: unknown }>,
+): boolean {
+  if (!nodeId) return false;
+  const escaped = nodeId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`@\\[[^\\]]+\\]\\(${escaped}\\)`);
+  for (const n of nodes) {
+    const d = (n.data ?? {}) as { content?: unknown; params?: { prompt?: unknown } };
+    if (typeof d.content === "string" && re.test(d.content)) return true;
+    const prompt = d.params && typeof d.params.prompt === "string" ? d.params.prompt : "";
+    if (prompt && re.test(prompt)) return true;
+  }
+  return false;
+}
+
 const TEXT_HANDLE_IDS = new Set([
   "text",
   "context",

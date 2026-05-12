@@ -10,7 +10,7 @@
  */
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { type NodeProps, useEdges, useReactFlow } from "@xyflow/react";
+import { type NodeProps, useEdges, useNodes, useReactFlow } from "@xyflow/react";
 import {
   Image as ImageIcon,
   Film,
@@ -33,7 +33,10 @@ import MediaContextMenu, {
 } from "./MediaContextMenu";
 import NodeQuickActionRail from "./NodeQuickActionRail";
 import { supabase } from "@/integrations/supabase/client";
-import { isVideoFrameImageOutputHandle } from "./workspaceSchema";
+import {
+  isNodeMentionedAnywhere,
+  isVideoFrameImageOutputHandle,
+} from "./workspaceSchema";
 import {
   captureVideoFrameBlob,
   safeStorageSegment,
@@ -99,6 +102,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
   const d = data as unknown as AssetNodeData;
   const { setNodes, getNode } = useReactFlow();
   const edges = useEdges();
+  const allNodes = useNodes();
   const { t, t: i18n } = useLanguage();
   const [isHovered, setIsHovered] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -145,8 +149,19 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
       ),
     [edges, id],
   );
+  // True when any other node's prompt / text content carries an
+  // `@[Label](thisId)` chip — covers the case where the user typed
+  // `@VideoFile` into an image-gen prompt without dragging a wire
+  // from the frame port. Without this signal the asset would never
+  // capture frames, and the mention's imageFrameUrl payload would
+  // stay null.
+  const isMentionedAnywhere = useMemo(
+    () => isNodeMentionedAnywhere(id, allNodes),
+    [allNodes, id],
+  );
   const shouldPrepareVideoFrames =
-    d.fieldType === "video" && (selected || isHovered || hasVideoFrameOutputEdge);
+    d.fieldType === "video" &&
+    (selected || isHovered || hasVideoFrameOutputEdge || isMentionedAnywhere);
 
   useEffect(() => {
     if (!shouldPrepareVideoFrames) return;
