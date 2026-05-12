@@ -210,7 +210,12 @@ export function MiniSelect({
             <SelectItem
               key={opt}
               value={opt}
-              className="text-[12.5px] text-popover-foreground focus:bg-accent focus:text-accent-foreground"
+              /* 11px matches the trigger pill's font-size — see
+               *  `.ws-mini-select-trigger` in workspace.css. The
+               *  user reported that dropdown items rendered larger
+               *  than the trigger that opened them, so the menu and
+               *  its button looked like two different controls. */
+              className="text-[11px] text-popover-foreground focus:bg-accent focus:text-accent-foreground"
             >
               {labelOf(opt)}
             </SelectItem>
@@ -277,11 +282,15 @@ function SearchableMiniSelect({
               <Search className="mr-2 h-3.5 w-3.5 shrink-0 opacity-50" />
               <CommandPrimitive.Input
                 placeholder={i18n("common.search")}
-                className="h-8 w-full border-0 bg-transparent px-0 py-0 text-[13px] outline-none placeholder:text-muted-foreground"
+                /* 11px matches the trigger + the other dropdown
+                 *  items in the same popover; keeping the search
+                 *  input at 13px made the "search row" look like
+                 *  a different control type than the rows under it. */
+                className="h-8 w-full border-0 bg-transparent px-0 py-0 text-[11px] outline-none placeholder:text-muted-foreground"
               />
             </div>
             <CommandList className="ws-picker-scroll max-h-[260px]">
-              <CommandEmpty className="py-4 text-center text-[12.5px] text-muted-foreground">
+              <CommandEmpty className="py-4 text-center text-[11px] text-muted-foreground">
                 {i18n("workspace.params.noResults")}
               </CommandEmpty>
               {options.map((opt) => {
@@ -295,8 +304,12 @@ function SearchableMiniSelect({
                       onChange(opt);
                       setOpen(false);
                     }}
+                    /* 11px matches `.ws-mini-select-trigger` —
+                     *  see workspace.css. User complained the
+                     *  popover items rendered visibly larger than
+                     *  the pill button that opened them. */
                     className={cn(
-                      "mx-1 my-px cursor-pointer rounded-md px-2 py-1.5 text-[12.5px] aria-selected:bg-accent",
+                      "mx-1 my-px cursor-pointer rounded-md px-2 py-1.5 text-[11px] aria-selected:bg-accent",
                       opt === value && "bg-accent/40 font-medium",
                       action && "pr-1",
                     )}
