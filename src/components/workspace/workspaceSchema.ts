@@ -1322,11 +1322,15 @@ export function textNodeVideoOutputNodeId(id: string | null | undefined): string
   return String(id).slice(TEXT_NODE_VIDEO_OUTPUT_HANDLE_PREFIX.length) || null;
 }
 
-export type VideoFrameImageOutputHandle = "output_start_frame" | "output_end_frame";
+export type VideoFrameImageOutputHandle =
+  | "output_start_frame"
+  | "output_end_frame"
+  | "output_last_frame";
 
 export const VIDEO_FRAME_IMAGE_OUTPUT_HANDLES = new Set<VideoFrameImageOutputHandle>([
   "output_start_frame",
   "output_end_frame",
+  "output_last_frame",
 ]);
 
 export function isVideoFrameImageOutputHandle(

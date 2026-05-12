@@ -27,6 +27,14 @@ export interface Generation {
    *  the preview can render <model-viewer> instead of the rendered
    *  image. `url` still holds the rendered preview thumbnail. */
   model_url?: string;
+  /** JPEG snapshots of the first and last visible frames, lazily
+   *  extracted in the browser when a video gen output is wired into
+   *  an image-shaped target handle. Lets downstream image models
+   *  (Banana, OpenAI) receive a real image URL instead of the raw
+   *  video URL — the latter trips a 400 "Unable to process input
+   *  image" at Gemini. */
+  startFrameUrl?: string;
+  endFrameUrl?: string;
   createdAt: number;
 }
 

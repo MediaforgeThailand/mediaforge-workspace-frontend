@@ -101,6 +101,10 @@ import {
   textNodeVideoOutputNodeId,
 } from "./workspaceSchema";
 import { cleanModelLabelMap } from "./modelDisplay";
+import {
+  extractAndUploadVideoFrames,
+  safeStorageSegment,
+} from "./videoFrameExtraction";
 
 const RUN_EDGE_FUNCTION = "workspace-run-node";
 const DEFAULT_WORKSPACE_INFRASTRUCTURE_BUFFER_PERCENT = 40;
@@ -923,13 +927,35 @@ function resolveInputs(nodeId: string): {
       const generations = srcData.generations as Array<{
         url?: string;
         text?: string;
+        type?: string;
+        startFrameUrl?: string;
+        endFrameUrl?: string;
       }>;
       const idx =
         typeof srcData.selectedGenIndex === "number"
           ? (srcData.selectedGenIndex as number)
           : 0;
       const gen = generations[idx] ?? generations[0];
-      pushAt(key, gen?.url ?? gen?.text ?? null);
+      // Frame-handle wires (output_start_frame / output_end_frame /
+      // output_last_frame) on a video gen need the extracted JPEG, not
+      // the raw video URL — otherwise downstream image models (Banana,
+      // OpenAI) reject the request with "Unable to process input
+      // image". Frames are populated by the useEffect inside
+      // WorkspaceToolNode when an outgoing frame edge is present.
+      if (gen?.type === "video" && isVideoFrameImageOutputHandle(e.sourceHandle)) {
+        const frameUrl =
+          e.sourceHandle === "output_start_frame"
+            ? gen.startFrameUrl
+            : gen.endFrameUrl;
+        if (!frameUrl) {
+          throw new Error(
+            "Video frame image is still preparing. Wait a moment and click Run again.",
+          );
+        }
+        pushAt(key, frameUrl);
+      } else {
+        pushAt(key, gen?.url ?? gen?.text ?? null);
+      }
     }
   }
   return { inputs: out, textMentioned };
@@ -1195,6 +1221,69 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     ro.observe(target);
     return () => ro.disconnect();
   }, [selected, isHovered]);
+
+  /* ── Extract start/end frame JPEGs for video gens ──
+   * Mirror of AssetNode's pattern (for uploaded videos), generalized
+   * to AI-generated video tool nodes. When the user wires this node's
+   * `output_start_frame` / `output_end_frame` / `output_last_frame`
+   * port into a downstream image input, the wire must carry a real
+   * image URL — the raw video URL trips a 400 "Unable to process
+   * input image" at Gemini / Banana. We capture the frames in the
+   * browser, upload as JPEGs, and stash the signed URLs back onto the
+   * current generation object so `resolveInputs` can hand them to
+   * downstream nodes. */
+  const frameExtractionInFlightFor = useRef<string | null>(null);
+  useEffect(() => {
+    const d = data as NodeData | undefined;
+    const generations = d?.generations;
+    if (!Array.isArray(generations) || generations.length === 0) return;
+    const idx =
+      typeof d?.selectedGenIndex === "number" ? d.selectedGenIndex : 0;
+    const gen = generations[idx] ?? generations[0];
+    if (!gen || gen.type !== "video" || !gen.url || !gen.id) return;
+    if (gen.startFrameUrl && gen.endFrameUrl) return;
+
+    const hasFrameEdge = edges.some(
+      (edge) =>
+        edge.source === id && isVideoFrameImageOutputHandle(edge.sourceHandle),
+    );
+    if (!hasFrameEdge) return;
+    if (frameExtractionInFlightFor.current === gen.id) return;
+    frameExtractionInFlightFor.current = gen.id;
+
+    let cancelled = false;
+    (async () => {
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData.user?.id;
+      if (!userId) throw new Error("Login required before extracting video frames");
+      const basePath = `${userId}/video-frames/${safeStorageSegment(id)}/${safeStorageSegment(gen.id)}`;
+      const frames = await extractAndUploadVideoFrames(gen.url!, basePath);
+      if (cancelled) return;
+      setNodes((nodes) =>
+        nodes.map((node) => {
+          if (node.id !== id) return node;
+          const nd = node.data as NodeData;
+          const gens = nd.generations ?? [];
+          const patched = gens.map((g) =>
+            g.id === gen.id ? { ...g, ...frames } : g,
+          );
+          return { ...node, data: { ...nd, generations: patched } };
+        }),
+      );
+    })()
+      .catch((err) => {
+        console.error("[workspace-tool-node] frame extraction failed", err);
+      })
+      .finally(() => {
+        if (frameExtractionInFlightFor.current === gen.id) {
+          frameExtractionInFlightFor.current = null;
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [data, edges, id, setNodes]);
 
   /* ── Publish preview height as `--ws-preview-h` ──
    *
