@@ -11,7 +11,7 @@
  * `data.generations` is populated — there's no shared HOC anymore.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ConnectionLineType,
   ReactFlow,
@@ -64,7 +64,11 @@ import NodePreviewLightbox, {
   getNodeDownloadable,
   type PreviewPayload,
 } from "./NodePreviewLightbox";
-import { ImageCropTool } from "./ImageCropTool";
+// Lazy: only rendered when user crops from a node's quick action.
+// Avoids paying its bundle weight on canvas mount.
+const ImageCropTool = lazy(() =>
+  import("./ImageCropTool").then((m) => ({ default: m.ImageCropTool })),
+);
 import {
   getWorkspaceSchema,
   getWsVisibleInputs,
@@ -79,13 +83,12 @@ import CanvasNodePicker, {
   type CanvasNodePickerState,
   type PickerOption,
 } from "./CanvasNodePicker";
-import CanvasContextMenu, {
-  type ContextMenuState,
-  type ToolItem,
-} from "./CanvasContextMenu";
-import MediaContextMenu, {
-  type MediaContextMenuItem,
-} from "./MediaContextMenu";
+import type { ContextMenuState, ToolItem } from "./CanvasContextMenu";
+import type { MediaContextMenuItem } from "./MediaContextMenu";
+// Lazy: context menus only render on right-click. Cost-of-mount win is
+// the eager dropdown/icon-set imports inside these files.
+const CanvasContextMenu = lazy(() => import("./CanvasContextMenu"));
+const MediaContextMenu = lazy(() => import("./MediaContextMenu"));
 import {
   Copy as CtxCopyIcon,
   Download as CtxDownloadIcon,
@@ -103,10 +106,12 @@ import {
 } from "./videoAudioActions";
 import { bundleNodesAsZip, harvestAssetsFromNode } from "./bundleNodes";
 import CanvasFloatingSidebar from "./CanvasFloatingSidebar";
-import ShortcutsDialog from "./ShortcutsDialog";
+// Lazy: dialog only opens via keyboard shortcut or settings button.
+const ShortcutsDialog = lazy(() => import("./ShortcutsDialog"));
 // VoicePickerDialog was removed when the hardcoded preset voice
 // lists were deleted. The canvas no longer hosts a voice picker —
 // audio nodes use the backend's per-provider default voice.
+import { useCanvasJobsRecovery } from "@/store/useCanvasJobsRecovery";
 import { useCanvasToolStore } from "./useCanvasToolStore";
 import { useWorkspaceShortcuts } from "./useWorkspaceShortcuts";
 import { useCanvasAutosave } from "./useCanvasAutosave";
@@ -743,6 +748,18 @@ const Inner = () => {
   }, [saveState]);
 
   const canvasId = useWorkspaceStore((s) => s.current?.id);
+  const canvasWorkspaceId = useWorkspaceStore((s) => s.current?.workspaceId);
+
+  // Batched canvas-wide load of completed jobs for orphan recovery.
+  // Replaces the per-WorkspaceToolNode select that fired N times on
+  // mount; tool nodes now read their slice from useCanvasJobsRecovery.
+  useEffect(() => {
+    if (!canvasId || !canvasWorkspaceId) return;
+    void useCanvasJobsRecovery
+      .getState()
+      .loadForCanvas(canvasId, canvasWorkspaceId);
+  }, [canvasId, canvasWorkspaceId]);
+
   // STABLE_EMPTY_* — see comment near the top of this file. Returning a
   // fresh `[]` literal each call would loop the store-snapshot check.
   const nodes = useWorkspaceStore((s) => (s.current?.nodes as Node[] | undefined) ?? STABLE_EMPTY_NODES);
@@ -2671,21 +2688,30 @@ const Inner = () => {
           onClose={() => setPicker(null)}
         />
       )}
+      {/* Per-surface Suspense boundaries — one shared boundary would
+       *  suspend ALL four whenever any single chunk is in flight,
+       *  visibly delaying unrelated UI (open shortcuts ⇒ context
+       *  menu also goes blank). Each gets its own. Null fallback is
+       *  right for modal/menu surfaces where a transient empty frame
+       *  is invisible (vs. a spinner that would flash). */}
       {contextMenu && (
-        <CanvasContextMenu
-          state={contextMenu}
-          onPick={onContextMenuPick}
-          onAction={onContextMenuAction}
-          onClose={() => setContextMenu(null)}
-        />
+        <Suspense fallback={null}>
+          <CanvasContextMenu
+            state={contextMenu}
+            onPick={onContextMenuPick}
+            onAction={onContextMenuAction}
+            onClose={() => setContextMenu(null)}
+          />
+        </Suspense>
       )}
-      {nodeContextMenu && nodeContextMenuItems.length > 0 && (
-        <MediaContextMenu
-          position={nodeContextMenu.position}
-          items={nodeContextMenuItems}
-          onClose={() => setNodeContextMenu(null)}
-          ariaLabel={t("workspace.nodemenu.aria")}
-        />
+        <Suspense fallback={null}>
+          <MediaContextMenu
+            position={nodeContextMenu.position}
+            items={nodeContextMenuItems}
+            onClose={() => setNodeContextMenu(null)}
+            ariaLabel={t("workspace.nodemenu.aria")}
+          />
+        </Suspense>
       )}
       {preview && (
         <NodePreviewLightbox
@@ -2712,28 +2738,34 @@ const Inner = () => {
         />
       )}
       {quickCrop && (
-        <ImageCropTool
-          src={quickCrop.src}
-          suggestedFilename={`${quickCrop.label}.png`}
-          onCancel={() => setQuickCrop(null)}
-          onCropConfirmed={async (blob, filename) => {
-            const file = new File([blob], filename, {
-              type: blob.type || "image/png",
-            });
-            await uploadTransformedFile(file);
-            setQuickCrop(null);
-            toast.success(t("workspace.crop.toast_added_canvas"));
-          }}
-        />
+        <Suspense fallback={null}>
+          <ImageCropTool
+            src={quickCrop.src}
+            suggestedFilename={`${quickCrop.label}.png`}
+            onCancel={() => setQuickCrop(null)}
+            onCropConfirmed={async (blob, filename) => {
+              const file = new File([blob], filename, {
+                type: blob.type || "image/png",
+              });
+              await uploadTransformedFile(file);
+              setQuickCrop(null);
+              toast.success(t("workspace.crop.toast_added_canvas"));
+            }}
+          />
+        </Suspense>
       )}
       <CanvasFloatingSidebar
         onAddNode={openContextMenuAtAnchor}
         onOpenSettings={() => setSettingsOpen(true)}
       />
-      <ShortcutsDialog
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-      />
+      {settingsOpen && (
+        <Suspense fallback={null}>
+          <ShortcutsDialog
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+          />
+        </Suspense>
+      )}
       {/* VoicePickerDialog render removed — the dialog and its
        *  hardcoded preset catalog are gone. */}
     </div>
