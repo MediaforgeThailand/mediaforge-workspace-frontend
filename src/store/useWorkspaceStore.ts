@@ -275,6 +275,10 @@ interface WorkspaceState {
   setChatStreaming: (v: boolean) => void;
   /** Clear conversation (e.g. "New chat" button). */
   clearChat: () => void;
+  /** Clear every user-scoped workspace datum from memory. Auth code calls
+   * this when there is no real Supabase session so stale local snapshots
+   * from a previous user cannot appear on the public workspace surface. */
+  resetWorkspaceState: () => void;
 
   // React Flow handlers
   onNodesChange: (changes: NodeChange[]) => void;
@@ -1477,6 +1481,22 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       setChatStreaming: (v) => set({ chatIsStreaming: v }),
 
       clearChat: () => set({ chatMessages: [], chatIsStreaming: false }),
+
+      resetWorkspaceState: () =>
+        set({
+          projects: [],
+          activeProjectId: null,
+          workspaces: [],
+          canvases: [],
+          graphs: {},
+          current: null,
+          selectedNodeId: null,
+          deletedWorkspaceIds: {},
+          history: [],
+          redoStack: [],
+          chatMessages: [],
+          chatIsStreaming: false,
+        }),
 
       onNodesChange: (changes) =>
         set((s) => {

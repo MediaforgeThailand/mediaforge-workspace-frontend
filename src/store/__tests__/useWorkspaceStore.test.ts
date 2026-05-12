@@ -30,6 +30,35 @@ beforeEach(() => {
 });
 
 describe("createWorkspace — initial state", () => {
+  it("resetWorkspaceState clears persisted user-scoped workspace data", () => {
+    const store = useWorkspaceStore.getState();
+    store.createWorkspace("Should disappear");
+    useWorkspaceStore.setState({
+      selectedNodeId: "node-1",
+      deletedWorkspaceIds: { old: Date.now() },
+      history: [{ nodes: [], edges: [] }],
+      redoStack: [{ nodes: [], edges: [] }],
+      chatMessages: [{ id: "m1", role: "user", content: "hi", createdAt: 1 }],
+      chatIsStreaming: true,
+    });
+
+    useWorkspaceStore.getState().resetWorkspaceState();
+
+    const s = useWorkspaceStore.getState();
+    expect(s.projects).toEqual([]);
+    expect(s.activeProjectId).toBeNull();
+    expect(s.workspaces).toEqual([]);
+    expect(s.canvases).toEqual([]);
+    expect(s.graphs).toEqual({});
+    expect(s.current).toBeNull();
+    expect(s.selectedNodeId).toBeNull();
+    expect(s.deletedWorkspaceIds).toEqual({});
+    expect(s.history).toEqual([]);
+    expect(s.redoStack).toEqual([]);
+    expect(s.chatMessages).toEqual([]);
+    expect(s.chatIsStreaming).toBe(false);
+  });
+
   it("creates a workspace with one default Page 1 canvas", () => {
     const { workspaceId, canvasId } = useWorkspaceStore
       .getState()

@@ -570,6 +570,16 @@ const WorkspaceDashboardInner = () => {
   const mergeServerWorkspaces = useWorkspaceStore(
     (s) => s.mergeServerWorkspaces,
   );
+  const isSignedIn = Boolean(user?.id);
+  const visibleProjects = useMemo(
+    () => (isSignedIn ? projects : []),
+    [isSignedIn, projects],
+  );
+  const visibleWorkspaces = useMemo(
+    () => (isSignedIn ? workspaces : []),
+    [isSignedIn, workspaces],
+  );
+  const visibleActiveProjectId = isSignedIn ? activeProjectId : null;
 
   useEducationPresence({
     enabled: !authLoading && Boolean(user?.id),
@@ -582,25 +592,25 @@ const WorkspaceDashboardInner = () => {
 
   const standaloneProjects = useMemo<StandaloneProjectOption[]>(
     () =>
-      [...projects]
+      [...visibleProjects]
         .sort((a, b) => b.updatedAt - a.updatedAt)
         .map((project) => ({
           id: project.id,
           name: project.name,
           updatedAt: project.updatedAt,
         })),
-    [projects],
+    [visibleProjects],
   );
   const projectIdsWithSpaces = useMemo(() => {
-    const knownProjectIds = new Set(projects.map((project) => project.id));
+    const knownProjectIds = new Set(visibleProjects.map((project) => project.id));
     const ids = new Set<string>();
-    for (const workspace of workspaces) {
+    for (const workspace of visibleWorkspaces) {
       if (workspace.projectId && knownProjectIds.has(workspace.projectId)) {
         ids.add(workspace.projectId);
       }
     }
     return ids;
-  }, [projects, workspaces]);
+  }, [visibleProjects, visibleWorkspaces]);
 
   const standaloneSyncRef = useRef<string | null>(null);
   useEffect(() => {
@@ -724,6 +734,11 @@ const WorkspaceDashboardInner = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const handleCreateProject = () => {
+    if (!user?.id) {
+      toast.error(t("workspace.toast.sign_in_first"));
+      navigate("/auth");
+      return;
+    }
     if (educationLockedStudent) {
       toast.error(i18n("workspace.education.studentLockedToast"));
       setSection("spaces");
@@ -802,10 +817,10 @@ const WorkspaceDashboardInner = () => {
         <WorkspaceSidebar
           active={section}
           onNavigate={setSection}
-          onCreate={handleCreateProject}
-          projects={projects}
-          activeProjectId={activeProjectId}
-          onSelectProject={setActiveProject}
+          onCreate={isSignedIn ? handleCreateProject : undefined}
+          projects={visibleProjects}
+          activeProjectId={visibleActiveProjectId}
+          onSelectProject={isSignedIn ? setActiveProject : undefined}
         />
       </div>
 
@@ -825,10 +840,10 @@ const WorkspaceDashboardInner = () => {
           <div className="relative z-10 h-full w-[228px] max-w-[84vw]">
             <WorkspaceSidebar
               active={section}
-              onCreate={handleCreateProject}
-              projects={projects}
-              activeProjectId={activeProjectId}
-              onSelectProject={setActiveProject}
+              onCreate={isSignedIn ? handleCreateProject : undefined}
+              projects={visibleProjects}
+              activeProjectId={visibleActiveProjectId}
+              onSelectProject={isSignedIn ? setActiveProject : undefined}
               onNavigate={(next) => {
                 setSection(next);
                 setMobileSidebarOpen(false);
@@ -849,8 +864,8 @@ const WorkspaceDashboardInner = () => {
         {section === "home" && (
           <HomeView
             onSection={setSection}
-            projects={projects}
-            activeProjectId={activeProjectId}
+            projects={visibleProjects}
+            activeProjectId={visibleActiveProjectId}
             onSelectProject={setActiveProject}
             onCreateProject={handleCreateProject}
             onDeleteProject={handleDeleteProject}
@@ -863,8 +878,8 @@ const WorkspaceDashboardInner = () => {
             <EducationLockedToolView onOpenSpaces={() => setSection("spaces")} onOpenSidebar={() => setMobileSidebarOpen(true)} />
           ) : (
             <ProjectsManagerView
-              projects={projects}
-              activeProjectId={activeProjectId}
+              projects={visibleProjects}
+              activeProjectId={visibleActiveProjectId}
               onSelectProject={setActiveProject}
               onCreateProject={handleCreateProject}
               onDeleteProject={handleDeleteProject}
@@ -874,8 +889,8 @@ const WorkspaceDashboardInner = () => {
         )}
         {section === "spaces" && (
           <SpacesView
-            activeProjectId={activeProjectId}
-            projects={projects}
+            activeProjectId={visibleActiveProjectId}
+            projects={visibleProjects}
             onSelectProject={setActiveProject}
             onCreateProject={handleCreateProject}
             onOpenSidebar={() => setMobileSidebarOpen(true)}
@@ -897,7 +912,7 @@ const WorkspaceDashboardInner = () => {
               onToolChange={(next) => setSection(next)}
               onOpenSidebar={() => setMobileSidebarOpen(true)}
               projects={standaloneProjects}
-              activeProjectId={activeProjectId}
+              activeProjectId={visibleActiveProjectId}
               onSelectProject={setActiveProject}
               onCreateProject={handleCreateProject}
               onDeleteProject={handleDeleteProject}
@@ -929,7 +944,7 @@ const WorkspaceDashboardInner = () => {
         onOpenChange={setCreateDialogOpen}
         defaultColor={
           PROJECT_COLOR_SWATCHES[
-            projects.length % PROJECT_COLOR_SWATCHES.length
+            visibleProjects.length % PROJECT_COLOR_SWATCHES.length
           ]
         }
         onCreate={handleConfirmCreateProject}
@@ -1242,7 +1257,7 @@ const HomeFeatureShowcase = ({ onSection }: { onSection: (section: Section) => v
               onMouseEnter={() => setActiveId(item.id)}
               onFocus={() => setActiveId(item.id)}
               className={cn(
-                "group relative h-[148px] overflow-visible rounded-[22px] border border-transparent p-0 text-left transition duration-300 ease-out sm:h-[172px] xl:h-[158px]",
+                "group relative h-[192px] overflow-visible rounded-[22px] border border-transparent p-0 text-left transition duration-300 ease-out sm:h-[224px] xl:h-[205px]",
                 isActive
                   ? "z-10"
                   : "hover:z-10",
@@ -1250,7 +1265,7 @@ const HomeFeatureShowcase = ({ onSection }: { onSection: (section: Section) => v
             >
               <span
                 className={cn(
-                  "absolute bottom-0 left-1/2 h-[76px] w-[78%] -translate-x-1/2 rounded-[22px] border border-white/10 bg-gradient-to-br opacity-70 transition duration-300 group-hover:border-[#eeff15]/50 group-focus-visible:border-[#eeff15]/50 sm:h-[90px] sm:w-[74%] xl:h-[78px] xl:w-[72%]",
+                  "absolute bottom-0 left-1/2 h-[99px] w-[78%] -translate-x-1/2 rounded-[22px] border border-white/10 bg-gradient-to-br opacity-70 transition duration-300 group-hover:border-[#eeff15]/50 group-focus-visible:border-[#eeff15]/50 sm:h-[117px] sm:w-[74%] xl:h-[101px] xl:w-[72%]",
                   item.tint,
                 )}
               />
@@ -1258,13 +1273,15 @@ const HomeFeatureShowcase = ({ onSection }: { onSection: (section: Section) => v
                 src={item.tileImage}
                 alt=""
                 className={cn(
-                  "absolute left-1/2 bottom-[24px] h-[100px] w-[88%] -translate-x-1/2 rounded-[14px] object-contain object-center drop-shadow-[0_18px_22px_rgba(0,0,0,0.48)] transition duration-300 ease-out sm:h-[120px] sm:w-[84%] xl:h-[106px] xl:w-[82%]",
-                  isActive ? "scale-[2]" : "scale-[1.86] group-hover:scale-[2] group-focus-visible:scale-[2]",
+                  "absolute left-1/2 bottom-[30px] h-[130px] w-[88%] -translate-x-1/2 rounded-[14px] object-contain object-center drop-shadow-[0_18px_22px_rgba(0,0,0,0.48)] transition duration-300 ease-out sm:h-[156px] sm:w-[84%] xl:h-[138px] xl:w-[82%]",
+                  isActive
+                    ? "scale-[2.35] group-hover:scale-[2.8] group-focus-visible:scale-[2.8]"
+                    : "scale-[2] group-hover:scale-[2.8] group-focus-visible:scale-[2.8]",
                 )}
                 loading="lazy"
                 decoding="async"
               />
-              <span className="pointer-events-none absolute bottom-0 left-1/2 h-[56px] w-[78%] -translate-x-1/2 rounded-b-[22px] bg-gradient-to-t from-black/72 via-black/24 to-transparent sm:w-[74%] xl:w-[72%]" />
+              <span className="pointer-events-none absolute bottom-0 left-1/2 h-[73px] w-[78%] -translate-x-1/2 rounded-b-[22px] bg-gradient-to-t from-black/72 via-black/24 to-transparent sm:w-[74%] xl:w-[72%]" />
               <span className="absolute inset-x-3 bottom-2.5 text-center text-[15px] font-semibold leading-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.62)] sm:text-[17px] xl:text-[14px]">
                 {item.title}
               </span>

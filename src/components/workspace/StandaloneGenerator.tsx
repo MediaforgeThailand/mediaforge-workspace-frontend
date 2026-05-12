@@ -2354,6 +2354,7 @@ export default function StandaloneGenerator({
         onOpenSidebar={onOpenSidebar}
         projects={projects}
         activeProject={activeProject}
+        showProjectPicker={Boolean(user?.id)}
         onSelectProject={onSelectProject}
         onCreateProject={onCreateProject}
         onDeleteProject={onDeleteProject}
@@ -2361,6 +2362,7 @@ export default function StandaloneGenerator({
       <DesktopTopBar
         projects={projects}
         activeProject={activeProject}
+        showProjectPicker={Boolean(user?.id)}
         onSelectProject={onSelectProject}
         onCreateProject={onCreateProject}
         onDeleteProject={onDeleteProject}
@@ -2808,6 +2810,7 @@ function MobileHeader({
   onOpenSidebar,
   projects,
   activeProject,
+  showProjectPicker,
   onSelectProject,
   onCreateProject,
   onDeleteProject,
@@ -2817,6 +2820,7 @@ function MobileHeader({
   onOpenSidebar: () => void;
   projects: StandaloneProjectOption[];
   activeProject: StandaloneProjectOption | null;
+  showProjectPicker: boolean;
   onSelectProject: (projectId: string) => void;
   onCreateProject: () => void;
   onDeleteProject?: (projectId: string) => void;
@@ -2834,14 +2838,18 @@ function MobileHeader({
         >
           <Menu className="h-4 w-4" />
         </button>
-        <ProjectPicker
-          projects={projects}
-          activeProject={activeProject}
-          onSelectProject={onSelectProject}
-          onCreateProject={onCreateProject}
-          onDeleteProject={onDeleteProject}
-          compact
-        />
+        {showProjectPicker ? (
+          <ProjectPicker
+            projects={projects}
+            activeProject={activeProject}
+            onSelectProject={onSelectProject}
+            onCreateProject={onCreateProject}
+            onDeleteProject={onDeleteProject}
+            compact
+          />
+        ) : (
+          <div className="h-8 min-w-[32px]" aria-hidden />
+        )}
         <UserMenu />
       </div>
       <div className="mx-auto max-w-[390px]">
@@ -2858,25 +2866,31 @@ function MobileHeader({
 function DesktopTopBar({
   projects,
   activeProject,
+  showProjectPicker,
   onSelectProject,
   onCreateProject,
   onDeleteProject,
 }: {
   projects: StandaloneProjectOption[];
   activeProject: StandaloneProjectOption | null;
+  showProjectPicker: boolean;
   onSelectProject: (projectId: string) => void;
   onCreateProject: () => void;
   onDeleteProject?: (projectId: string) => void;
 }) {
   return (
     <div className="hidden h-[66px] shrink-0 items-center justify-between bg-[var(--bg-app)] px-5 lg:flex">
-      <ProjectPicker
-        projects={projects}
-        activeProject={activeProject}
-        onSelectProject={onSelectProject}
-        onCreateProject={onCreateProject}
-        onDeleteProject={onDeleteProject}
-      />
+      {showProjectPicker ? (
+        <ProjectPicker
+          projects={projects}
+          activeProject={activeProject}
+          onSelectProject={onSelectProject}
+          onCreateProject={onCreateProject}
+          onDeleteProject={onDeleteProject}
+        />
+      ) : (
+        <div aria-hidden />
+      )}
       <UserMenu />
     </div>
   );
@@ -4168,7 +4182,7 @@ function VoiceSettingsControls({
             </div>
           )}
           {elevenVoices && elevenVoices.length > 0 && (
-            <div className="standalone-voice-controls ws-scroll-hide mt-2 grid max-h-[224px] grid-cols-2 gap-[6px] overflow-y-auto pr-0.5">
+            <div className="standalone-voice-controls ws-scroll-hide mt-[6px] grid max-h-[184px] grid-cols-2 gap-[5px] overflow-y-auto pr-0.5">
               {elevenVoices.map((voice) => {
                 const active = voice.id === form.voice;
                 return (
@@ -4177,7 +4191,7 @@ function VoiceSettingsControls({
                     type="button"
                     onClick={() => onChange({ voice: voice.id })}
                     className={cn(
-                      "standalone-voice-card flex min-h-[58px] flex-col items-start justify-between rounded-lg border border-dashed px-[10px] py-[8px] text-left transition",
+                      "standalone-voice-card flex min-h-[50px] flex-col items-start justify-between rounded-lg border border-dashed px-[9px] py-[6px] text-left transition",
                       active
                         ? "border-amber-300/50 bg-amber-300/10"
                         : "border-white/[0.12] bg-[#242424] hover:bg-[#2d2d2d]",
@@ -4282,7 +4296,7 @@ function GeminiVoicePicker({
         label="Voice"
         meta={`${GEMINI_TTS_VOICES.length} preset speakers`}
       />
-      <div className="standalone-voice-controls ws-scroll-hide mt-2 grid max-h-[224px] grid-cols-3 gap-[6px] overflow-y-auto pr-0.5">
+      <div className="standalone-voice-controls ws-scroll-hide mt-[6px] grid max-h-[184px] grid-cols-3 gap-[5px] overflow-y-auto pr-0.5">
         {GEMINI_TTS_VOICES.map((voiceName) => {
           const active = value === voiceName;
           const isPlaying = playingId === voiceName;
@@ -4293,7 +4307,7 @@ function GeminiVoicePicker({
               type="button"
               onClick={() => onChange(voiceName)}
               className={cn(
-                "standalone-voice-card relative flex min-h-[50px] flex-col items-start justify-center rounded-lg border border-dashed px-[10px] py-[7px] pr-[34px] text-left transition",
+                "standalone-voice-card relative flex min-h-[44px] flex-col items-start justify-center rounded-lg border border-dashed px-[9px] py-[5px] pr-[32px] text-left transition",
                 active
                   ? "border-amber-300/50 bg-amber-300/10"
                   : "border-white/[0.12] bg-[#242424] hover:bg-[#2d2d2d]",
@@ -4385,11 +4399,11 @@ function GeminiAudioTagsPanel({
   };
   const prefix = composeGeminiAudioTagPrefix({ emotion, personality, speed });
   return (
-    <div className="standalone-voice-controls rounded-[14px] bg-white/[0.04] px-[11px] py-[10px]">
-      <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+    <div className="standalone-voice-controls rounded-[12px] bg-white/[0.04] px-[10px] py-[8px]">
+      <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
         Audio tags
       </div>
-      <p className="mt-[4px] text-[11.5px] leading-[15px] text-zinc-500">
+      <p className="mt-[3px] text-[11.5px] leading-[14px] text-zinc-500">
         เลือกอารมณ์ / บุคลิก / ความเร็ว — Gemini จะใช้ tag ในวงเล็บเพื่อปรับการอ่าน
       </p>
 
@@ -4406,11 +4420,11 @@ function GeminiAudioTagsPanel({
         onToggle={(tag) => toggle(personality, tag, onChangePersonality)}
       />
 
-      <div className="mt-[9px]">
-        <div className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-zinc-500">
+      <div className="mt-[7px]">
+        <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
           ความเร็ว / Speed
         </div>
-        <div className="mt-[6px] inline-flex min-h-[38px] w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[12px]">
+        <div className="mt-[5px] inline-flex min-h-[32px] w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[12px]">
           {GEMINI_SPEED_OPTIONS.map((opt) => {
             const active = speed === opt.id;
             return (
@@ -4419,7 +4433,7 @@ function GeminiAudioTagsPanel({
                 type="button"
                 onClick={() => onChangeSpeed(opt.id)}
                 className={cn(
-                  "flex-1 rounded-md px-2 py-[7px] text-center leading-[14px] transition-colors",
+                  "flex-1 rounded-md px-2 py-[5px] text-center leading-[13px] transition-colors",
                   active
                     ? "bg-white/[0.10] text-zinc-50"
                     : "text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100",
@@ -4433,11 +4447,11 @@ function GeminiAudioTagsPanel({
       </div>
 
       {prefix ? (
-        <div className="mt-[9px] rounded-md bg-black/35 px-2.5 py-1.5 font-mono text-[11px] leading-[14px] text-amber-200/90">
+        <div className="mt-[7px] rounded-md bg-black/35 px-2.5 py-1.5 font-mono text-[11px] leading-[13px] text-amber-200/90">
           {prefix} <span className="text-zinc-500">+ script</span>
         </div>
       ) : (
-        <div className="mt-[9px] text-[11px] leading-[15px] italic text-zinc-600">
+        <div className="mt-[7px] text-[11px] leading-[14px] italic text-zinc-600">
           (ยังไม่ได้เลือก audio tag — Gemini จะอ่านตาม voice ที่เลือกอย่างเดียว)
         </div>
       )}
@@ -4457,11 +4471,11 @@ function TagChipRow({
   onToggle: (tag: string) => void;
 }) {
   return (
-    <div className="mt-[9px]">
-      <div className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-zinc-500">
+    <div className="mt-[7px]">
+      <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
         {title}
       </div>
-      <div className="mt-[6px] flex flex-wrap gap-[6px]">
+      <div className="mt-[5px] flex flex-wrap gap-[5px]">
         {items.map((item) => {
           const active = selected.includes(item.tag);
           return (
@@ -4471,7 +4485,7 @@ function TagChipRow({
               onClick={() => onToggle(item.tag)}
               title={item.sub}
               className={cn(
-                "rounded-full px-[10px] py-[6px] text-[12px] font-medium leading-[14px] transition-colors",
+                "rounded-full px-[9px] py-[5px] text-[12px] font-medium leading-[13px] transition-colors",
                 active
                   ? "bg-amber-300/20 text-amber-200 ring-1 ring-amber-300/30"
                   : "bg-white/[0.05] text-zinc-300 hover:bg-white/[0.10] hover:text-white",
@@ -4505,11 +4519,11 @@ function ElevenLabsVoiceParams({
   ];
 
   return (
-    <div className="standalone-voice-controls rounded-[14px] bg-white/[0.04] px-[11px] py-[10px]">
-      <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+    <div className="standalone-voice-controls rounded-[12px] bg-white/[0.04] px-[10px] py-[8px]">
+      <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
         {t("workspace.standalone.voice_style")}
       </div>
-      <div className="mt-[7px] inline-flex min-h-[36px] w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[12px]">
+      <div className="mt-[5px] inline-flex min-h-[32px] w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[12px]">
         {presets.map((p) => {
           const active = form.voiceStylePreset === p.id;
           return (
@@ -4518,7 +4532,7 @@ function ElevenLabsVoiceParams({
               type="button"
               onClick={() => onChange({ voiceStylePreset: p.id })}
               className={cn(
-                "flex-1 rounded-md px-2 py-[6px] text-center leading-[14px] transition-colors",
+                "flex-1 rounded-md px-2 py-[5px] text-center leading-[13px] transition-colors",
                 active
                   ? "bg-white/[0.10] text-zinc-50"
                   : "text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100",
@@ -4598,8 +4612,8 @@ function RangeSlider({
   onChange: (v: number) => void;
 }) {
   return (
-    <div className="mt-[9px]">
-      <div className="flex items-center justify-between text-[11px] font-medium leading-[14px] text-zinc-300">
+    <div className="mt-[7px]">
+      <div className="flex items-center justify-between text-[11px] font-medium leading-[13px] text-zinc-300">
         <span>{label}</span>
         {meta && <span className="text-zinc-500">{meta}</span>}
       </div>
@@ -4610,7 +4624,7 @@ function RangeSlider({
         step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="mt-[6px] h-1 w-full cursor-pointer appearance-none rounded-full bg-white/[0.08] accent-amber-300 outline-none"
+        className="mt-[5px] h-1 w-full cursor-pointer appearance-none rounded-full bg-white/[0.08] accent-amber-300 outline-none"
       />
     </div>
   );

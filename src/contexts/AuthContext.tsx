@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { posthog } from "@/lib/posthog";
 import { getStoredCode, clearStoredCode } from "@/lib/tracking/referralCapture";
 import { getVisitorId } from "@/lib/tracking/fingerprint";
+import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 
 interface Profile {
   id: string;
@@ -49,6 +50,36 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const DEMO_EMAIL = "__demo_disabled__";
 const DEMO_PASSWORD = "__demo_disabled__";
 const DEMO_SESSION_KEY = "mf_psc_demo_session";
+
+function clearWorkspaceLocalState() {
+  try {
+    useWorkspaceStore.getState().resetWorkspaceState();
+  } catch {
+    // ignore
+  }
+
+  const keysToClear = [DEMO_SESSION_KEY, "mf-workspace-v1"];
+  for (const key of keysToClear) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // ignore
+    }
+  }
+
+  try {
+    const prefixPatterns = [/^workspace-viewport-/, /^mf-workspace-/];
+    const toDelete: string[] = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      if (prefixPatterns.some((pattern) => pattern.test(key))) toDelete.push(key);
+    }
+    for (const key of toDelete) localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -143,6 +174,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           }, 0);
         } else {
           setProfile(null);
+          clearWorkspaceLocalState();
         }
 
         setLoading(false);
@@ -164,6 +196,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setSession(null);
         setUser(null);
         setProfile(null);
+        clearWorkspaceLocalState();
         setLoading(false);
         return;
       }
@@ -176,6 +209,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           setProfile(p);
           identifyUser(session.user, p);
         });
+      } else {
+        clearWorkspaceLocalState();
       }
 
       setLoading(false);
@@ -259,6 +294,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     posthog.capture("logout");
     posthog.reset();
     await supabase.auth.signOut();
+    clearWorkspaceLocalState();
     /* Clear EVERY per-user persisted blob, not just the Supabase
      * session token. The audit caught a real cross-user data leak
      * here: zustand persists the workspace store at

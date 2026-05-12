@@ -553,7 +553,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
       <div
         className={clsx(
           "flex flex-1 min-h-0 flex-col overflow-y-auto px-[12px] pb-[12px]",
-          compactVoice ? "gap-[9px]" : "gap-[12px]",
+          compactVoice ? "gap-[7px]" : "gap-[12px]",
         )}
       >
         {/* Model Selector */}
@@ -595,7 +595,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
         <section
           className={clsx(
             "shrink-0 rounded-[16px] border border-white/[0.05] bg-[#151719] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]",
-            compactVoice ? "p-[9px]" : "p-[10px]",
+            compactVoice ? "p-[8px]" : "p-[10px]",
           )}
           onPasteCapture={handlePromptPaste}
           onDragEnterCapture={handlePromptDragOver}
@@ -707,7 +707,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
               className={clsx(
                 "mt-[8px] rounded-none border-transparent bg-transparent px-[4px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-transparent focus:ring-0",
                 compactVoice
-                  ? "min-h-[94px] max-h-[170px] py-[6px]"
+                  ? "min-h-[82px] max-h-[140px] py-[5px]"
                   : "min-h-[116px] max-h-[230px] py-[8px]",
               )}
             />
@@ -766,7 +766,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
           <div
             className={clsx(
               "flex shrink-0 flex-col",
-              compactVoice ? "gap-[8px]" : "gap-[10px]",
+              compactVoice ? "gap-[6px]" : "gap-[10px]",
             )}
           >
             {extraControls}
@@ -775,7 +775,12 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
       </div>
 
       {/* ===== FOOTER ===== */}
-      <div className="flex w-full flex-row items-center justify-between gap-[16px] px-[12px] pb-[12px]">
+      <div
+        className={clsx(
+          "flex w-full flex-row items-center justify-between px-[12px]",
+          compactVoice ? "gap-[10px] pb-[8px]" : "gap-[16px] pb-[12px]",
+        )}
+      >
         {/* Quantity stepper */}
         {showQuantity && (
         <div className="flex h-[48px] items-center gap-[8px] px-[12px] rounded-[16px] bg-[#16181a] border border-white/[0.02]">
@@ -798,7 +803,10 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
           <button
             onClick={handleCreate}
             disabled={running}
-            className="standalone-generate-button ci-gloss-button group relative flex h-[48px] w-full items-center justify-center gap-[6px] overflow-hidden rounded-full border px-[8px] text-[15px] font-semibold leading-[20px] transition-all active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
+            className={clsx(
+              "standalone-generate-button ci-gloss-button group relative flex w-full items-center justify-center gap-[6px] overflow-hidden rounded-full border px-[8px] font-semibold transition-all active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70",
+              compactVoice ? "h-[42px] text-[14px] leading-[18px]" : "h-[48px] text-[15px] leading-[20px]",
+            )}
           >
             <span className="pointer-events-none absolute inset-x-4 top-0 h-[16px] rounded-b-full bg-white/30 blur-[10px]" />
             <span className="pointer-events-none absolute -right-8 top-1/2 h-20 w-28 -translate-y-1/2 rounded-full bg-sky-200/25 blur-2xl" />
@@ -809,7 +817,12 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
       </div>
 
       {/* ===== BOTTOM NAV ===== */}
-      <div className="hidden items-center justify-around border-t border-white/[0.04] px-[18px] py-[6px] md:flex">
+      <div
+        className={clsx(
+          "hidden items-center justify-around border-t border-white/[0.04] px-[18px] md:flex",
+          compactVoice ? "py-[3px]" : "py-[6px]",
+        )}
+      >
         {[
           { id: "video", icon: Video, label: copy.video },
           { id: "image", icon: ImageIcon, label: copy.image },
