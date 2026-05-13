@@ -164,15 +164,35 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
     (selected || isHovered || hasVideoFrameOutputEdge || isMentionedAnywhere);
 
   useEffect(() => {
-    if (!shouldPrepareVideoFrames) return;
-    if (d.fieldType !== "video") return;
-    if (d.uploading) return;
-    if (!livePreviewUrl || !videoFrameSourceKey) return;
-    if (d.extractingVideoFrames && d.frameSourceKey === videoFrameSourceKey) return;
+    // DIAGNOSTIC LOGS — chore/diag-frame-extraction-logs, REMOVE AFTER DEBUG
+    const dx = (tag: string, payload: Record<string, unknown> = {}) =>
+      console.log(`[diag-extract ${id.slice(-8)}] ${tag}`, payload);
+    dx("effect-fire", {
+      shouldPrepareVideoFrames,
+      fieldType: d.fieldType,
+      uploading: d.uploading,
+      livePreviewUrl: livePreviewUrl ? "<set>" : null,
+      videoFrameSourceKey: videoFrameSourceKey ? "<set>" : null,
+      extracting: d.extractingVideoFrames,
+      startFrameUrl: d.startFrameUrl ? "<set>" : null,
+      endFrameUrl: d.endFrameUrl ? "<set>" : null,
+      frameSourceKey: d.frameSourceKey ? "<set>" : null,
+      frameSourceKeyMatch: d.frameSourceKey === videoFrameSourceKey,
+      frameExtractionError: d.frameExtractionError,
+    });
+    if (!shouldPrepareVideoFrames) { dx("skip", { reason: "shouldPrepare false" }); return; }
+    if (d.fieldType !== "video") { dx("skip", { reason: "not video" }); return; }
+    if (d.uploading) { dx("skip", { reason: "uploading" }); return; }
+    if (!livePreviewUrl || !videoFrameSourceKey) { dx("skip", { reason: "no preview/sourceKey" }); return; }
+    if (d.extractingVideoFrames && d.frameSourceKey === videoFrameSourceKey) {
+      dx("skip", { reason: "already extracting for this key" });
+      return;
+    }
     if (
       d.frameSourceKey === videoFrameSourceKey &&
       (d.startFrameUrl && d.endFrameUrl)
     ) {
+      dx("skip", { reason: "URLs already set for this key" });
       return;
     }
     if (
@@ -180,8 +200,10 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
       d.frameExtractionError &&
       d.frameExtractionUrlKey === videoFrameUrlKey
     ) {
+      dx("skip", { reason: "previous error for this key", error: d.frameExtractionError });
       return;
     }
+    dx("guards-passed");
 
     // patchNode used to gate on a `cancelled` flag set by the effect
     // cleanup. The first synchronous patch (extractingVideoFrames=true)
@@ -196,6 +218,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
     // unconditionally; if frameSourceKey moves on (video replaced
     // mid-flight), the next render's key comparison still re-triggers.
     const patchNode = (patch: Partial<AssetNodeData>) => {
+      dx("patchNode-call", { patch: Object.keys(patch), values: patch });
       setNodes((nodes) =>
         nodes.map((node) =>
           node.id === id ? { ...node, data: { ...node.data, ...patch } } : node,
@@ -203,6 +226,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
       );
     };
 
+    dx("patch-extracting-true");
     patchNode({
       extractingVideoFrames: true,
       frameSourceKey: videoFrameSourceKey,
@@ -210,21 +234,28 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
       frameExtractionError: "",
     });
 
+    dx("async-start");
     void (async () => {
+      dx("async-step-1-auth");
       const { data: authData } = await supabase.auth.getUser();
       const userId = authData.user?.id;
       if (!userId) throw new Error("Login is required before extracting video frames");
+      dx("async-step-2-userid", { userId: userId.slice(-8) });
 
       const safeNodeId = safeStorageSegment(id);
+      dx("async-step-3-capture-start");
       const [startBlob, endBlob] = await Promise.all([
         captureVideoFrameBlob(livePreviewUrl, "start"),
         captureVideoFrameBlob(livePreviewUrl, "end"),
       ]);
+      dx("async-step-4-captured", { startBytes: startBlob.size, endBytes: endBlob.size });
       const basePath = `${userId}/video-frames/${safeNodeId}`;
+      dx("async-step-5-upload-start", { basePath });
       const [startFrameUrl, endFrameUrl] = await Promise.all([
         uploadExtractedFrame(startBlob, `${basePath}/start.jpg`),
         uploadExtractedFrame(endBlob, `${basePath}/end.jpg`),
       ]);
+      dx("async-step-6-uploaded", { startFrameUrl: startFrameUrl.slice(0, 80), endFrameUrl: endFrameUrl.slice(0, 80) });
 
       patchNode({
         startFrameUrl,
@@ -234,7 +265,9 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
         extractingVideoFrames: false,
         frameExtractionError: "",
       });
+      dx("async-step-7-success-patched");
     })().catch((error) => {
+      dx("async-catch", { message: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack?.split("\n").slice(0, 4).join(" | ") : null });
       patchNode({
         extractingVideoFrames: false,
         frameSourceKey: videoFrameSourceKey,
