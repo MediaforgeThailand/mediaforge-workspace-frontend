@@ -10,7 +10,7 @@
  *     Ctrl+Shift+V            paste without connections
  *     Ctrl+D                  duplicate
  *     Ctrl+Shift+D            duplicate without connections
- *     Ctrl+G                  group selected nodes
+ *     G                       group selected nodes
  *     Ctrl+A                  select all
  *     Ctrl+Z / Ctrl+Shift+Z   undo / redo (best-effort, history is shallow)
  *
@@ -350,11 +350,6 @@ export function useWorkspaceShortcuts({
           duplicateSelection(!shift);
           return;
         }
-        if (lower === "g") {
-          e.preventDefault();
-          useWorkspaceStore.getState().groupSelectedNodes();
-          return;
-        }
         if (lower === "0") {
           e.preventDefault();
           resetView();
@@ -418,6 +413,11 @@ export function useWorkspaceShortcuts({
         zoomToSelection();
         return;
       }
+      if (lower === "g" && !ctrl) {
+        e.preventDefault();
+        useWorkspaceStore.getState().groupSelectedNodes();
+        return;
+      }
       if (lower === "n" && !ctrl) {
         e.preventDefault();
         onAddNode?.();
@@ -430,8 +430,8 @@ export function useWorkspaceShortcuts({
       }
     };
 
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [
     selectAll,
     clearSelection,

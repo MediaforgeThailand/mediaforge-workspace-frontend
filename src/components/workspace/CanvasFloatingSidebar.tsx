@@ -81,7 +81,7 @@ const BUTTONS: ToolButton[] = [
   { id: "assets", labelKey: "workspace.tools.assets", icon: Images },
   { id: "add", labelKey: "workspace.tools.add_node", shortcut: "N", icon: Plus },
   { id: "select", labelKey: "workspace.tools.select", shortcut: "V", icon: MousePointer2, isMode: true, divider: true },
-  { id: "hand", labelKey: "workspace.tools.hand", shortcut: "H", icon: Hand, isMode: true },
+  { id: "hand", labelKey: "workspace.tools.hand", shortcut: "Space", icon: Hand, isMode: true },
   { id: "cut", labelKey: "workspace.tools.cut_connector", shortcut: "C", icon: Scissors, isMode: true },
   { id: "sticky", labelKey: "workspace.tools.sticky_note", shortcut: "S", icon: StickyNote, isMode: true },
   { id: "undo", labelKey: "workspace.tools.undo", shortcut: "Ctrl+Z", icon: Undo2, divider: true },

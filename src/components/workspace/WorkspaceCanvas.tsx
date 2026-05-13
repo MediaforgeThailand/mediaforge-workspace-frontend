@@ -1620,7 +1620,7 @@ const Inner = () => {
         key: "group",
         label: "Group",
         icon: CtxGroupIcon,
-        shortcut: "Ctrl+G",
+        shortcut: "G",
         disabled: groupable < 2,
         onSelect: () => onCtxGroup(targets),
       },

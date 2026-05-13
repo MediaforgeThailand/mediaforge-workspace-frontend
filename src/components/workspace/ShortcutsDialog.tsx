@@ -29,15 +29,22 @@ type ScLabelKey =
   | "workspace.shortcuts.add_to_selection"
   | "workspace.shortcuts.pan"
   | "workspace.shortcuts.zoom"
+  | "workspace.shortcuts.zoom_to_fit"
+  | "workspace.shortcuts.zoom_to_selection"
+  | "workspace.shortcuts.reset_view"
   | "workspace.shortcuts.undo"
   | "workspace.shortcuts.redo"
   | "workspace.shortcuts.copy"
   | "workspace.shortcuts.cut"
   | "workspace.shortcuts.paste"
+  | "workspace.shortcuts.paste_without_connections"
   | "workspace.shortcuts.duplicate"
+  | "workspace.shortcuts.duplicate_without_connections"
+  | "workspace.shortcuts.group_selected"
   | "workspace.shortcuts.delete"
   | "workspace.shortcuts.select_all"
   | "workspace.shortcuts.run_node"
+  | "workspace.shortcuts.run_all_nodes"
   | "workspace.shortcuts.open_lightbox"
   | "workspace.shortcuts.flip_gen"
   | "workspace.shortcuts.close_dialog";
@@ -85,6 +92,9 @@ const GROUPS: ShortcutGroup[] = [
       { labelKey: "workspace.shortcuts.add_to_selection", keys: ["Shift", { tk: "workspace.shortcuts.key_click" }] },
       { labelKey: "workspace.shortcuts.pan", keys: [{ tk: "workspace.shortcuts.key_drag" }] },
       { labelKey: "workspace.shortcuts.zoom", keys: ["Ctrl", { tk: "workspace.shortcuts.key_wheel" }] },
+      { labelKey: "workspace.shortcuts.zoom_to_fit", keys: ["D"] },
+      { labelKey: "workspace.shortcuts.zoom_to_selection", keys: ["F"] },
+      { labelKey: "workspace.shortcuts.reset_view", keys: ["Ctrl", "0"] },
     ],
   },
   {
@@ -95,7 +105,10 @@ const GROUPS: ShortcutGroup[] = [
       { labelKey: "workspace.shortcuts.copy", keys: ["Ctrl", "C"] },
       { labelKey: "workspace.shortcuts.cut", keys: ["Ctrl", "X"] },
       { labelKey: "workspace.shortcuts.paste", keys: ["Ctrl", "V"] },
+      { labelKey: "workspace.shortcuts.paste_without_connections", keys: ["Ctrl", "Shift", "V"] },
       { labelKey: "workspace.shortcuts.duplicate", keys: ["Ctrl", "D"] },
+      { labelKey: "workspace.shortcuts.duplicate_without_connections", keys: ["Ctrl", "Shift", "D"] },
+      { labelKey: "workspace.shortcuts.group_selected", keys: ["G"] },
       { labelKey: "workspace.shortcuts.delete", keys: ["Del"] },
       { labelKey: "workspace.shortcuts.select_all", keys: ["Ctrl", "A"] },
     ],
@@ -104,6 +117,7 @@ const GROUPS: ShortcutGroup[] = [
     titleKey: "workspace.shortcuts.group_run_inspect",
     items: [
       { labelKey: "workspace.shortcuts.run_node", keys: ["Ctrl", "Enter"] },
+      { labelKey: "workspace.shortcuts.run_all_nodes", keys: ["Ctrl", "Shift", "Enter"] },
       { labelKey: "workspace.shortcuts.open_lightbox", keys: ["A"] },
       { labelKey: "workspace.shortcuts.flip_gen", keys: ["←", "→"] },
       { labelKey: "workspace.shortcuts.close_dialog", keys: ["Esc"] },
