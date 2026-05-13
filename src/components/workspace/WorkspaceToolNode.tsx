@@ -206,6 +206,15 @@ function isSeedanceV2VideoModel(model: string | undefined): boolean {
   );
 }
 
+function isKlingMotionVideoModel(model: string | undefined): boolean {
+  const m = String(model ?? "").toLowerCase();
+  return (
+    m === "kling-v2-6-motion-pro" ||
+    m === "kling-v3-motion-pro" ||
+    m === "replicate-kling-v3-motion-pro"
+  );
+}
+
 function seedanceReferenceVideoDurationMessage(durationSec?: number | null): string {
   const durationLabel =
     typeof durationSec === "number" && Number.isFinite(durationSec)
@@ -1527,6 +1536,31 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       }
     }
 
+    // ── Kling Motion Pro ref_video guard ──
+    // /v1/videos/motion-control requires both image_url and video_url
+    // — without a ref_video the backend throws "Motion Control requires
+    // a video_url". Bail here with a toast + return (matching the
+    // prompt-length validators above) so the node never enters the
+    // "processing" → "error" cycle: that cycle leaves `lastRunError`
+    // set without a backgroundJobId, which trips the recovery-polling
+    // effect into re-querying the latest job for this node every 5s,
+    // re-applying its stale error, and looping forever (the "flashing"
+    // node + console-flood symptom).
+    if (schemaKey === "videoGenNode" && isKlingMotionVideoModel(selectedModel)) {
+      const hasRefVideoEdge = getEdges().some(
+        (e) => e.target === id && e.targetHandle === "ref_video",
+      );
+      if (!hasRefVideoEdge) {
+        toast.error(
+          friendlyError(
+            `${selectedModel} requires a reference video — connect a video into the ref_video port (it dictates the motion and duration).`,
+            language === "th" ? "th" : "en",
+          ),
+        );
+        return;
+      }
+    }
+
     const storeState = useWorkspaceStore.getState();
     const log = useDebugLogStore.getState().push;
     const nodeLabelForLog =
@@ -2623,6 +2657,14 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         d.activeRunId != null ||
         d.lastRunError != null);
     if ((!knownJobId && !canRecoverByNode) || d.jobStatus === "completed") return;
+    // Terminal failure is also "done" as far as recovery is concerned —
+    // once we've recorded the failure on the node (lastRunError + status:
+    // "error"), continuing to poll a job whose backend retry budget is
+    // spent just re-logs the same friendlyError every 5s and keeps the
+    // node's red footer flickering. The user has been informed; clicking
+    // Run resets jobStatus to null and re-engages this effect for the
+    // fresh attempt.
+    if (d.jobStatus === "failed" || d.jobStatus === "permanent_failed") return;
     if (!knownJobId && runInFlightRef.current) return;
 
     let cancelled = false;

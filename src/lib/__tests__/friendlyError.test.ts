@@ -111,6 +111,21 @@ describe("friendlyError — provider errors", () => {
       .toMatch(/2-15 seconds/);
   });
 
+  it("maps Kling Motion Pro missing-ref_video errors (raw backend + frontend gate)", () => {
+    expect(
+      friendlyError(
+        "Motion Control requires a video_url (reference video that dictates motion & duration)",
+        "en",
+      ),
+    ).toMatch(/Kling Motion Pro needs a reference video/);
+    expect(
+      friendlyError(
+        "kling-v3-motion-pro requires a reference video — connect a video into the ref_video port (it dictates the motion and duration).",
+        "th",
+      ),
+    ).toMatch(/ต้องมี Reference Video/);
+  });
+
   it("maps Veo image-input rejections", () => {
     expect(friendlyError("Veo image input was rejected", "en"))
       .toMatch(/image input is unavailable/);
