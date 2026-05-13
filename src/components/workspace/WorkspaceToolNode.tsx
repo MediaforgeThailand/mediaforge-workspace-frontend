@@ -206,6 +206,15 @@ function isSeedanceV2VideoModel(model: string | undefined): boolean {
   );
 }
 
+function isKlingMotionVideoModel(model: string | undefined): boolean {
+  const m = String(model ?? "").toLowerCase();
+  return (
+    m === "kling-v2-6-motion-pro" ||
+    m === "kling-v3-motion-pro" ||
+    m === "replicate-kling-v3-motion-pro"
+  );
+}
+
 function seedanceReferenceVideoDurationMessage(durationSec?: number | null): string {
   const durationLabel =
     typeof durationSec === "number" && Number.isFinite(durationSec)
@@ -1647,6 +1656,19 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
       if (schemaKey === "videoGenNode" && isSeedanceV2VideoModel(selectedModel)) {
         await validateSeedanceReferenceVideos(inputs);
+      }
+
+      // Kling Motion Pro's endpoint (/v1/videos/motion-control) requires
+      // BOTH image_url and video_url — the backend throws "Motion Control
+      // requires a video_url" otherwise. Catch the missing ref_video here
+      // so the user sees a labeled, actionable toast instead of the
+      // generic "something went wrong" that friendlyError falls back to.
+      if (schemaKey === "videoGenNode" && isKlingMotionVideoModel(selectedModel)) {
+        if (videoInputUrls(inputs.ref_video).length === 0) {
+          throw new Error(
+            `${selectedModel} requires a reference video — connect a video into the ref_video port (it dictates the motion and duration).`,
+          );
+        }
       }
 
       log({

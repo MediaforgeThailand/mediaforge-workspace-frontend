@@ -200,6 +200,12 @@ const MAPPINGS: ErrorMapping[] = [
     ja: "Seedance 2.0 の参照動画は 2〜15 秒、合計 15 秒以内にしてください。",
   },
   {
+    match: /Motion Control requires a video_url|requires a reference video — connect a video into the ref_video|Motion Control requires an image_url/i,
+    th: "Kling Motion Pro ต้องมี Reference Video — เชื่อมโหนดวิดีโอเข้าพอร์ต ref_video (วิดีโอนี้กำหนดท่าทางและความยาว)",
+    en: "Kling Motion Pro needs a reference video — connect a video node into the ref_video port (it dictates the motion and duration).",
+    ja: "Kling Motion Pro はリファレンス動画が必要です。動画ノードを ref_video ポートに接続してください（動きと長さを決定します）。",
+  },
+  {
     match: /validation|invalid[\s_-]*param|400[\s_]/i,
     th: "ข้อมูลที่ส่งไม่ถูกต้อง — ตรวจสอบแล้วลองใหม่",
     en: "Some inputs are invalid — please double-check and try again.",
