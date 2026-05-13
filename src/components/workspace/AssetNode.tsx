@@ -183,9 +183,19 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
       return;
     }
 
-    let cancelled = false;
+    // patchNode used to gate on a `cancelled` flag set by the effect
+    // cleanup. The first synchronous patch (extractingVideoFrames=true)
+    // changes state → React re-renders → the old render's cleanup
+    // sets cancelled=true → the IN-FLIGHT async's completion patch
+    // (URLs / error) then sees cancelled=true and is silently
+    // dropped, leaving the node stuck at extractingVideoFrames=true
+    // forever. The early-return guards above already prevent
+    // double-kickoff for the same frameSourceKey, so the cancel flag
+    // wasn't preventing duplication — it was hiding the only path
+    // that could lower the "still preparing" flag. Patch
+    // unconditionally; if frameSourceKey moves on (video replaced
+    // mid-flight), the next render's key comparison still re-triggers.
     const patchNode = (patch: Partial<AssetNodeData>) => {
-      if (cancelled) return;
       setNodes((nodes) =>
         nodes.map((node) =>
           node.id === id ? { ...node, data: { ...node.data, ...patch } } : node,
@@ -233,10 +243,6 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
           error instanceof Error ? error.message : "Could not extract video frames",
       });
     });
-
-    return () => {
-      cancelled = true;
-    };
   }, [
     d.endFrameUrl,
     d.extractingVideoFrames,

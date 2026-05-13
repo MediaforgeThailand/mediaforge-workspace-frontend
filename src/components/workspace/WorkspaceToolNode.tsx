@@ -1292,17 +1292,25 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     // much as a wired frame port does.
     const isMentionedAnywhere = isNodeMentionedAnywhere(id, allNodesForMentionScan);
     if (!hasFrameEdge && !isMentionedAnywhere) return;
+    // The `frameExtractionInFlightFor` ref already prevents
+    // double-kickoff for the same gen.id. Don't add a cleanup-driven
+    // `cancelled` flag here — when this effect re-runs after the
+    // setNodes patch lands (because `data` is in the deps), the old
+    // cleanup would set cancelled=true and the in-flight async's
+    // completion patch would silently drop, leaving the gen with no
+    // startFrameUrl/endFrameUrl. resolveInputs then throws "Video
+    // frame image is still preparing" forever. Same bug pattern as
+    // AssetNode's pre-existing extraction effect — both fixed in
+    // this PR.
     if (frameExtractionInFlightFor.current === gen.id) return;
     frameExtractionInFlightFor.current = gen.id;
 
-    let cancelled = false;
     (async () => {
       const { data: authData } = await supabase.auth.getUser();
       const userId = authData.user?.id;
       if (!userId) throw new Error("Login required before extracting video frames");
       const basePath = `${userId}/video-frames/${safeStorageSegment(id)}/${safeStorageSegment(gen.id)}`;
       const frames = await extractAndUploadVideoFrames(gen.url!, basePath);
-      if (cancelled) return;
       setNodes((nodes) =>
         nodes.map((node) => {
           if (node.id !== id) return node;
@@ -1323,10 +1331,6 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           frameExtractionInFlightFor.current = null;
         }
       });
-
-    return () => {
-      cancelled = true;
-    };
   }, [allNodesForMentionScan, data, edges, id, setNodes]);
 
   /* ── Publish preview height as `--ws-preview-h` ──
