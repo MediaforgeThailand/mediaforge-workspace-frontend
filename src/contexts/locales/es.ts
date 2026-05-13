@@ -2321,7 +2321,7 @@ export const es = {
   "workspace.sidebar.image_gen": "Generador de imágenes",
   "workspace.sidebar.video_gen": "Generador de vídeos",
   "workspace.sidebar.voice_gen": "Generador de voz",
-  "workspace.sidebar.voice_translate": "Traducir voz de vídeo",
+  "workspace.sidebar.voice_translate": "Traducir",
   "workspace.sidebar.threed_gen": "Generador 3D",
   "workspace.sidebar.create": "crear",
   "workspace.sidebar.assets": "recursos",
@@ -2536,7 +2536,7 @@ export const es = {
   "workspace.standalone.tool.voice_gen.nav": "Audio",
   "workspace.standalone.tool.voice_gen.title": "Generador de voz",
   "workspace.standalone.tool.voice_translate.nav": "Traducir",
-  "workspace.standalone.tool.voice_translate.title": "Traducir voz de vídeo",
+  "workspace.standalone.tool.voice_translate.title": "Traducir",
   "workspace.standalone.tool.image_to_3d.nav": "3D",
   "workspace.standalone.tool.image_to_3d.title": "Imagen a 3D",
   "workspace.standalone.generate": "Generar",
@@ -2809,6 +2809,8 @@ export const es = {
     "Sube un vídeo MP4 antes de traducir la voz.",
   "workspace.standalone.validation.translate_language":
     "Elige el idioma de salida.",
+  "workspace.standalone.validation.script_required":
+    "Añade un transcript/script antes de probar el doblaje local con IA.",
   "workspace.standalone.validation.translate_consent":
     "Confirma que tienes permiso para traducir y clonar esta voz.",
   "workspace.standalone.validation.model_image":

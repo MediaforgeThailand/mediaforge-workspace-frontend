@@ -2248,7 +2248,7 @@ export const en = {
   "workspace.sidebar.image_gen": "Image Generator",
   "workspace.sidebar.video_gen": "Video Generator",
   "workspace.sidebar.voice_gen": "Voice Generator",
-  "workspace.sidebar.voice_translate": "Voice Translate",
+  "workspace.sidebar.voice_translate": "Translate",
   "workspace.sidebar.threed_gen": "3D Generator",
   "workspace.sidebar.create": "Create",
   "workspace.sidebar.assets": "Assets",
@@ -2458,7 +2458,7 @@ export const en = {
   "workspace.standalone.tool.voice_gen.nav": "Audio",
   "workspace.standalone.tool.voice_gen.title": "Voice Generator",
   "workspace.standalone.tool.voice_translate.nav": "Translate",
-  "workspace.standalone.tool.voice_translate.title": "Video Voice Translate",
+  "workspace.standalone.tool.voice_translate.title": "Translate",
   "workspace.standalone.tool.image_to_3d.nav": "3D",
   "workspace.standalone.tool.image_to_3d.title": "Image to 3D",
   "workspace.standalone.generate": "Generate",
@@ -2723,6 +2723,8 @@ export const en = {
     "Upload an MP4 video before translating voice.",
   "workspace.standalone.validation.translate_language":
     "Choose the output language.",
+  "workspace.standalone.validation.script_required":
+    "Add a transcript/script before testing local AI dub.",
   "workspace.standalone.validation.translate_consent":
     "Confirm that you have permission to translate and clone this voice.",
   "workspace.standalone.validation.model_image":

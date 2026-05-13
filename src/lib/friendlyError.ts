@@ -46,6 +46,12 @@ const MAPPINGS: ErrorMapping[] = [
     ja: "クレジットが不足しています。チャージするかプランをアップグレードしてください。",
   },
   {
+    match: /ElevenLabs quota exceeded|Quota exceeded|insufficient[\s_-]*(?:credits|quota)|not enough.*credits/i,
+    th: "เครดิต ElevenLabs ไม่พอสำหรับวิดีโอนี้ ลองใช้วิดีโอที่สั้นลงหรือเติมเครดิต ElevenLabs ก่อนครับ",
+    en: "ElevenLabs credits are not enough for this video. Use a shorter video or top up ElevenLabs credits.",
+    ja: "この動画には ElevenLabs のクレジットが不足しています。短い動画を使うか、ElevenLabs クレジットを追加してください。",
+  },
+  {
     match: /PROVIDER_BILLING_ERROR|provider[\s_-]*bill|insufficient[\s_-]*balance/i,
     th: "ระบบ AI ผู้ให้บริการขัดข้องชั่วคราว ทีมงานกำลังแก้ไข",
     en: "The AI provider is temporarily unavailable. Our team is on it.",
@@ -93,9 +99,9 @@ const MAPPINGS: ErrorMapping[] = [
   },
   {
     match: /file size|too large|exceeded.*size|413/i,
-    th: "ไฟล์ใหญ่เกินกำหนด (สูงสุด 200MB)",
-    en: "File too large (max 200 MB).",
-    ja: "ファイルサイズが大きすぎます（最大 200MB）。",
+    th: "ไฟล์ใหญ่เกินกำหนด (สูงสุด 1GB)",
+    en: "File too large (max 1 GB).",
+    ja: "ファイルサイズが大きすぎます（最大 1GB）。",
   },
 
   // ── Provider auth / config ──────────────────────────────────

@@ -2210,7 +2210,7 @@ export const th = {
   "workspace.sidebar.image_gen": "สร้างรูปภาพ",
   "workspace.sidebar.video_gen": "สร้างวิดีโอ",
   "workspace.sidebar.voice_gen": "สร้างเสียง",
-  "workspace.sidebar.voice_translate": "แปลเสียงวิดีโอ",
+  "workspace.sidebar.voice_translate": "Translate",
   "workspace.sidebar.threed_gen": "สร้าง 3D",
   "workspace.sidebar.create": "สร้าง",
   "workspace.sidebar.assets": "ไฟล์",
@@ -2419,7 +2419,7 @@ export const th = {
   "workspace.standalone.tool.voice_gen.nav": "เสียง",
   "workspace.standalone.tool.voice_gen.title": "สร้างเสียง",
   "workspace.standalone.tool.voice_translate.nav": "แปลเสียง",
-  "workspace.standalone.tool.voice_translate.title": "แปลเสียงวิดีโอ",
+  "workspace.standalone.tool.voice_translate.title": "Translate",
   "workspace.standalone.tool.image_to_3d.nav": "3D",
   "workspace.standalone.tool.image_to_3d.title": "แปลงรูปเป็น 3D",
   "workspace.standalone.generate": "สร้าง",
@@ -2682,6 +2682,8 @@ export const th = {
   "workspace.standalone.validation.translate_video":
     "อัปโหลดวิดีโอ MP4 ก่อนเริ่มแปลเสียง",
   "workspace.standalone.validation.translate_language": "เลือกภาษาเป้าหมาย",
+  "workspace.standalone.validation.script_required":
+    "ใส่ transcript/script ก่อนทดสอบ AI dub",
   "workspace.standalone.validation.translate_consent":
     "ยืนยันว่าคุณมีสิทธิ์แปลและโคลนเสียงนี้ก่อน",
   "workspace.standalone.validation.model_image": "การสร้าง 3D ต้องมีภาพอ้างอิง",

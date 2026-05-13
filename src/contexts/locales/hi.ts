@@ -2091,7 +2091,7 @@ export const hi = {
   "workspace.sidebar.image_gen": "छवि जनरेटर",
   "workspace.sidebar.video_gen": "वीडियो जनरेशन",
   "workspace.sidebar.voice_gen": "आवाज जनरेटर",
-  "workspace.sidebar.voice_translate": "वीडियो आवाज अनुवाद",
+  "workspace.sidebar.voice_translate": "अनुवाद",
   "workspace.sidebar.threed_gen": "3 डी जेनरेटर",
   "workspace.sidebar.create": "बनाएं",
   "workspace.sidebar.assets": "एसेट्स",
@@ -2289,7 +2289,7 @@ export const hi = {
   "workspace.standalone.tool.voice_gen.nav": "ऑडियो",
   "workspace.standalone.tool.voice_gen.title": "आवाज जनरेटर",
   "workspace.standalone.tool.voice_translate.nav": "अनुवाद",
-  "workspace.standalone.tool.voice_translate.title": "वीडियो आवाज अनुवाद",
+  "workspace.standalone.tool.voice_translate.title": "अनुवाद",
   "workspace.standalone.tool.image_to_3d.nav": "3 डी",
   "workspace.standalone.tool.image_to_3d.title": "3D में छवि",
   "workspace.standalone.generate": "जनरेट करें",
@@ -2561,6 +2561,8 @@ export const hi = {
     "आवाज अनुवाद से पहले MP4 वीडियो अपलोड करें।",
   "workspace.standalone.validation.translate_language":
     "आउटपुट भाषा चुनें।",
+  "workspace.standalone.validation.script_required":
+    "लोकल AI डब टेस्ट करने से पहले transcript/script जोड़ें।",
   "workspace.standalone.validation.translate_consent":
     "पुष्टि करें कि आपके पास इस आवाज का अनुवाद और क्लोन करने की अनुमति है।",
   "workspace.standalone.validation.model_image":

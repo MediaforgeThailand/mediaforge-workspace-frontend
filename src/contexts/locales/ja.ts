@@ -2086,7 +2086,7 @@ export const ja = {
   "workspace.sidebar.image_gen": "画像生成器",
   "workspace.sidebar.video_gen": "動画生成",
   "workspace.sidebar.voice_gen": "音声ジェネレーター",
-  "workspace.sidebar.voice_translate": "動画音声翻訳",
+  "workspace.sidebar.voice_translate": "翻訳",
   "workspace.sidebar.threed_gen": "3Dジェネレーター",
   "workspace.sidebar.create": "作成",
   "workspace.sidebar.assets": "アセット",
@@ -2287,7 +2287,7 @@ export const ja = {
   "workspace.standalone.tool.voice_gen.nav": "オーディオ",
   "workspace.standalone.tool.voice_gen.title": "音声ジェネレーター",
   "workspace.standalone.tool.voice_translate.nav": "翻訳",
-  "workspace.standalone.tool.voice_translate.title": "動画音声翻訳",
+  "workspace.standalone.tool.voice_translate.title": "翻訳",
   "workspace.standalone.tool.image_to_3d.nav": "3D",
   "workspace.standalone.tool.image_to_3d.title": "画像を 3D に変換",
   "workspace.standalone.generate": "生成する",
@@ -2557,6 +2557,8 @@ export const ja = {
     "音声翻訳を開始する前に MP4 動画をアップロードしてください。",
   "workspace.standalone.validation.translate_language":
     "出力言語を選択してください。",
+  "workspace.standalone.validation.script_required":
+    "ローカル AI ダブをテストする前に transcript/script を追加してください。",
   "workspace.standalone.validation.translate_consent":
     "この音声を翻訳してクローンする権限があることを確認してください。",
   "workspace.standalone.validation.model_image":

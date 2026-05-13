@@ -122,9 +122,12 @@ import CanvasCollaborationOverlay from "./CanvasCollaborationOverlay";
 import { useCanvasCollaborationStore } from "./canvasCollaboration";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { friendlyError } from "@/lib/friendlyError";
+import { uploadSupabaseStorageFile } from "@/lib/supabase/resumableUpload";
 
 const VIEWPORT_KEY = (canvasId: string) => `workspace-viewport-${canvasId}`;
 const STORAGE_BUCKET = "ai-media";
+const MEDIA_UPLOAD_MAX_BYTES = 1024 * 1024 * 1024;
+const MEDIA_UPLOAD_MAX_LABEL = "1GB";
 
 type NodeDataWithParams = {
   params?: { model_name?: string };
@@ -886,17 +889,16 @@ const Inner = () => {
         toast.error(t("workspace.toast.login_to_upload"));
         return;
       }
-      // 200 MB cap — covers Thai-creator typical workflows (4k video
+      // 1 GB cap — covers longer creator video clips and voice-translate
       // clips, RAW DSLR photos, multi-page PSDs) without letting the
       // bucket get blasted. The bucket also has a server-side
       // file_size_limit migration of the same value as defence in
       // depth; this client check just gives a friendly toast instead
       // of waiting for the upload to fail mid-stream.
-      const MAX_BYTES = 200 * 1024 * 1024;
-      if (file.size > MAX_BYTES) {
+      if (file.size > MEDIA_UPLOAD_MAX_BYTES) {
         const sizeMb = Math.round(file.size / (1024 * 1024));
         toast.error(
-          `ไฟล์ใหญ่เกินไป (${sizeMb}MB) — สูงสุด 200MB / File too large (max 200 MB)`,
+          `ไฟล์ใหญ่เกินไป (${sizeMb}MB) — สูงสุด ${MEDIA_UPLOAD_MAX_LABEL} / File too large (max ${MEDIA_UPLOAD_MAX_LABEL})`,
         );
         return;
       }
@@ -961,9 +963,12 @@ const Inner = () => {
         (isModel3d ? "glb" : isVideo ? "mp4" : isAudio ? "mp3" : "png");
       const storagePath = `${user.id}/${crypto.randomUUID()}.${ext}`;
 
-      const { error: upErr } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(storagePath, file, { contentType: file.type, upsert: true });
+      const { error: upErr } = await uploadSupabaseStorageFile(
+        STORAGE_BUCKET,
+        storagePath,
+        file,
+        { contentType: file.type, upsert: true },
+      );
 
       if (upErr) {
         toast.error(t("workspace.toast.upload_failed", { name: file.name }));

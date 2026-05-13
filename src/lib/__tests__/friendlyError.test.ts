@@ -55,6 +55,11 @@ describe("friendlyError — credit-system errors", () => {
     expect(friendlyError("PROVIDER_BILLING_ERROR", "en")).toMatch(/AI provider is temporarily unavailable/);
   });
 
+  it("maps ElevenLabs quota errors to a provider-credit message", () => {
+    expect(friendlyError("ElevenLabs quota exceeded for this video. Quota exceeded.", "en"))
+      .toMatch(/ElevenLabs credits/);
+  });
+
   it("matches missing RPC functions (consume_credits / grant_credits)", () => {
     expect(friendlyError("function consume_credits_for(uuid) does not exist", "en"))
       .toMatch(/Credit system error/);
@@ -89,9 +94,9 @@ describe("friendlyError — RLS / storage errors", () => {
     expect(friendlyError("storage 404 not found", "en")).toMatch(/file is missing/);
   });
 
-  it("maps file-size errors to the 200MB ceiling copy", () => {
-    expect(friendlyError("file size exceeded", "en")).toMatch(/200 MB/);
-    expect(friendlyError("HTTP 413", "en")).toMatch(/200 MB/);
+  it("maps file-size errors to the 1GB ceiling copy", () => {
+    expect(friendlyError("file size exceeded", "en")).toMatch(/1 GB/);
+    expect(friendlyError("HTTP 413", "en")).toMatch(/1 GB/);
   });
 });
 

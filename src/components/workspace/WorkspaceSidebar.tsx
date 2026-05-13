@@ -121,7 +121,7 @@ const NAV_SECTIONS: SidebarSection[] = [
         { id: "image_gen", labelKey: "workspace.sidebar.image_gen", displayLabel: "Image", icon: ImageIcon },
         { id: "voice_gen", labelKey: "workspace.sidebar.voice_gen", displayLabel: "Audio", icon: Mic2 },
       ],
-      [{ id: "voice_translate", labelKey: "workspace.sidebar.voice_translate", displayLabel: "Voice Translate", icon: Languages, width: "full" }],
+      [{ id: "voice_translate", labelKey: "workspace.sidebar.voice_translate", displayLabel: "Translate", icon: Languages, width: "full" }],
       [{ id: "image_to_3d", labelKey: "workspace.sidebar.threed_gen", displayLabel: "3D Generator", icon: Box, width: "full" }],
     ],
   },
