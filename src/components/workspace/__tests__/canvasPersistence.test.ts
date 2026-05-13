@@ -14,7 +14,7 @@ function makeChain(result: unknown) {
     order: vi.fn(() => chain),
     maybeSingle: vi.fn(() => Promise.resolve(result)),
     insert: vi.fn(() => Promise.resolve(result)),
-    upsert: vi.fn(() => Promise.resolve(result)),
+    upsert: vi.fn(() => chain),
     update: vi.fn(() => chain),
     delete: vi.fn(() => chain),
     then: (onFulfilled: (v: unknown) => unknown) =>
@@ -71,6 +71,7 @@ const sampleCanvasRow = {
   viewport: { x: 0, y: 0, zoom: 1 },
   created_at: "2025-01-01T00:00:00Z",
   updated_at: "2025-01-02T00:00:00Z",
+  revision: 3,
 };
 
 describe("loadCanvasFromServer", () => {
@@ -87,6 +88,7 @@ describe("loadCanvasFromServer", () => {
       name: "My canvas",
       nodes: [{ id: "n1" }],
       edges: [{ id: "e1" }],
+      serverRevision: 3,
     });
     expect(result?.updatedAt).toBe(new Date("2025-01-02T00:00:00Z").getTime());
   });
@@ -196,7 +198,52 @@ describe("saveCanvasToServer", () => {
       nodes: [],
       edges: [],
     };
-    expect(await saveCanvasToServer(graph as never, "u1")).toEqual({ ok: true });
+    expect(await saveCanvasToServer(graph as never, "u1")).toEqual({ ok: true, revision: null });
+  });
+
+  it("blocks stale local saves that would strip existing node data", async () => {
+    const existingNodes = Array.from({ length: 4 }, (_, index) => ({
+      id: `n${index}`,
+      type: "imageGenNode",
+      data: {
+        label: "Image Generation",
+        params: { prompt: `detailed prompt ${index}` },
+        generations: [{ url: `https://example.test/${index}.png` }],
+      },
+    }));
+    const incomingNodes = existingNodes.map((node) => ({
+      id: node.id,
+      type: node.type,
+      data: { label: "Image Generation", params: { prompt: "" } },
+    }));
+    const handler = vi.fn()
+      .mockReturnValueOnce(makeChain({
+        data: {
+          id: "c1",
+          nodes: existingNodes,
+          edges: [{ id: "e1" }],
+          viewport: null,
+          revision: 12,
+          updated_at: "2026-05-13T08:00:00Z",
+        },
+        error: null,
+      }))
+      .mockReturnValueOnce(makeChain({ error: null }));
+    tableHandlers.set("workspace_canvases", handler);
+
+    const result = await saveCanvasToServer({
+      id: "c1",
+      ownerId: "u1",
+      projectId: null,
+      workspaceId: "ws1",
+      name: "n",
+      nodes: incomingNodes,
+      edges: [{ id: "e1" }],
+    } as never, "u1");
+
+    expect(result.ok).toBe(false);
+    expect(result.staleLocal).toBe(true);
+    expect(handler).toHaveBeenCalledTimes(1);
   });
 
   it("returns tableMissing=true when the canvases table is gone", async () => {

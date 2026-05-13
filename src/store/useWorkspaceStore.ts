@@ -88,6 +88,10 @@ export interface CanvasMeta {
   id: string;
   ownerId?: string | null;
   projectId: string | null;
+  /** Server-side revision from `workspace_canvases`. Present only
+   *  after a graph was fetched from Supabase or saved successfully.
+   *  Used to distinguish cloud truth from stale localStorage fallbacks. */
+  serverRevision?: number | null;
   /** Which workspace this tab belongs to. Tabs without a workspace
    *  are legacy persisted state from v1 and get migrated on load. */
   workspaceId: string;
@@ -962,6 +966,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               s.workspaces.find((w) => w.id === graph.workspaceId)?.projectId ??
               s.activeProjectId ??
               null,
+            serverRevision: graph.serverRevision ?? null,
             workspaceId: graph.workspaceId,
             name: graph.name,
             updatedAt: graph.updatedAt,
@@ -1007,6 +1012,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 workspaceProjectById.get(graph.workspaceId) ??
                 s.activeProjectId ??
                 null,
+              serverRevision: graph.serverRevision ?? null,
               workspaceId: graph.workspaceId,
               name: graph.name,
               updatedAt: graph.updatedAt,
@@ -1892,10 +1898,22 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             },
           ).map((c) => ({
             id: c.id,
+            ownerId:
+              typeof c.ownerId === "string"
+                ? c.ownerId
+                : typeof (c as unknown as { owner_id?: unknown }).owner_id === "string"
+                  ? String((c as unknown as { owner_id: string }).owner_id)
+                  : null,
             projectId:
               (typeof c.projectId === "string" && projectIds.has(c.projectId)
                 ? c.projectId
                 : workspaceProject.get(c.workspaceId)) ?? fallbackProjectId,
+            serverRevision:
+              typeof c.serverRevision === "number"
+                ? c.serverRevision
+                : typeof (c as unknown as { revision?: unknown }).revision === "number"
+                  ? Number((c as unknown as { revision: number }).revision)
+                  : null,
             workspaceId: c.workspaceId,
             name: c.name,
             updatedAt: typeof c.updatedAt === "number" ? c.updatedAt : Date.now(),
@@ -1911,11 +1929,23 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             // canvas is still openable, just without nodes.
             validGraphs[cid] = {
               id: cid,
+              ownerId:
+                typeof o.ownerId === "string"
+                  ? o.ownerId
+                  : typeof (o as { owner_id?: unknown }).owner_id === "string"
+                    ? String((o as { owner_id: string }).owner_id)
+                    : null,
               projectId:
                 (typeof o.projectId === "string" && projectIds.has(o.projectId)
                   ? o.projectId
                   : workspaceProject.get((o.workspaceId as string) ?? "")) ??
                 fallbackProjectId,
+              serverRevision:
+                typeof o.serverRevision === "number"
+                  ? o.serverRevision
+                  : typeof (o as { revision?: unknown }).revision === "number"
+                    ? Number((o as { revision: number }).revision)
+                    : null,
               workspaceId: (o.workspaceId as string) ?? "",
               name: (o.name as string) ?? "Untitled canvas",
               updatedAt: typeof o.updatedAt === "number" ? o.updatedAt : Date.now(),

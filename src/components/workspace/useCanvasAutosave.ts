@@ -35,6 +35,7 @@ import {
 } from "@/store/useWorkspaceShareRole";
 import {
   flushSaveOnUnload,
+  loadCanvasFromServer,
   saveCanvasToServer,
 } from "./canvasPersistence";
 
@@ -214,6 +215,15 @@ export function useCanvasAutosave(): SaveState {
         }
       } else if (res.tableMissing) {
         setState("tableMissing");
+        return;
+      } else if (res.staleLocal) {
+        void loadCanvasFromServer(saveGraph.id).then((serverGraph) => {
+          if (serverGraph) {
+            useWorkspaceStore.getState().replaceCanvasGraph(serverGraph);
+            lastSavedRef.current.set(serverGraph.id, fingerprint(serverGraph));
+          }
+          setState("idle");
+        });
         return;
       } else {
         console.error("[autosave] failed:", res.error);

@@ -37,6 +37,7 @@ interface ServerCanvasRow {
   nodes: unknown;
   edges: unknown;
   viewport: unknown;
+  revision?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -51,12 +52,61 @@ function rowToCanvasGraph(row: ServerCanvasRow): CanvasGraph {
     nodes: Array.isArray(row.nodes) ? (row.nodes as CanvasGraph["nodes"]) : [],
     edges: Array.isArray(row.edges) ? (row.edges as CanvasGraph["edges"]) : [],
     viewport: row.viewport as CanvasGraph["viewport"],
+    serverRevision: typeof row.revision === "number" ? row.revision : null,
     updatedAt: new Date(row.updated_at).getTime(),
   };
 }
 
 function rowHasContent(row: ServerCanvasRow): boolean {
   return Array.isArray(row.nodes) && row.nodes.length > 0;
+}
+
+function payloadStats(nodes: unknown, edges: unknown, viewport?: unknown) {
+  const safeStringify = (value: unknown) => {
+    try {
+      return JSON.stringify(value ?? null);
+    } catch {
+      return "";
+    }
+  };
+  const nodeList = Array.isArray(nodes) ? nodes : [];
+  let richFields = 0;
+  for (const node of nodeList) {
+    const data = (node as { data?: Record<string, unknown> } | null)?.data ?? {};
+    const params = (data.params && typeof data.params === "object"
+      ? data.params
+      : {}) as Record<string, unknown>;
+    const prompt = params.prompt ?? params.text ?? data.content ?? data.inputContent;
+    if (typeof prompt === "string" && prompt.trim().length > 0) richFields += 1;
+    if (typeof data.previewUrl === "string" && data.previewUrl) richFields += 1;
+    if (typeof data.storagePath === "string" && data.storagePath) richFields += 1;
+    if (Array.isArray(data.generations) && data.generations.length > 0) {
+      richFields += data.generations.length;
+    }
+  }
+  return {
+    nodeCount: nodeList.length,
+    edgeCount: Array.isArray(edges) ? edges.length : 0,
+    bytes:
+      safeStringify(nodes).length +
+      safeStringify(edges).length +
+      safeStringify(viewport ?? null).length,
+    richFields,
+  };
+}
+
+function looksLikeDestructiveStaleSave(
+  incoming: Pick<CanvasGraph, "nodes" | "edges" | "viewport">,
+  existing: Pick<ServerCanvasRow, "nodes" | "edges" | "viewport">,
+): boolean {
+  const next = payloadStats(incoming.nodes, incoming.edges, incoming.viewport);
+  const prev = payloadStats(existing.nodes, existing.edges, existing.viewport);
+  if (prev.nodeCount < 3) return false;
+  if (next.nodeCount !== prev.nodeCount) return false;
+  if (next.edgeCount !== prev.edgeCount) return false;
+  const lostRichFields = prev.richFields >= 3 && next.richFields < prev.richFields * 0.5;
+  const lostBytes = prev.bytes >= 6_000 && next.bytes < prev.bytes * 0.7;
+  return lostRichFields || lostBytes;
 }
 
 /** Fetch a canvas by id for the current user. Returns null if not
@@ -70,7 +120,7 @@ export async function loadCanvasFromServer(
     const { data, error } = await supabase
       .from("workspace_canvases")
       .select(
-        "id, user_id, project_id, workspace_id, name, nodes, edges, viewport, created_at, updated_at",
+        "id, user_id, project_id, workspace_id, name, nodes, edges, viewport, revision, created_at, updated_at",
       )
       .eq("id", canvasId)
       .maybeSingle();
@@ -139,7 +189,7 @@ export async function loadCanvasesByWorkspaceFromServer(
     const { data, error } = await supabase
       .from("workspace_canvases")
       .select(
-        "id, user_id, project_id, workspace_id, name, nodes, edges, viewport, created_at, updated_at",
+        "id, user_id, project_id, workspace_id, name, nodes, edges, viewport, revision, created_at, updated_at",
       )
       .eq("workspace_id", workspaceId)
       .order("updated_at", { ascending: false });
@@ -187,7 +237,7 @@ export async function loadLatestCanvasPreviewsByWorkspaceIds(
       const { data, error } = await supabase
         .from("workspace_canvases")
         .select(
-          "id, user_id, project_id, workspace_id, name, nodes, edges, viewport, created_at, updated_at",
+          "id, user_id, project_id, workspace_id, name, nodes, edges, viewport, revision, created_at, updated_at",
         )
         .in("workspace_id", batch)
         .order("updated_at", { ascending: false });
@@ -261,7 +311,39 @@ export async function saveCanvasToServer(
   userId: string,
 ): Promise<ServerWriteResult> {
   try {
-    const { error } = await supabase.from("workspace_canvases").upsert(
+    const existing = await supabase
+      .from("workspace_canvases")
+      .select("id, nodes, edges, viewport, revision, updated_at")
+      .eq("id", graph.id)
+      .maybeSingle();
+
+    if (existing.error) {
+      if (isMissingTableError(existing.error)) {
+        warnOnceAboutMissingTable();
+        return { ok: false, tableMissing: true };
+      }
+      return { ok: false, error: existing.error.message };
+    }
+
+    if (
+      existing.data &&
+      looksLikeDestructiveStaleSave(
+        graph,
+        existing.data as Pick<ServerCanvasRow, "nodes" | "edges" | "viewport">,
+      )
+    ) {
+      console.warn("[canvasPersistence] blocked destructive stale canvas save", {
+        canvasId: graph.id,
+        serverRevision: (existing.data as { revision?: number | null }).revision ?? null,
+      });
+      return {
+        ok: false,
+        staleLocal: true,
+        error: "Blocked stale local canvas snapshot that would remove existing node data.",
+      };
+    }
+
+    const { data, error } = await supabase.from("workspace_canvases").upsert(
       {
         id: graph.id,
         user_id: graph.ownerId ?? userId,
@@ -273,7 +355,7 @@ export async function saveCanvasToServer(
         viewport: graph.viewport ?? null,
       },
       { onConflict: "id" },
-    );
+    ).select("revision").maybeSingle();
     if (error) {
       if (isMissingTableError(error)) {
         warnOnceAboutMissingTable();
@@ -281,7 +363,10 @@ export async function saveCanvasToServer(
       }
       return { ok: false, error: error.message };
     }
-    return { ok: true };
+    return {
+      ok: true,
+      revision: typeof data?.revision === "number" ? data.revision : null,
+    };
   } catch (err) {
     return {
       ok: false,
@@ -299,6 +384,9 @@ export async function saveCanvasToServer(
  *  Fire-and-forget: we can't await anything during unload. */
 export function flushSaveOnUnload(graph: CanvasGraph, userId: string): void {
   try {
+    if (typeof graph.serverRevision !== "number") {
+      return;
+    }
     const url = (import.meta.env.VITE_SUPABASE_URL ?? "") +
       "/rest/v1/workspace_canvases?on_conflict=id";
     const apikey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "";
@@ -425,6 +513,8 @@ interface ServerProjectRow {
 export type ServerWriteResult = {
   ok: boolean;
   tableMissing?: boolean;
+  staleLocal?: boolean;
+  revision?: number | null;
   error?: string;
 };
 
