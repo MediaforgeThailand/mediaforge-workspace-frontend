@@ -33,6 +33,7 @@ import {
   Workflow,
   Image as ImageIcon,
   Images,
+  Languages,
   Video,
   Mic2,
   Settings as SettingsIcon,
@@ -71,6 +72,7 @@ export type SectionKey =
   | "image_gen"
   | "video_gen"
   | "voice_gen"
+  | "voice_translate"
   | "image_to_3d"
   | "assistant"
   | "tools"; // legacy "All tools" placeholder — still accepted
@@ -90,6 +92,7 @@ type NavItem = {
     | "workspace.sidebar.image_gen"
     | "workspace.sidebar.video_gen"
     | "workspace.sidebar.voice_gen"
+    | "workspace.sidebar.voice_translate"
     | "workspace.sidebar.threed_gen";
   displayLabel?: string;
   icon: LucideIcon;
@@ -118,6 +121,7 @@ const NAV_SECTIONS: SidebarSection[] = [
         { id: "image_gen", labelKey: "workspace.sidebar.image_gen", displayLabel: "Image", icon: ImageIcon },
         { id: "voice_gen", labelKey: "workspace.sidebar.voice_gen", displayLabel: "Audio", icon: Mic2 },
       ],
+      [{ id: "voice_translate", labelKey: "workspace.sidebar.voice_translate", displayLabel: "Voice Translate", icon: Languages, width: "full" }],
       [{ id: "image_to_3d", labelKey: "workspace.sidebar.threed_gen", displayLabel: "3D Generator", icon: Box, width: "full" }],
     ],
   },

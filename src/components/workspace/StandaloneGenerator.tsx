@@ -15,6 +15,7 @@ import {
   FolderOpen,
   GripVertical,
   ImagePlus,
+  Languages,
   Loader2,
   Menu,
   Pause,
@@ -24,6 +25,7 @@ import {
   Sparkles,
   SlidersHorizontal,
   Trash2,
+  UploadCloud,
   UserRound,
   X,
 } from "lucide-react";
@@ -112,6 +114,7 @@ const DEFAULT_VOICE_ID = "";
 
 const RUN_EDGE_FUNCTION = "workspace-run-node";
 const AUTO_PROMPT_EDGE_FUNCTION = "workspace-chat";
+const HEYGEN_TRANSLATE_EDGE_FUNCTION = "heygen-video-translate";
 const AUTO_PROMPT_MODEL = "gpt-5.5";
 const AUTO_PROMPT_SYSTEM_PROMPT = `You help MediaForge users create production-ready prompts for the active generation tool.
 Turn rough human language into a clear prompt that can be used immediately.
@@ -273,6 +276,7 @@ type UploadSlot =
   | "video-end"
   | "video-ref-image"
   | "video-ref-video"
+  | "translate-video"
   | "model-image";
 
 /** Optional reference role.
@@ -430,6 +434,18 @@ interface StandaloneResult {
   credits_spent?: number;
 }
 
+interface HeyGenTranslateTask {
+  id: string;
+  status: "submitted" | "queued" | "pending" | "processing" | "running" | "completed" | "failed";
+  outputLanguage: string;
+  sourceName: string;
+  sourceStorageBucket?: string;
+  sourceStoragePath?: string;
+  outputUrl?: string;
+  providerOutputUrl?: string;
+  error?: string;
+}
+
 type StandaloneVideoInputMode = "frames" | "reference";
 
 interface StandaloneFormState {
@@ -488,6 +504,12 @@ interface StandaloneFormState {
    *  of mapping a numeric slider so the on-wire value stays one of
    *  the documented Gemini tag tokens. */
   audioSpeed: "very_slow" | "normal" | "very_fast";
+  translateVideo: UploadedRef | null;
+  translateOutputLanguage: string;
+  translateMode: "fast" | "quality";
+  translateAudioOnly: boolean;
+  translateSpeakerNum: number;
+  translateConsent: boolean;
   modelImage: UploadedRef | null;
   modelImages: UploadedRef[];
   texture: boolean;
@@ -514,6 +536,15 @@ const DEFAULT_VOICE_PARAMS = {
   audioTagsEmotion: [] as string[],
   audioTagsPersonality: [] as string[],
   audioSpeed: "normal" as const,
+};
+
+const DEFAULT_TRANSLATE_PARAMS = {
+  translateVideo: null as UploadedRef | null,
+  translateOutputLanguage: "English",
+  translateMode: "fast" as const,
+  translateAudioOnly: false,
+  translateSpeakerNum: 1,
+  translateConsent: false,
 };
 
 /** Gemini audio-tag catalogue. The string in `tag` is the literal
@@ -604,6 +635,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     videoMultiPrompt: "",
     script: "",
     ...DEFAULT_VOICE_PARAMS,
+    ...DEFAULT_TRANSLATE_PARAMS,
     modelImage: null,
     modelImages: [],
     texture: true,
@@ -639,6 +671,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     videoMultiPrompt: "",
     script: "",
     ...DEFAULT_VOICE_PARAMS,
+    ...DEFAULT_TRANSLATE_PARAMS,
     modelImage: null,
     modelImages: [],
     texture: true,
@@ -674,6 +707,43 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     videoMultiPrompt: "",
     script: "",
     ...DEFAULT_VOICE_PARAMS,
+    ...DEFAULT_TRANSLATE_PARAMS,
+    modelImage: null,
+    modelImages: [],
+    texture: true,
+    pbr: true,
+  },
+  voice_translate: {
+    model: STANDALONE_TOOLS.voice_translate.defaultModel,
+    prompt: "",
+    styleId: "none",
+    aspectRatio: "16:9",
+    imageResolution: "1K",
+    quality: "medium",
+    outputFormat: "png",
+    background: "auto",
+    imageCount: 1,
+    imageRefs: [],
+    videoRatio: "16:9",
+    videoResolution: "720p",
+    videoDuration: 5,
+    videoCount: 1,
+    videoInputMode: "frames",
+    videoWithAudio: false,
+    videoStart: null,
+    videoEnd: null,
+    videoRefImage: null,
+    videoRefVideo: null,
+    videoCharacterOrientation: "video",
+    videoKeepOriginalSound: false,
+    videoNegativePrompt: "",
+    videoPersonGeneration: "allow_adult",
+    videoReturnLastFrame: false,
+    videoMultiShot: false,
+    videoMultiPrompt: "",
+    script: "",
+    ...DEFAULT_VOICE_PARAMS,
+    ...DEFAULT_TRANSLATE_PARAMS,
     modelImage: null,
     modelImages: [],
     texture: true,
@@ -709,6 +779,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     videoMultiPrompt: "",
     script: "",
     ...DEFAULT_VOICE_PARAMS,
+    ...DEFAULT_TRANSLATE_PARAMS,
     modelImage: null,
     modelImages: [],
     texture: true,
@@ -723,6 +794,7 @@ const STANDALONE_TOOL_TITLE_KEYS = {
   image_gen: "workspace.standalone.tool.image_gen.title",
   video_gen: "workspace.standalone.tool.video_gen.title",
   voice_gen: "workspace.standalone.tool.voice_gen.title",
+  voice_translate: "workspace.standalone.tool.voice_translate.title",
   image_to_3d: "workspace.standalone.tool.image_to_3d.title",
 } as const satisfies Record<StandaloneToolKey, TranslationKey>;
 
@@ -730,6 +802,7 @@ const STANDALONE_TOOL_NAV_KEYS = {
   image_gen: "workspace.standalone.tool.image_gen.nav",
   video_gen: "workspace.standalone.tool.video_gen.nav",
   voice_gen: "workspace.standalone.tool.voice_gen.nav",
+  voice_translate: "workspace.standalone.tool.voice_translate.nav",
   image_to_3d: "workspace.standalone.tool.image_to_3d.nav",
 } as const satisfies Record<StandaloneToolKey, TranslationKey>;
 
@@ -823,6 +896,7 @@ function standaloneCreateActionTitle(
     image_gen: { en: "Create Image", th: "สร้างรูปภาพ" },
     video_gen: { en: "Create Video", th: "สร้างวิดีโอ" },
     voice_gen: { en: "Create Audio", th: "สร้างเสียง" },
+    voice_translate: { en: "Translate Voice", th: "แปลเสียงวิดีโอ" },
     image_to_3d: { en: "Create 3D", th: "สร้าง 3D" },
   };
   return labels[tool][language];
@@ -845,6 +919,9 @@ function standaloneCreateButtonLabel(
   }
   if (tool === "image_gen") {
     return language === "th" ? "สร้างฟรี" : "Create for Free";
+  }
+  if (tool === "voice_translate") {
+    return language === "th" ? "เริ่มแปลเสียง" : "Translate Voice";
   }
   return language === "th" ? "สร้าง" : "Generate";
 }
@@ -1116,6 +1193,7 @@ export default function StandaloneGenerator({
   const [deleteReferenceTarget, setDeleteReferenceTarget] =
     useState<DeletableReference | null>(null);
   const [deletingReference, setDeletingReference] = useState(false);
+  const [translateTask, setTranslateTask] = useState<HeyGenTranslateTask | null>(null);
 
   const activeDef = STANDALONE_TOOLS[activeTool];
   const form = forms[activeTool];
@@ -1140,6 +1218,7 @@ export default function StandaloneGenerator({
   const jobsQuery = useStandaloneJobs(user?.id, activeProject?.id);
   const projectReferencesQuery = useProjectReferenceAssets(user?.id, activeProject?.id);
   const refetchJobs = jobsQuery.refetch;
+  const refetchProjectReferences = projectReferencesQuery.refetch;
   const hasActiveJobs = (jobsQuery.data ?? []).some((job) =>
     ["queued", "running"].includes(job.status),
   );
@@ -1173,6 +1252,10 @@ export default function StandaloneGenerator({
     }, 5000);
     return () => window.clearInterval(timer);
   }, [hasActiveJobs, refetchJobs]);
+
+  useEffect(() => {
+    setTranslateTask(null);
+  }, [activeProject?.id]);
 
   useEffect(() => {
     if (!user?.id || !activeProject?.id) return;
@@ -1235,6 +1318,89 @@ export default function StandaloneGenerator({
       window.clearInterval(timer);
     };
   }, [activeJobIdsKey, activeJobs, refetchJobs]);
+
+  useEffect(() => {
+    if (!translateTask?.id) return;
+    if (translateTask.status === "completed" || translateTask.status === "failed") return;
+    let cancelled = false;
+    let timer: number | undefined;
+
+    const pollTranslateTask = async () => {
+      if (cancelled || !translateTask?.id) return;
+      try {
+        const { data, error } = await supabase.functions.invoke(
+          HEYGEN_TRANSLATE_EDGE_FUNCTION,
+          {
+            body: {
+              action: "status",
+              video_translate_id: translateTask.id,
+              project_id: activeProject?.id ?? null,
+              output_language: translateTask.outputLanguage,
+              source_storage_bucket: translateTask.sourceStorageBucket,
+              source_storage_path: translateTask.sourceStoragePath,
+              mirror: true,
+            },
+          },
+        );
+        if (error) throw new Error(await functionErrorMessage(error));
+        const result = data as {
+          status?: HeyGenTranslateTask["status"];
+          output_url?: string;
+          provider_output_url?: string;
+          error?: string;
+        } | null;
+        const nextStatus = result?.status ?? "processing";
+        setTranslateTask((prev) =>
+          prev?.id === translateTask.id
+            ? {
+                ...prev,
+                status: nextStatus,
+                outputUrl: result?.output_url || prev.outputUrl,
+                providerOutputUrl:
+                  result?.provider_output_url || prev.providerOutputUrl,
+                error: result?.error || prev.error,
+              }
+            : prev,
+        );
+        if (nextStatus === "completed") {
+          toast.success(
+            language === "th"
+              ? "แปลเสียงวิดีโอเสร็จแล้ว"
+              : "Video voice translation is ready.",
+          );
+          void refetchProjectReferences();
+          return;
+        }
+        if (nextStatus === "failed") {
+          toast.error(result?.error || "HeyGen video translation failed.");
+          return;
+        }
+      } catch (err) {
+        console.info(
+          "[heygen-video-translate] status poll skipped",
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+      if (!cancelled) {
+        timer = window.setTimeout(() => void pollTranslateTask(), 6000);
+      }
+    };
+
+    timer = window.setTimeout(() => void pollTranslateTask(), 2500);
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [
+    activeProject?.id,
+    language,
+    refetchProjectReferences,
+    translateTask?.id,
+    translateTask?.outputLanguage,
+    translateTask?.sourceStorageBucket,
+    translateTask?.sourceStoragePath,
+    translateTask?.status,
+  ]);
 
   const updateForm = (patch: Partial<StandaloneFormState>) => {
     setForms((prev) => {
@@ -1359,6 +1525,7 @@ export default function StandaloneGenerator({
   const packageDiscountLabel = credits?.package_discount_label ?? null;
 
   const estimatedCostQuote = useMemo(() => {
+    if (activeTool === "voice_translate") return null;
     if (creditCostsLoading) return null;
     const params = buildCurrentParams(activeTool, form);
     if (!params) return null;
@@ -1479,6 +1646,8 @@ export default function StandaloneGenerator({
           : [form.videoStart, videoSupportsEnd ? form.videoEnd : null].filter(Boolean)
         : activeTool === "image_to_3d"
           ? threeDReferencesForForm(form)
+          : activeTool === "voice_translate"
+            ? [form.translateVideo].filter(Boolean)
           : [];
 
   const panelMaxReferences =
@@ -1495,6 +1664,8 @@ export default function StandaloneGenerator({
               : 0
         : activeTool === "image_to_3d"
           ? max3dRefsForModel(form.model)
+          : activeTool === "voice_translate"
+            ? 1
           : 0;
 
   const getPanelReferenceSlot = (): UploadSlot | null => {
@@ -1503,6 +1674,9 @@ export default function StandaloneGenerator({
     }
     if (activeTool === "image_to_3d") {
       return "model-image";
+    }
+    if (activeTool === "voice_translate") {
+      return "translate-video";
     }
     if (activeTool === "video_gen") {
       if (videoPanelMode === "frames") {
@@ -1562,6 +1736,8 @@ export default function StandaloneGenerator({
         patch.videoRefImage = uploaded;
       } else if (slot === "video-ref-video") {
         patch.videoRefVideo = uploaded;
+      } else if (slot === "translate-video") {
+        patch.translateVideo = uploaded;
       } else if (slot === "model-image") {
         const maxRefs = max3dRefsForModel(current.model);
         const existingRefs = threeDReferencesForForm(current);
@@ -1600,7 +1776,7 @@ export default function StandaloneGenerator({
     setUploading(slot);
     try {
       for (const file of candidates) {
-        const needsVideo = slot === "video-ref-video";
+        const needsVideo = slot === "video-ref-video" || slot === "translate-video";
         const isValidType = needsVideo
           ? file.type.startsWith("video/")
           : file.type.startsWith("image/");
@@ -1645,11 +1821,12 @@ export default function StandaloneGenerator({
     const slot = slotOverride ?? getPanelReferenceSlot();
     if (!slot) return;
     const referenceMime = reference.mime ?? "image/jpeg";
-    if (slot === "video-ref-video" && !referenceMime.startsWith("video/")) {
+    const expectsVideo = slot === "video-ref-video" || slot === "translate-video";
+    if (expectsVideo && !referenceMime.startsWith("video/")) {
       toast.error(t("workspace.toast.upload_video_ref"));
       return;
     }
-    if (slot !== "video-ref-video" && referenceMime.startsWith("video/")) {
+    if (!expectsVideo && referenceMime.startsWith("video/")) {
       toast.error(t("workspace.toast.upload_image_ref"));
       return;
     }
@@ -1753,6 +1930,8 @@ export default function StandaloneGenerator({
         const nextRefs = threeDReferencesForForm(current).filter((ref) => ref.id !== id);
         patch.modelImages = nextRefs;
         patch.modelImage = nextRefs[0] ?? null;
+      } else if (activeTool === "voice_translate" && current.translateVideo?.id === id) {
+        patch.translateVideo = null;
       }
       return {
         ...prev,
@@ -1883,10 +2062,11 @@ export default function StandaloneGenerator({
       videoPanelMode === "reference" &&
       isKlingMotionVideoModel(form.model);
     const wantsVideoAssets =
-      activeTool === "video_gen" &&
-      videoPanelMode === "reference" &&
-      videoSupportsReferenceVideo(form.model) &&
-      (!videoSupportsReferenceImage(form.model) || !!form.videoRefImage);
+      activeTool === "voice_translate" ||
+      (activeTool === "video_gen" &&
+        videoPanelMode === "reference" &&
+        videoSupportsReferenceVideo(form.model) &&
+        (!videoSupportsReferenceImage(form.model) || !!form.videoRefImage));
     return mergeReferenceOptions([
       ...(jobsQuery.data ?? []).map(referenceFromGenerationJob),
       ...(projectReferencesQuery.data ?? []),
@@ -1982,6 +2162,59 @@ export default function StandaloneGenerator({
     } finally {
       setAutoPrompting(false);
     }
+  };
+
+  const startVoiceTranslate = async () => {
+    const video = form.translateVideo;
+    if (!video?.url) {
+      toast.error(
+        language === "th"
+          ? "อัปโหลดวิดีโอ MP4 ก่อนเริ่มแปลเสียง"
+          : "Upload an MP4 video before translating voice.",
+      );
+      return;
+    }
+    const outputLanguage = form.translateOutputLanguage.trim();
+    const { data, error } = await supabase.functions.invoke(
+      HEYGEN_TRANSLATE_EDGE_FUNCTION,
+      {
+        body: {
+          action: "start",
+          video_url: video.url,
+          output_language: outputLanguage,
+          mode: form.translateMode,
+          translate_audio_only: form.translateAudioOnly,
+          speaker_num: form.translateSpeakerNum,
+          project_id: activeProject?.id ?? null,
+          source_storage_bucket: video.storageBucket,
+          source_storage_path: video.storagePath,
+          consent: form.translateConsent,
+        },
+      },
+    );
+    if (error) throw new Error(await functionErrorMessage(error));
+    const result = data as {
+      video_translate_id?: string;
+      status?: HeyGenTranslateTask["status"];
+      error?: string;
+    } | null;
+    if (result?.error) throw new Error(result.error);
+    if (!result?.video_translate_id) {
+      throw new Error("HeyGen did not return a video_translate_id.");
+    }
+    setTranslateTask({
+      id: result.video_translate_id,
+      status: result.status ?? "submitted",
+      outputLanguage,
+      sourceName: video.name,
+      sourceStorageBucket: video.storageBucket,
+      sourceStoragePath: video.storagePath,
+    });
+    toast.success(
+      language === "th"
+        ? "ส่งวิดีโอไปแปลเสียงแล้ว ระบบจะอัปเดตผลลัพธ์ให้อัตโนมัติ"
+        : "Video voice translation started. The result will update automatically.",
+    );
   };
 
   const videoRatioOptions = videoRatioOptionsForModel(form.model);
@@ -2224,6 +2457,14 @@ export default function StandaloneGenerator({
         toast.error(validation);
         return;
       }
+      if (activeTool === "voice_translate") {
+        try {
+          await startVoiceTranslate();
+        } catch (err) {
+          toast.error(friendlyError(err, language === "th" ? "th" : "en"));
+        }
+        return;
+      }
       if (
         activeTool === "video_gen" &&
         form.videoInputMode === "reference" &&
@@ -2369,7 +2610,20 @@ export default function StandaloneGenerator({
       <div className="ws-scroll-hide flex min-h-0 flex-1 flex-col overflow-y-auto bg-[var(--bg-app)] lg:flex-row lg:overflow-hidden">
         <aside className="ws-scroll-hide mx-auto flex min-h-[calc(100dvh-68px)] w-full max-w-[480px] shrink-0 flex-col bg-transparent px-[12px] pb-[12px] pt-[4px] lg:mx-0 lg:h-full lg:min-h-0 lg:w-[488px] lg:max-w-none lg:pb-0 lg:pl-2 lg:pr-0 lg:pt-0">
           {STANDALONE_TOOL_ORDER.includes(activeTool) ? (
-            activeTool === "video_gen" ? (
+            activeTool === "voice_translate" ? (
+            <VoiceTranslatePanel
+              form={form}
+              uploading={uploading === "translate-video"}
+              running={running}
+              task={translateTask}
+              language={language}
+              onChange={updateForm}
+              onUpload={() => openUpload("translate-video")}
+              onVideoFiles={(files) => void uploadPanelReferenceFiles(files, "translate-video")}
+              onRemoveVideo={() => updateForm({ translateVideo: null })}
+              onCreate={() => void run()}
+            />
+            ) : activeTool === "video_gen" ? (
             <CreateVideoPanel
               title={videoPanelTitle}
               modelCaption={t("workspace.standalone.model")}
@@ -3042,6 +3296,333 @@ function ProjectPicker({
         </div>
       )}
     </div>
+  );
+}
+
+const HEYGEN_TRANSLATE_LANGUAGE_OPTIONS = [
+  "English",
+  "Thai",
+  "Japanese",
+  "Korean",
+  "Chinese",
+  "Indonesian",
+  "Vietnamese",
+  "Spanish",
+  "French",
+  "German",
+  "Portuguese",
+  "Arabic",
+  "Hindi",
+];
+
+function videoFilesFromTransfer(data: DataTransfer | null): File[] {
+  if (!data) return [];
+  const files: File[] = [];
+  const seen = new Set<string>();
+  const push = (file: File | null) => {
+    if (!file || !file.type.startsWith("video/")) return;
+    const key = `${file.name}:${file.size}:${file.type}:${file.lastModified}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    files.push(file);
+  };
+  Array.from(data.items ?? []).forEach((item) => {
+    if (item.kind === "file") push(item.getAsFile());
+  });
+  Array.from(data.files ?? []).forEach(push);
+  return files;
+}
+
+function VoiceTranslatePanel({
+  form,
+  uploading,
+  running,
+  task,
+  language,
+  onChange,
+  onUpload,
+  onVideoFiles,
+  onRemoveVideo,
+  onCreate,
+}: {
+  form: StandaloneFormState;
+  uploading: boolean;
+  running: boolean;
+  task: HeyGenTranslateTask | null;
+  language: ReturnType<typeof useLanguage>["language"];
+  onChange: (patch: Partial<StandaloneFormState>) => void;
+  onUpload: () => void;
+  onVideoFiles: (files: File[]) => void;
+  onRemoveVideo: () => void;
+  onCreate: () => void;
+}) {
+  const th = language === "th";
+  const copy = {
+    title: th ? "แปลเสียงวิดีโอ" : "Video Voice Translate",
+    subtitle: th
+      ? "อัปโหลด MP4 แล้วให้ HeyGen แปลเสียงเป็นภาษาใหม่ โดยพยายามรักษาโทนเสียงของผู้พูดเดิม"
+      : "Upload an MP4 and let HeyGen translate the speech while preserving a similar speaker voice.",
+    uploadTitle: th ? "วิดีโอต้นฉบับ" : "Source video",
+    uploadHint: th ? "ลาก MP4 มาวาง หรือคลิกเพื่ออัปโหลด" : "Drop an MP4 here or click to upload",
+    target: th ? "ภาษาเป้าหมาย" : "Target language",
+    mode: th ? "โหมดงาน" : "Mode",
+    fast: th ? "เร็ว" : "Fast",
+    quality: th ? "คุณภาพ" : "Quality",
+    audioOnly: th ? "แปลเฉพาะเสียง" : "Translate audio only",
+    speakers: th ? "จำนวนผู้พูด" : "Speakers",
+    consent: th
+      ? "ฉันมีสิทธิ์ใช้วิดีโอนี้และได้รับอนุญาตให้แปล/โคลนเสียงของผู้พูด"
+      : "I have permission to translate this video and clone/preserve the speaker voice.",
+    action: th ? "เริ่มแปลเสียง" : "Translate Voice",
+    processing: th ? "กำลังแปลเสียง" : "Translating voice",
+    result: th ? "ผลลัพธ์" : "Result",
+    noResult: th ? "ผลลัพธ์จะแสดงที่นี่หลัง HeyGen ทำงานเสร็จ" : "The translated video will appear here when HeyGen finishes.",
+    download: th ? "ดาวน์โหลด" : "Download",
+  };
+
+  const addFiles = (files: File[]) => {
+    const videos = files.filter((file) => file.type.startsWith("video/"));
+    if (videos.length > 0) onVideoFiles(videos.slice(0, 1));
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    addFiles(videoFilesFromTransfer(event.dataTransfer));
+  };
+
+  const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    const files = videoFilesFromTransfer(event.clipboardData);
+    if (files.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    addFiles(files);
+  };
+
+  const isBusy =
+    running ||
+    uploading ||
+    task?.status === "submitted" ||
+    task?.status === "queued" ||
+    task?.status === "pending" ||
+    task?.status === "processing" ||
+    task?.status === "running";
+
+  return (
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-[var(--border-overlay)] bg-[var(--bg-sidebar)] shadow-[inset_0_1px_0_rgba(255,255,255,.05),0_22px_50px_-38px_rgba(238,255,0,.45)]">
+      <div className="flex h-[64px] shrink-0 items-center gap-3 border-b border-white/[0.05] px-4">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-200">
+          <Languages className="h-5 w-5" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="truncate text-[18px] font-bold text-white">{copy.title}</h2>
+          <p className="truncate text-[12px] text-zinc-400">{copy.subtitle}</p>
+        </div>
+      </div>
+
+      <div className="ws-scroll-hide min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={onUpload}
+            onPaste={handlePaste}
+            onDragOver={(event) => {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "copy";
+            }}
+            onDrop={handleDrop}
+            className={cn(
+              "group relative flex min-h-[170px] w-full overflow-hidden rounded-[16px] border text-left transition",
+              form.translateVideo
+                ? "border-white/10 bg-black/30"
+                : "border-dashed border-cyan-300/35 bg-cyan-300/[0.04] hover:border-cyan-200/70 hover:bg-cyan-300/[0.07]",
+            )}
+          >
+            {form.translateVideo ? (
+              <>
+                <video
+                  src={form.translateVideo.url}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="h-full min-h-[170px] w-full object-cover"
+                />
+                <span className="absolute left-3 top-3 max-w-[70%] truncate rounded-full border border-black/30 bg-black/70 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
+                  {form.translateVideo.name}
+                </span>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRemoveVideo();
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onRemoveVideo();
+                    }
+                  }}
+                  className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-black/70 text-white transition hover:bg-white/15"
+                  aria-label="Remove source video"
+                >
+                  <X className="h-4 w-4" />
+                </span>
+              </>
+            ) : (
+              <div className="flex w-full flex-col items-center justify-center gap-3 px-4 py-8 text-center">
+                <span className="grid h-12 w-12 place-items-center rounded-2xl border border-cyan-200/20 bg-cyan-200/10 text-cyan-200">
+                  {uploading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <UploadCloud className="h-5 w-5" />
+                  )}
+                </span>
+                <div>
+                  <p className="text-[14px] font-bold text-white">{copy.uploadTitle}</p>
+                  <p className="mt-1 text-[12px] text-zinc-400">{copy.uploadHint}</p>
+                </div>
+              </div>
+            )}
+          </button>
+
+          <div className="rounded-[16px] border border-white/[0.07] bg-white/[0.025] p-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="space-y-1.5">
+                <span className="text-[11px] font-semibold text-zinc-400">{copy.target}</span>
+                <select
+                  value={form.translateOutputLanguage}
+                  onChange={(event) =>
+                    onChange({ translateOutputLanguage: event.target.value })
+                  }
+                  className="h-10 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-[13px] font-semibold text-white outline-none transition focus:border-cyan-300/50"
+                >
+                  {HEYGEN_TRANSLATE_LANGUAGE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-1.5">
+                <span className="text-[11px] font-semibold text-zinc-400">{copy.speakers}</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={12}
+                  value={form.translateSpeakerNum}
+                  onChange={(event) =>
+                    onChange({
+                      translateSpeakerNum: Math.max(
+                        1,
+                        Math.min(12, Number(event.target.value) || 1),
+                      ),
+                    })
+                  }
+                  className="h-10 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-[13px] font-semibold text-white outline-none transition focus:border-cyan-300/50"
+                />
+              </label>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {(["fast", "quality"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => onChange({ translateMode: mode })}
+                  className={cn(
+                    "h-10 rounded-xl border text-[12px] font-bold transition",
+                    form.translateMode === mode
+                      ? "border-cyan-300/60 bg-cyan-300/15 text-cyan-100"
+                      : "border-white/10 bg-black/20 text-zinc-400 hover:bg-white/[0.06] hover:text-white",
+                  )}
+                >
+                  {mode === "fast" ? copy.fast : copy.quality}
+                </button>
+              ))}
+            </div>
+
+            <label className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+              <span className="text-[12px] font-semibold text-zinc-300">{copy.audioOnly}</span>
+              <input
+                type="checkbox"
+                checked={form.translateAudioOnly}
+                onChange={(event) =>
+                  onChange({ translateAudioOnly: event.target.checked })
+                }
+                className="h-4 w-4 accent-cyan-300"
+              />
+            </label>
+
+            <label className="mt-3 flex items-start gap-2 rounded-xl border border-white/10 bg-black/20 p-3">
+              <input
+                type="checkbox"
+                checked={form.translateConsent}
+                onChange={(event) => onChange({ translateConsent: event.target.checked })}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-cyan-300"
+              />
+              <span className="text-[12px] leading-relaxed text-zinc-300">{copy.consent}</span>
+            </label>
+          </div>
+
+          <div className="rounded-[16px] border border-white/[0.07] bg-white/[0.025] p-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <h3 className="text-[13px] font-bold text-white">{copy.result}</h3>
+              {task?.status && (
+                <span className="rounded-full border border-white/10 bg-black/30 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-300">
+                  {task.status}
+                </span>
+              )}
+            </div>
+            {task?.outputUrl ? (
+              <div className="space-y-2">
+                <video
+                  src={task.outputUrl}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="aspect-video w-full rounded-xl bg-black object-contain"
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    void downloadFromUrl(
+                      task.outputUrl as string,
+                      buildDownloadFilename("heygen-video-translate", "mp4"),
+                    )
+                  }
+                  className="inline-flex h-9 items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 text-[12px] font-semibold text-white transition hover:bg-white/[0.1]"
+                >
+                  <Download className="h-4 w-4" />
+                  {copy.download}
+                </button>
+              </div>
+            ) : (
+              <p className="text-[12px] leading-relaxed text-zinc-400">
+                {task?.error || copy.noResult}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="shrink-0 border-t border-white/[0.05] bg-[var(--bg-sidebar)] px-3 py-3">
+        <button
+          type="button"
+          onClick={onCreate}
+          disabled={isBusy || !form.translateVideo || !form.translateConsent}
+          className="btn-cta flex h-12 w-full items-center justify-center gap-2 text-[14px] disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-300 disabled:shadow-none disabled:opacity-70"
+        >
+          {isBusy ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <GenerateIcon className="h-4 w-4" />
+          )}
+          {isBusy ? copy.processing : copy.action}
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -6269,7 +6850,7 @@ function standaloneCanvasId(projectId: string): string {
 }
 
 function uploadAcceptForSlot(slot: UploadSlot): string {
-  return slot === "video-ref-video" ? "video/*" : "image/*";
+  return slot === "video-ref-video" || slot === "translate-video" ? "video/*" : "image/*";
 }
 
 function useStandaloneJobs(
@@ -6696,6 +7277,15 @@ function buildCurrentParams(
       voiceStyleAmount: form.voiceStyleAmount,
     });
   }
+  if (tool === "voice_translate") {
+    return {
+      model_name: "heygen-video-translate",
+      output_language: form.translateOutputLanguage.trim(),
+      mode: form.translateMode,
+      translate_audio_only: String(form.translateAudioOnly),
+      speaker_num: form.translateSpeakerNum,
+    };
+  }
   if (tool === "image_to_3d") {
     return build3dParams({
       model: form.model,
@@ -6769,6 +7359,9 @@ function buildCurrentInputs(
         : {}),
     };
   }
+  if (tool === "voice_translate") {
+    return form.translateVideo ? { video_url: form.translateVideo.url } : {};
+  }
   return {};
 }
 
@@ -6817,6 +7410,17 @@ function validateForm(
   }
   if (tool === "voice_gen" && form.script.length > 5000) {
     return t("workspace.standalone.validation.script_too_long");
+  }
+  if (tool === "voice_translate") {
+    if (!form.translateVideo) {
+      return t("workspace.standalone.validation.translate_video");
+    }
+    if (!form.translateOutputLanguage.trim()) {
+      return t("workspace.standalone.validation.translate_language");
+    }
+    if (!form.translateConsent) {
+      return t("workspace.standalone.validation.translate_consent");
+    }
   }
   if (tool === "image_to_3d" && threeDReferencesForForm(form).length === 0) {
     return t("workspace.standalone.validation.model_image");

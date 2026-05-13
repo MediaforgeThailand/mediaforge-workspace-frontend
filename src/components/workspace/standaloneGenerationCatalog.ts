@@ -2,6 +2,7 @@ import {
   Box,
   Film,
   Image as ImageIcon,
+  Languages,
   Mic2,
   Sparkles,
   type LucideIcon,
@@ -16,6 +17,7 @@ export type StandaloneToolKey =
   | "image_gen"
   | "video_gen"
   | "voice_gen"
+  | "voice_translate"
   | "image_to_3d";
 
 export type GenerationOutputType = "image" | "video" | "audio" | "text" | "model_3d";
@@ -43,7 +45,7 @@ export interface StandaloneToolDefinition {
   title: string;
   subtitle: string;
   navLabel: string;
-  nodeType: "imageGenNode" | "videoGenNode" | "audioGenNode" | "imageTo3dNode";
+  nodeType: "imageGenNode" | "videoGenNode" | "audioGenNode" | "voiceTranslateNode" | "imageTo3dNode";
   icon: LucideIcon;
   outputType: GenerationOutputType;
   accent: string;
@@ -312,6 +314,26 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
       },
     ],
   },
+  voice_translate: {
+    key: "voice_translate",
+    title: "Video Voice Translate",
+    subtitle: "Translate MP4 voice while preserving the speaker",
+    navLabel: "Translate",
+    nodeType: "voiceTranslateNode",
+    icon: Languages,
+    outputType: "video",
+    accent: "hsl(188 90% 52%)",
+    defaultModel: "heygen-video-translate",
+    models: [
+      {
+        id: "heygen-video-translate",
+        label: "HeyGen Video Translate",
+        provider: "HeyGen",
+        badge: "Voice Clone",
+        description: "Translate video speech into another language while keeping a similar voice.",
+      },
+    ],
+  },
   image_to_3d: {
     key: "image_to_3d",
     title: "3D Generator",
@@ -371,6 +393,7 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
 export const STANDALONE_TOOL_ORDER: StandaloneToolKey[] = [
   "video_gen",
   "image_gen",
+  "voice_translate",
   "image_to_3d",
   "voice_gen",
 ];

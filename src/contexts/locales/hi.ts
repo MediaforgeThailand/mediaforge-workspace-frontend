@@ -2091,6 +2091,7 @@ export const hi = {
   "workspace.sidebar.image_gen": "छवि जनरेटर",
   "workspace.sidebar.video_gen": "वीडियो जनरेशन",
   "workspace.sidebar.voice_gen": "आवाज जनरेटर",
+  "workspace.sidebar.voice_translate": "वीडियो आवाज अनुवाद",
   "workspace.sidebar.threed_gen": "3 डी जेनरेटर",
   "workspace.sidebar.create": "बनाएं",
   "workspace.sidebar.assets": "एसेट्स",
@@ -2287,6 +2288,8 @@ export const hi = {
   "workspace.standalone.tool.video_gen.title": "वीडियो जनरेशन",
   "workspace.standalone.tool.voice_gen.nav": "ऑडियो",
   "workspace.standalone.tool.voice_gen.title": "आवाज जनरेटर",
+  "workspace.standalone.tool.voice_translate.nav": "अनुवाद",
+  "workspace.standalone.tool.voice_translate.title": "वीडियो आवाज अनुवाद",
   "workspace.standalone.tool.image_to_3d.nav": "3 डी",
   "workspace.standalone.tool.image_to_3d.title": "3D में छवि",
   "workspace.standalone.generate": "जनरेट करें",
@@ -2554,6 +2557,12 @@ export const hi = {
     "वॉयस जेनरेशन के लिए एक स्क्रिप्ट की आवश्यकता होती है।",
   "workspace.standalone.validation.script_too_long":
     "स्क्रिप्ट बहुत लंबी है. अधिकतम 5,000 अक्षर हैं.",
+  "workspace.standalone.validation.translate_video":
+    "आवाज अनुवाद से पहले MP4 वीडियो अपलोड करें।",
+  "workspace.standalone.validation.translate_language":
+    "आउटपुट भाषा चुनें।",
+  "workspace.standalone.validation.translate_consent":
+    "पुष्टि करें कि आपके पास इस आवाज का अनुवाद और क्लोन करने की अनुमति है।",
   "workspace.standalone.validation.model_image":
     "3D जनरेशन को एक संदर्भ छवि की आवश्यकता होती है।",
   "workspace.standalone.error_failed_queue": "जनरेशन को कतारबद्ध करने में विफल",

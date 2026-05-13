@@ -2321,6 +2321,7 @@ export const es = {
   "workspace.sidebar.image_gen": "Generador de imágenes",
   "workspace.sidebar.video_gen": "Generador de vídeos",
   "workspace.sidebar.voice_gen": "Generador de voz",
+  "workspace.sidebar.voice_translate": "Traducir voz de vídeo",
   "workspace.sidebar.threed_gen": "Generador 3D",
   "workspace.sidebar.create": "crear",
   "workspace.sidebar.assets": "recursos",
@@ -2534,6 +2535,8 @@ export const es = {
   "workspace.standalone.tool.video_gen.title": "Generador de vídeos",
   "workspace.standalone.tool.voice_gen.nav": "Audio",
   "workspace.standalone.tool.voice_gen.title": "Generador de voz",
+  "workspace.standalone.tool.voice_translate.nav": "Traducir",
+  "workspace.standalone.tool.voice_translate.title": "Traducir voz de vídeo",
   "workspace.standalone.tool.image_to_3d.nav": "3D",
   "workspace.standalone.tool.image_to_3d.title": "Imagen a 3D",
   "workspace.standalone.generate": "Generar",
@@ -2802,6 +2805,12 @@ export const es = {
     "La generación de voz necesita un guión.",
   "workspace.standalone.validation.script_too_long":
     "El guión es demasiado largo. El máximo es 5.000 caracteres.",
+  "workspace.standalone.validation.translate_video":
+    "Sube un vídeo MP4 antes de traducir la voz.",
+  "workspace.standalone.validation.translate_language":
+    "Elige el idioma de salida.",
+  "workspace.standalone.validation.translate_consent":
+    "Confirma que tienes permiso para traducir y clonar esta voz.",
   "workspace.standalone.validation.model_image":
     "La generación 3D necesita una imagen de referencia.",
   "workspace.standalone.error_failed_queue": "No se pudo generar la cola",

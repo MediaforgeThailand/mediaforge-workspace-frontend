@@ -493,6 +493,7 @@ const VALID_SECTIONS: Section[] = [
   "image_gen",
   "video_gen",
   "voice_gen",
+  "voice_translate",
   "image_to_3d",
 ];
 
@@ -500,6 +501,7 @@ const STANDALONE_SECTIONS = new Set<SectionKey>([
   "image_gen",
   "video_gen",
   "voice_gen",
+  "voice_translate",
   "image_to_3d",
 ]);
 
@@ -1257,7 +1259,7 @@ const HomeFeatureShowcase = ({ onSection }: { onSection: (section: Section) => v
               onMouseEnter={() => setActiveId(item.id)}
               onFocus={() => setActiveId(item.id)}
               className={cn(
-                "group relative h-[192px] overflow-visible rounded-[22px] border border-transparent p-0 text-left transition duration-300 ease-out sm:h-[224px] xl:h-[205px]",
+                "group relative h-[216px] overflow-visible rounded-[22px] border border-transparent p-0 text-left transition duration-300 ease-out sm:h-[246px] xl:h-[224px]",
                 isActive
                   ? "z-10"
                   : "hover:z-10",
@@ -1265,7 +1267,7 @@ const HomeFeatureShowcase = ({ onSection }: { onSection: (section: Section) => v
             >
               <span
                 className={cn(
-                  "pointer-events-none absolute bottom-0 left-1/2 h-[129px] w-full -translate-x-1/2 rounded-[22px] border border-white/10 bg-gradient-to-br opacity-70 transition duration-300 group-hover:border-[#eeff15]/50 group-focus-visible:border-[#eeff15]/50 sm:h-[152px] sm:w-[96%] xl:h-[131px] xl:w-[94%]",
+                  "pointer-events-none absolute bottom-[36px] left-1/2 h-[118px] w-full -translate-x-1/2 rounded-[22px] border border-white/10 bg-gradient-to-br opacity-70 transition duration-300 group-hover:border-[#eeff15]/50 group-focus-visible:border-[#eeff15]/50 sm:bottom-[40px] sm:h-[138px] sm:w-[96%] xl:bottom-[38px] xl:h-[120px] xl:w-[94%]",
                   item.tint,
                 )}
               />
@@ -1273,7 +1275,7 @@ const HomeFeatureShowcase = ({ onSection }: { onSection: (section: Section) => v
                 src={item.tileImage}
                 alt=""
                 className={cn(
-                  "pointer-events-none absolute left-1/2 bottom-[42px] h-[104px] w-[88%] -translate-x-1/2 rounded-[14px] object-contain object-center drop-shadow-[0_18px_22px_rgba(0,0,0,0.48)] transition duration-300 ease-out sm:h-[125px] sm:w-[84%] xl:h-[110px] xl:w-[82%]",
+                  "pointer-events-none absolute left-1/2 bottom-[72px] h-[104px] w-[88%] -translate-x-1/2 rounded-[14px] object-contain object-center drop-shadow-[0_18px_22px_rgba(0,0,0,0.48)] transition duration-300 ease-out sm:bottom-[82px] sm:h-[125px] sm:w-[84%] xl:bottom-[76px] xl:h-[110px] xl:w-[82%]",
                   isActive
                     ? "scale-[2.35] group-hover:scale-[2.8] group-focus-visible:scale-[2.8]"
                     : "scale-[2] group-hover:scale-[2.8] group-focus-visible:scale-[2.8]",
@@ -1281,8 +1283,12 @@ const HomeFeatureShowcase = ({ onSection }: { onSection: (section: Section) => v
                 loading="lazy"
                 decoding="async"
               />
-              <span className="pointer-events-none absolute bottom-0 left-1/2 h-[95px] w-full -translate-x-1/2 rounded-b-[22px] bg-gradient-to-t from-black/72 via-black/24 to-transparent sm:w-[96%] xl:w-[94%]" />
-              <span className="pointer-events-none absolute inset-x-3 bottom-2.5 text-center text-[15px] font-semibold leading-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.62)] sm:text-[17px] xl:text-[14px]">
+              <span
+                className={cn(
+                  "pointer-events-none absolute inset-x-1 bottom-0 text-center text-[18px] font-extrabold leading-none tracking-[-0.02em] text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.78)] transition duration-300 sm:text-[21px] xl:text-[18px]",
+                  isActive && "text-[#eeff15] drop-shadow-[0_0_18px_rgba(238,255,21,0.28)]",
+                )}
+              >
                 {item.title}
               </span>
             </button>
@@ -1321,16 +1327,15 @@ const HomeFeatureShowcase = ({ onSection }: { onSection: (section: Section) => v
           </button>
         </div>
 
-        <div className="relative overflow-hidden rounded-[18px] bg-[#111] shadow-[0_24px_70px_rgba(0,0,0,0.42)]">
+        <div className="relative flex min-h-[320px] items-center justify-center">
           <img
             key={activeFeature.heroImage}
             src={activeFeature.heroImage}
             alt={activeFeature.title}
-            className="aspect-[16/10] w-full object-cover transition duration-500"
+            className="max-h-[520px] w-full object-contain transition duration-500"
             loading="lazy"
             decoding="async"
           />
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0)_45%,rgba(0,0,0,0.28)_100%)]" />
         </div>
       </div>
     </section>
@@ -3659,6 +3664,8 @@ const Placeholder = ({
         return STANDALONE_TOOLS.video_gen.title;
       case "voice_gen":
         return STANDALONE_TOOLS.voice_gen.title;
+      case "voice_translate":
+        return STANDALONE_TOOLS.voice_translate.title;
       case "image_to_3d":
         return STANDALONE_TOOLS.image_to_3d.title;
       case "community":
