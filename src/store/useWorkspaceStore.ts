@@ -2017,6 +2017,25 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     runError: null,
                   } as typeof n.data;
                 }
+
+                // AssetNode's video frame extraction is a browser-side
+                // async (capture → upload). It can't survive a tab
+                // reload — yet `extractingVideoFrames: true` gets
+                // persisted alongside other node.data. After reload
+                // the asset effect's "already extracting for this
+                // key" guard short-circuits forever and the node sits
+                // permanently at "preparing", with `assetUrlForSourceHandle`
+                // throwing "Video frame image is still preparing" on
+                // every Run click. Clear both the in-flight flag and
+                // any cached extraction error so the effect picks the
+                // asset back up on the next render and re-extracts.
+                if ((d as { extractingVideoFrames?: unknown }).extractingVideoFrames === true) {
+                  n.data = {
+                    ...(n.data as object),
+                    extractingVideoFrames: false,
+                    frameExtractionError: "",
+                  } as typeof n.data;
+                }
               }
             }
           } catch (sweepErr) {
