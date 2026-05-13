@@ -1337,8 +1337,17 @@ export function isNodeMentionedAnywhere(
   const escaped = nodeId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const re = new RegExp(`@\\[[^\\]]+\\]\\(${escaped}\\)`);
   for (const n of nodes) {
-    const d = (n.data ?? {}) as { content?: unknown; params?: { prompt?: unknown } };
+    const d = (n.data ?? {}) as {
+      content?: unknown;
+      inputContent?: unknown;
+      params?: { prompt?: unknown };
+    };
+    // Text node stores the "Result prompt" tab in `content` and the
+    // "Prompt" tab raw input in `inputContent`. A mention chip in
+    // either tab should be enough to trigger frame extraction — same
+    // fallback as the wire path uses in resolveInputs.
     if (typeof d.content === "string" && re.test(d.content)) return true;
+    if (typeof d.inputContent === "string" && re.test(d.inputContent)) return true;
     const prompt = d.params && typeof d.params.prompt === "string" ? d.params.prompt : "";
     if (prompt && re.test(prompt)) return true;
   }

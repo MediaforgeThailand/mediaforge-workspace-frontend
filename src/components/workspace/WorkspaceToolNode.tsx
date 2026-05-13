@@ -859,7 +859,20 @@ function resolveInputs(nodeId: string): {
         pushAt(key, videoUrl);
         continue;
       }
-      const textContent = typeof srcData.content === "string" ? srcData.content : "";
+      // Text node has TWO content fields:
+      //   data.content      — "Result prompt" tab (optimized/canonical output)
+      //   data.inputContent — "Prompt" tab (raw human input)
+      // The wire is supposed to carry the canonical output, but if the
+      // user only typed in the Prompt tab and hasn't run the optimizer,
+      // `content` stays empty. Reading just `content` then sends "" to
+      // the image model, which throws "A prompt is required" with no
+      // hint to the user that the Result-prompt tab is the one being
+      // shipped. Prefer `content` when set (preserves the optimizer's
+      // output), else fall back to the raw `inputContent` so the wire
+      // never silently ships empty text.
+      const resultText = typeof srcData.content === "string" ? srcData.content : "";
+      const inputText = typeof srcData.inputContent === "string" ? srcData.inputContent : "";
+      const textContent = resultText.trim() ? resultText : inputText;
       const allowedMediaIds = connectedTextNodeMediaSourceIds(src.id, nodes, edges);
       const tokenNodeIds = extractMentionNodeIds(textContent);
       const disconnected = tokenNodeIds.filter((nodeId) => !allowedMediaIds.has(nodeId));
