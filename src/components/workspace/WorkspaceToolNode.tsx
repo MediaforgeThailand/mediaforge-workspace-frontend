@@ -2657,6 +2657,14 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         d.activeRunId != null ||
         d.lastRunError != null);
     if ((!knownJobId && !canRecoverByNode) || d.jobStatus === "completed") return;
+    // Terminal failure is also "done" as far as recovery is concerned —
+    // once we've recorded the failure on the node (lastRunError + status:
+    // "error"), continuing to poll a job whose backend retry budget is
+    // spent just re-logs the same friendlyError every 5s and keeps the
+    // node's red footer flickering. The user has been informed; clicking
+    // Run resets jobStatus to null and re-engages this effect for the
+    // fresh attempt.
+    if (d.jobStatus === "failed" || d.jobStatus === "permanent_failed") return;
     if (!knownJobId && runInFlightRef.current) return;
 
     let cancelled = false;
