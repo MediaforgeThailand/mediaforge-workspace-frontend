@@ -1536,6 +1536,31 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       }
     }
 
+    // ── Kling Motion Pro ref_video guard ──
+    // /v1/videos/motion-control requires both image_url and video_url
+    // — without a ref_video the backend throws "Motion Control requires
+    // a video_url". Bail here with a toast + return (matching the
+    // prompt-length validators above) so the node never enters the
+    // "processing" → "error" cycle: that cycle leaves `lastRunError`
+    // set without a backgroundJobId, which trips the recovery-polling
+    // effect into re-querying the latest job for this node every 5s,
+    // re-applying its stale error, and looping forever (the "flashing"
+    // node + console-flood symptom).
+    if (schemaKey === "videoGenNode" && isKlingMotionVideoModel(selectedModel)) {
+      const hasRefVideoEdge = getEdges().some(
+        (e) => e.target === id && e.targetHandle === "ref_video",
+      );
+      if (!hasRefVideoEdge) {
+        toast.error(
+          friendlyError(
+            `${selectedModel} requires a reference video — connect a video into the ref_video port (it dictates the motion and duration).`,
+            language === "th" ? "th" : "en",
+          ),
+        );
+        return;
+      }
+    }
+
     const storeState = useWorkspaceStore.getState();
     const log = useDebugLogStore.getState().push;
     const nodeLabelForLog =
@@ -1656,19 +1681,6 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
       if (schemaKey === "videoGenNode" && isSeedanceV2VideoModel(selectedModel)) {
         await validateSeedanceReferenceVideos(inputs);
-      }
-
-      // Kling Motion Pro's endpoint (/v1/videos/motion-control) requires
-      // BOTH image_url and video_url — the backend throws "Motion Control
-      // requires a video_url" otherwise. Catch the missing ref_video here
-      // so the user sees a labeled, actionable toast instead of the
-      // generic "something went wrong" that friendlyError falls back to.
-      if (schemaKey === "videoGenNode" && isKlingMotionVideoModel(selectedModel)) {
-        if (videoInputUrls(inputs.ref_video).length === 0) {
-          throw new Error(
-            `${selectedModel} requires a reference video — connect a video into the ref_video port (it dictates the motion and duration).`,
-          );
-        }
       }
 
       log({
