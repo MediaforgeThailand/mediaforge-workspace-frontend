@@ -587,6 +587,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
         <ReferencePicker
           open={referenceOpen}
           onClose={() => setReferenceOpen(false)}
+          title={resolvedReferenceTitle}
           references={references}
           assets={referenceAssets}
           accept={referenceAccept}
@@ -1098,6 +1099,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
         <ReferencePicker
           open={referenceOpen}
           onClose={() => setReferenceOpen(false)}
+          title={resolvedReferenceTitle}
           references={references}
           assets={referenceAssets}
           accept={referenceAccept}
@@ -2060,7 +2062,7 @@ function SelectedReferenceThumb({
   compact?: boolean;
 }) {
   const copy = usePanelCopy();
-  const isVideo = reference.mime?.startsWith("video/");
+  const isVideo = referenceLooksVideo(reference);
   const label = referenceDisplayLabel(reference, index, compact ? 8 : 10);
   const fullLabel = referenceBaseName(reference, index);
   return (
@@ -2107,6 +2109,27 @@ function SelectedReferenceThumb({
         </button>
       )}
     </div>
+  );
+}
+
+const IMAGE_REFERENCE_EXTENSION_RE = /\.(png|jpe?g|webp|gif)(?:[?#].*)?$/i;
+const VIDEO_REFERENCE_EXTENSION_RE = /\.(mp4|mov|webm|m4v)(?:[?#].*)?$/i;
+
+function referenceLooksImage(reference: Pick<CreateImagePanelReference, "mime" | "name" | "url">) {
+  const mime = reference.mime ?? "";
+  if (mime.startsWith("image/")) return true;
+  return (
+    IMAGE_REFERENCE_EXTENSION_RE.test(reference.name ?? "") ||
+    IMAGE_REFERENCE_EXTENSION_RE.test(reference.url ?? "")
+  );
+}
+
+function referenceLooksVideo(reference: Pick<CreateImagePanelReference, "mime" | "name" | "url">) {
+  const mime = reference.mime ?? "";
+  if (mime.startsWith("video/")) return true;
+  return (
+    VIDEO_REFERENCE_EXTENSION_RE.test(reference.name ?? "") ||
+    VIDEO_REFERENCE_EXTENSION_RE.test(reference.url ?? "")
   );
 }
 
@@ -2165,8 +2188,8 @@ function ReferencePicker({
   const visibleAssets = useMemo(() => {
     const isCompatible = (asset: CreateImagePanelReference) => {
       const mime = asset.mime ?? "";
-      if (acceptsImages && mime.startsWith("image/")) return true;
-      if (acceptsVideos && mime.startsWith("video/")) return true;
+      if (acceptsImages && referenceLooksImage(asset)) return true;
+      if (acceptsVideos && referenceLooksVideo(asset)) return true;
       // Older rows can be missing a MIME type. Keep them usable for image-only
       // references because those rows are image assets in the existing data model.
       return acceptsImages && !mime;
@@ -2208,7 +2231,9 @@ function ReferencePicker({
   const addFiles = (files: FileList | File[] | null | undefined) => {
     const list = Array.from(files ?? []).filter((file) =>
       (acceptsImages && file.type.startsWith("image/")) ||
-      (acceptsVideos && file.type.startsWith("video/")),
+      (acceptsVideos && file.type.startsWith("video/")) ||
+      (acceptsImages && IMAGE_REFERENCE_EXTENSION_RE.test(file.name)) ||
+      (acceptsVideos && VIDEO_REFERENCE_EXTENSION_RE.test(file.name)),
     );
     if (list.length === 0) return;
     setLocalUploads((prev) => {
