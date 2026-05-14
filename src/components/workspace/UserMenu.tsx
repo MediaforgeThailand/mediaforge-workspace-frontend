@@ -303,7 +303,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
       }}
     >
       <DropdownMenuTrigger
-        className="flex items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/50"
+        className="fixed right-4 top-4 z-[70] flex items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/50 md:right-6 lg:right-8"
         style={{ width: triggerSize, height: triggerSize }}
         aria-label={t("workspace.usermenu.account")}
       >
