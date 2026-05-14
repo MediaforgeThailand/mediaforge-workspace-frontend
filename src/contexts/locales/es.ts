@@ -1242,6 +1242,12 @@ export const es = {
     "Genera múltiples variaciones al pulsar Ejecutar",
   "workspace.toolNode.decreaseVariation": "Disminuir cantidad de variaciones",
   "workspace.toolNode.increaseVariation": "Aumentar cantidad de variaciones",
+  "workspace.toolNode.voicePreviewPlay": "Reproducir vista previa de {voiceId}",
+  "workspace.toolNode.voicePreviewStop": "Detener vista previa de {voiceId}",
+  "workspace.toolNode.voicePreviewFailed": "No se pudo reproducir la vista previa de voz",
+  "workspace.toolNode.runVariationsToast": "Generando {n} variaciones en paralelo",
+  "workspace.toolNode.connectionsExceedLimit":
+    "Algunas conexiones superan el límite del nuevo modelo:\n{lines}\nElimina las que sobran antes de ejecutar.",
   "createImagePanel.video": "Video",
   "createImagePanel.image": "Imagen",
   "createImagePanel.audio": "Audio",

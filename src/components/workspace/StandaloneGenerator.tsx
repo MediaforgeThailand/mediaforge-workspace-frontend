@@ -1969,7 +1969,10 @@ export default function StandaloneGenerator({
           return;
         }
         if (nextStatus === "failed") {
-          toast.error(displayError || "Translation failed.");
+          toast.error(
+            displayError ||
+              (language === "th" ? "แปลเสียงไม่สำเร็จ" : "Translation failed."),
+          );
           return;
         }
       } catch (err) {

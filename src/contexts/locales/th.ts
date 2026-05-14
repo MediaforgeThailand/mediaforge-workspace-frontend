@@ -1165,6 +1165,12 @@ export const th = {
   "workspace.toolNode.variationStepperTip": "สร้างหลายรูปแบบเมื่อกดรัน",
   "workspace.toolNode.decreaseVariation": "ลดจำนวนรูปแบบ",
   "workspace.toolNode.increaseVariation": "เพิ่มจำนวนรูปแบบ",
+  "workspace.toolNode.voicePreviewPlay": "เล่นตัวอย่างเสียง {voiceId}",
+  "workspace.toolNode.voicePreviewStop": "หยุดตัวอย่างเสียง {voiceId}",
+  "workspace.toolNode.voicePreviewFailed": "เล่นตัวอย่างเสียงไม่สำเร็จ",
+  "workspace.toolNode.runVariationsToast": "กำลังสร้าง {n} รูปแบบพร้อมกัน",
+  "workspace.toolNode.connectionsExceedLimit":
+    "บางการเชื่อมต่อเกินขีดจำกัดของโมเดลใหม่:\n{lines}\nกรุณาลบสายที่เกินออกก่อนรัน",
   "createImagePanel.video": "วิดีโอ",
   "createImagePanel.image": "รูปภาพ",
   "createImagePanel.audio": "เสียง",

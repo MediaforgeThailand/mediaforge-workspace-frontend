@@ -1141,6 +1141,12 @@ export const hi = {
     "Run दबाने पर कई variations जनरेट करें",
   "workspace.toolNode.decreaseVariation": "variation संख्या घटाएं",
   "workspace.toolNode.increaseVariation": "variation संख्या बढ़ाएं",
+  "workspace.toolNode.voicePreviewPlay": "{voiceId} का प्रीव्यू चलाएँ",
+  "workspace.toolNode.voicePreviewStop": "{voiceId} का प्रीव्यू रोकें",
+  "workspace.toolNode.voicePreviewFailed": "वॉइस प्रीव्यू नहीं चल सका",
+  "workspace.toolNode.runVariationsToast": "{n} variations समानांतर में जनरेट हो रहे हैं",
+  "workspace.toolNode.connectionsExceedLimit":
+    "कुछ कनेक्शन नए मॉडल की सीमा से अधिक हैं:\n{lines}\nरन से पहले अतिरिक्त कनेक्शन हटाएँ।",
   "createImagePanel.video": "वीडियो",
   "createImagePanel.image": "इमेज",
   "createImagePanel.audio": "ऑडियो",

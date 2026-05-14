@@ -1138,6 +1138,12 @@ export const ja = {
     "実行時に複数のバリエーションを生成",
   "workspace.toolNode.decreaseVariation": "バリエーション数を減らす",
   "workspace.toolNode.increaseVariation": "バリエーション数を増やす",
+  "workspace.toolNode.voicePreviewPlay": "{voiceId} のプレビューを再生",
+  "workspace.toolNode.voicePreviewStop": "{voiceId} のプレビューを停止",
+  "workspace.toolNode.voicePreviewFailed": "ボイスプレビューを再生できませんでした",
+  "workspace.toolNode.runVariationsToast": "{n} 件のバリエーションを並列生成中",
+  "workspace.toolNode.connectionsExceedLimit":
+    "新しいモデルの上限を超えた接続があります:\n{lines}\n実行前に余分な接続を削除してください。",
   "createImagePanel.video": "動画",
   "createImagePanel.image": "画像",
   "createImagePanel.audio": "音声",
