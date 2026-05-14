@@ -22,7 +22,7 @@ import {
 } from "@xyflow/react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ChevronLeft, ChevronRight, Film, Loader2, Pause, Play, RotateCw, Sparkles, Scissors, Combine, FileVideo,
+  ChevronLeft, ChevronRight, Film, Loader2, Pause, Play, RotateCw, Sparkles, Scissors, Combine, FileVideo, Languages,
   Maximize2, Box, Image as ImageIcon, Music, Info,
   type LucideIcon,
 } from "lucide-react";
@@ -666,7 +666,7 @@ function nodeCanProvideVideoMentionRef(
   if (sourceHandle && portTypeFromHandleId(sourceHandle) !== "video") return false;
   const generation = selectedNodeGeneration(data);
   if (generation) return generation.type === "video" && typeof generation.url === "string";
-  return ["videoGenNode", "klingVideoNode"].includes(node.type ?? "");
+  return ["videoGenNode", "klingVideoNode", "upscaleImageNode"].includes(node.type ?? "");
 }
 
 function imageUrlFromWorkspaceNode(
@@ -804,6 +804,35 @@ function resolveInputs(nodeId: string): {
     }
   };
 
+  const setMediaInputMeta = (
+    key: string,
+    sourceData: Record<string, unknown>,
+    mediaType: string | undefined,
+  ) => {
+    if (key !== "media") return;
+    if (mediaType === "audio" || mediaType === "video") {
+      out.media_type = mediaType;
+      out.source_media_type = mediaType;
+    }
+    const contentType =
+      typeof sourceData.mime === "string"
+        ? sourceData.mime
+        : typeof sourceData.contentType === "string"
+          ? sourceData.contentType
+          : typeof sourceData.type === "string" && sourceData.type.includes("/")
+            ? sourceData.type
+            : "";
+    if (contentType) out.source_content_type = contentType;
+    const duration = Number(
+      sourceData.durationSec ??
+        sourceData.duration_seconds ??
+        sourceData.duration,
+    );
+    if (Number.isFinite(duration) && duration > 0) {
+      out.source_duration_seconds = duration;
+    }
+  };
+
   for (const e of edges) {
     if (e.target !== nodeId) continue;
     const src = nodes.find((n) => n.id === e.source);
@@ -911,7 +940,13 @@ function resolveInputs(nodeId: string): {
             "Reference asset is still uploading — wait a moment and click Run again",
         );
       }
-      pushAt(key, assetUrlForSourceHandle(srcData, e.sourceHandle));
+      const assetUrl = assetUrlForSourceHandle(srcData, e.sourceHandle);
+      pushAt(key, assetUrl);
+      setMediaInputMeta(
+        key,
+        srcData,
+        typeof srcData.fieldType === "string" ? srcData.fieldType : undefined,
+      );
     } else if (src.type === "elementNode") {
       // Both saved (cached refs) + creator (walk edges) modes share the
       // same logic now — collectElementRefs handles both.
@@ -1016,6 +1051,11 @@ function resolveInputs(nodeId: string): {
         pushAt(key, frameUrl);
       } else {
         pushAt(key, gen?.url ?? gen?.text ?? null);
+        setMediaInputMeta(
+          key,
+          gen as unknown as Record<string, unknown>,
+          gen?.type,
+        );
       }
     }
   }
@@ -1137,6 +1177,7 @@ const ICONS: Record<string, LucideIcon> = {
   imageGenNode: ImageIcon,
   videoGenNode: Film,
   audioGenNode: Music,
+  voiceTranslateNode: Languages,
   upscaleImageNode: Maximize2,
   removeBackgroundNode: Scissors,
   mergeAudioNode: Combine,
@@ -1423,6 +1464,34 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const d = (data ?? {}) as NodeData & { status?: "idle" | "processing" | "done" | "error" };
   const params = d.params ?? {};
   const selectedModel = (params.model_name as string) ?? schema?.defaultModel ?? "";
+  const connectedMediaDurationSeconds = useMemo(() => {
+    if (schemaKey !== "voiceTranslateNode") return null;
+    const mediaEdge = edges.find(
+      (edge) => edge.target === id && edge.targetHandle === "media",
+    );
+    if (!mediaEdge) return null;
+    const sourceNode = allNodesForMentionScan.find((node) => node.id === mediaEdge.source);
+    const sourceData = sourceNode?.data as (NodeData & Record<string, unknown>) | undefined;
+    if (!sourceData) return null;
+    const rawDuration =
+      sourceData.durationSec ??
+      sourceData.duration_seconds ??
+      sourceData.duration;
+    const duration = Number(rawDuration);
+    return Number.isFinite(duration) && duration > 0 ? duration : null;
+  }, [allNodesForMentionScan, edges, id, schemaKey]);
+  const quoteParams = useMemo(() => {
+    if (
+      schemaKey !== "voiceTranslateNode" ||
+      connectedMediaDurationSeconds == null
+    ) {
+      return params;
+    }
+    return {
+      ...params,
+      source_duration_seconds: connectedMediaDurationSeconds,
+    };
+  }, [connectedMediaDurationSeconds, params, schemaKey]);
 
   // Set of node ids that are wired UPSTREAM into this node (any edge
   // whose target == this node). The mention dropdown is restricted
@@ -1666,6 +1735,37 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       });
       if (imageRefValidationError) {
         throw new Error(imageRefValidationError);
+      }
+
+      if (schemaKey === "voiceTranslateNode") {
+        const mediaInput = inputs.media;
+        const hasMedia =
+          typeof mediaInput === "string"
+            ? mediaInput.length > 0
+            : Array.isArray(mediaInput)
+              ? mediaInput.some((item) => typeof item === "string" && item.length > 0)
+              : false;
+        if (!hasMedia) {
+          throw new Error("Connect an MP3 or MP4 source before running Dubbing.");
+        }
+        const hasConsent =
+          cleanParams.consent === true ||
+          String(cleanParams.consent ?? "").toLowerCase() === "true";
+        if (!hasConsent) {
+          throw new Error("Confirm permission to translate this file and preserve or clone the speaker voice.");
+        }
+      }
+
+      if (schemaKey === "upscaleImageNode") {
+        const imageCount = inputValueCount(inputs.image) + inputValueCount(inputs.image_url);
+        const videoCount = inputValueCount(inputs.video) + inputValueCount(inputs.video_url);
+        if (imageCount + videoCount === 0) {
+          throw new Error("Connect one image or video source before running Upscale.");
+        }
+        if (imageCount > 0 && videoCount > 0) {
+          throw new Error("Upscale accepts either one image or one video per run, not both.");
+        }
+        cleanParams.media_type = videoCount > 0 ? "video" : "image";
       }
 
       // Merge mention-resolved URLs into inputs as a fallback ref_image
@@ -2207,6 +2307,9 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           provider_model_id?: string;
           model_url?: string;
           rendered_image?: string;
+          output_type?: string;
+          target_lang?: string;
+          output_language?: string;
         };
       };
 
@@ -2237,8 +2340,9 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         const isReplicateVeo = pollProvider === "replicate_veo";
         const isReplicateVideo = pollProvider === "replicate_video";
         const isFreepikVideo = pollProvider === "freepik_veo" || pollProvider === "freepik_seedance";
+        const isElevenLabsDubbing = pollProvider === "elevenlabs_dubbing";
         const POLL_INTERVAL_MS = isTripo3d ? 4_000 : 5_000;
-        const POLL_TIMEOUT_MS = isTripo3d ? 8 * 60_000 : 6 * 60_000;
+        const POLL_TIMEOUT_MS = isElevenLabsDubbing ? 30 * 60_000 : isTripo3d ? 8 * 60_000 : 6 * 60_000;
         const pollAction = isTripo3d
           ? "poll_tripo3d"
           : isSeedance
@@ -2251,6 +2355,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                   ? "poll_replicate_video"
                   : isFreepikVideo
                     ? "poll_freepik_video"
+                    : isElevenLabsDubbing
+                      ? "poll_elevenlabs_dubbing"
                     : "poll_kling";
         const providerLabel = isTripo3d
           ? "Tripo3D"
@@ -2264,6 +2370,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                   ? "Replicate Video"
                 : isFreepikVideo
                   ? pollProvider === "freepik_seedance" ? "Freepik Seedance" : "Freepik Veo"
+                  : isElevenLabsDubbing
+                    ? "ElevenLabs Dubbing"
                   : "Kling";
         let polledUrl: string | undefined;
         let polledModelUrl: string | undefined;
@@ -2292,6 +2400,9 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                 poll_endpoint: pollEndpoint,
                 model: pollModel,
                 provider_model_id: pollProviderModelId,
+                output_type: r.provider_meta?.output_type,
+                target_lang: r.provider_meta?.target_lang,
+                output_language: r.provider_meta?.output_language,
               },
             },
           );
@@ -3055,8 +3166,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           }
         : null;
     }
-    return calculateNodeCostQuote({ schemaKey, params, creditCosts });
-  }, [creditCosts, isMotionModel, params, schema, schemaKey, selectedModel]);
+    return calculateNodeCostQuote({ schemaKey, params: quoteParams, creditCosts });
+  }, [creditCosts, isMotionModel, params, quoteParams, schema, schemaKey, selectedModel]);
 
   const nodeCostQuote = useMemo(() => {
     if (!baseNodeQuote) return null;

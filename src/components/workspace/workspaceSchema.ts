@@ -82,6 +82,39 @@ const REPLICATE_BANANA_MODELS = [] as const;
 const OPENAI_IMAGE_MODELS = ["gpt-image-2"] as const;
 const REPLICATE_OPENAI_IMAGE_MODELS = [] as const;
 const ELEVENLABS_TTS_MODELS = ["elevenlabs-multilingual-v2", "elevenlabs-turbo-v2-5"] as const;
+const ELEVENLABS_DUBBING_MODEL = "elevenlabs-dubbing-voice-clone" as const;
+const ELEVENLABS_DUBBING_LANGUAGES = [
+  "English",
+  "Hindi",
+  "Portuguese",
+  "Chinese",
+  "Spanish",
+  "French",
+  "German",
+  "Japanese",
+  "Arabic",
+  "Russian",
+  "Korean",
+  "Indonesian",
+  "Italian",
+  "Dutch",
+  "Turkish",
+  "Polish",
+  "Swedish",
+  "Filipino",
+  "Malay",
+  "Romanian",
+  "Ukrainian",
+  "Greek",
+  "Czech",
+  "Danish",
+  "Finnish",
+  "Bulgarian",
+  "Croatian",
+  "Slovak",
+  "Tamil",
+] as const;
+const ELEVENLABS_DUBBING_SOURCE_LANGUAGES = ["Auto", ...ELEVENLABS_DUBBING_LANGUAGES] as const;
 const GEMINI_TTS_MODELS = ["gemini-3.1-flash-tts-preview", "gemini-2.5-pro-preview-tts"] as const;
 /** All 30 official preset speakers shipped with Gemini 3.1 Flash TTS
  *  Preview (verified against
@@ -1175,8 +1208,76 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     ],
   },
 
+  voiceTranslateNode: {
+    displayName: "Dubbing",
+    category: "AI PROCESS",
+    accentColor: "sky",
+    supportedModels: [ELEVENLABS_DUBBING_MODEL],
+    defaultModel: ELEVENLABS_DUBBING_MODEL,
+    inputs: [
+      {
+        id: "media",
+        label: "MP3 / MP4",
+        color: "amber",
+        required: true,
+        maxConnections: 1,
+      },
+    ],
+    outputs: [{ id: "output_media", label: "MEDIA", color: "amber" }],
+    params: [
+      {
+        key: "model_name",
+        label: "Model",
+        type: "select",
+        options: [ELEVENLABS_DUBBING_MODEL],
+        optionLabels: {
+          [ELEVENLABS_DUBBING_MODEL]: "ElevenLabs Dubbing",
+        },
+        default: ELEVENLABS_DUBBING_MODEL,
+        required: true,
+      },
+      {
+        key: "source_language",
+        label: "Source",
+        type: "select",
+        options: [...ELEVENLABS_DUBBING_SOURCE_LANGUAGES],
+        optionLabels: {
+          Auto: "Auto detect",
+        },
+        default: "Auto",
+      },
+      {
+        key: "output_language",
+        label: "Target",
+        type: "select",
+        options: [...ELEVENLABS_DUBBING_LANGUAGES],
+        default: "English",
+        required: true,
+      },
+      {
+        key: "speaker_num",
+        label: "Speakers",
+        type: "select",
+        options: ["1", "2", "3"],
+        default: "1",
+      },
+      {
+        key: "consent",
+        label: "Permission",
+        type: "select",
+        options: ["false", "true"],
+        optionLabels: {
+          false: "Permission needed",
+          true: "Permission confirmed",
+        },
+        default: "false",
+        required: true,
+      },
+    ],
+  },
+
   upscaleImageNode: {
-    displayName: "Upscale Image",
+    displayName: "Upscale",
     category: "AI PROCESS",
     accentColor: "cyan",
     supportedModels: [...MAGNIFIC_UPSCALE_MODELS],
@@ -1186,11 +1287,21 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         id: "image",
         label: "image",
         color: "emerald",
-        required: true,
+        required: false,
+        maxConnections: 1,
+      },
+      {
+        id: "video",
+        label: "video",
+        color: "emerald",
+        required: false,
         maxConnections: 1,
       },
     ],
-    outputs: [{ id: "image", label: "IMAGE", color: "emerald" }],
+    outputs: [
+      { id: "image", label: "IMAGE", color: "emerald" },
+      { id: "output_video", label: "VIDEO", color: "emerald" },
+    ],
     params: [
       {
         key: "model_name",
@@ -1204,75 +1315,74 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         required: true,
       },
       {
-        key: "scale_factor",
-        label: "Scale",
+        key: "media_type",
+        label: "Source",
         type: "select",
-        options: ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"],
+        options: ["image", "video"],
+        optionLabels: {
+          image: "Image",
+          video: "Video",
+        },
+        default: "image",
+      },
+      {
+        key: "scale_factor",
+        label: "Image scale",
+        type: "select",
+        options: ["2", "4", "8", "16"],
         optionLabels: {
           "2": "2x",
-          "3": "3x",
           "4": "4x",
-          "5": "5x",
-          "6": "6x",
-          "7": "7x",
           "8": "8x",
-          "9": "9x",
-          "10": "10x",
-          "11": "11x",
-          "12": "12x",
-          "13": "13x",
-          "14": "14x",
-          "15": "15x",
           "16": "16x",
         },
         default: "2",
+        visibleWhen: { media_type: "image" },
       },
       {
-        key: "flavor",
-        label: "Flavor",
+        key: "resolution",
+        label: "Video target",
         type: "select",
-        options: ["photo", "sublime", "photo_denoiser"],
+        options: ["720p", "1k", "2k", "4k"],
         optionLabels: {
-          photo: "Photo",
-          sublime: "Illustration",
-          photo_denoiser: "Photo Denoiser",
+          "720p": "720p",
+          "1k": "1K",
+          "2k": "2K",
+          "4k": "4K",
         },
-        default: "photo",
+        default: "2k",
+        visibleWhen: { media_type: "video" },
       },
       {
-        key: "sharpen",
-        label: "Sharpen",
-        type: "slider",
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 7,
+        key: "preset",
+        label: "Preset",
+        type: "select",
+        options: ["balanced", "clean", "detail", "creative"],
+        optionLabels: {
+          balanced: "Balanced",
+          clean: "Clean / denoise",
+          detail: "More detail",
+          creative: "Illustration / graphic",
+        },
+        default: "balanced",
       },
       {
-        key: "smart_grain",
-        label: "Smart Grain",
-        type: "slider",
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 7,
-      },
-      {
-        key: "ultra_detail",
-        label: "Ultra Detail",
-        type: "slider",
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 30,
-      },
-      {
-        key: "filter_nsfw",
-        label: "NSFW Filter",
+        key: "fps_boost",
+        label: "FPS Boost",
         type: "select",
         options: ["false", "true"],
         optionLabels: { "false": "Off", "true": "On" },
         default: "false",
+        visibleWhen: { media_type: "video" },
+      },
+      {
+        key: "filter_nsfw",
+        label: "Safety Filter",
+        type: "select",
+        options: ["false", "true"],
+        optionLabels: { "false": "Off", "true": "On" },
+        default: "false",
+        visibleWhen: { media_type: "image" },
       },
     ],
   },
@@ -1381,7 +1491,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
  * tagging — both must stay in sync or visual feedback diverges
  * from the actual connect rules.
  */
-export type WirePortType = "text" | "image" | "video" | "audio" | "element" | "model3d";
+export type WirePortType = "text" | "image" | "video" | "audio" | "media" | "element" | "model3d";
 
 export const TEXT_NODE_IMAGE_OUTPUT_HANDLE_PREFIX = "image_ref:";
 export const TEXT_NODE_VIDEO_OUTPUT_HANDLE_PREFIX = "video_ref:";
@@ -1502,6 +1612,10 @@ const AUDIO_HANDLE_IDS = new Set([
   "ref_audio",
   "output_audio",
 ]);
+const MEDIA_HANDLE_IDS = new Set([
+  "media",
+  "output_media",
+]);
 const ELEMENT_HANDLE_IDS = new Set(["elements", "element"]);
 const MODEL3D_HANDLE_IDS = new Set([
   "model3d",
@@ -1517,6 +1631,7 @@ export function portTypeFromHandleId(id: string): WirePortType {
   if (isTextNodeImageOutputHandle(id)) return "image";
   if (isTextNodeVideoOutputHandle(id)) return "video";
   if (TEXT_HANDLE_IDS.has(id)) return "text";
+  if (MEDIA_HANDLE_IDS.has(id)) return "media";
   if (VIDEO_HANDLE_IDS.has(id)) return "video";
   if (AUDIO_HANDLE_IDS.has(id)) return "audio";
   if (ELEMENT_HANDLE_IDS.has(id)) return "element";

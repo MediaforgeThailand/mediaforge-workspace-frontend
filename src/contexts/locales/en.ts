@@ -2331,6 +2331,7 @@ export const en = {
   "workspace.settings.security_sso": "Security SSO",
   "workspace.settings.preferences": "Preferences",
   "workspace.settings.plan_billing": "Plan & billing",
+  "workspace.settings.system_preferences": "System preferences",
   "workspace.settings.coming_soon_pill": "Soon",
   "workspace.settings.fallback_title": "Settings",
   "workspace.settings.coming_soon_title": "Coming soon",
@@ -2455,7 +2456,7 @@ export const en = {
   "workspace.standalone.tool.image_gen.nav": "Image",
   "workspace.standalone.tool.image_gen.title": "Image Generator",
   "workspace.standalone.tool.image_upscale.nav": "Upscale",
-  "workspace.standalone.tool.image_upscale.title": "Upscale Image",
+  "workspace.standalone.tool.image_upscale.title": "Upscale Media",
   "workspace.standalone.tool.video_gen.nav": "Video",
   "workspace.standalone.tool.video_gen.title": "Video Generator",
   "workspace.standalone.tool.voice_gen.nav": "Audio",
@@ -2667,7 +2668,7 @@ export const en = {
   "workspace.standalone.model.gpt_image_2.desc":
     "Best for precise style and quality control.",
   "workspace.standalone.model.magnific_upscale_precision_v2.desc":
-    "Magnific Precision V2 image upscaling with scale, detail, sharpen, grain, and NSFW filter controls.",
+    "Magnific image and video upscaling with simple presets over the advanced controls.",
   "workspace.standalone.model.kling_v2_6_pro.desc":
     "Classic text/image-to-video workflow.",
   "workspace.standalone.model.kling_v2_6_motion_pro.desc":
@@ -2715,7 +2716,7 @@ export const en = {
   "workspace.standalone.validation.image_prompt":
     "Image generation needs a prompt.",
   "workspace.standalone.validation.upscale_image":
-    "Upscale needs one source image.",
+    "Upscale needs one source image or video.",
   "workspace.standalone.validation.motion_refs":
     "Motion video needs a reference image and a motion video.",
   "workspace.standalone.validation.end_needs_start":
@@ -2978,6 +2979,9 @@ export const en = {
   "workspace.toolnames.audio_gen": "Audio Generator",
   "workspace.toolnames.audio_gen_desc":
     "Text-to-speech with Gemini TTS — 30 named voices, per-clip style direction.",
+  "workspace.toolnames.voice_translate": "Dubbing",
+  "workspace.toolnames.voice_translate_desc":
+    "Translate MP3/MP4 speech with ElevenLabs dubbing and voice preservation.",
   "workspace.toolnames.video_to_prompt": "Video to Prompt",
   "workspace.toolnames.video_to_prompt_desc":
     "Read a video and write a scene-by-scene prompt breakdown.",
@@ -2996,9 +3000,9 @@ export const en = {
   "workspace.toolnames.remove_bg": "Remove BG",
   "workspace.toolnames.remove_bg_desc":
     "Strip the background from an image with Freepik/Magnific.",
-  "workspace.toolnames.upscale": "Upscale Image",
+  "workspace.toolnames.upscale": "Upscale",
   "workspace.toolnames.upscale_desc":
-    "Increase image resolution with Magnific Precision V2.",
+    "Increase image or video resolution with Magnific.",
   "workspace.toolnames.image_to_3d": "Image to 3D",
   "workspace.toolnames.image_to_3d_desc":
     "Turn a reference image into a GLB via Tripo3D.",
@@ -4048,9 +4052,11 @@ export const en = {
   "workspace.picker.port.cutout": "cutout",
   "workspace.picker.port.to_video": "→ video",
   "workspace.picker.port.to_audio": "→ audio",
+  "workspace.picker.port.to_media": "→ MP3/MP4",
   "workspace.picker.port.to_context": "→ context",
   "workspace.picker.port.to_script": "→ script",
   "workspace.picker.port.audio": "audio",
+  "workspace.picker.port.media": "MP3/MP4",
   "workspace.picker.port.prompt": "prompt",
 } as const;
 

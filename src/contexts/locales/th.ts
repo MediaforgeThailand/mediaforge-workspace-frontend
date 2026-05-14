@@ -2293,6 +2293,7 @@ export const th = {
   "workspace.settings.security_sso": "ความปลอดภัย SSO",
   "workspace.settings.preferences": "การตั้งค่า",
   "workspace.settings.plan_billing": "แผนและการชำระเงิน",
+  "workspace.settings.system_preferences": "การตั้งค่าระบบ",
   "workspace.settings.coming_soon_pill": "เร็วๆ นี้",
   "workspace.settings.fallback_title": "ตั้งค่า",
   "workspace.settings.coming_soon_title": "เร็วๆ นี้",
@@ -2416,7 +2417,7 @@ export const th = {
   "workspace.standalone.tool.image_gen.nav": "รูปภาพ",
   "workspace.standalone.tool.image_gen.title": "สร้างรูปภาพ",
   "workspace.standalone.tool.image_upscale.nav": "ขยายภาพ",
-  "workspace.standalone.tool.image_upscale.title": "ขยายภาพ",
+  "workspace.standalone.tool.image_upscale.title": "ขยายภาพ/วิดีโอ",
   "workspace.standalone.tool.video_gen.nav": "วิดีโอ",
   "workspace.standalone.tool.video_gen.title": "สร้างวิดีโอ",
   "workspace.standalone.tool.voice_gen.nav": "เสียง",
@@ -2629,7 +2630,7 @@ export const th = {
   "workspace.standalone.model.gpt_image_2.desc":
     "เหมาะกับการควบคุมสไตล์และคุณภาพอย่างละเอียด",
   "workspace.standalone.model.magnific_upscale_precision_v2.desc":
-    "ขยายความละเอียดภาพด้วย Magnific Precision V2 พร้อมควบคุมขนาด รายละเอียด ความคม เกรน และตัวกรอง NSFW",
+    "ขยายความละเอียดภาพหรือวิดีโอด้วย Magnific โดยใช้ preset ง่ายๆ แทนการปรับค่าละเอียดเอง",
   "workspace.standalone.model.kling_v2_6_pro.desc":
     "เวิร์กโฟลว์ text/image-to-video แบบคลาสสิก",
   "workspace.standalone.model.kling_v2_6_motion_pro.desc":
@@ -2675,7 +2676,7 @@ export const th = {
   "workspace.standalone.model.hyper3d_gen2.desc":
     "image-to-3D จาก BytePlus เป็น engine ทางเลือกจาก Tripo",
   "workspace.standalone.validation.image_prompt": "การสร้างรูปภาพต้องมีพรอมป์",
-  "workspace.standalone.validation.upscale_image": "การขยายภาพต้องมีภาพต้นฉบับ 1 รูป",
+  "workspace.standalone.validation.upscale_image": "การขยายต้องมีภาพหรือวิดีโอต้นฉบับ 1 ไฟล์",
   "workspace.standalone.validation.motion_refs":
     "วิดีโอแบบ motion ต้องมีภาพอ้างอิงและวิดีโอการเคลื่อนไหว",
   "workspace.standalone.validation.end_needs_start":
@@ -2932,6 +2933,9 @@ export const th = {
   "workspace.toolnames.audio_gen": "สร้างเสียง",
   "workspace.toolnames.audio_gen_desc":
     "Text-to-speech ด้วย Gemini TTS — 30 เสียง พร้อมการกำกับสไตล์ต่อคลิป",
+  "workspace.toolnames.voice_translate": "พากย์แปลภาษา",
+  "workspace.toolnames.voice_translate_desc":
+    "แปลเสียงจาก MP3/MP4 ด้วย ElevenLabs dubbing และคงโทนเสียงผู้พูด",
   "workspace.toolnames.video_to_prompt": "แปลงวิดีโอเป็นพรอมป์",
   "workspace.toolnames.video_to_prompt_desc":
     "อ่านวิดีโอและสร้างพรอมป์แยกตามฉาก",
@@ -2947,9 +2951,9 @@ export const th = {
   "workspace.toolnames.remove_bg": "ลบพื้นหลัง",
   "workspace.toolnames.remove_bg_desc":
     "ลบพื้นหลังออกจากภาพด้วย Freepik/Magnific",
-  "workspace.toolnames.upscale": "ขยายภาพ",
+  "workspace.toolnames.upscale": "ขยาย",
   "workspace.toolnames.upscale_desc":
-    "เพิ่มความละเอียดภาพด้วย Magnific Precision V2",
+    "เพิ่มความละเอียดภาพหรือวิดีโอด้วย Magnific",
   "workspace.toolnames.image_to_3d": "ภาพเป็น 3D",
   "workspace.toolnames.image_to_3d_desc":
     "เปลี่ยนภาพ reference เป็น GLB ผ่าน Tripo3D",
@@ -3978,8 +3982,10 @@ export const th = {
   "workspace.picker.port.cutout": "ภาพตัดพื้นหลัง",
   "workspace.picker.port.to_video": "→ วิดีโอ",
   "workspace.picker.port.to_audio": "→ เสียง",
+  "workspace.picker.port.to_media": "→ MP3/MP4",
   "workspace.picker.port.to_context": "→ บริบท",
   "workspace.picker.port.to_script": "→ สคริปต์",
   "workspace.picker.port.audio": "เสียง",
+  "workspace.picker.port.media": "MP3/MP4",
   "workspace.picker.port.prompt": "พรอมป์",
 } satisfies TranslationMap;

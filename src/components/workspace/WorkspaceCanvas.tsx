@@ -135,6 +135,7 @@ type NodeDataWithParams = {
 
 type AssetNodeData = {
   fieldType?: string;
+  durationSec?: number;
 };
 
 function nodeModelName(node: Node | undefined, fallback: string): string {
@@ -145,6 +146,30 @@ function nodeModelName(node: Node | undefined, fallback: string): string {
 function assetFieldType(node: Node | undefined): string | undefined {
   const data = node?.data as AssetNodeData | undefined;
   return typeof data?.fieldType === "string" ? data.fieldType : undefined;
+}
+
+function readLocalMediaDuration(
+  objectUrl: string,
+  fieldType: "video" | "audio",
+): Promise<number | undefined> {
+  return new Promise((resolve) => {
+    const media =
+      fieldType === "video"
+        ? document.createElement("video")
+        : document.createElement("audio");
+    const cleanup = () => {
+      media.removeAttribute("src");
+      media.load();
+    };
+    const finish = (value?: number) => {
+      cleanup();
+      resolve(Number.isFinite(value) && value && value > 0 ? value : undefined);
+    };
+    media.preload = "metadata";
+    media.onloadedmetadata = () => finish(media.duration);
+    media.onerror = () => finish(undefined);
+    media.src = objectUrl;
+  });
 }
 // Supabase Storage signed-URL TTL. Was 24h — way too short for a
 // canvas the user keeps open across sessions. The previous value
@@ -281,6 +306,7 @@ const VIDEO_TARGETS = new Set([
   "img_1", "img_2", "img_3",
 ]);
 const AUDIO_TARGETS = new Set(["audio", "ref_audio"]);
+const MEDIA_TARGETS = new Set(["media"]);
 const ELEMENT_TARGETS = new Set(["elements", "element"]);
 const MODEL3D_TARGETS = new Set(["model3d", "model_3d", "ref_model"]);
 const SEEDANCE_V2_KEYFRAME_TARGETS = new Set(["start_frame", "end_frame"]);
@@ -554,6 +580,7 @@ const nodeTypes = {
   imageGenNode: WorkspaceToolNode,
   videoGenNode: WorkspaceToolNode,
   audioGenNode: WorkspaceToolNode,
+  voiceTranslateNode: WorkspaceToolNode,
   removeBackgroundNode: WorkspaceToolNode,
   upscaleImageNode: WorkspaceToolNode,
   mergeAudioNode: WorkspaceToolNode,
@@ -922,6 +949,10 @@ const Inner = () => {
         : isAudio ? "audio"
         : "image";
       const localPreview = URL.createObjectURL(file);
+      const durationPromise =
+        fieldType === "video" || fieldType === "audio"
+          ? readLocalMediaDuration(localPreview, fieldType)
+          : Promise.resolve(undefined);
       const defaultLabel = file.name.replace(/\.[^.]+$/, "").slice(0, 40);
 
       const nodeId = addAssetNode(
@@ -981,10 +1012,12 @@ const Inner = () => {
       const { data: signed } = await supabase.storage
         .from(STORAGE_BUCKET)
         .createSignedUrl(storagePath, SIGNED_URL_TTL_SEC);
+      const durationSec = await durationPromise;
 
       updateNodeData(nodeId, {
         previewUrl: signed?.signedUrl ?? localPreview,
         storagePath,
+        ...(durationSec ? { durationSec } : {}),
         uploading: false,
       });
       URL.revokeObjectURL(localPreview);
@@ -2311,6 +2344,7 @@ const Inner = () => {
                 const portTypeFromHandle = (id: string): string => {
                   if (TEXT_TARGETS.has(id)) return "text";
                   if (IMAGE_TARGETS.has(id)) return "image";
+                  if (MEDIA_TARGETS.has(id)) return "media";
                   if (VIDEO_TARGETS.has(id)) return "video";
                   if (AUDIO_TARGETS.has(id)) return "audio";
                   if (ELEMENT_TARGETS.has(id)) return "element";
@@ -2348,6 +2382,7 @@ const Inner = () => {
               const portKindOf = (id: string): string => {
                 if (TEXT_TARGETS.has(id)) return "text";
                 if (IMAGE_TARGETS.has(id)) return "image";
+                if (MEDIA_TARGETS.has(id)) return "media";
                 if (VIDEO_TARGETS.has(id)) return "video";
                 if (AUDIO_TARGETS.has(id)) return "audio";
                 if (ELEMENT_TARGETS.has(id)) return "element";
@@ -2458,7 +2493,7 @@ const Inner = () => {
       typeOk = isTextNodeImageOutputHandle(sh)
         ? IMAGE_TARGETS.has(th)
         : isTextNodeVideoOutputHandle(sh)
-          ? VIDEO_TARGETS.has(th)
+          ? VIDEO_TARGETS.has(th) || MEDIA_TARGETS.has(th)
           : TEXT_TARGETS.has(th);
     }
     else if (srcType === "elementNode") typeOk = ELEMENT_TARGETS.has(th);
@@ -2466,16 +2501,16 @@ const Inner = () => {
       const ft = assetFieldType(src);
       if (isVideoFrameImageOutputHandle(conn.sourceHandle)) typeOk = IMAGE_TARGETS.has(th);
       else if (ft === "image") typeOk = IMAGE_TARGETS.has(th);
-      else if (ft === "video") typeOk = VIDEO_TARGETS.has(th);
-      else if (ft === "audio") typeOk = AUDIO_TARGETS.has(th);
+      else if (ft === "video") typeOk = VIDEO_TARGETS.has(th) || MEDIA_TARGETS.has(th);
+      else if (ft === "audio") typeOk = AUDIO_TARGETS.has(th) || MEDIA_TARGETS.has(th);
       else if (ft === "model3d") typeOk = MODEL3D_TARGETS.has(th);
     } else if (srcType === "groupNode") {
       // Group has multiple typed output ports — `image` / `video` /
       // `audio`. The edge's `sourceHandle` tells us which one was
       // dragged, and the target handle has to accept that media type.
       const sh = conn.sourceHandle ?? "image";
-      if (sh === "video") typeOk = VIDEO_TARGETS.has(th);
-      else if (sh === "audio") typeOk = AUDIO_TARGETS.has(th);
+      if (sh === "video") typeOk = VIDEO_TARGETS.has(th) || MEDIA_TARGETS.has(th);
+      else if (sh === "audio") typeOk = AUDIO_TARGETS.has(th) || MEDIA_TARGETS.has(th);
       else typeOk = IMAGE_TARGETS.has(th); // default + "image" port
     } else {
       // Tool nodes — derive type from sourceHandle id. Centralised in
@@ -2484,9 +2519,10 @@ const Inner = () => {
       const sh = conn.sourceHandle ?? "";
       const srcKind = portTypeFromHandleId(sh);
       if (srcKind === "image") typeOk = IMAGE_TARGETS.has(th);
-      else if (srcKind === "video") typeOk = VIDEO_TARGETS.has(th);
+      else if (srcKind === "video") typeOk = VIDEO_TARGETS.has(th) || MEDIA_TARGETS.has(th);
       else if (srcKind === "text") typeOk = TEXT_TARGETS.has(th);
-      else if (srcKind === "audio") typeOk = AUDIO_TARGETS.has(th);
+      else if (srcKind === "audio") typeOk = AUDIO_TARGETS.has(th) || MEDIA_TARGETS.has(th);
+      else if (srcKind === "media") typeOk = MEDIA_TARGETS.has(th) || VIDEO_TARGETS.has(th) || AUDIO_TARGETS.has(th);
       else if (srcKind === "element") typeOk = ELEMENT_TARGETS.has(th);
       else if (srcKind === "model3d") typeOk = MODEL3D_TARGETS.has(th);
     }

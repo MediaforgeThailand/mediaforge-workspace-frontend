@@ -45,6 +45,7 @@ import { Handle, Position, useEdges, useNodeId } from "@xyflow/react";
 import {
   Image as ImageIcon,
   Film,
+  FileVideo2,
   Music,
   Type,
   Users,
@@ -62,6 +63,7 @@ const ICON_BY_TYPE: Record<WirePortType, LucideIcon> = {
   image: ImageIcon,
   video: Film,
   audio: Music,
+  media: FileVideo2,
   text: Type,
   element: Users,
   model3d: Box,

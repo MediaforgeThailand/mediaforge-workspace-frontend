@@ -24,7 +24,7 @@ import {
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { TranslationKey } from "@/contexts/locales/en";
 
-export type WirePortType = "text" | "image" | "video" | "audio" | "element";
+export type WirePortType = "text" | "image" | "video" | "audio" | "media" | "element";
 
 export interface PickerOption {
   /** node.type to spawn */
@@ -100,6 +100,7 @@ export function portTypeOf(
   }
 
   if (handleId === "text" || handleId === "context" || handleId === "context_text") return "text";
+  if (handleId === "media" || handleId === "output_media") return "media";
   if (handleId === "audio") return "audio";
   if (handleId === "elements") return "element";
   if (handleId.includes("video")) return "video";
@@ -132,6 +133,13 @@ const lucideIcon = (name: string): Lucide.LucideIcon => {
   const icons = Lucide as unknown as Record<string, Lucide.LucideIcon>;
   return icons[name] ?? Lucide.Box;
 };
+
+function portsCompatible(source: WirePortType, target: WirePortType): boolean {
+  if (source === target) return true;
+  if (source === "media") return target === "video" || target === "audio";
+  if (target === "media") return source === "video" || source === "audio";
+  return false;
+}
 
 const CATALOG: CatalogEntry[] = [
   {
@@ -203,10 +211,16 @@ const CATALOG: CatalogEntry[] = [
     nodeType: "upscaleImageNode",
     label: "Upscale",
     labelKey: "workspace.toolnames.upscale",
-    defaultLabel: "Upscale Image",
+    defaultLabel: "Upscale",
     icon: "Maximize2",
-    inputs: [{ id: "image", type: "image", hint: "-> image", hintKey: "workspace.picker.port.to_image" }],
-    outputs: [{ id: "image", type: "image", hint: "image", hintKey: "workspace.picker.port.image" }],
+    inputs: [
+      { id: "image", type: "image", hint: "-> image", hintKey: "workspace.picker.port.to_image" },
+      { id: "video", type: "video", hint: "-> video", hintKey: "workspace.picker.port.to_video" },
+    ],
+    outputs: [
+      { id: "image", type: "image", hint: "image", hintKey: "workspace.picker.port.image" },
+      { id: "output_video", type: "video", hint: "video", hintKey: "workspace.picker.port.video" },
+    ],
   },
   {
     nodeType: "mergeAudioNode",
@@ -237,6 +251,15 @@ const CATALOG: CatalogEntry[] = [
     icon: "AudioLines",
     inputs: [{ id: "text", type: "text", hint: "→ script", hintKey: "workspace.picker.port.to_script" }],
     outputs: [{ id: "audio", type: "audio", hint: "audio", hintKey: "workspace.picker.port.audio" }],
+  },
+  {
+    nodeType: "voiceTranslateNode",
+    label: "Dubbing",
+    labelKey: "workspace.toolnames.voice_translate",
+    defaultLabel: "Dubbing",
+    icon: "Languages",
+    inputs: [{ id: "media", type: "media", hint: "-> MP3/MP4", hintKey: "workspace.picker.port.to_media" }],
+    outputs: [{ id: "output_media", type: "media", hint: "MP3/MP4", hintKey: "workspace.picker.port.media" }],
   },
   {
     nodeType: "videoToPromptNode",
@@ -293,7 +316,7 @@ export function getPickerOptions(state: CanvasNodePickerState): PickerOption[] {
   for (const entry of VISIBLE_CATALOG) {
     const ports = state.fromIsOutput ? entry.inputs : entry.outputs;
     for (const p of ports) {
-      if (p.type !== sourceType) continue;
+      if (!portsCompatible(sourceType, p.type)) continue;
       opts.push({
         nodeType: entry.nodeType,
         label: entry.label,

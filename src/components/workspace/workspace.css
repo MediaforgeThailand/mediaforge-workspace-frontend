@@ -240,7 +240,7 @@
 /* ── Compatibility-filtered reveal during connection drag ──────
  *
  * Body attrs from useConnectingAttribute:
- *   data-rfc-type    = image | video | text | audio | element
+ *   data-rfc-type    = image | video | text | audio | media | element
  *   data-rfc-dir     = source (drag from output) | target (from input)
  *
  * React Flow v12 marks Handle direction with the bare `target`/
@@ -265,6 +265,22 @@ body[data-rfc="true"][data-rfc-type="audio"][data-rfc-dir="source"]
   .react-flow__handle.workspace-handle.target[data-port-type="audio"][data-port-anchor="left"],
 body[data-rfc="true"][data-rfc-type="audio"][data-rfc-dir="target"]
   .react-flow__handle.workspace-handle.source[data-port-type="audio"][data-port-anchor="left"],
+body[data-rfc="true"][data-rfc-type="audio"][data-rfc-dir="source"]
+  .react-flow__handle.workspace-handle.target[data-port-type="media"][data-port-anchor="left"],
+body[data-rfc="true"][data-rfc-type="video"][data-rfc-dir="source"]
+  .react-flow__handle.workspace-handle.target[data-port-type="media"][data-port-anchor="left"],
+body[data-rfc="true"][data-rfc-type="media"][data-rfc-dir="source"]
+  .react-flow__handle.workspace-handle.target[data-port-type="media"][data-port-anchor="left"],
+body[data-rfc="true"][data-rfc-type="media"][data-rfc-dir="source"]
+  .react-flow__handle.workspace-handle.target[data-port-type="audio"][data-port-anchor="left"],
+body[data-rfc="true"][data-rfc-type="media"][data-rfc-dir="source"]
+  .react-flow__handle.workspace-handle.target[data-port-type="video"][data-port-anchor="left"],
+body[data-rfc="true"][data-rfc-type="media"][data-rfc-dir="target"]
+  .react-flow__handle.workspace-handle.source[data-port-type="media"][data-port-anchor="left"],
+body[data-rfc="true"][data-rfc-type="media"][data-rfc-dir="target"]
+  .react-flow__handle.workspace-handle.source[data-port-type="audio"][data-port-anchor="left"],
+body[data-rfc="true"][data-rfc-type="media"][data-rfc-dir="target"]
+  .react-flow__handle.workspace-handle.source[data-port-type="video"][data-port-anchor="left"],
 body[data-rfc="true"][data-rfc-type="element"][data-rfc-dir="source"]
   .react-flow__handle.workspace-handle.target[data-port-type="element"][data-port-anchor="left"],
 body[data-rfc="true"][data-rfc-type="element"][data-rfc-dir="target"]
@@ -295,6 +311,22 @@ body[data-rfc="true"][data-rfc-type="audio"][data-rfc-dir="source"]
   .react-flow__handle.workspace-handle.target[data-port-type="audio"][data-port-anchor="right"],
 body[data-rfc="true"][data-rfc-type="audio"][data-rfc-dir="target"]
   .react-flow__handle.workspace-handle.source[data-port-type="audio"][data-port-anchor="right"],
+body[data-rfc="true"][data-rfc-type="audio"][data-rfc-dir="source"]
+  .react-flow__handle.workspace-handle.target[data-port-type="media"][data-port-anchor="right"],
+body[data-rfc="true"][data-rfc-type="video"][data-rfc-dir="source"]
+  .react-flow__handle.workspace-handle.target[data-port-type="media"][data-port-anchor="right"],
+body[data-rfc="true"][data-rfc-type="media"][data-rfc-dir="source"]
+  .react-flow__handle.workspace-handle.target[data-port-type="media"][data-port-anchor="right"],
+body[data-rfc="true"][data-rfc-type="media"][data-rfc-dir="source"]
+  .react-flow__handle.workspace-handle.target[data-port-type="audio"][data-port-anchor="right"],
+body[data-rfc="true"][data-rfc-type="media"][data-rfc-dir="source"]
+  .react-flow__handle.workspace-handle.target[data-port-type="video"][data-port-anchor="right"],
+body[data-rfc="true"][data-rfc-type="media"][data-rfc-dir="target"]
+  .react-flow__handle.workspace-handle.source[data-port-type="media"][data-port-anchor="right"],
+body[data-rfc="true"][data-rfc-type="media"][data-rfc-dir="target"]
+  .react-flow__handle.workspace-handle.source[data-port-type="audio"][data-port-anchor="right"],
+body[data-rfc="true"][data-rfc-type="media"][data-rfc-dir="target"]
+  .react-flow__handle.workspace-handle.source[data-port-type="video"][data-port-anchor="right"],
 body[data-rfc="true"][data-rfc-type="element"][data-rfc-dir="source"]
   .react-flow__handle.workspace-handle.target[data-port-type="element"][data-port-anchor="right"],
 body[data-rfc="true"][data-rfc-type="element"][data-rfc-dir="target"]
