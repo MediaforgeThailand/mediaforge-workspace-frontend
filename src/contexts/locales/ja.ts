@@ -2831,6 +2831,7 @@ export const ja = {
   "workspace.toolnames.merge_av_desc":
     "オーディオ トラックを動画 クリップに多重化します。出力はMP4です。",
   "workspace.tools.add_node": "ノードの追加",
+  "workspace.tools.assets": "アセットを開く",
   "workspace.tools.select": "選択",
   "workspace.tools.hand": "手 (スペースを保持)",
   "workspace.tools.cut_connector": "カットコネクタ",

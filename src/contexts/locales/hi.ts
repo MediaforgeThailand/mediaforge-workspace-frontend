@@ -2829,6 +2829,7 @@ export const hi = {
   "workspace.toolnames.merge_av_desc":
     "एक ऑडियो ट्रैक को वीडियो क्लिप पर मक्स करें। आउटपुट MP4 है.",
   "workspace.tools.add_node": "नोड जोड़ें",
+  "workspace.tools.assets": "एसेट खोलें",
   "workspace.tools.select": "चुनें",
   "workspace.tools.hand": "हैंड (Space दबाकर पैन करें)",
   "workspace.tools.cut_connector": "कनेक्टर को काटें",
