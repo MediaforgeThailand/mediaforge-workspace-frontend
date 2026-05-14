@@ -204,6 +204,18 @@ export async function generateCaptions(
 
     const audio = await svc.extractAudioFromClip(clip, mediaItem);
 
+    // OpenAI's Whisper /v1/audio/transcriptions endpoint rejects payloads
+    // > 25MB with a generic "Request Entity Too Large" error. Catch this
+    // up-front with a friendly message so the user knows to trim the clip
+    // before retrying. 24MB threshold gives us multipart-encoding headroom.
+    const WHISPER_MAX_BYTES = 24 * 1024 * 1024;
+    if (audio.size > WHISPER_MAX_BYTES) {
+      const mb = (audio.size / (1024 * 1024)).toFixed(1);
+      throw new Error(
+        `Audio is too long for transcription (${mb} MB). OpenAI Whisper accepts up to 25 MB — please trim the clip or split it into shorter sections.`,
+      );
+    }
+
     onProgress?.({
       phase: "uploading",
       progress: 20,

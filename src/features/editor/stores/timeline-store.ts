@@ -152,16 +152,21 @@ export const useTimelineStore = create<TimelineState>()(
     },
 
     setPlayheadPosition: (position: number) => {
-      set({ playheadPosition: Math.max(0, position) });
+      // Guard against NaN / Infinity from arithmetic on missing durations.
+      // Without this, a non-finite playhead would freeze the renderer
+      // because every frame-time comparison fails.
+      const safe = Number.isFinite(position) ? Math.max(0, position) : 0;
+      set({ playheadPosition: safe });
     },
 
     seekTo: (position: number) => {
-      const clampedPosition = Math.max(0, position);
-      set({ playheadPosition: clampedPosition });
+      const safe = Number.isFinite(position) ? Math.max(0, position) : 0;
+      set({ playheadPosition: safe });
     },
 
     seekRelative: (delta: number) => {
       const { playheadPosition } = get();
+      if (!Number.isFinite(delta)) return;
       const newPosition = Math.max(0, playheadPosition + delta);
       set({ playheadPosition: newPosition });
     },

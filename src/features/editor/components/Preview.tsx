@@ -3100,7 +3100,6 @@ export const Preview: React.FC = () => {
           let currentMediaTime = mediaStartTime;
           let currentPlayheadTime = timelinePosition;
           let lastFrameTimestamp = performance.now();
-          let frameCount = 0;
 
           const processNextFrame = async () => {
             if (!isActive) {
@@ -3140,8 +3139,6 @@ export const Preview: React.FC = () => {
                   } | null>;
                 }
               ).getCanvas(currentMediaTime);
-
-              frameCount++;
 
               if (!frameResult || !frameResult.canvas) {
                 console.warn("[Preview] No frame at time", currentMediaTime);
@@ -3536,7 +3533,6 @@ export const Preview: React.FC = () => {
       // every tick from previewFpsRef so the user can change FPS live without
       // restarting playback. See the inline comment near the targetTime calc.
       let lastFrameTimestamp = performance.now();
-      let frameCount = 0;
       let isProcessingFrame = false;
 
       const processMultiTrackFrame = async () => {
@@ -4182,7 +4178,6 @@ export const Preview: React.FC = () => {
           // finishes.
           getSharedDecoderPool().endTick();
 
-          frameCount++;
           masterClock.reportVideoTime(currentPlayhead);
           const nowMulti = performance.now();
           if (nowMulti - lastPlayheadUpdateRef.current >= PLAYHEAD_UPDATE_THROTTLE_MS) {

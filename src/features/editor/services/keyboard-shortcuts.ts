@@ -700,12 +700,19 @@ class KeyboardShortcutsManager {
     // Bail when the user is typing into any text-input surface. Without this,
     // shortcuts like B/A/T/P would steal keystrokes from text fields and
     // contentEditable nodes (e.g. inline text-clip editing).
+    // Also bail when a Radix Slider thumb is focused — pressing a letter
+    // shortcut while adjusting a slider would otherwise split the selected
+    // clip (B) or trigger another tool. Sliders consume arrows and Tab on
+    // their own, so we only need to block other keys.
+    const role = target?.getAttribute("role") ?? "";
     if (
       target instanceof HTMLInputElement ||
       target instanceof HTMLTextAreaElement ||
       (target && target.isContentEditable) ||
       (target && target.closest?.('[contenteditable="true"]')) ||
-      (target && target.closest?.('[data-prevent-shortcuts="true"]'))
+      (target && target.closest?.('[data-prevent-shortcuts="true"]')) ||
+      role === "slider" ||
+      role === "spinbutton"
     ) {
       return;
     }
