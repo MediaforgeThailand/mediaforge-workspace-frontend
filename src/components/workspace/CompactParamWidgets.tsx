@@ -48,6 +48,8 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { useLanguage } from "@/contexts/LanguageContext";
+import ModelHoverPreview from "./ModelHoverPreview";
+import { modelPreviewFor } from "./modelDisplay";
 
 /**
  * Returns true when the given select param ought to render as a
@@ -206,7 +208,11 @@ export function MiniSelect({
           position="popper"
           sideOffset={4}
         >
-          {options.map((opt) => (
+          {options.map((opt) => {
+            const label = labelOf(opt);
+            const preview = modelPreviewFor({ id: opt, label });
+            const content = <span className="block truncate">{label}</span>;
+            return (
             <SelectItem
               key={opt}
               value={opt}
@@ -222,9 +228,16 @@ export function MiniSelect({
               style={{ fontSize: "11px" }}
               className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
             >
-              {labelOf(opt)}
+              {preview ? (
+                <ModelHoverPreview model={{ id: opt, label }} label={label} className="block min-w-0">
+                  {content}
+                </ModelHoverPreview>
+              ) : (
+                content
+              )}
             </SelectItem>
-          ))}
+            );
+          })}
         </SelectContent>
       </Select>
     </div>
@@ -305,6 +318,8 @@ function SearchableMiniSelect({
               {options.map((opt) => {
                 const label = labelOf(opt);
                 const action = renderItemAction?.(opt);
+                const preview = modelPreviewFor({ id: opt, label });
+                const labelNode = <span className="min-w-0 flex-1 truncate">{label}</span>;
                 return (
                   <CommandItem
                     key={opt}
@@ -324,7 +339,13 @@ function SearchableMiniSelect({
                       action && "pr-1",
                     )}
                   >
-                    <span className="min-w-0 flex-1 truncate">{label}</span>
+                    {preview ? (
+                      <ModelHoverPreview model={{ id: opt, label }} label={label} className="flex min-w-0 flex-1">
+                        {labelNode}
+                      </ModelHoverPreview>
+                    ) : (
+                      labelNode
+                    )}
                     {action ? (
                       // Wrap the action so a click on it doesn't bubble
                       // up and select the row. cmdk's CommandItem

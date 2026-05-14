@@ -83,6 +83,147 @@ export interface ModelLogoMeta {
   shadow: string;
 }
 
+export interface ModelPreviewMeta {
+  imageSrc?: string;
+  videoSrc?: string;
+  title: string;
+  subtitle?: string;
+}
+
+const MODEL_PREVIEW_META: Record<string, ModelPreviewMeta> = {
+  "nano-banana-2": {
+    imageSrc: "/model-previews/banana-2.webp",
+    title: "Nano Banana 2",
+    subtitle: "Reference-heavy Google image generation preview",
+  },
+  "nano-banana-pro": {
+    imageSrc: "/model-previews/banana-pro.webp",
+    title: "Nano Banana Pro",
+    subtitle: "Premium Google image generation preview",
+  },
+  "gpt-image-2": {
+    imageSrc: "/model-previews/gpt-2.webp",
+    title: "GPT Image 2",
+    subtitle: "OpenAI image generation preview",
+  },
+  "seedream-4-5": {
+    imageSrc: "/model-previews/seedream-4-5.webp",
+    title: "Seedream 4.5",
+    subtitle: "ByteDance image generation preview",
+  },
+  "seedream-5-0-lite": {
+    imageSrc: "/model-previews/seedream-5-0-lite.webp",
+    title: "Seedream 5.0 Lite",
+    subtitle: "Lightweight Seedream image generation preview",
+  },
+  "seedream-5-0": {
+    imageSrc: "/model-previews/seedream-5-0.webp",
+    title: "Seedream 5.0",
+    subtitle: "Seedream image generation preview",
+  },
+  "kling-2-6": {
+    videoSrc: "/model-previews/kling-2-6.webm",
+    title: "Kling 2.6 Pro",
+    subtitle: "Kling video generation preview",
+  },
+  "kling-2-6-motion": {
+    videoSrc: "/model-previews/kling-2-6-motion.webm",
+    title: "Kling 2.6 Motion Pro",
+    subtitle: "Motion-controlled Kling preview",
+  },
+  "kling-3-0": {
+    videoSrc: "/model-previews/kling-3-0.webm",
+    title: "Kling 3.0 Pro",
+    subtitle: "Kling 3 video generation preview",
+  },
+  "kling-3-0-motion-pro": {
+    videoSrc: "/model-previews/kling-3-0-motion-pro.webm",
+    title: "Kling 3.0 Motion Pro",
+    subtitle: "Kling 3 motion-controlled preview",
+  },
+  "kling-3-0-omni": {
+    videoSrc: "/model-previews/kling-3-0-omni.webm",
+    title: "Kling 3.0 Omni",
+    subtitle: "Kling Omni multi-input preview",
+  },
+  "seedance-2-0": {
+    videoSrc: "/model-previews/seedance-2-0.webm",
+    title: "Seedance 2.0",
+    subtitle: "Premium BytePlus video generation preview",
+  },
+  "seedance-2-0-fast": {
+    videoSrc: "/model-previews/seedance-2-0-fast.webm",
+    title: "Seedance 2.0 Fast",
+    subtitle: "Fast BytePlus video generation preview",
+  },
+  "veo-3-1": {
+    videoSrc: "/model-previews/veo-3-1.webm",
+    title: "Google Veo 3.1",
+    subtitle: "Google video generation preview",
+  },
+};
+
+export function modelPreviewFor(model: ModelLogoInput | string): ModelPreviewMeta | undefined {
+  const input = typeof model === "string" ? { id: model } : model;
+  const haystack = `${input.id ?? ""} ${input.label ?? ""} ${input.name ?? ""} ${input.provider ?? ""}`.toLowerCase();
+  const normalized = haystack.replace(/[^a-z0-9]+/g, "-");
+  const normalizedNoVersionPrefix = normalized.replace(/-v(?=\d)/g, "-");
+  const compact = haystack.replace(/[^a-z0-9]+/g, "");
+  const has = (value: string) => (
+    normalized.includes(value) ||
+    normalizedNoVersionPrefix.includes(value) ||
+    compact.includes(value.replace(/-/g, ""))
+  );
+
+  if (
+    has("seedream-5-0-lite") ||
+    (normalized.includes("seedream") && normalized.includes("5") && normalized.includes("lite"))
+  ) {
+    return MODEL_PREVIEW_META["seedream-5-0-lite"];
+  }
+  if (has("seedream-5-0") || (normalized.includes("seedream") && normalized.includes("5"))) {
+    return MODEL_PREVIEW_META["seedream-5-0"];
+  }
+  if (has("seedream-4-5") || (normalized.includes("seedream") && normalized.includes("4-5"))) {
+    return MODEL_PREVIEW_META["seedream-4-5"];
+  }
+  if (has("nano-banana-pro") || has("banana-pro")) {
+    return MODEL_PREVIEW_META["nano-banana-pro"];
+  }
+  if (has("nano-banana-2") || has("banana-2")) {
+    return MODEL_PREVIEW_META["nano-banana-2"];
+  }
+  if (has("gpt-image-2") || has("gpt-2")) {
+    return MODEL_PREVIEW_META["gpt-image-2"];
+  }
+  if (has("seedance-2-0-lite") || (has("seedance-2-0") && normalized.includes("fast"))) {
+    return MODEL_PREVIEW_META["seedance-2-0-fast"];
+  }
+  if (has("seedance-2-0-pro") || has("seedance-2-0")) {
+    return MODEL_PREVIEW_META["seedance-2-0"];
+  }
+  if (has("veo-3-1")) {
+    return MODEL_PREVIEW_META["veo-3-1"];
+  }
+  if (has("kling-3-0-omni") || has("kling-3-omni")) {
+    return MODEL_PREVIEW_META["kling-3-0-omni"];
+  }
+  if (has("kling-3-0-motion-pro") || has("kling-3-motion-pro") || has("kling-3-motion")) {
+    return MODEL_PREVIEW_META["kling-3-0-motion-pro"];
+  }
+  if (has("kling-3-0-pro") || has("kling-3-0") || has("kling-3-pro")) {
+    return MODEL_PREVIEW_META["kling-3-0"];
+  }
+  if (has("kling-2-6-motion-pro") || has("kling-2-6-motion")) {
+    return MODEL_PREVIEW_META["kling-2-6-motion"];
+  }
+  if (has("kling-2-6-pro") || has("kling-2-6")) {
+    return MODEL_PREVIEW_META["kling-2-6"];
+  }
+
+  return undefined;
+}
+
 export function modelLogoFor(model: ModelLogoInput): ModelLogoMeta {
   const haystack = `${model.id ?? ""} ${model.label ?? ""} ${model.name ?? ""} ${model.provider ?? ""}`.toLowerCase();
 

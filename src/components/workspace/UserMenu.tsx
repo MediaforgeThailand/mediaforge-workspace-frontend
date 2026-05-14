@@ -201,7 +201,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
   // (or vice-versa). The placeholder reserves the trigger's pixel
   // footprint so the header doesn't reflow either way.
   if (authLoading) {
-    return <div className="h-[32px] w-[32px]" aria-hidden />;
+    return <div className="h-[48px] w-[48px]" aria-hidden />;
   }
 
   // Guest fallback — when no user is signed in (the dashboard / home
@@ -283,8 +283,8 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
         : isEducationOrg
           ? credits?.organization_name || t("workspace.userMenu.sharedCredits")
           : t("common.companyPool");
-  const triggerSize = compact ? 43 : 40;
-  const ringSize = compact ? 43 : 42;
+  const triggerSize = compact ? 52 : 48;
+  const ringSize = compact ? 52 : 50;
 
   const handleSignOut = async () => {
     await signOut();

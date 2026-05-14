@@ -130,6 +130,12 @@ const MAPPINGS: ErrorMapping[] = [
     ja: "Seedance 2.0 はこの経路で実在人物の参照画像をブロックしました。認証済みの人物アセットを使うか、別のモデル/プロバイダーを選んでください。",
   },
   {
+    match: /Dubbing without a watermark.*Creator\+|watermark.*Creator\+|subscription_not_allowed|subscription_required|instant voice cloning|instant_voice_cloning|paid_plan_required/i,
+    th: "บัญชี ElevenLabs ตอนนี้ยังไม่รองรับการทำ MP4 แบบไม่ติด watermark หรือ voice clone แบบนี้ กรุณาใช้ไฟล์เสียง MP3/Audio เป็นต้นฉบับ หรืออัปเกรด ElevenLabs เป็นแผนที่รองรับ",
+    en: "This ElevenLabs account cannot create watermark-free MP4 dubbing or this voice-clone mode on the current plan. Use an MP3/audio source, or upgrade ElevenLabs to a supported plan.",
+    ja: "現在の ElevenLabs プランでは、透かしなしの MP4 ダビングまたはこのボイスクローンモードを利用できません。MP3/音声ソースを使うか、対応プランへアップグレードしてください。",
+  },
+  {
     match: /content[\s_-]*polic|moderation|blocked|safety[\s_-]*system|disallowed/i,
     th: "เนื้อหาที่ขอนี้ผู้ให้บริการ AI ปฏิเสธ ลองปรับ prompt ให้ปลอดภัยกว่านี้",
     en: "The AI provider blocked this request — try a safer prompt.",
