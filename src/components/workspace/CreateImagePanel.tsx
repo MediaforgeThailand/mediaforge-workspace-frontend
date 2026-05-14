@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Minus, Plus,
-  Video, Image as ImageIcon, Box, Music, ChevronRight,
+  Video, Image as ImageIcon, Box, Music, Languages, ChevronRight,
   FileText,
   X, ChevronDown, Check, Upload, Clipboard,
   SlidersHorizontal, Trash2,
@@ -22,7 +22,7 @@ import {
   recommendationRankForModel,
 } from "./modelDisplay";
 
-type BottomTab = "video" | "image" | "3d" | "audio";
+type BottomTab = "video" | "image" | "translate" | "3d" | "audio";
 type MaybePromise<T> = T | Promise<T>;
 
 function usePanelCopy() {
@@ -31,6 +31,7 @@ function usePanelCopy() {
     video: t("createImagePanel.video"),
     image: t("createImagePanel.image"),
     audio: t("createImagePanel.audio"),
+    translate: t("workspace.standalone.tool.voice_translate.nav"),
     models: t("createImagePanel.models"),
     recommended: t("createImagePanel.recommended"),
     allModels: t("createImagePanel.allModels"),
@@ -827,6 +828,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
         {[
           { id: "video", icon: Video, label: copy.video },
           { id: "image", icon: ImageIcon, label: copy.image },
+          { id: "translate", icon: Languages, label: copy.translate },
           { id: "3d", icon: Box, label: "3D" },
           { id: "audio", icon: Music, label: copy.audio },
         ].map(({ id, icon: Icon, label }) => {
@@ -1337,6 +1339,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
         {[
           { id: "video", icon: Video, label: copy.video },
           { id: "image", icon: ImageIcon, label: copy.image },
+          { id: "translate", icon: Languages, label: copy.translate },
           { id: "3d", icon: Box, label: "3D" },
           { id: "audio", icon: Music, label: copy.audio },
         ].map(({ id, icon: Icon, label }) => {

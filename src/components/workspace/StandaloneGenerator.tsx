@@ -66,6 +66,12 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 import NodePreviewLightbox, { type PreviewPayload } from "./NodePreviewLightbox";
 import { useFreshSignedUrl } from "./useFreshSignedUrl";
 import { getSignedUrl } from "@/hooks/useSignedUrl";
@@ -103,6 +109,10 @@ import { getProjectAvatar } from "./projectAvatars";
 import MediaContextMenu from "./MediaContextMenu";
 import { buildMediaMenuItems } from "./mediaMenuItems";
 import { useMediaContextMenu } from "./useMediaContextMenu";
+import {
+  buildExtractedAudioFile,
+  extractAudioBlobFromVideo,
+} from "./videoAudioActions";
 // Hardcoded voice catalogs (Gemini star names, Google Studio
 // labels, ElevenLabs default presets) were deleted in the
 // preset-purge cleanup. ElevenLabs voices come from a live
@@ -471,6 +481,7 @@ interface VoiceTranslateTask {
 type StandaloneVideoInputMode = "frames" | "reference";
 type VoiceTranslateEngine =
   | "elevenlabs_dubbing_clone"
+  | "elevenlabs_ivc_tts"
   | "local_gemini_tts"
   | "local_google_tts";
 
@@ -538,6 +549,7 @@ interface StandaloneFormState {
   translateAudioOnly: boolean;
   translateSpeakerNum: number;
   translateConsent: boolean;
+  translateTtsText: string;
   modelImage: UploadedRef | null;
   modelImages: UploadedRef[];
   texture: boolean;
@@ -569,12 +581,13 @@ const DEFAULT_VOICE_PARAMS = {
 const DEFAULT_TRANSLATE_PARAMS = {
   translateVideo: null as UploadedRef | null,
   translateEngine: "elevenlabs_dubbing_clone" as VoiceTranslateEngine,
-  translateSourceLanguage: "Thai",
+  translateSourceLanguage: "Auto",
   translateOutputLanguage: "English",
   translateMode: "fast" as const,
-  translateAudioOnly: false,
+  translateAudioOnly: true,
   translateSpeakerNum: 1,
   translateConsent: false,
+  translateTtsText: "This is a quick Gemini TTS test from MediaForge.",
 };
 
 type VoiceTranslateEngineOption = {
@@ -599,10 +612,23 @@ function isElevenLabsDubbingEngine(engine?: VoiceTranslateEngine): boolean {
   return engine === "elevenlabs_dubbing_clone";
 }
 
+function isVoiceTranslateProvider(provider: string | null | undefined): boolean {
+  return provider === "elevenlabs_dubbing" || provider === "elevenlabs_ivc_tts";
+}
+
+function isVoiceTranslateStandaloneJob(job: StandaloneJobRow): boolean {
+  return (
+    (job.node_type === "voiceTranslateNode" && isVoiceTranslateProvider(job.provider)) ||
+    (job.node_type === "audioGenNode" && isLocalVoiceDubJob(job))
+  );
+}
+
 function voiceDubModelForEngine(engine: VoiceTranslateEngine): string {
   switch (engine) {
     case "elevenlabs_dubbing_clone":
       return "elevenlabs-dubbing-voice-clone";
+    case "elevenlabs_ivc_tts":
+      return "elevenlabs-ivc-tts-demo";
     case "local_gemini_tts":
       return "gemini-3.1-flash-tts-preview";
     case "local_google_tts":
@@ -616,6 +642,8 @@ function voiceDubProviderForEngine(engine: VoiceTranslateEngine): string {
   switch (engine) {
     case "elevenlabs_dubbing_clone":
       return "ElevenLabs Dubbing";
+    case "elevenlabs_ivc_tts":
+      return "ElevenLabs IVC TTS";
     case "local_gemini_tts":
       return "Gemini TTS";
     case "local_google_tts":
@@ -1381,7 +1409,7 @@ export default function StandaloneGenerator({
     if (!nodeType) return 0;
     return activeJobs.filter((job) => {
       if (activeTool === "voice_translate") {
-        return job.node_type === nodeType && job.provider === "elevenlabs_dubbing";
+        return isVoiceTranslateStandaloneJob(job);
       }
       return job.node_type === nodeType;
     }).length;
@@ -1402,12 +1430,41 @@ export default function StandaloneGenerator({
   useEffect(() => {
     if (activeTool !== "voice_translate") return;
     const jobs = jobsQuery.data ?? [];
-    const voiceJob = jobs.find(
-      (job) =>
-        job.node_type === "voiceTranslateNode" &&
-        job.provider === "elevenlabs_dubbing",
-    );
-    if (!voiceJob) return;
+    const translateJob = jobs.find((job) => isVoiceTranslateStandaloneJob(job));
+    if (!translateJob) return;
+    if (translateJob.node_type === "audioGenNode" && isLocalVoiceDubJob(translateJob)) {
+      const localAudioJob = translateJob;
+      const result = localAudioJob.result ?? {};
+      const params = localAudioJob.request?.params ?? {};
+      const outputUrl = firstText(
+        result.url,
+        result.outputs?.audio_url,
+        result.outputs?.output_audio,
+      );
+      const status =
+        localAudioJob.status === "completed"
+          ? "completed"
+          : localAudioJob.status === "failed" || localAudioJob.status === "permanent_failed"
+            ? "failed"
+            : "running";
+      const engine = localVoiceDubEngineFromJob(localAudioJob) ?? "local_gemini_tts";
+      setTranslateTask({
+        id: localAudioJob.id,
+        jobId: localAudioJob.id,
+        status,
+        engine,
+        stage: status === "completed" ? "completed" : "synthesizing",
+        outputType: "audio",
+        outputLanguage: firstText(params.output_language) ?? "",
+        sourceName: firstText(params.local_voice_translate_source_name) ?? voiceDubProviderForEngine(engine),
+        outputUrl: outputUrl || undefined,
+        providerOutputUrl: outputUrl || undefined,
+        translatedScript: firstText(params.local_voice_translate_script, params.prompt) ?? "",
+        error: localAudioJob.error || localAudioJob.last_error || undefined,
+      });
+      return;
+    }
+    const voiceJob = translateJob;
     const result = voiceJob.result ?? {};
     const providerMeta = result.provider_meta ?? {};
     const params = voiceJob.request?.params ?? {};
@@ -1436,7 +1493,7 @@ export default function StandaloneGenerator({
       id: translateId,
       jobId: voiceJob.id,
       status,
-      engine: "elevenlabs_dubbing_clone",
+      engine: voiceJob.provider === "elevenlabs_ivc_tts" ? "elevenlabs_ivc_tts" : "elevenlabs_dubbing_clone",
       stage: status === "completed" ? "completed" : "submitted",
       outputType: String(result.type ?? "video") === "audio" ? "audio" : "video",
       outputLanguage: firstText(params.output_language, providerMeta.output_language) ?? "",
@@ -1497,6 +1554,9 @@ export default function StandaloneGenerator({
               return supabase.functions.invoke(ELEVENLABS_DUBBING_EDGE_FUNCTION, {
                 body: { action: "status", job_id: job.id },
               });
+            }
+            if (job.node_type === "voiceTranslateNode" && job.provider === "elevenlabs_ivc_tts") {
+              return Promise.resolve();
             }
             return supabase.functions.invoke(RUN_EDGE_FUNCTION, {
               body: { action: "poll_workspace_job", job_id: job.id },
@@ -1616,6 +1676,7 @@ export default function StandaloneGenerator({
 
     const pollTranslateTask = async () => {
       if (cancelled || !translateTask?.id) return;
+      if (isLocalVoiceDubEngine(translateTask.engine ?? "elevenlabs_dubbing_clone")) return;
       try {
         const { data, error } = await supabase.functions.invoke(
           ELEVENLABS_DUBBING_EDGE_FUNCTION,
@@ -1892,6 +1953,8 @@ export default function StandaloneGenerator({
   const panelBottom =
     activeTool === "video_gen"
       ? "video"
+      : activeTool === "voice_translate"
+        ? "translate"
       : activeTool === "image_to_3d"
         ? "3d"
         : activeTool === "voice_gen"
@@ -2636,23 +2699,49 @@ export default function StandaloneGenerator({
     }
     const outputLanguage = form.translateOutputLanguage.trim();
     const sourceLanguage = form.translateSourceLanguage.trim();
+    if (!isElevenLabsDubbingLanguage(outputLanguage)) {
+      toast.error(unsupportedElevenLabsDubbingLanguageMessage(outputLanguage, language));
+      return;
+    }
+    let providerMedia = video;
+    if (form.translateAudioOnly && video.mime.startsWith("video/")) {
+      const toastId = toast.loading(
+        language === "th" ? "Extracting audio for MP3 test..." : "Extracting audio for MP3 test...",
+      );
+      try {
+        const audioBlob = await extractAudioBlobFromVideo(video.url);
+        const audioFile = buildExtractedAudioFile(audioBlob, video.name);
+        providerMedia = await uploadReference(audioFile, user?.id, activeProject.id);
+        toast.success(
+          language === "th" ? "Audio source prepared." : "Audio source prepared.",
+          { id: toastId },
+        );
+      } catch (err) {
+        toast.error(friendlyError(err, language === "th" ? "th" : "en"), { id: toastId });
+        return;
+      }
+    }
+    const outputType: "audio" | "video" =
+      form.translateAudioOnly || providerMedia.mime.startsWith("audio/") ? "audio" : "video";
     const { data, error } = await supabase.functions.invoke(
       ELEVENLABS_DUBBING_EDGE_FUNCTION,
       {
         body: {
           action: "start",
-          video_url: video.url,
+          video_url: providerMedia.url,
           output_language: outputLanguage,
+          output_type: outputType,
           source_language:
             sourceLanguage && sourceLanguage.toLowerCase() !== "auto"
+              && isElevenLabsDubbingLanguage(sourceLanguage)
               ? sourceLanguage
               : undefined,
           speaker_num: form.translateSpeakerNum,
           project_id: activeProject.id,
-          source_storage_bucket: video.storageBucket,
-          source_storage_path: video.storagePath,
-          source_content_type: video.mime,
-          source_name: video.name,
+          source_storage_bucket: providerMedia.storageBucket,
+          source_storage_path: providerMedia.storagePath,
+          source_content_type: providerMedia.mime,
+          source_name: providerMedia.name,
           consent: form.translateConsent,
         },
       },
@@ -2676,9 +2765,9 @@ export default function StandaloneGenerator({
       sourceName: video.name,
       engine: "elevenlabs_dubbing_clone",
       stage: "submitted",
-      outputType: video.mime.startsWith("audio/") ? "audio" : "video",
-      sourceStorageBucket: video.storageBucket,
-      sourceStoragePath: video.storagePath,
+      outputType,
+      sourceStorageBucket: providerMedia.storageBucket,
+      sourceStoragePath: providerMedia.storagePath,
     });
     void refetchJobs();
     toast.success(
@@ -2686,6 +2775,112 @@ export default function StandaloneGenerator({
         ? "เริ่มแปลเสียงแล้ว ผลลัพธ์จะแสดงทางขวาเมื่อพร้อม"
         : "Translation queued. The result will appear on the right.",
     );
+  };
+
+  const startGeminiTtsSample = async () => {
+    if (runInFlightRef.current) return;
+    runInFlightRef.current = true;
+    setRunning(true);
+    try {
+      if (!user?.id) {
+        toast.error(t("workspace.toast.sign_in_first"));
+        return;
+      }
+      if (!activeProject?.id) {
+        toast.error(t("workspace.toast.create_project_first_gen"));
+        return;
+      }
+      const text = form.translateTtsText.trim();
+      if (!text) {
+        toast.error(
+          language === "th"
+            ? "Add the line you want Gemini TTS to speak."
+            : "Add the line you want Gemini TTS to speak.",
+        );
+        return;
+      }
+
+      const outputLanguage = form.translateOutputLanguage.trim() || "English";
+      const sourceMedia = form.translateVideo;
+      const params = buildAudioParams({
+        model: "gemini-3.1-flash-tts-preview",
+        script: text,
+        voice: DEFAULT_GEMINI_TTS_VOICE,
+        stylePrompt: outputLanguage ? `Speak naturally in ${outputLanguage}.` : "",
+        voiceStylePreset: "neutral",
+      });
+      Object.assign(params, {
+        local_voice_translate: true,
+        local_voice_translate_engine: "local_gemini_tts",
+        local_voice_translate_source_video_url: sourceMedia?.url ?? "",
+        local_voice_translate_source_name: sourceMedia?.name ?? "Gemini TTS sample",
+        local_voice_translate_script: text,
+        output_language: outputLanguage,
+      });
+
+      setTranslateTask({
+        id: `gemini-tts-${Date.now()}`,
+        status: "running",
+        outputLanguage,
+        sourceName: sourceMedia?.name ?? "Gemini TTS sample",
+        engine: "local_gemini_tts",
+        stage: "synthesizing",
+        outputType: "audio",
+        translatedScript: text,
+      });
+
+      const { data, error } = await supabase.functions.invoke(RUN_EDGE_FUNCTION, {
+        body: {
+          action: "enqueue_workspace_job",
+          node_type: "audioGenNode",
+          params,
+          inputs: { prompt: text },
+          project_id: activeProject.id,
+          workspace_id: null,
+          canvas_id: standaloneCanvasId(activeProject.id),
+          node_id: `standalone-${activeProject.id}-gemini-translate-tts-${Date.now()}`,
+        },
+      });
+      if (error) throw new Error(await functionErrorMessage(error));
+      const result = data as {
+        job_id?: string;
+        error?: string;
+      } | null;
+      if (result?.error) throw new Error(result.error);
+      if (!result?.job_id) throw new Error("Could not queue Gemini TTS sample.");
+
+      setTranslateTask({
+        id: result.job_id,
+        jobId: result.job_id,
+        status: "queued",
+        outputLanguage,
+        sourceName: sourceMedia?.name ?? "Gemini TTS sample",
+        engine: "local_gemini_tts",
+        stage: "synthesizing",
+        outputType: "audio",
+        translatedScript: text,
+      });
+      await jobsQuery.refetch();
+      toast.success(
+        language === "th"
+          ? "Gemini TTS sample queued."
+          : "Gemini TTS sample queued.",
+      );
+    } catch (err) {
+      setTranslateTask((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "failed",
+              error: friendlyError(err, language === "th" ? "th" : "en"),
+            }
+          : prev,
+      );
+      toast.error(friendlyError(err, language === "th" ? "th" : "en"));
+    } finally {
+      setRunning(false);
+      runInFlightRef.current = false;
+    }
   };
 
   const startVoiceTranslate = async () => {
@@ -3113,6 +3308,7 @@ export default function StandaloneGenerator({
               onVideoFiles={(files) => void uploadPanelReferenceFiles(files, "translate-video")}
               onRemoveVideo={() => updateForm({ translateVideo: null })}
               onCreate={() => void run()}
+              onCloneTtsDemo={() => void startGeminiTtsSample()}
               onToolChange={onToolChange}
             />
             ) : activeTool === "video_gen" ? (
@@ -3189,6 +3385,7 @@ export default function StandaloneGenerator({
               onBottomChange={(tab) => {
                 if (tab === "video") onToolChange("video_gen");
                 if (tab === "image") onToolChange("image_gen");
+                if (tab === "translate") onToolChange("voice_translate");
                 if (tab === "3d") onToolChange("image_to_3d");
                 if (tab === "audio") onToolChange("voice_gen");
               }}
@@ -3284,6 +3481,7 @@ export default function StandaloneGenerator({
               onBottomChange={(tab) => {
                 if (tab === "video") onToolChange("video_gen");
                 if (tab === "image") onToolChange("image_gen");
+                if (tab === "translate") onToolChange("voice_translate");
                 if (tab === "3d") onToolChange("image_to_3d");
                 if (tab === "audio") onToolChange("voice_gen");
               }}
@@ -3495,7 +3693,7 @@ function ToolTabs({
       className={cn(
         isMobile
           ? "standalone-mobile-tool-tabs flex h-[42px] items-center justify-center gap-[8px] rounded-[14px] border border-white/[0.05] bg-[#151719] px-[8px] py-[4px] shadow-[inset_0_1px_0_rgba(255,255,255,.04),0_10px_24px_-20px_rgba(238,255,0,.75)]"
-          : "flex items-center justify-between gap-2 border-t border-white/[0.05] bg-[#17191b] px-4 py-3",
+          : "items-center justify-around border-t border-white/[0.04] bg-[#17191b] px-[18px] py-[6px]",
         className,
       )}
     >
@@ -3503,10 +3701,13 @@ function ToolTabs({
         const item = STANDALONE_TOOLS[key];
         const active = key === activeTool;
         const Icon = item.icon;
+        const label = standaloneToolNav(item.key, t);
         return (
           <button
             key={key}
             type="button"
+            aria-label={label}
+            title={label}
             onClick={() => onToolChange(key)}
             className={cn(
               "relative flex min-w-0 items-center justify-center overflow-hidden rounded-full font-semibold outline-none transition-all duration-300 focus-visible:ring-2 focus-visible:ring-[var(--brand-soft)]/60",
@@ -3515,30 +3716,30 @@ function ToolTabs({
                   ? "h-[34px] min-w-[78px] px-[12px] text-[12px] bg-white text-black shadow-[0_0_18px_rgba(244,255,0,.5)]"
                   : "h-[34px] w-[34px] px-0 text-[var(--text-default)] hover:bg-white/10 hover:text-white"
                 : cn(
-                    "h-11 px-3 text-[13px]",
+                    "h-[34px] w-[34px] px-0",
                     active
-                      ? "min-w-[112px] bg-white text-black shadow-[0_4px_20px_rgba(238,255,0,0.45)]"
-                      : "w-11 text-[var(--text-default)] hover:bg-white/10 hover:text-white",
+                      ? "bg-white text-black shadow-[0_6px_18px_-10px_rgba(255,255,255,.75)]"
+                      : "text-neutral-400 hover:bg-white/[0.06] hover:text-white",
                   ),
             )}
           >
             <Icon
               className={cn(
                 "shrink-0 transition-transform duration-300",
-                isMobile ? "h-[17px] w-[17px]" : "h-5 w-5",
+                isMobile ? "h-[17px] w-[17px]" : "h-[18px] w-[18px]",
                 active
                   ? "scale-105"
                   : "opacity-70",
               )}
             />
-            {active && (
+            {isMobile && active && (
               <span
                 className={cn(
                   "ml-[6px] truncate leading-[14px]",
                   isMobile ? "max-w-[48px]" : "max-w-[72px]",
                 )}
               >
-                {standaloneToolNav(item.key, t)}
+                {label}
               </span>
             )}
           </button>
@@ -3793,24 +3994,53 @@ function ProjectPicker({
 
 const TRANSLATE_LANGUAGE_OPTIONS = [
   "English",
-  "Thai",
-  "Japanese",
-  "Korean",
+  "Hindi",
+  "Portuguese",
   "Chinese",
-  "Indonesian",
-  "Vietnamese",
   "Spanish",
   "French",
   "German",
-  "Portuguese",
+  "Japanese",
   "Arabic",
-  "Hindi",
+  "Russian",
+  "Korean",
+  "Indonesian",
+  "Italian",
+  "Dutch",
+  "Turkish",
+  "Polish",
+  "Swedish",
+  "Filipino",
+  "Malay",
+  "Romanian",
+  "Ukrainian",
+  "Greek",
+  "Czech",
+  "Danish",
+  "Finnish",
+  "Bulgarian",
+  "Croatian",
+  "Slovak",
+  "Tamil",
 ];
 
 const ELEVENLABS_SOURCE_LANGUAGE_OPTIONS = [
   "Auto",
   ...TRANSLATE_LANGUAGE_OPTIONS,
 ];
+
+const ELEVENLABS_DUBBING_LANGUAGE_SET = new Set(TRANSLATE_LANGUAGE_OPTIONS);
+
+function isElevenLabsDubbingLanguage(value: string): boolean {
+  return ELEVENLABS_DUBBING_LANGUAGE_SET.has(value.trim());
+}
+
+function unsupportedElevenLabsDubbingLanguageMessage(value: string, language: string): string {
+  const label = value.trim() || "selected language";
+  return language === "th"
+    ? `ElevenLabs Translate ยังไม่รองรับ ${label} สำหรับการพากย์เสียง เลือกภาษาเป้าหมายอื่นก่อน`
+    : `ElevenLabs Translate does not support ${label} for dubbing yet. Choose another target language.`;
+}
 
 function translateMediaFilesFromTransfer(data: DataTransfer | null): File[] {
   if (!data) return [];
@@ -3854,6 +4084,7 @@ function VoiceTranslatePanel({
   onVideoFiles,
   onRemoveVideo,
   onCreate,
+  onCloneTtsDemo,
   onToolChange,
 }: {
   form: StandaloneFormState;
@@ -3866,6 +4097,7 @@ function VoiceTranslatePanel({
   onVideoFiles: (files: File[]) => void;
   onRemoveVideo: () => void;
   onCreate: () => void;
+  onCloneTtsDemo: () => void;
   onToolChange: (tool: StandaloneToolKey) => void;
 }) {
   const th = language === "th";
@@ -3879,17 +4111,23 @@ function VoiceTranslatePanel({
     uploadLimit: th
       ? `รองรับ MP4/MP3 สูงสุด ${TRANSLATE_VIDEO_UPLOAD_MAX_LABEL}`
       : `MP4/MP3, up to ${TRANSLATE_VIDEO_UPLOAD_MAX_LABEL}`,
-    source: th ? "ภาษาต้นฉบับ" : "Source language",
+    source: th ? "ต้นฉบับ" : "Source",
     sourceAuto: th ? "ตรวจจับอัตโนมัติ" : "Auto detect",
     sourceHint: th
       ? "เลือกภาษาต้นฉบับให้ตรงเพื่อลดการเดาผิดและลดสำเนียงเพี้ยน"
       : "Pick the actual source language to reduce detection mistakes and odd accents in voice-clone dubbing.",
-    target: th ? "ภาษาเป้าหมาย" : "Target language",
+    target: th ? "เป้าหมาย" : "Target",
     speakers: th ? "ผู้พูด" : "Speakers",
     consent: th
       ? "ฉันมีสิทธิ์ใช้ไฟล์นี้และได้รับอนุญาตให้แปล/โคลนเสียงของผู้พูด"
       : "I have permission to translate this file and preserve or clone the speaker voice.",
     action: "Translate",
+    cloneTtsTitle: th ? "Gemini TTS MP3 sample" : "Gemini TTS MP3 sample",
+    cloneTtsHint: th
+      ? "Uses Gemini TTS to create an MP3 from the text below. This does not clone the uploaded speaker voice."
+      : "Uses Gemini TTS to create an MP3 from the text below. This does not clone the uploaded speaker voice.",
+    cloneTtsPlaceholder: th ? "Text for Gemini TTS to speak" : "Text for Gemini TTS to speak",
+    cloneTtsAction: th ? "Generate Gemini MP3" : "Generate Gemini MP3",
     processing: th ? "กำลังแปล" : "Translating",
     ready: th ? "ผลลัพธ์จะแสดงทางขวาเมื่อพร้อม" : "Results appear on the right when ready.",
     remove: th ? "ลบไฟล์" : "Remove file",
@@ -3925,19 +4163,19 @@ function VoiceTranslatePanel({
     task?.status === "running";
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-[var(--border-overlay)] bg-[var(--bg-sidebar)] shadow-[inset_0_1px_0_rgba(255,255,255,.05),0_22px_50px_-38px_rgba(238,255,0,.45)]">
-      <div className="flex h-[58px] shrink-0 items-center gap-3 border-b border-white/[0.05] px-4">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-200">
-          <Languages className="h-5 w-5" />
+    <section className="standalone-translate-panel flex min-h-0 flex-1 flex-col overflow-hidden rounded-[18px] border border-[var(--border-overlay)] bg-[var(--bg-sidebar)] shadow-[inset_0_1px_0_rgba(255,255,255,.05)]">
+      <div className="flex h-[52px] shrink-0 items-center gap-2.5 border-b border-white/[0.05] px-3.5">
+        <span className="grid h-8 w-8 shrink-0 place-items-center text-cyan-200">
+          <Languages className="h-4 w-4" />
         </span>
         <div className="min-w-0">
-          <h2 className="truncate text-[17px] font-bold text-white">{copy.title}</h2>
-          <p className="truncate text-[11px] text-zinc-400">{copy.subtitle}</p>
+          <h2 className="truncate text-[15px] font-bold leading-[17px] text-white">{copy.title}</h2>
+          <p className="mt-0.5 truncate text-[10px] leading-[13px] text-zinc-400">{copy.subtitle}</p>
         </div>
       </div>
 
-      <div className="ws-scroll-hide min-h-0 flex-1 overflow-y-auto px-3 py-3">
-        <div className="space-y-3">
+      <div className="ws-scroll-hide min-h-0 flex-1 overflow-y-auto px-3 py-2.5">
+        <div className="space-y-2.5">
           <div
             role={!media ? "button" : undefined}
             tabIndex={!media ? 0 : undefined}
@@ -3955,7 +4193,7 @@ function VoiceTranslatePanel({
             }}
             onDrop={handleDrop}
             className={cn(
-              "group relative flex min-h-[132px] w-full overflow-hidden rounded-[16px] border text-left transition",
+              "group relative flex min-h-[94px] w-full overflow-hidden rounded-[12px] border text-left transition",
               media
                 ? "border-white/10 bg-black/30"
                 : "border-dashed border-cyan-300/35 bg-cyan-300/[0.04] hover:border-cyan-200/70 hover:bg-cyan-300/[0.07]",
@@ -3964,14 +4202,14 @@ function VoiceTranslatePanel({
             {media ? (
               <>
                 {isAudio ? (
-                  <div className="flex min-h-[132px] w-full flex-col justify-center gap-3 px-4 py-4">
-                    <div className="flex items-center gap-3">
-                      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-cyan-200/20 bg-cyan-200/10 text-cyan-200">
-                        <Music className="h-5 w-5" />
+                  <div className="flex min-h-[94px] w-full flex-col justify-center gap-2 px-3 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <span className="grid h-8 w-8 shrink-0 place-items-center text-cyan-200">
+                        <Music className="h-4 w-4" />
                       </span>
                       <div className="min-w-0">
-                        <p className="truncate text-[13px] font-bold text-white">{media.name}</p>
-                        <p className="mt-0.5 text-[11px] font-semibold text-zinc-500">MP3 / audio</p>
+                        <p className="truncate text-[12px] font-bold leading-[14px] text-white">{media.name}</p>
+                        <p className="mt-0.5 text-[10px] font-semibold leading-[12px] text-zinc-500">MP3 / audio</p>
                       </div>
                     </div>
                     <audio src={media.url} controls className="w-full" />
@@ -3982,7 +4220,7 @@ function VoiceTranslatePanel({
                     controls
                     playsInline
                     preload="metadata"
-                    className="aspect-video max-h-[168px] w-full bg-black object-contain"
+                    className="aspect-video max-h-[142px] w-full bg-black object-contain"
                   />
                 )}
                 {!isAudio && (
@@ -3996,25 +4234,25 @@ function VoiceTranslatePanel({
                     event.stopPropagation();
                     onRemoveVideo();
                   }}
-                  className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-black/70 text-white transition hover:bg-white/15"
+                  className="absolute right-2.5 top-2.5 grid h-7 w-7 place-items-center rounded-full bg-black/70 text-white transition hover:bg-white/15"
                   aria-label={copy.remove}
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3.5 w-3.5" />
                 </button>
               </>
             ) : (
-              <div className="flex w-full items-center gap-3 px-4 py-5">
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-cyan-200/20 bg-cyan-200/10 text-cyan-200">
+              <div className="flex w-full items-center gap-2.5 px-3 py-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center text-cyan-200">
                   {uploading ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <UploadCloud className="h-5 w-5" />
+                    <UploadCloud className="h-4 w-4" />
                   )}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-[14px] font-bold text-white">{copy.uploadTitle}</p>
-                  <p className="mt-1 text-[12px] leading-snug text-zinc-400">{copy.uploadHint}</p>
-                  <p className="mt-1 text-[11px] font-semibold text-cyan-100/70">
+                  <p className="text-[13px] font-bold leading-[15px] text-white">{copy.uploadTitle}</p>
+                  <p className="mt-1 truncate text-[11px] leading-[14px] text-zinc-400">{copy.uploadHint}</p>
+                  <p className="mt-1 text-[10px] font-semibold leading-[12px] text-cyan-100/70">
                     {copy.uploadLimit}
                   </p>
                 </div>
@@ -4049,36 +4287,40 @@ function VoiceTranslatePanel({
               }))}
               onChange={(value) => onChange({ translateOutputLanguage: value })}
             />
-            <VoiceTranslateNumberCard
+            <VoiceTranslateSelectCard
               label={copy.speakers}
-              value={form.translateSpeakerNum}
-              min={1}
-              max={9}
-              onChange={(value) => onChange({ translateSpeakerNum: value })}
+              value={String(form.translateSpeakerNum)}
+              displayValue={String(form.translateSpeakerNum)}
+              icon={<SlidersHorizontal className="h-[14px] w-[14px]" />}
+              options={[1, 2, 3].map((value) => ({
+                value: String(value),
+                label: String(value),
+              }))}
+              onChange={(value) => onChange({ translateSpeakerNum: Number(value) || 1 })}
             />
-            <div className="flex min-h-[58px] items-center gap-2 rounded-[14px] border border-white/[0.07] bg-white/[0.025] px-3">
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/[0.06] text-zinc-300">
-                {media?.mime.startsWith("audio/") ? <Music className="h-4 w-4" /> : <Film className="h-4 w-4" />}
-              </span>
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold text-zinc-500">Format</p>
-                <p className="truncate text-[12px] font-bold text-white">
-                  {media ? (media.mime.startsWith("audio/") ? "MP3 / audio" : "MP4 / video") : "MP4 / MP3"}
-                </p>
-              </div>
-            </div>
+            <VoiceTranslateSelectCard
+              label="Format"
+              value={form.translateAudioOnly ? "audio" : "video"}
+              displayValue={form.translateAudioOnly ? "MP3 / audio" : "MP4 / video"}
+              icon={form.translateAudioOnly ? <Music className="h-[14px] w-[14px]" /> : <Film className="h-[14px] w-[14px]" />}
+              options={[
+                { value: "audio", label: "MP3 / audio" },
+                { value: "video", label: "MP4 / video" },
+              ]}
+              onChange={(value) => onChange({ translateAudioOnly: value === "audio" })}
+            />
           </div>
 
-          <label className="flex items-start gap-3 rounded-[14px] border border-white/[0.07] bg-white/[0.025] px-3 py-3">
+          <label className="flex min-h-[42px] items-center gap-2.5 rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-2.5 py-2">
             <span
               className={cn(
-                "mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border transition",
+                "grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[5px] border transition",
                 form.translateConsent
                   ? "border-cyan-200 bg-cyan-200 text-black"
                   : "border-white/20 bg-black/30 text-transparent",
               )}
             >
-              <Check className="h-3.5 w-3.5" />
+              <Check className="h-[13px] w-[13px]" />
             </span>
             <input
               type="checkbox"
@@ -4086,20 +4328,56 @@ function VoiceTranslatePanel({
               onChange={(event) => onChange({ translateConsent: event.target.checked })}
               className="sr-only"
             />
-            <span className="text-[12px] leading-[18px] text-zinc-300">{copy.consent}</span>
+            <span className="text-[15px] font-semibold leading-[18px] text-zinc-200">{copy.consent}</span>
           </label>
 
-          <p className="rounded-[14px] border border-white/[0.07] bg-black/20 px-3 py-2 text-[11px] leading-[17px] text-zinc-500">
+          <p className="rounded-[10px] border border-[var(--border-faint)] bg-black/20 px-2.5 py-2 text-[13px] font-medium leading-[18px] text-zinc-400">
             {copy.sourceHint}
           </p>
 
+          <div className="rounded-[10px] border border-cyan-300/15 bg-cyan-300/[0.035] p-2.5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[13px] font-bold leading-[16px] text-cyan-100">
+                  {copy.cloneTtsTitle}
+                </p>
+                <p className="mt-0.5 text-[11px] font-medium leading-[15px] text-cyan-100/65">
+                  {copy.cloneTtsHint}
+                </p>
+              </div>
+              <span className="shrink-0 rounded-full border border-cyan-200/20 bg-black/25 px-2 py-0.5 text-[10px] font-bold leading-[13px] text-cyan-100">
+                MP3
+              </span>
+            </div>
+            <textarea
+              value={form.translateTtsText}
+              onChange={(event) => onChange({ translateTtsText: event.target.value })}
+              placeholder={copy.cloneTtsPlaceholder}
+              rows={3}
+              className="mt-2 min-h-[72px] w-full resize-none rounded-[9px] border border-white/10 bg-black/35 px-2.5 py-2 text-[13px] font-medium leading-[18px] text-white outline-none placeholder:text-zinc-600 focus:border-cyan-200/45"
+            />
+            <button
+              type="button"
+              onClick={onCloneTtsDemo}
+              disabled={isBusy || !form.translateTtsText.trim()}
+              className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-[10px] border border-cyan-200/20 bg-cyan-200/10 px-3 text-[12px] font-bold text-cyan-50 transition hover:bg-cyan-200/16 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-zinc-800/70 disabled:text-zinc-500"
+            >
+              {isBusy && task?.engine === "local_gemini_tts" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Music className="h-3.5 w-3.5" />
+              )}
+              {copy.cloneTtsAction}
+            </button>
+          </div>
+
           {(task?.error || (task?.status && task.status !== "completed")) && (
-            <div className="rounded-[14px] border border-white/[0.07] bg-white/[0.025] px-3 py-2">
+            <div className="rounded-[10px] border border-white/[0.07] bg-white/[0.025] px-3 py-2.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-semibold text-zinc-400">{copy.ready}</span>
+                <span className="text-[13px] font-semibold leading-[16px] text-zinc-300">{copy.ready}</span>
                 <span
                   className={cn(
-                    "rounded-full px-2 py-0.5 text-[10px] font-bold",
+                    "rounded-full px-2 py-0.5 text-[12px] font-bold leading-[15px]",
                     task.status === "failed"
                       ? "bg-red-500/15 text-red-200"
                       : task.status === "completed"
@@ -4111,7 +4389,7 @@ function VoiceTranslatePanel({
                 </span>
               </div>
               {task.error && (
-                <p className="mt-1 line-clamp-2 text-[11px] leading-[16px] text-red-200">
+                <p className="mt-1.5 line-clamp-3 text-[13px] font-medium leading-[18px] text-red-200">
                   {task.error}
                 </p>
               )}
@@ -4120,22 +4398,22 @@ function VoiceTranslatePanel({
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-white/[0.05] bg-[var(--bg-sidebar)] px-3 py-3">
-        <div className="grid grid-cols-[124px_minmax(0,1fr)] gap-3">
-          <div className="flex h-12 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-[12px] font-semibold text-zinc-300">
-            <SlidersHorizontal className="h-4 w-4 text-zinc-400" />
-            <span className="truncate">{media ? (isAudio ? "MP3" : "MP4") : "Media"}</span>
+      <div className="shrink-0 border-t border-white/[0.05] bg-[var(--bg-sidebar)] px-3 py-2.5">
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="flex h-[40px] items-center gap-2 rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-2.5 text-[13px] font-semibold text-zinc-300">
+            <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-400" />
+            <span className="truncate">{media ? (form.translateAudioOnly ? "MP3" : isAudio ? "MP3" : "MP4") : "Media"}</span>
           </div>
           <button
             type="button"
             onClick={onCreate}
             disabled={isBusy || !media || !form.translateConsent}
-            className="btn-cta flex h-12 w-full items-center justify-center gap-2 text-[14px] disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-300 disabled:shadow-none disabled:opacity-70"
+            className="btn-cta flex !h-10 w-full items-center justify-center gap-2 text-[13px] disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-300 disabled:shadow-none disabled:opacity-70"
           >
             {isBusy ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <GenerateIcon className="h-4 w-4" />
+              <GenerateIcon className="h-3.5 w-3.5" />
             )}
             {isBusy ? copy.processing : copy.action}
           </button>
@@ -4166,64 +4444,37 @@ function VoiceTranslateSelectCard({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="relative flex min-h-[58px] items-center gap-2 rounded-[14px] border border-white/[0.07] bg-white/[0.025] px-3 transition focus-within:border-cyan-300/45 focus-within:bg-white/[0.045]">
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/[0.06] text-zinc-300">
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[10px] font-semibold text-zinc-500">{label}</span>
-        <span className="block truncate text-[12px] font-bold text-white">{displayValue}</span>
-      </span>
-      <ChevronDown className="h-4 w-4 shrink-0 text-zinc-500" />
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger
         aria-label={label}
+        className="standalone-setting-card h-auto min-h-[38px] rounded-[10px] border-[var(--border-faint)] bg-[var(--bg-panel)] px-[7px] py-[3px] text-white shadow-none ring-0 transition hover:border-[var(--brand-primary)]/30 hover:bg-[var(--bg-surface-2)] focus:ring-0 focus:ring-offset-0 data-[state=open]:border-cyan-300/45 [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:text-zinc-500"
       >
+        <div className="flex min-w-0 items-center gap-[6px]">
+          <span className="grid h-[24px] w-[24px] shrink-0 place-items-center rounded-[7px] bg-white/[0.05] text-zinc-300">
+            {icon}
+          </span>
+          <span className="min-w-0 text-left">
+            <span className="block text-[13px] font-medium leading-[14px] text-[var(--text-tertiary)]">
+              {label}
+            </span>
+            <span className="block truncate text-[15px] font-bold leading-[16px] text-white">
+              {displayValue}
+            </span>
+          </span>
+        </div>
+      </SelectTrigger>
+      <SelectContent className="standalone-translate-menu z-[9999] max-h-[220px] overflow-hidden rounded-[10px] border border-white/10 bg-neutral-950 p-1 text-white shadow-2xl">
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <SelectItem
+            key={option.value}
+            value={option.value}
+            className="standalone-translate-menu-item h-[30px] rounded-md py-[5px] pl-7 pr-2 text-[13px] font-semibold leading-[16px] text-zinc-200 focus:bg-white/10 focus:text-white data-[state=checked]:text-[var(--brand-primary)]"
+          >
             {option.label}
-          </option>
+          </SelectItem>
         ))}
-      </select>
-    </label>
-  );
-}
-
-function VoiceTranslateNumberCard({
-  label,
-  value,
-  min,
-  max,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <label className="flex min-h-[58px] items-center gap-2 rounded-[14px] border border-white/[0.07] bg-white/[0.025] px-3 transition focus-within:border-cyan-300/45 focus-within:bg-white/[0.045]">
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/[0.06] text-zinc-300">
-        <SlidersHorizontal className="h-4 w-4" />
-      </span>
-      <span className="min-w-[52px] flex-1">
-        <span className="block whitespace-nowrap text-[12px] font-bold text-white">{label}</span>
-      </span>
-      <input
-        type="number"
-        min={min}
-        max={max}
-        value={value}
-        onChange={(event) =>
-          onChange(Math.max(min, Math.min(max, Number(event.target.value) || min)))
-        }
-        className="h-9 w-12 rounded-xl border border-white/10 bg-black/30 px-2 text-center text-[13px] font-bold text-white outline-none focus:border-cyan-300/50"
-        aria-label={label}
-      />
-    </label>
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -7983,9 +8234,11 @@ function buildCurrentParams(
       translate_engine: "elevenlabs_dubbing_clone",
       source_language:
         form.translateSourceLanguage.trim().toLowerCase() !== "auto"
+          && isElevenLabsDubbingLanguage(form.translateSourceLanguage)
           ? form.translateSourceLanguage.trim()
           : "auto",
       output_language: form.translateOutputLanguage.trim(),
+      output_type: form.translateAudioOnly ? "audio" : "video",
       speaker_num: form.translateSpeakerNum,
       source_content_type: form.translateVideo?.mime ?? null,
     };
@@ -8121,6 +8374,9 @@ function validateForm(
     }
     if (!form.translateOutputLanguage.trim()) {
       return t("workspace.standalone.validation.translate_language");
+    }
+    if (!isElevenLabsDubbingLanguage(form.translateOutputLanguage)) {
+      return unsupportedElevenLabsDubbingLanguageMessage(form.translateOutputLanguage, language);
     }
     if (!form.translateConsent) {
       return t("workspace.standalone.validation.translate_consent");
@@ -8646,9 +8902,7 @@ function filterJobsForTool(
 ): StandaloneJobRow[] {
   const nodeType = STANDALONE_TOOLS[tool].nodeType;
   if (tool === "voice_translate") {
-    return jobs.filter(
-      (job) => job.node_type === nodeType && job.provider === "elevenlabs_dubbing",
-    );
+    return jobs.filter((job) => isVoiceTranslateStandaloneJob(job));
   }
   return jobs.filter((job) => job.node_type === nodeType);
 }

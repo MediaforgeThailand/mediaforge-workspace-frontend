@@ -1609,6 +1609,42 @@ body {
   line-height: 18px !important;
 }
 
+.mf-readable .standalone-translate-panel :where([class*="text-[10px]"], [class*="text-[10.5px]"], [class*="text-[11px]"], [class*="text-[11.5px]"], .text-xs) {
+  font-size: 11px !important;
+  line-height: 14px !important;
+}
+
+.mf-readable .standalone-translate-panel :where([class*="text-[12px]"], [class*="text-[12.5px]"]) {
+  font-size: 12px !important;
+  line-height: 15px !important;
+}
+
+.mf-readable .standalone-translate-panel :where([class*="text-[13px]"], [class*="text-[13.5px]"], .text-sm) {
+  font-size: 13px !important;
+  line-height: 16px !important;
+}
+
+.mf-readable .standalone-translate-panel :where([class*="text-[14px]"], [class*="text-[14.5px]"]) {
+  font-size: 14px !important;
+  line-height: 17px !important;
+}
+
+.mf-readable .standalone-translate-panel :where([class*="text-[15px]"], [class*="text-[15.5px]"], [class*="text-[16px]"]) {
+  font-size: 15px !important;
+  line-height: 18px !important;
+}
+
+.mf-readable .standalone-translate-panel .btn-cta {
+  font-size: 13px !important;
+  line-height: 16px !important;
+  height: 40px !important;
+}
+
+.mf-readable .standalone-translate-menu :where([class*="text-[13px]"], .text-sm) {
+  font-size: 13px !important;
+  line-height: 16px !important;
+}
+
 .mf-readable .standalone-create-panel-voice :where([class*="text-[10px]"], [class*="text-[10.5px]"], [class*="text-[11px]"], [class*="text-[11.5px]"], .text-xs) {
   font-size: 11.5px !important;
   line-height: 15px !important;
