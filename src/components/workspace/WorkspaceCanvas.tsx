@@ -555,6 +555,7 @@ const nodeTypes = {
   videoGenNode: WorkspaceToolNode,
   audioGenNode: WorkspaceToolNode,
   removeBackgroundNode: WorkspaceToolNode,
+  upscaleImageNode: WorkspaceToolNode,
   mergeAudioNode: WorkspaceToolNode,
   videoToPromptNode: WorkspaceToolNode,
   imageTo3dNode: WorkspaceToolNode,

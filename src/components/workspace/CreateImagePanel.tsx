@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Minus, Plus,
-  Video, Image as ImageIcon, Box, Music, Languages, ChevronRight,
+  Video, Image as ImageIcon, Box, Music, Languages, Maximize2, ChevronRight,
   FileText,
   X, ChevronDown, Check, Upload, Clipboard,
   SlidersHorizontal, Trash2,
@@ -15,6 +15,7 @@ import sampleRefOne from "@/assets/showcase-cat-astronaut.jpg";
 import sampleRefTwo from "@/assets/mock-packshot-perfume.jpg";
 import sampleRefThree from "@/assets/pro-trend-space-cat.jpg";
 import GenerateIcon from "@/components/GenerateIcon";
+import ModelHoverPreview from "./ModelHoverPreview";
 import {
   cleanModelDisplayName,
   modelLogoFor,
@@ -22,7 +23,7 @@ import {
   recommendationRankForModel,
 } from "./modelDisplay";
 
-type BottomTab = "video" | "image" | "translate" | "3d" | "audio";
+type BottomTab = "video" | "image" | "upscale" | "translate" | "3d" | "audio";
 type MaybePromise<T> = T | Promise<T>;
 
 function usePanelCopy() {
@@ -30,6 +31,7 @@ function usePanelCopy() {
   return {
     video: t("createImagePanel.video"),
     image: t("createImagePanel.image"),
+    upscale: t("workspace.standalone.tool.image_upscale.nav"),
     audio: t("createImagePanel.audio"),
     translate: t("workspace.standalone.tool.voice_translate.nav"),
     models: t("createImagePanel.models"),
@@ -558,18 +560,20 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
         )}
       >
         {/* Model Selector */}
-        <button
-          type="button"
-          onClick={() => setModelOpen(true)}
-          className="standalone-model-card group relative inline-flex min-h-[50px] w-full shrink-0 items-center gap-[10px] overflow-hidden rounded-[14px] border border-white/[0.02] bg-[#16181a] py-[6px] pl-[8px] pr-[10px] transition-colors hover:bg-[#1c1f22]"
-        >
-          <ModelLogoBadge model={{ id: selectedModelId, label: modelLabel }} size="md" />
-          <div className="flex-1 flex flex-col items-start min-w-0">
-            <span className="text-[12px] leading-[16px] text-neutral-400">{resolvedModelCaption}</span>
-            <span className="text-[14px] leading-[20px] font-semibold text-white">{cleanModelDisplayName(modelLabel)}</span>
-          </div>
-          <ChevronRight className="h-[16px] w-[16px] text-neutral-500" />
-        </button>
+        <ModelHoverPreview model={{ id: selectedModelId, label: modelLabel }} label={modelLabel} className="block w-full shrink-0">
+          <button
+            type="button"
+            onClick={() => setModelOpen(true)}
+            className="standalone-model-card group relative inline-flex min-h-[50px] w-full shrink-0 items-center gap-[10px] overflow-hidden rounded-[14px] border border-white/[0.02] bg-[#16181a] py-[6px] pl-[8px] pr-[10px] transition-colors hover:bg-[#1c1f22]"
+          >
+            <ModelLogoBadge model={{ id: selectedModelId, label: modelLabel }} size="md" />
+            <div className="flex-1 flex flex-col items-start min-w-0">
+              <span className="text-[12px] leading-[16px] text-neutral-400">{resolvedModelCaption}</span>
+              <span className="text-[14px] leading-[20px] font-semibold text-white">{cleanModelDisplayName(modelLabel)}</span>
+            </div>
+            <ChevronRight className="h-[16px] w-[16px] text-neutral-500" />
+          </button>
+        </ModelHoverPreview>
         <ModelsPopover
           open={modelOpen}
           onClose={() => setModelOpen(false)}
@@ -828,6 +832,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
         {[
           { id: "video", icon: Video, label: copy.video },
           { id: "image", icon: ImageIcon, label: copy.image },
+          { id: "upscale", icon: Maximize2, label: copy.upscale },
           { id: "translate", icon: Languages, label: copy.translate },
           { id: "3d", icon: Box, label: "3D" },
           { id: "audio", icon: Music, label: copy.audio },
@@ -1065,18 +1070,20 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           />
         </div>
 
-        <button
-          type="button"
-          onClick={() => setModelOpen(true)}
-          className="standalone-model-card group relative inline-flex min-h-[54px] w-full shrink-0 items-center gap-[10px] overflow-hidden rounded-[14px] border border-white/[0.02] bg-[#16181a] py-[6px] pl-[8px] pr-[10px] transition-colors hover:bg-[#1c1f22]"
-        >
-          <ModelLogoBadge model={{ id: selectedModelId, label: modelLabel }} size="lg" />
-          <div className="flex min-w-0 flex-1 flex-col items-start">
-            <span className="text-[12px] leading-[16px] text-neutral-400">{resolvedModelCaption}</span>
-            <span className="truncate text-[14px] font-semibold leading-[20px] text-white">{cleanModelDisplayName(modelLabel)}</span>
-          </div>
-          <ChevronRight className="h-[16px] w-[16px] text-neutral-500" />
-        </button>
+        <ModelHoverPreview model={{ id: selectedModelId, label: modelLabel }} label={modelLabel} className="block w-full shrink-0">
+          <button
+            type="button"
+            onClick={() => setModelOpen(true)}
+            className="standalone-model-card group relative inline-flex min-h-[54px] w-full shrink-0 items-center gap-[10px] overflow-hidden rounded-[14px] border border-white/[0.02] bg-[#16181a] py-[6px] pl-[8px] pr-[10px] transition-colors hover:bg-[#1c1f22]"
+          >
+            <ModelLogoBadge model={{ id: selectedModelId, label: modelLabel }} size="lg" />
+            <div className="flex min-w-0 flex-1 flex-col items-start">
+              <span className="text-[12px] leading-[16px] text-neutral-400">{resolvedModelCaption}</span>
+              <span className="truncate text-[14px] font-semibold leading-[20px] text-white">{cleanModelDisplayName(modelLabel)}</span>
+            </div>
+            <ChevronRight className="h-[16px] w-[16px] text-neutral-500" />
+          </button>
+        </ModelHoverPreview>
 
         <ModelsPopover
           open={modelOpen}
@@ -1339,6 +1346,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
         {[
           { id: "video", icon: Video, label: copy.video },
           { id: "image", icon: ImageIcon, label: copy.image },
+          { id: "upscale", icon: Maximize2, label: copy.upscale },
           { id: "translate", icon: Languages, label: copy.translate },
           { id: "3d", icon: Box, label: "3D" },
           { id: "audio", icon: Music, label: copy.audio },
@@ -2709,45 +2717,47 @@ const RecommendedCard: React.FC<RecommendedCardProps> = ({
   onClick,
   showNext = false,
 }) => (
-  <div
-    onClick={onClick}
-    className={clsx(
-      "transition-all duration-300 ease-out shrink-0 rounded-[12px]",
-      "h-[112px] w-[248px] p-[2px] cursor-pointer border-[1.5px] relative overflow-hidden",
-      selected ? "border-[#f4ff00]" : "border-transparent",
-    )}
-  >
+  <ModelHoverPreview model={model} label={model.name} className="shrink-0">
     <div
+      onClick={onClick}
       className={clsx(
-        "relative w-full h-full rounded-[10px] overflow-hidden",
-        recommendedGradientFor(index),
+        "transition-all duration-300 ease-out shrink-0 rounded-[12px]",
+        "h-[112px] w-[248px] p-[2px] cursor-pointer border-[1.5px] relative overflow-hidden",
+        selected ? "border-[#f4ff00]" : "border-transparent",
       )}
     >
-      {model.coverSrc && (
-        <img
-          src={model.coverSrc}
-          alt={model.name}
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-      )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+      <div
+        className={clsx(
+          "relative w-full h-full rounded-[10px] overflow-hidden",
+          recommendedGradientFor(index),
+        )}
+      >
+        {model.coverSrc && (
+          <img
+            src={model.coverSrc}
+            alt={model.name}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
 
-      {showNext && (
-        <span className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 backdrop-blur-md">
-          <ChevronRight className="h-4 w-4 text-white" />
-        </span>
-      )}
+        {showNext && (
+          <span className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 backdrop-blur-md">
+            <ChevronRight className="h-4 w-4 text-white" />
+          </span>
+        )}
 
-      <div className="absolute bottom-[10px] left-[12px] right-[48px]">
-        <h4 className="truncate text-[15px] font-bold leading-tight text-white">
-          {model.name}
-        </h4>
-        <p className="mt-1 line-clamp-1 text-[11px] text-white/80">
-          {model.description}
-        </p>
+        <div className="absolute bottom-[10px] left-[12px] right-[48px]">
+          <h4 className="truncate text-[15px] font-bold leading-tight text-white">
+            {model.name}
+          </h4>
+          <p className="mt-1 line-clamp-1 text-[11px] text-white/80">
+            {model.description}
+          </p>
+        </div>
       </div>
     </div>
-  </div>
+  </ModelHoverPreview>
 );
 
 interface ModelListItemProps {
@@ -2757,49 +2767,51 @@ interface ModelListItemProps {
 }
 
 const ModelListItem: React.FC<ModelListItemProps> = ({ model, selected, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={clsx(
-      "group flex min-h-[46px] w-full items-center gap-[8px] rounded-[10px] p-[6px]",
-      "transition-colors text-left",
-      selected ? "bg-[#f4ff00]/[0.08] ring-1 ring-[#f4ff00]/40" : "hover:bg-white/[0.04]",
-    )}
-  >
-    {model.iconSrc ? (
-      <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center overflow-hidden rounded-[8px] bg-white/[0.06]">
-        <img src={model.iconSrc} alt={model.name} className="w-full h-full object-cover" />
-      </div>
-    ) : (
-      <ModelLogoBadge model={model} size="md" />
-    )}
+  <ModelHoverPreview model={model} label={model.name} className="block w-full">
+    <button
+      type="button"
+      onClick={onClick}
+      className={clsx(
+        "group flex min-h-[46px] w-full items-center gap-[8px] rounded-[10px] p-[6px]",
+        "transition-colors text-left",
+        selected ? "bg-[#f4ff00]/[0.08] ring-1 ring-[#f4ff00]/40" : "hover:bg-white/[0.04]",
+      )}
+    >
+      {model.iconSrc ? (
+        <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center overflow-hidden rounded-[8px] bg-white/[0.06]">
+          <img src={model.iconSrc} alt={model.name} className="w-full h-full object-cover" />
+        </div>
+      ) : (
+        <ModelLogoBadge model={model} size="md" />
+      )}
 
-    <div className="flex min-w-0 flex-1 flex-col gap-[4px]">
-      <div className="flex items-center gap-[8px]">
-        <p className="truncate text-[13px] font-semibold leading-4 text-white">{model.name}</p>
-        {model.badge && (
-          <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-300">
-            {model.badge}
-          </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-[4px]">
+        <div className="flex items-center gap-[8px]">
+          <p className="truncate text-[13px] font-semibold leading-4 text-white">{model.name}</p>
+          {model.badge && (
+            <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-300">
+              {model.badge}
+            </span>
+          )}
+        </div>
+        <p className="truncate text-[11px] leading-[14px] text-neutral-400">{model.description}</p>
+
+        {model.settings && model.settings.length > 0 && (
+          <div className="flex max-w-full flex-wrap gap-[4px]">
+            {model.settings.map((setting) => (
+              <ModelSettingChip key={`${model.id}-${setting.label}`} setting={setting} />
+            ))}
+          </div>
         )}
       </div>
-      <p className="truncate text-[11px] leading-[14px] text-neutral-400">{model.description}</p>
 
-      {model.settings && model.settings.length > 0 && (
-        <div className="flex max-w-full flex-wrap gap-[4px]">
-          {model.settings.map((setting) => (
-            <ModelSettingChip key={`${model.id}-${setting.label}`} setting={setting} />
-          ))}
-        </div>
+      {selected && (
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#f4ff00] text-xs font-bold text-black">
+          <Check className="h-3 w-3" />
+        </span>
       )}
-    </div>
-
-    {selected && (
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#f4ff00] text-xs font-bold text-black">
-        <Check className="h-3 w-3" />
-      </span>
-    )}
-  </button>
+    </button>
+  </ModelHoverPreview>
 );
 
 function ModelSettingChip({ setting }: { setting: ModelSettingTag }) {

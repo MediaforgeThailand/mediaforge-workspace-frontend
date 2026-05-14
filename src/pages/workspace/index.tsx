@@ -491,6 +491,7 @@ const VALID_SECTIONS: Section[] = [
   "stock",
   "spaces",
   "image_gen",
+  "image_upscale",
   "video_gen",
   "voice_gen",
   "voice_translate",
@@ -499,6 +500,7 @@ const VALID_SECTIONS: Section[] = [
 
 const STANDALONE_SECTIONS = new Set<SectionKey>([
   "image_gen",
+  "image_upscale",
   "video_gen",
   "voice_gen",
   "voice_translate",
@@ -3558,7 +3560,11 @@ const PageHeader = ({
     <h1 className="flex-1 truncate text-[15.5px] font-medium tracking-tight text-zinc-300">
       {title}
     </h1>
-    {rightSlot}
+    {rightSlot && (
+      <div className="fixed right-4 top-4 z-[80] pointer-events-auto md:right-6 lg:right-8">
+        {rightSlot}
+      </div>
+    )}
   </div>
   );
 };
@@ -3660,6 +3666,8 @@ const Placeholder = ({
         return t("workspace.spaces.title");
       case "image_gen":
         return STANDALONE_TOOLS.image_gen.title;
+      case "image_upscale":
+        return STANDALONE_TOOLS.image_upscale.title;
       case "video_gen":
         return STANDALONE_TOOLS.video_gen.title;
       case "voice_gen":

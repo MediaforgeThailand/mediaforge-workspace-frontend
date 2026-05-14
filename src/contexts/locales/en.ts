@@ -2246,6 +2246,7 @@ export const en = {
   "workspace.sidebar.stock": "Stock",
   "workspace.sidebar.spaces": "Spaces",
   "workspace.sidebar.image_gen": "Image Generator",
+  "workspace.sidebar.image_upscale": "Upscale",
   "workspace.sidebar.video_gen": "Video Generator",
   "workspace.sidebar.voice_gen": "Voice Generator",
   "workspace.sidebar.voice_translate": "Translate",
@@ -2453,6 +2454,8 @@ export const en = {
   "workspace.standalone.tools": "Tools",
   "workspace.standalone.tool.image_gen.nav": "Image",
   "workspace.standalone.tool.image_gen.title": "Image Generator",
+  "workspace.standalone.tool.image_upscale.nav": "Upscale",
+  "workspace.standalone.tool.image_upscale.title": "Upscale Image",
   "workspace.standalone.tool.video_gen.nav": "Video",
   "workspace.standalone.tool.video_gen.title": "Video Generator",
   "workspace.standalone.tool.voice_gen.nav": "Audio",
@@ -2663,6 +2666,8 @@ export const en = {
     "Previous-generation SeedDream — broad style coverage.",
   "workspace.standalone.model.gpt_image_2.desc":
     "Best for precise style and quality control.",
+  "workspace.standalone.model.magnific_upscale_precision_v2.desc":
+    "Magnific Precision V2 image upscaling with scale, detail, sharpen, grain, and NSFW filter controls.",
   "workspace.standalone.model.kling_v2_6_pro.desc":
     "Classic text/image-to-video workflow.",
   "workspace.standalone.model.kling_v2_6_motion_pro.desc":
@@ -2709,6 +2714,8 @@ export const en = {
     "BytePlus image-to-3D — alternative engine to Tripo.",
   "workspace.standalone.validation.image_prompt":
     "Image generation needs a prompt.",
+  "workspace.standalone.validation.upscale_image":
+    "Upscale needs one source image.",
   "workspace.standalone.validation.motion_refs":
     "Motion video needs a reference image and a motion video.",
   "workspace.standalone.validation.end_needs_start":
@@ -2989,6 +2996,9 @@ export const en = {
   "workspace.toolnames.remove_bg": "Remove BG",
   "workspace.toolnames.remove_bg_desc":
     "Strip the background from an image with Freepik/Magnific.",
+  "workspace.toolnames.upscale": "Upscale Image",
+  "workspace.toolnames.upscale_desc":
+    "Increase image resolution with Magnific Precision V2.",
   "workspace.toolnames.image_to_3d": "Image to 3D",
   "workspace.toolnames.image_to_3d_desc":
     "Turn a reference image into a GLB via Tripo3D.",

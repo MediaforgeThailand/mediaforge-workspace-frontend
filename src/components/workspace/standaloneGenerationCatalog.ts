@@ -3,6 +3,7 @@ import {
   Film,
   Image as ImageIcon,
   Languages,
+  Maximize2,
   Mic2,
   Sparkles,
   type LucideIcon,
@@ -15,6 +16,7 @@ import {
 
 export type StandaloneToolKey =
   | "image_gen"
+  | "image_upscale"
   | "video_gen"
   | "voice_gen"
   | "voice_translate"
@@ -45,7 +47,7 @@ export interface StandaloneToolDefinition {
   title: string;
   subtitle: string;
   navLabel: string;
-  nodeType: "imageGenNode" | "videoGenNode" | "audioGenNode" | "voiceTranslateNode" | "imageTo3dNode";
+  nodeType: "imageGenNode" | "upscaleImageNode" | "videoGenNode" | "audioGenNode" | "voiceTranslateNode" | "imageTo3dNode";
   icon: LucideIcon;
   outputType: GenerationOutputType;
   accent: string;
@@ -179,6 +181,26 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
         provider: "OpenAI",
         badge: "4K",
         description: "Best for precise style and quality control.",
+      },
+    ],
+  },
+  image_upscale: {
+    key: "image_upscale",
+    title: "Upscale Image",
+    subtitle: "Enhance image resolution with Magnific Precision V2",
+    navLabel: "Upscale",
+    nodeType: "upscaleImageNode",
+    icon: Maximize2,
+    outputType: "image",
+    accent: "hsl(188 90% 52%)",
+    defaultModel: "magnific-upscale-precision-v2",
+    models: [
+      {
+        id: "magnific-upscale-precision-v2",
+        label: "Magnific Precision V2",
+        provider: "Magnific",
+        badge: "Upscale",
+        description: "High-fidelity image upscaling with scale, flavor, sharpness, grain, and detail controls.",
       },
     ],
   },
@@ -393,6 +415,7 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
 export const STANDALONE_TOOL_ORDER: StandaloneToolKey[] = [
   "video_gen",
   "image_gen",
+  "image_upscale",
   "voice_translate",
   "image_to_3d",
   "voice_gen",

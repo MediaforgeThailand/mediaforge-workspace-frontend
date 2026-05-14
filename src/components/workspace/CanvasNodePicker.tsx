@@ -200,6 +200,15 @@ const CATALOG: CatalogEntry[] = [
     outputs: [{ id: "image", type: "image", hint: "cutout", hintKey: "workspace.picker.port.cutout" }],
   },
   {
+    nodeType: "upscaleImageNode",
+    label: "Upscale",
+    labelKey: "workspace.toolnames.upscale",
+    defaultLabel: "Upscale Image",
+    icon: "Maximize2",
+    inputs: [{ id: "image", type: "image", hint: "-> image", hintKey: "workspace.picker.port.to_image" }],
+    outputs: [{ id: "image", type: "image", hint: "image", hintKey: "workspace.picker.port.image" }],
+  },
+  {
     nodeType: "mergeAudioNode",
     label: "Audio Merge",
     labelKey: "workspace.toolnames.merge_av",

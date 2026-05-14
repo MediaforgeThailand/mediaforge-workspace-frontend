@@ -2208,6 +2208,7 @@ export const th = {
   "workspace.sidebar.stock": "คลังสื่อสต็อก",
   "workspace.sidebar.spaces": "พื้นที่งาน",
   "workspace.sidebar.image_gen": "สร้างรูปภาพ",
+  "workspace.sidebar.image_upscale": "ขยายภาพ",
   "workspace.sidebar.video_gen": "สร้างวิดีโอ",
   "workspace.sidebar.voice_gen": "สร้างเสียง",
   "workspace.sidebar.voice_translate": "Translate",
@@ -2414,6 +2415,8 @@ export const th = {
   "workspace.standalone.tools": "เครื่องมือ",
   "workspace.standalone.tool.image_gen.nav": "รูปภาพ",
   "workspace.standalone.tool.image_gen.title": "สร้างรูปภาพ",
+  "workspace.standalone.tool.image_upscale.nav": "ขยายภาพ",
+  "workspace.standalone.tool.image_upscale.title": "ขยายภาพ",
   "workspace.standalone.tool.video_gen.nav": "วิดีโอ",
   "workspace.standalone.tool.video_gen.title": "สร้างวิดีโอ",
   "workspace.standalone.tool.voice_gen.nav": "เสียง",
@@ -2625,6 +2628,8 @@ export const th = {
     "SeedDream รุ่นก่อนหน้า รองรับสไตล์ได้กว้าง",
   "workspace.standalone.model.gpt_image_2.desc":
     "เหมาะกับการควบคุมสไตล์และคุณภาพอย่างละเอียด",
+  "workspace.standalone.model.magnific_upscale_precision_v2.desc":
+    "ขยายความละเอียดภาพด้วย Magnific Precision V2 พร้อมควบคุมขนาด รายละเอียด ความคม เกรน และตัวกรอง NSFW",
   "workspace.standalone.model.kling_v2_6_pro.desc":
     "เวิร์กโฟลว์ text/image-to-video แบบคลาสสิก",
   "workspace.standalone.model.kling_v2_6_motion_pro.desc":
@@ -2670,6 +2675,7 @@ export const th = {
   "workspace.standalone.model.hyper3d_gen2.desc":
     "image-to-3D จาก BytePlus เป็น engine ทางเลือกจาก Tripo",
   "workspace.standalone.validation.image_prompt": "การสร้างรูปภาพต้องมีพรอมป์",
+  "workspace.standalone.validation.upscale_image": "การขยายภาพต้องมีภาพต้นฉบับ 1 รูป",
   "workspace.standalone.validation.motion_refs":
     "วิดีโอแบบ motion ต้องมีภาพอ้างอิงและวิดีโอการเคลื่อนไหว",
   "workspace.standalone.validation.end_needs_start":
@@ -2941,6 +2947,9 @@ export const th = {
   "workspace.toolnames.remove_bg": "ลบพื้นหลัง",
   "workspace.toolnames.remove_bg_desc":
     "ลบพื้นหลังออกจากภาพด้วย Freepik/Magnific",
+  "workspace.toolnames.upscale": "ขยายภาพ",
+  "workspace.toolnames.upscale_desc":
+    "เพิ่มความละเอียดภาพด้วย Magnific Precision V2",
   "workspace.toolnames.image_to_3d": "ภาพเป็น 3D",
   "workspace.toolnames.image_to_3d_desc":
     "เปลี่ยนภาพ reference เป็น GLB ผ่าน Tripo3D",

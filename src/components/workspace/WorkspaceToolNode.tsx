@@ -649,7 +649,7 @@ function nodeCanProvideImageMentionRef(
   if (sourceHandle && portTypeFromHandleId(sourceHandle) !== "image") return false;
   const generation = selectedNodeGeneration(data);
   if (generation) return generation.type === "image" && typeof generation.url === "string";
-  return ["imageGenNode", "removeBackgroundNode", "bananaProNode"].includes(node.type ?? "");
+  return ["imageGenNode", "upscaleImageNode", "removeBackgroundNode", "bananaProNode"].includes(node.type ?? "");
 }
 
 function nodeCanProvideVideoMentionRef(
@@ -1137,6 +1137,7 @@ const ICONS: Record<string, LucideIcon> = {
   imageGenNode: ImageIcon,
   videoGenNode: Film,
   audioGenNode: Music,
+  upscaleImageNode: Maximize2,
   removeBackgroundNode: Scissors,
   mergeAudioNode: Combine,
   videoToPromptNode: FileVideo,
@@ -3812,6 +3813,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                     "audioGenNode",
                     "videoToPromptNode",
                     "imageTo3dNode",
+                    "upscaleImageNode",
                     "removeBackgroundNode",
                     "mergeAudioNode",
                     "bananaProNode",

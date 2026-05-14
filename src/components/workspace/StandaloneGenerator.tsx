@@ -304,6 +304,7 @@ type UploadSlot =
   | "video-ref-image"
   | "video-ref-video"
   | "translate-video"
+  | "upscale-image"
   | "model-image";
 
 /** Optional reference role.
@@ -327,6 +328,20 @@ interface UploadedRef {
   storageBucket?: "ai-media" | "user_assets";
   storagePath?: string;
   durationSec?: number;
+}
+
+function translateOutputTypeForMedia(
+  _media: UploadedRef | null | undefined,
+): "audio" | "video" {
+  return "audio";
+}
+
+function translateOutputFormatLabel(_media: UploadedRef | null | undefined): string {
+  return "MP3 / audio";
+}
+
+function translateOutputShortLabel(_media: UploadedRef | null | undefined): string {
+  return "MP3";
 }
 
 interface StandaloneSceneBlock {
@@ -443,6 +458,7 @@ type ProjectReferenceAssetRow = Record<string, unknown>;
 
 interface StandaloneResult {
   type?: "image" | "video" | "audio" | "text" | "model_3d";
+  output_type?: string;
   url?: string;
   text?: string;
   task_id?: string;
@@ -546,10 +562,15 @@ interface StandaloneFormState {
   translateSourceLanguage: string;
   translateOutputLanguage: string;
   translateMode: "fast" | "quality";
-  translateAudioOnly: boolean;
   translateSpeakerNum: number;
   translateConsent: boolean;
-  translateTtsText: string;
+  upscaleImage: UploadedRef | null;
+  upscaleScale: string;
+  upscaleFlavor: "photo" | "sublime" | "photo_denoiser";
+  upscaleSharpen: string;
+  upscaleSmartGrain: string;
+  upscaleUltraDetail: string;
+  upscaleFilterNsfw: boolean;
   modelImage: UploadedRef | null;
   modelImages: UploadedRef[];
   texture: boolean;
@@ -584,10 +605,18 @@ const DEFAULT_TRANSLATE_PARAMS = {
   translateSourceLanguage: "Auto",
   translateOutputLanguage: "English",
   translateMode: "fast" as const,
-  translateAudioOnly: true,
   translateSpeakerNum: 1,
   translateConsent: false,
-  translateTtsText: "This is a quick Gemini TTS test from MediaForge.",
+};
+
+const DEFAULT_UPSCALE_PARAMS = {
+  upscaleImage: null as UploadedRef | null,
+  upscaleScale: "2",
+  upscaleFlavor: "photo" as const,
+  upscaleSharpen: "7",
+  upscaleSmartGrain: "7",
+  upscaleUltraDetail: "30",
+  upscaleFilterNsfw: false,
 };
 
 type VoiceTranslateEngineOption = {
@@ -619,7 +648,8 @@ function isVoiceTranslateProvider(provider: string | null | undefined): boolean 
 function isVoiceTranslateStandaloneJob(job: StandaloneJobRow): boolean {
   return (
     (job.node_type === "voiceTranslateNode" && isVoiceTranslateProvider(job.provider)) ||
-    (job.node_type === "audioGenNode" && isLocalVoiceDubJob(job))
+    ((job.node_type === "audioGenNode" || job.node_type === "mergeAudioNode") &&
+      isLocalVoiceDubJob(job))
   );
 }
 
@@ -800,6 +830,44 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     script: "",
     ...DEFAULT_VOICE_PARAMS,
     ...DEFAULT_TRANSLATE_PARAMS,
+    ...DEFAULT_UPSCALE_PARAMS,
+    modelImage: null,
+    modelImages: [],
+    texture: true,
+    pbr: true,
+  },
+  image_upscale: {
+    model: STANDALONE_TOOLS.image_upscale.defaultModel,
+    prompt: "",
+    styleId: "none",
+    aspectRatio: "1:1",
+    imageResolution: "1K",
+    quality: "medium",
+    outputFormat: "png",
+    background: "auto",
+    imageCount: 1,
+    imageRefs: [],
+    videoRatio: "16:9",
+    videoResolution: "720p",
+    videoDuration: 5,
+    videoCount: 1,
+    videoInputMode: "frames",
+    videoWithAudio: false,
+    videoStart: null,
+    videoEnd: null,
+    videoRefImage: null,
+    videoRefVideo: null,
+    videoCharacterOrientation: "video",
+    videoKeepOriginalSound: false,
+    videoNegativePrompt: "",
+    videoPersonGeneration: "allow_adult",
+    videoReturnLastFrame: false,
+    videoMultiShot: false,
+    videoMultiPrompt: "",
+    script: "",
+    ...DEFAULT_VOICE_PARAMS,
+    ...DEFAULT_TRANSLATE_PARAMS,
+    ...DEFAULT_UPSCALE_PARAMS,
     modelImage: null,
     modelImages: [],
     texture: true,
@@ -836,6 +904,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     script: "",
     ...DEFAULT_VOICE_PARAMS,
     ...DEFAULT_TRANSLATE_PARAMS,
+    ...DEFAULT_UPSCALE_PARAMS,
     modelImage: null,
     modelImages: [],
     texture: true,
@@ -872,6 +941,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     script: "",
     ...DEFAULT_VOICE_PARAMS,
     ...DEFAULT_TRANSLATE_PARAMS,
+    ...DEFAULT_UPSCALE_PARAMS,
     modelImage: null,
     modelImages: [],
     texture: true,
@@ -908,6 +978,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     script: "",
     ...DEFAULT_VOICE_PARAMS,
     ...DEFAULT_TRANSLATE_PARAMS,
+    ...DEFAULT_UPSCALE_PARAMS,
     modelImage: null,
     modelImages: [],
     texture: true,
@@ -944,6 +1015,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     script: "",
     ...DEFAULT_VOICE_PARAMS,
     ...DEFAULT_TRANSLATE_PARAMS,
+    ...DEFAULT_UPSCALE_PARAMS,
     modelImage: null,
     modelImages: [],
     texture: true,
@@ -956,6 +1028,7 @@ type TranslationKey = Parameters<TranslationFn>[0];
 
 const STANDALONE_TOOL_TITLE_KEYS = {
   image_gen: "workspace.standalone.tool.image_gen.title",
+  image_upscale: "workspace.standalone.tool.image_upscale.title",
   video_gen: "workspace.standalone.tool.video_gen.title",
   voice_gen: "workspace.standalone.tool.voice_gen.title",
   voice_translate: "workspace.standalone.tool.voice_translate.title",
@@ -964,6 +1037,7 @@ const STANDALONE_TOOL_TITLE_KEYS = {
 
 const STANDALONE_TOOL_NAV_KEYS = {
   image_gen: "workspace.standalone.tool.image_gen.nav",
+  image_upscale: "workspace.standalone.tool.image_upscale.nav",
   video_gen: "workspace.standalone.tool.video_gen.nav",
   voice_gen: "workspace.standalone.tool.voice_gen.nav",
   voice_translate: "workspace.standalone.tool.voice_translate.nav",
@@ -977,6 +1051,7 @@ const STANDALONE_MODEL_DESCRIPTION_KEYS = {
   "seedream-5-0-lite-260128": "workspace.standalone.model.seedream_5_0_lite.desc",
   "seedream-4-5-251128": "workspace.standalone.model.seedream_4_5.desc",
   "gpt-image-2": "workspace.standalone.model.gpt_image_2.desc",
+  "magnific-upscale-precision-v2": "workspace.standalone.model.magnific_upscale_precision_v2.desc",
   "kling-v2-6-pro": "workspace.standalone.model.kling_v2_6_pro.desc",
   "kling-v2-6-motion-pro": "workspace.standalone.model.kling_v2_6_motion_pro.desc",
   "kling-v3-pro": "workspace.standalone.model.kling_v3_pro.desc",
@@ -1058,6 +1133,7 @@ function standaloneCreateActionTitle(
 ) {
   const labels: Record<StandaloneToolKey, { en: string; th: string }> = {
     image_gen: { en: "Create Image", th: "สร้างรูปภาพ" },
+    image_upscale: { en: "Upscale Image", th: "ขยายภาพ" },
     video_gen: { en: "Create Video", th: "สร้างวิดีโอ" },
     voice_gen: { en: "Create Audio", th: "สร้างเสียง" },
     voice_translate: { en: "Translate Voice", th: "แปลเสียงวิดีโอ" },
@@ -1086,6 +1162,9 @@ function standaloneCreateButtonLabel(
   }
   if (tool === "voice_translate") {
     return language === "th" ? "เริ่มแปลเสียง" : "Translate Voice";
+  }
+  if (tool === "image_upscale") {
+    return language === "th" ? "ขยายภาพ" : "Upscale";
   }
   return language === "th" ? "สร้าง" : "Generate";
 }
@@ -1432,35 +1511,50 @@ export default function StandaloneGenerator({
     const jobs = jobsQuery.data ?? [];
     const translateJob = jobs.find((job) => isVoiceTranslateStandaloneJob(job));
     if (!translateJob) return;
-    if (translateJob.node_type === "audioGenNode" && isLocalVoiceDubJob(translateJob)) {
-      const localAudioJob = translateJob;
-      const result = localAudioJob.result ?? {};
-      const params = localAudioJob.request?.params ?? {};
+    if (
+      (translateJob.node_type === "audioGenNode" || translateJob.node_type === "mergeAudioNode") &&
+      isLocalVoiceDubJob(translateJob)
+    ) {
+      const localJob = translateJob;
+      const result = localJob.result ?? {};
+      const params = localJob.request?.params ?? {};
       const outputUrl = firstText(
         result.url,
+        (result as StandaloneResult & { result_url?: unknown }).result_url,
+        result.outputs?.output_video,
         result.outputs?.audio_url,
         result.outputs?.output_audio,
       );
       const status =
-        localAudioJob.status === "completed"
+        localJob.status === "completed"
           ? "completed"
-          : localAudioJob.status === "failed" || localAudioJob.status === "permanent_failed"
+          : localJob.status === "failed" || localJob.status === "permanent_failed"
             ? "failed"
             : "running";
-      const engine = localVoiceDubEngineFromJob(localAudioJob) ?? "local_gemini_tts";
+      const engine = localVoiceDubEngineFromJob(localJob) ?? "local_gemini_tts";
+      const outputType =
+        localJob.node_type === "mergeAudioNode" ||
+        String(params.local_voice_translate_output_type ?? "") === "video"
+          ? "video"
+          : "audio";
+      const localJobError = localJob.error || localJob.last_error || undefined;
       setTranslateTask({
-        id: localAudioJob.id,
-        jobId: localAudioJob.id,
+        id: localJob.id,
+        jobId: localJob.id,
         status,
         engine,
         stage: status === "completed" ? "completed" : "synthesizing",
-        outputType: "audio",
+        outputType,
         outputLanguage: firstText(params.output_language) ?? "",
-        sourceName: firstText(params.local_voice_translate_source_name) ?? voiceDubProviderForEngine(engine),
+        sourceName:
+          firstText(params.local_voice_translate_source_name) ??
+          voiceDubProviderForEngine(engine),
         outputUrl: outputUrl || undefined,
         providerOutputUrl: outputUrl || undefined,
         translatedScript: firstText(params.local_voice_translate_script, params.prompt) ?? "",
-        error: localAudioJob.error || localAudioJob.last_error || undefined,
+        error: localJobError
+          ? friendlyError(localJobError, language === "th" ? "th" : "en")
+          : undefined,
       });
       return;
     }
@@ -1489,6 +1583,7 @@ export default function StandaloneGenerator({
         : voiceJob.status === "failed" || voiceJob.status === "permanent_failed"
           ? "failed"
           : "running";
+    const voiceJobError = voiceJob.error || voiceJob.last_error || undefined;
     setTranslateTask({
       id: translateId,
       jobId: voiceJob.id,
@@ -1508,9 +1603,11 @@ export default function StandaloneGenerator({
       ),
       outputUrl: outputUrl || undefined,
       providerOutputUrl: providerOutputUrl || undefined,
-      error: voiceJob.error || voiceJob.last_error || undefined,
+      error: voiceJobError
+        ? friendlyError(voiceJobError, language === "th" ? "th" : "en")
+        : undefined,
     });
-  }, [activeTool, jobsQuery.data]);
+  }, [activeTool, jobsQuery.data, language]);
 
   useEffect(() => {
     if (!user?.id || !activeProject?.id) return;
@@ -1612,6 +1709,7 @@ export default function StandaloneGenerator({
     );
     const params = completedAudioJob.request?.params ?? {};
     const videoUrl = firstText(params.local_voice_translate_source_video_url);
+    if (String(params.local_voice_translate_output_type ?? "") !== "video") return;
     if (!audioUrl || !videoUrl) return;
     const existingMerge = jobs.find((job) => {
       const mergeParams = job.request?.params ?? {};
@@ -1640,6 +1738,7 @@ export default function StandaloneGenerator({
               local_voice_translate_engine: engine,
               local_voice_translate_parent_audio_job_id: completedAudioJob.id,
               local_voice_translate_source_video_url: videoUrl,
+              local_voice_translate_output_type: "video",
               local_voice_translate_source_name: firstText(
                 params.local_voice_translate_source_name,
               ),
@@ -1698,6 +1797,9 @@ export default function StandaloneGenerator({
           error?: string;
         } | null;
         const nextStatus = result?.status ?? "processing";
+        const displayError = result?.error
+          ? friendlyError(result.error, language === "th" ? "th" : "en")
+          : undefined;
         setTranslateTask((prev) =>
           prev?.id === translateTask.id
             ? {
@@ -1707,7 +1809,7 @@ export default function StandaloneGenerator({
                 providerOutputUrl:
                   result?.provider_output_url || prev.providerOutputUrl,
                 outputType: result?.output_type ?? prev.outputType,
-                error: result?.error || prev.error,
+                error: displayError || prev.error,
               }
             : prev,
         );
@@ -1721,7 +1823,7 @@ export default function StandaloneGenerator({
           return;
         }
         if (nextStatus === "failed") {
-          toast.error(result?.error || "Translation failed.");
+          toast.error(displayError || "Translation failed.");
           return;
         }
       } catch (err) {
@@ -1953,6 +2055,8 @@ export default function StandaloneGenerator({
   const panelBottom =
     activeTool === "video_gen"
       ? "video"
+      : activeTool === "image_upscale"
+        ? "upscale"
       : activeTool === "voice_translate"
         ? "translate"
       : activeTool === "image_to_3d"
@@ -2000,6 +2104,8 @@ export default function StandaloneGenerator({
   const panelReferences =
     activeTool === "image_gen"
       ? form.imageRefs
+      : activeTool === "image_upscale"
+        ? [form.upscaleImage].filter(Boolean)
       : activeTool === "video_gen"
         ? videoPanelMode === "reference"
           ? [form.videoRefImage, form.videoRefVideo].filter(Boolean)
@@ -2013,6 +2119,8 @@ export default function StandaloneGenerator({
   const panelMaxReferences =
     activeTool === "image_gen"
       ? maxImageRefsForModel(form.model)
+      : activeTool === "image_upscale"
+        ? 1
       : activeTool === "video_gen"
         ? videoPanelMode === "reference"
           ? Number(videoSupportsReferenceImage(form.model)) +
@@ -2034,6 +2142,9 @@ export default function StandaloneGenerator({
     }
     if (activeTool === "image_to_3d") {
       return "model-image";
+    }
+    if (activeTool === "image_upscale") {
+      return "upscale-image";
     }
     if (activeTool === "voice_translate") {
       return "translate-video";
@@ -2098,6 +2209,8 @@ export default function StandaloneGenerator({
         patch.videoRefVideo = uploaded;
       } else if (slot === "translate-video") {
         patch.translateVideo = uploaded;
+      } else if (slot === "upscale-image") {
+        patch.upscaleImage = uploaded;
       } else if (slot === "model-image") {
         const maxRefs = max3dRefsForModel(current.model);
         const existingRefs = threeDReferencesForForm(current);
@@ -2320,6 +2433,8 @@ export default function StandaloneGenerator({
         patch.modelImage = nextRefs[0] ?? null;
       } else if (activeTool === "voice_translate" && current.translateVideo?.id === id) {
         patch.translateVideo = null;
+      } else if (activeTool === "image_upscale" && current.upscaleImage?.id === id) {
+        patch.upscaleImage = null;
       }
       return {
         ...prev,
@@ -2424,7 +2539,7 @@ export default function StandaloneGenerator({
       ? t("workspace.standalone.script")
       : activeTool === "video_gen"
         ? t("workspace.standalone.describe_video")
-        : activeTool === "image_to_3d"
+        : activeTool === "image_to_3d" || activeTool === "image_upscale"
           ? t("workspace.standalone.reference_image")
           : t("workspace.standalone.describe_image");
 
@@ -2435,10 +2550,12 @@ export default function StandaloneGenerator({
         ? t("workspace.standalone.describe_video")
         : activeTool === "image_to_3d"
           ? t("workspace.standalone.validation.model_image")
+          : activeTool === "image_upscale"
+            ? t("workspace.standalone.validation.upscale_image")
           : t("workspace.standalone.describe_image");
 
   const panelReferenceTitle =
-    activeTool === "image_to_3d"
+    activeTool === "image_to_3d" || activeTool === "image_upscale"
       ? t("workspace.standalone.reference_image")
       : activeTool === "video_gen"
         ? t("workspace.standalone.reference_image")
@@ -2703,26 +2820,13 @@ export default function StandaloneGenerator({
       toast.error(unsupportedElevenLabsDubbingLanguageMessage(outputLanguage, language));
       return;
     }
-    let providerMedia = video;
-    if (form.translateAudioOnly && video.mime.startsWith("video/")) {
-      const toastId = toast.loading(
-        language === "th" ? "Extracting audio for MP3 test..." : "Extracting audio for MP3 test...",
-      );
-      try {
-        const audioBlob = await extractAudioBlobFromVideo(video.url);
-        const audioFile = buildExtractedAudioFile(audioBlob, video.name);
-        providerMedia = await uploadReference(audioFile, user?.id, activeProject.id);
-        toast.success(
-          language === "th" ? "Audio source prepared." : "Audio source prepared.",
-          { id: toastId },
-        );
-      } catch (err) {
-        toast.error(friendlyError(err, language === "th" ? "th" : "en"), { id: toastId });
-        return;
-      }
-    }
-    const outputType: "audio" | "video" =
-      form.translateAudioOnly || providerMedia.mime.startsWith("audio/") ? "audio" : "video";
+    const outputType: "audio" = "audio";
+    const toastId = toast.loading(
+      language === "th"
+        ? "กำลังส่งไฟล์เข้า ElevenLabs voice clone dubbing..."
+        : "Submitting to ElevenLabs voice-clone dubbing...",
+    );
+    const providerMedia = video;
     const { data, error } = await supabase.functions.invoke(
       ELEVENLABS_DUBBING_EDGE_FUNCTION,
       {
@@ -2746,15 +2850,22 @@ export default function StandaloneGenerator({
         },
       },
     );
-    if (error) throw new Error(await functionErrorMessage(error));
+    if (error) {
+      toast.dismiss(toastId);
+      throw new Error(await functionErrorMessage(error));
+    }
     const result = data as {
       job_id?: string;
       dubbing_id?: string;
       status?: VoiceTranslateTask["status"];
       error?: string;
     } | null;
-    if (result?.error) throw new Error(result.error);
+    if (result?.error) {
+      toast.dismiss(toastId);
+      throw new Error(result.error);
+    }
     if (!result?.dubbing_id) {
+      toast.dismiss(toastId);
       throw new Error("ElevenLabs did not return a dubbing_id.");
     }
     setTranslateTask({
@@ -2772,115 +2883,10 @@ export default function StandaloneGenerator({
     void refetchJobs();
     toast.success(
       language === "th"
-        ? "เริ่มแปลเสียงแล้ว ผลลัพธ์จะแสดงทางขวาเมื่อพร้อม"
-        : "Translation queued. The result will appear on the right.",
+        ? "เริ่มแปลเสียงแบบ MP3 แล้ว ผลลัพธ์จะแสดงทางขวาเมื่อพร้อม"
+        : "MP3 dubbing queued. The result will appear on the right.",
+      { id: toastId },
     );
-  };
-
-  const startGeminiTtsSample = async () => {
-    if (runInFlightRef.current) return;
-    runInFlightRef.current = true;
-    setRunning(true);
-    try {
-      if (!user?.id) {
-        toast.error(t("workspace.toast.sign_in_first"));
-        return;
-      }
-      if (!activeProject?.id) {
-        toast.error(t("workspace.toast.create_project_first_gen"));
-        return;
-      }
-      const text = form.translateTtsText.trim();
-      if (!text) {
-        toast.error(
-          language === "th"
-            ? "Add the line you want Gemini TTS to speak."
-            : "Add the line you want Gemini TTS to speak.",
-        );
-        return;
-      }
-
-      const outputLanguage = form.translateOutputLanguage.trim() || "English";
-      const sourceMedia = form.translateVideo;
-      const params = buildAudioParams({
-        model: "gemini-3.1-flash-tts-preview",
-        script: text,
-        voice: DEFAULT_GEMINI_TTS_VOICE,
-        stylePrompt: outputLanguage ? `Speak naturally in ${outputLanguage}.` : "",
-        voiceStylePreset: "neutral",
-      });
-      Object.assign(params, {
-        local_voice_translate: true,
-        local_voice_translate_engine: "local_gemini_tts",
-        local_voice_translate_source_video_url: sourceMedia?.url ?? "",
-        local_voice_translate_source_name: sourceMedia?.name ?? "Gemini TTS sample",
-        local_voice_translate_script: text,
-        output_language: outputLanguage,
-      });
-
-      setTranslateTask({
-        id: `gemini-tts-${Date.now()}`,
-        status: "running",
-        outputLanguage,
-        sourceName: sourceMedia?.name ?? "Gemini TTS sample",
-        engine: "local_gemini_tts",
-        stage: "synthesizing",
-        outputType: "audio",
-        translatedScript: text,
-      });
-
-      const { data, error } = await supabase.functions.invoke(RUN_EDGE_FUNCTION, {
-        body: {
-          action: "enqueue_workspace_job",
-          node_type: "audioGenNode",
-          params,
-          inputs: { prompt: text },
-          project_id: activeProject.id,
-          workspace_id: null,
-          canvas_id: standaloneCanvasId(activeProject.id),
-          node_id: `standalone-${activeProject.id}-gemini-translate-tts-${Date.now()}`,
-        },
-      });
-      if (error) throw new Error(await functionErrorMessage(error));
-      const result = data as {
-        job_id?: string;
-        error?: string;
-      } | null;
-      if (result?.error) throw new Error(result.error);
-      if (!result?.job_id) throw new Error("Could not queue Gemini TTS sample.");
-
-      setTranslateTask({
-        id: result.job_id,
-        jobId: result.job_id,
-        status: "queued",
-        outputLanguage,
-        sourceName: sourceMedia?.name ?? "Gemini TTS sample",
-        engine: "local_gemini_tts",
-        stage: "synthesizing",
-        outputType: "audio",
-        translatedScript: text,
-      });
-      await jobsQuery.refetch();
-      toast.success(
-        language === "th"
-          ? "Gemini TTS sample queued."
-          : "Gemini TTS sample queued.",
-      );
-    } catch (err) {
-      setTranslateTask((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: "failed",
-              error: friendlyError(err, language === "th" ? "th" : "en"),
-            }
-          : prev,
-      );
-      toast.error(friendlyError(err, language === "th" ? "th" : "en"));
-    } finally {
-      setRunning(false);
-      runInFlightRef.current = false;
-    }
   };
 
   const startVoiceTranslate = async () => {
@@ -3000,6 +3006,10 @@ export default function StandaloneGenerator({
           t,
           language,
         })
+      : [];
+  const upscalePanelSettings =
+    activeTool === "image_upscale"
+      ? buildUpscalePanelSettings({ form, onChange: updateForm, language })
       : [];
   const threeDPanelSettings =
     activeTool === "image_to_3d"
@@ -3308,7 +3318,6 @@ export default function StandaloneGenerator({
               onVideoFiles={(files) => void uploadPanelReferenceFiles(files, "translate-video")}
               onRemoveVideo={() => updateForm({ translateVideo: null })}
               onCreate={() => void run()}
-              onCloneTtsDemo={() => void startGeminiTtsSample()}
               onToolChange={onToolChange}
             />
             ) : activeTool === "video_gen" ? (
@@ -3385,6 +3394,7 @@ export default function StandaloneGenerator({
               onBottomChange={(tab) => {
                 if (tab === "video") onToolChange("video_gen");
                 if (tab === "image") onToolChange("image_gen");
+                if (tab === "upscale") onToolChange("image_upscale");
                 if (tab === "translate") onToolChange("voice_translate");
                 if (tab === "3d") onToolChange("image_to_3d");
                 if (tab === "audio") onToolChange("voice_gen");
@@ -3404,7 +3414,7 @@ export default function StandaloneGenerator({
               onAutoPrompt={() => void runAutoPrompt()}
               autoPromptRunning={autoPrompting}
               autoPromptDisabled={autoPromptDisabled}
-              showPromptInput={activeTool !== "image_to_3d"}
+              showPromptInput={activeTool !== "image_to_3d" && activeTool !== "image_upscale"}
               modelLabel={selectedModel?.label ?? "Nano Banana Pro"}
               modelValue={form.model}
               modelOptions={activeDef.models.filter((model) => model.id !== "google-tts-studio").map((model) => ({
@@ -3414,6 +3424,8 @@ export default function StandaloneGenerator({
                 settings:
                   activeTool === "image_gen"
                     ? imageModelSettingTags(model.id, language)
+                    : activeTool === "image_upscale"
+                      ? upscaleModelSettingTags(language)
                     : activeTool === "image_to_3d"
                       ? threeDModelSettingTags(model.id, language)
                       : activeTool === "voice_gen"
@@ -3425,7 +3437,11 @@ export default function StandaloneGenerator({
               maxReferences={panelMaxReferences}
               showReferences={activeTool !== "voice_gen"}
               referenceTitle={panelReferenceTitle}
-              referenceBadge={language === "th" ? "ไม่บังคับ" : "Optional"}
+              referenceBadge={
+                activeTool === "image_upscale"
+                  ? undefined
+                  : language === "th" ? "ไม่บังคับ" : "Optional"
+              }
               referenceHint={
                 activeTool === "video_gen"
                   ? "JPEG/PNG/WEBP/MP4, 20 MB max"
@@ -3456,6 +3472,8 @@ export default function StandaloneGenerator({
               settings={
                 activeTool === "image_gen"
                   ? imagePanelSettings
+                  : activeTool === "image_upscale"
+                    ? upscalePanelSettings
                   : activeTool === "image_to_3d"
                     ? threeDPanelSettings
                     : []
@@ -3481,6 +3499,7 @@ export default function StandaloneGenerator({
               onBottomChange={(tab) => {
                 if (tab === "video") onToolChange("video_gen");
                 if (tab === "image") onToolChange("image_gen");
+                if (tab === "upscale") onToolChange("image_upscale");
                 if (tab === "translate") onToolChange("voice_translate");
                 if (tab === "3d") onToolChange("image_to_3d");
                 if (tab === "audio") onToolChange("voice_gen");
@@ -4084,7 +4103,6 @@ function VoiceTranslatePanel({
   onVideoFiles,
   onRemoveVideo,
   onCreate,
-  onCloneTtsDemo,
   onToolChange,
 }: {
   form: StandaloneFormState;
@@ -4097,7 +4115,6 @@ function VoiceTranslatePanel({
   onVideoFiles: (files: File[]) => void;
   onRemoveVideo: () => void;
   onCreate: () => void;
-  onCloneTtsDemo: () => void;
   onToolChange: (tool: StandaloneToolKey) => void;
 }) {
   const th = language === "th";
@@ -4105,7 +4122,7 @@ function VoiceTranslatePanel({
     title: "Translate",
     subtitle: th
       ? "แปลเสียงจาก MP4/MP3 โดยคงโทนเสียงผู้พูดให้ใกล้ต้นฉบับ"
-      : "Translate MP4/MP3 speech while preserving the speaker tone.",
+      : "Translate MP4/MP3 speech with ElevenLabs voice-clone dubbing.",
     uploadTitle: th ? "ไฟล์ต้นฉบับ" : "Source file",
     uploadHint: th ? "ลาก MP4/MP3 มาวาง หรือคลิกเพื่ออัปโหลด" : "Drop an MP4/MP3 here or click to upload",
     uploadLimit: th
@@ -4115,19 +4132,13 @@ function VoiceTranslatePanel({
     sourceAuto: th ? "ตรวจจับอัตโนมัติ" : "Auto detect",
     sourceHint: th
       ? "เลือกภาษาต้นฉบับให้ตรงเพื่อลดการเดาผิดและลดสำเนียงเพี้ยน"
-      : "Pick the actual source language to reduce detection mistakes and odd accents in voice-clone dubbing.",
+      : "Pick the actual source language to reduce transcription mistakes before generating the new voice.",
     target: th ? "เป้าหมาย" : "Target",
     speakers: th ? "ผู้พูด" : "Speakers",
     consent: th
       ? "ฉันมีสิทธิ์ใช้ไฟล์นี้และได้รับอนุญาตให้แปล/โคลนเสียงของผู้พูด"
-      : "I have permission to translate this file and preserve or clone the speaker voice.",
+      : "I have permission to translate this file's speech.",
     action: "Translate",
-    cloneTtsTitle: th ? "Gemini TTS MP3 sample" : "Gemini TTS MP3 sample",
-    cloneTtsHint: th
-      ? "Uses Gemini TTS to create an MP3 from the text below. This does not clone the uploaded speaker voice."
-      : "Uses Gemini TTS to create an MP3 from the text below. This does not clone the uploaded speaker voice.",
-    cloneTtsPlaceholder: th ? "Text for Gemini TTS to speak" : "Text for Gemini TTS to speak",
-    cloneTtsAction: th ? "Generate Gemini MP3" : "Generate Gemini MP3",
     processing: th ? "กำลังแปล" : "Translating",
     ready: th ? "ผลลัพธ์จะแสดงทางขวาเมื่อพร้อม" : "Results appear on the right when ready.",
     remove: th ? "ลบไฟล์" : "Remove file",
@@ -4298,17 +4309,23 @@ function VoiceTranslatePanel({
               }))}
               onChange={(value) => onChange({ translateSpeakerNum: Number(value) || 1 })}
             />
-            <VoiceTranslateSelectCard
-              label="Format"
-              value={form.translateAudioOnly ? "audio" : "video"}
-              displayValue={form.translateAudioOnly ? "MP3 / audio" : "MP4 / video"}
-              icon={form.translateAudioOnly ? <Music className="h-[14px] w-[14px]" /> : <Film className="h-[14px] w-[14px]" />}
-              options={[
-                { value: "audio", label: "MP3 / audio" },
-                { value: "video", label: "MP4 / video" },
-              ]}
-              onChange={(value) => onChange({ translateAudioOnly: value === "audio" })}
-            />
+            <div className="standalone-setting-card flex min-h-[38px] items-center gap-[6px] rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-[7px] py-[3px] text-white">
+              <span className="grid h-[24px] w-[24px] shrink-0 place-items-center rounded-[7px] bg-white/[0.05] text-zinc-300">
+                {translateOutputTypeForMedia(media) === "audio" ? (
+                  <Music className="h-[14px] w-[14px]" />
+                ) : (
+                  <Film className="h-[14px] w-[14px]" />
+                )}
+              </span>
+              <span className="min-w-0 text-left">
+                <span className="block text-[13px] font-medium leading-[14px] text-[var(--text-tertiary)]">
+                  Format
+                </span>
+                <span className="block truncate text-[15px] font-bold leading-[16px] text-white">
+                  {media ? translateOutputFormatLabel(media) : "Auto"}
+                </span>
+              </span>
+            </div>
           </div>
 
           <label className="flex min-h-[42px] items-center gap-2.5 rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-2.5 py-2">
@@ -4334,42 +4351,6 @@ function VoiceTranslatePanel({
           <p className="rounded-[10px] border border-[var(--border-faint)] bg-black/20 px-2.5 py-2 text-[13px] font-medium leading-[18px] text-zinc-400">
             {copy.sourceHint}
           </p>
-
-          <div className="rounded-[10px] border border-cyan-300/15 bg-cyan-300/[0.035] p-2.5">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-[13px] font-bold leading-[16px] text-cyan-100">
-                  {copy.cloneTtsTitle}
-                </p>
-                <p className="mt-0.5 text-[11px] font-medium leading-[15px] text-cyan-100/65">
-                  {copy.cloneTtsHint}
-                </p>
-              </div>
-              <span className="shrink-0 rounded-full border border-cyan-200/20 bg-black/25 px-2 py-0.5 text-[10px] font-bold leading-[13px] text-cyan-100">
-                MP3
-              </span>
-            </div>
-            <textarea
-              value={form.translateTtsText}
-              onChange={(event) => onChange({ translateTtsText: event.target.value })}
-              placeholder={copy.cloneTtsPlaceholder}
-              rows={3}
-              className="mt-2 min-h-[72px] w-full resize-none rounded-[9px] border border-white/10 bg-black/35 px-2.5 py-2 text-[13px] font-medium leading-[18px] text-white outline-none placeholder:text-zinc-600 focus:border-cyan-200/45"
-            />
-            <button
-              type="button"
-              onClick={onCloneTtsDemo}
-              disabled={isBusy || !form.translateTtsText.trim()}
-              className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-[10px] border border-cyan-200/20 bg-cyan-200/10 px-3 text-[12px] font-bold text-cyan-50 transition hover:bg-cyan-200/16 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-zinc-800/70 disabled:text-zinc-500"
-            >
-              {isBusy && task?.engine === "local_gemini_tts" ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Music className="h-3.5 w-3.5" />
-              )}
-              {copy.cloneTtsAction}
-            </button>
-          </div>
 
           {(task?.error || (task?.status && task.status !== "completed")) && (
             <div className="rounded-[10px] border border-white/[0.07] bg-white/[0.025] px-3 py-2.5">
@@ -4402,7 +4383,7 @@ function VoiceTranslatePanel({
         <div className="grid grid-cols-2 gap-2.5">
           <div className="flex h-[40px] items-center gap-2 rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-2.5 text-[13px] font-semibold text-zinc-300">
             <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-400" />
-            <span className="truncate">{media ? (form.translateAudioOnly ? "MP3" : isAudio ? "MP3" : "MP4") : "Media"}</span>
+            <span className="truncate">{media ? translateOutputShortLabel(media) : "Media"}</span>
           </div>
           <button
             type="button"
@@ -7173,9 +7154,21 @@ function CreationTile({
         job.model ??
         t("workspace.standalone.generation_fallback"),
     );
-  const url = result?.url;
+  const url = firstText(
+    result?.url,
+    (result as StandaloneResult & { result_url?: unknown } | null)?.result_url,
+    result?.outputs?.output_video,
+    result?.outputs?.audio_url,
+    result?.outputs?.output_audio,
+  );
   const modelUrl = getStandaloneModelUrl(result);
-  const resultType = String(result?.type ?? "");
+  const resultTypeRaw = String(result?.type ?? result?.output_type ?? "");
+  const resultType =
+    resultTypeRaw === "video_url"
+      ? "video"
+      : resultTypeRaw === "audio_url"
+        ? "audio"
+        : resultTypeRaw;
   const isModel3d = resultType === "model_3d" || resultType === "model3d" || !!modelUrl;
   const rawPreviewUrl = isModel3d ? getStandalonePosterUrl(result, modelUrl) : url;
   const mediaUrl = useFreshSignedUrl(url);
@@ -7188,7 +7181,7 @@ function CreationTile({
     : "";
   const ratio = String(params.ratio ?? params.aspect_ratio ?? params.size ?? "");
   const modelName =
-    job.node_type === "voiceTranslateNode"
+    isVoiceTranslateStandaloneJob(job)
       ? "Translate"
       : String(params.model_name ?? job.model ?? "model");
   const generatedAtLabel = formatDate(job.completed_at ?? job.created_at, language);
@@ -8178,6 +8171,17 @@ function buildCurrentParams(
       hasCharacterRef,
     });
   }
+  if (tool === "image_upscale") {
+    return {
+      model_name: "magnific-upscale-precision-v2",
+      scale_factor: Math.max(2, Math.min(16, Number(form.upscaleScale) || 2)),
+      flavor: form.upscaleFlavor,
+      sharpen: Math.max(0, Math.min(100, Number(form.upscaleSharpen) || 7)),
+      smart_grain: Math.max(0, Math.min(100, Number(form.upscaleSmartGrain) || 7)),
+      ultra_detail: Math.max(0, Math.min(100, Number(form.upscaleUltraDetail) || 30)),
+      filter_nsfw: form.upscaleFilterNsfw,
+    };
+  }
   if (tool === "video_gen") {
     const usesReferenceMode =
       form.videoInputMode === "reference" &&
@@ -8238,9 +8242,11 @@ function buildCurrentParams(
           ? form.translateSourceLanguage.trim()
           : "auto",
       output_language: form.translateOutputLanguage.trim(),
-      output_type: form.translateAudioOnly ? "audio" : "video",
+      output_type: translateOutputTypeForMedia(form.translateVideo),
       speaker_num: form.translateSpeakerNum,
       source_content_type: form.translateVideo?.mime ?? null,
+      voice_cloning: true,
+      disable_voice_cloning: false,
     };
   }
   if (tool === "image_to_3d") {
@@ -8274,6 +8280,9 @@ function buildCurrentInputs(
           ? ordered[0].url
           : ordered.map((ref) => ref.url),
     };
+  }
+  if (tool === "image_upscale") {
+    return form.upscaleImage ? { image: form.upscaleImage.url } : {};
   }
   if (tool === "video_gen") {
     const inputs: Record<string, unknown> = {};
@@ -8330,6 +8339,9 @@ function validateForm(
   if (tool === "image_gen" && !form.prompt.trim()) {
     return t("workspace.standalone.validation.image_prompt");
   }
+  if (tool === "image_upscale" && !form.upscaleImage) {
+    return t("workspace.standalone.validation.upscale_image");
+  }
   if (
     tool === "video_gen" &&
     isKlingMotionVideoModel(form.model) &&
@@ -8374,9 +8386,6 @@ function validateForm(
     }
     if (!form.translateOutputLanguage.trim()) {
       return t("workspace.standalone.validation.translate_language");
-    }
-    if (!isElevenLabsDubbingLanguage(form.translateOutputLanguage)) {
-      return unsupportedElevenLabsDubbingLanguageMessage(form.translateOutputLanguage, language);
     }
     if (!form.translateConsent) {
       return t("workspace.standalone.validation.translate_consent");
@@ -8833,6 +8842,91 @@ function buildThreeDPanelSettings({
   ];
 }
 
+function buildUpscalePanelSettings({
+  form,
+  onChange,
+  language,
+}: {
+  form: StandaloneFormState;
+  onChange: (patch: Partial<StandaloneFormState>) => void;
+  language: "en" | "th";
+}): CreateVideoPanelSetting[] {
+  const th = language === "th";
+  const percentOptions = ["0", "7", "15", "30", "50", "75", "100"].map((value) => ({
+    value,
+    label: value,
+  }));
+  return [
+    {
+      id: "upscale-scale",
+      label: th ? "ขนาด" : "Scale",
+      value: `${form.upscaleScale}x`,
+      kind: "select",
+      options: Array.from({ length: 15 }, (_, index) => {
+        const value = String(index + 2);
+        return { value, label: `${value}x` };
+      }),
+      onChange: (upscaleScale) => onChange({ upscaleScale }),
+    },
+    {
+      id: "upscale-flavor",
+      label: th ? "โหมด" : "Mode",
+      value: upscaleFlavorLabel(form.upscaleFlavor, language),
+      kind: "select",
+      options: (["photo", "sublime", "photo_denoiser"] as const).map((value) => ({
+        value,
+        label: upscaleFlavorLabel(value, language),
+      })),
+      onChange: (upscaleFlavor) =>
+        onChange({ upscaleFlavor: upscaleFlavor as StandaloneFormState["upscaleFlavor"] }),
+    },
+    {
+      id: "upscale-sharpen",
+      label: th ? "คมชัด" : "Sharpen",
+      value: form.upscaleSharpen,
+      kind: "select",
+      options: percentOptions,
+      onChange: (upscaleSharpen) => onChange({ upscaleSharpen }),
+    },
+    {
+      id: "upscale-detail",
+      label: th ? "รายละเอียด" : "Detail",
+      value: form.upscaleUltraDetail,
+      kind: "select",
+      options: percentOptions,
+      onChange: (upscaleUltraDetail) => onChange({ upscaleUltraDetail }),
+    },
+    {
+      id: "upscale-grain",
+      label: th ? "เกรน" : "Grain",
+      value: form.upscaleSmartGrain,
+      kind: "select",
+      options: percentOptions,
+      onChange: (upscaleSmartGrain) => onChange({ upscaleSmartGrain }),
+    },
+    {
+      id: "upscale-nsfw",
+      label: th ? "กรอง NSFW" : "NSFW filter",
+      value: form.upscaleFilterNsfw
+        ? standaloneInlineLabel("on", language)
+        : standaloneInlineLabel("off", language),
+      kind: "toggle",
+      checked: form.upscaleFilterNsfw,
+      onToggle: (upscaleFilterNsfw) => onChange({ upscaleFilterNsfw }),
+    },
+  ];
+}
+
+function upscaleFlavorLabel(
+  value: StandaloneFormState["upscaleFlavor"],
+  language: "en" | "th",
+): string {
+  const th = language === "th";
+  if (value === "sublime") return th ? "Sublime" : "Sublime";
+  if (value === "photo_denoiser") return th ? "Photo Denoiser" : "Photo Denoiser";
+  return th ? "Photo" : "Photo";
+}
+
 function imageModelSettingTags(model: string, language: "en" | "th"): Array<{
   label: string;
   icon?: "reference" | "resolution";
@@ -8865,6 +8959,16 @@ function imageModelSettingTags(model: string, language: "en" | "th"): Array<{
         : "1K-2K",
       icon: "resolution",
     },
+  ];
+}
+
+function upscaleModelSettingTags(language: "en" | "th"): Array<{
+  label: string;
+  icon?: "reference" | "resolution";
+}> {
+  return [
+    { label: `${standaloneInlineLabel("reference", language)} 1`, icon: "reference" },
+    { label: "2x-16x", icon: "resolution" },
   ];
 }
 

@@ -34,6 +34,7 @@ import {
   Image as ImageIcon,
   Images,
   Languages,
+  Maximize2,
   Video,
   Mic2,
   Settings as SettingsIcon,
@@ -70,6 +71,7 @@ export type SectionKey =
   | "projects"
   | "spaces"
   | "image_gen"
+  | "image_upscale"
   | "video_gen"
   | "voice_gen"
   | "voice_translate"
@@ -90,6 +92,7 @@ type NavItem = {
     | "workspace.sidebar.stock"
     | "workspace.sidebar.spaces"
     | "workspace.sidebar.image_gen"
+    | "workspace.sidebar.image_upscale"
     | "workspace.sidebar.video_gen"
     | "workspace.sidebar.voice_gen"
     | "workspace.sidebar.voice_translate"
@@ -121,6 +124,7 @@ const NAV_SECTIONS: SidebarSection[] = [
         { id: "image_gen", labelKey: "workspace.sidebar.image_gen", displayLabel: "Image", icon: ImageIcon },
         { id: "voice_gen", labelKey: "workspace.sidebar.voice_gen", displayLabel: "Audio", icon: Mic2 },
       ],
+      [{ id: "image_upscale", labelKey: "workspace.sidebar.image_upscale", displayLabel: "Upscale", icon: Maximize2, width: "full" }],
       [{ id: "voice_translate", labelKey: "workspace.sidebar.voice_translate", displayLabel: "Translate", icon: Languages, width: "full" }],
       [{ id: "image_to_3d", labelKey: "workspace.sidebar.threed_gen", displayLabel: "3D Generator", icon: Box, width: "full" }],
     ],

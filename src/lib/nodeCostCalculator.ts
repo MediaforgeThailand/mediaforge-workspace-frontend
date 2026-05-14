@@ -107,6 +107,10 @@ function modelDiscountPercent({ schemaKey, params, creditCosts }: NodeCostParams
     const apiModel = modelName || "freepik-remove-bg";
     return maxDiscountForRows(rowsForFeatureModels(creditCosts, "remove_background", [apiModel, "freepik-remove-bg", "replicate-birefnet"]));
   }
+  if (schemaKey === "upscaleImageNode") {
+    const apiModel = modelName || "magnific-upscale-precision-v2";
+    return maxDiscountForRows(rowsForFeatureModels(creditCosts, "upscale_image", [apiModel, "magnific-upscale-precision-v2"]));
+  }
   if (schemaKey === "mergeAudioNode") {
     return maxDiscountForRows(rowsForFeatureModels(creditCosts, "merge_audio_video", [modelName || "shotstack"]));
   }
@@ -236,6 +240,16 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
     const aliases = [apiModel, "freepik-remove-bg", "replicate-birefnet"];
     const match = creditCosts.find(
       (r) => r.feature === "remove_background" && aliases.includes(r.model ?? ""),
+    );
+    return match?.cost ?? null;
+  }
+
+  // Image Upscale (Magnific Precision V2)
+  if (schemaKey === "upscaleImageNode") {
+    const apiModel = modelName || "magnific-upscale-precision-v2";
+    const aliases = [apiModel, "magnific-upscale-precision-v2"];
+    const match = creditCosts.find(
+      (r) => r.feature === "upscale_image" && aliases.includes(r.model ?? ""),
     );
     return match?.cost ?? null;
   }
