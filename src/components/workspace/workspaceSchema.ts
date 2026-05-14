@@ -229,6 +229,21 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         default: "2K",
         supportedModels: [...SEEDREAM_MODELS],
       },
+      // BytePlus ModelArk Seedream `size` accepts named aspect-ratio
+      // strings in addition to "WIDTHxHEIGHT". The executor combines
+      // the chosen ratio with the Resolution tier above into BytePlus-
+      // compatible pixel dimensions — 1:1 stays at the doc-verified
+      // baselines (2048×2048 / 3072×3072); other ratios scale to keep
+      // total pixels within the 3.7-10.4 MP API range.
+      // Source: https://docs.byteplus.com/en/docs/ModelArk/1824121
+      {
+        key: "aspect_ratio",
+        label: "Aspect Ratio",
+        type: "select",
+        options: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9", "9:21"],
+        default: "1:1",
+        supportedModels: [...SEEDREAM_MODELS],
+      },
       // GPT Image 2 — expanded size catalog covering the popular
       // social / video aspect ratios users actually shoot for:
       //   1:1 (feed), 4:5 (IG portrait), 3:4 (feed alt),
@@ -392,15 +407,6 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           fast: "Fast",
         },
         default: "off",
-        supportedModels: [...SEEDREAM_MODELS],
-      },
-      {
-        key: "watermark",
-        label: "Watermark",
-        type: "select",
-        options: ["false", "true"],
-        optionLabels: { "false": "No", "true": "Yes" },
-        default: "false",
         supportedModels: [...SEEDREAM_MODELS],
       },
     ],
