@@ -1095,8 +1095,8 @@ function workspaceCostMultiplierForTool(
   model: string,
   workspaceMultiplier: number,
 ) {
-  // Gemini TTS proxies through the legacy text-to-speech edge function.
-  // That function owns its own credit deduction and does not apply the
+  // Gemini TTS runs via the Gemini API directly inside workspace-run-node
+  // (no separate edge function in between). It currently doesn't apply the
   // workspace infrastructure multiplier, so keep the preview in sync.
   if (tool === "voice_gen" && model.startsWith("gemini-")) return 1;
   return workspaceMultiplier;

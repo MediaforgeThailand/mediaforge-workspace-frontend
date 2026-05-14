@@ -305,9 +305,9 @@ function workspaceCostMultiplierForNode(
   model: string,
   workspaceMultiplier: number,
 ): number {
-  // Gemini TTS still routes through the legacy text-to-speech function, which
-  // owns its own credit deduction path. Keep the canvas estimate aligned with
-  // standalone tools until that backend path is moved under workspace pricing.
+  // Gemini TTS runs inline inside workspace-run-node via the Gemini API; it
+  // doesn't apply the workspace infrastructure multiplier yet, so keep the
+  // canvas estimate aligned with the standalone tools preview.
   if (schemaKey === "audioGenNode" && model.startsWith("gemini-")) return 1;
   return workspaceMultiplier;
 }
