@@ -36,6 +36,9 @@ export default defineConfig(({ mode }) => ({
     },
   },
   plugins: [react()],
+  // Treat .wasm files as static assets so the video editor's FFmpeg / FFT
+  // bundles can be imported via Vite's asset graph.
+  assetsInclude: ["**/*.wasm"],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -45,49 +48,59 @@ export default defineConfig(({ mode }) => ({
     __APP_VERSION__: JSON.stringify(APP_VERSION),
     __APP_COMMIT__: JSON.stringify(APP_COMMIT),
   },
+  worker: {
+    format: "es",
+  },
+  optimizeDeps: {
+    // FFmpeg uses dynamic imports + workers that confuse the dep optimiser.
+    exclude: [
+      "@ffmpeg/ffmpeg",
+      "@ffmpeg/util",
+      "@ffmpeg/core",
+      "@ffmpeg/core-mt",
+    ],
+  },
   build: {
+    target: "esnext",
     rollupOptions: {
       output: {
         // Split heavy vendors into their own chunks so they can be
         // cached independently and so the main app chunk doesn't
-        // balloon to ~1.1 MB. three / drei / framer-motion are
-        // all large and only needed on the canvas page; keeping
+        // balloon. three / drei / framer-motion are
+        // all large and only needed on dedicated pages; keeping
         // them in separate chunks lets Rollup tree-share them across
         // routes that import them dynamically.
         // NOTE: do NOT split `@xyflow/react` into its own chunk — it reads React hooks at module-init and crashes with `useState` of undefined when separated from `vendor-react`.
-        manualChunks: {
-          "vendor-react": ["react", "react-dom", "react-router-dom"],
-          "vendor-radix": [
-            "@radix-ui/react-accordion",
-            "@radix-ui/react-alert-dialog",
-            "@radix-ui/react-aspect-ratio",
-            "@radix-ui/react-avatar",
-            "@radix-ui/react-checkbox",
-            "@radix-ui/react-collapsible",
-            "@radix-ui/react-context-menu",
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-hover-card",
-            "@radix-ui/react-label",
-            "@radix-ui/react-menubar",
-            "@radix-ui/react-navigation-menu",
-            "@radix-ui/react-popover",
-            "@radix-ui/react-progress",
-            "@radix-ui/react-radio-group",
-            "@radix-ui/react-scroll-area",
-            "@radix-ui/react-select",
-            "@radix-ui/react-separator",
-            "@radix-ui/react-slider",
-            "@radix-ui/react-slot",
-            "@radix-ui/react-switch",
-            "@radix-ui/react-tabs",
-            "@radix-ui/react-toast",
-            "@radix-ui/react-toggle",
-            "@radix-ui/react-toggle-group",
-            "@radix-ui/react-tooltip",
-          ],
-          "vendor-three": ["three", "@react-three/drei", "@react-three/fiber"],
-          "vendor-framer": ["framer-motion"],
+        manualChunks: (id) => {
+          if (id.includes("node_modules/@xyflow/react")) {
+            return "vendor-react";
+          }
+          if (id.includes("node_modules/react-router-dom") || id.includes("node_modules/react-dom") || (id.includes("node_modules/react/") && !id.includes("@types"))) {
+            return "vendor-react";
+          }
+          if (id.includes("node_modules/@radix-ui")) {
+            return "vendor-radix";
+          }
+          if (id.includes("node_modules/three") || id.includes("node_modules/@react-three")) {
+            return "vendor-three";
+          }
+          if (id.includes("node_modules/framer-motion")) {
+            return "vendor-framer";
+          }
+          // Heavy editor-only deps — each becomes its own lazy chunk
+          // loaded only when /app/editor (and its child routes) is opened.
+          if (id.includes("node_modules/mediabunny")) {
+            return "vendor-mediabunny";
+          }
+          if (id.includes("node_modules/@ffmpeg")) {
+            return "vendor-ffmpeg";
+          }
+          if (id.includes("node_modules/gsap") || id.includes("node_modules/@gsap")) {
+            return "vendor-gsap";
+          }
+          if (id.includes("node_modules/react-syntax-highlighter")) {
+            return "vendor-syntax-highlighter";
+          }
         },
       },
     },

@@ -2,7 +2,15 @@ import type { Config } from "tailwindcss";
 
 export default {
   darkMode: ["class"],
-  content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
+  content: [
+    "./pages/**/*.{ts,tsx}",
+    "./components/**/*.{ts,tsx}",
+    "./app/**/*.{ts,tsx}",
+    "./src/**/*.{ts,tsx}",
+    "./src/features/editor/**/*.{ts,tsx}",
+    "./src/lib/openreel-core/**/*.{ts,tsx}",
+    "./src/components/openreel-ui/**/*.{ts,tsx}",
+  ],
   prefix: "",
   theme: {
     container: {
@@ -18,11 +26,31 @@ export default {
         prompt: ['var(--font-sans)'],
       },
       colors: {
-        border: "hsl(var(--border))",
+        border: {
+          DEFAULT: "hsl(var(--border))",
+          hover: "rgb(var(--color-border-hover) / <alpha-value>)",
+          active: "rgb(var(--color-border-active) / <alpha-value>)",
+        },
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
+        background: {
+          DEFAULT: "hsl(var(--background))",
+          secondary: "rgb(var(--color-background-secondary) / <alpha-value>)",
+          tertiary: "rgb(var(--color-background-tertiary) / <alpha-value>)",
+          elevated: "rgb(var(--color-background-elevated) / <alpha-value>)",
+        },
         foreground: "hsl(var(--foreground))",
+        text: {
+          primary: "rgb(var(--color-text-primary) / <alpha-value>)",
+          secondary: "rgb(var(--color-text-secondary) / <alpha-value>)",
+          muted: "rgb(var(--color-text-muted) / <alpha-value>)",
+        },
+        status: {
+          success: "#22c55e",
+          warning: "#eab308",
+          error: "#ef4444",
+          info: "#3b82f6",
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",

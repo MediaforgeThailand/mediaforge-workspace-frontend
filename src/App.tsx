@@ -123,6 +123,13 @@ const TeacherCenter = lazyWithRetry(() => import("./pages/teacher-center"));
 const ClassEnroll = lazyWithRetry(() => import("./pages/ClassEnroll"));
 const OrgBranding = lazyWithRetry(() => import("./pages/org-admin/branding"));
 
+// ── Editor (MediaForge Studio video editor) ──────────────────
+// Lazy-loaded so the heavy editor chunk (~600 KB of NLE code +
+// 435 KB mediabunny + ~200 KB ffmpeg) only downloads when the
+// user actually opens /app/editor. The chunk graph is shaped by
+// the manualChunks block in vite.config.ts.
+const EditorPage = lazyWithRetry(() => import("./features/editor/EditorPage"));
+
 const queryClient = new QueryClient();
 const PageLoader = () => <PageLoadingAnim />;
 const PricingAliasRedirect = () => {
@@ -221,6 +228,27 @@ const App = () => (
                         <WorkspacePageShell hideSidebarBelowLg>
                           <Pricing />
                         </WorkspacePageShell>
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* MediaForge Studio (video editor). Lazy-loaded; full
+                   *  viewport (no AccountShell chrome). NOT linked from
+                   *  any menu yet — accessible via direct URL only while
+                   *  we test the integration. */}
+                  <Route
+                    path="/app/editor"
+                    element={
+                      <ProtectedRoute>
+                        <EditorPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/app/editor/:projectId"
+                    element={
+                      <ProtectedRoute>
+                        <EditorPage />
                       </ProtectedRoute>
                     }
                   />

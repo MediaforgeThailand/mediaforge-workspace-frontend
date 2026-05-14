@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MediaForge brand mark — placeholder SVG approximation of the
+  yellow cursive "M." brush stroke the user sent in chat. The
+  actual 5000×5000 raster from the user should be dropped in at
+  /mediaforge-logo.png alongside this file when convenient; the
+  apps prefer the SVG when both exist.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="MediaForge">
+  <path
+    d="M 70 60
+       C 50 130, 45 250, 70 340
+       Q 95 390, 130 365
+       C 160 340, 180 270, 205 180
+       C 220 130, 245 75, 280 75
+       C 310 75, 325 130, 345 210
+       C 365 285, 385 325, 415 325
+       C 445 325, 465 290, 480 240
+       Q 495 195, 515 210"
+    fill="none"
+    stroke="#E8FF14"
+    stroke-width="48"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <circle cx="552" cy="320" r="26" fill="#E8FF14" />
+</svg>

@@ -134,6 +134,29 @@
     --text-2: 240 20% 78%;
 
     --mf-ui-scale: 1.455;
+
+    /* MediaForge Studio (editor) RGB color tokens — consumed by the
+       Tailwind palette extension `bg-background-secondary`, `text-text-primary`,
+       etc. The editor was forked with a CapCut-style dark palette; keep
+       those values aligned with workspace's surface elevation map so
+       the editor blends with the surrounding shell. */
+    --color-background-secondary: 18 18 20;  /* matches workspace --bg-section */
+    --color-background-tertiary: 22 24 26;   /* matches workspace --bg-card */
+    --color-background-elevated: 32 35 38;   /* matches workspace --bg-surface-2 */
+    --color-text-primary: 255 255 255;
+    --color-text-secondary: 176 180 186;
+    --color-text-muted: 122 128 138;
+    --color-border-hover: 60 65 72;
+    --color-border-active: 92 99 110;
+
+    /* NLE clip colors (used by editor Timeline.tsx) */
+    --nle-clip-video: #5a47e0;
+    --nle-clip-audio: #1aa86b;
+    --nle-clip-text: #ff8b3d;
+    --nle-clip-image: #2389ff;
+    --nle-clip-graphic: #c64eff;
+    --nle-playhead: #ff3838;
+    --nle-accent: #F4FF00;
   }
 
   @keyframes fadeSlideIn {
