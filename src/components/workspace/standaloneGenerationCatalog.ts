@@ -662,7 +662,6 @@ export function buildImageParams(args: {
       size: args.resolution === "3K" ? "3K" : "2K",
       sequential_image_generation: "disabled",
       optimize_prompt: "off",
-      watermark: "false",
     };
   }
   const bananaSupports4k =
