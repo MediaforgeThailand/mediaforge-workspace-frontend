@@ -2930,6 +2930,9 @@ export const hi = {
   "workspace.toolnames.stock": "स्टॉक",
   "workspace.toolnames.stock_desc":
     "प्रीमियम स्टॉक फ़ोटो, वैक्टर और वीडियो खोजें।",
+  "workspace.toolnames.url_asset": "URL को एसेट में",
+  "workspace.toolnames.url_asset_desc":
+    "MP4, MP3, या PNG URL को सीधे workspace एसेट के रूप में आयात करें।",
   "workspace.toolnames.kling_element": "Kling तत्व",
   "workspace.toolnames.kling_element_desc":
     "किसी वर्ण या ऑब्जेक्ट को पुन: प्रयोज्य Kling ओमनी तत्व के रूप में सहेजें। 4 रेफरी + 1 फ्रंटल।",
@@ -3982,7 +3985,11 @@ export const hi = {
   "workspace.picker.port.to_media": "→ MP3/MP4",
   "workspace.picker.port.to_context": "→ context",
   "workspace.picker.port.to_script": "→ स्क्रिप्ट",
+  "workspace.picker.port.to_url": "→ URL",
   "workspace.picker.port.audio": "ऑडियो",
   "workspace.picker.port.media": "MP3/MP4",
+  "workspace.picker.port.png": "PNG",
+  "workspace.picker.port.mp3": "MP3",
+  "workspace.picker.port.mp4": "MP4",
   "workspace.picker.port.prompt": "Prompt",
 } satisfies TranslationMap;

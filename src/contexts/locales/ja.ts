@@ -2932,6 +2932,9 @@ export const ja = {
   "workspace.toolnames.stock": "ストック素材",
   "workspace.toolnames.stock_desc":
     "プレミアムストック写真、ベクター、動画を検索します。",
+  "workspace.toolnames.url_asset": "URL を素材に",
+  "workspace.toolnames.url_asset_desc":
+    "MP4 / MP3 / PNG の URL をワークスペース素材として読み込みます。",
   "workspace.toolnames.kling_element": "Kling 要素",
   "workspace.toolnames.kling_element_desc":
     "キャラクターまたはオブジェクトを再利用可能な Kling Omni 要素として保存します。レフト4枚+フロント1枚。",
@@ -4001,7 +4004,11 @@ export const ja = {
   "workspace.picker.port.to_media": "→ MP3/MP4",
   "workspace.picker.port.to_context": "→ コンテキスト",
   "workspace.picker.port.to_script": "→ スクリプト",
+  "workspace.picker.port.to_url": "→ URL",
   "workspace.picker.port.audio": "音声",
   "workspace.picker.port.media": "MP3/MP4",
+  "workspace.picker.port.png": "PNG",
+  "workspace.picker.port.mp3": "MP3",
+  "workspace.picker.port.mp4": "MP4",
   "workspace.picker.port.prompt": "プロンプト",
 } satisfies TranslationMap;
