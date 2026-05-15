@@ -2217,7 +2217,7 @@ export const th = {
   "workspace.sidebar.image_upscale": "ขยายภาพ",
   "workspace.sidebar.video_gen": "สร้างวิดีโอ",
   "workspace.sidebar.voice_gen": "สร้างเสียง",
-  "workspace.sidebar.voice_translate": "Translate",
+  "workspace.sidebar.voice_translate": "แปลเสียง",
   "workspace.sidebar.threed_gen": "สร้าง 3D",
   "workspace.sidebar.create": "สร้าง",
   "workspace.sidebar.tools": "Tools",

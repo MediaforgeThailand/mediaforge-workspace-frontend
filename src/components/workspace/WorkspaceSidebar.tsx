@@ -100,7 +100,6 @@ type NavItem = {
     | "workspace.sidebar.voice_translate"
     | "workspace.sidebar.threed_gen"
     | "workspace.sidebar.editor_new";
-  displayLabel?: string;
   icon: LucideIcon;
   width?: "full" | "half";
   tone?: "default" | "accent";
@@ -124,21 +123,21 @@ const NAV_SECTIONS: SidebarSection[] = [
     labelKey: "workspace.sidebar.create",
     variant: "tool",
     rows: [
-      [{ id: "video_gen", labelKey: "workspace.sidebar.video_gen", displayLabel: "Video", icon: Video, width: "full" }],
+      [{ id: "video_gen", labelKey: "workspace.sidebar.video_gen", icon: Video, width: "full" }],
       [
-        { id: "image_gen", labelKey: "workspace.sidebar.image_gen", displayLabel: "Image", icon: ImageIcon },
-        { id: "voice_gen", labelKey: "workspace.sidebar.voice_gen", displayLabel: "Audio", icon: Mic2 },
+        { id: "image_gen", labelKey: "workspace.sidebar.image_gen", icon: ImageIcon },
+        { id: "voice_gen", labelKey: "workspace.sidebar.voice_gen", icon: Mic2 },
       ],
-      [{ id: "image_upscale", labelKey: "workspace.sidebar.image_upscale", displayLabel: "Upscale", icon: Maximize2, width: "full" }],
-      [{ id: "voice_translate", labelKey: "workspace.sidebar.voice_translate", displayLabel: "Translate", icon: Languages, width: "full" }],
-      [{ id: "image_to_3d", labelKey: "workspace.sidebar.threed_gen", displayLabel: "3D Generator", icon: Box, width: "full" }],
+      [{ id: "image_upscale", labelKey: "workspace.sidebar.image_upscale", icon: Maximize2, width: "full" }],
+      [{ id: "voice_translate", labelKey: "workspace.sidebar.voice_translate", icon: Languages, width: "full" }],
+      [{ id: "image_to_3d", labelKey: "workspace.sidebar.threed_gen", icon: Box, width: "full" }],
     ],
   },
   {
     labelKey: "workspace.sidebar.tools",
     variant: "tool",
     rows: [
-      [{ id: "editor", labelKey: "workspace.sidebar.editor_new", displayLabel: "New", icon: Clapperboard, width: "full", tone: "accent" }],
+      [{ id: "editor", labelKey: "workspace.sidebar.editor_new", icon: Clapperboard, width: "full", tone: "accent" }],
     ],
   },
   {
@@ -663,7 +662,7 @@ const SidebarNavSection = ({
             {row.map((item) => (
               <NavLink
                 key={item.id}
-                label={item.displayLabel ?? translate(item.labelKey)}
+                label={translate(item.labelKey)}
                 icon={item.icon}
                 active={active === item.id}
                 onClick={() => onSelect(item.id)}
