@@ -1,5 +1,6 @@
 import { TranscriptionService } from "@/lib/openreel-core";
 import type { CloudflareWhisperResponse } from "@/lib/openreel-core";
+import { getFFmpegFallback } from "@/lib/openreel-core/media/ffmpeg-fallback";
 import { transcribeAudio } from "../captions-client";
 import {
   algorithmFromCaptionSettings,
@@ -47,11 +48,24 @@ export async function generateAutoSuptitle(
       message: "Extracting audio from source...",
     });
 
-    const audio = await svc.extractAudioFromClip(clip, mediaItem);
+    const wavAudio = await svc.extractAudioFromClip(clip, mediaItem);
+
+    onProgress?.({
+      phase: "compressing",
+      progress: 12,
+      message: "Compressing audio...",
+    });
+
+    const ffmpeg = getFFmpegFallback();
+    const audio = await ffmpeg.convertAudio(wavAudio, "mp3", {
+      bitrate: "128k",
+      channels: 1,
+    });
+
     if (audio.size > WHISPER_MAX_BYTES) {
       const mb = (audio.size / (1024 * 1024)).toFixed(1);
       throw new Error(
-        `Audio is too long for Auto Suptitle (${mb} MB). Trim the clip or split it into shorter sections before generating.`,
+        `Compressed audio is too large (${mb} MB). Trim the clip or split it into shorter sections before generating.`,
       );
     }
 

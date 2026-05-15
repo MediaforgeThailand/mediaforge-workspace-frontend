@@ -141,8 +141,10 @@ function hexFromCSS(css: string): string {
   return "#000000";
 }
 
+const DURATION_WARNING_MINUTES = 20;
+
 export const CaptionsPanel: React.FC = () => {
-  useI18n(); // subscribes to locale changes
+  const t = useI18n();
   const settings = useCaptionsStore((s) => s.settings);
   const updateSettings = useCaptionsStore((s) => s.updateSettings);
   const applySettings = useCaptionsStore((s) => s.applySettings);
@@ -201,6 +203,11 @@ export const CaptionsPanel: React.FC = () => {
     if (sourceClipId && candidateClips.find((c) => c.id === sourceClipId)) return sourceClipId;
     return candidateClips[0]?.id ?? "";
   }, [sourceClipId, candidateClips]);
+
+  const effectiveClipDurationMin = useMemo(() => {
+    const clip = candidateClips.find((c) => c.id === effectiveSourceClipId);
+    return clip ? clip.duration / 60 : 0;
+  }, [effectiveSourceClipId, candidateClips]);
 
   // Caption-group lookup — gathers all text clips that belong to a group.
   const captionGroups = useMemo(() => {
@@ -486,6 +493,21 @@ export const CaptionsPanel: React.FC = () => {
               </Select>
             </LabelRow>
           </Section>
+
+          {/* ─────── Duration warning ─────── */}
+          {effectiveSourceClipId && (
+            <div
+              className={`rounded px-2.5 py-1.5 text-[10px] leading-relaxed ${
+                effectiveClipDurationMin > DURATION_WARNING_MINUTES
+                  ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                  : "bg-blue-500/10 text-blue-400/80"
+              }`}
+            >
+              {effectiveClipDurationMin > DURATION_WARNING_MINUTES
+                ? `${t("captions_duration_warning")} (${Math.round(effectiveClipDurationMin)} min)`
+                : t("captions_duration_recommendation")}
+            </div>
+          )}
 
           {/* ─────── 2. LANGUAGE ─────── */}
           <Section title="Language">

@@ -4182,6 +4182,11 @@ export const en = {
   "workspace.picker.port.mp3": "MP3",
   "workspace.picker.port.mp4": "MP4",
   "workspace.picker.port.prompt": "prompt",
+
+  // Captions / Auto Suptitle
+  "captions.durationRecommendation": "Recommended: clips under 20 minutes for best results",
+  "captions.durationWarning": "This clip is {duration} min long. Clips over 20 min may exceed the 25 MB audio limit.",
+  "captions.compressingAudio": "Compressing audio...",
 } as const;
 
 export type TranslationKey = keyof typeof en;

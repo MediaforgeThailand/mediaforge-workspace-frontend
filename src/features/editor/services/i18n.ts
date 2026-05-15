@@ -66,6 +66,19 @@ const dictionary = {
   // Resizable panel dividers (V4)
   resize_library_panel: { en: "Resize library panel", th: "ปรับขนาดแผงคลังสินทรัพย์" },
   resize_inspector_panel: { en: "Resize inspector panel", th: "ปรับขนาดแผงตรวจสอบ" },
+  // Captions / Auto Suptitle
+  captions_duration_recommendation: {
+    en: "Recommended: clips under 20 minutes for best results",
+    th: "แนะนำ: คลิปไม่เกิน 20 นาทีเพื่อผลลัพธ์ที่ดีที่สุด",
+  },
+  captions_duration_warning: {
+    en: "This clip is over 20 minutes. It may exceed the 25 MB audio limit.",
+    th: "คลิปนี้ยาวเกิน 20 นาที อาจเกินขีดจำกัดเสียง 25 MB",
+  },
+  captions_compressing_audio: {
+    en: "Compressing audio...",
+    th: "กำลังบีบอัดเสียง...",
+  },
 } as const;
 
 export type I18nKey = keyof typeof dictionary;

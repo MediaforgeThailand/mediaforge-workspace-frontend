@@ -4317,4 +4317,9 @@ export const es = {
   "workspace.picker.port.mp3": "MP3",
   "workspace.picker.port.mp4": "MP4",
   "workspace.picker.port.prompt": "Prompt",
+
+  // Captions / Auto Suptitle
+  "captions.durationRecommendation": "Recomendado: clips de menos de 20 minutos para mejores resultados",
+  "captions.durationWarning": "Este clip dura {duration} min. Los clips de más de 20 min pueden superar el límite de audio de 25 MB.",
+  "captions.compressingAudio": "Comprimiendo audio...",
 } satisfies TranslationMap;
