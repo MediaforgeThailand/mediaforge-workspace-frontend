@@ -4,6 +4,7 @@ import {
   algorithmFromCaptionSettings,
   buildAutoSuptitleCues,
   DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+  normalizeAutoSuptitleCuesForDuration,
 } from "../segmenter";
 import { exportAutoSuptitleSRT } from "../subtitle-export";
 
@@ -82,5 +83,46 @@ describe("Auto Suptitle segmenter", () => {
     ]);
 
     expect(srt).toContain("00:00:02,000 --> 00:01:03,000");
+  });
+
+  it("normalizes millisecond cue timing and clips cues to the video duration", () => {
+    const cues = normalizeAutoSuptitleCuesForDuration(
+      [
+        {
+          text: "HELLO",
+          startTime: 1500,
+          endTime: 2500,
+          words: [{ text: "HELLO", start: 1500, end: 2500 }],
+        },
+        {
+          text: "OUTSIDE",
+          startTime: 25000,
+          endTime: 26000,
+          words: [{ text: "OUTSIDE", start: 25000, end: 26000 }],
+        },
+      ],
+      3,
+    );
+
+    expect(cues).toHaveLength(1);
+    expect(cues[0].startTime).toBeCloseTo(1.5);
+    expect(cues[0].endTime).toBeCloseTo(2.5);
+    expect(cues[0].words[0]).toEqual({ text: "HELLO", start: 1.5, end: 2.5 });
+  });
+
+  it("does not treat short out-of-range second timestamps as milliseconds", () => {
+    const cues = normalizeAutoSuptitleCuesForDuration(
+      [
+        {
+          text: "OUTSIDE",
+          startTime: 15,
+          endTime: 16,
+          words: [{ text: "OUTSIDE", start: 15, end: 16 }],
+        },
+      ],
+      3,
+    );
+
+    expect(cues).toEqual([]);
   });
 });

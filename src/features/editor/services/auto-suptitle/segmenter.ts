@@ -113,3 +113,64 @@ export function buildAutoSuptitleCues(
   flush();
   return cues;
 }
+
+export function normalizeAutoSuptitleCuesForDuration(
+  cues: readonly AutoSuptitleCue[],
+  durationSec?: number | null,
+): AutoSuptitleCue[] {
+  const finiteDuration =
+    typeof durationSec === "number" && Number.isFinite(durationSec) && durationSec > 0
+      ? durationSec
+      : null;
+  const finiteCues = cues.filter(
+    (cue) => Number.isFinite(cue.startTime) && Number.isFinite(cue.endTime),
+  );
+  const scale = (() => {
+    if (!finiteDuration) return 1;
+    const secondsOverlap = finiteCues.filter(
+      (cue) => cue.startTime < finiteDuration && cue.endTime > 0,
+    ).length;
+    const millisOverlap = finiteCues.filter(
+      (cue) =>
+        cue.endTime >= 100 &&
+        cue.startTime / 1000 < finiteDuration &&
+        cue.endTime / 1000 > 0,
+    ).length;
+    return millisOverlap > secondsOverlap ? 0.001 : 1;
+  })();
+
+  return cues.flatMap((cue) => {
+    let startTime = cue.startTime * scale;
+    let endTime = cue.endTime * scale;
+    if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) return [];
+    if (endTime <= startTime) return [];
+
+    startTime = Math.max(0, startTime);
+    if (finiteDuration) {
+      if (startTime >= finiteDuration) return [];
+      endTime = Math.min(finiteDuration, endTime);
+    }
+    if (endTime - startTime < 0.05) {
+      endTime = finiteDuration
+        ? Math.min(finiteDuration, startTime + 0.05)
+        : startTime + 0.05;
+    }
+    if (endTime <= startTime) return [];
+
+    const words = cue.words
+      .map((word) => {
+        let start = word.start * scale;
+        let end = word.end * scale;
+        if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+        start = Math.max(startTime, start);
+        end = finiteDuration
+          ? Math.min(endTime, finiteDuration, end)
+          : Math.min(endTime, end);
+        if (end <= start) return null;
+        return { text: word.text, start, end };
+      })
+      .filter(Boolean) as AutoSuptitleCue["words"];
+
+    return [{ ...cue, startTime, endTime, words }];
+  });
+}

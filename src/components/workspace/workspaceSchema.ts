@@ -144,9 +144,8 @@ const SINGLE_IMAGE_3D_MODELS = [
   "tripo3d-p1",
   "hyper3d-gen2-260112",
 ] as const;
-const MAGNIFIC_UPSCALE_MODELS = ["magnific-upscale-precision-v2"] as const;
 const OPENAI_UPSCALE_MODELS = ["gpt-image-2-enhance"] as const;
-const UPSCALE_MODELS = [...MAGNIFIC_UPSCALE_MODELS, ...OPENAI_UPSCALE_MODELS] as const;
+const UPSCALE_MODELS = [...OPENAI_UPSCALE_MODELS] as const;
 const URL_ASSET_MODELS = ["url-to-png", "url-to-mp3", "url-to-mp4"] as const;
 
 export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
@@ -1324,11 +1323,11 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
   },
 
   upscaleImageNode: {
-    displayName: "Upscale",
+    displayName: "Upscale Mediaforge",
     category: "AI PROCESS",
     accentColor: "cyan",
     supportedModels: [...UPSCALE_MODELS],
-    defaultModel: "magnific-upscale-precision-v2",
+    defaultModel: "gpt-image-2-enhance",
     inputs: [
       {
         id: "image",
@@ -1338,18 +1337,9 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         maxConnections: 1,
         supportedModels: [...UPSCALE_MODELS],
       },
-      {
-        id: "video",
-        label: "video",
-        color: "emerald",
-        required: false,
-        maxConnections: 1,
-        supportedModels: [...MAGNIFIC_UPSCALE_MODELS],
-      },
     ],
     outputs: [
       { id: "image", label: "IMAGE", color: "emerald" },
-      { id: "output_video", label: "VIDEO", color: "emerald" },
     ],
     params: [
       {
@@ -1358,88 +1348,10 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         type: "select",
         options: [...UPSCALE_MODELS],
         optionLabels: {
-          "magnific-upscale-precision-v2": "Magnific Precision V2",
-          "gpt-image-2-enhance": "GPT Image 2 Enhance",
+          "gpt-image-2-enhance": "Upscale Mediaforge",
         },
-        default: "magnific-upscale-precision-v2",
+        default: "gpt-image-2-enhance",
         required: true,
-      },
-      {
-        key: "media_type",
-        label: "Source",
-        type: "select",
-        options: ["image", "video"],
-        optionLabels: {
-          image: "Image",
-          video: "Video",
-        },
-        default: "image",
-        supportedModels: [...MAGNIFIC_UPSCALE_MODELS],
-      },
-      {
-        key: "scale_factor",
-        label: "Image scale",
-        type: "select",
-        // Production verification on 2026-05-15 showed Magnific
-        // Precision V2 returning a single 2x output even when the
-        // submitted task had scale_factor=8. Keep only the verified
-        // option visible until the provider behavior is confirmed.
-        options: ["2"],
-        optionLabels: {
-          "2": "2x",
-        },
-        default: "2",
-        visibleWhen: { media_type: "image" },
-        supportedModels: [...MAGNIFIC_UPSCALE_MODELS],
-      },
-      {
-        key: "resolution",
-        label: "Video target",
-        type: "select",
-        options: ["720p", "1k", "2k", "4k"],
-        optionLabels: {
-          "720p": "720p",
-          "1k": "1K",
-          "2k": "2K",
-          "4k": "4K",
-        },
-        default: "2k",
-        visibleWhen: { media_type: "video" },
-        supportedModels: [...MAGNIFIC_UPSCALE_MODELS],
-      },
-      {
-        key: "preset",
-        label: "Preset",
-        type: "select",
-        options: ["balanced", "clean", "detail", "creative"],
-        optionLabels: {
-          balanced: "Balanced",
-          clean: "Clean / denoise",
-          detail: "More detail",
-          creative: "Illustration / graphic",
-        },
-        default: "balanced",
-        supportedModels: [...MAGNIFIC_UPSCALE_MODELS],
-      },
-      {
-        key: "fps_boost",
-        label: "FPS Boost",
-        type: "select",
-        options: ["false", "true"],
-        optionLabels: { "false": "Off", "true": "On" },
-        default: "false",
-        visibleWhen: { media_type: "video" },
-        supportedModels: [...MAGNIFIC_UPSCALE_MODELS],
-      },
-      {
-        key: "filter_nsfw",
-        label: "Safety Filter",
-        type: "select",
-        options: ["false", "true"],
-        optionLabels: { "false": "Off", "true": "On" },
-        default: "false",
-        visibleWhen: { media_type: "image" },
-        supportedModels: [...MAGNIFIC_UPSCALE_MODELS],
       },
       {
         key: "size",

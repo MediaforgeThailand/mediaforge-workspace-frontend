@@ -122,11 +122,9 @@ function modelDiscountPercent({ schemaKey, params, creditCosts }: NodeCostParams
     return maxDiscountForRows(rowsForFeatureModels(creditCosts, "remove_background", [apiModel, "freepik-remove-bg", "replicate-birefnet"]));
   }
   if (schemaKey === "upscaleImageNode") {
-    const apiModel = modelName || "magnific-upscale-precision-v2";
-    if (apiModel === "gpt-image-2-enhance" || apiModel.startsWith("gpt-image-2-enhance:")) {
-      return maxDiscountForRows(rowsForFeatureModels(creditCosts, "upscale_image", openAiEnhancePriceKeys({ ...params, model_name: apiModel })));
-    }
-    return maxDiscountForRows(rowsForFeatureModels(creditCosts, "upscale_image", [apiModel, "magnific-upscale-precision-v2"]));
+    const rawModel = modelName || "gpt-image-2-enhance";
+    const apiModel = rawModel.startsWith("gpt-image-2-enhance") ? rawModel : "gpt-image-2-enhance";
+    return maxDiscountForRows(rowsForFeatureModels(creditCosts, "upscale_image", openAiEnhancePriceKeys({ ...params, model_name: apiModel })));
   }
   if (schemaKey === "mergeAudioNode") {
     return maxDiscountForRows(rowsForFeatureModels(creditCosts, "merge_audio_video", [modelName || "shotstack"]));
@@ -271,22 +269,16 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
     return match?.cost ?? null;
   }
 
-  // Image Upscale (Magnific Precision V2 / GPT Image 2 Enhance)
+  // Image Upscale (MediaForge-branded enhance path)
   if (schemaKey === "upscaleImageNode") {
-    const apiModel = modelName || "magnific-upscale-precision-v2";
-    if (apiModel === "gpt-image-2-enhance" || apiModel.startsWith("gpt-image-2-enhance:")) {
-      const keys = openAiEnhancePriceKeys({ ...params, model_name: apiModel });
-      for (const key of keys) {
-        const row = creditCosts.find((r) => r.feature === "upscale_image" && r.model === key);
-        if (row) return row.cost;
-      }
-      return null;
+    const rawModel = modelName || "gpt-image-2-enhance";
+    const apiModel = rawModel.startsWith("gpt-image-2-enhance") ? rawModel : "gpt-image-2-enhance";
+    const keys = openAiEnhancePriceKeys({ ...params, model_name: apiModel });
+    for (const key of keys) {
+      const row = creditCosts.find((r) => r.feature === "upscale_image" && r.model === key);
+      if (row) return row.cost;
     }
-    const aliases = [apiModel, "magnific-upscale-precision-v2"];
-    const match = creditCosts.find(
-      (r) => r.feature === "upscale_image" && aliases.includes(r.model ?? ""),
-    );
-    return match?.cost ?? null;
+    return null;
   }
 
   // ── Merge Audio + Video (Shotstack) ──

@@ -134,6 +134,7 @@ import {
   AUTO_SUPTITLE_TRACK_NAME,
   algorithmFromCaptionSettings,
   buildAutoSuptitleCues,
+  normalizeAutoSuptitleCuesForDuration,
   type AutoSuptitleResult,
 } from "@/features/editor/services/auto-suptitle";
 import {
@@ -784,49 +785,7 @@ function isElevenLabsDubbingEngine(engine?: VoiceTranslateEngine): boolean {
   return engine === "elevenlabs_dubbing_clone";
 }
 
-const UPSCALE_IMAGE_PRESETS: Record<
-  UpscalePreset,
-  {
-    flavor: StandaloneFormState["upscaleFlavor"];
-    sharpen: string;
-    smart_grain: string;
-    ultra_detail: string;
-  }
-> = {
-  balanced: { flavor: "photo", sharpen: "7", smart_grain: "7", ultra_detail: "30" },
-  clean: { flavor: "photo_denoiser", sharpen: "4", smart_grain: "0", ultra_detail: "18" },
-  detail: { flavor: "photo", sharpen: "15", smart_grain: "8", ultra_detail: "55" },
-  creative: { flavor: "sublime", sharpen: "8", smart_grain: "8", ultra_detail: "35" },
-};
-
-const UPSCALE_VIDEO_PRESETS: Record<
-  UpscalePreset,
-  { strength: string; sharpen: string; smart_grain: string }
-> = {
-  balanced: { strength: "60", sharpen: "0", smart_grain: "0" },
-  clean: { strength: "45", sharpen: "0", smart_grain: "0" },
-  detail: { strength: "75", sharpen: "12", smart_grain: "6" },
-  creative: { strength: "60", sharpen: "0", smart_grain: "0" },
-};
-
-const UPSCALE_MEDIA_ACCEPT = "image/*,video/*,.mp4,.mov,.webm,.m4v";
 const UPSCALE_VIDEO_EXTENSION_RE = /\.(mp4|mov|webm|m4v)(?:[?#].*)?$/i;
-const UPSCALE_IMAGE_EXTENSION_RE = /\.(png|jpe?g|webp|gif)(?:[?#].*)?$/i;
-
-function isUpscaleMediaFile(file: File): boolean {
-  const name = file.name.toLowerCase();
-  return (
-    file.type.startsWith("image/") ||
-    file.type.startsWith("video/") ||
-    UPSCALE_IMAGE_EXTENSION_RE.test(name) ||
-    UPSCALE_VIDEO_EXTENSION_RE.test(name)
-  );
-}
-
-function isUpscaleMediaMime(mime: string): boolean {
-  const normalized = mime.toLowerCase();
-  return normalized.startsWith("image/") || normalized.startsWith("video/");
-}
 
 function isUpscaleVideoReference(
   ref: Pick<UploadedRef, "mime" | "name" | "url"> | null | undefined,
@@ -837,27 +796,8 @@ function isUpscaleVideoReference(
   return UPSCALE_VIDEO_EXTENSION_RE.test(ref.name) || UPSCALE_VIDEO_EXTENSION_RE.test(ref.url);
 }
 
-function isUpscaleMediaReference(
-  ref: Pick<UploadedRef, "mime" | "name" | "url"> | null | undefined,
-): boolean {
-  if (!ref) return false;
-  if (isUpscaleMediaMime(ref.mime)) return true;
-  return (
-    UPSCALE_IMAGE_EXTENSION_RE.test(ref.name) ||
-    UPSCALE_IMAGE_EXTENSION_RE.test(ref.url) ||
-    UPSCALE_VIDEO_EXTENSION_RE.test(ref.name) ||
-    UPSCALE_VIDEO_EXTENSION_RE.test(ref.url)
-  );
-}
-
 function isUpscaleVideoSource(form: Pick<StandaloneFormState, "upscaleImage">): boolean {
   return isUpscaleVideoReference(form.upscaleImage);
-}
-
-function upscaleMediaTypeLabel(form: Pick<StandaloneFormState, "upscaleImage">, language: "en" | "th") {
-  const th = language === "th";
-  if (!form.upscaleImage) return th ? "ภาพ/วิดีโอ" : "image/video";
-  return isUpscaleVideoSource(form) ? (th ? "วิดีโอ" : "video") : (th ? "ภาพ" : "image");
 }
 
 function isVoiceTranslateProvider(provider: string | null | undefined): boolean {
@@ -1358,7 +1298,6 @@ const STANDALONE_MODEL_DESCRIPTION_KEYS = {
   "seedream-5-0-lite-260128": "workspace.standalone.model.seedream_5_0_lite.desc",
   "seedream-4-5-251128": "workspace.standalone.model.seedream_4_5.desc",
   "gpt-image-2": "workspace.standalone.model.gpt_image_2.desc",
-  "magnific-upscale-precision-v2": "workspace.standalone.model.magnific_upscale_precision_v2.desc",
   "kling-v2-6-pro": "workspace.standalone.model.kling_v2_6_pro.desc",
   "kling-v2-6-motion-pro": "workspace.standalone.model.kling_v2_6_motion_pro.desc",
   "kling-v3-pro": "workspace.standalone.model.kling_v3_pro.desc",
@@ -1444,7 +1383,7 @@ function standaloneCreateActionTitle(
 ) {
   const labels: Record<StandaloneToolKey, { en: string; th: string }> = {
     image_gen: { en: "Create Image", th: "สร้างรูปภาพ" },
-    image_upscale: { en: "Upscale Media", th: "ขยายภาพ/วิดีโอ" },
+    image_upscale: { en: "Upscale Mediaforge", th: "ขยายภาพ Mediaforge" },
     video_gen: { en: "Create Video", th: "สร้างวิดีโอ" },
     voice_gen: { en: "Create Audio", th: "สร้างเสียง" },
     voice_translate: { en: "Translate Voice", th: "แปลเสียงวิดีโอ" },
@@ -1669,6 +1608,21 @@ function isReplicateGptImageModel(model: string) {
 
 function isGptImage2EnhanceModel(model: string) {
   return model === "gpt-image-2-enhance";
+}
+
+const UPSCALE_MEDIAFORGE_LABEL = "Upscale Mediaforge";
+
+function isUpscaleStandaloneJob(job: Pick<StandaloneJobRow, "node_type">) {
+  return job.node_type === "upscaleImageNode";
+}
+
+function standaloneJobModelLabel(
+  job: Pick<StandaloneJobRow, "node_type" | "model">,
+  params: Record<string, unknown>,
+) {
+  if (isUpscaleStandaloneJob(job)) return UPSCALE_MEDIAFORGE_LABEL;
+  if (job.node_type === "voiceTranslateNode") return "Translate";
+  return String(params.model_name ?? job.model ?? "model");
 }
 
 function nearestGptImageAspectRatio(
@@ -2258,6 +2212,12 @@ export default function StandaloneGenerator({
           next.videoResolution = "720p";
         }
       }
+      if (activeTool === "image_upscale") {
+        next.model = "gpt-image-2-enhance";
+        if (next.upscaleImage && isUpscaleVideoReference(next.upscaleImage)) {
+          next.upscaleImage = null;
+        }
+      }
       return {
         ...prev,
         [activeTool]: next,
@@ -2303,16 +2263,12 @@ export default function StandaloneGenerator({
       nextPatch.imageRefs = form.imageRefs.slice(0, maxImageRefsForModel(model));
     }
     if (activeTool === "image_upscale") {
-      if (isGptImage2EnhanceModel(model)) {
-        nextPatch.imageResolution = ["1K", "2K", "4K"].includes(form.imageResolution)
-          ? form.imageResolution
-          : "1K";
-        nextPatch.quality = ["low", "medium", "high"].includes(form.quality)
-          ? form.quality
-          : "medium";
-      } else {
-        nextPatch.upscaleScale = "2";
-      }
+      nextPatch.imageResolution = ["1K", "2K", "4K"].includes(form.imageResolution)
+        ? form.imageResolution
+        : "1K";
+      nextPatch.quality = ["low", "medium", "high"].includes(form.quality)
+        ? form.quality
+        : "medium";
     }
     if (activeTool === "video_gen") {
       const isSeedance = isSeedanceVideoModel(model);
@@ -2669,9 +2625,7 @@ export default function StandaloneGenerator({
           : needsAutoSubtitleMedia
             ? isAutoSubtitleMediaFile(file)
           : needsUpscaleMedia
-            ? isGptImage2EnhanceModel(form.model)
-              ? file.type.startsWith("image/")
-              : isUpscaleMediaFile(file)
+            ? file.type.startsWith("image/")
           : needsVideo
             ? file.type.startsWith("video/")
             : file.type.startsWith("image/");
@@ -2685,12 +2639,8 @@ export default function StandaloneGenerator({
                 ? "Choose an MP4 video for Auto Subtitle."
               : needsUpscaleMedia
                 ? language === "th"
-                  ? isGptImage2EnhanceModel(form.model)
-                    ? "เลือกไฟล์ภาพสำหรับ GPT Image 2 Enhance"
-                    : "เลือกภาพหรือวิดีโอสำหรับ Upscale"
-                  : isGptImage2EnhanceModel(form.model)
-                    ? "Choose an image for GPT Image 2 Enhance."
-                    : "Choose an image or video for Upscale."
+                  ? "เลือกไฟล์ภาพสำหรับ Upscale Mediaforge"
+                  : "Choose an image for Upscale Mediaforge."
               : needsVideo
                 ? t("workspace.toast.upload_video_ref")
                 : t("workspace.toast.upload_image_ref"),
@@ -2714,6 +2664,12 @@ export default function StandaloneGenerator({
           }
           if (!isSeedanceReferenceVideoDurationValid(durationSec)) {
             toast.error(seedanceReferenceVideoDurationMessage(durationSec));
+            continue;
+          }
+        } else if (needsAutoSubtitleMedia) {
+          durationSec = await readVideoFileDuration(file);
+          if (durationSec == null) {
+            toast.error("Could not read the video duration for Auto Subtitle.");
             continue;
           }
         }
@@ -2756,22 +2712,12 @@ export default function StandaloneGenerator({
     }
     if (
       expectsUpscaleMedia &&
-      (isGptImage2EnhanceModel(form.model)
-        ? !referenceMime.startsWith("image/")
-        : !isUpscaleMediaReference({
-            mime: referenceMime,
-            name: reference.name ?? "asset-reference",
-            url: reference.url,
-          }))
+      !referenceMime.startsWith("image/")
     ) {
       toast.error(
         language === "th"
-          ? isGptImage2EnhanceModel(form.model)
-            ? "เลือกไฟล์ภาพสำหรับ GPT Image 2 Enhance"
-            : "เลือกภาพหรือวิดีโอสำหรับ Upscale"
-          : isGptImage2EnhanceModel(form.model)
-            ? "Choose an image for GPT Image 2 Enhance."
-            : "Choose an image or video for Upscale.",
+          ? "เลือกไฟล์ภาพสำหรับ Upscale Mediaforge"
+          : "Choose an image for Upscale Mediaforge.",
       );
       return;
     }
@@ -3045,7 +2991,7 @@ export default function StandaloneGenerator({
           return ref.mime.startsWith("image/") || ref.mime.startsWith("video/");
         }
         if (activeTool === "image_upscale") {
-          return isUpscaleMediaReference(ref);
+          return ref.mime.startsWith("image/");
         }
         return wantsVideoAssets
           ? ref.mime.startsWith("video/") || ref.mime.startsWith("audio/")
@@ -3387,16 +3333,29 @@ export default function StandaloneGenerator({
         granularity: "word",
       });
       const algorithm = algorithmFromCaptionSettings(settings);
-      const cues = buildAutoSuptitleCues(
+      const rawCues = buildAutoSuptitleCues(
         whisperResponse.words ?? [],
         0,
         settings,
         algorithm,
       );
-      if (cues.length === 0) {
+      if (rawCues.length === 0) {
         throw new Error("No speech was detected in this video.");
       }
 
+      const provisionalCues =
+        normalizeAutoSuptitleCuesForDuration(rawCues, source.durationSec);
+
+      const rendered: RenderAutoSubtitleVideoResult = await renderAutoSubtitleVideo({
+        sourceUrl: source.url,
+        cues: provisionalCues.length > 0 ? provisionalCues : rawCues,
+        settings,
+        onProgress: (progress, message) => setAutoSubtitleProgress({ progress, message }),
+      });
+      const cues = normalizeAutoSuptitleCuesForDuration(rawCues, rendered.duration);
+      if (cues.length === 0) {
+        throw new Error("Subtitle timing did not overlap the source video.");
+      }
       const result: AutoSuptitleResult = {
         whisperResponse,
         cues,
@@ -3410,13 +3369,6 @@ export default function StandaloneGenerator({
           highlightColor: settings.highlightColor,
         },
       };
-
-      const rendered: RenderAutoSubtitleVideoResult = await renderAutoSubtitleVideo({
-        sourceUrl: source.url,
-        cues,
-        settings,
-        onProgress: (progress, message) => setAutoSubtitleProgress({ progress, message }),
-      });
       const outputUrl = URL.createObjectURL(rendered.blob);
       const outputName = autoSubtitleOutputName(source.name, rendered.extension);
       const handoff = {
@@ -3680,13 +3632,14 @@ export default function StandaloneGenerator({
     const slot = pendingSlotRef.current;
     const needsVideo = slot === "video-ref-video";
     const needsTranslateMedia = slot === "translate-video";
+    const needsAutoSubtitleMedia = slot === "auto-subtitle-video";
     const needsUpscaleMedia = slot === "upscale-image";
     const isValidType = needsTranslateMedia
       ? isTranslateMediaFile(file)
+      : needsAutoSubtitleMedia
+        ? isAutoSubtitleMediaFile(file)
       : needsUpscaleMedia
-        ? isGptImage2EnhanceModel(form.model)
-          ? file.type.startsWith("image/")
-          : isUpscaleMediaFile(file)
+        ? file.type.startsWith("image/")
       : needsVideo
         ? file.type.startsWith("video/")
         : file.type.startsWith("image/");
@@ -3696,10 +3649,12 @@ export default function StandaloneGenerator({
           ? language === "th"
             ? "เลือกไฟล์ MP4 หรือ MP3 สำหรับ Translate"
             : "Choose an MP4 or MP3 file for Translate."
+          : needsAutoSubtitleMedia
+            ? "Choose an MP4 video for Auto Subtitle."
           : needsUpscaleMedia
             ? language === "th"
-              ? "เลือกภาพหรือวิดีโอสำหรับ Upscale"
-              : "Choose an image or video for Upscale."
+              ? "เลือกไฟล์ภาพสำหรับ Upscale Mediaforge"
+              : "Choose an image for Upscale Mediaforge."
           : needsVideo
             ? t("workspace.toast.upload_video_ref")
             : t("workspace.toast.upload_image_ref"),
@@ -3727,6 +3682,12 @@ export default function StandaloneGenerator({
         }
         if (!isSeedanceReferenceVideoDurationValid(durationSec)) {
           toast.error(seedanceReferenceVideoDurationMessage(durationSec));
+          return;
+        }
+      } else if (needsAutoSubtitleMedia) {
+        durationSec = await readVideoFileDuration(file);
+        if (durationSec == null) {
+          toast.error("Could not read the video duration for Auto Subtitle.");
           return;
         }
       }
@@ -4094,9 +4055,7 @@ export default function StandaloneGenerator({
                 activeTool === "video_gen"
                   ? "JPEG/PNG/WEBP/MP4, 20 MB max"
                   : activeTool === "image_upscale"
-                    ? isGptImage2EnhanceModel(form.model)
-                      ? "JPEG/PNG/WEBP, 20 MB max"
-                      : "JPEG/PNG/WEBP/GIF or MP4/MOV/WEBM"
+                    ? "JPEG/PNG/WEBP, 20 MB max"
                   : activeTool === "image_to_3d"
                     ? panelMaxReferences > 1
                       ? "Front first, then left/back/right. JPEG/PNG/WEBP, 20 MB max"
@@ -4105,9 +4064,7 @@ export default function StandaloneGenerator({
               }
               referenceAccept={
                 activeTool === "image_upscale"
-                  ? isGptImage2EnhanceModel(form.model)
-                    ? "image/*"
-                    : UPSCALE_MEDIA_ACCEPT
+                  ? "image/*"
                   : activeTool === "video_gen" ? "image/*,video/*" : "image/*"
               }
               referenceAssets={panelReferenceAssets}
@@ -6531,27 +6488,11 @@ function UpscaleGuide({
   language: "en" | "th";
 }) {
   const th = language === "th";
-  const isGptEnhance = isGptImage2EnhanceModel(form.model);
-  const isVideo = isUpscaleVideoSource(form);
-  const mediaLabel = isGptEnhance
-    ? th ? "ภาพเท่านั้น" : "image only"
-    : upscaleMediaTypeLabel(form, language);
-  const title = isGptEnhance
-    ? th ? "ตั้งค่า Enhance รูปภาพ" : "Image enhance settings"
-    : isVideo
-    ? th ? "ตั้งค่าอัปสเกลวิดีโอ" : "Video upscale settings"
-    : th ? "ตั้งค่าอัปสเกลรูปภาพ" : "Image upscale settings";
-  const summary = isGptEnhance
-    ? th
-      ? "เลือกขนาด 1K, 2K, หรือ 4K และระดับคุณภาพสำหรับ GPT Image 2 Enhance"
-      : "Choose 1K, 2K, or 4K output and quality for GPT Image 2 Enhance."
-    : isVideo
-    ? th
-      ? "Preset รวมความคม รายละเอียด และ grain ให้เหมาะกับวิดีโอ; เปิด FPS Boost เมื่อต้องการให้ภาพเคลื่อนไหวลื่นขึ้น"
-      : "Preset tunes detail, sharpness, and grain for video. FPS Boost makes motion smoother."
-    : th
-      ? "Preset ปรับโทน ความคม grain และรายละเอียด; Safety ใช้กรองผลลัพธ์"
-      : "Preset tunes style, sharpness, grain, and detail for images. Safety filters output.";
+  const mediaLabel = th ? "ภาพเท่านั้น" : "image only";
+  const title = th ? "ตั้งค่า Upscale Mediaforge" : "Upscale Mediaforge settings";
+  const summary = th
+    ? "เลือกขนาด 1K, 2K, หรือ 4K และระดับคุณภาพสำหรับการเพิ่มความคมชัดของภาพ"
+    : "Choose 1K, 2K, or 4K output and quality for image enhancement.";
 
   return (
     <div className="rounded-[10px] border border-white/[0.04] bg-[#101112] px-[11px] py-[8px] text-[12px] leading-[16px] text-neutral-300">
@@ -8447,7 +8388,7 @@ function CreationTile({
     prompt.trim().slice(0, 90) ||
     String(
       params.nodeName ??
-        params.model_name ??
+        (isUpscaleStandaloneJob(job) ? UPSCALE_MEDIAFORGE_LABEL : params.model_name) ??
         job.model ??
         t("workspace.standalone.generation_fallback"),
     );
@@ -8468,7 +8409,7 @@ function CreationTile({
   const modelName =
     isVoiceTranslateStandaloneJob(job)
       ? "Translate"
-      : String(params.model_name ?? job.model ?? "model");
+      : standaloneJobModelLabel(job, params);
   const generatedAtLabel = formatDate(job.completed_at ?? job.created_at, language);
   const downloadUrl = modelUrl ?? playbackUrl;
   const downloadBaseName =
@@ -8803,7 +8744,7 @@ function CreationRow({
     prompt.trim().slice(0, 90) ||
     String(
       params.nodeName ??
-        params.model_name ??
+        (isUpscaleStandaloneJob(job) ? UPSCALE_MEDIAFORGE_LABEL : params.model_name) ??
         job.model ??
         t("workspace.standalone.generation_fallback"),
     );
@@ -8823,10 +8764,7 @@ function CreationRow({
   const previewUrl = useFreshSignedUrl(rawPreviewUrl);
   const duration = String(params.duration ?? "");
   const ratio = String(params.ratio ?? params.aspect_ratio ?? params.size ?? "");
-  const modelName =
-    job.node_type === "voiceTranslateNode"
-      ? "Translate"
-      : String(params.model_name ?? job.model ?? "model");
+  const modelName = standaloneJobModelLabel(job, params);
   const playbackUrl = mediaUrl ?? url;
   const displayPreviewUrl = previewUrl ?? rawPreviewUrl;
   const downloadUrl = modelUrl ?? playbackUrl;
@@ -9031,7 +8969,7 @@ function CreationRow({
               {standaloneStatusLabel(job.status, t)}
             </span>
             <span className="rounded-full bg-white/[0.05] px-2 py-1 text-[11px] text-zinc-400">
-              {job.model ?? params.model_name?.toString() ?? "model"}
+              {modelName}
             </span>
             {typeof job.credits_charged === "number" && (
               <span className="rounded-full bg-white/[0.05] px-2 py-1 text-[11px] text-zinc-400">
@@ -9132,7 +9070,7 @@ function uploadAcceptForSlot(slot: UploadSlot, model?: string): string {
   if (slot === "translate-video") return TRANSLATE_MEDIA_ACCEPT;
   if (slot === "auto-subtitle-video") return AUTO_SUBTITLE_MEDIA_ACCEPT;
   if (slot === "upscale-image") {
-    return isGptImage2EnhanceModel(model ?? "") ? "image/*" : UPSCALE_MEDIA_ACCEPT;
+    return "image/*";
   }
   return slot === "video-ref-video" ? "video/*" : "image/*";
 }
@@ -9526,49 +9464,16 @@ function buildCurrentParams(
     });
   }
   if (tool === "image_upscale") {
-    const isVideo = isUpscaleVideoSource(form);
-    if (isGptImage2EnhanceModel(form.model) && !isVideo) {
-      const quality = ["low", "medium", "high"].includes(form.quality)
-        ? form.quality
-        : "medium";
-      return {
-        model_name: "gpt-image-2-enhance",
-        mode: "enhance",
-        size: gptImage2EnhanceSizeForForm(form),
-        quality,
-        output_format: "png",
-        moderation: "auto",
-        source_content_type: form.upscaleImage?.mime ?? null,
-      };
-    }
-    if (isVideo) {
-      const preset = UPSCALE_VIDEO_PRESETS[form.upscalePreset] ?? UPSCALE_VIDEO_PRESETS.balanced;
-      return {
-        model_name: "magnific-upscale-precision-v2",
-        media_type: "video",
-        preset: form.upscalePreset,
-        resolution: form.upscaleVideoResolution,
-        fps_boost: form.upscaleFpsBoost,
-        strength: Math.max(0, Math.min(100, Number(preset.strength) || 60)),
-        sharpen: Math.max(0, Math.min(100, Number(preset.sharpen) || 0)),
-        smart_grain: Math.max(0, Math.min(100, Number(preset.smart_grain) || 0)),
-        source_content_type: form.upscaleImage?.mime ?? null,
-      };
-    }
-    const preset = UPSCALE_IMAGE_PRESETS[form.upscalePreset] ?? UPSCALE_IMAGE_PRESETS.balanced;
+    const quality = ["low", "medium", "high"].includes(form.quality)
+      ? form.quality
+      : "medium";
     return {
-      model_name: "magnific-upscale-precision-v2",
-      media_type: "image",
-      preset: form.upscalePreset,
-      // Magnific currently returns a verified 2x image even for higher
-      // scale factors, so clamp standalone image upscale to the only
-      // production-confirmed setting until the provider resolves it.
-      scale_factor: 2,
-      flavor: preset.flavor,
-      sharpen: Math.max(0, Math.min(100, Number(preset.sharpen) || 7)),
-      smart_grain: Math.max(0, Math.min(100, Number(preset.smart_grain) || 7)),
-      ultra_detail: Math.max(0, Math.min(100, Number(preset.ultra_detail) || 30)),
-      filter_nsfw: form.upscaleFilterNsfw,
+      model_name: "gpt-image-2-enhance",
+      mode: "enhance",
+      size: gptImage2EnhanceSizeForForm(form),
+      quality,
+      output_format: "png",
+      moderation: "auto",
       source_content_type: form.upscaleImage?.mime ?? null,
     };
   }
@@ -9694,9 +9599,7 @@ function buildCurrentInputs(
   }
   if (tool === "image_upscale") {
     if (!form.upscaleImage) return {};
-    return isUpscaleVideoSource(form)
-      ? { video: form.upscaleImage.url }
-      : { image: form.upscaleImage.url };
+    return { image: form.upscaleImage.url };
   }
   if (tool === "video_gen") {
     const inputs: Record<string, unknown> = {};
@@ -9769,12 +9672,8 @@ function validateForm(
   if (tool === "image_upscale" && !form.upscaleImage) {
     return t("workspace.standalone.validation.upscale_image");
   }
-  if (
-    tool === "image_upscale" &&
-    isGptImage2EnhanceModel(form.model) &&
-    isUpscaleVideoSource(form)
-  ) {
-    return "GPT Image 2 Enhance supports image input only. Use Magnific Precision V2 for video.";
+  if (tool === "image_upscale" && isUpscaleVideoSource(form)) {
+    return "Upscale Mediaforge supports image input only.";
   }
   if (
     tool === "video_gen" &&
@@ -10293,119 +10192,31 @@ function buildUpscalePanelSettings({
   language: "en" | "th";
 }): CreateVideoPanelSetting[] {
   const th = language === "th";
-  const isVideo = isUpscaleVideoSource(form);
-  const presetOptions = (isVideo
-    ? (["balanced", "clean", "detail"] as UpscalePreset[])
-    : (["balanced", "clean", "detail", "creative"] as UpscalePreset[])
-  ).map((value) => ({
-    value,
-    label: upscalePresetLabel(value, language),
-  }));
-
-  if (isGptImage2EnhanceModel(form.model)) {
-    return [
-      {
-        id: "gpt-enhance-resolution",
-        label: th ? "เป้าหมาย" : "Target",
-        value: form.imageResolution,
-        kind: "select",
-        options: ["1K", "2K", "4K"].map((value) => ({ value, label: value })),
-        onChange: (imageResolution) => onChange({ imageResolution }),
-      },
-      {
-        id: "gpt-enhance-quality",
-        label: th ? "คุณภาพ" : "Quality",
-        value: form.quality,
-        kind: "select",
-        options: (["low", "medium", "high"] as const).map((value) => ({
-          value,
-          label: value === "low"
-            ? (th ? "ต่ำ" : "Low")
-            : value === "high"
-              ? (th ? "สูง" : "High")
-              : (th ? "กลาง" : "Medium"),
-        })),
-        onChange: (quality) => onChange({ quality }),
-      },
-    ];
-  }
-
-  if (isVideo) {
-    return [
-      {
-        id: "upscale-video-resolution",
-        label: th ? "เป้าหมาย" : "Target",
-        value: form.upscaleVideoResolution,
-        kind: "select",
-        options: (["720p", "1k", "2k", "4k"] as UpscaleVideoResolution[]).map((value) => ({
-          value,
-          label: value === "720p" ? "720p" : value.toUpperCase(),
-        })),
-        onChange: (upscaleVideoResolution) =>
-          onChange({ upscaleVideoResolution: upscaleVideoResolution as UpscaleVideoResolution }),
-      },
-      {
-        id: "upscale-preset",
-        label: th ? "ลักษณะงาน" : "Preset",
-        value: form.upscalePreset,
-        kind: "select",
-        options: presetOptions,
-        onChange: (upscalePreset) => onChange({ upscalePreset: upscalePreset as UpscalePreset }),
-      },
-      {
-        id: "upscale-fps",
-        label: th ? "ลื่นขึ้น" : "FPS boost",
-        value: form.upscaleFpsBoost
-          ? standaloneInlineLabel("on", language)
-          : standaloneInlineLabel("off", language),
-        kind: "toggle",
-        checked: form.upscaleFpsBoost,
-        onToggle: (upscaleFpsBoost) => onChange({ upscaleFpsBoost }),
-      },
-    ];
-  }
-
   return [
     {
-      id: "upscale-scale",
+      id: "gpt-enhance-resolution",
       label: th ? "เป้าหมาย" : "Target",
-      value: form.upscaleScale,
+      value: form.imageResolution,
       kind: "select",
-      options: ["2"].map((value) => {
-        return { value, label: `${value}x` };
-      }),
-      onChange: (upscaleScale) => onChange({ upscaleScale }),
+      options: ["1K", "2K", "4K"].map((value) => ({ value, label: value })),
+      onChange: (imageResolution) => onChange({ imageResolution }),
     },
     {
-      id: "upscale-preset",
-      label: th ? "ลักษณะงาน" : "Preset",
-      value: form.upscalePreset,
+      id: "gpt-enhance-quality",
+      label: th ? "คุณภาพ" : "Quality",
+      value: form.quality,
       kind: "select",
-      options: presetOptions,
-      onChange: (upscalePreset) => onChange({ upscalePreset: upscalePreset as UpscalePreset }),
-    },
-    {
-      id: "upscale-nsfw",
-      label: th ? "ความปลอดภัย" : "Safety",
-      value: form.upscaleFilterNsfw
-        ? standaloneInlineLabel("on", language)
-        : standaloneInlineLabel("off", language),
-      kind: "toggle",
-      checked: form.upscaleFilterNsfw,
-      onToggle: (upscaleFilterNsfw) => onChange({ upscaleFilterNsfw }),
+      options: (["low", "medium", "high"] as const).map((value) => ({
+        value,
+        label: value === "low"
+          ? (th ? "ต่ำ" : "Low")
+          : value === "high"
+            ? (th ? "สูง" : "High")
+            : (th ? "กลาง" : "Medium"),
+      })),
+      onChange: (quality) => onChange({ quality }),
     },
   ];
-}
-
-function upscalePresetLabel(
-  value: UpscalePreset,
-  language: "en" | "th",
-): string {
-  const th = language === "th";
-  if (value === "clean") return th ? "สะอาด/ลด noise" : "Clean";
-  if (value === "detail") return th ? "เพิ่มรายละเอียด" : "Detail";
-  if (value === "creative") return th ? "ภาพวาด/กราฟิก" : "Creative";
-  return th ? "สมดุล" : "Balanced";
 }
 
 function imageModelSettingTags(model: string, language: "en" | "th"): Array<{

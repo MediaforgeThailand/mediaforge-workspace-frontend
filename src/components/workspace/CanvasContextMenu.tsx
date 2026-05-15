@@ -221,7 +221,7 @@ const CATALOG: ToolItem[] = [
     category: "image",
     icon: Maximize2,
     tint: "sky",
-    keywords: ["upscale", "magnific", "resolution", "enhance"],
+    keywords: ["upscale", "mediaforge", "resolution", "enhance"],
   },
   {
     nodeType: "imageTo3dNode",

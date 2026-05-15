@@ -301,6 +301,9 @@ export function modelLogoFor(model: ModelLogoInput): ModelLogoMeta {
   if (haystack.includes("seedance") || haystack.includes("seedream")) {
     return modelLogoImage(seedanceLogoSrc, haystack.includes("seedream") ? "SeedDream" : "SeedDance");
   }
+  if (haystack.includes("gpt-image-2-enhance") || haystack.includes("upscale mediaforge")) {
+    return modelLogoMeta("MF", "Upscale Mediaforge", "#f4ff00", "#151700", "rgba(244,255,0,.4)");
+  }
   if (haystack.includes("gpt") || haystack.includes("openai")) {
     return modelLogoImage(openAiLogoSrc, "OpenAI");
   }

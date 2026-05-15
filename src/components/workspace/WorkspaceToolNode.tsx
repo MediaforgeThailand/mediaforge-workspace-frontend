@@ -1467,7 +1467,22 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
   const d = (data ?? {}) as NodeData & { status?: "idle" | "processing" | "done" | "error" };
   const params = d.params ?? {};
-  const selectedModel = (params.model_name as string) ?? schema?.defaultModel ?? "";
+  const rawSelectedModel = (params.model_name as string) ?? schema?.defaultModel ?? "";
+  const selectedModel =
+    schemaKey === "upscaleImageNode" && rawSelectedModel !== "gpt-image-2-enhance"
+      ? "gpt-image-2-enhance"
+      : rawSelectedModel;
+  useEffect(() => {
+    if (schemaKey !== "upscaleImageNode") return;
+    if (params.model_name === "gpt-image-2-enhance") return;
+    patchNodeDataNow({
+      params: {
+        ...params,
+        model_name: "gpt-image-2-enhance",
+        media_type: "image",
+      },
+    });
+  }, [params, patchNodeDataNow, schemaKey]);
   const connectedMediaDurationSeconds = useMemo(() => {
     if (schemaKey !== "voiceTranslateNode") return null;
     const mediaEdge = edges.find(
@@ -1770,13 +1785,14 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       if (schemaKey === "upscaleImageNode") {
         const imageCount = inputValueCount(inputs.image) + inputValueCount(inputs.image_url);
         const videoCount = inputValueCount(inputs.video) + inputValueCount(inputs.video_url);
-        if (imageCount + videoCount === 0) {
-          throw new Error("Connect one image or video source before running Upscale.");
+        if (imageCount === 0 && videoCount === 0) {
+          throw new Error("Connect one image source before running Upscale Mediaforge.");
         }
-        if (imageCount > 0 && videoCount > 0) {
-          throw new Error("Upscale accepts either one image or one video per run, not both.");
+        if (videoCount > 0) {
+          throw new Error("Upscale Mediaforge supports image input only.");
         }
-        cleanParams.media_type = videoCount > 0 ? "video" : "image";
+        cleanParams.model_name = "gpt-image-2-enhance";
+        cleanParams.media_type = "image";
       }
 
       // Merge mention-resolved URLs into inputs as a fallback ref_image

@@ -2392,7 +2392,7 @@ export const ja = {
   "workspace.standalone.tool.image_gen.nav": "画像",
   "workspace.standalone.tool.image_gen.title": "画像生成器",
   "workspace.standalone.tool.image_upscale.nav": "アップスケール",
-  "workspace.standalone.tool.image_upscale.title": "メディアをアップスケール",
+  "workspace.standalone.tool.image_upscale.title": "Upscale Mediaforge",
   "workspace.standalone.tool.url_asset.nav": "URL",
   "workspace.standalone.tool.url_asset.title": "URL to Asset",
   "workspace.standalone.tool.auto_subtitle.nav": "Subtitle",
@@ -2611,7 +2611,7 @@ export const ja = {
   "workspace.standalone.model.gpt_image_2.desc":
     "正確なスタイルと品質管理に最適です。",
   "workspace.standalone.model.magnific_upscale_precision_v2.desc":
-    "高度な制御をシンプルなプリセットでまとめた Magnific の画像・動画アップスケーリング。",
+    "Upscale Mediaforge で画像を 1K、2K、4K に高精細化します。",
   "workspace.standalone.model.kling_v2_6_pro.desc":
     "古典的なテキスト/画像から動画へのワークフロー。",
   "workspace.standalone.model.kling_v2_6_motion_pro.desc":

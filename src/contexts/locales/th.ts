@@ -2524,7 +2524,7 @@ export const th = {
   "workspace.standalone.tool.image_gen.nav": "รูปภาพ",
   "workspace.standalone.tool.image_gen.title": "สร้างรูปภาพ",
   "workspace.standalone.tool.image_upscale.nav": "ขยายภาพ",
-  "workspace.standalone.tool.image_upscale.title": "ขยายภาพ/วิดีโอ",
+  "workspace.standalone.tool.image_upscale.title": "Upscale Mediaforge",
   "workspace.standalone.tool.url_asset.nav": "URL",
   "workspace.standalone.tool.url_asset.title": "URL to Asset",
   "workspace.standalone.tool.auto_subtitle.nav": "Subtitle",
@@ -2741,7 +2741,7 @@ export const th = {
   "workspace.standalone.model.gpt_image_2.desc":
     "เหมาะกับการควบคุมสไตล์และคุณภาพอย่างละเอียด",
   "workspace.standalone.model.magnific_upscale_precision_v2.desc":
-    "ขยายความละเอียดภาพหรือวิดีโอด้วย Magnific โดยใช้ preset ง่ายๆ แทนการปรับค่าละเอียดเอง",
+    "เพิ่มความคมชัดภาพด้วย Upscale Mediaforge ที่ 1K, 2K หรือ 4K",
   "workspace.standalone.model.kling_v2_6_pro.desc":
     "เวิร์กโฟลว์ text/image-to-video แบบคลาสสิก",
   "workspace.standalone.model.kling_v2_6_motion_pro.desc":

@@ -2642,7 +2642,7 @@ export const es = {
   "workspace.standalone.tool.image_gen.nav": "Imagen",
   "workspace.standalone.tool.image_gen.title": "Generador de imágenes",
   "workspace.standalone.tool.image_upscale.nav": "Escalar",
-  "workspace.standalone.tool.image_upscale.title": "Escalar medios",
+  "workspace.standalone.tool.image_upscale.title": "Upscale Mediaforge",
   "workspace.standalone.tool.url_asset.nav": "URL",
   "workspace.standalone.tool.url_asset.title": "URL to Asset",
   "workspace.standalone.tool.auto_subtitle.nav": "Subtitle",
@@ -2864,7 +2864,7 @@ export const es = {
   "workspace.standalone.model.gpt_image_2.desc":
     "Lo mejor para un estilo preciso y control de calidad.",
   "workspace.standalone.model.magnific_upscale_precision_v2.desc":
-    "Escalado de imágenes y vídeos Magnific con presets simples sobre los controles avanzados.",
+    "Mejora imágenes con Upscale Mediaforge en 1K, 2K o 4K.",
   "workspace.standalone.model.kling_v2_6_pro.desc":
     "Flujo de trabajo clásico de texto/imagen a vídeo.",
   "workspace.standalone.model.kling_v2_6_motion_pro.desc":

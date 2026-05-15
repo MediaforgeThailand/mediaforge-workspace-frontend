@@ -1,4 +1,5 @@
 import type { CaptionStyleSettings } from "@/features/editor/services/caption-presets";
+import { normalizeAutoSuptitleCuesForDuration } from "@/features/editor/services/auto-suptitle";
 import type {
   AutoSuptitleCue,
   AutoSuptitleResult,
@@ -393,6 +394,7 @@ export async function renderAutoSubtitleVideo(
   if (!duration || duration <= 0) {
     throw new Error("Could not read the source video duration.");
   }
+  const cues = normalizeAutoSuptitleCuesForDuration(options.cues, duration);
 
   await waitForSeek(video, 0);
 
@@ -428,7 +430,7 @@ export async function renderAutoSubtitleVideo(
     const draw = () => {
       ctx.clearRect(0, 0, width, height);
       ctx.drawImage(video, 0, 0, width, height);
-      const activeCue = options.cues.find(
+      const activeCue = cues.find(
         (cue) => video.currentTime >= cue.startTime && video.currentTime <= cue.endTime,
       );
       drawCue(ctx, activeCue, options.settings, width, height);

@@ -80,6 +80,22 @@ function blobToDataURL(blob: Blob): Promise<string> {
   });
 }
 
+function syncSidecarClipEngines(
+  project?: Pick<Project, "textClips" | "shapeClips" | "svgClips" | "stickerClips">,
+): void {
+  const engineState = useEngineStore.getState();
+  const titleEngine = engineState.getTitleEngine();
+  const graphicsEngine = engineState.getGraphicsEngine();
+
+  titleEngine?.loadTextClips(project?.textClips ?? []);
+
+  if (graphicsEngine) {
+    graphicsEngine.loadShapeClips(project?.shapeClips ?? []);
+    graphicsEngine.loadSVGClips(project?.svgClips ?? []);
+    graphicsEngine.loadStickerClips(project?.stickerClips ?? []);
+  }
+}
+
 /**
  * ProjectState - Complete state interface for project management
  *
@@ -486,6 +502,7 @@ export const useProjectStore = create<ProjectState>()(
         name?: string,
         settings?: Partial<ProjectSettings>,
       ) => {
+        syncSidecarClipEngines();
         const newHistory = new ActionHistory();
         const newExecutor = new ActionExecutor(newHistory);
         set({
@@ -499,23 +516,7 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       loadProject: (project: Project) => {
-        const titleEngine = useEngineStore.getState().getTitleEngine();
-        const graphicsEngine = useEngineStore.getState().getGraphicsEngine();
-
-        if (titleEngine && project.textClips) {
-          titleEngine.loadTextClips(project.textClips);
-        }
-        if (graphicsEngine) {
-          if (project.shapeClips) {
-            graphicsEngine.loadShapeClips(project.shapeClips);
-          }
-          if (project.svgClips) {
-            graphicsEngine.loadSVGClips(project.svgClips);
-          }
-          if (project.stickerClips) {
-            graphicsEngine.loadStickerClips(project.stickerClips);
-          }
-        }
+        syncSidecarClipEngines(project);
 
         const newHistory = new ActionHistory();
         const newExecutor = new ActionExecutor(newHistory);
@@ -2938,23 +2939,7 @@ export const useProjectStore = create<ProjectState>()(
             },
           };
 
-          const titleEngine = useEngineStore.getState().getTitleEngine();
-          const graphicsEngine = useEngineStore.getState().getGraphicsEngine();
-
-          if (titleEngine && recoveredProject.textClips) {
-            titleEngine.loadTextClips(recoveredProject.textClips);
-          }
-          if (graphicsEngine) {
-            if (recoveredProject.shapeClips) {
-              graphicsEngine.loadShapeClips(recoveredProject.shapeClips);
-            }
-            if (recoveredProject.svgClips) {
-              graphicsEngine.loadSVGClips(recoveredProject.svgClips);
-            }
-            if (recoveredProject.stickerClips) {
-              graphicsEngine.loadStickerClips(recoveredProject.stickerClips);
-            }
-          }
+          syncSidecarClipEngines(recoveredProject);
 
           const newHistory = new ActionHistory();
           const newExecutor = new ActionExecutor(newHistory);

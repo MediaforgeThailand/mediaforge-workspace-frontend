@@ -912,7 +912,15 @@ function getNodePreviewSettings(
     cleanPreviewText(params?.model_name) ??
     cleanPreviewText(data.model) ??
     cleanPreviewText(generation?.model);
-  if (model) settings.push({ label: model });
+  if (model) {
+    settings.push({
+      label:
+        model === "gpt-image-2-enhance" ||
+        model === "magnific-upscale-precision-v2"
+          ? "Upscale Mediaforge"
+          : model,
+    });
+  }
   add("Aspect", params?.ratio ?? params?.aspect_ratio ?? params?.size);
   add("Duration", params?.duration ? `${params.duration}s` : undefined);
   add("Quality", params?.quality ?? params?.resolution);

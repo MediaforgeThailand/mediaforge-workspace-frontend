@@ -2394,7 +2394,7 @@ export const hi = {
   "workspace.standalone.tool.image_gen.nav": "छवि",
   "workspace.standalone.tool.image_gen.title": "छवि जनरेटर",
   "workspace.standalone.tool.image_upscale.nav": "अपस्केल",
-  "workspace.standalone.tool.image_upscale.title": "मीडिया अपस्केल करें",
+  "workspace.standalone.tool.image_upscale.title": "Upscale Mediaforge",
   "workspace.standalone.tool.url_asset.nav": "URL",
   "workspace.standalone.tool.url_asset.title": "URL to Asset",
   "workspace.standalone.tool.auto_subtitle.nav": "Subtitle",
@@ -2617,7 +2617,7 @@ export const hi = {
   "workspace.standalone.model.gpt_image_2.desc":
     "सटीक शैली और गुणवत्ता नियंत्रण के लिए सर्वोत्तम।",
   "workspace.standalone.model.magnific_upscale_precision_v2.desc":
-    "उन्नत नियंत्रणों के ऊपर सरल प्रीसेट के साथ Magnific इमेज और वीडियो अपस्केलिंग।",
+    "Upscale Mediaforge से इमेज को 1K, 2K या 4K में बेहतर बनाएं।",
   "workspace.standalone.model.kling_v2_6_pro.desc":
     "क्लासिक टेक्स्ट/इमेज-टू-वीडियो वर्कफ़्लो।",
   "workspace.standalone.model.kling_v2_6_motion_pro.desc":
