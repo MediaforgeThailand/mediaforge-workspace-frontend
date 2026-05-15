@@ -40,6 +40,14 @@ interface ErrorMapping {
 }
 
 const MAPPINGS: ErrorMapping[] = [
+  {
+    match: /URL to Asset|URL must point directly to a|direct (?:MP4|MP3|PNG)|Received text\/html/i,
+    th: "URL to Asset currently imports direct MP4, MP3, or PNG file URLs only. Paste the actual media file URL, not a YouTube, Instagram, or social page link.",
+    en: "URL to Asset currently imports direct MP4, MP3, or PNG file URLs only. Paste the actual media file URL, not a YouTube, Instagram, or social page link.",
+    ja: "URL to Asset currently imports direct MP4, MP3, or PNG file URLs only. Paste the actual media file URL, not a YouTube, Instagram, or social page link.",
+    es: "URL to Asset currently imports direct MP4, MP3, or PNG file URLs only. Paste the actual media file URL, not a YouTube, Instagram, or social page link.",
+    hi: "URL to Asset currently imports direct MP4, MP3, or PNG file URLs only. Paste the actual media file URL, not a YouTube, Instagram, or social page link.",
+  },
   // ── Credit-system errors ────────────────────────────────────
   {
     match: /INSUFFICIENT_CREDITS|insufficient[\s_-]*credit/i,

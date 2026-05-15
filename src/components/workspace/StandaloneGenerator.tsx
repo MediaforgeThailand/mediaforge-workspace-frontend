@@ -47,6 +47,7 @@ import {
   StandalonePromptMentionTextarea,
   type CreateVideoPanelSetting,
 } from "@/components/workspace/CreateImagePanel";
+import { validateUrlAssetSource } from "@/components/workspace/urlAssetValidation";
 import InsufficientCreditsDialog from "@/components/InsufficientCreditsDialog";
 import {
   applyNodeCostDiscount,
@@ -9818,15 +9819,7 @@ function validateForm(
   }
   if (tool === "url_asset") {
     const rawUrl = (form.urlAssetSource ?? "").trim();
-    if (!rawUrl) return t("workspace.standalone.validation.url_asset_url");
-    try {
-      const parsed = new URL(rawUrl);
-      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-        return t("workspace.standalone.validation.url_asset_url");
-      }
-    } catch {
-      return t("workspace.standalone.validation.url_asset_url");
-    }
+    return validateUrlAssetSource(rawUrl, form.model);
   }
   return null;
 }
