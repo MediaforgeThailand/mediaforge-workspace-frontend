@@ -61,7 +61,7 @@ function normalizeSocialSource(raw: unknown): string {
 
   const facebookQuery = trimmed.replace(/^[?&]/, "");
   if (/^(?:fbid=|.*&fbid=)/i.test(facebookQuery)) {
-    return `https://www.facebook.com/photo/?${facebookQuery}`;
+    return `https://www.facebook.com/photo.php?${facebookQuery}`;
   }
 
   const youtubeQuery = trimmed.replace(/^[?&]/, "");
@@ -243,11 +243,13 @@ function extensionForImageContentType(contentType: string, imageUrl: URL): strin
   return ext && /^[a-z0-9]{2,5}$/.test(ext) ? ext : "img";
 }
 
-async function downloadImageCandidate(candidate: string, tempDir: string, prefix: string, maxBytes: number) {
+async function downloadImageCandidate(candidate: string, tempDir: string, prefix: string, maxBytes: number, referer?: string) {
   const imageUrl = new URL(candidate);
   const response = await fetch(imageUrl, {
     headers: {
       Accept: "image/avif,image/webp,image/png,image/jpeg,image/*,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      ...(referer ? { Referer: referer } : {}),
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
     },
   });
@@ -268,6 +270,51 @@ async function downloadImageCandidate(candidate: string, tempDir: string, prefix
   return { inputPath, sourceUrl: imageUrl.toString(), sourceContentType: contentType, bytes: bytes.byteLength };
 }
 
+function socialPageVariants(source: URL): URL[] {
+  const variants = [source];
+  const host = source.hostname.toLowerCase();
+  if (/(^|\.)facebook\.com$/.test(host)) {
+    const fbid = source.searchParams.get("fbid");
+    if (fbid) {
+      const query = source.searchParams.toString();
+      for (const base of ["https://www.facebook.com/photo.php", "https://m.facebook.com/photo.php"]) {
+        const candidate = new URL(base);
+        candidate.search = query;
+        if (!variants.some((item) => item.toString() === candidate.toString())) {
+          variants.push(candidate);
+        }
+      }
+    }
+  }
+  return variants;
+}
+
+async function fetchSocialPageHtml(source: URL): Promise<{ html: string; pageUrl: URL }> {
+  const errors: string[] = [];
+  for (const pageUrl of socialPageVariants(source)) {
+    try {
+      const response = await fetch(pageUrl, {
+        headers: {
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+          "Upgrade-Insecure-Requests": "1",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+        },
+      });
+      if (!response.ok) {
+        errors.push(`${pageUrl.hostname} HTTP ${response.status}`);
+        continue;
+      }
+      return { html: await response.text(), pageUrl };
+    } catch (error) {
+      errors.push(`${pageUrl.hostname} ${errorPart((error as Error)?.message) || "fetch failed"}`);
+    }
+  }
+  throw new Error(`Social page returned ${errors.join(", ") || "an empty response"}.`);
+}
+
 async function convertImageToPng(inputPath: string, outputPath: string): Promise<void> {
   if (!ffmpegPath) {
     throw new Error("Image converter is temporarily unavailable. Please try again later or upload the image directly.");
@@ -284,16 +331,7 @@ async function downloadSocialPageImageAsPng(args: {
   prefix: string;
   maxBytes: number;
 }): Promise<{ filePath: string; sourceUrl: string; sourceContentType: string; bytes: number; extractor: string; cleanup: string[] }> {
-  const response = await fetch(args.source, {
-    headers: {
-      Accept: "text/html,application/xhtml+xml",
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-    },
-  });
-  if (!response.ok) {
-    throw new Error(`Social page returned HTTP ${response.status}.`);
-  }
-  const html = await response.text();
+  const { html, pageUrl } = await fetchSocialPageHtml(args.source);
   const candidates = extractSocialImageCandidates(html).sort((a, b) => socialImageScore(b) - socialImageScore(a));
   if (candidates.length === 0) {
     throw new Error("This social page did not expose a public image. Try another public link or upload the image directly.");
@@ -303,7 +341,7 @@ async function downloadSocialPageImageAsPng(args: {
   for (const candidate of candidates.slice(0, 8)) {
     const cleanupPaths: string[] = [];
     try {
-      const downloaded = await downloadImageCandidate(candidate, args.tempDir, args.prefix, args.maxBytes);
+      const downloaded = await downloadImageCandidate(candidate, args.tempDir, args.prefix, args.maxBytes, pageUrl.toString());
       cleanupPaths.push(downloaded.inputPath);
       const outputPath = path.join(args.tempDir, `${args.prefix}.png`);
       await convertImageToPng(downloaded.inputPath, outputPath);
