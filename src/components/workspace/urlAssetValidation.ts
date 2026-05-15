@@ -2,12 +2,8 @@ const PAGE_URL_HOST_PATTERNS = [
   /(^|\.)youtube\.com$/i,
   /(^|\.)youtu\.be$/i,
   /(^|\.)instagram\.com$/i,
-  /(^|\.)tiktok\.com$/i,
   /(^|\.)facebook\.com$/i,
   /(^|\.)fb\.watch$/i,
-  /(^|\.)x\.com$/i,
-  /(^|\.)twitter\.com$/i,
-  /(^|\.)vimeo\.com$/i,
 ];
 
 const FORMAT_EXTENSIONS: Record<string, string[]> = {
@@ -25,18 +21,46 @@ export function urlAssetFormatFromModel(model: string): "mp4" | "mp3" | "png" {
 
 export function urlAssetDirectFileMessage(model: string): string {
   const format = urlAssetFormatFromModel(model).toUpperCase();
-  return `URL to Asset currently imports direct ${format} file URLs only. Paste a URL that points to the actual file, not a YouTube, Instagram, or social page link.`;
+  return `Paste a direct ${format} file URL or a supported YouTube, Instagram, or Facebook link.`;
+}
+
+export function normalizeUrlAssetSource(rawUrl: string): string {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return "";
+
+  const youtubeQuery = trimmed.replace(/^[?&]/, "");
+  if (/^(?:v=|.*&v=)/i.test(youtubeQuery)) {
+    const params = new URLSearchParams(youtubeQuery);
+    const videoId = params.get("v")?.trim();
+    if (videoId) return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
+  }
+
+  if (/^(?:www\.|m\.)?(?:youtube\.com|youtu\.be|instagram\.com|facebook\.com|fb\.watch)(?:\/|$)/i.test(trimmed)) {
+    return `https://${trimmed}`;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (/youtube\.com$/i.test(parsed.hostname) && parsed.pathname === "/watch") {
+      const videoId = parsed.searchParams.get("v")?.trim();
+      if (videoId) return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
+    }
+  } catch {
+    // Let validation below return the user-facing error.
+  }
+
+  return trimmed;
 }
 
 export function validateUrlAssetSource(rawUrl: string, model: string): string | null {
-  const trimmed = rawUrl.trim();
+  const trimmed = normalizeUrlAssetSource(rawUrl);
   if (!trimmed) return "Enter a direct MP4, MP3, or PNG URL before running URL to Asset.";
 
   let parsed: URL;
   try {
     parsed = new URL(trimmed);
   } catch {
-    return "URL to Asset accepts only valid http or https direct file URLs.";
+    return "URL to Asset accepts a valid http/https media URL, YouTube link, Instagram link, Facebook link, or YouTube v= video ID.";
   }
 
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
@@ -44,16 +68,14 @@ export function validateUrlAssetSource(rawUrl: string, model: string): string | 
   }
 
   const hostname = parsed.hostname.toLowerCase();
-  if (PAGE_URL_HOST_PATTERNS.some((pattern) => pattern.test(hostname))) {
-    return urlAssetDirectFileMessage(model);
-  }
+  const isSupportedSocialUrl = PAGE_URL_HOST_PATTERNS.some((pattern) => pattern.test(hostname));
 
   const format = urlAssetFormatFromModel(model);
   const path = decodeURIComponent(parsed.pathname).toLowerCase();
   const knownMediaExtensions = Object.values(FORMAT_EXTENSIONS).flat();
   const hasKnownMediaExtension = knownMediaExtensions.some((ext) => path.endsWith(ext));
   const hasExpectedExtension = FORMAT_EXTENSIONS[format].some((ext) => path.endsWith(ext));
-  if (hasKnownMediaExtension && !hasExpectedExtension) {
+  if (!isSupportedSocialUrl && hasKnownMediaExtension && !hasExpectedExtension) {
     return `Selected model expects a direct ${format.toUpperCase()} URL. Change the model or paste a matching file URL.`;
   }
 

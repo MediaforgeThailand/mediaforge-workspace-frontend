@@ -52,3 +52,4 @@ supabase/.tempvite.config.ts.timestamp-*.mjs
 
 # Workspace mascot — keep the .webm (1.6MB), drop the giant raw .mov source.
 public/videos/*.mov
+.vercel

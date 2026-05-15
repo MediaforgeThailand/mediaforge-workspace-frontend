@@ -85,7 +85,7 @@ import { cloneNodeFresh } from "./cloneNode";
 import { useFreshSignedUrl } from "./useFreshSignedUrl";
 import { getSignedUrl } from "@/hooks/useSignedUrl";
 import NodeQuickActionRail from "./NodeQuickActionRail";
-import { validateUrlAssetSource } from "./urlAssetValidation";
+import { normalizeUrlAssetSource, validateUrlAssetSource } from "./urlAssetValidation";
 // Workspace-local schema + helpers — kept out of the shared file so
 // the main flow editor stays untouched.
 import {
@@ -1761,7 +1761,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       }
 
       if (schemaKey === "urlAssetNode") {
-        const sourceUrl = String(cleanParams.source_url || cleanParams.prompt || "").trim();
+        const sourceUrl = normalizeUrlAssetSource(String(cleanParams.source_url || cleanParams.prompt || ""));
         const validation = validateUrlAssetSource(sourceUrl, String(cleanParams.model_name || cleanParams.model || ""));
         if (validation) throw new Error(validation);
         cleanParams.source_url = sourceUrl;

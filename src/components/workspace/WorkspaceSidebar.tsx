@@ -71,6 +71,7 @@ export type SectionKey =
   | "community"
   | "projects"
   | "spaces"
+  | "library"
   | "image_gen"
   | "image_upscale"
   | "video_gen"
@@ -92,6 +93,7 @@ type NavItem = {
   labelKey:
     | "workspace.sidebar.home"
     | "workspace.sidebar.projects"
+    | "workspace.sidebar.library"
     | "workspace.sidebar.all_assets"
     | "workspace.sidebar.stock"
     | "workspace.sidebar.spaces"
@@ -136,7 +138,6 @@ const NAV_SECTIONS: SidebarSection[] = [
         { id: "voice_translate", labelKey: "workspace.sidebar.voice_translate", icon: Languages },
       ],
       [{ id: "image_upscale", labelKey: "workspace.sidebar.image_upscale", icon: Maximize2, width: "full" }],
-      [{ id: "url_asset", labelKey: "workspace.sidebar.url_asset", icon: Link, width: "full" }],
       [{ id: "auto_subtitle", labelKey: "workspace.sidebar.auto_subtitle", icon: Captions, width: "full" }],
       [{ id: "image_to_3d", labelKey: "workspace.sidebar.threed_gen", icon: Box, width: "full" }],
     ],
@@ -152,6 +153,8 @@ const NAV_SECTIONS: SidebarSection[] = [
     labelKey: "workspace.sidebar.assets",
     variant: "list",
     rows: [
+      [{ id: "library", labelKey: "workspace.sidebar.library", icon: FolderOpen }],
+      [{ id: "url_asset", labelKey: "workspace.sidebar.url_asset", icon: Link }],
       [{ id: "spaces", labelKey: "workspace.sidebar.spaces", icon: Workflow }],
       [{ id: "stock", labelKey: "workspace.sidebar.stock", icon: Images }],
     ],
@@ -239,6 +242,10 @@ export default function WorkspaceSidebar({
     null;
 
   const handleClick = (s: SectionKey) => {
+    if (s === "library") {
+      setLibraryOpen(true);
+      return;
+    }
     if (s === "editor") {
       navigate("/app/editor");
       return;
@@ -317,13 +324,6 @@ export default function WorkspaceSidebar({
             variant="list"
           />
         ))}
-        <NavLink
-          label={t("workspace.sidebar.library")}
-          icon={FolderOpen}
-          active={false}
-          onClick={() => setLibraryOpen(true)}
-          variant="list"
-        />
       </nav>
 
       {/* ── Section divider with label ─────────────────────────── */}

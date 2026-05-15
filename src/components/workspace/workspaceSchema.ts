@@ -1310,7 +1310,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         label: "Source URL",
         type: "text",
         default: "",
-        placeholder: "https://cdn.example.com/file.png",
+        placeholder: "Direct media URL or YouTube / Instagram / Facebook link",
         required: false,
       },
       {

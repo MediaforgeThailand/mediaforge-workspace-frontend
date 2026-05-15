@@ -47,7 +47,7 @@ import {
   StandalonePromptMentionTextarea,
   type CreateVideoPanelSetting,
 } from "@/components/workspace/CreateImagePanel";
-import { validateUrlAssetSource } from "@/components/workspace/urlAssetValidation";
+import { normalizeUrlAssetSource, validateUrlAssetSource } from "@/components/workspace/urlAssetValidation";
 import InsufficientCreditsDialog from "@/components/InsufficientCreditsDialog";
 import {
   applyNodeCostDiscount,
@@ -9649,7 +9649,7 @@ function buildCurrentParams(
     return {
       model_name: form.model,
       output_format: form.model,
-      source_url: (form.urlAssetSource ?? "").trim(),
+      source_url: normalizeUrlAssetSource(form.urlAssetSource ?? ""),
       file_name: (form.urlAssetFileName ?? "").trim(),
     };
   }
