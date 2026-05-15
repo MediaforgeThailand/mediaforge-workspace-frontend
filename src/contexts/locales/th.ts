@@ -2384,15 +2384,15 @@ export const th = {
     "จัดระเบียบไอเดียตามโปรเจกต์ สเปซ และบอร์ด",
   "workspace.home.feature.cinematic.title": "ภาพยนตร์",
   "workspace.home.feature.cinematic.kicker":
-    "สร้างภาพเล่าเรื่อง ช็อต และคอนเซ็ปต์วิดีโอ",
+    "สร้างภาพเล่าเรื่อง ช็อต และคอนเซปต์วิดีโอ",
   "workspace.home.feature.cinematic.description":
-    "ปั้นซีนภาพยนตร์จาก prompt, ภาพอ้างอิง และ asset สตอรี่บอร์ดในไหลงานเดียว",
+    "ออกแบบซีนภาพยนตร์จากพรอมป์ ภาพอ้างอิง และสตอรี่บอร์ด ให้จบในโฟลว์การผลิตเดียว",
   "workspace.home.feature.cinematic.bullet1":
-    "สร้าง keyframe ไอเดียช็อต และภาพอ้างอิง",
+    "สร้างคีย์เฟรม ไอเดียช็อต และภาพอ้างอิง",
   "workspace.home.feature.cinematic.bullet2":
-    "นำคอนเซ็ปต์ภาพไปสร้างวิดีโอได้อย่างต่อเนื่อง",
+    "ต่อยอดคอนเซปต์ภาพไปสู่การสร้างวิดีโอได้อย่างเป็นระบบ",
   "workspace.home.feature.cinematic.bullet3":
-    "ทำให้บอร์ดซีนอ่านง่ายสำหรับลูกค้าและทีม",
+    "ทำให้บอร์ดฉากอ่านง่ายสำหรับลูกค้าและทีม",
   "workspace.home.feature.3d.title": "3D",
   "workspace.home.feature.3d.kicker":
     "เปลี่ยนภาพอ้างอิงเป็นทิศทางครีเอทีฟพร้อมขึ้น 3D",
