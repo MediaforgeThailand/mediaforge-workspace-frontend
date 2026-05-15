@@ -4024,4 +4024,9 @@ export const ja = {
   "workspace.picker.port.mp3": "MP3",
   "workspace.picker.port.mp4": "MP4",
   "workspace.picker.port.prompt": "プロンプト",
+
+  // Captions / Auto Suptitle
+  "captions.durationRecommendation": "推奨: 最良の結果を得るには20分以内のクリップをご利用ください",
+  "captions.durationWarning": "このクリップは{duration}分です。20分を超えるクリップは25MBの音声制限を超える可能性があります。",
+  "captions.compressingAudio": "音声を圧縮中...",
 } satisfies TranslationMap;

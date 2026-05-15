@@ -1,5 +1,6 @@
 import type { Subtitle, SubtitleStyle, Clip } from "../types/timeline";
 import type { MediaItem } from "../types/project";
+import { getFFmpegFallback } from "../media/ffmpeg-fallback";
 
 /**
  * Whisper word-level transcription record. Time fields are in seconds,
@@ -24,6 +25,7 @@ export interface CloudflareWhisperResponse {
 export interface WhisperTranscriptionProgress {
   phase:
     | "extracting"
+    | "compressing"
     | "uploading"
     | "transcribing"
     | "processing"
@@ -89,7 +91,15 @@ export class TranscriptionService {
         message: "Extracting audio from video...",
       });
 
-      const audioBlob = await this.extractAudioFromClip(clip, mediaItem);
+      const wavBlob = await this.extractAudioFromClip(clip, mediaItem);
+
+      onProgress?.({
+        phase: "compressing",
+        progress: 15,
+        message: "Compressing audio...",
+      });
+
+      const audioBlob = await this.compressToMp3(wavBlob);
 
       onProgress?.({
         phase: "uploading",
@@ -254,6 +264,14 @@ export class TranscriptionService {
     return new Blob([arrayBuffer], { type: "audio/wav" });
   }
 
+  private async compressToMp3(wavBlob: Blob): Promise<Blob> {
+    const ffmpeg = getFFmpegFallback();
+    return ffmpeg.convertAudio(wavBlob, "mp3", {
+      bitrate: "128k",
+      channels: 1,
+    });
+  }
+
   private async sendToWhisper(
     audioBlob: Blob,
     onProgress?: (progress: WhisperTranscriptionProgress) => void,
@@ -280,7 +298,7 @@ export class TranscriptionService {
     }
 
     const formData = new FormData();
-    formData.append("audio", audioBlob, "audio.wav");
+    formData.append("audio", audioBlob, "audio.mp3");
 
     const response = await fetch(this.config.apiEndpoint, {
       method: "POST",

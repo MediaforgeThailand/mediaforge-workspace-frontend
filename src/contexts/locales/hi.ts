@@ -4003,4 +4003,9 @@ export const hi = {
   "workspace.picker.port.mp3": "MP3",
   "workspace.picker.port.mp4": "MP4",
   "workspace.picker.port.prompt": "Prompt",
+
+  // Captions / Auto Suptitle
+  "captions.durationRecommendation": "सुझाव: सर्वोत्तम परिणामों के लिए 20 मिनट से कम के क्लिप",
+  "captions.durationWarning": "यह क्लिप {duration} मिनट लंबी है। 20 मिनट से अधिक के क्लिप 25 MB ऑडियो सीमा से अधिक हो सकते हैं।",
+  "captions.compressingAudio": "ऑडियो संपीड़ित हो रहा है...",
 } satisfies TranslationMap;

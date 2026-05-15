@@ -4112,4 +4112,9 @@ export const th = {
   "workspace.picker.port.mp3": "MP3",
   "workspace.picker.port.mp4": "MP4",
   "workspace.picker.port.prompt": "พรอมป์",
+
+  // Captions / Auto Suptitle
+  "captions.durationRecommendation": "แนะนำ: คลิปไม่เกิน 20 นาทีเพื่อผลลัพธ์ที่ดีที่สุด",
+  "captions.durationWarning": "คลิปนี้ยาว {duration} นาที คลิปที่ยาวเกิน 20 นาทีอาจเกินขีดจำกัดเสียง 25 MB",
+  "captions.compressingAudio": "กำลังบีบอัดเสียง...",
 } satisfies TranslationMap;

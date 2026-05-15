@@ -38,7 +38,7 @@ export async function transcribeAudio(
   }
 
   const formData = new FormData();
-  formData.append("audio", audio, "captions.wav");
+  formData.append("audio", audio, "captions.mp3");
   if (options.language && options.language !== "auto") {
     formData.append("language", options.language);
   }
