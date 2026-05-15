@@ -355,6 +355,187 @@ describe("ProjectStore", () => {
     });
   });
 
+  describe("clip placement", () => {
+    const createMediaItem = (
+      id: string,
+      type: MediaItem["type"],
+      name: string,
+    ): MediaItem => ({
+      id,
+      name,
+      type,
+      fileHandle: null,
+      blob: null,
+      metadata: {
+        duration: type === "image" ? 0 : 10,
+        width: type === "audio" ? 0 : 1920,
+        height: type === "audio" ? 0 : 1080,
+        frameRate: type === "video" ? 30 : 0,
+        codec: "",
+        sampleRate: type === "audio" ? 48000 : 0,
+        channels: type === "audio" ? 2 : 0,
+        fileSize: 1000000,
+      },
+      thumbnailUrl: null,
+      waveformData: null,
+    });
+
+    const loadPlacementProject = () => {
+      const project: Project = {
+        id: "placement-project",
+        name: "Placement Project",
+        createdAt: Date.now(),
+        modifiedAt: Date.now(),
+        settings: {
+          width: 1920,
+          height: 1080,
+          frameRate: 30,
+          sampleRate: 48000,
+          channels: 2,
+        },
+        mediaLibrary: {
+          items: [
+            createMediaItem("video-media", "video", "video.mp4"),
+            createMediaItem("audio-media", "audio", "audio.mp3"),
+            createMediaItem("image-media", "image", "image.png"),
+          ],
+        },
+        timeline: {
+          tracks: [
+            {
+              id: "video-track",
+              type: "video",
+              name: "Video",
+              clips: [],
+              transitions: [],
+              locked: false,
+              hidden: false,
+              muted: false,
+              solo: false,
+            },
+            {
+              id: "audio-track",
+              type: "audio",
+              name: "Audio",
+              clips: [],
+              transitions: [],
+              locked: false,
+              hidden: false,
+              muted: false,
+              solo: false,
+            },
+            {
+              id: "image-track",
+              type: "image",
+              name: "Image",
+              clips: [],
+              transitions: [],
+              locked: false,
+              hidden: false,
+              muted: false,
+              solo: false,
+            },
+            {
+              id: "text-track",
+              type: "text",
+              name: "Text",
+              clips: [],
+              transitions: [],
+              locked: false,
+              hidden: false,
+              muted: false,
+              solo: false,
+            },
+          ],
+          subtitles: [],
+          duration: 0,
+          markers: [],
+        },
+      };
+
+      useProjectStore.getState().loadProject(project);
+    };
+
+    it("should add media only to a matching track type", async () => {
+      loadPlacementProject();
+
+      const videoResult = await useProjectStore
+        .getState()
+        .addClip("video-track", "video-media", 0);
+      const audioResult = await useProjectStore
+        .getState()
+        .addClip("audio-track", "audio-media", 0);
+      const imageResult = await useProjectStore
+        .getState()
+        .addClip("image-track", "image-media", 0);
+
+      expect(videoResult.success).toBe(true);
+      expect(audioResult.success).toBe(true);
+      expect(imageResult.success).toBe(true);
+    });
+
+    it("should reject media dropped onto the wrong track type", async () => {
+      loadPlacementProject();
+
+      const audioResult = await useProjectStore
+        .getState()
+        .addClip("audio-track", "video-media", 0);
+      const textResult = await useProjectStore
+        .getState()
+        .addClip("text-track", "audio-media", 0);
+
+      expect(audioResult.success).toBe(false);
+      expect(audioResult.error?.code).toBe("INCOMPATIBLE_TYPE");
+      expect(textResult.success).toBe(false);
+      expect(textResult.error?.code).toBe("INCOMPATIBLE_TYPE");
+
+      const { project } = useProjectStore.getState();
+      expect(project.timeline.tracks.find((t) => t.id === "audio-track")?.clips)
+        .toHaveLength(0);
+      expect(project.timeline.tracks.find((t) => t.id === "text-track")?.clips)
+        .toHaveLength(0);
+    });
+
+    it("should keep the remaining audio segment after deleting one split segment", async () => {
+      loadPlacementProject();
+      const store = useProjectStore.getState();
+
+      const addResult = await store.addClip("audio-track", "audio-media", 0);
+      expect(addResult.success).toBe(true);
+
+      const originalClip = useProjectStore
+        .getState()
+        .project.timeline.tracks.find((t) => t.id === "audio-track")
+        ?.clips[0];
+      expect(originalClip).toBeDefined();
+
+      const splitResult = await useProjectStore
+        .getState()
+        .splitClip(originalClip!.id, 4);
+      expect(splitResult.success).toBe(true);
+
+      const splitClips = useProjectStore
+        .getState()
+        .project.timeline.tracks.find((t) => t.id === "audio-track")
+        ?.clips;
+      expect(splitClips).toHaveLength(2);
+      expect(new Set(splitClips?.map((clip) => clip.id)).size).toBe(2);
+
+      const deleteResult = await useProjectStore
+        .getState()
+        .removeClip(originalClip!.id);
+      expect(deleteResult.success).toBe(true);
+
+      const remainingClips = useProjectStore
+        .getState()
+        .project.timeline.tracks.find((t) => t.id === "audio-track")
+        ?.clips;
+      expect(remainingClips).toHaveLength(1);
+      expect(remainingClips?.[0].mediaId).toBe("audio-media");
+      expect(remainingClips?.[0].startTime).toBe(4);
+    });
+  });
+
   describe("media operations", () => {
     it("should get media item by id", () => {
       const projectWithMedia: Project = {

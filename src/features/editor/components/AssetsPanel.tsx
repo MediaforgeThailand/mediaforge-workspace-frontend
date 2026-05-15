@@ -164,6 +164,7 @@ const MediaThumbnail: React.FC<{
   onDelete: () => void;
   onReplace: () => void;
   onDragStart: (e: React.DragEvent) => void;
+  onDragEnd: () => void;
   onAddToTimeline: () => void;
   onKieAI?: () => void;
   onRetryKieAI?: () => void;
@@ -175,6 +176,7 @@ const MediaThumbnail: React.FC<{
   onDelete,
   onReplace,
   onDragStart,
+  onDragEnd,
   onAddToTimeline,
   onKieAI,
   onRetryKieAI,
@@ -295,6 +297,7 @@ const MediaThumbnail: React.FC<{
       <div
         draggable
         onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
         onClick={onSelect}
         onDoubleClick={(e) => { e.stopPropagation(); onAddToTimeline(); }}
         onMouseEnter={() => setIsHovered(true)}
@@ -442,6 +445,7 @@ const MediaThumbnail: React.FC<{
       <div
         draggable
         onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
         onClick={onSelect}
         onDoubleClick={(e) => {
           e.stopPropagation();
@@ -667,7 +671,7 @@ export const AssetsPanel: React.FC = () => {
   const { retryTask } = useKieAIStore();
 
   // UI store
-  const { select, isSelected, startDrag } = useUIStore();
+  const { select, isSelected, startDrag, endDrag } = useUIStore();
 
   // Count missing assets
   const missingAssetsCount = mediaItems.filter(
@@ -977,7 +981,7 @@ export const AssetsPanel: React.FC = () => {
     (e: React.DragEvent, item: MediaItem) => {
       e.dataTransfer.setData(
         "application/json",
-        JSON.stringify({ mediaId: item.id }),
+        JSON.stringify({ mediaId: item.id, mediaType: item.type }),
       );
       e.dataTransfer.effectAllowed = "copy";
       startDrag("media", { mediaId: item.id, mediaType: item.type });
@@ -1082,7 +1086,7 @@ export const AssetsPanel: React.FC = () => {
   // when the full label would otherwise overflow.
   const compactLabel = (id: AssetsTab, full: string): string => {
     if (id === "transitions") return "Transit.";
-    if (id === "captions") return t("captions");
+    if (id === "captions") return "Suptitle";
     return full;
   };
 
@@ -1091,7 +1095,7 @@ export const AssetsPanel: React.FC = () => {
     { id: "audio", icon: Music, label: "Audio" },
     { id: "text", icon: Type, label: t("text") },
     { id: "transitions", icon: ArrowLeftRight, label: t("transitions") },
-    { id: "captions", icon: CaptionsIcon, label: t("captions"), accent: true },
+    { id: "captions", icon: CaptionsIcon, label: "Auto Suptitle", accent: true },
   ] as Array<{
     id: AssetsTab;
     icon: typeof Film;
@@ -1375,6 +1379,7 @@ export const AssetsPanel: React.FC = () => {
                     onDelete={() => handleDeleteItem(item.id)}
                     onReplace={() => handleReplaceAsset(item.id)}
                     onDragStart={(e) => handleItemDragStart(e, item)}
+                    onDragEnd={endDrag}
                     onAddToTimeline={() => handleAddToTimeline(item)}
                     onKieAI={item.type === "image" && !item.isPending && !item.kieaiError ? () => handleOpenKieAI(item) : undefined}
                     onRetryKieAI={item.kieaiError && item.kieaiTaskId ? () => handleRetryKieAI(item) : undefined}

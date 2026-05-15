@@ -35,6 +35,13 @@ import { ActionValidator } from "./action-validator";
 import { ActionHistory } from "./action-history";
 import { InverseActionGenerator } from "./inverse-action-generator";
 
+function createTimelineClipId(): string {
+  return `clip-${
+    globalThis.crypto?.randomUUID?.() ??
+    `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  }`;
+}
+
 export class ActionExecutor {
   private validator: ActionValidator;
   private history: ActionHistory;
@@ -494,7 +501,7 @@ export class ActionExecutor {
               ? mediaItem.metadata.duration
               : 5);
           const newClip = {
-            id: `clip-${Date.now()}`,
+            id: createTimelineClipId(),
             mediaId: params.mediaId,
             trackId: params.trackId,
             startTime: params.startTime,
@@ -617,7 +624,7 @@ export class ActionExecutor {
 
           const clip2 = {
             ...clip,
-            id: `clip-${Date.now()}`,
+            id: createTimelineClipId(),
             startTime: splitTime,
             duration: clip.duration - splitOffset,
             inPoint: clip.inPoint + splitOffset,

@@ -242,12 +242,16 @@ export function drawWaveform(
     fillStyle?: string;
     bgStyle?: string;
     barGap?: number;
+    minVisiblePeak?: number;
+    amplitudeCurve?: number;
   } = {},
 ): void {
   const {
     fillStyle = "#F4FF00",
     bgStyle = "rgba(14, 61, 61, 0.7)",
     barGap = 1,
+    minVisiblePeak = 0.08,
+    amplitudeCurve = 0.65,
   } = options;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
@@ -261,12 +265,24 @@ export function drawWaveform(
   if (!peaks || peaks.length === 0) return;
 
   const mid = h / 2;
-  const barWidth = Math.max(1, w / peaks.length);
+  const visualBars = Math.max(1, Math.min(peaks.length, Math.floor(w / 2)));
+  const barWidth = w / visualBars;
+  const sourcePerBar = peaks.length / visualBars;
   ctx.fillStyle = fillStyle;
 
-  for (let i = 0; i < peaks.length; i++) {
-    const v = Math.max(0, Math.min(1, peaks[i]));
-    const barHeight = Math.max(1, v * (h - 4));
+  for (let i = 0; i < visualBars; i++) {
+    const start = Math.floor(i * sourcePerBar);
+    const end = Math.max(start + 1, Math.ceil((i + 1) * sourcePerBar));
+    let peak = 0;
+    for (let j = start; j < end && j < peaks.length; j++) {
+      const v = Math.abs(peaks[j]);
+      if (v > peak) peak = v;
+    }
+
+    const normalized = Math.max(0, Math.min(1, peak));
+    const visible =
+      normalized <= 0 ? 0 : Math.max(minVisiblePeak, Math.pow(normalized, amplitudeCurve));
+    const barHeight = Math.max(visible > 0 ? 2 : 1, visible * (h - 5));
     const x = i * barWidth;
     ctx.fillRect(
       Math.floor(x),

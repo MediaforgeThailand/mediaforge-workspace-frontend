@@ -59,6 +59,10 @@ import {
 import { restoreMediaItem } from "../utils/media-recovery";
 import { projectManager } from "../services/project-manager";
 import { getTransitionBridge } from "../bridges/transition-bridge";
+import {
+  canPlaceMediaItemOnTrack,
+  incompatibleMediaTrackResult,
+} from "../utils/media-track-compatibility";
 
 /**
  * Convert a Blob into a base64 data URL. Used so filmstrip thumbnails
@@ -1245,6 +1249,32 @@ export const useProjectStore = create<ProjectState>()(
       // Clip actions
       addClip: async (trackId: string, mediaId: string, startTime: number) => {
         const { project, actionExecutor } = get();
+        const track = project.timeline.tracks.find((t) => t.id === trackId);
+        const mediaItem = project.mediaLibrary.items.find((m) => m.id === mediaId);
+
+        if (!track) {
+          return {
+            success: false,
+            error: {
+              code: "TRACK_NOT_FOUND" as const,
+              message: "Track not found",
+            },
+          };
+        }
+
+        if (!mediaItem) {
+          return {
+            success: false,
+            error: {
+              code: "MEDIA_NOT_FOUND" as const,
+              message: "Media item not found",
+            },
+          };
+        }
+
+        if (!canPlaceMediaItemOnTrack(mediaItem, track)) {
+          return incompatibleMediaTrackResult(mediaItem, track);
+        }
 
         // IMPORTANT: Deep clone the project BEFORE mutation
         // actionExecutor mutates the project directly, so we need a fresh copy
@@ -1285,16 +1315,7 @@ export const useProjectStore = create<ProjectState>()(
           };
         }
 
-        let trackType: "video" | "audio" | "image" | "text" | "graphics";
-        if (mediaItem.type === "video") {
-          trackType = "video";
-        } else if (mediaItem.type === "audio") {
-          trackType = "audio";
-        } else if (mediaItem.type === "image") {
-          trackType = "image";
-        } else {
-          trackType = "video";
-        }
+        const trackType: "video" | "audio" | "image" = mediaItem.type;
 
         const clipStartTime =
           startTime !== undefined
@@ -1671,6 +1692,53 @@ export const useProjectStore = create<ProjectState>()(
 
       moveClip: async (clipId: string, startTime: number, trackId?: string) => {
         const { project, actionExecutor } = get();
+
+        if (trackId) {
+          const sourceTrack = project.timeline.tracks.find((track) =>
+            track.clips.some((clip) => clip.id === clipId),
+          );
+          const targetTrack = project.timeline.tracks.find(
+            (track) => track.id === trackId,
+          );
+
+          if (!sourceTrack) {
+            return {
+              success: false,
+              error: {
+                code: "CLIP_NOT_FOUND" as const,
+                message: "Clip not found",
+              },
+            };
+          }
+
+          if (!targetTrack) {
+            return {
+              success: false,
+              error: {
+                code: "TRACK_NOT_FOUND" as const,
+                message: "Target track not found",
+              },
+            };
+          }
+
+          if (sourceTrack.type !== targetTrack.type) {
+            return {
+              success: false,
+              error: {
+                code: "INCOMPATIBLE_TYPE" as const,
+                message: `Cannot move a ${sourceTrack.type} clip to a ${targetTrack.type} track.`,
+                details: {
+                  clipId,
+                  sourceTrackId: sourceTrack.id,
+                  sourceTrackType: sourceTrack.type,
+                  targetTrackId: targetTrack.id,
+                  targetTrackType: targetTrack.type,
+                },
+              },
+            };
+          }
+        }
+
         const action: Action = {
           type: "clip/move",
           id: uuidv4(),

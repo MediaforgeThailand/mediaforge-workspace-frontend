@@ -10,6 +10,17 @@ import { useEngineStore } from "../stores/engine-store";
 import { getPlaybackBridge } from "../bridges/playback-bridge";
 import { toast } from "../stores/notification-store";
 
+const clipsOverlap = (
+  a: { startTime: number; duration: number },
+  b: { startTime: number; duration: number },
+): boolean => {
+  const aStart = a.startTime;
+  const aEnd = a.startTime + a.duration;
+  const bStart = b.startTime;
+  const bEnd = b.startTime + b.duration;
+  return aStart < bEnd && bStart < aEnd;
+};
+
 export function useKeyboardShortcuts() {
   const [showShortcutsOverlay, setShowShortcutsOverlay] = useState(false);
 
@@ -224,9 +235,10 @@ export function useKeyboardShortcuts() {
 
   const handleDelete = useCallback(() => {
     const selectedIds = getSelectedClipIds();
-    // CapCut linkage: when ON, deleting a clip also deletes its sibling
-    // clips that share the same mediaId (e.g. video + its auto-extracted
-    // audio). When OFF, only the selected clip is removed.
+    // CapCut linkage: when ON, deleting a clip also deletes linked sibling
+    // clips from other tracks that overlap in time (e.g. video + extracted
+    // audio). Split pieces on the same track share mediaId but are separate
+    // edit decisions, so they must not be swept up together.
     //
     // Note: only MEDIA clips have a `mediaId` (and only media clips are
     // linkable). Text/shape clips don't participate in linkage — they get
@@ -241,7 +253,11 @@ export function useKeyboardShortcuts() {
         for (const track of state.project.timeline.tracks) {
           for (const sibling of track.clips) {
             if (sibling.id === id) continue;
-            if (sibling.mediaId === clip.mediaId) {
+            if (sibling.trackId === clip.trackId) continue;
+            if (
+              sibling.mediaId === clip.mediaId &&
+              clipsOverlap(sibling, clip)
+            ) {
               toDelete.add(sibling.id);
             }
           }
@@ -447,7 +463,7 @@ export function useKeyboardShortcuts() {
   // (or create one), then create a 5-second text clip at the current playhead.
   const handleAddText = useCallback(() => {
     const tracks = project.timeline.tracks;
-    let textTrack = tracks.find((t) => t.type === "text");
+    const textTrack = tracks.find((t) => t.type === "text");
     const startTime = playheadPosition;
     const text = "New Title";
     if (textTrack) {

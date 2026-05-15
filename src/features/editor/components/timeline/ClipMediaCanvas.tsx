@@ -418,11 +418,15 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
   // results to the cache. Prevents the "Decoding…" indicator from getting
   // stuck when a deps-change race orphans an in-flight decode promise —
   // mirrors the same fix that's already in the FrameStrip thumbnail path.
-  const waveformOwnershipRef = useRef<{ clipId: string; binBucket: number } | null>(null);
+  const waveformOwnershipRef = useRef<{ cacheId: string; binBucket: number } | null>(null);
 
   const binCount = Math.max(8, Math.floor(width / 2));
   const binBucket = cache.binBucketFor(binCount);
-  const entry = cache.get(clip.id, binBucket);
+  const waveformCacheId = useMemo(
+    () => `${clip.id}:${clip.inPoint.toFixed(3)}:${clip.outPoint.toFixed(3)}`,
+    [clip.id, clip.inPoint, clip.outPoint],
+  );
+  const entry = cache.get(waveformCacheId, binBucket);
   const [, forceRender] = useState(0);
 
   const sourceDuration = mediaItem.metadata?.duration ?? 0;
@@ -454,7 +458,7 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
   useEffect(() => {
     if (height <= 0) return;
     // Fresh-read the entry so we don't reason from a stale closure copy.
-    const current = cache.get(clip.id, binBucket);
+    const current = cache.get(waveformCacheId, binBucket);
     // Already settled at the right resolution → nothing to do.
     if (current && current.peaks.length === binBucket && !current.inFlight) return;
     // Someone else (the previous mount of THIS clip at THIS bucket) is
@@ -470,7 +474,7 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
         clip.outPoint,
         binBucket,
       );
-      cache.set(clip.id, binBucket, peaks);
+      cache.set(waveformCacheId, binBucket, peaks);
       forceRender((n) => n + 1);
       return;
     }
@@ -480,9 +484,9 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
     // Ownership token — only the most recent call commits its result back
     // into the cache. Older promises that resolve after a deps-change race
     // are dropped silently.
-    const ownership = { clipId: clip.id, binBucket };
+    const ownership = { cacheId: waveformCacheId, binBucket };
     waveformOwnershipRef.current = ownership;
-    cache.markInFlight(clip.id, binBucket);
+    cache.markInFlight(waveformCacheId, binBucket);
 
     // Safety timeout — if the decode pipeline hangs (rare codec, oversize
     // buffer, browser tab background-throttled mid-decode), release the
@@ -492,7 +496,7 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
     const timeoutMs = 15000;
     const timeoutHandle = window.setTimeout(() => {
       if (waveformOwnershipRef.current !== ownership) return;
-      cache.clearInFlight(clip.id, binBucket);
+      cache.clearInFlight(waveformCacheId, binBucket);
       forceRender((n) => n + 1);
     }, timeoutMs);
 
@@ -505,7 +509,7 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
         if (typeof window !== "undefined") {
           (window as unknown as { __or_lastWaveformDecodeMs?: number }).__or_lastWaveformDecodeMs = dt;
         }
-        cache.set(clip.id, binBucket, peaks);
+        cache.set(waveformCacheId, binBucket, peaks);
         forceRender((n) => n + 1);
       })
       .catch(() => {
@@ -513,7 +517,7 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
         window.clearTimeout(timeoutHandle);
         // Failed → commit empty peaks so we don't infinitely retry, but
         // still drop the inFlight flag.
-        cache.set(clip.id, binBucket, new Float32Array(binBucket));
+        cache.set(waveformCacheId, binBucket, new Float32Array(binBucket));
         forceRender((n) => n + 1);
       });
 
@@ -525,12 +529,13 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
         waveformOwnershipRef.current = null;
       }
       window.clearTimeout(timeoutHandle);
-      cache.clearInFlight(clip.id, binBucket);
+      cache.clearInFlight(waveformCacheId, binBucket);
     };
   }, [
     clip.id,
     clip.inPoint,
     clip.outPoint,
+    waveformCacheId,
     mediaItem,
     binBucket,
     sourceDuration,
@@ -557,8 +562,10 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
     logical.height = height;
     drawWaveform(logical, peaks, {
       fillStyle: "#F4FF00",
-      bgStyle: "rgba(14, 61, 61, 0.55)",
-      barGap: 1,
+      bgStyle: "rgba(3, 76, 64, 0.72)",
+      barGap: 0,
+      minVisiblePeak: 0.1,
+      amplitudeCurve: 0.6,
     });
     if (ctx) {
       ctx.clearRect(0, 0, width, height);

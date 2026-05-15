@@ -16,8 +16,37 @@ import { useUIStore } from "../../stores/ui-store";
 import { useProjectStore } from "../../stores/project-store";
 import { toast } from "../../stores/notification-store";
 import { getTransitionBridge } from "../../bridges/transition-bridge";
+import {
+  canPlaceMediaTypeOnTrack,
+  getMediaTypeFromDataTransferItem,
+  getMediaTypeFromFile,
+  getTrackTypeLabel,
+  type TimelineMediaType,
+} from "../../utils/media-track-compatibility";
 
 type GraphicClipUnion = ShapeClip | SVGClip | StickerClip;
+
+const coerceTimelineMediaType = (
+  value: unknown,
+): TimelineMediaType | null => {
+  return value === "video" || value === "audio" || value === "image"
+    ? value
+    : null;
+};
+
+const getMediaTypeFromTransferData = (
+  event: React.DragEvent,
+): TimelineMediaType | null => {
+  const rawData = event.dataTransfer.getData("application/json");
+  if (!rawData) return null;
+
+  try {
+    const data = JSON.parse(rawData);
+    return coerceTimelineMediaType(data?.mediaType);
+  } catch {
+    return null;
+  }
+};
 
 interface TrackLaneProps {
   track: Track;
@@ -88,8 +117,9 @@ export const TrackLane: React.FC<TrackLaneProps> = ({
 }) => {
   const { isTrackExpanded, playheadPosition } = useTimelineStore();
   const isExpanded = isTrackExpanded(track.id);
-  const { snapSettings } = useUIStore();
+  const { snapSettings, dragType, dragData } = useUIStore();
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isInvalidMediaDrop, setIsInvalidMediaDrop] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const laneRef = useRef<HTMLDivElement>(null);
   const resizeStartY = useRef<number>(0);
@@ -99,14 +129,63 @@ export const TrackLane: React.FC<TrackLaneProps> = ({
     return track.clips.filter((clip) => clip.keyframes && clip.keyframes.length > 0);
   }, [track.clips]);
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
-    setIsDragOver(true);
-  }, []);
+  const acceptsDraggedPayload = useCallback(
+    (e: React.DragEvent): boolean => {
+      const transferTypes = Array.from(e.dataTransfer.types ?? []);
+
+      if (transferTypes.includes("application/x-openreel-transition")) {
+        return track.type === "video" || track.type === "image";
+      }
+
+      if (transferTypes.includes("Files")) {
+        const fileItems = Array.from(e.dataTransfer.items ?? []).filter(
+          (item) => item.kind === "file",
+        );
+        const detectedTypes = fileItems
+          .map(getMediaTypeFromDataTransferItem)
+          .filter((type): type is TimelineMediaType => Boolean(type));
+
+        if (fileItems.length > 0 && detectedTypes.length === fileItems.length) {
+          return detectedTypes.every((mediaType) =>
+            canPlaceMediaTypeOnTrack(mediaType, track.type),
+          );
+        }
+
+        return (
+          track.type === "video" ||
+          track.type === "audio" ||
+          track.type === "image"
+        );
+      }
+
+      const mediaTypeFromTransfer = getMediaTypeFromTransferData(e);
+      const mediaTypeFromStore =
+        dragType === "media"
+          ? coerceTimelineMediaType(dragData?.mediaType)
+          : null;
+      const mediaType = mediaTypeFromTransfer ?? mediaTypeFromStore;
+
+      return mediaType
+        ? canPlaceMediaTypeOnTrack(mediaType, track.type)
+        : true;
+    },
+    [dragData?.mediaType, dragType, track.type],
+  );
+
+  const handleDragOver = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const canDrop = acceptsDraggedPayload(e);
+      e.dataTransfer.dropEffect = canDrop ? "copy" : "none";
+      setIsDragOver(true);
+      setIsInvalidMediaDrop(!canDrop);
+    },
+    [acceptsDraggedPayload],
+  );
 
   const handleDragLeave = useCallback(() => {
     setIsDragOver(false);
+    setIsInvalidMediaDrop(false);
   }, []);
 
   const handleDrop = useCallback(
@@ -114,9 +193,23 @@ export const TrackLane: React.FC<TrackLaneProps> = ({
       e.preventDefault();
       e.stopPropagation();
       setIsDragOver(false);
+      setIsInvalidMediaDrop(false);
 
       // External OS file drop (e.g. from Windows Explorer)
       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const files = Array.from(e.dataTransfer.files);
+        const invalidFile = files.find(
+          (file) =>
+            !canPlaceMediaTypeOnTrack(getMediaTypeFromFile(file), track.type),
+        );
+        if (invalidFile) {
+          toast.warning(
+            "Wrong track type",
+            `${invalidFile.name} belongs on a ${getMediaTypeFromFile(invalidFile) ?? "matching"} track, not ${getTrackTypeLabel(track.type)}.`,
+          );
+          return;
+        }
+
         const rect = laneRef.current?.getBoundingClientRect();
         if (!rect) return;
         const x = e.clientX - rect.left + scrollX;
@@ -130,7 +223,7 @@ export const TrackLane: React.FC<TrackLaneProps> = ({
           pixelsPerSecond,
         );
         const { importMedia, addClip } = useProjectStore.getState();
-        for (const file of Array.from(e.dataTransfer.files)) {
+        for (const file of files) {
           try {
             const beforeIds = new Set(
               useProjectStore.getState().project.mediaLibrary.items.map(i => i.id)
@@ -141,8 +234,15 @@ export const TrackLane: React.FC<TrackLaneProps> = ({
                 .getState()
                 .project.mediaLibrary.items.find(i => !beforeIds.has(i.id));
               if (newItem) {
-                await addClip(track.id, newItem.id, snapResult.time);
-                toast.success(`Added to ${track.name}`, file.name);
+                const addResult = await addClip(track.id, newItem.id, snapResult.time);
+                if (addResult.success) {
+                  toast.success(`Added to ${track.name}`, file.name);
+                } else {
+                  toast.warning(
+                    "Wrong track type",
+                    addResult.error?.message ?? "This file belongs on its own track type.",
+                  );
+                }
               }
             }
           } catch (err) {
@@ -239,6 +339,19 @@ export const TrackLane: React.FC<TrackLaneProps> = ({
           return;
         }
 
+        const mediaItem = useProjectStore
+          .getState()
+          .getMediaItem(data.mediaId);
+        if (!canPlaceMediaTypeOnTrack(mediaItem?.type, track.type)) {
+          toast.warning(
+            "Wrong track type",
+            mediaItem
+              ? `${mediaItem.name} belongs on a ${mediaItem.type} track, not ${getTrackTypeLabel(track.type)}.`
+              : "This file belongs on its own track type.",
+          );
+          return;
+        }
+
         const rect = laneRef.current?.getBoundingClientRect();
         if (rect) {
           const x = e.clientX - rect.left + scrollX;
@@ -257,7 +370,18 @@ export const TrackLane: React.FC<TrackLaneProps> = ({
         // Silently ignore parse errors
       }
     },
-    [track.id, track.name, pixelsPerSecond, scrollX, onDropMedia],
+    [
+      allTracks,
+      onDropMedia,
+      pixelsPerSecond,
+      playheadPosition,
+      scrollX,
+      snapSettings,
+      track.id,
+      track.clips,
+      track.name,
+      track.type,
+    ],
   );
 
   const handleResizeStart = useCallback(
@@ -304,7 +428,9 @@ export const TrackLane: React.FC<TrackLaneProps> = ({
         style={{ height: trackHeight }}
         className={`border-b border-border/50 relative transition-colors ${
           isDragOver
-            ? "bg-primary/10 border-primary/30"
+            ? isInvalidMediaDrop
+              ? "bg-red-500/10 border-red-500/40"
+              : "bg-primary/10 border-primary/30"
             : "bg-background-secondary/20"
         }`}
         onDragOver={handleDragOver}
@@ -353,9 +479,21 @@ export const TrackLane: React.FC<TrackLaneProps> = ({
           />
         ))}
         {isDragOver && (
-          <div className="absolute inset-0 border-2 border-dashed border-primary/50 rounded pointer-events-none flex items-center justify-center">
-            <span className="text-xs text-primary bg-background/80 px-2 py-1 rounded">
-              Drop to add clip
+          <div
+            className={`absolute inset-0 border-2 border-dashed rounded pointer-events-none flex items-center justify-center ${
+              isInvalidMediaDrop
+                ? "border-red-500/60"
+                : "border-primary/50"
+            }`}
+          >
+            <span
+              className={`text-xs bg-background/80 px-2 py-1 rounded ${
+                isInvalidMediaDrop ? "text-red-400" : "text-primary"
+              }`}
+            >
+              {isInvalidMediaDrop
+                ? `Use ${getTrackTypeLabel(track.type)} assets only`
+                : "Drop to add clip"}
             </span>
           </div>
         )}
