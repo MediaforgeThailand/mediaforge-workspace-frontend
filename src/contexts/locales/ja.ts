@@ -2090,6 +2090,7 @@ export const ja = {
   "workspace.sidebar.stock": "ストック素材",
   "workspace.sidebar.spaces": "スペース",
   "workspace.sidebar.image_gen": "画像生成器",
+  "workspace.sidebar.image_upscale": "アップスケール",
   "workspace.sidebar.video_gen": "動画生成",
   "workspace.sidebar.voice_gen": "音声ジェネレーター",
   "workspace.sidebar.voice_translate": "翻訳",
@@ -2171,6 +2172,7 @@ export const ja = {
   "workspace.settings.security_sso": "セキュリティ SSO",
   "workspace.settings.preferences": "設定",
   "workspace.settings.plan_billing": "プランと請求",
+  "workspace.settings.system_preferences": "システム環境設定",
   "workspace.settings.coming_soon_pill": "もうすぐ",
   "workspace.settings.fallback_title": "設定",
   "workspace.settings.coming_soon_title": "近日公開予定",
@@ -2290,6 +2292,8 @@ export const ja = {
   "workspace.standalone.tools": "ツール",
   "workspace.standalone.tool.image_gen.nav": "画像",
   "workspace.standalone.tool.image_gen.title": "画像生成器",
+  "workspace.standalone.tool.image_upscale.nav": "アップスケール",
+  "workspace.standalone.tool.image_upscale.title": "メディアをアップスケール",
   "workspace.standalone.tool.video_gen.nav": "動画",
   "workspace.standalone.tool.video_gen.title": "動画生成",
   "workspace.standalone.tool.voice_gen.nav": "オーディオ",
@@ -2503,6 +2507,8 @@ export const ja = {
     "旧版の SeedDream — 幅広いスタイルをカバーします。",
   "workspace.standalone.model.gpt_image_2.desc":
     "正確なスタイルと品質管理に最適です。",
+  "workspace.standalone.model.magnific_upscale_precision_v2.desc":
+    "高度な制御をシンプルなプリセットでまとめた Magnific の画像・動画アップスケーリング。",
   "workspace.standalone.model.kling_v2_6_pro.desc":
     "古典的なテキスト/画像から動画へのワークフロー。",
   "workspace.standalone.model.kling_v2_6_motion_pro.desc":
@@ -2551,6 +2557,8 @@ export const ja = {
     "BytePlus image-to-3D — Tripo の代替エンジン。",
   "workspace.standalone.validation.image_prompt":
     "画像生成にはプロンプトが必要です。",
+  "workspace.standalone.validation.upscale_image":
+    "アップスケールには元の画像または動画が 1 つ必要です。",
   "workspace.standalone.validation.motion_refs":
     "動画には参照画像と動画が必要です。",
   "workspace.standalone.validation.end_needs_start":
@@ -2812,6 +2820,9 @@ export const ja = {
   "workspace.toolnames.audio_gen": "オーディオジェネレーター",
   "workspace.toolnames.audio_gen_desc":
     "Gemini TTS によるテキスト読み上げ — 30 の名前付き音声、クリップごとのスタイル方向。",
+  "workspace.toolnames.voice_translate": "吹き替え",
+  "workspace.toolnames.voice_translate_desc":
+    "ElevenLabs ダビングで MP3/MP4 の音声を翻訳しつつ声を保持。",
   "workspace.toolnames.video_to_prompt": "動画からプロンプトを生成",
   "workspace.toolnames.video_to_prompt_desc":
     "動画を読み取り、シーンごとのプロンプトを生成します。",
@@ -2830,6 +2841,9 @@ export const ja = {
   "workspace.toolnames.remove_bg": "BG を削除",
   "workspace.toolnames.remove_bg_desc":
     "Freepik/Magnific で画像から背景を取り除きます。",
+  "workspace.toolnames.upscale": "アップスケール",
+  "workspace.toolnames.upscale_desc":
+    "Magnific で画像または動画の解像度を上げます。",
   "workspace.toolnames.image_to_3d": "画像を 3D に変換",
   "workspace.toolnames.image_to_3d_desc":
     "Tripo3D を介して参照画像を GLB に変換します。",
@@ -3887,8 +3901,10 @@ export const ja = {
   "workspace.picker.port.cutout": "切り抜き",
   "workspace.picker.port.to_video": "→ 動画",
   "workspace.picker.port.to_audio": "→ 音声",
+  "workspace.picker.port.to_media": "→ MP3/MP4",
   "workspace.picker.port.to_context": "→ コンテキスト",
   "workspace.picker.port.to_script": "→ スクリプト",
   "workspace.picker.port.audio": "音声",
+  "workspace.picker.port.media": "MP3/MP4",
   "workspace.picker.port.prompt": "プロンプト",
 } satisfies TranslationMap;

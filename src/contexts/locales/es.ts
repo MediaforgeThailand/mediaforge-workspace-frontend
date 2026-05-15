@@ -2325,6 +2325,7 @@ export const es = {
   "workspace.sidebar.stock": "Stock",
   "workspace.sidebar.spaces": "Espacios",
   "workspace.sidebar.image_gen": "Generador de imágenes",
+  "workspace.sidebar.image_upscale": "Escalar",
   "workspace.sidebar.video_gen": "Generador de vídeos",
   "workspace.sidebar.voice_gen": "Generador de voz",
   "workspace.sidebar.voice_translate": "Traducir",
@@ -2414,6 +2415,7 @@ export const es = {
   "workspace.settings.security_sso": "Seguridad SSO",
   "workspace.settings.preferences": "Preferencias",
   "workspace.settings.plan_billing": "Planificación y facturación",
+  "workspace.settings.system_preferences": "Preferencias del sistema",
   "workspace.settings.coming_soon_pill": "pronto",
   "workspace.settings.fallback_title": "Configuración",
   "workspace.settings.coming_soon_title": "Próximamente",
@@ -2539,6 +2541,8 @@ export const es = {
   "workspace.standalone.tools": "Herramientas",
   "workspace.standalone.tool.image_gen.nav": "Imagen",
   "workspace.standalone.tool.image_gen.title": "Generador de imágenes",
+  "workspace.standalone.tool.image_upscale.nav": "Escalar",
+  "workspace.standalone.tool.image_upscale.title": "Escalar medios",
   "workspace.standalone.tool.video_gen.nav": "Vídeo",
   "workspace.standalone.tool.video_gen.title": "Generador de vídeos",
   "workspace.standalone.tool.voice_gen.nav": "Audio",
@@ -2755,6 +2759,8 @@ export const es = {
     "SeedDream de generación anterior: amplia cobertura de estilo.",
   "workspace.standalone.model.gpt_image_2.desc":
     "Lo mejor para un estilo preciso y control de calidad.",
+  "workspace.standalone.model.magnific_upscale_precision_v2.desc":
+    "Escalado de imágenes y vídeos Magnific con presets simples sobre los controles avanzados.",
   "workspace.standalone.model.kling_v2_6_pro.desc":
     "Flujo de trabajo clásico de texto/imagen a vídeo.",
   "workspace.standalone.model.kling_v2_6_motion_pro.desc":
@@ -2803,6 +2809,8 @@ export const es = {
     "BytePlus image-to-3D: motor alternativo a Tripo.",
   "workspace.standalone.validation.image_prompt":
     "La generación de imágenes necesita un Prompt.",
+  "workspace.standalone.validation.upscale_image":
+    "Escalar requiere una imagen o vídeo de origen.",
   "workspace.standalone.validation.motion_refs":
     "El vídeo en movimiento necesita una imagen de referencia y un vídeo en movimiento.",
   "workspace.standalone.validation.end_needs_start":
@@ -3073,6 +3081,9 @@ export const es = {
   "workspace.toolnames.audio_gen": "Generador de audio",
   "workspace.toolnames.audio_gen_desc":
     "Conversión de texto a voz con Gemini TTS: 30 voces nombradas, dirección de estilo por clip.",
+  "workspace.toolnames.voice_translate": "Doblaje",
+  "workspace.toolnames.voice_translate_desc":
+    "Traduce voz de MP3/MP4 con doblaje de ElevenLabs y preservación de voz.",
   "workspace.toolnames.video_to_prompt": "Convertir video en prompt",
   "workspace.toolnames.video_to_prompt_desc":
     "Lee un video y genera un desglose de prompts por escena.",
@@ -3094,6 +3105,9 @@ export const es = {
   "workspace.toolnames.remove_bg": "Eliminar glucemia",
   "workspace.toolnames.remove_bg_desc":
     "Quite el fondo de una imagen con Freepik/Magnific.",
+  "workspace.toolnames.upscale": "Escalar",
+  "workspace.toolnames.upscale_desc":
+    "Aumenta la resolución de imagen o vídeo con Magnific.",
   "workspace.toolnames.image_to_3d": "Imagen a 3D",
   "workspace.toolnames.image_to_3d_desc":
     "Convierta una imagen de referencia en una GLB mediante Tripo3D.",
@@ -4182,11 +4196,11 @@ export const es = {
   "workspace.picker.port.cutout": "recorte",
   "workspace.picker.port.to_video": "→ video",
   "workspace.picker.port.to_audio": "→ audio",
+  "workspace.picker.port.to_media": "→ MP3/MP4",
   "workspace.picker.port.to_context": "→ contexto",
   "workspace.picker.port.to_script": "→ guion",
   "workspace.picker.port.audio": "audio",
-  "workspace.picker.port.to_media": "-> MP3/MP4",
-  "workspace.picker.port.to_url": "-> URL",
+  "workspace.picker.port.to_url": "→ URL",
   "workspace.picker.port.media": "MP3/MP4",
   "workspace.picker.port.png": "PNG",
   "workspace.picker.port.mp3": "MP3",

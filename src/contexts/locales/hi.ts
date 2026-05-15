@@ -2095,6 +2095,7 @@ export const hi = {
   "workspace.sidebar.stock": "स्टॉक मीडिया लाइब्रेरी",
   "workspace.sidebar.spaces": "रिक्त स्थान",
   "workspace.sidebar.image_gen": "छवि जनरेटर",
+  "workspace.sidebar.image_upscale": "अपस्केल",
   "workspace.sidebar.video_gen": "वीडियो जनरेशन",
   "workspace.sidebar.voice_gen": "आवाज जनरेटर",
   "workspace.sidebar.voice_translate": "अनुवाद",
@@ -2176,6 +2177,7 @@ export const hi = {
   "workspace.settings.security_sso": "सरक्षा SSO",
   "workspace.settings.preferences": "प्राथमिकताएँ",
   "workspace.settings.plan_billing": "योजना एवं बिलिंग",
+  "workspace.settings.system_preferences": "सिस्टम प्राथमिकताएँ",
   "workspace.settings.coming_soon_pill": "जल्द ही",
   "workspace.settings.fallback_title": "सेटिंग्स",
   "workspace.settings.coming_soon_title": "जल्द ही आ रहा है",
@@ -2292,6 +2294,8 @@ export const hi = {
   "workspace.standalone.tools": "उपकरण",
   "workspace.standalone.tool.image_gen.nav": "छवि",
   "workspace.standalone.tool.image_gen.title": "छवि जनरेटर",
+  "workspace.standalone.tool.image_upscale.nav": "अपस्केल",
+  "workspace.standalone.tool.image_upscale.title": "मीडिया अपस्केल करें",
   "workspace.standalone.tool.video_gen.nav": "वीडियो",
   "workspace.standalone.tool.video_gen.title": "वीडियो जनरेशन",
   "workspace.standalone.tool.voice_gen.nav": "ऑडियो",
@@ -2509,6 +2513,8 @@ export const hi = {
     "पिछली जनरेशन का सीडड्रीम - व्यापक शैली कवरेज।",
   "workspace.standalone.model.gpt_image_2.desc":
     "सटीक शैली और गुणवत्ता नियंत्रण के लिए सर्वोत्तम।",
+  "workspace.standalone.model.magnific_upscale_precision_v2.desc":
+    "उन्नत नियंत्रणों के ऊपर सरल प्रीसेट के साथ Magnific इमेज और वीडियो अपस्केलिंग।",
   "workspace.standalone.model.kling_v2_6_pro.desc":
     "क्लासिक टेक्स्ट/इमेज-टू-वीडियो वर्कफ़्लो।",
   "workspace.standalone.model.kling_v2_6_motion_pro.desc":
@@ -2555,6 +2561,8 @@ export const hi = {
     "बाइटप्लस इमेज-टू-3 डी — ट्रिपो का वैकल्पिक इंजन।",
   "workspace.standalone.validation.image_prompt":
     "छवि निर्माण के लिए प्रॉम्प्ट की आवश्यकता होती है।",
+  "workspace.standalone.validation.upscale_image":
+    "अपस्केल के लिए एक स्रोत इमेज या वीडियो आवश्यक है।",
   "workspace.standalone.validation.motion_refs":
     "मोशन वीडियो के लिए एक संदर्भ छवि और एक मोशन वीडियो की आवश्यकता होती है।",
   "workspace.standalone.validation.end_needs_start":
@@ -2810,6 +2818,9 @@ export const hi = {
   "workspace.toolnames.audio_gen": "ऑडियो जेनरेटर",
   "workspace.toolnames.audio_gen_desc":
     "GeminiTTS के साथ टेक्स्ट-टू-स्पीच - 30 नामित आवाजें, प्रति-क्लिप शैली दिशा।",
+  "workspace.toolnames.voice_translate": "डबिंग",
+  "workspace.toolnames.voice_translate_desc":
+    "ElevenLabs डबिंग और वॉइस संरक्षण के साथ MP3/MP4 स्पीच का अनुवाद करें।",
   "workspace.toolnames.video_to_prompt": "वीडियो से प्रॉम्प्ट",
   "workspace.toolnames.video_to_prompt_desc":
     "वीडियो का विश्लेषण करें और हर दृश्य के लिए प्रॉम्प्ट बनाएं",
@@ -2828,6 +2839,9 @@ export const hi = {
   "workspace.toolnames.remove_bg": "बीजी हटाएँ",
   "workspace.toolnames.remove_bg_desc":
     "Freepik/Magnific से किसी छवि की पृष्ठभूमि निकालें।",
+  "workspace.toolnames.upscale": "अपस्केल",
+  "workspace.toolnames.upscale_desc":
+    "Magnific के साथ इमेज या वीडियो रिज़ॉल्यूशन बढ़ाएँ।",
   "workspace.toolnames.image_to_3d": "3D में छवि",
   "workspace.toolnames.image_to_3d_desc":
     "Tripo3D के माध्यम से एक संदर्भ छवि को GLB में बदलें।",
@@ -3868,8 +3882,10 @@ export const hi = {
   "workspace.picker.port.cutout": "कटआउट",
   "workspace.picker.port.to_video": "→ वीडियो",
   "workspace.picker.port.to_audio": "→ ऑडियो",
+  "workspace.picker.port.to_media": "→ MP3/MP4",
   "workspace.picker.port.to_context": "→ context",
   "workspace.picker.port.to_script": "→ स्क्रिप्ट",
   "workspace.picker.port.audio": "ऑडियो",
+  "workspace.picker.port.media": "MP3/MP4",
   "workspace.picker.port.prompt": "Prompt",
 } satisfies TranslationMap;
