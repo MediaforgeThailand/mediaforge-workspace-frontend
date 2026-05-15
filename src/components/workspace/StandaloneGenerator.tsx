@@ -2707,7 +2707,9 @@ export default function StandaloneGenerator({
       ? t("workspace.standalone.script")
       : activeTool === "video_gen"
         ? t("workspace.standalone.describe_video")
-        : activeTool === "image_to_3d" || activeTool === "image_upscale"
+        : activeTool === "image_upscale"
+          ? language === "th" ? "ไฟล์ต้นฉบับ" : "Source media"
+        : activeTool === "image_to_3d"
           ? t("workspace.standalone.reference_image")
           : t("workspace.standalone.describe_image");
 
@@ -2724,7 +2726,7 @@ export default function StandaloneGenerator({
 
   const panelReferenceTitle =
     activeTool === "image_upscale"
-      ? language === "th" ? "ไฟล์ต้นฉบับ" : "Source file"
+      ? language === "th" ? "ไฟล์ต้นฉบับ" : "Source media"
       : activeTool === "image_to_3d"
       ? t("workspace.standalone.reference_image")
       : activeTool === "video_gen"
@@ -4755,9 +4757,6 @@ function ModelPicker({
 
             {recommendedModels.length > 0 && (
               <div className="relative px-6 pb-4">
-                <div className="mb-2 text-xs text-[var(--text-tertiary)]">
-                  {uiText.recommended}
-                </div>
                 <div className="ws-scroll-hide flex snap-x gap-3 overflow-x-auto">
                   {recommendedModels.map((model) => {
                     const active = model.id === value;
@@ -4849,22 +4848,13 @@ function ModelPicker({
                     )}
                   >
                     <StandaloneModelLogo model={model} size="xl" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block min-w-0">
-                        <span className="block line-clamp-2 font-medium leading-5 text-white">
-                          {model.label}
-                        </span>
-                        <span className="mt-1 flex flex-wrap items-center gap-1.5">
-                          {model.badge && <ModelBadge>{model.badge}</ModelBadge>}
-                          {active && <ModelBadge variant="active">{uiText.active}</ModelBadge>}
-                        </span>
+                    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="min-w-0 max-w-[260px] truncate text-sm font-semibold leading-5 text-white">
+                        {model.label}
                       </span>
-                      <span className="mt-0.5 block line-clamp-1 text-xs text-[var(--text-default)]">
-                        {standaloneModelDescription(model.id, model.description, t)}
+                      <span className="rounded-full bg-white/[0.04] px-2 py-0.5 text-[11px] text-[var(--text-default)] ring-1 ring-white/10">
+                        {model.provider}
                       </span>
-                    </span>
-                    <span className="hidden rounded-full bg-white/[0.04] px-2 py-0.5 text-[11px] text-[var(--text-default)] ring-1 ring-white/10 sm:inline-flex">
-                      {model.provider}
                     </span>
                   </button>
                 );
@@ -5692,15 +5682,15 @@ function UpscaleGuide({
   const isVideo = isUpscaleVideoSource(form);
   const mediaLabel = upscaleMediaTypeLabel(form, language);
   const title = isVideo
-    ? th ? "วิดีโอ: เลือกให้น้อยลง" : "Video: fewer choices"
-    : th ? "ภาพ: เลือกให้น้อยลง" : "Image: fewer choices";
+    ? th ? "ตั้งค่าอัปสเกลวิดีโอ" : "Video upscale settings"
+    : th ? "ตั้งค่าอัปสเกลรูปภาพ" : "Image upscale settings";
   const summary = isVideo
     ? th
-      ? "Preset รวม strength, sharpen, grain ให้เอง; FPS Boost ใช้ให้ภาพลื่นขึ้น"
-      : "Preset bundles strength, sharpen, and grain. FPS Boost smooths motion."
+      ? "Preset รวมความคม รายละเอียด และ grain ให้เหมาะกับวิดีโอ; เปิด FPS Boost เมื่อต้องการให้ภาพเคลื่อนไหวลื่นขึ้น"
+      : "Preset tunes detail, sharpness, and grain for video. FPS Boost makes motion smoother."
     : th
-      ? "Preset รวม flavor, sharpen, grain, detail ให้เอง; Safety ใช้กรองผลลัพธ์"
-      : "Preset bundles flavor, sharpen, grain, and detail. Safety filters output.";
+      ? "Preset ปรับโทน ความคม grain และรายละเอียด; Safety ใช้กรองผลลัพธ์"
+      : "Preset tunes style, sharpness, grain, and detail for images. Safety filters output.";
 
   return (
     <div className="rounded-[10px] border border-white/[0.04] bg-[#101112] px-[11px] py-[8px] text-[12px] leading-[16px] text-neutral-300">
@@ -5711,7 +5701,7 @@ function UpscaleGuide({
         <div className="min-w-0">
           <div className="text-[12px] font-semibold leading-[15px] text-white">{title}</div>
           <div className="text-[10px] font-medium leading-[13px] text-neutral-500">
-            {th ? `ต้นฉบับ: ${mediaLabel}` : `Source: ${mediaLabel}`}
+            {th ? `ไฟล์ต้นฉบับ: ${mediaLabel}` : `Source media: ${mediaLabel}`}
           </div>
         </div>
       </div>

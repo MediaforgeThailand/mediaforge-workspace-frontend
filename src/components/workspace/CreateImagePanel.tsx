@@ -2675,9 +2675,6 @@ export const ModelsPopover: React.FC<ModelsPopoverProps> = ({
       <div className="flex-1 min-h-0 flex flex-col overflow-y-auto">
         {recommended.length > 0 && (
           <div className="px-[16px]">
-            <p className="mb-[6px] text-[11px] font-medium uppercase tracking-wide text-neutral-400">
-              {copy.recommended}
-            </p>
             <div className="ws-scroll-hide flex gap-[8px] overflow-x-auto pb-[4px]">
               {recommended.map((model, index) => (
                 <RecommendedCard
@@ -2779,13 +2776,10 @@ const RecommendedCard: React.FC<RecommendedCardProps> = ({
             </span>
           )}
 
-          <div className="absolute bottom-[10px] left-[12px] right-[48px]">
-            <h4 className="truncate text-[15px] font-bold leading-tight text-white">
+          <div className="absolute bottom-[12px] left-[12px] right-[48px]">
+            <h4 className="truncate text-[22px] font-bold leading-[1.05] text-white">
               {model.name}
             </h4>
-            <p className="mt-1 line-clamp-1 text-[11px] text-white/80">
-              {model.description}
-            </p>
           </div>
         </div>
       </div>
@@ -2833,7 +2827,7 @@ const ModelListItem: React.FC<ModelListItemProps> = ({ model, selected, onClick 
       type="button"
       onClick={onClick}
       className={clsx(
-        "group flex min-h-[46px] w-full items-center gap-[8px] rounded-[10px] p-[6px]",
+        "group grid min-h-[46px] w-full grid-cols-[34px_minmax(0,1fr)_auto] items-start gap-[8px] rounded-[10px] p-[6px]",
         "transition-colors text-left",
         selected ? "bg-[#f4ff00]/[0.08] ring-1 ring-[#f4ff00]/40" : "hover:bg-white/[0.04]",
       )}
@@ -2846,19 +2840,10 @@ const ModelListItem: React.FC<ModelListItemProps> = ({ model, selected, onClick 
         <ModelLogoBadge model={model} size="md" />
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col gap-[4px]">
-        <div className="flex items-center gap-[8px]">
-          <p className="truncate text-[13px] font-semibold leading-4 text-white">{model.name}</p>
-          {model.badge && (
-            <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-300">
-              {model.badge}
-            </span>
-          )}
-        </div>
-        <p className="truncate text-[11px] leading-[14px] text-neutral-400">{model.description}</p>
-
+      <div className="flex min-h-[34px] min-w-0 flex-wrap items-center gap-x-[6px] gap-y-[4px]">
+        <p className="min-w-0 max-w-[260px] truncate text-[14px] font-semibold leading-4 text-white">{model.name}</p>
         {model.settings && model.settings.length > 0 && (
-          <div className="flex max-w-full flex-wrap gap-[4px]">
+          <div className="flex min-w-0 flex-wrap items-center gap-[4px]">
             {model.settings.map((setting) => (
               <ModelSettingChip key={`${model.id}-${setting.label}`} setting={setting} />
             ))}
@@ -2867,7 +2852,7 @@ const ModelListItem: React.FC<ModelListItemProps> = ({ model, selected, onClick 
       </div>
 
       {selected && (
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#f4ff00] text-xs font-bold text-black">
+        <span className="mt-[7px] flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#f4ff00] text-xs font-bold text-black">
           <Check className="h-3 w-3" />
         </span>
       )}
