@@ -8490,15 +8490,29 @@ function CreationTile({
   const isFailed = job.status === "failed" || job.status === "permanent_failed";
   const canDelete = !isActive;
   const failureMessage = isFailed ? (job.error ?? job.last_error) : null;
+  const urlAssetFailureMessage =
+    isFailed && job.node_type === "urlAssetNode" && failureMessage
+      ? failureMessage.replace(/^Validation:\s*/i, "").trim()
+      : null;
   if (isFailed) {
     const failedLabel = t("workspace.standalone.status.failed");
     return (
       <article
-        className="group inline-flex w-fit max-w-[320px] items-center gap-2 rounded-full bg-red-950/70 px-3 py-2 text-[12px] font-semibold leading-none text-red-100 shadow-[inset_0_0_0_1px_rgba(248,113,113,.22)]"
+        className={cn(
+          "group inline-flex w-fit max-w-[520px] items-center gap-2 bg-red-950/70 px-3 py-2 text-[12px] font-semibold text-red-100 shadow-[inset_0_0_0_1px_rgba(248,113,113,.22)]",
+          urlAssetFailureMessage ? "rounded-[14px]" : "rounded-full leading-none",
+        )}
         title={failureMessage ?? failedLabel}
       >
         <AlertCircle className="h-4 w-4 shrink-0" />
-        <span>{failedLabel}</span>
+        <span className="min-w-0">
+          <span className="block leading-none">{failedLabel}</span>
+          {urlAssetFailureMessage && (
+            <span className="mt-1 block max-w-[420px] whitespace-normal text-[11px] font-medium leading-snug text-red-100/80">
+              {urlAssetFailureMessage}
+            </span>
+          )}
+        </span>
         {canDelete && (
           <button
             type="button"

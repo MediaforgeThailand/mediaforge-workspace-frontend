@@ -1,7 +1,8 @@
 import { createReadStream, promises as fs } from "node:fs";
+import { execFile } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
-import { pipeline } from "node:stream/promises";
+import { promisify } from "node:util";
 
 import youtubedl from "youtube-dl-exec";
 import ffmpegPath from "ffmpeg-static";
@@ -33,6 +34,8 @@ const FORMAT_META: Record<OutputFormat, { extension: string; contentType: string
   png: { extension: "png", contentType: "image/png", maxBytes: 32 * 1024 * 1024 },
 };
 
+const execFileAsync = promisify(execFile);
+
 function sendJson(res: any, status: number, body: Record<string, unknown>) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -55,6 +58,11 @@ function parseFormat(raw: unknown): OutputFormat {
 function normalizeSocialSource(raw: unknown): string {
   const trimmed = String(raw ?? "").trim();
   if (!trimmed) return "";
+
+  const facebookQuery = trimmed.replace(/^[?&]/, "");
+  if (/^(?:fbid=|.*&fbid=)/i.test(facebookQuery)) {
+    return `https://www.facebook.com/photo/?${facebookQuery}`;
+  }
 
   const youtubeQuery = trimmed.replace(/^[?&]/, "");
   if (/^(?:v=|.*&v=)/i.test(youtubeQuery)) {
@@ -148,6 +156,180 @@ function ytdlpFlags(format: OutputFormat, outputTemplate: string): Record<string
     writeThumbnail: true,
     convertThumbnails: "png",
   };
+}
+
+function decodeHtml(value: string): string {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#039;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
+function htmlAttr(tag: string, name: string): string | null {
+  const match = tag.match(new RegExp(`${name}\\s*=\\s*["']([^"']+)["']`, "i"));
+  return match?.[1] ? decodeHtml(match[1]) : null;
+}
+
+function normalizeEmbeddedHtmlUrls(html: string): string {
+  return html
+    .replace(/\\\//g, "/")
+    .replace(/\\u0025/g, "%")
+    .replace(/\\u0026/g, "&")
+    .replace(/\\u003d/g, "=")
+    .replace(/&amp;/g, "&");
+}
+
+function extractSocialImageCandidates(html: string): string[] {
+  const candidates = new Set<string>();
+  const normalized = normalizeEmbeddedHtmlUrls(html);
+
+  for (const match of normalized.matchAll(/<meta\b[^>]*>/gi)) {
+    const tag = match[0];
+    const key = (htmlAttr(tag, "property") || htmlAttr(tag, "name") || "").toLowerCase();
+    if (key === "og:image" || key === "og:image:url" || key === "twitter:image" || key === "twitter:image:src") {
+      const content = htmlAttr(tag, "content");
+      if (content) candidates.add(content);
+    }
+  }
+
+  for (const match of normalized.matchAll(/https:\/\/[^"'<>\\\s]+/gi)) {
+    const value = decodeHtml(match[0]);
+    const lower = value.toLowerCase();
+    const looksLikeImage =
+      /\.(?:png|jpe?g|webp)(?:[?#]|$)/i.test(value) ||
+      lower.includes("fbcdn.net") ||
+      lower.includes("cdninstagram.com") ||
+      lower.includes("scontent.");
+    if (looksLikeImage) candidates.add(value);
+  }
+
+  return [...candidates].filter((value) => {
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === "https:" || parsed.protocol === "http:";
+    } catch {
+      return false;
+    }
+  });
+}
+
+function socialImageScore(url: string): number {
+  const lower = url.toLowerCase();
+  let score = 0;
+  if (lower.includes("scontent.") || lower.includes("fbcdn.net") || lower.includes("cdninstagram.com")) score += 1000;
+  if (lower.includes("/t39.30808-6/") || lower.includes("/t51.")) score += 5000;
+  if (lower.includes("og:image")) score += 500;
+  if (lower.includes("profile_picture") || lower.includes("/t1.30497-1/")) score -= 8000;
+
+  const sizeMatch = lower.match(/[_-]s(\d{2,4})x(\d{2,4})/);
+  if (sizeMatch) {
+    score += (Number(sizeMatch[1]) * Number(sizeMatch[2])) / 1000;
+  } else {
+    score += 1500;
+  }
+  return score;
+}
+
+function extensionForImageContentType(contentType: string, imageUrl: URL): string {
+  const clean = contentType.split(";")[0]?.trim().toLowerCase();
+  if (clean === "image/png") return "png";
+  if (clean === "image/webp") return "webp";
+  if (clean === "image/gif") return "gif";
+  if (clean === "image/jpeg" || clean === "image/jpg") return "jpg";
+  const ext = path.extname(imageUrl.pathname).replace(".", "").toLowerCase();
+  return ext && /^[a-z0-9]{2,5}$/.test(ext) ? ext : "img";
+}
+
+async function downloadImageCandidate(candidate: string, tempDir: string, prefix: string, maxBytes: number) {
+  const imageUrl = new URL(candidate);
+  const response = await fetch(imageUrl, {
+    headers: {
+      Accept: "image/avif,image/webp,image/png,image/jpeg,image/*,*/*;q=0.8",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`image returned HTTP ${response.status}`);
+  }
+  const contentType = response.headers.get("content-type") || "";
+  if (!/^image\//i.test(contentType)) {
+    throw new Error(`image candidate returned ${contentType || "unknown content-type"}`);
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength <= 0) throw new Error("image candidate was empty");
+  if (bytes.byteLength > maxBytes) {
+    throw new Error(`PNG source image is larger than ${Math.round(maxBytes / (1024 * 1024))} MB.`);
+  }
+  const inputPath = path.join(tempDir, `${prefix}_source.${extensionForImageContentType(contentType, imageUrl)}`);
+  await fs.writeFile(inputPath, bytes);
+  return { inputPath, sourceUrl: imageUrl.toString(), sourceContentType: contentType, bytes: bytes.byteLength };
+}
+
+async function convertImageToPng(inputPath: string, outputPath: string): Promise<void> {
+  if (!ffmpegPath) {
+    throw new Error("Image converter is temporarily unavailable. Please try again later or upload the image directly.");
+  }
+  await execFileAsync(ffmpegPath, ["-y", "-hide_banner", "-loglevel", "error", "-i", inputPath, outputPath], {
+    timeout: 25_000,
+    windowsHide: true,
+  });
+}
+
+async function downloadSocialPageImageAsPng(args: {
+  source: URL;
+  tempDir: string;
+  prefix: string;
+  maxBytes: number;
+}): Promise<{ filePath: string; sourceUrl: string; sourceContentType: string; bytes: number; extractor: string; cleanup: string[] }> {
+  const response = await fetch(args.source, {
+    headers: {
+      Accept: "text/html,application/xhtml+xml",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Social page returned HTTP ${response.status}.`);
+  }
+  const html = await response.text();
+  const candidates = extractSocialImageCandidates(html).sort((a, b) => socialImageScore(b) - socialImageScore(a));
+  if (candidates.length === 0) {
+    throw new Error("This social page did not expose a public image. Try another public link or upload the image directly.");
+  }
+
+  const errors: string[] = [];
+  for (const candidate of candidates.slice(0, 8)) {
+    const cleanupPaths: string[] = [];
+    try {
+      const downloaded = await downloadImageCandidate(candidate, args.tempDir, args.prefix, args.maxBytes);
+      cleanupPaths.push(downloaded.inputPath);
+      const outputPath = path.join(args.tempDir, `${args.prefix}.png`);
+      await convertImageToPng(downloaded.inputPath, outputPath);
+      cleanupPaths.push(outputPath);
+      const stat = await fs.stat(outputPath);
+      if (stat.size <= 0) throw new Error("converted image was empty");
+      if (stat.size > args.maxBytes) {
+        throw new Error(`PNG file is larger than ${Math.round(args.maxBytes / (1024 * 1024))} MB.`);
+      }
+      return {
+        filePath: outputPath,
+        sourceUrl: downloaded.sourceUrl,
+        sourceContentType: downloaded.sourceContentType,
+        bytes: stat.size,
+        extractor: "social-page-image",
+        cleanup: cleanupPaths,
+      };
+    } catch (error) {
+      errors.push(errorPart((error as Error)?.message) || "candidate failed");
+      await cleanup(cleanupPaths);
+    }
+  }
+
+  throw new Error(
+    errors[0] || "This social image could not be downloaded from our server. Try another public link or upload the image directly.",
+  );
 }
 
 async function uploadToSignedUrl(signedUrl: string, filePath: string, contentType: string): Promise<void> {
@@ -254,14 +436,28 @@ export default async function handler(req: any, res: any) {
     if (!uploadUrl || !uploadPath) throw new Error("Missing signed upload target.");
 
     const prefix = `mediaforge_${Date.now()}_${crypto.randomUUID().replace(/-/g, "").slice(0, 10)}`;
-    const outputTemplate = path.join(tempDir, `${prefix}.%(ext)s`);
-    await youtubedl.exec(source.toString(), ytdlpFlags(format, outputTemplate), {
-      timeout: 55_000,
-      killSignal: "SIGKILL",
-    });
+    let outputFile: string;
+    let extractor = "yt-dlp";
+    let sourceContentType = meta.contentType;
+    let sourceUrl = source.toString();
 
-    const outputFile = await findOutputFile(tempDir, prefix, meta.extension);
-    createdFiles.push(outputFile);
+    if (format === "png") {
+      const pageImage = await downloadSocialPageImageAsPng({ source, tempDir, prefix, maxBytes });
+      outputFile = pageImage.filePath;
+      extractor = pageImage.extractor;
+      sourceContentType = pageImage.sourceContentType;
+      sourceUrl = pageImage.sourceUrl;
+      createdFiles.push(...pageImage.cleanup);
+    } else {
+      const outputTemplate = path.join(tempDir, `${prefix}.%(ext)s`);
+      await youtubedl.exec(source.toString(), ytdlpFlags(format, outputTemplate), {
+        timeout: 55_000,
+        killSignal: "SIGKILL",
+      });
+      outputFile = await findOutputFile(tempDir, prefix, meta.extension);
+      createdFiles.push(outputFile);
+    }
+
     const stat = await fs.stat(outputFile);
     if (stat.size <= 0) throw new Error("Downloaded media is empty.");
     if (stat.size > maxBytes) {
@@ -276,8 +472,9 @@ export default async function handler(req: any, res: any) {
       content_type: meta.contentType,
       bytes: stat.size,
       file_name: `${safeBaseName(request.file_name, "social import")}.${meta.extension}`,
-      source_url: source.toString(),
-      extractor: "yt-dlp",
+      source_url: sourceUrl,
+      source_content_type: sourceContentType,
+      extractor,
     });
   } catch (error) {
     console.error("[social-download] failed", {

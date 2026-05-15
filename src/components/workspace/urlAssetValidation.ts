@@ -28,6 +28,11 @@ export function normalizeUrlAssetSource(rawUrl: string): string {
   const trimmed = rawUrl.trim();
   if (!trimmed) return "";
 
+  const facebookQuery = trimmed.replace(/^[?&]/, "");
+  if (/^(?:fbid=|.*&fbid=)/i.test(facebookQuery)) {
+    return `https://www.facebook.com/photo/?${facebookQuery}`;
+  }
+
   const youtubeQuery = trimmed.replace(/^[?&]/, "");
   if (/^(?:v=|.*&v=)/i.test(youtubeQuery)) {
     const params = new URLSearchParams(youtubeQuery);
