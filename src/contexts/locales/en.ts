@@ -2394,6 +2394,102 @@ export const en = {
   "workspace.home.untitled_project_prompt": "Project name:",
   "workspace.home.untitled_project_default": "Untitled project",
 
+  // Dashboard home — document title, feature showcase, inspirations, academy
+  "workspace.home.document_title": "Workspace — MediaForge",
+
+  "workspace.home.inspiration.thumbnail_ui": "Thumbnail UI",
+  "workspace.home.inspiration.full_screen": "Full Screen",
+  "workspace.home.inspiration.magnific_motion_1": "Magnific Motion 1",
+  "workspace.home.inspiration.magnific_motion_2": "Magnific Motion 2",
+  "workspace.home.inspiration.sketch_3": "Sketch 3",
+  "workspace.home.inspiration.sketch_1": "Sketch 1",
+  "workspace.home.inspiration.concept_art_3_4": "Concept Art 3/4",
+  "workspace.home.inspiration.concept_art": "Concept Art",
+  "workspace.home.inspiration.collage": "Collage",
+  "workspace.home.inspiration.character_sheet": "Character Sheet",
+
+  "workspace.home.feature.action_label": "Explore More",
+  "workspace.home.feature.workspace.title": "Workspace",
+  "workspace.home.feature.workspace.kicker": "One canvas for every AI workflow.",
+  "workspace.home.feature.workspace.description":
+    "Build connected boards for image, video, voice, and 3D work without losing context between tools.",
+  "workspace.home.feature.workspace.bullet1":
+    "Drag, paste, and connect assets directly on the canvas",
+  "workspace.home.feature.workspace.bullet2":
+    "Chain outputs into the next AI tool with visible context",
+  "workspace.home.feature.workspace.bullet3":
+    "Organize ideas by project, space, and board",
+  "workspace.home.feature.cinematic.title": "Cinematic",
+  "workspace.home.feature.cinematic.kicker":
+    "Create story visuals, shots, and video concepts.",
+  "workspace.home.feature.cinematic.description":
+    "Shape cinematic scenes from prompt, image references, and storyboard assets in one production flow.",
+  "workspace.home.feature.cinematic.bullet1":
+    "Generate keyframes, shot ideas, and visual references",
+  "workspace.home.feature.cinematic.bullet2":
+    "Move image concepts into video generation cleanly",
+  "workspace.home.feature.cinematic.bullet3":
+    "Keep scene boards readable for clients and teams",
+  "workspace.home.feature.3d.title": "3D",
+  "workspace.home.feature.3d.kicker":
+    "Turn references into 3D-ready creative direction.",
+  "workspace.home.feature.3d.description":
+    "Move from a sketch or reference image into model, material, and animation-ready exploration.",
+  "workspace.home.feature.3d.bullet1":
+    "Use references to generate model-ready ideas",
+  "workspace.home.feature.3d.bullet2":
+    "Preview visual direction before exporting assets",
+  "workspace.home.feature.3d.bullet3":
+    "Keep character, material, and scene references together",
+  "workspace.home.feature.editing.title": "Editing",
+  "workspace.home.feature.editing.kicker":
+    "Refine images into production-ready assets.",
+  "workspace.home.feature.editing.description":
+    "Crop, remix, restyle, and rebuild visual ideas while keeping source material close to the workflow.",
+  "workspace.home.feature.editing.bullet1":
+    "Open generated images for review and edits",
+  "workspace.home.feature.editing.bullet2":
+    "Use references to guide variations without losing context",
+  "workspace.home.feature.editing.bullet3":
+    "Move edited assets back into canvas workflows",
+  "workspace.home.feature.sound.title": "Sound & Voice",
+  "workspace.home.feature.sound.kicker":
+    "Create voice, narration, and audio layers.",
+  "workspace.home.feature.sound.description":
+    "Turn scripts into usable voice assets and keep audio connected with the images, scenes, and videos around it.",
+  "workspace.home.feature.sound.bullet1":
+    "Generate voice from scripts and direction",
+  "workspace.home.feature.sound.bullet2":
+    "Keep audio assets available beside visual boards",
+  "workspace.home.feature.sound.bullet3":
+    "Route sound into video and production workflows",
+  "workspace.home.feature.academy.title": "Academy",
+  "workspace.home.feature.academy.kicker":
+    "Learn workflows directly inside the product.",
+  "workspace.home.feature.academy.description":
+    "Discover guided examples, creative recipes, and practical workflows for building better AI projects.",
+  "workspace.home.feature.academy.bullet1":
+    "Browse learning content from the home surface",
+  "workspace.home.feature.academy.bullet2":
+    "Use examples as a starting point for real projects",
+  "workspace.home.feature.academy.bullet3":
+    "Keep product learning close to the tools",
+
+  "workspace.home.academy_video.scene_monitor_fn.title":
+    "Scene Monitor FN tutorial",
+  "workspace.home.academy_video.scene_monitor_fn.description":
+    "Workflow tutorial for building a complete scene.",
+  "workspace.home.academy_video.full_screen.title": "Full Screen workflow",
+  "workspace.home.academy_video.full_screen.description":
+    "Step-by-step full-screen workspace walkthrough.",
+
+  "workspace.home.education_status.passed": "Pass",
+  "workspace.home.education_status.ended": "Ended",
+  "workspace.home.education_status.submitted": "Submitted",
+
+  "workspace.home.owner.team_project": "Team project",
+  "workspace.home.owner.owned_by_you": "Owned by you",
+
   // Spaces view
   "workspace.spaces.title": "Spaces",
   "workspace.spaces.subtitle":

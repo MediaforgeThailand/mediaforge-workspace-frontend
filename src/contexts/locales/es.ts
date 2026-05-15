@@ -2470,6 +2470,104 @@ export const es = {
   "workspace.home.untitled_project_prompt": "Nombre del proyecto:",
   "workspace.home.untitled_project_default": "Proyecto sin título",
 
+  // Dashboard home — document title, feature showcase, inspirations, academy
+  "workspace.home.document_title": "Workspace — MediaForge",
+
+  "workspace.home.inspiration.thumbnail_ui": "UI de miniatura",
+  "workspace.home.inspiration.full_screen": "Pantalla completa",
+  "workspace.home.inspiration.magnific_motion_1": "Magnific Motion 1",
+  "workspace.home.inspiration.magnific_motion_2": "Magnific Motion 2",
+  "workspace.home.inspiration.sketch_3": "Boceto 3",
+  "workspace.home.inspiration.sketch_1": "Boceto 1",
+  "workspace.home.inspiration.concept_art_3_4": "Concept Art 3/4",
+  "workspace.home.inspiration.concept_art": "Concept Art",
+  "workspace.home.inspiration.collage": "Collage",
+  "workspace.home.inspiration.character_sheet": "Hoja de personaje",
+
+  "workspace.home.feature.action_label": "Explorar más",
+  "workspace.home.feature.workspace.title": "Workspace",
+  "workspace.home.feature.workspace.kicker":
+    "Un lienzo para cada flujo de trabajo de IA.",
+  "workspace.home.feature.workspace.description":
+    "Construye paneles conectados para trabajos de imagen, vídeo, voz y 3D sin perder contexto entre herramientas.",
+  "workspace.home.feature.workspace.bullet1":
+    "Arrastra, pega y conecta assets directamente en el lienzo",
+  "workspace.home.feature.workspace.bullet2":
+    "Encadena resultados a la siguiente herramienta de IA con contexto visible",
+  "workspace.home.feature.workspace.bullet3":
+    "Organiza ideas por proyecto, espacio y panel",
+  "workspace.home.feature.cinematic.title": "Cinemático",
+  "workspace.home.feature.cinematic.kicker":
+    "Crea visuales narrativos, tomas y conceptos de vídeo.",
+  "workspace.home.feature.cinematic.description":
+    "Modela escenas cinemáticas a partir de prompts, referencias de imagen y assets de storyboard en un solo flujo.",
+  "workspace.home.feature.cinematic.bullet1":
+    "Genera keyframes, ideas de tomas y referencias visuales",
+  "workspace.home.feature.cinematic.bullet2":
+    "Lleva conceptos de imagen a generación de vídeo sin saltos",
+  "workspace.home.feature.cinematic.bullet3":
+    "Mantén paneles de escenas legibles para clientes y equipos",
+  "workspace.home.feature.3d.title": "3D",
+  "workspace.home.feature.3d.kicker":
+    "Convierte referencias en una dirección creativa lista para 3D.",
+  "workspace.home.feature.3d.description":
+    "Pasa de un boceto o imagen de referencia a la exploración de modelos, materiales y animación.",
+  "workspace.home.feature.3d.bullet1":
+    "Usa referencias para generar ideas listas para modelar",
+  "workspace.home.feature.3d.bullet2":
+    "Vista previa de la dirección visual antes de exportar assets",
+  "workspace.home.feature.3d.bullet3":
+    "Mantén juntas las referencias de personaje, material y escena",
+  "workspace.home.feature.editing.title": "Edición",
+  "workspace.home.feature.editing.kicker":
+    "Refina imágenes en assets listos para producción.",
+  "workspace.home.feature.editing.description":
+    "Recorta, remezcla, restiliza y reconstruye ideas visuales mientras mantienes el material fuente cerca del flujo de trabajo.",
+  "workspace.home.feature.editing.bullet1":
+    "Abre imágenes generadas para revisar y editar",
+  "workspace.home.feature.editing.bullet2":
+    "Usa referencias para guiar variaciones sin perder contexto",
+  "workspace.home.feature.editing.bullet3":
+    "Devuelve assets editados a los flujos del lienzo",
+  "workspace.home.feature.sound.title": "Sonido y voz",
+  "workspace.home.feature.sound.kicker":
+    "Crea voz, narración y capas de audio.",
+  "workspace.home.feature.sound.description":
+    "Convierte guiones en assets de voz utilizables y mantén el audio conectado con las imágenes, escenas y vídeos cercanos.",
+  "workspace.home.feature.sound.bullet1":
+    "Genera voz a partir de guiones y dirección",
+  "workspace.home.feature.sound.bullet2":
+    "Mantén los assets de audio disponibles junto a los paneles visuales",
+  "workspace.home.feature.sound.bullet3":
+    "Encamina el sonido hacia los flujos de vídeo y producción",
+  "workspace.home.feature.academy.title": "Academia",
+  "workspace.home.feature.academy.kicker":
+    "Aprende flujos de trabajo directamente dentro del producto.",
+  "workspace.home.feature.academy.description":
+    "Descubre ejemplos guiados, recetas creativas y flujos prácticos para construir mejores proyectos de IA.",
+  "workspace.home.feature.academy.bullet1":
+    "Explora contenido de aprendizaje desde la superficie de inicio",
+  "workspace.home.feature.academy.bullet2":
+    "Usa ejemplos como punto de partida para proyectos reales",
+  "workspace.home.feature.academy.bullet3":
+    "Mantén el aprendizaje del producto cerca de las herramientas",
+
+  "workspace.home.academy_video.scene_monitor_fn.title":
+    "Tutorial Scene Monitor FN",
+  "workspace.home.academy_video.scene_monitor_fn.description":
+    "Tutorial de flujo de trabajo para construir una escena completa.",
+  "workspace.home.academy_video.full_screen.title":
+    "Flujo de pantalla completa",
+  "workspace.home.academy_video.full_screen.description":
+    "Recorrido paso a paso del workspace en pantalla completa.",
+
+  "workspace.home.education_status.passed": "Aprobado",
+  "workspace.home.education_status.ended": "Finalizado",
+  "workspace.home.education_status.submitted": "Enviado",
+
+  "workspace.home.owner.team_project": "Proyecto de equipo",
+  "workspace.home.owner.owned_by_you": "Te pertenece",
+
   // Spaces view
   "workspace.spaces.title": "Espacios",
   "workspace.spaces.subtitle":

@@ -2228,6 +2228,103 @@ export const hi = {
   "workspace.home.delete_dialog_confirm": "प्रोजेक्ट हटाएं",
   "workspace.home.untitled_project_prompt": "परियोजना का नाम:",
   "workspace.home.untitled_project_default": "शीर्षकहीन परियोजना",
+
+  "workspace.home.document_title": "Workspace — MediaForge",
+
+  "workspace.home.inspiration.thumbnail_ui": "थंबनेल UI",
+  "workspace.home.inspiration.full_screen": "फ़ुल स्क्रीन",
+  "workspace.home.inspiration.magnific_motion_1": "Magnific Motion 1",
+  "workspace.home.inspiration.magnific_motion_2": "Magnific Motion 2",
+  "workspace.home.inspiration.sketch_3": "स्केच 3",
+  "workspace.home.inspiration.sketch_1": "स्केच 1",
+  "workspace.home.inspiration.concept_art_3_4": "Concept Art 3/4",
+  "workspace.home.inspiration.concept_art": "Concept Art",
+  "workspace.home.inspiration.collage": "कोलाज",
+  "workspace.home.inspiration.character_sheet": "कैरेक्टर शीट",
+
+  "workspace.home.feature.action_label": "और देखें",
+  "workspace.home.feature.workspace.title": "Workspace",
+  "workspace.home.feature.workspace.kicker":
+    "हर AI वर्कफ़्लो के लिए एक ही कैनवस।",
+  "workspace.home.feature.workspace.description":
+    "टूल्स के बीच संदर्भ खोए बिना इमेज, वीडियो, वॉइस और 3D काम के लिए जुड़े बोर्ड बनाएँ।",
+  "workspace.home.feature.workspace.bullet1":
+    "एसेट को सीधे कैनवस पर खींचें, पेस्ट करें और जोड़ें",
+  "workspace.home.feature.workspace.bullet2":
+    "दिखाई देने वाले संदर्भ के साथ आउटपुट को अगले AI टूल में जोड़ें",
+  "workspace.home.feature.workspace.bullet3":
+    "प्रोजेक्ट, स्पेस और बोर्ड के अनुसार विचार व्यवस्थित करें",
+  "workspace.home.feature.cinematic.title": "सिनेमैटिक",
+  "workspace.home.feature.cinematic.kicker":
+    "कहानी के विज़ुअल, शॉट और वीडियो कॉन्सेप्ट बनाएँ।",
+  "workspace.home.feature.cinematic.description":
+    "प्रॉम्प्ट, इमेज संदर्भों और स्टोरीबोर्ड एसेट से सिनेमैटिक सीन एक प्रोडक्शन फ्लो में आकार दें।",
+  "workspace.home.feature.cinematic.bullet1":
+    "कीफ़्रेम, शॉट आइडिया और विज़ुअल संदर्भ जनरेट करें",
+  "workspace.home.feature.cinematic.bullet2":
+    "इमेज कॉन्सेप्ट को वीडियो जनरेशन में आसानी से ले जाएँ",
+  "workspace.home.feature.cinematic.bullet3":
+    "क्लाइंट्स और टीमों के लिए सीन बोर्ड पठनीय रखें",
+  "workspace.home.feature.3d.title": "3D",
+  "workspace.home.feature.3d.kicker":
+    "संदर्भों को 3D-तैयार क्रिएटिव दिशा में बदलें।",
+  "workspace.home.feature.3d.description":
+    "स्केच या संदर्भ इमेज से मॉडल, मटीरियल और एनिमेशन-तैयार खोज तक बढ़ें।",
+  "workspace.home.feature.3d.bullet1":
+    "संदर्भों का उपयोग करके मॉडल-तैयार आइडिया जनरेट करें",
+  "workspace.home.feature.3d.bullet2":
+    "एसेट एक्सपोर्ट करने से पहले विज़ुअल दिशा का पूर्वावलोकन करें",
+  "workspace.home.feature.3d.bullet3":
+    "कैरेक्टर, मटीरियल और सीन संदर्भों को एक साथ रखें",
+  "workspace.home.feature.editing.title": "एडिटिंग",
+  "workspace.home.feature.editing.kicker":
+    "इमेजेज़ को प्रोडक्शन-तैयार एसेट्स में निखारें।",
+  "workspace.home.feature.editing.description":
+    "स्रोत सामग्री को वर्कफ़्लो के पास रखते हुए विज़ुअल आइडिया को क्रॉप, रीमिक्स, रीस्टाइल और पुनर्निर्माण करें।",
+  "workspace.home.feature.editing.bullet1":
+    "जनरेट की गई इमेजेज़ को समीक्षा और एडिट के लिए खोलें",
+  "workspace.home.feature.editing.bullet2":
+    "संदर्भ खोए बिना संदर्भों से variations को मार्गदर्शन दें",
+  "workspace.home.feature.editing.bullet3":
+    "एडिट किए गए एसेट्स को कैनवस वर्कफ़्लो में वापस ले जाएँ",
+  "workspace.home.feature.sound.title": "साउंड और वॉइस",
+  "workspace.home.feature.sound.kicker":
+    "वॉइस, नैरेशन और ऑडियो लेयर बनाएँ।",
+  "workspace.home.feature.sound.description":
+    "स्क्रिप्ट्स को उपयोगी वॉइस एसेट्स में बदलें और ऑडियो को आसपास की इमेजेज़, सीन और वीडियो से जोड़े रखें।",
+  "workspace.home.feature.sound.bullet1":
+    "स्क्रिप्ट और दिशा से वॉइस जनरेट करें",
+  "workspace.home.feature.sound.bullet2":
+    "विज़ुअल बोर्ड के साथ ऑडियो एसेट्स को उपलब्ध रखें",
+  "workspace.home.feature.sound.bullet3":
+    "साउंड को वीडियो और प्रोडक्शन वर्कफ़्लो में रूट करें",
+  "workspace.home.feature.academy.title": "Academy",
+  "workspace.home.feature.academy.kicker":
+    "प्रोडक्ट के अंदर सीधे वर्कफ़्लो सीखें।",
+  "workspace.home.feature.academy.description":
+    "गाइडेड उदाहरण, क्रिएटिव रेसिपी और बेहतर AI प्रोजेक्ट बनाने के लिए व्यावहारिक वर्कफ़्लो खोजें।",
+  "workspace.home.feature.academy.bullet1":
+    "होम सतह से लर्निंग कंटेंट ब्राउज़ करें",
+  "workspace.home.feature.academy.bullet2":
+    "उदाहरणों को असली प्रोजेक्ट के शुरुआती बिंदु के रूप में उपयोग करें",
+  "workspace.home.feature.academy.bullet3":
+    "प्रोडक्ट लर्निंग को टूल्स के पास रखें",
+
+  "workspace.home.academy_video.scene_monitor_fn.title":
+    "Scene Monitor FN ट्यूटोरियल",
+  "workspace.home.academy_video.scene_monitor_fn.description":
+    "पूरा सीन बनाने के लिए वर्कफ़्लो ट्यूटोरियल।",
+  "workspace.home.academy_video.full_screen.title": "फ़ुल स्क्रीन वर्कफ़्लो",
+  "workspace.home.academy_video.full_screen.description":
+    "फ़ुल-स्क्रीन workspace का स्टेप-बाय-स्टेप वॉकथ्रू।",
+
+  "workspace.home.education_status.passed": "पास",
+  "workspace.home.education_status.ended": "समाप्त",
+  "workspace.home.education_status.submitted": "सबमिट",
+
+  "workspace.home.owner.team_project": "टीम प्रोजेक्ट",
+  "workspace.home.owner.owned_by_you": "आपका स्वामित्व",
+
   "workspace.spaces.title": "रिक्त स्थान",
   "workspace.spaces.subtitle":
     "नोड-आधारित जेनरेटिव वर्कफ़्लो बनाएं और अपने विचारों को जीवन में लाएं।",

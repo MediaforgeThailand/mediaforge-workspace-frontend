@@ -2356,6 +2356,103 @@ export const th = {
   "workspace.home.untitled_project_prompt": "ชื่อโปรเจกต์:",
   "workspace.home.untitled_project_default": "โปรเจกต์ไม่มีชื่อ",
 
+  // Dashboard home — document title, feature showcase, inspirations, academy
+  "workspace.home.document_title": "Workspace — MediaForge",
+
+  "workspace.home.inspiration.thumbnail_ui": "ภาพปก UI",
+  "workspace.home.inspiration.full_screen": "เต็มจอ",
+  "workspace.home.inspiration.magnific_motion_1": "Magnific Motion 1",
+  "workspace.home.inspiration.magnific_motion_2": "Magnific Motion 2",
+  "workspace.home.inspiration.sketch_3": "สเก็ตช์ 3",
+  "workspace.home.inspiration.sketch_1": "สเก็ตช์ 1",
+  "workspace.home.inspiration.concept_art_3_4": "Concept Art 3/4",
+  "workspace.home.inspiration.concept_art": "Concept Art",
+  "workspace.home.inspiration.collage": "ภาพคอลลาจ",
+  "workspace.home.inspiration.character_sheet": "ชีตตัวละคร",
+
+  "workspace.home.feature.action_label": "ดูเพิ่มเติม",
+  "workspace.home.feature.workspace.title": "Workspace",
+  "workspace.home.feature.workspace.kicker":
+    "ผืนผ้าใบเดียวสำหรับทุกเวิร์กโฟลว์ AI",
+  "workspace.home.feature.workspace.description":
+    "สร้างกระดานที่เชื่อมกันสำหรับงาน image, video, voice และ 3D โดยไม่ขาดบริบทระหว่างเครื่องมือ",
+  "workspace.home.feature.workspace.bullet1":
+    "ลาก วาง และเชื่อม asset ลงบนผืนผ้าใบได้โดยตรง",
+  "workspace.home.feature.workspace.bullet2":
+    "ส่งผลลัพธ์ต่อไปยังเครื่องมือ AI ตัวถัดไปโดยเห็นบริบทตลอด",
+  "workspace.home.feature.workspace.bullet3":
+    "จัดระเบียบไอเดียตามโปรเจกต์ สเปซ และบอร์ด",
+  "workspace.home.feature.cinematic.title": "Cinematic",
+  "workspace.home.feature.cinematic.kicker":
+    "สร้างภาพเล่าเรื่อง ช็อต และคอนเซ็ปต์วิดีโอ",
+  "workspace.home.feature.cinematic.description":
+    "ปั้นซีนภาพยนตร์จาก prompt, ภาพอ้างอิง และ asset สตอรี่บอร์ดในไหลงานเดียว",
+  "workspace.home.feature.cinematic.bullet1":
+    "สร้าง keyframe ไอเดียช็อต และภาพอ้างอิง",
+  "workspace.home.feature.cinematic.bullet2":
+    "นำคอนเซ็ปต์ภาพไปสร้างวิดีโอได้อย่างต่อเนื่อง",
+  "workspace.home.feature.cinematic.bullet3":
+    "ทำให้บอร์ดซีนอ่านง่ายสำหรับลูกค้าและทีม",
+  "workspace.home.feature.3d.title": "3D",
+  "workspace.home.feature.3d.kicker":
+    "เปลี่ยนภาพอ้างอิงเป็นทิศทางครีเอทีฟพร้อมขึ้น 3D",
+  "workspace.home.feature.3d.description":
+    "จากสเก็ตช์หรือภาพอ้างอิง ก้าวเข้าสู่การสำรวจโมเดล วัสดุ และพื้นฐานสำหรับแอนิเมชัน",
+  "workspace.home.feature.3d.bullet1":
+    "ใช้ภาพอ้างอิงสร้างไอเดียที่พร้อมไปทำโมเดล",
+  "workspace.home.feature.3d.bullet2":
+    "พรีวิวทิศทางภาพก่อนส่งออก asset",
+  "workspace.home.feature.3d.bullet3":
+    "เก็บภาพอ้างอิงตัวละคร วัสดุ และซีนไว้ในที่เดียว",
+  "workspace.home.feature.editing.title": "ตัดต่อภาพ",
+  "workspace.home.feature.editing.kicker":
+    "ขัดเกลาภาพให้กลายเป็น asset พร้อมใช้งานจริง",
+  "workspace.home.feature.editing.description":
+    "ครอป รีมิกซ์ ปรับสไตล์ และสร้างไอเดียภาพใหม่ โดยยังเก็บไฟล์ต้นฉบับใกล้กับเวิร์กโฟลว์",
+  "workspace.home.feature.editing.bullet1":
+    "เปิดภาพที่สร้างขึ้นเพื่อรีวิวและแก้ไข",
+  "workspace.home.feature.editing.bullet2":
+    "ใช้ภาพอ้างอิงนำทาง variation โดยไม่ขาดบริบท",
+  "workspace.home.feature.editing.bullet3":
+    "ส่ง asset ที่แก้แล้วกลับเข้าเวิร์กโฟลว์บน canvas",
+  "workspace.home.feature.sound.title": "เสียง & พากย์",
+  "workspace.home.feature.sound.kicker":
+    "สร้างเสียง บรรยาย และเลเยอร์เสียง",
+  "workspace.home.feature.sound.description":
+    "เปลี่ยนสคริปต์เป็น asset เสียงที่ใช้งานได้จริง และเชื่อมเสียงเข้ากับภาพ ซีน และวิดีโอรอบๆ",
+  "workspace.home.feature.sound.bullet1":
+    "สร้างเสียงจากสคริปต์และการกำกับ",
+  "workspace.home.feature.sound.bullet2":
+    "เก็บ asset เสียงไว้ข้างบอร์ดภาพ",
+  "workspace.home.feature.sound.bullet3":
+    "ส่งเสียงเข้าสู่เวิร์กโฟลว์วิดีโอและงานโปรดักชัน",
+  "workspace.home.feature.academy.title": "Academy",
+  "workspace.home.feature.academy.kicker":
+    "เรียนรู้เวิร์กโฟลว์ในตัวโปรดักต์โดยตรง",
+  "workspace.home.feature.academy.description":
+    "ค้นพบตัวอย่างมีไกด์ สูตรงานสร้างสรรค์ และเวิร์กโฟลว์ใช้จริง เพื่อสร้างโปรเจกต์ AI ให้ดียิ่งขึ้น",
+  "workspace.home.feature.academy.bullet1":
+    "เลือกชมเนื้อหาเรียนรู้จากหน้าโฮม",
+  "workspace.home.feature.academy.bullet2":
+    "ใช้ตัวอย่างเป็นจุดเริ่มของโปรเจกต์จริง",
+  "workspace.home.feature.academy.bullet3":
+    "ทำให้การเรียนรู้โปรดักต์อยู่ใกล้กับเครื่องมือ",
+
+  "workspace.home.academy_video.scene_monitor_fn.title":
+    "บทเรียน Scene Monitor FN",
+  "workspace.home.academy_video.scene_monitor_fn.description":
+    "บทเรียนเวิร์กโฟลว์สำหรับสร้างซีนแบบครบจบ",
+  "workspace.home.academy_video.full_screen.title": "เวิร์กโฟลว์เต็มจอ",
+  "workspace.home.academy_video.full_screen.description":
+    "เดินผ่านการใช้ workspace แบบเต็มจอทีละขั้น",
+
+  "workspace.home.education_status.passed": "ผ่าน",
+  "workspace.home.education_status.ended": "สิ้นสุด",
+  "workspace.home.education_status.submitted": "ส่งแล้ว",
+
+  "workspace.home.owner.team_project": "โปรเจกต์ทีม",
+  "workspace.home.owner.owned_by_you": "คุณเป็นเจ้าของ",
+
   // Spaces view
   "workspace.spaces.title": "Spaces",
   "workspace.spaces.subtitle":
