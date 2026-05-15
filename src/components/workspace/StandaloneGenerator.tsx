@@ -7587,7 +7587,7 @@ function CreationTile({
       });
       return;
     }
-  if (canPreviewAudio && playbackUrl) {
+    if (canPreviewAudio && playbackUrl) {
       onPreview({
         type: "audio",
         url: playbackUrl,
@@ -7599,6 +7599,8 @@ function CreationTile({
         onDownload: handleDownload,
       });
     }
+  };
+
   const handleDownload = async () => {
     if (!downloadUrl) return;
     try {
