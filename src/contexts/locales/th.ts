@@ -2373,11 +2373,11 @@ export const th = {
   "workspace.home.feature.action_label": "ดูเพิ่มเติม",
   "workspace.home.feature.workspace.title": "Workspace",
   "workspace.home.feature.workspace.kicker":
-    "ผืนผ้าใบเดียวสำหรับทุกเวิร์กโฟลว์ AI",
+    "แคนวาสเดียวสำหรับทุกเวิร์กโฟลว์ AI",
   "workspace.home.feature.workspace.description":
     "สร้างกระดานที่เชื่อมกันสำหรับงาน image, video, voice และ 3D โดยไม่ขาดบริบทระหว่างเครื่องมือ",
   "workspace.home.feature.workspace.bullet1":
-    "ลาก วาง และเชื่อม asset ลงบนผืนผ้าใบได้โดยตรง",
+    "ลาก วาง และเชื่อม asset ลงบนแคนวาสได้โดยตรง",
   "workspace.home.feature.workspace.bullet2":
     "ส่งผลลัพธ์ต่อไปยังเครื่องมือ AI ตัวถัดไปโดยเห็นบริบทตลอด",
   "workspace.home.feature.workspace.bullet3":
@@ -2414,7 +2414,7 @@ export const th = {
   "workspace.home.feature.editing.bullet2":
     "ใช้ภาพอ้างอิงนำทาง variation โดยไม่ขาดบริบท",
   "workspace.home.feature.editing.bullet3":
-    "ส่ง asset ที่แก้แล้วกลับเข้าเวิร์กโฟลว์บน canvas",
+    "ส่ง asset ที่แก้แล้วกลับเข้าเวิร์กโฟลว์บนแคนวาส",
   "workspace.home.feature.sound.title": "เสียง & พากย์",
   "workspace.home.feature.sound.kicker":
     "สร้างเสียง บรรยาย และเลเยอร์เสียง",
