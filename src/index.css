@@ -1760,3 +1760,45 @@ body {
       rgba(238,255,0,0.24) 56.19%, rgba(238,255,0,0) 100%);
   box-shadow: inset 0 0 0 1px rgba(238, 255, 0, 0.3);
 }
+
+/* ──────────────────────────────────────────────────────────────────
+ * MediaForge Studio (video editor) — scope reset.
+ *
+ * The editor was forked as a standalone app and designed against
+ * the browser's default 16px html font-size + Inter system stack.
+ * The workspace shell intentionally inflates the root font-size by
+ * --mf-ui-scale (1.455 desktop, 1.32 for Hindi) and swaps the body
+ * font to 'DB Adman X' for the Thai-friendly chrome elsewhere in
+ * the product. Inside the NLE that combo makes every rem-based
+ * Tailwind utility ~1.45× larger and replaces Inter with a Thai
+ * display face whose glyph metrics throw the dense panel layouts
+ * off-rhythm.
+ *
+ * EditorPage.tsx adds `.editor-mounted` to <html> while the editor
+ * route is mounted, and removes it on unmount. The rules below
+ * scope-reset just inside that flag so the editor renders at its
+ * intended sizes again while the rest of the workspace keeps the
+ * inflated typography.
+ *
+ * Specificity note: `html.editor-mounted` (0,1,1) ties with
+ * `html[lang="hi-IN"]` and beats bare `html`. We append at the end
+ * of the file so source-order resolves any tie in our favor.
+ * ────────────────────────────────────────────────────────────────── */
+html.editor-mounted {
+  /* Reset the 1.455× rem inflation. */
+  font-size: 16px;
+
+  /* Redirect Tailwind's `.font-sans` / `font-family: var(--font-sans)`
+   * lookups inside the editor scope. The editor root carries a
+   * `font-sans` utility class (EditorInterface.tsx) so html-level
+   * font-family alone is not enough; overriding the variable also
+   * captures any descendant that consults --font-sans. */
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+
+html.editor-mounted,
+html.editor-mounted body {
+  font-family: var(--font-sans);
+}
+
