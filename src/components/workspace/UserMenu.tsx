@@ -152,7 +152,7 @@ function UsageRow({
   const pct = percentOf(used, total);
   return (
     <div className="space-y-[5px]">
-      <div className="flex items-center justify-between gap-3 text-[12px] font-semibold leading-[15px] text-white">
+      <div className="flex items-center justify-between gap-3 text-[16px] font-semibold leading-[20px] text-white">
         <span className="truncate">{label}</span>
         <span className="shrink-0 tabular-nums text-white/[0.78]">
           {formatCompact(used)} / {formatCompact(total)}
@@ -161,7 +161,7 @@ function UsageRow({
       <div className="h-[5px] overflow-hidden rounded-full bg-white/[0.12]">
         <div className={`h-full rounded-full ${colorClass}`} style={{ width: `${pct}%` }} />
       </div>
-      <div className="flex items-center justify-between gap-3 text-[10.5px] leading-[13px] text-white/[0.66]">
+      <div className="flex items-center justify-between gap-3 text-[14px] leading-[18px] text-white/[0.66]">
         <span>{t("workspace.userMenu.spent")} {formatCompact(used)}</span>
         <span>{t("common.available2")} {formatCompact(available)}</span>
       </div>
@@ -348,7 +348,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-[6px]">
-                  <div className="truncate text-[12.5px] font-semibold leading-[16px] text-white">
+                  <div className="truncate text-[16px] font-semibold leading-[20px] text-white">
                     {profile?.display_name || t("workspace.usermenu.member_fallback")}
                   </div>
                   {hasTeamContext && (
@@ -357,7 +357,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
                       : <Crown className="h-[13px] w-[13px] shrink-0 fill-yellow-400 text-yellow-400" />
                   )}
                 </div>
-                <div className="truncate text-[11px] leading-[15px] text-white/65">
+                <div className="truncate text-[15px] leading-[18px] text-white/65">
                   {user?.email}
                 </div>
               </div>
@@ -369,7 +369,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
                   <button
                     type="button"
                     onClick={() => navigate("/app/org-admin")}
-                    className="flex h-[30px] w-full items-center justify-center gap-[7px] rounded-[8px] bg-emerald-500 px-[10px] text-[12px] font-semibold leading-none text-white transition-colors hover:bg-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200/70"
+                    className="flex h-[36px] w-full items-center justify-center gap-[7px] rounded-[8px] bg-emerald-500 px-[10px] text-[16px] font-semibold leading-none text-white transition-colors hover:bg-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200/70"
                   >
                     <GraduationCap className="h-[13px] w-[13px]" />
                     {t("workspace.userMenu.universityAdmin")}
@@ -381,7 +381,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
                 <button
                   type="button"
                   onClick={() => navigate("/app/pricing")}
-                  className="ci-gloss-button flex h-[30px] w-full items-center justify-center gap-[7px] rounded-full px-[10px] text-[12px] font-semibold leading-none transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200/80"
+                  className="ci-gloss-button flex h-[36px] w-full items-center justify-center gap-[7px] rounded-full px-[10px] text-[16px] font-semibold leading-none transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200/80"
                 >
                   <Sparkles className="h-[13px] w-[13px]" />
                   {t("workspace.usermenu.upgrade")}
@@ -395,7 +395,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
                       navigate("/app/team-register");
                     }
                   }}
-                  className="flex h-[28px] w-full items-center justify-center gap-[7px] rounded-[8px] bg-white/[0.055] px-[10px] text-[12px] font-semibold leading-none text-white transition-colors hover:bg-white/[0.10]"
+                  className="flex h-[36px] w-full items-center justify-center gap-[7px] rounded-[8px] bg-white/[0.055] px-[10px] text-[16px] font-semibold leading-none text-white transition-colors hover:bg-white/[0.10]"
                 >
                   {hasTeamContext ? <Building2 className="h-[13px] w-[13px]" /> : <UserPlus className="h-[13px] w-[13px]" />}
                   {hasTeamContext ? t("common.adminConsole") : t("common.createYourTeam")}
@@ -429,7 +429,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
         {!hasTeamContext && !isEducationOrg && (
           <DropdownMenuItem
             onSelect={() => navigate("/app/settings?tab=plan-billing")}
-            className="mx-[7px] my-[3px] h-[30px] cursor-pointer gap-[10px] rounded-[8px] px-[10px] text-[12px] font-medium leading-none text-white focus:bg-white/[0.06] focus:text-white"
+            className="mx-[7px] my-[3px] h-[36px] cursor-pointer gap-[10px] rounded-[8px] px-[10px] text-[16px] font-medium leading-none text-white focus:bg-white/[0.06] focus:text-white"
           >
             <CreditCard className="h-[14px] w-[14px] text-white/[0.82]" />
             {t("workspace.usermenu.plan_billing")}
@@ -447,7 +447,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
         <div className="mx-[7px] my-[3px] rounded-[8px] px-[10px] py-[7px]">
           <div className="flex items-center gap-[10px]">
             <Languages className="h-[14px] w-[14px] shrink-0 text-white/[0.82]" />
-            <span className="flex-1 text-[12px] font-medium leading-none text-white">
+            <span className="flex-1 text-[16px] font-medium leading-none text-white">
               {t("workspace.userMenu.language")}
             </span>
             <Popover
@@ -461,7 +461,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
                 <button
                   type="button"
                   onClick={(event) => event.stopPropagation()}
-                  className="flex h-[30px] min-w-[116px] items-center justify-between gap-2 rounded-[8px] border border-white/[0.12] bg-white/[0.04] px-[9px] text-[12px] font-semibold leading-none text-white transition hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-200/70"
+                  className="flex h-[36px] min-w-[116px] items-center justify-between gap-2 rounded-[8px] border border-white/[0.12] bg-white/[0.04] px-[9px] text-[16px] font-semibold leading-none text-white transition hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-200/70"
                   aria-expanded={languageMenuOpen}
                   aria-haspopup="listbox"
                 >
@@ -491,12 +491,12 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
                     onChange={(event) => setLanguageQuery(event.target.value)}
                     onKeyDown={(event) => event.stopPropagation()}
                     placeholder={t("workspace.userMenu.languageSearch")}
-                    className="h-[34px] w-full rounded-[8px] border border-white/[0.12] bg-white/[0.04] pl-8 pr-2.5 text-[12px] text-white outline-none placeholder:text-white/45 focus:border-yellow-200/60"
+                    className="h-[40px] w-full rounded-[8px] border border-white/[0.12] bg-white/[0.04] pl-8 pr-2.5 text-[16px] text-white outline-none placeholder:text-white/45 focus:border-yellow-200/60"
                   />
                 </div>
                 <div className="mt-2 max-h-[156px] overflow-y-auto overscroll-contain pr-1" role="listbox">
                   {filteredLanguageOptions.length === 0 ? (
-                    <div className="px-2 py-2 text-[12px] text-white/55">
+                    <div className="px-2 py-2 text-[16px] text-white/55">
                       {t("workspace.userMenu.languageNoResults")}
                     </div>
                   ) : (
@@ -514,7 +514,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
                           setLanguageQuery("");
                         }}
                         className={cn(
-                          "flex h-[34px] w-full items-center justify-between rounded-[8px] px-2 text-left text-[12px] font-medium text-white/85 transition hover:bg-white/[0.06]",
+                          "flex h-[40px] w-full items-center justify-between rounded-[8px] px-2 text-left text-[16px] font-medium text-white/85 transition hover:bg-white/[0.06]",
                           option === language && "text-[#f4ff00]",
                         )}
                       >
@@ -533,7 +533,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
 
         <DropdownMenuItem
           onSelect={handleSignOut}
-          className="mx-[7px] my-[5px] h-[30px] cursor-pointer gap-[10px] rounded-[8px] px-[10px] text-[12px] font-medium leading-none text-red-200 focus:bg-red-500/10 focus:text-red-100"
+          className="mx-[7px] my-[5px] h-[36px] cursor-pointer gap-[10px] rounded-[8px] px-[10px] text-[16px] font-medium leading-none text-red-200 focus:bg-red-500/10 focus:text-red-100"
         >
           <LogOut className="h-[14px] w-[14px]" />
           {t("workspace.usermenu.sign_out")}
