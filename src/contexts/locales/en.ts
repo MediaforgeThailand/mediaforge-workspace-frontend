@@ -2253,6 +2253,8 @@ export const en = {
   "workspace.sidebar.spaces": "Spaces",
   "workspace.sidebar.image_gen": "Image Generator",
   "workspace.sidebar.image_upscale": "Upscale",
+  "workspace.sidebar.url_asset": "URL to Asset",
+  "workspace.sidebar.auto_subtitle": "Auto Subtitle",
   "workspace.sidebar.video_gen": "Video Generator",
   "workspace.sidebar.voice_gen": "Voice Generator",
   "workspace.sidebar.voice_translate": "Translate",
@@ -2561,6 +2563,10 @@ export const en = {
   "workspace.standalone.tool.image_gen.title": "Image Generator",
   "workspace.standalone.tool.image_upscale.nav": "Upscale",
   "workspace.standalone.tool.image_upscale.title": "Upscale Media",
+  "workspace.standalone.tool.url_asset.nav": "URL",
+  "workspace.standalone.tool.url_asset.title": "URL to Asset",
+  "workspace.standalone.tool.auto_subtitle.nav": "Subtitle",
+  "workspace.standalone.tool.auto_subtitle.title": "Auto Subtitle",
   "workspace.standalone.tool.video_gen.nav": "Video",
   "workspace.standalone.tool.video_gen.title": "Video Generator",
   "workspace.standalone.tool.voice_gen.nav": "Audio",
@@ -2841,6 +2847,8 @@ export const en = {
     "Confirm that you have permission to translate and clone this voice.",
   "workspace.standalone.validation.model_image":
     "3D generation needs a reference image.",
+  "workspace.standalone.validation.url_asset_url":
+    "Enter a valid direct http or https URL to a PNG, MP4, or MP3 file.",
   "workspace.standalone.error_failed_queue": "Failed to queue generation",
 
   // ─── Share dialog / banner / invalid screen ─────────────────────
@@ -3101,6 +3109,9 @@ export const en = {
   "workspace.toolnames.url_asset": "URL to Asset",
   "workspace.toolnames.url_asset_desc":
     "Import a direct MP4, MP3, or PNG URL as a workspace asset.",
+  "workspace.toolnames.auto_subtitle": "Auto Subtitle",
+  "workspace.toolnames.auto_subtitle_desc":
+    "Generate subtitles from an uploaded video.",
   "workspace.toolnames.kling_element": "Kling Element",
   "workspace.toolnames.kling_element_desc":
     "Save a character or object as a reusable Kling Omni element. 4 ref + 1 frontal.",
@@ -4107,6 +4118,8 @@ export const en = {
     'Try "happy dog wearing sunglasses, studio light"',
   "workspace.toolNode.wireImageAndRun":
     "Wire an image into the input port and press Run",
+  "workspace.toolNode.urlAssetPlaceholder":
+    "Paste a direct PNG, MP3, or MP4 URL",
   "textInputNode.defaultTitle": "Text Variable",
   "textInputNode.badge": "TEXT VAR",
   "textInputNode.referencedVia": "referenced via #[name](id)",

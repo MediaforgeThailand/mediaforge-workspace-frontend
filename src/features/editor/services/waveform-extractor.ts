@@ -234,7 +234,7 @@ export function rebinPeaks(
   return out;
 }
 
-/** Render peaks to a canvas. Centred bars with optional MediaForge yellow fill. */
+/** Render peak bins to a canvas as timeline-readable vertical bars. */
 export function drawWaveform(
   canvas: HTMLCanvasElement,
   peaks: Float32Array,
@@ -244,6 +244,9 @@ export function drawWaveform(
     barGap?: number;
     minVisiblePeak?: number;
     amplitudeCurve?: number;
+    mode?: "center" | "positive";
+    topPadding?: number;
+    bottomPadding?: number;
   } = {},
 ): void {
   const {
@@ -252,6 +255,9 @@ export function drawWaveform(
     barGap = 1,
     minVisiblePeak = 0.08,
     amplitudeCurve = 0.65,
+    mode = "center",
+    topPadding = 0,
+    bottomPadding = 0,
   } = options;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
@@ -264,8 +270,11 @@ export function drawWaveform(
 
   if (!peaks || peaks.length === 0) return;
 
-  const mid = h / 2;
-  const visualBars = Math.max(1, Math.min(peaks.length, Math.floor(w / 2)));
+  const usableTop = Math.max(0, Math.min(h - 1, topPadding));
+  const usableBottom = Math.max(usableTop + 1, h - Math.max(0, bottomPadding));
+  const usableHeight = usableBottom - usableTop;
+  const mid = usableTop + usableHeight / 2;
+  const visualBars = Math.max(1, Math.min(peaks.length, Math.floor(w / 3)));
   const barWidth = w / visualBars;
   const sourcePerBar = peaks.length / visualBars;
   ctx.fillStyle = fillStyle;
@@ -282,11 +291,15 @@ export function drawWaveform(
     const normalized = Math.max(0, Math.min(1, peak));
     const visible =
       normalized <= 0 ? 0 : Math.max(minVisiblePeak, Math.pow(normalized, amplitudeCurve));
-    const barHeight = Math.max(visible > 0 ? 2 : 1, visible * (h - 5));
+    const barHeight = Math.max(visible > 0 ? 2 : 1, visible * Math.max(1, usableHeight - 2));
     const x = i * barWidth;
+    const y =
+      mode === "positive"
+        ? usableBottom - barHeight
+        : mid - barHeight / 2;
     ctx.fillRect(
       Math.floor(x),
-      Math.floor(mid - barHeight / 2),
+      Math.floor(y),
       Math.max(1, Math.floor(barWidth - barGap)),
       Math.ceil(barHeight),
     );

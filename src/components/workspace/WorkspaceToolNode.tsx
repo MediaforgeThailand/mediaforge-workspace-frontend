@@ -1759,6 +1759,17 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         }
       }
 
+      if (schemaKey === "urlAssetNode") {
+        const sourceUrl = String(cleanParams.source_url || cleanParams.prompt || "").trim();
+        if (!sourceUrl) {
+          throw new Error("Enter a direct MP4, MP3, or PNG URL before running URL to Asset.");
+        }
+        if (!/^https?:\/\//i.test(sourceUrl)) {
+          throw new Error("URL to Asset accepts only http or https direct file URLs.");
+        }
+        cleanParams.source_url = sourceUrl;
+      }
+
       if (schemaKey === "upscaleImageNode") {
         const imageCount = inputValueCount(inputs.image) + inputValueCount(inputs.image_url);
         const videoCount = inputValueCount(inputs.video) + inputValueCount(inputs.video_url);
@@ -3560,6 +3571,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     () => schema?.params?.some((p) => p.key === "prompt") ?? false,
     [schema],
   );
+  const isUrlAssetNode = schemaKey === "urlAssetNode";
 
   // The Tripo3D rendered_image is a small square thumbnail — letting
   // it drive the preview's height collapses the node to a tiny
@@ -3897,10 +3909,23 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             <div
               className={cn(
                 "ws-compact-prompt-overlay has-run-anchor",
-                !hasPromptParam && "is-no-prompt",
+                !hasPromptParam && !isUrlAssetNode && "is-no-prompt",
+                isUrlAssetNode && "is-url-asset",
               )}
             >
-              {hasPromptParam ? (
+              {isUrlAssetNode ? (
+                <textarea
+                  value={String(params.source_url ?? "")}
+                  onChange={(e) => updateParam("source_url", e.target.value)}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="ws-compact-prompt-input ws-url-asset-input nodrag nowheel"
+                  placeholder={t("workspace.toolNode.urlAssetPlaceholder")}
+                  spellCheck={false}
+                  rows={2}
+                  aria-label="Source URL"
+                />
+              ) : hasPromptParam ? (
                 <PromptMentionTextarea
                   value={String(params.prompt ?? "")}
                   onChange={(v) => updateParam("prompt", v)}
@@ -3925,6 +3950,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                     "imageGenNode",
                     "videoGenNode",
                     "audioGenNode",
+                    "urlAssetNode",
                     "videoToPromptNode",
                     "imageTo3dNode",
                     "upscaleImageNode",

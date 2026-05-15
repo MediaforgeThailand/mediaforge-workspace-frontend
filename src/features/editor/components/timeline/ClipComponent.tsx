@@ -441,7 +441,11 @@ export const ClipComponent: React.FC<ClipComponentProps> = ({
         </div>
       )}
 
-      <div className="w-full h-full flex flex-col justify-end px-2 pb-1 relative z-10 pointer-events-none">
+      <div
+        className={`w-full h-full flex flex-col px-2 relative z-10 pointer-events-none ${
+          isAudio ? "justify-start pt-1 pb-0" : "justify-end pb-1"
+        }`}
+      >
         <span
           className={`text-[10px] font-medium truncate drop-shadow-md ${
             isSelected ? clipStyle.selectedText : clipStyle.text

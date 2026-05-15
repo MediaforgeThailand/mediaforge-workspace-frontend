@@ -145,6 +145,9 @@ const SINGLE_IMAGE_3D_MODELS = [
   "hyper3d-gen2-260112",
 ] as const;
 const MAGNIFIC_UPSCALE_MODELS = ["magnific-upscale-precision-v2"] as const;
+const OPENAI_UPSCALE_MODELS = ["gpt-image-2-enhance"] as const;
+const UPSCALE_MODELS = [...MAGNIFIC_UPSCALE_MODELS, ...OPENAI_UPSCALE_MODELS] as const;
+const URL_ASSET_MODELS = ["url-to-png", "url-to-mp3", "url-to-mp4"] as const;
 
 export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
   /**
@@ -1276,11 +1279,55 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     ],
   },
 
+  urlAssetNode: {
+    displayName: "URL to Asset",
+    category: "AI PROCESS",
+    accentColor: "zinc",
+    supportedModels: [...URL_ASSET_MODELS],
+    defaultModel: "url-to-png",
+    inputs: [],
+    outputs: [
+      { id: "image", label: "PNG", color: "emerald", supportedModels: ["url-to-png"] },
+      { id: "audio", label: "MP3", color: "amber", supportedModels: ["url-to-mp3"] },
+      { id: "output_video", label: "MP4", color: "violet", supportedModels: ["url-to-mp4"] },
+    ],
+    params: [
+      {
+        key: "model_name",
+        label: "Output",
+        type: "select",
+        options: [...URL_ASSET_MODELS],
+        optionLabels: {
+          "url-to-png": "PNG",
+          "url-to-mp3": "MP3",
+          "url-to-mp4": "MP4",
+        },
+        default: "url-to-png",
+        required: true,
+      },
+      {
+        key: "source_url",
+        label: "Source URL",
+        type: "text",
+        default: "",
+        placeholder: "https://cdn.example.com/file.png",
+        required: false,
+      },
+      {
+        key: "file_name",
+        label: "File name",
+        type: "text",
+        default: "",
+        placeholder: "Optional asset name",
+      },
+    ],
+  },
+
   upscaleImageNode: {
     displayName: "Upscale",
     category: "AI PROCESS",
     accentColor: "cyan",
-    supportedModels: [...MAGNIFIC_UPSCALE_MODELS],
+    supportedModels: [...UPSCALE_MODELS],
     defaultModel: "magnific-upscale-precision-v2",
     inputs: [
       {
@@ -1289,6 +1336,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         color: "emerald",
         required: false,
         maxConnections: 1,
+        supportedModels: [...UPSCALE_MODELS],
       },
       {
         id: "video",
@@ -1296,6 +1344,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         color: "emerald",
         required: false,
         maxConnections: 1,
+        supportedModels: [...MAGNIFIC_UPSCALE_MODELS],
       },
     ],
     outputs: [
@@ -1307,9 +1356,10 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         key: "model_name",
         label: "Model",
         type: "select",
-        options: [...MAGNIFIC_UPSCALE_MODELS],
+        options: [...UPSCALE_MODELS],
         optionLabels: {
           "magnific-upscale-precision-v2": "Magnific Precision V2",
+          "gpt-image-2-enhance": "GPT Image 2 Enhance",
         },
         default: "magnific-upscale-precision-v2",
         required: true,
@@ -1324,20 +1374,23 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           video: "Video",
         },
         default: "image",
+        supportedModels: [...MAGNIFIC_UPSCALE_MODELS],
       },
       {
         key: "scale_factor",
         label: "Image scale",
         type: "select",
-        options: ["2", "4", "8", "16"],
+        // Production verification on 2026-05-15 showed Magnific
+        // Precision V2 returning a single 2x output even when the
+        // submitted task had scale_factor=8. Keep only the verified
+        // option visible until the provider behavior is confirmed.
+        options: ["2"],
         optionLabels: {
           "2": "2x",
-          "4": "4x",
-          "8": "8x",
-          "16": "16x",
         },
         default: "2",
         visibleWhen: { media_type: "image" },
+        supportedModels: [...MAGNIFIC_UPSCALE_MODELS],
       },
       {
         key: "resolution",
@@ -1352,6 +1405,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         },
         default: "2k",
         visibleWhen: { media_type: "video" },
+        supportedModels: [...MAGNIFIC_UPSCALE_MODELS],
       },
       {
         key: "preset",
@@ -1365,6 +1419,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           creative: "Illustration / graphic",
         },
         default: "balanced",
+        supportedModels: [...MAGNIFIC_UPSCALE_MODELS],
       },
       {
         key: "fps_boost",
@@ -1374,6 +1429,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         optionLabels: { "false": "Off", "true": "On" },
         default: "false",
         visibleWhen: { media_type: "video" },
+        supportedModels: [...MAGNIFIC_UPSCALE_MODELS],
       },
       {
         key: "filter_nsfw",
@@ -1383,6 +1439,33 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         optionLabels: { "false": "Off", "true": "On" },
         default: "false",
         visibleWhen: { media_type: "image" },
+        supportedModels: [...MAGNIFIC_UPSCALE_MODELS],
+      },
+      {
+        key: "size",
+        label: "Resolution",
+        type: "select",
+        options: ["1024x1024", "2048x2048", "3840x2160"],
+        optionLabels: {
+          "1024x1024": "1K",
+          "2048x2048": "2K",
+          "3840x2160": "4K",
+        },
+        default: "1024x1024",
+        supportedModels: [...OPENAI_UPSCALE_MODELS],
+      },
+      {
+        key: "quality",
+        label: "Quality",
+        type: "select",
+        options: ["low", "medium", "high"],
+        optionLabels: {
+          low: "Low",
+          medium: "Medium",
+          high: "High",
+        },
+        default: "medium",
+        supportedModels: [...OPENAI_UPSCALE_MODELS],
       },
     ],
   },

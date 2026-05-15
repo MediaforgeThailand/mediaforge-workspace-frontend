@@ -2091,6 +2091,8 @@ export const ja = {
   "workspace.sidebar.spaces": "スペース",
   "workspace.sidebar.image_gen": "画像生成器",
   "workspace.sidebar.image_upscale": "アップスケール",
+  "workspace.sidebar.url_asset": "URL to Asset",
+  "workspace.sidebar.auto_subtitle": "Auto Subtitle",
   "workspace.sidebar.video_gen": "動画生成",
   "workspace.sidebar.voice_gen": "音声ジェネレーター",
   "workspace.sidebar.voice_translate": "翻訳",
@@ -2391,6 +2393,10 @@ export const ja = {
   "workspace.standalone.tool.image_gen.title": "画像生成器",
   "workspace.standalone.tool.image_upscale.nav": "アップスケール",
   "workspace.standalone.tool.image_upscale.title": "メディアをアップスケール",
+  "workspace.standalone.tool.url_asset.nav": "URL",
+  "workspace.standalone.tool.url_asset.title": "URL to Asset",
+  "workspace.standalone.tool.auto_subtitle.nav": "Subtitle",
+  "workspace.standalone.tool.auto_subtitle.title": "Auto Subtitle",
   "workspace.standalone.tool.video_gen.nav": "動画",
   "workspace.standalone.tool.video_gen.title": "動画生成",
   "workspace.standalone.tool.voice_gen.nav": "オーディオ",
@@ -2676,6 +2682,8 @@ export const ja = {
     "この音声を翻訳してクローンする権限があることを確認してください。",
   "workspace.standalone.validation.model_image":
     "3D 生成には参照画像が必要です。",
+  "workspace.standalone.validation.url_asset_url":
+    "PNG、MP4、または MP3 ファイルへの有効な http/https の直接 URL を入力してください。",
   "workspace.standalone.error_failed_queue": "キューの生成に失敗しました",
   "workspace.share.title": "ワークスペースを共有する",
   "workspace.share.description":
@@ -2935,6 +2943,9 @@ export const ja = {
   "workspace.toolnames.url_asset": "URL を素材に",
   "workspace.toolnames.url_asset_desc":
     "MP4 / MP3 / PNG の URL をワークスペース素材として読み込みます。",
+  "workspace.toolnames.auto_subtitle": "Auto Subtitle",
+  "workspace.toolnames.auto_subtitle_desc":
+    "Generate subtitles from an uploaded video.",
   "workspace.toolnames.kling_element": "Kling 要素",
   "workspace.toolnames.kling_element_desc":
     "キャラクターまたはオブジェクトを再利用可能な Kling Omni 要素として保存します。レフト4枚+フロント1枚。",
@@ -3949,6 +3960,8 @@ export const ja = {
     "例: 「サングラスをかけた楽しそうな犬、スタジオ照明」",
   "workspace.toolNode.wireImageAndRun":
     "画像を入力ポートにつないでRunを押してください",
+  "workspace.toolNode.urlAssetPlaceholder":
+    "Paste a direct PNG, MP3, or MP4 URL",
   "textInputNode.defaultTitle": "テキスト変数",
   "textInputNode.badge": "テキスト変数",
   "textInputNode.referencedVia": "#[name](id) で参照",

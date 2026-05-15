@@ -43,6 +43,10 @@ import {
   captionSettingsToTextStyle,
   captionPositionToTransform,
 } from "../../services/captions-generator";
+import {
+  AUTO_SUPTITLE_TRACK_NAME,
+  materializeAutoSuptitleTrack,
+} from "../../services/auto-suptitle";
 import { CAPTIONS_LANGUAGES } from "../../services/captions-client";
 import {
   BUILTIN_CAPTION_PRESETS,
@@ -158,8 +162,6 @@ export const CaptionsPanel: React.FC = () => {
   const project = useProjectStore((s) => s.project);
   const getClip = useProjectStore((s) => s.getClip);
   const getMediaItem = useProjectStore((s) => s.getMediaItem);
-  const addTrack = useProjectStore((s) => s.addTrack);
-  const createCaptionTextClip = useProjectStore((s) => s.createCaptionTextClip);
   const getAllTextClips = useProjectStore((s) => s.getAllTextClips);
   const deleteTextClip = useProjectStore((s) => s.deleteTextClip);
   const updateTextStyle = useProjectStore((s) => s.updateTextStyle);
@@ -273,7 +275,7 @@ export const CaptionsPanel: React.FC = () => {
     setGenerating(true);
     setProgress({ phase: "extracting", progress: 5, message: "Extracting audio..." });
     try {
-      const { lines, meta } = await generateCaptions({
+      const generated = await generateCaptions({
         clip: sourceClip,
         mediaItem,
         settings,
@@ -282,62 +284,35 @@ export const CaptionsPanel: React.FC = () => {
         onProgress: (p) => setProgress(p),
       });
 
-      // Captions go on the same Text track type as ordinary text clips —
-      // there's no separate "Captions" track. We prefer to reuse an existing
-      // text track (so captioned clips and styled text live together, which
-      // matches CapCut / Premiere / Descript behavior); if no text track
-      // exists we create one. Caption clips are still distinguishable from
-      // ordinary text via the `captionMeta` field on each TextClip.
-      // Migration: an older project may have a literal "Captions"-named track
-      // from the previous codepath — that's just a normal text track now and
-      // we'll use it transparently.
-      // V6-M2: matches addSubtitle's first-text-track strategy.
-      let captionsTrack = project.timeline.tracks.find(
-        (tr) => tr.type === "text",
-      );
-      if (!captionsTrack) {
-        // V6-H3 safe pattern: snapshot ids before addTrack so we pick the
-        // newly-created track, not an existing empty text track.
-        const existingIds = new Set(project.timeline.tracks.map((t) => t.id));
-        await addTrack("text");
-        const after = useProjectStore.getState().project;
-        captionsTrack = after.timeline.tracks.find(
-          (tr) => tr.type === "text" && !existingIds.has(tr.id),
-        );
-      }
-      if (!captionsTrack) {
-        toast.error("Could not create text track for captions");
+      const materialized = await materializeAutoSuptitleTrack({
+        result: {
+          whisperResponse: generated.whisperResponse,
+          cues: generated.lines,
+          meta: generated.meta,
+          algorithm: {
+            wordsPerLine: settings.wordsPerLine,
+            maxLineDuration: settings.maxLineDuration,
+            maxCharsPerLine: 42,
+            minLineDuration: 0.45,
+            maxSilenceGap: 0.75,
+            splitOnPunctuation: true,
+          },
+        },
+        settings,
+        trackName: AUTO_SUPTITLE_TRACK_NAME,
+      });
+      if (!materialized) {
+        toast.error("Could not create Auto Suptitle track");
         return;
       }
 
-      const refHeight = project.settings.height || 1080;
-      const refWidth = project.settings.width || 1920;
-      const transformPos = captionPositionToTransform(settings, refHeight, refWidth);
-
-      const baseStyle = captionSettingsToTextStyle(settings);
-
-      // Create one TextClip per caption line
-      let firstStart: number | null = null;
-      for (const line of lines) {
-        if (firstStart === null) firstStart = line.startTime;
-        createCaptionTextClip({
-          trackId: captionsTrack.id,
-          startTime: line.startTime,
-          duration: Math.max(0.05, line.endTime - line.startTime),
-          text: line.text,
-          style: baseStyle,
-          transform: { position: transformPos },
-          words: line.words,
-          captionMeta: meta,
-        });
-      }
-
+      const firstStart = generated.lines[0]?.startTime ?? null;
       // Reset bulk shift so the user can apply fresh
       setBulkShiftY(0);
 
       toast.success(
-        `Created ${lines.length} caption clips`,
-        `Language: ${meta.language.toUpperCase()}`,
+        `Created ${materialized.clips.length} Auto Suptitle clips`,
+        `Language: ${generated.meta.language.toUpperCase()}`,
       );
 
       // Seek to first caption
@@ -349,9 +324,9 @@ export const CaptionsPanel: React.FC = () => {
         setProgress(null);
       }, 1500);
     } catch (err) {
-      console.error("[Captions] Generation failed:", err);
-      const msg = err instanceof Error ? err.message : "Caption generation failed";
-      toast.error("Caption generation failed", msg);
+      console.error("[Auto Suptitle] Generation failed:", err);
+      const msg = err instanceof Error ? err.message : "Auto Suptitle generation failed";
+      toast.error("Auto Suptitle generation failed", msg);
       setProgress({ phase: "error", progress: 0, message: msg });
       setTimeout(() => setProgress(null), 4000);
     } finally {
@@ -367,11 +342,6 @@ export const CaptionsPanel: React.FC = () => {
     settings,
     language,
     promptText,
-    project.timeline.tracks,
-    project.settings.height,
-    project.settings.width,
-    addTrack,
-    createCaptionTextClip,
     setBulkShiftY,
     seekTo,
   ]);
@@ -483,7 +453,7 @@ export const CaptionsPanel: React.FC = () => {
           {/* Header */}
           <div className="flex items-center gap-2 pb-2 border-b border-border/30">
             <CaptionsIcon size={14} className="text-primary" />
-            <h3 className="text-[12px] font-semibold tracking-tight">AI Captions</h3>
+            <h3 className="text-[12px] font-semibold tracking-tight">Auto Suptitle</h3>
           </div>
 
           {/* ─────── 1. SOURCE ─────── */}
@@ -890,7 +860,7 @@ export const CaptionsPanel: React.FC = () => {
                 data-testid="captions-generate"
               >
                 <Wand2 size={14} />
-                Generate Captions
+                Generate Auto Suptitle
               </button>
             )}
           </div>
@@ -900,7 +870,7 @@ export const CaptionsPanel: React.FC = () => {
             <div className="mt-3 pt-3 border-t border-border" data-testid="captions-group">
               <div className="flex items-center gap-2 mb-2">
                 <Bookmark size={12} className="text-primary" />
-                <span className="text-[11px] font-semibold uppercase tracking-wider">Existing Captions</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider">Existing Auto Suptitle</span>
               </div>
               <div className="bg-background-tertiary rounded p-2 mb-2 text-[10px] text-text-secondary space-y-0.5" data-testid="captions-group-info">
                 <div>Generated: {new Date(activeGroup.meta.generatedAt).toLocaleTimeString()}</div>

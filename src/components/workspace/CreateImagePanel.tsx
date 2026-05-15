@@ -600,6 +600,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
         />
 
         {/* Prompt box */}
+        {(showPromptInput || showReferences) && (
         <section
           className={clsx(
             "shrink-0 rounded-[16px] border border-white/[0.05] bg-[#151719] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]",
@@ -758,6 +759,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
             )}
           </div>
         </section>
+        )}
 
         {settings.length > 0 && (
           <div className="grid shrink-0 grid-cols-2 gap-[5px]">

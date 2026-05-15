@@ -153,7 +153,7 @@ export const formatTimecode = (
 };
 
 export const getTrackInfo = (track: Track, index: number): TrackInfo => {
-  // CapCut palette: video=purple-blue, audio=teal-green, image=blue, text=orange, graphics=magenta
+  // CapCut palette: video=purple-blue, audio=blue, image=blue, text=orange, graphics=magenta
   switch (track.type) {
     case "video":
       return {
@@ -167,9 +167,9 @@ export const getTrackInfo = (track: Track, index: number): TrackInfo => {
       return {
         label: `A${index + 1}`,
         icon: Volume2,
-        color: "bg-emerald-500",
-        textColor: "text-emerald-300",
-        bgLight: "bg-emerald-500/20",
+        color: "bg-sky-500",
+        textColor: "text-sky-300",
+        bgLight: "bg-sky-500/20",
       };
     case "image":
       return {
@@ -218,10 +218,10 @@ export const getClipStyle = (trackType: string): ClipStyle => {
       };
     case "audio":
       return {
-        bg: "bg-emerald-500/30",
-        border: "border-emerald-400/60",
-        text: "text-emerald-50",
-        selectedText: "text-emerald-200",
+        bg: "bg-sky-500/25",
+        border: "border-sky-400/60",
+        text: "text-sky-50",
+        selectedText: "text-sky-100",
       };
     case "image":
       return {

@@ -107,15 +107,9 @@ export function useTour() {
     }
   }, []);
 
-  useEffect(() => {
-    const completed = localStorage.getItem(ONBOARDING_KEY);
-    if (!completed) {
-      const timer = setTimeout(() => {
-        start();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [start]);
+  // Do not auto-open the editor tour. The workspace entry now lands users in
+  // a real project flow, so interrupting first paint with a modal makes the
+  // editor feel blocked. Menu -> Editor Tour still calls startTour() manually.
 
   useEffect(() => {
     if (!state.isActive) return;

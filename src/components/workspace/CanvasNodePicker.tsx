@@ -262,6 +262,19 @@ const CATALOG: CatalogEntry[] = [
     outputs: [{ id: "output_media", type: "media", hint: "MP3/MP4", hintKey: "workspace.picker.port.media" }],
   },
   {
+    nodeType: "urlAssetNode",
+    label: "URL to Asset",
+    labelKey: "workspace.toolnames.url_asset",
+    defaultLabel: "URL to Asset",
+    icon: "Link",
+    inputs: [{ id: "text", type: "text", hint: "-> URL", hintKey: "workspace.picker.port.to_url" }],
+    outputs: [
+      { id: "image", type: "image", hint: "PNG", hintKey: "workspace.picker.port.png" },
+      { id: "audio", type: "audio", hint: "MP3", hintKey: "workspace.picker.port.mp3" },
+      { id: "output_video", type: "video", hint: "MP4", hintKey: "workspace.picker.port.mp4" },
+    ],
+  },
+  {
     nodeType: "videoToPromptNode",
     label: "Video to Prompt",
     labelKey: "workspace.toolnames.video_to_prompt",

@@ -1,8 +1,10 @@
 import {
   Box,
+  Captions,
   Film,
   Image as ImageIcon,
   Languages,
+  Link,
   Maximize2,
   Mic2,
   Sparkles,
@@ -20,7 +22,9 @@ export type StandaloneToolKey =
   | "video_gen"
   | "voice_gen"
   | "voice_translate"
-  | "image_to_3d";
+  | "auto_subtitle"
+  | "image_to_3d"
+  | "url_asset";
 
 export type GenerationOutputType = "image" | "video" | "audio" | "text" | "model_3d";
 
@@ -47,7 +51,7 @@ export interface StandaloneToolDefinition {
   title: string;
   subtitle: string;
   navLabel: string;
-  nodeType: "imageGenNode" | "upscaleImageNode" | "videoGenNode" | "audioGenNode" | "voiceTranslateNode" | "imageTo3dNode";
+  nodeType: "imageGenNode" | "upscaleImageNode" | "videoGenNode" | "audioGenNode" | "voiceTranslateNode" | "autoSubtitleNode" | "imageTo3dNode" | "urlAssetNode";
   icon: LucideIcon;
   outputType: GenerationOutputType;
   accent: string;
@@ -187,7 +191,7 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
   image_upscale: {
     key: "image_upscale",
     title: "Upscale Media",
-    subtitle: "Enhance images or videos with Magnific",
+    subtitle: "Enhance images or videos",
     navLabel: "Upscale",
     nodeType: "upscaleImageNode",
     icon: Maximize2,
@@ -201,6 +205,13 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
         provider: "Magnific",
         badge: "Upscale",
         description: "High-fidelity image and video upscaling with simple presets over Magnific's advanced controls.",
+      },
+      {
+        id: "gpt-image-2-enhance",
+        label: "GPT Image 2 Enhance",
+        provider: "OpenAI",
+        badge: "Enhance",
+        description: "AI image enhancement with GPT Image 2 for sharper, clearer 1K, 2K, or 4K outputs.",
       },
     ],
   },
@@ -356,6 +367,26 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
       },
     ],
   },
+  auto_subtitle: {
+    key: "auto_subtitle",
+    title: "Auto Subtitle",
+    subtitle: "Create editable subtitles from an uploaded video",
+    navLabel: "Subtitle",
+    nodeType: "autoSubtitleNode",
+    icon: Captions,
+    outputType: "video",
+    accent: "hsl(188 90% 52%)",
+    defaultModel: "auto-suptitle-whisper",
+    models: [
+      {
+        id: "auto-suptitle-whisper",
+        label: "Auto Subtitle",
+        provider: "MediaForge",
+        badge: "Editable",
+        description: "Transcribes speech, renders a subtitle preview, and creates an editable video project.",
+      },
+    ],
+  },
   image_to_3d: {
     key: "image_to_3d",
     title: "3D Generator",
@@ -410,13 +441,49 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
       },
     ],
   },
+  url_asset: {
+    key: "url_asset",
+    title: "URL to Asset",
+    subtitle: "Import direct MP4, MP3, or PNG URLs into your library",
+    navLabel: "URL",
+    nodeType: "urlAssetNode",
+    icon: Link,
+    outputType: "image",
+    accent: "hsl(204 90% 58%)",
+    defaultModel: "url-to-png",
+    models: [
+      {
+        id: "url-to-png",
+        label: "Import PNG",
+        provider: "URL Import",
+        badge: "PNG",
+        description: "Save a direct .png URL as a workspace asset.",
+      },
+      {
+        id: "url-to-mp4",
+        label: "Import MP4",
+        provider: "URL Import",
+        badge: "MP4",
+        description: "Save a direct .mp4 URL as a workspace asset.",
+      },
+      {
+        id: "url-to-mp3",
+        label: "Import MP3",
+        provider: "URL Import",
+        badge: "MP3",
+        description: "Save a direct .mp3 URL as a workspace asset.",
+      },
+    ],
+  },
 };
 
 export const STANDALONE_TOOL_ORDER: StandaloneToolKey[] = [
   "video_gen",
   "image_gen",
   "image_upscale",
+  "url_asset",
   "voice_translate",
+  "auto_subtitle",
   "image_to_3d",
   "voice_gen",
 ];

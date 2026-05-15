@@ -17,6 +17,7 @@ import {
   Layers2,
   Languages,
   LayoutGrid,
+  Link,
   Maximize2,
   Music,
   PenTool,
@@ -45,7 +46,7 @@ type ToolSection = "basics" | "media" | "video" | "threed" | "tools";
 const SECTION_ORDER: ToolSection[] = ["basics", "media", "video", "threed", "tools"];
 const SECTION_LABELS: Record<ToolSection, string> = {
   basics: "BASICS",
-  media: "MEDIA",
+  media: "ASSETS",
   video: "VIDEO",
   threed: "3D",
   tools: "TOOLS",
@@ -164,6 +165,18 @@ const CATALOG: ToolItem[] = [
     icon: FolderOpen,
     tint: "zinc",
     keywords: ["library", "files", "history"],
+  },
+  {
+    nodeType: "urlAssetNode",
+    labelKey: "workspace.toolnames.url_asset",
+    descriptionKey: "workspace.toolnames.url_asset_desc",
+    defaultLabel: "URL to Asset",
+    section: "media",
+    category: "media",
+    icon: Link,
+    tint: "sky",
+    isNew: true,
+    keywords: ["url", "link", "import", "mp4", "mp3", "png", "asset"],
   },
   {
     nodeType: "__stock__",

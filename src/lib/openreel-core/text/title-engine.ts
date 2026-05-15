@@ -337,6 +337,13 @@ export class TitleEngine {
         charIdx++;
       }
     } else {
+      const wantsWordHighlight =
+        clip.captionMeta?.animation === "wordHighlight" &&
+        clip.words &&
+        clip.words.length > 0;
+      const absoluteTime = clip.startTime + time;
+      let captionWordCursor = 0;
+
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const y = startY + i * lineHeight;
@@ -347,6 +354,42 @@ export class TitleEngine {
           const bgHeight = lineHeight;
           ctx.fillStyle = style.backgroundColor;
           ctx.fillRect(-bgWidth / 2, y - bgHeight / 2, bgWidth, bgHeight);
+        }
+
+        if (wantsWordHighlight) {
+          const lineWidth = ctx.measureText(line).width;
+          const startX =
+            style.textAlign === "center"
+              ? -lineWidth / 2
+              : style.textAlign === "right"
+                ? -lineWidth
+                : 0;
+          const tokens = line.split(/\s+/).filter(Boolean);
+          const spaceWidth = ctx.measureText(" ").width;
+          let cursorX = startX;
+
+          ctx.save();
+          ctx.textAlign = "left";
+          for (const token of tokens) {
+            const word = clip.words?.[captionWordCursor];
+            captionWordCursor++;
+            const isActive = !!(
+              word && absoluteTime >= word.start && absoluteTime < word.end
+            );
+            const color = isActive ? clip.captionMeta!.highlightColor : style.color;
+
+            if (style.strokeColor && style.strokeWidth) {
+              ctx.strokeStyle = style.strokeColor;
+              ctx.lineWidth = style.strokeWidth;
+              ctx.strokeText(token, cursorX, y);
+            }
+
+            ctx.fillStyle = color;
+            ctx.fillText(token, cursorX, y);
+            cursorX += ctx.measureText(token).width + spaceWidth;
+          }
+          ctx.restore();
+          continue;
         }
 
         if (style.strokeColor && style.strokeWidth) {

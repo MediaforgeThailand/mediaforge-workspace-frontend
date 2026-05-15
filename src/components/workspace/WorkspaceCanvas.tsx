@@ -583,6 +583,7 @@ const nodeTypes = {
   voiceTranslateNode: WorkspaceToolNode,
   removeBackgroundNode: WorkspaceToolNode,
   upscaleImageNode: WorkspaceToolNode,
+  urlAssetNode: WorkspaceToolNode,
   mergeAudioNode: WorkspaceToolNode,
   videoToPromptNode: WorkspaceToolNode,
   imageTo3dNode: WorkspaceToolNode,

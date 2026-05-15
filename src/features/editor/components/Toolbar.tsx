@@ -26,7 +26,7 @@ import {
 import { useProjectStore } from "../stores/project-store";
 import { useUIStore } from "../stores/ui-store";
 import { useThemeStore } from "../stores/theme-store";
-import { useRouter } from "../hooks/use-router";
+import { useNavigate } from "react-router-dom";
 import {
   getExportEngine,
   getDeviceProfile,
@@ -50,6 +50,10 @@ import { useAnalytics, AnalyticsEvents } from "../hooks/useAnalytics";
 import { startTour, ONBOARDING_KEY, startMoGraphTour, MOGRAPH_TOUR_KEY } from "./tour";
 import { autoSaveManager } from "../services/auto-save";
 import {
+  flushCloudSave,
+  saveProject as saveCloudProject,
+} from "../services/project-cloud";
+import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
@@ -64,7 +68,6 @@ import { useI18n, useI18nStore } from "../services/i18n";
 // only matters when the user actually exports to cloud. Keeping it static
 // pulled @supabase/supabase-js into the main editor bundle.
 import { Cloud } from "lucide-react";
-import { projectManager } from "../services/project-manager";
 
 type ExportType =
   | "mp4"
@@ -89,7 +92,7 @@ interface ExportState {
 }
 
 export const Toolbar: React.FC = () => {
-  const { project, renameProject, createNewProject } = useProjectStore();
+  const { project, renameProject, createNewProject, getFullProject } = useProjectStore();
   const {
     openModal,
     selectedItems,
@@ -103,7 +106,7 @@ export const Toolbar: React.FC = () => {
   const t = useI18n();
   const currentLocale = useI18nStore((s) => s.locale);
   const toggleLocale = useI18nStore((s) => s.toggleLocale);
-  const { navigate } = useRouter();
+  const navigate = useNavigate();
   const { openSettings } = useSettingsStore();
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
@@ -174,14 +177,19 @@ export const Toolbar: React.FC = () => {
   );
 
   // Menu dropdown actions
-  const handleNewProject = useCallback(() => {
+  const handleNewProject = useCallback(async () => {
+    await flushCloudSave();
     createNewProject();
-  }, [createNewProject]);
+    const nextProject = useProjectStore.getState().project;
+    await saveCloudProject(nextProject);
+    navigate(`/app/editor/${nextProject.id}`);
+  }, [createNewProject, navigate]);
 
   const handleSaveProject = useCallback(async () => {
     try {
-      const ok = await projectManager.saveProject(project);
+      const ok = await saveCloudProject(getFullProject());
       if (ok) {
+        setLastSavedAt(Date.now());
         toast.success("Project saved");
       } else {
         toast.error("Save failed");
@@ -189,7 +197,7 @@ export const Toolbar: React.FC = () => {
     } catch (e) {
       toast.error("Save failed", String(e));
     }
-  }, [project]);
+  }, [getFullProject]);
 
   const dispatchShortcut = useCallback((name: string) => {
     window.dispatchEvent(new CustomEvent(name));
@@ -235,8 +243,9 @@ export const Toolbar: React.FC = () => {
   useEffect(() => {
     const onSave = async () => {
       try {
-        const ok = await projectManager.saveProject(project);
+        const ok = await saveCloudProject(getFullProject());
         if (ok) {
+          setLastSavedAt(Date.now());
           toast.success("Project saved");
         } else {
           toast.error("Save failed");
@@ -261,7 +270,7 @@ export const Toolbar: React.FC = () => {
       window.removeEventListener("openreel:open-search", onOpenSearch);
       window.removeEventListener("openreel:open-settings", onOpenSettings);
     };
-  }, [project, openModal, openSettings]);
+  }, [getFullProject, openModal, openSettings]);
 
   useEffect(() => {
     if (isExportOpen && !deviceProfile) {
@@ -913,7 +922,7 @@ export const Toolbar: React.FC = () => {
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              onClick={() => navigate("welcome")}
+              onClick={() => navigate("/app/editor")}
               className="flex items-center gap-2 hover:opacity-80 transition-opacity"
               title="Back to Home"
               data-testid="brand-logo"

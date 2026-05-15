@@ -13,6 +13,7 @@ const ALLOWED_FOR_ORG_USER: RegExp[] = [
   /^\/$/,
   /^\/blog(\/|$)/,
   /^\/app\/workspace(\/|$)/,
+  /^\/app\/editor(\/|$)/,
   /^\/app\/org-admin(\/|$)/,
   /^\/app\/settings(\/|$)/,
   /^\/app\/pricing(\/|$)/,

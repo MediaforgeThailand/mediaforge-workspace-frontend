@@ -87,8 +87,22 @@ function openAiImagePriceKeys(params: Record<string, unknown>) {
     : [`${model}:${normalizedSize}:${quality}`, `${model}:${tier}:${quality}`, model];
 }
 
+function openAiEnhancePriceKeys(params: Record<string, unknown>) {
+  const rawModel = String(params.model_name ?? params.model ?? "gpt-image-2-enhance").toLowerCase();
+  const model = rawModel === "gpt-image-2" ? "gpt-image-2-enhance" : rawModel;
+  const rawQuality = String(params.quality ?? "medium").toLowerCase();
+  const quality = ["low", "medium", "high", "auto"].includes(rawQuality) ? rawQuality : "medium";
+  const size = String(params.size ?? "1024x1024").toLowerCase();
+  const normalizedSize = size === "auto" ? "1024x1024" : size;
+  const tier = resolutionTier(normalizedSize);
+  const exactSku = model.match(/^gpt-image-2-enhance:(1k|2k|4k):(low|medium|high|auto)$/);
+  if (exactSku) return [model];
+  return [`${model}:${normalizedSize}:${quality}`, `${model}:${tier}:${quality}`, model];
+}
+
 function modelDiscountPercent({ schemaKey, params, creditCosts }: NodeCostParams): number {
   const modelName = params.model_name as string | undefined;
+  if (schemaKey === "urlAssetNode") return 0;
   if (schemaKey === "bananaProNode" || schemaKey === "imageGenNode") {
     const apiModel = modelName || "nano-banana-pro";
     if (apiModel.startsWith("gpt-image") || apiModel.startsWith("replicate-gpt-image") || apiModel.startsWith("dall-e")) {
@@ -109,6 +123,9 @@ function modelDiscountPercent({ schemaKey, params, creditCosts }: NodeCostParams
   }
   if (schemaKey === "upscaleImageNode") {
     const apiModel = modelName || "magnific-upscale-precision-v2";
+    if (apiModel === "gpt-image-2-enhance" || apiModel.startsWith("gpt-image-2-enhance:")) {
+      return maxDiscountForRows(rowsForFeatureModels(creditCosts, "upscale_image", openAiEnhancePriceKeys({ ...params, model_name: apiModel })));
+    }
     return maxDiscountForRows(rowsForFeatureModels(creditCosts, "upscale_image", [apiModel, "magnific-upscale-precision-v2"]));
   }
   if (schemaKey === "mergeAudioNode") {
@@ -211,6 +228,7 @@ function replicateVideoPricingVariant(model: string, params: Record<string, unkn
  * Returns the base credit cost for a node, or null if pricing is missing.
  */
 export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostParams): number | null {
+  if (schemaKey === "mp3InputNode" || schemaKey === "urlAssetNode") return 0;
   if (!creditCosts || creditCosts.length === 0) return null;
 
   const modelName = params.model_name as string | undefined;
@@ -253,9 +271,17 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
     return match?.cost ?? null;
   }
 
-  // Image Upscale (Magnific Precision V2)
+  // Image Upscale (Magnific Precision V2 / GPT Image 2 Enhance)
   if (schemaKey === "upscaleImageNode") {
     const apiModel = modelName || "magnific-upscale-precision-v2";
+    if (apiModel === "gpt-image-2-enhance" || apiModel.startsWith("gpt-image-2-enhance:")) {
+      const keys = openAiEnhancePriceKeys({ ...params, model_name: apiModel });
+      for (const key of keys) {
+        const row = creditCosts.find((r) => r.feature === "upscale_image" && r.model === key);
+        if (row) return row.cost;
+      }
+      return null;
+    }
     const aliases = [apiModel, "magnific-upscale-precision-v2"];
     const match = creditCosts.find(
       (r) => r.feature === "upscale_image" && aliases.includes(r.model ?? ""),
@@ -283,11 +309,6 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
         (r.model === apiModel || r.model == null || r.model === ""),
     );
     return looseFallback?.cost ?? null;
-  }
-
-  // ── MP3 Input (no cost — pure source) ──
-  if (schemaKey === "mp3InputNode") {
-    return 0;
   }
 
   // ── Chat AI ──

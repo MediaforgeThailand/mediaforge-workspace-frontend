@@ -2096,6 +2096,8 @@ export const hi = {
   "workspace.sidebar.spaces": "रिक्त स्थान",
   "workspace.sidebar.image_gen": "छवि जनरेटर",
   "workspace.sidebar.image_upscale": "अपस्केल",
+  "workspace.sidebar.url_asset": "URL to Asset",
+  "workspace.sidebar.auto_subtitle": "Auto Subtitle",
   "workspace.sidebar.video_gen": "वीडियो जनरेशन",
   "workspace.sidebar.voice_gen": "आवाज जनरेटर",
   "workspace.sidebar.voice_translate": "अनुवाद",
@@ -2393,6 +2395,10 @@ export const hi = {
   "workspace.standalone.tool.image_gen.title": "छवि जनरेटर",
   "workspace.standalone.tool.image_upscale.nav": "अपस्केल",
   "workspace.standalone.tool.image_upscale.title": "मीडिया अपस्केल करें",
+  "workspace.standalone.tool.url_asset.nav": "URL",
+  "workspace.standalone.tool.url_asset.title": "URL to Asset",
+  "workspace.standalone.tool.auto_subtitle.nav": "Subtitle",
+  "workspace.standalone.tool.auto_subtitle.title": "Auto Subtitle",
   "workspace.standalone.tool.video_gen.nav": "वीडियो",
   "workspace.standalone.tool.video_gen.title": "वीडियो जनरेशन",
   "workspace.standalone.tool.voice_gen.nav": "ऑडियो",
@@ -2933,6 +2939,9 @@ export const hi = {
   "workspace.toolnames.url_asset": "URL को एसेट में",
   "workspace.toolnames.url_asset_desc":
     "MP4, MP3, या PNG URL को सीधे workspace एसेट के रूप में आयात करें।",
+  "workspace.toolnames.auto_subtitle": "Auto Subtitle",
+  "workspace.toolnames.auto_subtitle_desc":
+    "Generate subtitles from an uploaded video.",
   "workspace.toolnames.kling_element": "Kling तत्व",
   "workspace.toolnames.kling_element_desc":
     "किसी वर्ण या ऑब्जेक्ट को पुन: प्रयोज्य Kling ओमनी तत्व के रूप में सहेजें। 4 रेफरी + 1 फ्रंटल।",
@@ -3930,6 +3939,8 @@ export const hi = {
     'आज़माएं "सनग्लास पहना खुश कुत्ता, स्टूडियो लाइट"',
   "workspace.toolNode.wireImageAndRun":
     "इनपुट पोर्ट में इमेज जोड़ें और Run दबाएं",
+  "workspace.toolNode.urlAssetPlaceholder":
+    "Paste a direct PNG, MP3, or MP4 URL",
   "textInputNode.defaultTitle": "टेक्स्ट वैरिएबल",
   "textInputNode.badge": "टेक्स्ट वैरिएबल",
   "textInputNode.referencedVia": "#[name](id) से संदर्भित",

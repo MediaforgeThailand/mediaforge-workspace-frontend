@@ -144,6 +144,7 @@ export const ClipMediaCanvas: React.FC<ClipMediaCanvasProps> = ({
           width={clipWidth}
           height={layout.waveformHeight}
           top={layout.thumbsHeight}
+          isAudioTrack={isAudio}
           isInteractingExternal={isInteractingExternal}
         />
       )}
@@ -399,6 +400,7 @@ interface WaveformBandProps {
   width: number;
   height: number;
   top: number;
+  isAudioTrack: boolean;
   isInteractingExternal?: boolean;
 }
 
@@ -408,6 +410,7 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
   width,
   height,
   top,
+  isAudioTrack,
   isInteractingExternal,
 }) => {
   const cache = useClipWaveformCache();
@@ -420,7 +423,7 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
   // mirrors the same fix that's already in the FrameStrip thumbnail path.
   const waveformOwnershipRef = useRef<{ cacheId: string; binBucket: number } | null>(null);
 
-  const binCount = Math.max(8, Math.floor(width / 2));
+  const binCount = Math.max(16, Math.floor(width / 3));
   const binBucket = cache.binBucketFor(binCount);
   const waveformCacheId = useMemo(
     () => `${clip.id}:${clip.inPoint.toFixed(3)}:${clip.outPoint.toFixed(3)}`,
@@ -560,18 +563,24 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
     const logical = document.createElement("canvas");
     logical.width = width;
     logical.height = height;
+    const audioTrackTopPadding = isAudioTrack
+      ? Math.min(15, Math.max(8, Math.floor(height * 0.28)))
+      : 0;
     drawWaveform(logical, peaks, {
-      fillStyle: "#F4FF00",
-      bgStyle: "rgba(3, 76, 64, 0.72)",
-      barGap: 0,
-      minVisiblePeak: 0.1,
-      amplitudeCurve: 0.6,
+      fillStyle: isAudioTrack ? "#17BDF2" : "#20D6FF",
+      bgStyle: isAudioTrack ? "rgba(8, 54, 94, 0.86)" : "rgba(5, 68, 96, 0.76)",
+      barGap: 1,
+      minVisiblePeak: isAudioTrack ? 0.06 : 0.08,
+      amplitudeCurve: isAudioTrack ? 0.46 : 0.56,
+      mode: isAudioTrack ? "positive" : "center",
+      topPadding: audioTrackTopPadding,
+      bottomPadding: isAudioTrack ? 3 : 1,
     });
     if (ctx) {
       ctx.clearRect(0, 0, width, height);
       ctx.drawImage(logical, 0, 0, width, height);
     }
-  }, [entry?.peaks, width, height]);
+  }, [entry?.peaks, width, height, isAudioTrack]);
 
   if (height <= 0) return null;
 
@@ -723,7 +732,7 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
           className="absolute inset-0 flex items-center justify-center pointer-events-none"
           data-testid="clip-waveform-loading"
         >
-          <div className="text-[9px] font-medium text-[#F4FF00]/80 px-1.5 py-0.5 rounded bg-black/40 backdrop-blur-sm">
+          <div className="text-[9px] font-medium text-[#20D6FF]/85 px-1.5 py-0.5 rounded bg-black/40 backdrop-blur-sm">
             Decoding…
           </div>
         </div>
@@ -737,10 +746,10 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
             top: `${volumeLineY}px`,
             height: "1px",
             background: dragging
-              ? "#F4FF00"
-              : "rgba(244, 255, 0, 0.85)",
+              ? "#20D6FF"
+              : "rgba(32, 214, 255, 0.85)",
             boxShadow: dragging
-              ? "0 0 6px rgba(244, 255, 0, 0.9), 0 0 2px rgba(0,0,0,0.6)"
+              ? "0 0 6px rgba(32, 214, 255, 0.9), 0 0 2px rgba(0,0,0,0.6)"
               : "0 0 3px rgba(0,0,0,0.6)",
           }}
           data-testid="clip-volume-line"
@@ -772,10 +781,10 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
             height: "10px",
             marginLeft: "-5px",
             borderRadius: "50%",
-            background: "#F4FF00",
+            background: "#20D6FF",
             border: "1px solid rgba(0,0,0,0.5)",
             boxShadow: dragging
-              ? "0 0 6px rgba(244, 255, 0, 0.9), 0 1px 3px rgba(0,0,0,0.4)"
+              ? "0 0 6px rgba(32, 214, 255, 0.9), 0 1px 3px rgba(0,0,0,0.4)"
               : "0 1px 3px rgba(0,0,0,0.4)",
             opacity: dragging ? 1 : 0.9,
           }}
@@ -796,8 +805,8 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
                 ? `${Math.max(2, Math.min(height - 18, pointerLabel.y - 16))}px`
                 : `${Math.max(2, Math.min(height - 18, volumeLineY - 16))}px`,
             background: "#0e3d3d",
-            color: "#F4FF00",
-            border: "1px solid #F4FF00",
+            color: "#20D6FF",
+            border: "1px solid #20D6FF",
             whiteSpace: "nowrap",
             zIndex: 2,
           }}

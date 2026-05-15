@@ -2215,6 +2215,8 @@ export const th = {
   "workspace.sidebar.spaces": "พื้นที่งาน",
   "workspace.sidebar.image_gen": "สร้างรูปภาพ",
   "workspace.sidebar.image_upscale": "ขยายภาพ",
+  "workspace.sidebar.url_asset": "URL to Asset",
+  "workspace.sidebar.auto_subtitle": "Auto Subtitle",
   "workspace.sidebar.video_gen": "สร้างวิดีโอ",
   "workspace.sidebar.voice_gen": "สร้างเสียง",
   "workspace.sidebar.voice_translate": "แปลเสียง",
@@ -2523,6 +2525,10 @@ export const th = {
   "workspace.standalone.tool.image_gen.title": "สร้างรูปภาพ",
   "workspace.standalone.tool.image_upscale.nav": "ขยายภาพ",
   "workspace.standalone.tool.image_upscale.title": "ขยายภาพ/วิดีโอ",
+  "workspace.standalone.tool.url_asset.nav": "URL",
+  "workspace.standalone.tool.url_asset.title": "URL to Asset",
+  "workspace.standalone.tool.auto_subtitle.nav": "Subtitle",
+  "workspace.standalone.tool.auto_subtitle.title": "Auto Subtitle",
   "workspace.standalone.tool.video_gen.nav": "วิดีโอ",
   "workspace.standalone.tool.video_gen.title": "สร้างวิดีโอ",
   "workspace.standalone.tool.voice_gen.nav": "เสียง",
@@ -2799,6 +2805,8 @@ export const th = {
   "workspace.standalone.validation.translate_consent":
     "ยืนยันว่าคุณมีสิทธิ์แปลและโคลนเสียงนี้ก่อน",
   "workspace.standalone.validation.model_image": "การสร้าง 3D ต้องมีภาพอ้างอิง",
+  "workspace.standalone.validation.url_asset_url":
+    "ใส่ URL แบบ http หรือ https ที่เป็นไฟล์ PNG, MP4 หรือ MP3 โดยตรง",
   "workspace.standalone.error_failed_queue": "ส่งคำสั่งสร้างไม่สำเร็จ",
 
   // ─── Share dialog / banner / invalid screen ─────────────────────
@@ -3052,6 +3060,9 @@ export const th = {
   "workspace.toolnames.stock_desc": "ค้นหารูป เวกเตอร์ และวิดีโอสต็อกคุณภาพสูง",
   "workspace.toolnames.url_asset": "URL to Asset",
   "workspace.toolnames.url_asset_desc": "Import a direct MP4, MP3, or PNG URL as a workspace asset.",
+  "workspace.toolnames.auto_subtitle": "Auto Subtitle",
+  "workspace.toolnames.auto_subtitle_desc":
+    "Generate subtitles from an uploaded video.",
   "workspace.toolnames.kling_element": "Kling Element",
   "workspace.toolnames.kling_element_desc":
     "บันทึกตัวละคร/วัตถุเป็น Kling Omni element ใช้ซ้ำได้ · 4 ref + 1 frontal",
@@ -4037,6 +4048,8 @@ export const th = {
   "workspace.toolNode.imagePromptPlaceholder":
     'ลอง "สุนัขใส่แว่นกันแดด แสงสตูดิโอ"',
   "workspace.toolNode.wireImageAndRun": "เชื่อมรูปภาพเข้าพอร์ตอินพุตแล้วกด Run",
+  "workspace.toolNode.urlAssetPlaceholder":
+    "Paste a direct PNG, MP3, or MP4 URL",
   "textInputNode.defaultTitle": "ตัวแปรข้อความ",
   "textInputNode.badge": "ตัวแปรข้อความ",
   "textInputNode.referencedVia": "อ้างอิงด้วย #[name](id)",

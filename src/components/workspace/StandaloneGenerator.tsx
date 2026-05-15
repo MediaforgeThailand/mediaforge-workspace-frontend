@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Box,
   BookOpen,
+  Captions,
   Check,
   ChevronDown,
   ChevronRight,
@@ -32,6 +33,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -102,7 +104,11 @@ import {
   videoSupportsReferenceVideo,
   videoSupportsStartEndFrames,
 } from "./standaloneGenerationCatalog";
-import { GEMINI_TTS_VOICES, DEFAULT_GEMINI_TTS_VOICE } from "./workspaceSchema";
+import {
+  composeGptImageSize,
+  GEMINI_TTS_VOICES,
+  DEFAULT_GEMINI_TTS_VOICE,
+} from "./workspaceSchema";
 import { useVoicePreview } from "@/hooks/useVoicePreview";
 import {
   modelLogoFor,
@@ -118,6 +124,28 @@ import {
   buildExtractedAudioFile,
   extractAudioBlobFromVideo,
 } from "./videoAudioActions";
+import {
+  CAPTIONS_LANGUAGES,
+  transcribeAudio,
+} from "@/features/editor/services/captions-client";
+import {
+  AUTO_SUPTITLE_GROUP_PREFIX,
+  AUTO_SUPTITLE_TRACK_NAME,
+  algorithmFromCaptionSettings,
+  buildAutoSuptitleCues,
+  type AutoSuptitleResult,
+} from "@/features/editor/services/auto-suptitle";
+import {
+  BUILTIN_CAPTION_PRESETS,
+  DEFAULT_CAPTION_SETTINGS,
+  type CaptionStyleSettings,
+} from "@/features/editor/services/caption-presets";
+import {
+  createAutoSubtitleEditorProject,
+  renderAutoSubtitleVideo,
+  saveAutoSubtitleHandoff,
+  type RenderAutoSubtitleVideoResult,
+} from "./autoSubtitleStandalone";
 // Hardcoded voice catalogs (Gemini star names, Google Studio
 // labels, ElevenLabs default presets) were deleted in the
 // preset-purge cleanup. ElevenLabs voices come from a live
@@ -148,6 +176,16 @@ const IMAGE_REFERENCE_UPLOAD_JPEG_QUALITY = 0.88;
 const TRANSLATE_VIDEO_UPLOAD_MAX_BYTES = 1024 * 1024 * 1024;
 const TRANSLATE_VIDEO_UPLOAD_MAX_LABEL = "1 GB";
 const TRANSLATE_MEDIA_ACCEPT = "video/*,audio/*,.mp3,.wav,.m4a,.aac";
+const AUTO_SUBTITLE_MEDIA_ACCEPT = "video/*,.mp4,.mov,.webm,.m4v";
+const AUTO_SUBTITLE_AUDIO_MAX_BYTES = 24 * 1024 * 1024;
+const AUTO_SUBTITLE_FONT_OPTIONS = [
+  "Inter",
+  "Prompt",
+  "Kanit",
+  "Noto Sans Thai",
+  "Arial",
+  "Montserrat",
+];
 const SHOW_LOCAL_VOICE_DUB_ENGINES = false;
 const STANDALONE_JOB_SELECT =
   "id,node_type,provider,model,request,status,attempts,result,error,last_error,created_at,completed_at,run_after,deadline_at,locked_by,lock_expires_at,credits_charged,credits_refunded";
@@ -179,7 +217,10 @@ function translateVideoUploadSizeMessage(language: string): string {
 }
 
 function isTranslateVideoOverUploadLimit(slot: UploadSlot, file: File): boolean {
-  return slot === "translate-video" && file.size > TRANSLATE_VIDEO_UPLOAD_MAX_BYTES;
+  return (
+    (slot === "translate-video" || slot === "auto-subtitle-video") &&
+    file.size > TRANSLATE_VIDEO_UPLOAD_MAX_BYTES
+  );
 }
 
 function isSeedanceReferenceVideoDurationValid(
@@ -297,6 +338,19 @@ async function normalizeImageReferenceUpload(file: File): Promise<File> {
   });
 }
 
+async function readImageFileDimensions(file: File): Promise<{ width: number; height: number } | null> {
+  if (!file.type.startsWith("image/") || file.type === "image/svg+xml") return null;
+  try {
+    const img = await loadImageElement(file);
+    const width = img.naturalWidth || img.width;
+    const height = img.naturalHeight || img.height;
+    if (width > 0 && height > 0) return { width, height };
+  } catch {
+    // Dimension metadata is a hint for output-size selection only.
+  }
+  return null;
+}
+
 type UploadSlot =
   | "image-ref"
   /* Character slot — same upload pipeline as image-ref, but the
@@ -310,6 +364,7 @@ type UploadSlot =
   | "video-ref-image"
   | "video-ref-video"
   | "translate-video"
+  | "auto-subtitle-video"
   | "upscale-image"
   | "model-image";
 
@@ -334,6 +389,8 @@ interface UploadedRef {
   storageBucket?: "ai-media" | "user_assets";
   storagePath?: string;
   durationSec?: number;
+  width?: number;
+  height?: number;
 }
 
 const TRANSLATE_VIDEO_EXTENSION_RE = /\.(mp4|mov|webm|m4v)(?:[?#].*)?$/i;
@@ -523,6 +580,28 @@ interface VoiceTranslateTask {
   error?: string;
 }
 
+interface AutoSubtitleResultItem {
+  id: string;
+  sourceName: string;
+  sourceUrl: string;
+  outputUrl: string;
+  outputName: string;
+  outputMime: string;
+  outputExtension: "mp4" | "webm";
+  cueCount: number;
+  transcriptText: string;
+  handoffId: string;
+  editorProjectId?: string;
+  editorProjectError?: string;
+  createdAt: number;
+  duration: number;
+}
+
+interface AutoSubtitleProgress {
+  progress: number;
+  message: string;
+}
+
 type StandaloneVideoInputMode = "frames" | "reference";
 type VoiceTranslateEngine =
   | "elevenlabs_dubbing_clone"
@@ -593,6 +672,16 @@ interface StandaloneFormState {
   translateMode: "fast" | "quality";
   translateSpeakerNum: number;
   translateConsent: boolean;
+  autoSubtitleVideo: UploadedRef | null;
+  autoSubtitleLanguage: string;
+  autoSubtitlePresetId: string;
+  autoSubtitleFont: string;
+  autoSubtitleSize: number;
+  autoSubtitlePosition: "top" | "middle" | "bottom";
+  autoSubtitleStroke: boolean;
+  autoSubtitleStrokeWidth: number;
+  autoSubtitleBackground: boolean;
+  autoSubtitleWordsPerLine: number;
   upscaleImage: UploadedRef | null;
   upscalePreset: UpscalePreset;
   upscaleScale: string;
@@ -607,6 +696,8 @@ interface StandaloneFormState {
   modelImages: UploadedRef[];
   texture: boolean;
   pbr: boolean;
+  urlAssetSource?: string;
+  urlAssetFileName?: string;
 }
 
 type UpscalePreset = "balanced" | "clean" | "detail" | "creative";
@@ -642,6 +733,19 @@ const DEFAULT_TRANSLATE_PARAMS = {
   translateMode: "fast" as const,
   translateSpeakerNum: 1,
   translateConsent: false,
+};
+
+const DEFAULT_AUTO_SUBTITLE_PARAMS = {
+  autoSubtitleVideo: null as UploadedRef | null,
+  autoSubtitleLanguage: "auto",
+  autoSubtitlePresetId: "tiktok-yellow",
+  autoSubtitleFont: "Inter",
+  autoSubtitleSize: 56,
+  autoSubtitlePosition: "bottom" as const,
+  autoSubtitleStroke: true,
+  autoSubtitleStrokeWidth: 6,
+  autoSubtitleBackground: false,
+  autoSubtitleWordsPerLine: 4,
 };
 
 const DEFAULT_UPSCALE_PARAMS = {
@@ -944,6 +1048,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     script: "",
     ...DEFAULT_VOICE_PARAMS,
     ...DEFAULT_TRANSLATE_PARAMS,
+    ...DEFAULT_AUTO_SUBTITLE_PARAMS,
     ...DEFAULT_UPSCALE_PARAMS,
     modelImage: null,
     modelImages: [],
@@ -981,6 +1086,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     script: "",
     ...DEFAULT_VOICE_PARAMS,
     ...DEFAULT_TRANSLATE_PARAMS,
+    ...DEFAULT_AUTO_SUBTITLE_PARAMS,
     ...DEFAULT_UPSCALE_PARAMS,
     modelImage: null,
     modelImages: [],
@@ -1018,6 +1124,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     script: "",
     ...DEFAULT_VOICE_PARAMS,
     ...DEFAULT_TRANSLATE_PARAMS,
+    ...DEFAULT_AUTO_SUBTITLE_PARAMS,
     ...DEFAULT_UPSCALE_PARAMS,
     modelImage: null,
     modelImages: [],
@@ -1055,6 +1162,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     script: "",
     ...DEFAULT_VOICE_PARAMS,
     ...DEFAULT_TRANSLATE_PARAMS,
+    ...DEFAULT_AUTO_SUBTITLE_PARAMS,
     ...DEFAULT_UPSCALE_PARAMS,
     modelImage: null,
     modelImages: [],
@@ -1092,6 +1200,45 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     script: "",
     ...DEFAULT_VOICE_PARAMS,
     ...DEFAULT_TRANSLATE_PARAMS,
+    ...DEFAULT_AUTO_SUBTITLE_PARAMS,
+    ...DEFAULT_UPSCALE_PARAMS,
+    modelImage: null,
+    modelImages: [],
+    texture: true,
+    pbr: true,
+  },
+  auto_subtitle: {
+    model: STANDALONE_TOOLS.auto_subtitle.defaultModel,
+    prompt: "",
+    styleId: "none",
+    aspectRatio: "16:9",
+    imageResolution: "1K",
+    quality: "medium",
+    outputFormat: "mp4",
+    background: "auto",
+    imageCount: 1,
+    imageRefs: [],
+    videoRatio: "16:9",
+    videoResolution: "720p",
+    videoDuration: 5,
+    videoCount: 1,
+    videoInputMode: "frames",
+    videoWithAudio: false,
+    videoStart: null,
+    videoEnd: null,
+    videoRefImage: null,
+    videoRefVideo: null,
+    videoCharacterOrientation: "video",
+    videoKeepOriginalSound: false,
+    videoNegativePrompt: "",
+    videoPersonGeneration: "allow_adult",
+    videoReturnLastFrame: false,
+    videoMultiShot: false,
+    videoMultiPrompt: "",
+    script: "",
+    ...DEFAULT_VOICE_PARAMS,
+    ...DEFAULT_TRANSLATE_PARAMS,
+    ...DEFAULT_AUTO_SUBTITLE_PARAMS,
     ...DEFAULT_UPSCALE_PARAMS,
     modelImage: null,
     modelImages: [],
@@ -1129,11 +1276,52 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     script: "",
     ...DEFAULT_VOICE_PARAMS,
     ...DEFAULT_TRANSLATE_PARAMS,
+    ...DEFAULT_AUTO_SUBTITLE_PARAMS,
     ...DEFAULT_UPSCALE_PARAMS,
     modelImage: null,
     modelImages: [],
     texture: true,
     pbr: true,
+  },
+  url_asset: {
+    model: STANDALONE_TOOLS.url_asset.defaultModel,
+    prompt: "",
+    styleId: "none",
+    aspectRatio: "1:1",
+    imageResolution: "1K",
+    quality: "medium",
+    outputFormat: "png",
+    background: "auto",
+    imageCount: 1,
+    imageRefs: [],
+    videoRatio: "16:9",
+    videoResolution: "720p",
+    videoDuration: 5,
+    videoCount: 1,
+    videoInputMode: "frames",
+    videoWithAudio: false,
+    videoStart: null,
+    videoEnd: null,
+    videoRefImage: null,
+    videoRefVideo: null,
+    videoCharacterOrientation: "video",
+    videoKeepOriginalSound: false,
+    videoNegativePrompt: "",
+    videoPersonGeneration: "allow_adult",
+    videoReturnLastFrame: false,
+    videoMultiShot: false,
+    videoMultiPrompt: "",
+    script: "",
+    ...DEFAULT_VOICE_PARAMS,
+    ...DEFAULT_TRANSLATE_PARAMS,
+    ...DEFAULT_AUTO_SUBTITLE_PARAMS,
+    ...DEFAULT_UPSCALE_PARAMS,
+    modelImage: null,
+    modelImages: [],
+    texture: true,
+    pbr: true,
+    urlAssetSource: "",
+    urlAssetFileName: "",
   },
 };
 
@@ -1146,7 +1334,9 @@ const STANDALONE_TOOL_TITLE_KEYS = {
   video_gen: "workspace.standalone.tool.video_gen.title",
   voice_gen: "workspace.standalone.tool.voice_gen.title",
   voice_translate: "workspace.standalone.tool.voice_translate.title",
+  auto_subtitle: "workspace.standalone.tool.auto_subtitle.title",
   image_to_3d: "workspace.standalone.tool.image_to_3d.title",
+  url_asset: "workspace.standalone.tool.url_asset.title",
 } as const satisfies Record<StandaloneToolKey, TranslationKey>;
 
 const STANDALONE_TOOL_NAV_KEYS = {
@@ -1155,7 +1345,9 @@ const STANDALONE_TOOL_NAV_KEYS = {
   video_gen: "workspace.standalone.tool.video_gen.nav",
   voice_gen: "workspace.standalone.tool.voice_gen.nav",
   voice_translate: "workspace.standalone.tool.voice_translate.nav",
+  auto_subtitle: "workspace.standalone.tool.auto_subtitle.nav",
   image_to_3d: "workspace.standalone.tool.image_to_3d.nav",
+  url_asset: "workspace.standalone.tool.url_asset.nav",
 } as const satisfies Record<StandaloneToolKey, TranslationKey>;
 
 const STANDALONE_MODEL_DESCRIPTION_KEYS = {
@@ -1234,11 +1426,15 @@ const STATUS_LABEL_KEYS = {
 } as const satisfies Record<StandaloneJobRow["status"], TranslationKey>;
 
 function standaloneToolTitle(tool: StandaloneToolKey, t: TranslationFn) {
-  return t(STANDALONE_TOOL_TITLE_KEYS[tool]);
+  const key = STANDALONE_TOOL_TITLE_KEYS[tool];
+  const translated = t(key);
+  return translated === key ? STANDALONE_TOOLS[tool].title : translated;
 }
 
 function standaloneToolNav(tool: StandaloneToolKey, t: TranslationFn) {
-  return t(STANDALONE_TOOL_NAV_KEYS[tool]);
+  const key = STANDALONE_TOOL_NAV_KEYS[tool];
+  const translated = t(key);
+  return translated === key ? STANDALONE_TOOLS[tool].navLabel : translated;
 }
 
 function standaloneCreateActionTitle(
@@ -1252,6 +1448,8 @@ function standaloneCreateActionTitle(
     voice_gen: { en: "Create Audio", th: "สร้างเสียง" },
     voice_translate: { en: "Translate Voice", th: "แปลเสียงวิดีโอ" },
     image_to_3d: { en: "Create 3D", th: "สร้าง 3D" },
+    auto_subtitle: { en: "Auto Subtitle", th: "Auto Subtitle" },
+    url_asset: { en: "URL to Asset", th: "URL to Asset" },
   };
   return labels[tool][language];
 }
@@ -1351,7 +1549,6 @@ type StandaloneInlineLabelKey =
   | "negativePrompt"
   | "off"
   | "on"
-  | "orientation"
   | "originalSound"
   | "people"
   | "quality"
@@ -1396,7 +1593,6 @@ const STANDALONE_INLINE_LABELS: Record<
   negativePrompt: { en: "Negative prompt", th: "คำสั่งที่ไม่ต้องการ" },
   off: { en: "Off", th: "ปิด" },
   on: { en: "On", th: "เปิด" },
-  orientation: { en: "Orientation", th: "ทิศทาง" },
   originalSound: { en: "Original sound", th: "เสียงต้นฉบับ" },
   people: { en: "People", th: "บุคคล" },
   quality: { en: "Quality", th: "คุณภาพ" },
@@ -1470,6 +1666,47 @@ function isReplicateGptImageModel(model: string) {
   return model === "replicate-gpt-image-2";
 }
 
+function isGptImage2EnhanceModel(model: string) {
+  return model === "gpt-image-2-enhance";
+}
+
+function nearestGptImageAspectRatio(
+  ref: Pick<UploadedRef, "width" | "height"> | null | undefined,
+  resolution: string,
+): string {
+  const supportsResolution = (id: string) =>
+    gptImageResolutionsFor(id).includes(resolution) || resolution === "Auto";
+  const fallback = supportsResolution("1:1")
+    ? "1:1"
+    : supportsResolution("16:9")
+      ? "16:9"
+      : "9:16";
+  if (!ref?.width || !ref.height) return fallback;
+  const ratio = ref.width / ref.height;
+  const candidates = [
+    { id: "1:1", ratio: 1 },
+    { id: "16:9", ratio: 16 / 9 },
+    { id: "9:16", ratio: 9 / 16 },
+    { id: "3:2", ratio: 3 / 2 },
+    { id: "2:3", ratio: 2 / 3 },
+    { id: "5:4", ratio: 5 / 4 },
+    { id: "4:5", ratio: 4 / 5 },
+    { id: "3:4", ratio: 3 / 4 },
+  ].filter((candidate) => supportsResolution(candidate.id));
+  return candidates.reduce((best, candidate) => (
+    Math.abs(candidate.ratio - ratio) < Math.abs(best.ratio - ratio)
+      ? candidate
+      : best
+  )).id ?? fallback;
+}
+
+function gptImage2EnhanceSizeForForm(form: StandaloneFormState): string {
+  const resolution = ["1K", "2K", "4K"].includes(form.imageResolution)
+    ? form.imageResolution
+    : "1K";
+  return composeGptImageSize(nearestGptImageAspectRatio(form.upscaleImage, resolution), resolution);
+}
+
 function isBananaProImageModel(model: string) {
   return model === "nano-banana-pro" || model === "replicate-nano-banana-pro";
 }
@@ -1532,6 +1769,7 @@ export default function StandaloneGenerator({
 }) {
   const { user } = useAuth();
   const { language, t } = useLanguage();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { credits, loading: creditsLoading } = useCredits();
   const { data: creditCosts = [], isLoading: creditCostsLoading } =
@@ -1575,6 +1813,9 @@ export default function StandaloneGenerator({
     useState<DeletableReference | null>(null);
   const [deletingReference, setDeletingReference] = useState(false);
   const [translateTask, setTranslateTask] = useState<VoiceTranslateTask | null>(null);
+  const [autoSubtitleResults, setAutoSubtitleResults] = useState<AutoSubtitleResultItem[]>([]);
+  const [autoSubtitleProgress, setAutoSubtitleProgress] =
+    useState<AutoSubtitleProgress | null>(null);
 
   const activeDef = STANDALONE_TOOLS[activeTool];
   const form = forms[activeTool];
@@ -1969,10 +2210,7 @@ export default function StandaloneGenerator({
           return;
         }
         if (nextStatus === "failed") {
-          toast.error(
-            displayError ||
-              (language === "th" ? "แปลเสียงไม่สำเร็จ" : "Translation failed."),
-          );
+          toast.error(displayError || "Translation failed.");
           return;
         }
       } catch (err) {
@@ -2063,6 +2301,18 @@ export default function StandaloneGenerator({
       }
       nextPatch.imageRefs = form.imageRefs.slice(0, maxImageRefsForModel(model));
     }
+    if (activeTool === "image_upscale") {
+      if (isGptImage2EnhanceModel(model)) {
+        nextPatch.imageResolution = ["1K", "2K", "4K"].includes(form.imageResolution)
+          ? form.imageResolution
+          : "1K";
+        nextPatch.quality = ["low", "medium", "high"].includes(form.quality)
+          ? form.quality
+          : "medium";
+      } else {
+        nextPatch.upscaleScale = "2";
+      }
+    }
     if (activeTool === "video_gen") {
       const isSeedance = isSeedanceVideoModel(model);
       const supportsFrames = videoSupportsStartEndFrames(model);
@@ -2126,7 +2376,7 @@ export default function StandaloneGenerator({
   const packageDiscountLabel = credits?.package_discount_label ?? null;
 
   const estimatedCostQuote = useMemo(() => {
-    if (activeTool === "voice_translate") return null;
+    if (activeTool === "voice_translate" || activeTool === "auto_subtitle") return null;
     if (creditCostsLoading) return null;
     const params = buildCurrentParams(activeTool, form);
     if (!params) return null;
@@ -2195,7 +2445,7 @@ export default function StandaloneGenerator({
       return;
     }
     pendingSlotRef.current = slot;
-    const accept = uploadAcceptForSlot(slot);
+    const accept = uploadAcceptForSlot(slot, form.model);
     setUploadAccept(accept);
     if (fileInputRef.current) fileInputRef.current.accept = accept;
     fileInputRef.current?.click();
@@ -2208,6 +2458,8 @@ export default function StandaloneGenerator({
         ? "upscale"
       : activeTool === "voice_translate"
         ? "translate"
+      : activeTool === "auto_subtitle"
+        ? "subtitle"
       : activeTool === "image_to_3d"
         ? "3d"
         : activeTool === "voice_gen"
@@ -2261,8 +2513,10 @@ export default function StandaloneGenerator({
           : [form.videoStart, videoSupportsEnd ? form.videoEnd : null].filter(Boolean)
         : activeTool === "image_to_3d"
           ? threeDReferencesForForm(form)
-          : activeTool === "voice_translate"
+        : activeTool === "voice_translate"
             ? [form.translateVideo].filter(Boolean)
+        : activeTool === "auto_subtitle"
+            ? [form.autoSubtitleVideo].filter(Boolean)
           : [];
 
   const panelMaxReferences =
@@ -2281,7 +2535,9 @@ export default function StandaloneGenerator({
               : 0
         : activeTool === "image_to_3d"
           ? max3dRefsForModel(form.model)
-          : activeTool === "voice_translate"
+        : activeTool === "voice_translate"
+            ? 1
+        : activeTool === "auto_subtitle"
             ? 1
           : 0;
 
@@ -2297,6 +2553,9 @@ export default function StandaloneGenerator({
     }
     if (activeTool === "voice_translate") {
       return "translate-video";
+    }
+    if (activeTool === "auto_subtitle") {
+      return "auto-subtitle-video";
     }
     if (activeTool === "video_gen") {
       if (videoPanelMode === "frames") {
@@ -2358,6 +2617,8 @@ export default function StandaloneGenerator({
         patch.videoRefVideo = uploaded;
       } else if (slot === "translate-video") {
         patch.translateVideo = uploaded;
+      } else if (slot === "auto-subtitle-video") {
+        patch.autoSubtitleVideo = uploaded;
       } else if (slot === "upscale-image") {
         patch.upscaleImage = uploaded;
       } else if (slot === "model-image") {
@@ -2400,11 +2661,16 @@ export default function StandaloneGenerator({
       for (const file of candidates) {
         const needsVideo = slot === "video-ref-video";
         const needsTranslateMedia = slot === "translate-video";
+        const needsAutoSubtitleMedia = slot === "auto-subtitle-video";
         const needsUpscaleMedia = slot === "upscale-image";
         const isValidType = needsTranslateMedia
           ? isTranslateMediaFile(file)
+          : needsAutoSubtitleMedia
+            ? isAutoSubtitleMediaFile(file)
           : needsUpscaleMedia
-            ? isUpscaleMediaFile(file)
+            ? isGptImage2EnhanceModel(form.model)
+              ? file.type.startsWith("image/")
+              : isUpscaleMediaFile(file)
           : needsVideo
             ? file.type.startsWith("video/")
             : file.type.startsWith("image/");
@@ -2414,10 +2680,16 @@ export default function StandaloneGenerator({
               ? language === "th"
                 ? "เลือกไฟล์ MP4 หรือ MP3 สำหรับ Translate"
                 : "Choose an MP4 or MP3 file for Translate."
+              : needsAutoSubtitleMedia
+                ? "Choose an MP4 video for Auto Subtitle."
               : needsUpscaleMedia
                 ? language === "th"
-                  ? "เลือกภาพหรือวิดีโอสำหรับ Upscale"
-                  : "Choose an image or video for Upscale."
+                  ? isGptImage2EnhanceModel(form.model)
+                    ? "เลือกไฟล์ภาพสำหรับ GPT Image 2 Enhance"
+                    : "เลือกภาพหรือวิดีโอสำหรับ Upscale"
+                  : isGptImage2EnhanceModel(form.model)
+                    ? "Choose an image for GPT Image 2 Enhance."
+                    : "Choose an image or video for Upscale."
               : needsVideo
                 ? t("workspace.toast.upload_video_ref")
                 : t("workspace.toast.upload_image_ref"),
@@ -2467,7 +2739,12 @@ export default function StandaloneGenerator({
     const referenceMime = reference.mime ?? "image/jpeg";
     const expectsVideo = slot === "video-ref-video";
     const expectsTranslateMedia = slot === "translate-video";
+    const expectsAutoSubtitleMedia = slot === "auto-subtitle-video";
     const expectsUpscaleMedia = slot === "upscale-image";
+    if (expectsAutoSubtitleMedia && !referenceMime.startsWith("video/")) {
+      toast.error("Choose an MP4 video for Auto Subtitle.");
+      return;
+    }
     if (expectsTranslateMedia && !referenceMime.startsWith("video/") && !referenceMime.startsWith("audio/")) {
       toast.error(
         language === "th"
@@ -2478,16 +2755,22 @@ export default function StandaloneGenerator({
     }
     if (
       expectsUpscaleMedia &&
-      !isUpscaleMediaReference({
-        mime: referenceMime,
-        name: reference.name ?? "asset-reference",
-        url: reference.url,
-      })
+      (isGptImage2EnhanceModel(form.model)
+        ? !referenceMime.startsWith("image/")
+        : !isUpscaleMediaReference({
+            mime: referenceMime,
+            name: reference.name ?? "asset-reference",
+            url: reference.url,
+          }))
     ) {
       toast.error(
         language === "th"
-          ? "เลือกภาพหรือวิดีโอสำหรับ Upscale"
-          : "Choose an image or video for Upscale.",
+          ? isGptImage2EnhanceModel(form.model)
+            ? "เลือกไฟล์ภาพสำหรับ GPT Image 2 Enhance"
+            : "เลือกภาพหรือวิดีโอสำหรับ Upscale"
+          : isGptImage2EnhanceModel(form.model)
+            ? "Choose an image for GPT Image 2 Enhance."
+            : "Choose an image or video for Upscale.",
       );
       return;
     }
@@ -2498,6 +2781,7 @@ export default function StandaloneGenerator({
     if (
       !expectsVideo &&
       !expectsTranslateMedia &&
+      !expectsAutoSubtitleMedia &&
       !expectsUpscaleMedia &&
       (referenceMime.startsWith("video/") || referenceMime.startsWith("audio/"))
     ) {
@@ -2606,6 +2890,8 @@ export default function StandaloneGenerator({
         patch.modelImage = nextRefs[0] ?? null;
       } else if (activeTool === "voice_translate" && current.translateVideo?.id === id) {
         patch.translateVideo = null;
+      } else if (activeTool === "auto_subtitle" && current.autoSubtitleVideo?.id === id) {
+        patch.autoSubtitleVideo = null;
       } else if (activeTool === "image_upscale" && current.upscaleImage?.id === id) {
         patch.upscaleImage = null;
       }
@@ -3077,6 +3363,129 @@ export default function StandaloneGenerator({
     await startElevenLabsDubbing();
   };
 
+  const startAutoSubtitle = async () => {
+    const source = form.autoSubtitleVideo;
+    if (!source) {
+      throw new Error("Upload an MP4 video before generating subtitles.");
+    }
+    const settings = autoSubtitleStyleFromForm(form);
+    const toastId = toast.loading("Generating subtitles...");
+    setAutoSubtitleProgress({ progress: 8, message: "Preparing source video..." });
+    try {
+      const audio = await extractAudioBlobFromVideo(source.url);
+      if (audio.size > AUTO_SUBTITLE_AUDIO_MAX_BYTES) {
+        const mb = (audio.size / (1024 * 1024)).toFixed(1);
+        throw new Error(
+          `Extracted audio is ${mb} MB. Trim the video or use a shorter clip for Auto Subtitle.`,
+        );
+      }
+
+      setAutoSubtitleProgress({ progress: 22, message: "Transcribing speech..." });
+      const whisperResponse = await transcribeAudio(audio, {
+        language: form.autoSubtitleLanguage,
+        granularity: "word",
+      });
+      const algorithm = algorithmFromCaptionSettings(settings);
+      const cues = buildAutoSuptitleCues(
+        whisperResponse.words ?? [],
+        0,
+        settings,
+        algorithm,
+      );
+      if (cues.length === 0) {
+        throw new Error("No speech was detected in this video.");
+      }
+
+      const result: AutoSuptitleResult = {
+        whisperResponse,
+        cues,
+        algorithm,
+        meta: {
+          groupId: `${AUTO_SUPTITLE_GROUP_PREFIX}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          generatedAt: Date.now(),
+          language: whisperResponse.language ?? form.autoSubtitleLanguage ?? "auto",
+          sourceClipId: source.id,
+          animation: settings.animation,
+          highlightColor: settings.highlightColor,
+        },
+      };
+
+      const rendered: RenderAutoSubtitleVideoResult = await renderAutoSubtitleVideo({
+        sourceUrl: source.url,
+        cues,
+        settings,
+        onProgress: (progress, message) => setAutoSubtitleProgress({ progress, message }),
+      });
+      const outputUrl = URL.createObjectURL(rendered.blob);
+      const outputName = autoSubtitleOutputName(source.name, rendered.extension);
+      const handoff = {
+        version: 1,
+        feature: "auto-suptitle",
+        source: {
+          url: source.url,
+          fileName: source.name,
+          mime: source.mime || "video/mp4",
+          duration: rendered.duration,
+        },
+        track: {
+          name: AUTO_SUPTITLE_TRACK_NAME,
+          cues: result.cues,
+          meta: result.meta,
+        },
+        style: settings,
+        transcriptText: whisperResponse.text ?? cues.map((cue) => cue.text).join(" "),
+        createdAt: Date.now(),
+      } as const;
+      const handoffId = saveAutoSubtitleHandoff(handoff);
+      setAutoSubtitleProgress({ progress: 97, message: "Creating editable project..." });
+      let editorProjectId: string | undefined;
+      let editorProjectError: string | undefined;
+      try {
+        editorProjectId = await createAutoSubtitleEditorProject(handoff);
+      } catch (projectErr) {
+        editorProjectError =
+          projectErr instanceof Error ? projectErr.message : "Could not create the editable project.";
+        console.warn("[AutoSubtitle] editor project creation failed:", projectErr);
+      }
+
+      setAutoSubtitleResults((items) => [
+        {
+          id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`,
+          sourceName: source.name,
+          sourceUrl: source.url,
+          outputUrl,
+          outputName,
+          outputMime: rendered.mime,
+          outputExtension: rendered.extension,
+          cueCount: cues.length,
+          transcriptText: whisperResponse.text ?? cues.map((cue) => cue.text).join(" "),
+          handoffId,
+          editorProjectId,
+          editorProjectError,
+          createdAt: Date.now(),
+          duration: rendered.duration,
+        },
+        ...items,
+      ]);
+      toast.success(
+        editorProjectId ? "Subtitle video and editor project ready." : "Subtitle video ready.",
+        { id: toastId },
+      );
+    } catch (err) {
+      toast.error(friendlyError(err, language === "th" ? "th" : "en"), { id: toastId });
+    } finally {
+      setAutoSubtitleProgress(null);
+    }
+  };
+
+  const openAutoSubtitleEditor = (result: AutoSubtitleResultItem) => {
+    if (result.editorProjectId) {
+      navigate(`/app/editor/${result.editorProjectId}`);
+      return;
+    }
+    navigate(`/app/editor?autoSubtitleHandoff=${encodeURIComponent(result.handoffId)}`);
+  };
+
   const videoRatioOptions = videoRatioOptionsForModel(form.model);
   const videoResolutionOptions = videoResolutionOptionsForModel(form.model);
   const videoDurationOptions = videoDurationOptionsForSettings(
@@ -3234,6 +3643,27 @@ export default function StandaloneGenerator({
             : []),
         ]
       : [];
+  const urlAssetTextControls =
+    activeTool === "url_asset"
+      ? [
+          {
+            id: "source-url",
+            label: language === "th" ? "Source URL" : "Source URL",
+            value: form.urlAssetSource ?? "",
+            placeholder: "https://example.com/file.png",
+            rows: 1,
+            onChange: (urlAssetSource: string) => updateForm({ urlAssetSource }),
+          },
+          {
+            id: "file-name",
+            label: language === "th" ? "Asset name" : "Asset name",
+            value: form.urlAssetFileName ?? "",
+            placeholder: "Optional file name",
+            rows: 1,
+            onChange: (urlAssetFileName: string) => updateForm({ urlAssetFileName }),
+          },
+        ]
+      : [];
   const videoPanelTitle =
     videoPanelMode === "reference"
       ? standaloneInlineLabel("textToVideo", language)
@@ -3253,7 +3683,9 @@ export default function StandaloneGenerator({
     const isValidType = needsTranslateMedia
       ? isTranslateMediaFile(file)
       : needsUpscaleMedia
-        ? isUpscaleMediaFile(file)
+        ? isGptImage2EnhanceModel(form.model)
+          ? file.type.startsWith("image/")
+          : isUpscaleMediaFile(file)
       : needsVideo
         ? file.type.startsWith("video/")
         : file.type.startsWith("image/");
@@ -3352,6 +3784,10 @@ export default function StandaloneGenerator({
         }
         return;
       }
+      if (activeTool === "auto_subtitle") {
+        await startAutoSubtitle();
+        return;
+      }
       if (
         activeTool === "video_gen" &&
         form.videoInputMode === "reference" &&
@@ -3390,7 +3826,9 @@ export default function StandaloneGenerator({
       }
 
       const mentionPrompt =
-        activeTool === "voice_gen" ? form.script : form.prompt;
+        activeTool === "url_asset"
+          ? ""
+          : activeTool === "voice_gen" ? form.script : form.prompt;
       const mentionedAssets = resolveStandaloneMentionedAssets(
         mentionPrompt,
         panelMentionOptions,
@@ -3497,7 +3935,21 @@ export default function StandaloneGenerator({
       <div className="ws-scroll-hide flex min-h-0 flex-1 flex-col overflow-y-auto bg-[var(--bg-app)] lg:flex-row lg:overflow-hidden">
         <aside className="ws-scroll-hide mx-auto flex min-h-[calc(100dvh-68px)] w-full max-w-[480px] shrink-0 flex-col bg-transparent px-[12px] pb-[12px] pt-[4px] lg:mx-0 lg:h-full lg:min-h-0 lg:w-[488px] lg:max-w-none lg:pb-0 lg:pl-2 lg:pr-0 lg:pt-0">
           {STANDALONE_TOOL_ORDER.includes(activeTool) ? (
-            activeTool === "voice_translate" ? (
+            activeTool === "auto_subtitle" ? (
+            <AutoSubtitlePanel
+              form={form}
+              uploading={uploading === "auto-subtitle-video"}
+              running={running}
+              progress={autoSubtitleProgress}
+              language={language}
+              onChange={updateForm}
+              onUpload={() => openUpload("auto-subtitle-video")}
+              onVideoFiles={(files) => void uploadPanelReferenceFiles(files, "auto-subtitle-video")}
+              onRemoveVideo={() => updateForm({ autoSubtitleVideo: null })}
+              onCreate={() => void run()}
+              onToolChange={onToolChange}
+            />
+            ) : activeTool === "voice_translate" ? (
             <VoiceTranslatePanel
               form={form}
               uploading={uploading === "translate-video"}
@@ -3605,7 +4057,11 @@ export default function StandaloneGenerator({
               onAutoPrompt={() => void runAutoPrompt()}
               autoPromptRunning={autoPrompting}
               autoPromptDisabled={autoPromptDisabled}
-              showPromptInput={activeTool !== "image_to_3d" && activeTool !== "image_upscale"}
+              showPromptInput={
+                activeTool !== "image_to_3d" &&
+                activeTool !== "image_upscale" &&
+                activeTool !== "url_asset"
+              }
               modelLabel={selectedModel?.label ?? "Nano Banana Pro"}
               modelValue={form.model}
               modelOptions={activeDef.models.filter((model) => model.id !== "google-tts-studio").map((model) => ({
@@ -3616,7 +4072,7 @@ export default function StandaloneGenerator({
                   activeTool === "image_gen"
                     ? imageModelSettingTags(model.id, language)
                     : activeTool === "image_upscale"
-                      ? upscaleModelSettingTags(language)
+                      ? upscaleModelSettingTags(model.id, language)
                     : activeTool === "image_to_3d"
                       ? threeDModelSettingTags(model.id, language)
                       : activeTool === "voice_gen"
@@ -3626,7 +4082,7 @@ export default function StandaloneGenerator({
               onModelChange={setToolModel}
               references={panelReferences}
               maxReferences={panelMaxReferences}
-              showReferences={activeTool !== "voice_gen"}
+              showReferences={activeTool !== "voice_gen" && activeTool !== "url_asset"}
               referenceTitle={panelReferenceTitle}
               referenceBadge={
                 activeTool === "image_upscale"
@@ -3637,7 +4093,9 @@ export default function StandaloneGenerator({
                 activeTool === "video_gen"
                   ? "JPEG/PNG/WEBP/MP4, 20 MB max"
                   : activeTool === "image_upscale"
-                    ? "JPEG/PNG/WEBP/GIF or MP4/MOV/WEBM"
+                    ? isGptImage2EnhanceModel(form.model)
+                      ? "JPEG/PNG/WEBP, 20 MB max"
+                      : "JPEG/PNG/WEBP/GIF or MP4/MOV/WEBM"
                   : activeTool === "image_to_3d"
                     ? panelMaxReferences > 1
                       ? "Front first, then left/back/right. JPEG/PNG/WEBP, 20 MB max"
@@ -3646,21 +4104,23 @@ export default function StandaloneGenerator({
               }
               referenceAccept={
                 activeTool === "image_upscale"
-                  ? UPSCALE_MEDIA_ACCEPT
+                  ? isGptImage2EnhanceModel(form.model)
+                    ? "image/*"
+                    : UPSCALE_MEDIA_ACCEPT
                   : activeTool === "video_gen" ? "image/*,video/*" : "image/*"
               }
               referenceAssets={panelReferenceAssets}
               onAddReferences={
-                activeTool === "voice_gen" ? undefined : openPanelReferenceUpload
+                activeTool === "voice_gen" || activeTool === "url_asset" ? undefined : openPanelReferenceUpload
               }
               onReferenceFiles={
-                activeTool === "voice_gen" ? undefined : uploadPanelReferenceFiles
+                activeTool === "voice_gen" || activeTool === "url_asset" ? undefined : uploadPanelReferenceFiles
               }
               onSelectReferenceAsset={
-                activeTool === "voice_gen" ? undefined : selectPanelReferenceAsset
+                activeTool === "voice_gen" || activeTool === "url_asset" ? undefined : selectPanelReferenceAsset
               }
               onDeleteReferenceAsset={
-                activeTool === "voice_gen" ? undefined : deletePanelReferenceAsset
+                activeTool === "voice_gen" || activeTool === "url_asset" ? undefined : deletePanelReferenceAsset
               }
               onRemoveReference={removePanelReference}
               mentionOptions={panelMentionOptions}
@@ -3673,6 +4133,7 @@ export default function StandaloneGenerator({
                     ? threeDPanelSettings
                     : []
               }
+              textControls={activeTool === "url_asset" ? urlAssetTextControls : []}
               extraControls={
                 activeTool === "image_upscale" ? (
                   <UpscaleGuide form={form} language={language} />
@@ -3822,11 +4283,27 @@ export default function StandaloneGenerator({
         <main className="ws-scroll-hide min-h-0 flex-1 overflow-visible bg-[var(--bg-app)] px-3 pb-3 pt-3 md:px-4 lg:overflow-hidden lg:pb-0 lg:pl-2 lg:pr-3 lg:pt-0">
           <section className="flex min-h-[560px] flex-1 flex-col overflow-hidden rounded-[20px] bg-[var(--bg-sidebar)] shadow-[inset_0_1px_0_rgba(255,255,255,.035),0_22px_50px_-38px_rgba(238,255,0,.45)] lg:h-full lg:min-h-0">
             <div className="ws-scroll-hide min-h-0 flex-1 overflow-y-auto px-3 py-3">
-              <CreationFeed
-                jobs={filterJobsForTool(jobsQuery.data ?? [], activeTool)}
-                loading={jobsQuery.isLoading}
-                onDeleteJob={deleteStandaloneResult}
-              />
+              {activeTool === "auto_subtitle" ? (
+                <AutoSubtitleResultFeed
+                  results={autoSubtitleResults}
+                  running={running}
+                  progress={autoSubtitleProgress}
+                  onEdit={openAutoSubtitleEditor}
+                  onDelete={(id) => {
+                    setAutoSubtitleResults((items) => {
+                      const target = items.find((item) => item.id === id);
+                      if (target) URL.revokeObjectURL(target.outputUrl);
+                      return items.filter((item) => item.id !== id);
+                    });
+                  }}
+                />
+              ) : (
+                <CreationFeed
+                  jobs={filterJobsForTool(jobsQuery.data ?? [], activeTool)}
+                  loading={jobsQuery.isLoading}
+                  onDeleteJob={deleteStandaloneResult}
+                />
+              )}
             </div>
           </section>
         </main>
@@ -4289,6 +4766,42 @@ function isTranslateMediaFile(file: File): boolean {
   );
 }
 
+function isAutoSubtitleMediaFile(file: File): boolean {
+  return file.type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/i.test(file.name);
+}
+
+function autoSubtitleVideoFilesFromTransfer(data: DataTransfer | null): File[] {
+  return translateMediaFilesFromTransfer(data).filter(isAutoSubtitleMediaFile);
+}
+
+function autoSubtitleStyleFromForm(form: StandaloneFormState): CaptionStyleSettings {
+  const preset =
+    BUILTIN_CAPTION_PRESETS.find((item) => item.id === form.autoSubtitlePresetId)?.settings ??
+    DEFAULT_CAPTION_SETTINGS;
+  return {
+    ...preset,
+    font: form.autoSubtitleFont,
+    size: Math.max(24, Math.min(96, Number(form.autoSubtitleSize) || preset.size)),
+    stroke: {
+      ...preset.stroke,
+      enabled: form.autoSubtitleStroke,
+      width: Math.max(0, Math.min(12, Number(form.autoSubtitleStrokeWidth) || 0)),
+    },
+    background: {
+      ...preset.background,
+      enabled: form.autoSubtitleBackground,
+    },
+    wordsPerLine: Math.max(1, Math.min(8, Number(form.autoSubtitleWordsPerLine) || preset.wordsPerLine)),
+    positionV: form.autoSubtitlePosition,
+    positionH: "center",
+  };
+}
+
+function autoSubtitleOutputName(sourceName: string, extension: string): string {
+  const base = sourceName.replace(/\.[^.]+$/, "") || "auto-subtitle";
+  return `${base}-auto-subtitle.${extension}`;
+}
+
 function VoiceTranslatePanel({
   form,
   uploading,
@@ -4372,13 +4885,13 @@ function VoiceTranslatePanel({
 
   return (
     <section className="standalone-translate-panel flex min-h-0 flex-1 flex-col overflow-hidden rounded-[18px] border border-[var(--border-overlay)] bg-[var(--bg-sidebar)] shadow-[inset_0_1px_0_rgba(255,255,255,.05)]">
-      <div className="flex h-[64px] shrink-0 items-center gap-2.5 border-b border-white/[0.05] px-[20px]">
+      <div className="flex h-[52px] shrink-0 items-center gap-2.5 border-b border-white/[0.05] px-3.5">
         <span className="grid h-8 w-8 shrink-0 place-items-center text-cyan-200">
           <Languages className="h-4 w-4" />
         </span>
         <div className="min-w-0">
-          <h2 className="truncate text-[18px] font-semibold leading-[24px] tracking-[-0.12px] text-white">{copy.title}</h2>
-          <p className="mt-0.5 truncate text-[14px] leading-[18px] text-zinc-400">{copy.subtitle}</p>
+          <h2 className="truncate text-[15px] font-bold leading-[17px] text-white">{copy.title}</h2>
+          <p className="mt-0.5 truncate text-[10px] leading-[13px] text-zinc-400">{copy.subtitle}</p>
         </div>
       </div>
 
@@ -4458,9 +4971,9 @@ function VoiceTranslatePanel({
                   )}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-[16px] font-bold leading-[20px] text-white">{copy.uploadTitle}</p>
-                  <p className="mt-1 truncate text-[14px] leading-[18px] text-zinc-400">{copy.uploadHint}</p>
-                  <p className="mt-1 text-[13px] font-semibold leading-[16px] text-cyan-100/70">
+                  <p className="text-[13px] font-bold leading-[15px] text-white">{copy.uploadTitle}</p>
+                  <p className="mt-1 truncate text-[11px] leading-[14px] text-zinc-400">{copy.uploadHint}</p>
+                  <p className="mt-1 text-[10px] font-semibold leading-[12px] text-cyan-100/70">
                     {copy.uploadLimit}
                   </p>
                 </div>
@@ -4515,7 +5028,7 @@ function VoiceTranslatePanel({
                 )}
               </span>
               <span className="min-w-0 text-left">
-                <span className="block text-[13px] font-medium leading-[14px] text-neutral-400">
+                <span className="block text-[13px] font-medium leading-[14px] text-[var(--text-tertiary)]">
                   Format
                 </span>
                 <span className="block truncate text-[15px] font-bold leading-[16px] text-white">
@@ -4545,7 +5058,7 @@ function VoiceTranslatePanel({
             <span className="text-[15px] font-semibold leading-[18px] text-zinc-200">{copy.consent}</span>
           </label>
 
-          <p className="rounded-[10px] border border-[var(--border-faint)] bg-black/20 px-2.5 py-2 text-[16px] font-medium leading-[22px] text-zinc-400">
+          <p className="rounded-[10px] border border-[var(--border-faint)] bg-black/20 px-2.5 py-2 text-[13px] font-medium leading-[18px] text-zinc-400">
             {copy.sourceHint}
           </p>
 
@@ -4606,6 +5119,339 @@ function VoiceTranslatePanel({
   );
 }
 
+function AutoSubtitlePanel({
+  form,
+  uploading,
+  running,
+  progress,
+  language,
+  onChange,
+  onUpload,
+  onVideoFiles,
+  onRemoveVideo,
+  onCreate,
+  onToolChange,
+}: {
+  form: StandaloneFormState;
+  uploading: boolean;
+  running: boolean;
+  progress: AutoSubtitleProgress | null;
+  language: ReturnType<typeof useLanguage>["language"];
+  onChange: (patch: Partial<StandaloneFormState>) => void;
+  onUpload: () => void;
+  onVideoFiles: (files: File[]) => void;
+  onRemoveVideo: () => void;
+  onCreate: () => void;
+  onToolChange: (tool: StandaloneToolKey) => void;
+}) {
+  const th = language === "th";
+  const media = form.autoSubtitleVideo;
+  const copy = {
+    title: "Auto Subtitle",
+    subtitle: th
+      ? "อัปโหลด MP4 เพื่อสร้างซับอัตโนมัติและโปรเจกต์แก้ไขได้"
+      : "Upload an MP4, generate subtitles, and keep an editable project.",
+    uploadTitle: th ? "วิดีโอต้นฉบับ" : "Source video",
+    uploadHint: th ? "ลาก MP4 มาวาง หรือคลิกเพื่ออัปโหลด" : "Drop an MP4 here or click to upload",
+    uploadLimit: th ? "รองรับ MP4/MOV/WEBM สูงสุด 1 GB" : "MP4/MOV/WEBM, up to 1 GB",
+    speechLanguage: th ? "ภาษาเสียง" : "Speech",
+    preset: th ? "สไตล์ซับ" : "Style",
+    font: th ? "ฟอนต์" : "Font",
+    position: th ? "ตำแหน่ง" : "Position",
+    size: th ? "ขนาด" : "Size",
+    words: th ? "คำต่อบรรทัด" : "Words",
+    stroke: th ? "เส้นขอบ" : "Stroke",
+    background: th ? "พื้นหลัง" : "Background",
+    ready: th
+      ? "ผลลัพธ์จะแสดงด้านขวา และจะสร้างโปรเจกต์ editor พร้อม track subtitle ให้แก้ต่อได้"
+      : "Results appear on the right with an editable editor project.",
+    action: th ? "Auto Subtitle" : "Auto Subtitle",
+    processing: th ? "กำลังสร้างซับ" : "Generating",
+    remove: th ? "ลบวิดีโอ" : "Remove video",
+  };
+
+  const addFiles = (files: File[]) => {
+    if (files.length > 0) onVideoFiles(files.slice(0, 1));
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    addFiles(autoSubtitleVideoFilesFromTransfer(event.dataTransfer));
+  };
+
+  const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    const files = autoSubtitleVideoFilesFromTransfer(event.clipboardData);
+    if (files.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    addFiles(files);
+  };
+
+  const selectedPreset =
+    BUILTIN_CAPTION_PRESETS.find((preset) => preset.id === form.autoSubtitlePresetId)?.name ??
+    form.autoSubtitlePresetId;
+  const speechLabel =
+    CAPTIONS_LANGUAGES.find((item) => item.code === form.autoSubtitleLanguage)?.label ??
+    form.autoSubtitleLanguage;
+  const positionLabel =
+    form.autoSubtitlePosition === "top"
+      ? th ? "บน" : "Top"
+      : form.autoSubtitlePosition === "middle"
+        ? th ? "กลาง" : "Middle"
+        : th ? "ล่าง" : "Bottom";
+
+  return (
+    <section className="standalone-translate-panel flex min-h-0 flex-1 flex-col overflow-hidden rounded-[18px] border border-[var(--border-overlay)] bg-[var(--bg-sidebar)] shadow-[inset_0_1px_0_rgba(255,255,255,.05)]">
+      <div className="flex h-[52px] shrink-0 items-center gap-2.5 border-b border-white/[0.05] px-3.5">
+        <span className="grid h-8 w-8 shrink-0 place-items-center text-cyan-200">
+          <Captions className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="truncate text-[15px] font-bold leading-[17px] text-white">{copy.title}</h2>
+          <p className="mt-0.5 truncate text-[10px] leading-[13px] text-zinc-400">{copy.subtitle}</p>
+        </div>
+      </div>
+
+      <div className="ws-scroll-hide min-h-0 flex-1 overflow-y-auto px-3 py-2.5">
+        <div className="space-y-2.5">
+          <div
+            role={!media ? "button" : undefined}
+            tabIndex={!media ? 0 : undefined}
+            onClick={!media ? onUpload : undefined}
+            onKeyDown={(event) => {
+              if (!media && (event.key === "Enter" || event.key === " ")) {
+                event.preventDefault();
+                onUpload();
+              }
+            }}
+            onPaste={handlePaste}
+            onDragOver={(event) => {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "copy";
+            }}
+            onDrop={handleDrop}
+            className={cn(
+              "group relative flex min-h-[112px] w-full overflow-hidden rounded-[12px] border text-left transition",
+              media
+                ? "border-white/10 bg-black/30"
+                : "border-dashed border-cyan-300/35 bg-cyan-300/[0.04] hover:border-cyan-200/70 hover:bg-cyan-300/[0.07]",
+            )}
+          >
+            {media ? (
+              <>
+                <video
+                  src={media.url}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="aspect-video max-h-[166px] w-full bg-black object-contain"
+                />
+                <span className="absolute left-3 top-3 max-w-[70%] truncate rounded-full border border-black/30 bg-black/70 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
+                  {media.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRemoveVideo();
+                  }}
+                  className="absolute right-2.5 top-2.5 grid h-7 w-7 place-items-center rounded-full bg-black/70 text-white transition hover:bg-white/15"
+                  aria-label={copy.remove}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </>
+            ) : (
+              <div className="flex w-full items-center gap-2.5 px-3 py-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center text-cyan-200">
+                  {uploading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <UploadCloud className="h-4 w-4" />
+                  )}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-bold leading-[15px] text-white">{copy.uploadTitle}</p>
+                  <p className="mt-1 truncate text-[11px] leading-[14px] text-zinc-400">{copy.uploadHint}</p>
+                  <p className="mt-1 text-[10px] font-semibold leading-[12px] text-cyan-100/70">
+                    {copy.uploadLimit}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <VoiceTranslateSelectCard
+              label={copy.speechLanguage}
+              value={form.autoSubtitleLanguage}
+              displayValue={speechLabel}
+              icon={<Languages className="h-4 w-4" />}
+              options={CAPTIONS_LANGUAGES.map((item) => ({ value: item.code, label: item.label }))}
+              onChange={(value) => onChange({ autoSubtitleLanguage: value })}
+            />
+            <VoiceTranslateSelectCard
+              label={copy.preset}
+              value={form.autoSubtitlePresetId}
+              displayValue={selectedPreset}
+              icon={<Captions className="h-4 w-4" />}
+              options={BUILTIN_CAPTION_PRESETS.map((preset) => ({ value: preset.id, label: preset.name }))}
+              onChange={(value) => {
+                const preset = BUILTIN_CAPTION_PRESETS.find((item) => item.id === value);
+                onChange({
+                  autoSubtitlePresetId: value,
+                  autoSubtitleFont: preset?.settings.font ?? form.autoSubtitleFont,
+                  autoSubtitleSize: preset?.settings.size ?? form.autoSubtitleSize,
+                  autoSubtitleStroke: preset?.settings.stroke.enabled ?? form.autoSubtitleStroke,
+                  autoSubtitleStrokeWidth: preset?.settings.stroke.width ?? form.autoSubtitleStrokeWidth,
+                  autoSubtitleBackground: preset?.settings.background.enabled ?? form.autoSubtitleBackground,
+                  autoSubtitlePosition: preset?.settings.positionV ?? form.autoSubtitlePosition,
+                  autoSubtitleWordsPerLine: preset?.settings.wordsPerLine ?? form.autoSubtitleWordsPerLine,
+                });
+              }}
+            />
+            <VoiceTranslateSelectCard
+              label={copy.font}
+              value={form.autoSubtitleFont}
+              displayValue={form.autoSubtitleFont}
+              icon={<BookOpen className="h-4 w-4" />}
+              options={AUTO_SUBTITLE_FONT_OPTIONS.map((font) => ({ value: font, label: font }))}
+              onChange={(value) => onChange({ autoSubtitleFont: value })}
+            />
+            <VoiceTranslateSelectCard
+              label={copy.position}
+              value={form.autoSubtitlePosition}
+              displayValue={positionLabel}
+              icon={<SlidersHorizontal className="h-[14px] w-[14px]" />}
+              options={[
+                { value: "top", label: th ? "บน" : "Top" },
+                { value: "middle", label: th ? "กลาง" : "Middle" },
+                { value: "bottom", label: th ? "ล่าง" : "Bottom" },
+              ]}
+              onChange={(value) =>
+                onChange({ autoSubtitlePosition: value as StandaloneFormState["autoSubtitlePosition"] })
+              }
+            />
+            <VoiceTranslateSelectCard
+              label={copy.size}
+              value={String(form.autoSubtitleSize)}
+              displayValue={`${form.autoSubtitleSize}px`}
+              icon={<SlidersHorizontal className="h-[14px] w-[14px]" />}
+              options={[36, 44, 56, 68, 80, 92].map((size) => ({
+                value: String(size),
+                label: `${size}px`,
+              }))}
+              onChange={(value) => onChange({ autoSubtitleSize: Number(value) || 56 })}
+            />
+            <VoiceTranslateSelectCard
+              label={copy.words}
+              value={String(form.autoSubtitleWordsPerLine)}
+              displayValue={String(form.autoSubtitleWordsPerLine)}
+              icon={<SlidersHorizontal className="h-[14px] w-[14px]" />}
+              options={[2, 3, 4, 5, 6].map((count) => ({ value: String(count), label: String(count) }))}
+              onChange={(value) => onChange({ autoSubtitleWordsPerLine: Number(value) || 4 })}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <AutoSubtitleToggle
+              label={copy.stroke}
+              checked={form.autoSubtitleStroke}
+              onChange={(checked) => onChange({ autoSubtitleStroke: checked })}
+            />
+            <AutoSubtitleToggle
+              label={copy.background}
+              checked={form.autoSubtitleBackground}
+              onChange={(checked) => onChange({ autoSubtitleBackground: checked })}
+            />
+          </div>
+
+          <p className="rounded-[10px] border border-[var(--border-faint)] bg-black/20 px-2.5 py-2 text-[13px] font-medium leading-[18px] text-zinc-400">
+            {copy.ready}
+          </p>
+
+          {progress && (
+            <div className="rounded-[10px] border border-cyan-300/15 bg-cyan-300/[0.045] px-3 py-2">
+              <div className="flex items-center justify-between gap-2 text-[12px] font-semibold text-cyan-100">
+                <span>{progress.message}</span>
+                <span>{Math.round(progress.progress)}%</span>
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-cyan-200 transition-all"
+                  style={{ width: `${Math.max(4, Math.min(100, progress.progress))}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="shrink-0 border-t border-white/[0.05] bg-[var(--bg-sidebar)] px-3 py-2.5">
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="flex h-[40px] items-center gap-2 rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-2.5 text-[13px] font-semibold text-zinc-300">
+            <Film className="h-3.5 w-3.5 text-zinc-400" />
+            <span className="truncate">{media ? "MP4" : "Media"}</span>
+          </div>
+          <button
+            type="button"
+            onClick={onCreate}
+            disabled={running || uploading || !media}
+            className="btn-cta flex !h-10 w-full items-center justify-center gap-2 text-[13px] disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-300 disabled:shadow-none disabled:opacity-70"
+          >
+            {running ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <GenerateIcon className="h-3.5 w-3.5" />
+            )}
+            {running ? copy.processing : copy.action}
+          </button>
+        </div>
+      </div>
+      <ToolTabs
+        activeTool="auto_subtitle"
+        onToolChange={onToolChange}
+        className="hidden shrink-0 lg:flex"
+      />
+    </section>
+  );
+}
+
+function AutoSubtitleToggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="standalone-setting-card flex min-h-[38px] items-center justify-between gap-2 rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-[9px] py-[4px] text-left transition hover:border-cyan-300/30 hover:bg-[var(--bg-surface-2)]"
+      aria-pressed={checked}
+    >
+      <span className="text-[13px] font-semibold leading-[16px] text-zinc-200">{label}</span>
+      <span
+        className={cn(
+          "flex h-[20px] w-[34px] items-center rounded-full p-[2px] transition",
+          checked ? "bg-cyan-200" : "bg-white/12",
+        )}
+      >
+        <span
+          className={cn(
+            "h-[16px] w-[16px] rounded-full bg-black transition-transform",
+            checked ? "translate-x-[14px]" : "translate-x-0 bg-zinc-400",
+          )}
+        />
+      </span>
+    </button>
+  );
+}
+
 function VoiceTranslateSelectCard({
   label,
   value,
@@ -4632,7 +5478,7 @@ function VoiceTranslateSelectCard({
             {icon}
           </span>
           <span className="min-w-0 text-left">
-            <span className="block text-[13px] font-medium leading-[14px] text-neutral-400">
+            <span className="block text-[13px] font-medium leading-[14px] text-[var(--text-tertiary)]">
               {label}
             </span>
             <span className="block truncate text-[15px] font-bold leading-[16px] text-white">
@@ -5684,12 +6530,21 @@ function UpscaleGuide({
   language: "en" | "th";
 }) {
   const th = language === "th";
+  const isGptEnhance = isGptImage2EnhanceModel(form.model);
   const isVideo = isUpscaleVideoSource(form);
-  const mediaLabel = upscaleMediaTypeLabel(form, language);
-  const title = isVideo
+  const mediaLabel = isGptEnhance
+    ? th ? "ภาพเท่านั้น" : "image only"
+    : upscaleMediaTypeLabel(form, language);
+  const title = isGptEnhance
+    ? th ? "ตั้งค่า Enhance รูปภาพ" : "Image enhance settings"
+    : isVideo
     ? th ? "ตั้งค่าอัปสเกลวิดีโอ" : "Video upscale settings"
     : th ? "ตั้งค่าอัปสเกลรูปภาพ" : "Image upscale settings";
-  const summary = isVideo
+  const summary = isGptEnhance
+    ? th
+      ? "เลือกขนาด 1K, 2K, หรือ 4K และระดับคุณภาพสำหรับ GPT Image 2 Enhance"
+      : "Choose 1K, 2K, or 4K output and quality for GPT Image 2 Enhance."
+    : isVideo
     ? th
       ? "Preset รวมความคม รายละเอียด และ grain ให้เหมาะกับวิดีโอ; เปิด FPS Boost เมื่อต้องการให้ภาพเคลื่อนไหวลื่นขึ้น"
       : "Preset tunes detail, sharpness, and grain for video. FPS Boost makes motion smoother."
@@ -5870,7 +6725,7 @@ function VoiceSettingsControls({
                       {voice.name.charAt(0)}
                     </span>
                     <span className="min-w-0 w-full">
-                      <span className="block truncate text-[15px] font-bold leading-[18px] text-white">
+                      <span className="block truncate text-[12px] font-bold leading-[15px] text-white">
                         {voice.name}
                       </span>
                       <span className="block truncate text-[10.5px] leading-[13px] text-zinc-500">
@@ -5985,7 +6840,7 @@ function GeminiVoicePicker({
               >
                 {voiceName.charAt(0)}
               </span>
-              <span className="mt-[5px] block w-full truncate text-[15px] font-bold leading-[18px] text-white">
+              <span className="mt-[5px] block w-full truncate text-[12px] font-bold leading-[15px] text-white">
                 {voiceName}
               </span>
               {/* Preview ▶ — sits in the top-right of the card. We
@@ -6942,6 +7797,143 @@ function SingleReferenceButton({
             )}
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+function AutoSubtitleResultFeed({
+  results,
+  running,
+  progress,
+  onEdit,
+  onDelete,
+}: {
+  results: AutoSubtitleResultItem[];
+  running: boolean;
+  progress: AutoSubtitleProgress | null;
+  onEdit: (result: AutoSubtitleResultItem) => void;
+  onDelete: (id: string) => void;
+}) {
+  const { language, t } = useLanguage();
+  const th = language === "th";
+
+  const downloadResult = async (result: AutoSubtitleResultItem) => {
+    try {
+      const response = await fetch(result.outputUrl);
+      if (!response.ok) throw new Error("Could not read the generated subtitle video.");
+      const blob = await response.blob();
+      triggerBlobDownload(blob, result.outputName);
+      toast.success(t("workspace.stock.download_started"));
+    } catch (err) {
+      toast.error(friendlyError(err, th ? "th" : "en"));
+    }
+  };
+
+  if (results.length === 0 && !running && !progress) {
+    return (
+      <div className="grid min-h-[520px] place-items-center p-8 text-center">
+        <div>
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-white/[0.04] text-zinc-200 ring-1 ring-white/10">
+            <Captions className="h-6 w-6" />
+          </div>
+          <h2 className="mt-4 text-[16px] font-bold text-white">
+            {th ? "พร้อมสร้างซับอัตโนมัติ" : "Ready for Auto Subtitle"}
+          </h2>
+          <p className="mt-2 max-w-[320px] text-[13px] leading-[18px] text-zinc-400">
+            {th
+              ? "อัปโหลดวิดีโอ ตั้งค่าฟอนต์และตำแหน่ง แล้วผลลัพธ์จะแสดงที่นี่"
+              : "Upload a video, choose subtitle styling, and the rendered result will appear here."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {(running || progress) && (
+        <div className="rounded-[16px] border border-cyan-300/15 bg-cyan-300/[0.045] p-4">
+          <div className="flex items-center gap-3">
+            <Loader2 className="h-5 w-5 animate-spin text-cyan-100" />
+            <div className="min-w-0">
+              <div className="text-[14px] font-bold text-white">
+                {progress?.message ?? (th ? "กำลังสร้างซับ" : "Generating subtitles")}
+              </div>
+              <div className="mt-1 text-[12px] font-medium text-zinc-400">
+                {th ? "กำลังเรนเดอร์ผลลัพธ์และสร้างโปรเจกต์แก้ไข" : "Rendering the video and preparing the editable project."}
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-cyan-200 transition-all"
+              style={{ width: `${Math.max(4, Math.min(100, progress?.progress ?? 12))}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-3 xl:grid-cols-2">
+        {results.map((result) => (
+          <article
+            key={result.id}
+            className="overflow-hidden rounded-[16px] border border-white/[0.07] bg-[#101112] shadow-[0_18px_42px_-34px_rgba(0,0,0,.9)]"
+          >
+            <div className="relative aspect-video bg-black">
+              <video
+                src={result.outputUrl}
+                controls
+                playsInline
+                preload="metadata"
+                className="h-full w-full object-contain"
+              />
+              <button
+                type="button"
+                onClick={() => onDelete(result.id)}
+                className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-black/70 text-zinc-200 transition hover:bg-red-500/25 hover:text-red-100"
+                aria-label={th ? "ลบผลลัพธ์" : "Delete result"}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-3 p-3">
+              <div className="min-w-0">
+                <div className="truncate text-[13px] font-bold text-white">{result.outputName}</div>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  <MiniMeta label={`${result.cueCount} cues`} />
+                  <MiniMeta label={result.outputExtension.toUpperCase()} />
+                  <MiniMeta label={`${Math.max(1, Math.round(result.duration))}s`} />
+                </div>
+                {result.editorProjectError && (
+                  <p className="mt-2 line-clamp-2 text-[12px] font-medium leading-[16px] text-amber-200">
+                    {th
+                      ? "ยังสร้างโปรเจกต์แก้ไขไม่ได้ กดปรับแต่งเพื่อสร้างใหม่อีกครั้ง"
+                      : "Editable project was not saved yet. Edit will rebuild it from the handoff."}
+                  </p>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => void downloadResult(result)}
+                  className="flex h-9 items-center justify-center gap-2 rounded-[10px] border border-white/10 bg-white/[0.045] text-[12px] font-bold text-zinc-100 transition hover:bg-white/[0.08]"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {th ? "ดาวน์โหลด" : "Download"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onEdit(result)}
+                  className="flex h-9 items-center justify-center gap-2 rounded-[10px] bg-cyan-200 text-[12px] font-bold text-black transition hover:bg-cyan-100"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  {th ? "ปรับแต่งวิดีโอ" : "Edit video"}
+                </button>
+              </div>
+            </div>
+          </article>
+        ))}
       </div>
     </div>
   );
@@ -8121,9 +9113,12 @@ function standaloneCanvasId(projectId: string): string {
   return `${STANDALONE_CANVAS_ID}:${projectId}`;
 }
 
-function uploadAcceptForSlot(slot: UploadSlot): string {
+function uploadAcceptForSlot(slot: UploadSlot, model?: string): string {
   if (slot === "translate-video") return TRANSLATE_MEDIA_ACCEPT;
-  if (slot === "upscale-image") return UPSCALE_MEDIA_ACCEPT;
+  if (slot === "auto-subtitle-video") return AUTO_SUBTITLE_MEDIA_ACCEPT;
+  if (slot === "upscale-image") {
+    return isGptImage2EnhanceModel(model ?? "") ? "image/*" : UPSCALE_MEDIA_ACCEPT;
+  }
   return slot === "video-ref-video" ? "video/*" : "image/*";
 }
 
@@ -8237,6 +9232,7 @@ async function uploadReference(
     throw new Error("Only image, video, or audio references are supported on this surface.");
   }
   const uploadFile = await normalizeImageReferenceUpload(file);
+  const imageDimensions = await readImageFileDimensions(uploadFile);
   const contentType = uploadFile.type || inferredMime || "application/octet-stream";
   const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 80);
   // Storage RLS on `ai-media` requires the FIRST folder segment to
@@ -8272,6 +9268,8 @@ async function uploadReference(
     name: file.name,
     url: data.signedUrl,
     mime: contentType,
+    width: imageDimensions?.width,
+    height: imageDimensions?.height,
   };
 }
 
@@ -8514,6 +9512,20 @@ function buildCurrentParams(
   }
   if (tool === "image_upscale") {
     const isVideo = isUpscaleVideoSource(form);
+    if (isGptImage2EnhanceModel(form.model) && !isVideo) {
+      const quality = ["low", "medium", "high"].includes(form.quality)
+        ? form.quality
+        : "medium";
+      return {
+        model_name: "gpt-image-2-enhance",
+        mode: "enhance",
+        size: gptImage2EnhanceSizeForForm(form),
+        quality,
+        output_format: "png",
+        moderation: "auto",
+        source_content_type: form.upscaleImage?.mime ?? null,
+      };
+    }
     if (isVideo) {
       const preset = UPSCALE_VIDEO_PRESETS[form.upscalePreset] ?? UPSCALE_VIDEO_PRESETS.balanced;
       return {
@@ -8533,7 +9545,10 @@ function buildCurrentParams(
       model_name: "magnific-upscale-precision-v2",
       media_type: "image",
       preset: form.upscalePreset,
-      scale_factor: Math.max(2, Math.min(16, Number(form.upscaleScale) || 2)),
+      // Magnific currently returns a verified 2x image even for higher
+      // scale factors, so clamp standalone image upscale to the only
+      // production-confirmed setting until the provider resolves it.
+      scale_factor: 2,
       flavor: preset.flavor,
       sharpen: Math.max(0, Math.min(100, Number(preset.sharpen) || 7)),
       smart_grain: Math.max(0, Math.min(100, Number(preset.smart_grain) || 7)),
@@ -8612,12 +9627,30 @@ function buildCurrentParams(
       disable_voice_cloning: false,
     };
   }
+  if (tool === "auto_subtitle") {
+    return {
+      model_name: "auto-suptitle-whisper",
+      language: form.autoSubtitleLanguage,
+      preset: form.autoSubtitlePresetId,
+      font: form.autoSubtitleFont,
+      position: form.autoSubtitlePosition,
+      words_per_line: form.autoSubtitleWordsPerLine,
+    };
+  }
   if (tool === "image_to_3d") {
     return build3dParams({
       model: form.model,
       texture: form.texture,
       pbr: form.pbr,
     });
+  }
+  if (tool === "url_asset") {
+    return {
+      model_name: form.model,
+      output_format: form.model,
+      source_url: (form.urlAssetSource ?? "").trim(),
+      file_name: (form.urlAssetFileName ?? "").trim(),
+    };
   }
   return null;
 }
@@ -8701,6 +9734,12 @@ function buildCurrentInputs(
         : { video_url: form.translateVideo.url }),
     };
   }
+  if (tool === "auto_subtitle") {
+    return form.autoSubtitleVideo ? { video_url: form.autoSubtitleVideo.url } : {};
+  }
+  if (tool === "url_asset") {
+    return {};
+  }
   return {};
 }
 
@@ -8714,6 +9753,13 @@ function validateForm(
   }
   if (tool === "image_upscale" && !form.upscaleImage) {
     return t("workspace.standalone.validation.upscale_image");
+  }
+  if (
+    tool === "image_upscale" &&
+    isGptImage2EnhanceModel(form.model) &&
+    isUpscaleVideoSource(form)
+  ) {
+    return "GPT Image 2 Enhance supports image input only. Use Magnific Precision V2 for video.";
   }
   if (
     tool === "video_gen" &&
@@ -8764,8 +9810,23 @@ function validateForm(
       return t("workspace.standalone.validation.translate_consent");
     }
   }
+  if (tool === "auto_subtitle" && !form.autoSubtitleVideo) {
+    return "Upload an MP4 video before generating subtitles.";
+  }
   if (tool === "image_to_3d" && threeDReferencesForForm(form).length === 0) {
     return t("workspace.standalone.validation.model_image");
+  }
+  if (tool === "url_asset") {
+    const rawUrl = (form.urlAssetSource ?? "").trim();
+    if (!rawUrl) return t("workspace.standalone.validation.url_asset_url");
+    try {
+      const parsed = new URL(rawUrl);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return t("workspace.standalone.validation.url_asset_url");
+      }
+    } catch {
+      return t("workspace.standalone.validation.url_asset_url");
+    }
   }
   return null;
 }
@@ -9234,6 +10295,34 @@ function buildUpscalePanelSettings({
     label: upscalePresetLabel(value, language),
   }));
 
+  if (isGptImage2EnhanceModel(form.model)) {
+    return [
+      {
+        id: "gpt-enhance-resolution",
+        label: th ? "เป้าหมาย" : "Target",
+        value: form.imageResolution,
+        kind: "select",
+        options: ["1K", "2K", "4K"].map((value) => ({ value, label: value })),
+        onChange: (imageResolution) => onChange({ imageResolution }),
+      },
+      {
+        id: "gpt-enhance-quality",
+        label: th ? "คุณภาพ" : "Quality",
+        value: form.quality,
+        kind: "select",
+        options: (["low", "medium", "high"] as const).map((value) => ({
+          value,
+          label: value === "low"
+            ? (th ? "ต่ำ" : "Low")
+            : value === "high"
+              ? (th ? "สูง" : "High")
+              : (th ? "กลาง" : "Medium"),
+        })),
+        onChange: (quality) => onChange({ quality }),
+      },
+    ];
+  }
+
   if (isVideo) {
     return [
       {
@@ -9275,7 +10364,7 @@ function buildUpscalePanelSettings({
       label: th ? "เป้าหมาย" : "Target",
       value: form.upscaleScale,
       kind: "select",
-      options: ["2", "4", "8", "16"].map((value) => {
+      options: ["2"].map((value) => {
         return { value, label: `${value}x` };
       }),
       onChange: (upscaleScale) => onChange({ upscaleScale }),
@@ -9347,10 +10436,16 @@ function imageModelSettingTags(model: string, language: "en" | "th"): Array<{
   ];
 }
 
-function upscaleModelSettingTags(language: "en" | "th"): Array<{
+function upscaleModelSettingTags(model: string, language: "en" | "th"): Array<{
   label: string;
   icon?: "reference" | "resolution";
 }> {
+  if (isGptImage2EnhanceModel(model)) {
+    return [
+      { label: `${standaloneInlineLabel("reference", language)} 1`, icon: "reference" },
+      { label: "1K-4K", icon: "resolution" },
+    ];
+  }
   return [
     { label: `${standaloneInlineLabel("reference", language)} 1`, icon: "reference" },
     { label: "Image/Video", icon: "resolution" },

@@ -2326,6 +2326,8 @@ export const es = {
   "workspace.sidebar.spaces": "Espacios",
   "workspace.sidebar.image_gen": "Generador de imágenes",
   "workspace.sidebar.image_upscale": "Escalar",
+  "workspace.sidebar.url_asset": "URL to Asset",
+  "workspace.sidebar.auto_subtitle": "Auto Subtitle",
   "workspace.sidebar.video_gen": "Generador de vídeos",
   "workspace.sidebar.voice_gen": "Generador de voz",
   "workspace.sidebar.voice_translate": "Traducir",
@@ -2641,6 +2643,10 @@ export const es = {
   "workspace.standalone.tool.image_gen.title": "Generador de imágenes",
   "workspace.standalone.tool.image_upscale.nav": "Escalar",
   "workspace.standalone.tool.image_upscale.title": "Escalar medios",
+  "workspace.standalone.tool.url_asset.nav": "URL",
+  "workspace.standalone.tool.url_asset.title": "URL to Asset",
+  "workspace.standalone.tool.auto_subtitle.nav": "Subtitle",
+  "workspace.standalone.tool.auto_subtitle.title": "Auto Subtitle",
   "workspace.standalone.tool.video_gen.nav": "Vídeo",
   "workspace.standalone.tool.video_gen.title": "Generador de vídeos",
   "workspace.standalone.tool.voice_gen.nav": "Audio",
@@ -2929,6 +2935,8 @@ export const es = {
     "Confirma que tienes permiso para traducir y clonar esta voz.",
   "workspace.standalone.validation.model_image":
     "La generación 3D necesita una imagen de referencia.",
+  "workspace.standalone.validation.url_asset_url":
+    "Introduce una URL directa http o https a un archivo PNG, MP4 o MP3.",
   "workspace.standalone.error_failed_queue": "No se pudo generar la cola",
 
   // ─── Share dialog / banner / invalid screen ─────────────────────
@@ -3197,6 +3205,9 @@ export const es = {
   "workspace.toolnames.url_asset": "URL to Asset",
   "workspace.toolnames.url_asset_desc":
     "Import a direct MP4, MP3, or PNG URL as a workspace asset.",
+  "workspace.toolnames.auto_subtitle": "Auto Subtitle",
+  "workspace.toolnames.auto_subtitle_desc":
+    "Generate subtitles from an uploaded video.",
   "workspace.toolnames.kling_element": "Elemento Kling",
   "workspace.toolnames.kling_element_desc":
     "Guarda un personaje u objeto como un elemento Omni Kling reutilizable. 4 ref + 1 frontal.",
@@ -4242,6 +4253,8 @@ export const es = {
     'Prueba "perro feliz con gafas de sol, luz de estudio"',
   "workspace.toolNode.wireImageAndRun":
     "Conecta una imagen al puerto de entrada y pulsa Run",
+  "workspace.toolNode.urlAssetPlaceholder":
+    "Paste a direct PNG, MP3, or MP4 URL",
   "textInputNode.defaultTitle": "Variable de texto",
   "textInputNode.badge": "VAR TEXTO",
   "textInputNode.referencedVia": "referenciado con #[name](id)",
