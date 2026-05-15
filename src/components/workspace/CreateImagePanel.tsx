@@ -570,8 +570,8 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
           >
             <ModelLogoBadge model={{ id: selectedModelId, label: modelLabel }} size="md" />
             <div className="flex-1 flex flex-col items-start min-w-0">
-              <span className="text-[12px] leading-[16px] text-neutral-400">{resolvedModelCaption}</span>
-              <span className="text-[14px] leading-[20px] font-semibold text-white">{cleanModelDisplayName(modelLabel)}</span>
+              <span className="text-[16px] leading-[20px] text-neutral-400">{resolvedModelCaption}</span>
+              <span className="text-[15px] leading-[20px] font-semibold text-white">{cleanModelDisplayName(modelLabel)}</span>
             </div>
             <ChevronRight className="h-[16px] w-[16px] text-neutral-500" />
           </button>
@@ -1081,8 +1081,8 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           >
             <ModelLogoBadge model={{ id: selectedModelId, label: modelLabel }} size="lg" />
             <div className="flex min-w-0 flex-1 flex-col items-start">
-              <span className="text-[12px] leading-[16px] text-neutral-400">{resolvedModelCaption}</span>
-              <span className="truncate text-[14px] font-semibold leading-[20px] text-white">{cleanModelDisplayName(modelLabel)}</span>
+              <span className="text-[16px] leading-[20px] text-neutral-400">{resolvedModelCaption}</span>
+              <span className="truncate text-[15px] font-semibold leading-[20px] text-white">{cleanModelDisplayName(modelLabel)}</span>
             </div>
             <ChevronRight className="h-[16px] w-[16px] text-neutral-500" />
           </button>
@@ -2841,7 +2841,8 @@ const ModelListItem: React.FC<ModelListItemProps> = ({ model, selected, onClick 
       )}
 
       <div className="flex min-h-[34px] min-w-0 flex-wrap items-center gap-x-[6px] gap-y-[4px]">
-        <p className="min-w-0 max-w-[260px] truncate text-[14px] font-semibold leading-4 text-white">{model.name}</p>
+        <p className="min-w-0 max-w-[260px] truncate text-[16px] font-semibold leading-[20px] text-white">{model.name}</p>
+
         {model.settings && model.settings.length > 0 && (
           <div className="flex min-w-0 flex-wrap items-center gap-[4px]">
             {model.settings.map((setting) => (
@@ -2875,8 +2876,8 @@ function ModelSettingChip({ setting }: { setting: ModelSettingTag }) {
               : SlidersHorizontal;
 
   return (
-    <span className="inline-flex h-[18px] max-w-[110px] items-center gap-[3px] rounded-[4px] bg-white/[0.06] px-[5px] text-[10px] font-medium leading-none text-neutral-400 ring-1 ring-white/[0.04]">
-      <Icon className="h-[11px] w-[11px] shrink-0" />
+    <span className="inline-flex h-[24px] max-w-[140px] items-center gap-[5px] rounded-[5px] bg-white/[0.06] px-[8px] text-[13px] font-medium leading-none text-neutral-400 ring-1 ring-white/[0.04]">
+      <Icon className="h-[14px] w-[14px] shrink-0" />
       <span className="truncate">{setting.label}</span>
     </span>
   );

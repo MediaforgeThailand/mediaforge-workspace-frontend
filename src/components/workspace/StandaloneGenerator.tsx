@@ -1351,6 +1351,7 @@ type StandaloneInlineLabelKey =
   | "negativePrompt"
   | "off"
   | "on"
+  | "orientation"
   | "originalSound"
   | "people"
   | "quality"
@@ -1395,6 +1396,7 @@ const STANDALONE_INLINE_LABELS: Record<
   negativePrompt: { en: "Negative prompt", th: "คำสั่งที่ไม่ต้องการ" },
   off: { en: "Off", th: "ปิด" },
   on: { en: "On", th: "เปิด" },
+  orientation: { en: "Orientation", th: "ทิศทาง" },
   originalSound: { en: "Original sound", th: "เสียงต้นฉบับ" },
   people: { en: "People", th: "บุคคล" },
   quality: { en: "Quality", th: "คุณภาพ" },
@@ -4367,13 +4369,13 @@ function VoiceTranslatePanel({
 
   return (
     <section className="standalone-translate-panel flex min-h-0 flex-1 flex-col overflow-hidden rounded-[18px] border border-[var(--border-overlay)] bg-[var(--bg-sidebar)] shadow-[inset_0_1px_0_rgba(255,255,255,.05)]">
-      <div className="flex h-[52px] shrink-0 items-center gap-2.5 border-b border-white/[0.05] px-3.5">
+      <div className="flex h-[64px] shrink-0 items-center gap-2.5 border-b border-white/[0.05] px-[20px]">
         <span className="grid h-8 w-8 shrink-0 place-items-center text-cyan-200">
           <Languages className="h-4 w-4" />
         </span>
         <div className="min-w-0">
-          <h2 className="truncate text-[15px] font-bold leading-[17px] text-white">{copy.title}</h2>
-          <p className="mt-0.5 truncate text-[10px] leading-[13px] text-zinc-400">{copy.subtitle}</p>
+          <h2 className="truncate text-[18px] font-semibold leading-[24px] tracking-[-0.12px] text-white">{copy.title}</h2>
+          <p className="mt-0.5 truncate text-[14px] leading-[18px] text-zinc-400">{copy.subtitle}</p>
         </div>
       </div>
 
@@ -4453,9 +4455,9 @@ function VoiceTranslatePanel({
                   )}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-[13px] font-bold leading-[15px] text-white">{copy.uploadTitle}</p>
-                  <p className="mt-1 truncate text-[11px] leading-[14px] text-zinc-400">{copy.uploadHint}</p>
-                  <p className="mt-1 text-[10px] font-semibold leading-[12px] text-cyan-100/70">
+                  <p className="text-[16px] font-bold leading-[20px] text-white">{copy.uploadTitle}</p>
+                  <p className="mt-1 truncate text-[14px] leading-[18px] text-zinc-400">{copy.uploadHint}</p>
+                  <p className="mt-1 text-[13px] font-semibold leading-[16px] text-cyan-100/70">
                     {copy.uploadLimit}
                   </p>
                 </div>
@@ -4510,7 +4512,7 @@ function VoiceTranslatePanel({
                 )}
               </span>
               <span className="min-w-0 text-left">
-                <span className="block text-[13px] font-medium leading-[14px] text-[var(--text-tertiary)]">
+                <span className="block text-[13px] font-medium leading-[14px] text-neutral-400">
                   Format
                 </span>
                 <span className="block truncate text-[15px] font-bold leading-[16px] text-white">
@@ -4540,7 +4542,7 @@ function VoiceTranslatePanel({
             <span className="text-[15px] font-semibold leading-[18px] text-zinc-200">{copy.consent}</span>
           </label>
 
-          <p className="rounded-[10px] border border-[var(--border-faint)] bg-black/20 px-2.5 py-2 text-[13px] font-medium leading-[18px] text-zinc-400">
+          <p className="rounded-[10px] border border-[var(--border-faint)] bg-black/20 px-2.5 py-2 text-[16px] font-medium leading-[22px] text-zinc-400">
             {copy.sourceHint}
           </p>
 
@@ -4627,7 +4629,7 @@ function VoiceTranslateSelectCard({
             {icon}
           </span>
           <span className="min-w-0 text-left">
-            <span className="block text-[13px] font-medium leading-[14px] text-[var(--text-tertiary)]">
+            <span className="block text-[13px] font-medium leading-[14px] text-neutral-400">
               {label}
             </span>
             <span className="block truncate text-[15px] font-bold leading-[16px] text-white">
@@ -5865,7 +5867,7 @@ function VoiceSettingsControls({
                       {voice.name.charAt(0)}
                     </span>
                     <span className="min-w-0 w-full">
-                      <span className="block truncate text-[12px] font-bold leading-[15px] text-white">
+                      <span className="block truncate text-[15px] font-bold leading-[18px] text-white">
                         {voice.name}
                       </span>
                       <span className="block truncate text-[10.5px] leading-[13px] text-zinc-500">
@@ -5980,7 +5982,7 @@ function GeminiVoicePicker({
               >
                 {voiceName.charAt(0)}
               </span>
-              <span className="mt-[5px] block w-full truncate text-[12px] font-bold leading-[15px] text-white">
+              <span className="mt-[5px] block w-full truncate text-[15px] font-bold leading-[18px] text-white">
                 {voiceName}
               </span>
               {/* Preview ▶ — sits in the top-right of the card. We
