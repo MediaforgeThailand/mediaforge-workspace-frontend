@@ -1242,6 +1242,12 @@ export const es = {
     "Genera múltiples variaciones al pulsar Ejecutar",
   "workspace.toolNode.decreaseVariation": "Disminuir cantidad de variaciones",
   "workspace.toolNode.increaseVariation": "Aumentar cantidad de variaciones",
+  "workspace.toolNode.voicePreviewPlay": "Reproducir vista previa de {voiceId}",
+  "workspace.toolNode.voicePreviewStop": "Detener vista previa de {voiceId}",
+  "workspace.toolNode.voicePreviewFailed": "No se pudo reproducir la vista previa de voz",
+  "workspace.toolNode.runVariationsToast": "Generando {n} variaciones en paralelo",
+  "workspace.toolNode.connectionsExceedLimit":
+    "Algunas conexiones superan el límite del nuevo modelo:\n{lines}\nElimina las que sobran antes de ejecutar.",
   "createImagePanel.video": "Video",
   "createImagePanel.image": "Imagen",
   "createImagePanel.audio": "Audio",
@@ -2319,6 +2325,7 @@ export const es = {
   "workspace.sidebar.stock": "Stock",
   "workspace.sidebar.spaces": "Espacios",
   "workspace.sidebar.image_gen": "Generador de imágenes",
+  "workspace.sidebar.image_upscale": "Escalar",
   "workspace.sidebar.video_gen": "Generador de vídeos",
   "workspace.sidebar.voice_gen": "Generador de voz",
   "workspace.sidebar.voice_translate": "Traducir",
@@ -2408,6 +2415,7 @@ export const es = {
   "workspace.settings.security_sso": "Seguridad SSO",
   "workspace.settings.preferences": "Preferencias",
   "workspace.settings.plan_billing": "Planificación y facturación",
+  "workspace.settings.system_preferences": "Preferencias del sistema",
   "workspace.settings.coming_soon_pill": "pronto",
   "workspace.settings.fallback_title": "Configuración",
   "workspace.settings.coming_soon_title": "Próximamente",
@@ -2461,6 +2469,104 @@ export const es = {
   "workspace.home.delete_dialog_confirm": "Eliminar proyecto",
   "workspace.home.untitled_project_prompt": "Nombre del proyecto:",
   "workspace.home.untitled_project_default": "Proyecto sin título",
+
+  // Dashboard home — document title, feature showcase, inspirations, academy
+  "workspace.home.document_title": "Workspace — MediaForge",
+
+  "workspace.home.inspiration.thumbnail_ui": "UI de miniatura",
+  "workspace.home.inspiration.full_screen": "Pantalla completa",
+  "workspace.home.inspiration.magnific_motion_1": "Magnific Motion 1",
+  "workspace.home.inspiration.magnific_motion_2": "Magnific Motion 2",
+  "workspace.home.inspiration.sketch_3": "Boceto 3",
+  "workspace.home.inspiration.sketch_1": "Boceto 1",
+  "workspace.home.inspiration.concept_art_3_4": "Concept Art 3/4",
+  "workspace.home.inspiration.concept_art": "Concept Art",
+  "workspace.home.inspiration.collage": "Collage",
+  "workspace.home.inspiration.character_sheet": "Hoja de personaje",
+
+  "workspace.home.feature.action_label": "Explorar más",
+  "workspace.home.feature.workspace.title": "Workspace",
+  "workspace.home.feature.workspace.kicker":
+    "Un lienzo para cada flujo de trabajo de IA.",
+  "workspace.home.feature.workspace.description":
+    "Construye paneles conectados para trabajos de imagen, vídeo, voz y 3D sin perder contexto entre herramientas.",
+  "workspace.home.feature.workspace.bullet1":
+    "Arrastra, pega y conecta assets directamente en el lienzo",
+  "workspace.home.feature.workspace.bullet2":
+    "Encadena resultados a la siguiente herramienta de IA con contexto visible",
+  "workspace.home.feature.workspace.bullet3":
+    "Organiza ideas por proyecto, espacio y panel",
+  "workspace.home.feature.cinematic.title": "Cine",
+  "workspace.home.feature.cinematic.kicker":
+    "Crea visuales narrativos, tomas y conceptos de vídeo.",
+  "workspace.home.feature.cinematic.description":
+    "Modela escenas cinemáticas a partir de prompts, referencias de imagen y assets de storyboard en un solo flujo.",
+  "workspace.home.feature.cinematic.bullet1":
+    "Genera keyframes, ideas de tomas y referencias visuales",
+  "workspace.home.feature.cinematic.bullet2":
+    "Lleva conceptos de imagen a generación de vídeo sin saltos",
+  "workspace.home.feature.cinematic.bullet3":
+    "Mantén paneles de escenas legibles para clientes y equipos",
+  "workspace.home.feature.3d.title": "3D",
+  "workspace.home.feature.3d.kicker":
+    "Convierte referencias en una dirección creativa lista para 3D.",
+  "workspace.home.feature.3d.description":
+    "Pasa de un boceto o imagen de referencia a la exploración de modelos, materiales y animación.",
+  "workspace.home.feature.3d.bullet1":
+    "Usa referencias para generar ideas listas para modelar",
+  "workspace.home.feature.3d.bullet2":
+    "Vista previa de la dirección visual antes de exportar assets",
+  "workspace.home.feature.3d.bullet3":
+    "Mantén juntas las referencias de personaje, material y escena",
+  "workspace.home.feature.editing.title": "Edición",
+  "workspace.home.feature.editing.kicker":
+    "Refina imágenes en assets listos para producción.",
+  "workspace.home.feature.editing.description":
+    "Recorta, remezcla, restiliza y reconstruye ideas visuales mientras mantienes el material fuente cerca del flujo de trabajo.",
+  "workspace.home.feature.editing.bullet1":
+    "Abre imágenes generadas para revisar y editar",
+  "workspace.home.feature.editing.bullet2":
+    "Usa referencias para guiar variaciones sin perder contexto",
+  "workspace.home.feature.editing.bullet3":
+    "Devuelve assets editados a los flujos del lienzo",
+  "workspace.home.feature.sound.title": "Sonido y voz",
+  "workspace.home.feature.sound.kicker":
+    "Crea voz, narración y capas de audio.",
+  "workspace.home.feature.sound.description":
+    "Convierte guiones en assets de voz utilizables y mantén el audio conectado con las imágenes, escenas y vídeos cercanos.",
+  "workspace.home.feature.sound.bullet1":
+    "Genera voz a partir de guiones y dirección",
+  "workspace.home.feature.sound.bullet2":
+    "Mantén los assets de audio disponibles junto a los paneles visuales",
+  "workspace.home.feature.sound.bullet3":
+    "Encamina el sonido hacia los flujos de vídeo y producción",
+  "workspace.home.feature.academy.title": "Aprendizaje",
+  "workspace.home.feature.academy.kicker":
+    "Aprende flujos de trabajo directamente dentro del producto.",
+  "workspace.home.feature.academy.description":
+    "Descubre ejemplos guiados, recetas creativas y flujos prácticos para construir mejores proyectos de IA.",
+  "workspace.home.feature.academy.bullet1":
+    "Explora contenido de aprendizaje desde la superficie de inicio",
+  "workspace.home.feature.academy.bullet2":
+    "Usa ejemplos como punto de partida para proyectos reales",
+  "workspace.home.feature.academy.bullet3":
+    "Mantén el aprendizaje del producto cerca de las herramientas",
+
+  "workspace.home.academy_video.scene_monitor_fn.title":
+    "Tutorial Scene Monitor FN",
+  "workspace.home.academy_video.scene_monitor_fn.description":
+    "Tutorial de flujo de trabajo para construir una escena completa.",
+  "workspace.home.academy_video.full_screen.title":
+    "Flujo de pantalla completa",
+  "workspace.home.academy_video.full_screen.description":
+    "Recorrido paso a paso del workspace en pantalla completa.",
+
+  "workspace.home.education_status.passed": "Aprobado",
+  "workspace.home.education_status.ended": "Finalizado",
+  "workspace.home.education_status.submitted": "Enviado",
+
+  "workspace.home.owner.team_project": "Proyecto de equipo",
+  "workspace.home.owner.owned_by_you": "Te pertenece",
 
   // Spaces view
   "workspace.spaces.title": "Espacios",
@@ -2533,6 +2639,8 @@ export const es = {
   "workspace.standalone.tools": "Herramientas",
   "workspace.standalone.tool.image_gen.nav": "Imagen",
   "workspace.standalone.tool.image_gen.title": "Generador de imágenes",
+  "workspace.standalone.tool.image_upscale.nav": "Escalar",
+  "workspace.standalone.tool.image_upscale.title": "Escalar medios",
   "workspace.standalone.tool.video_gen.nav": "Vídeo",
   "workspace.standalone.tool.video_gen.title": "Generador de vídeos",
   "workspace.standalone.tool.voice_gen.nav": "Audio",
@@ -2749,6 +2857,8 @@ export const es = {
     "SeedDream de generación anterior: amplia cobertura de estilo.",
   "workspace.standalone.model.gpt_image_2.desc":
     "Lo mejor para un estilo preciso y control de calidad.",
+  "workspace.standalone.model.magnific_upscale_precision_v2.desc":
+    "Escalado de imágenes y vídeos Magnific con presets simples sobre los controles avanzados.",
   "workspace.standalone.model.kling_v2_6_pro.desc":
     "Flujo de trabajo clásico de texto/imagen a vídeo.",
   "workspace.standalone.model.kling_v2_6_motion_pro.desc":
@@ -2797,6 +2907,8 @@ export const es = {
     "BytePlus image-to-3D: motor alternativo a Tripo.",
   "workspace.standalone.validation.image_prompt":
     "La generación de imágenes necesita un Prompt.",
+  "workspace.standalone.validation.upscale_image":
+    "Escalar requiere una imagen o vídeo de origen.",
   "workspace.standalone.validation.motion_refs":
     "El vídeo en movimiento necesita una imagen de referencia y un vídeo en movimiento.",
   "workspace.standalone.validation.end_needs_start":
@@ -3067,6 +3179,9 @@ export const es = {
   "workspace.toolnames.audio_gen": "Generador de audio",
   "workspace.toolnames.audio_gen_desc":
     "Conversión de texto a voz con Gemini TTS: 30 voces nombradas, dirección de estilo por clip.",
+  "workspace.toolnames.voice_translate": "Doblaje",
+  "workspace.toolnames.voice_translate_desc":
+    "Traduce voz de MP3/MP4 con doblaje de ElevenLabs y preservación de voz.",
   "workspace.toolnames.video_to_prompt": "Convertir video en prompt",
   "workspace.toolnames.video_to_prompt_desc":
     "Lee un video y genera un desglose de prompts por escena.",
@@ -3088,6 +3203,9 @@ export const es = {
   "workspace.toolnames.remove_bg": "Eliminar glucemia",
   "workspace.toolnames.remove_bg_desc":
     "Quite el fondo de una imagen con Freepik/Magnific.",
+  "workspace.toolnames.upscale": "Escalar",
+  "workspace.toolnames.upscale_desc":
+    "Aumenta la resolución de imagen o vídeo con Magnific.",
   "workspace.toolnames.image_to_3d": "Imagen a 3D",
   "workspace.toolnames.image_to_3d_desc":
     "Convierta una imagen de referencia en una GLB mediante Tripo3D.",
@@ -3097,6 +3215,7 @@ export const es = {
 
   // ─── Floating sidebar mode buttons ──────────────────────────────
   "workspace.tools.add_node": "Agregar nodo",
+  "workspace.tools.assets": "Abrir recursos",
   "workspace.tools.select": "Seleccionar",
   "workspace.tools.hand": "Mano (mantenga presionada la barra espaciadora)",
   "workspace.tools.cut_connector": "Cortar conector",
@@ -4175,11 +4294,11 @@ export const es = {
   "workspace.picker.port.cutout": "recorte",
   "workspace.picker.port.to_video": "→ video",
   "workspace.picker.port.to_audio": "→ audio",
+  "workspace.picker.port.to_media": "→ MP3/MP4",
   "workspace.picker.port.to_context": "→ contexto",
   "workspace.picker.port.to_script": "→ guion",
   "workspace.picker.port.audio": "audio",
-  "workspace.picker.port.to_media": "-> MP3/MP4",
-  "workspace.picker.port.to_url": "-> URL",
+  "workspace.picker.port.to_url": "→ URL",
   "workspace.picker.port.media": "MP3/MP4",
   "workspace.picker.port.png": "PNG",
   "workspace.picker.port.mp3": "MP3",

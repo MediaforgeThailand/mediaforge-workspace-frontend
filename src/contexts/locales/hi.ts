@@ -1141,6 +1141,12 @@ export const hi = {
     "Run दबाने पर कई variations जनरेट करें",
   "workspace.toolNode.decreaseVariation": "variation संख्या घटाएं",
   "workspace.toolNode.increaseVariation": "variation संख्या बढ़ाएं",
+  "workspace.toolNode.voicePreviewPlay": "{voiceId} का प्रीव्यू चलाएँ",
+  "workspace.toolNode.voicePreviewStop": "{voiceId} का प्रीव्यू रोकें",
+  "workspace.toolNode.voicePreviewFailed": "वॉइस प्रीव्यू नहीं चल सका",
+  "workspace.toolNode.runVariationsToast": "{n} variations समानांतर में जनरेट हो रहे हैं",
+  "workspace.toolNode.connectionsExceedLimit":
+    "कुछ कनेक्शन नए मॉडल की सीमा से अधिक हैं:\n{lines}\nरन से पहले अतिरिक्त कनेक्शन हटाएँ।",
   "createImagePanel.video": "वीडियो",
   "createImagePanel.image": "इमेज",
   "createImagePanel.audio": "ऑडियो",
@@ -2089,6 +2095,7 @@ export const hi = {
   "workspace.sidebar.stock": "स्टॉक मीडिया लाइब्रेरी",
   "workspace.sidebar.spaces": "रिक्त स्थान",
   "workspace.sidebar.image_gen": "छवि जनरेटर",
+  "workspace.sidebar.image_upscale": "अपस्केल",
   "workspace.sidebar.video_gen": "वीडियो जनरेशन",
   "workspace.sidebar.voice_gen": "आवाज जनरेटर",
   "workspace.sidebar.voice_translate": "अनुवाद",
@@ -2170,6 +2177,7 @@ export const hi = {
   "workspace.settings.security_sso": "सरक्षा SSO",
   "workspace.settings.preferences": "प्राथमिकताएँ",
   "workspace.settings.plan_billing": "योजना एवं बिलिंग",
+  "workspace.settings.system_preferences": "सिस्टम प्राथमिकताएँ",
   "workspace.settings.coming_soon_pill": "जल्द ही",
   "workspace.settings.fallback_title": "सेटिंग्स",
   "workspace.settings.coming_soon_title": "जल्द ही आ रहा है",
@@ -2220,6 +2228,103 @@ export const hi = {
   "workspace.home.delete_dialog_confirm": "प्रोजेक्ट हटाएं",
   "workspace.home.untitled_project_prompt": "परियोजना का नाम:",
   "workspace.home.untitled_project_default": "शीर्षकहीन परियोजना",
+
+  "workspace.home.document_title": "Workspace — MediaForge",
+
+  "workspace.home.inspiration.thumbnail_ui": "थंबनेल UI",
+  "workspace.home.inspiration.full_screen": "फ़ुल स्क्रीन",
+  "workspace.home.inspiration.magnific_motion_1": "Magnific Motion 1",
+  "workspace.home.inspiration.magnific_motion_2": "Magnific Motion 2",
+  "workspace.home.inspiration.sketch_3": "स्केच 3",
+  "workspace.home.inspiration.sketch_1": "स्केच 1",
+  "workspace.home.inspiration.concept_art_3_4": "Concept Art 3/4",
+  "workspace.home.inspiration.concept_art": "Concept Art",
+  "workspace.home.inspiration.collage": "कोलाज",
+  "workspace.home.inspiration.character_sheet": "कैरेक्टर शीट",
+
+  "workspace.home.feature.action_label": "और देखें",
+  "workspace.home.feature.workspace.title": "Workspace",
+  "workspace.home.feature.workspace.kicker":
+    "हर AI वर्कफ़्लो के लिए एक ही कैनवस।",
+  "workspace.home.feature.workspace.description":
+    "टूल्स के बीच संदर्भ खोए बिना इमेज, वीडियो, वॉइस और 3D काम के लिए जुड़े बोर्ड बनाएँ।",
+  "workspace.home.feature.workspace.bullet1":
+    "एसेट को सीधे कैनवस पर खींचें, पेस्ट करें और जोड़ें",
+  "workspace.home.feature.workspace.bullet2":
+    "दिखाई देने वाले संदर्भ के साथ आउटपुट को अगले AI टूल में जोड़ें",
+  "workspace.home.feature.workspace.bullet3":
+    "प्रोजेक्ट, स्पेस और बोर्ड के अनुसार विचार व्यवस्थित करें",
+  "workspace.home.feature.cinematic.title": "सिनेमा",
+  "workspace.home.feature.cinematic.kicker":
+    "कहानी के विज़ुअल, शॉट और वीडियो कॉन्सेप्ट बनाएँ।",
+  "workspace.home.feature.cinematic.description":
+    "प्रॉम्प्ट, इमेज संदर्भों और स्टोरीबोर्ड एसेट से सिनेमैटिक सीन एक प्रोडक्शन फ्लो में आकार दें।",
+  "workspace.home.feature.cinematic.bullet1":
+    "कीफ़्रेम, शॉट आइडिया और विज़ुअल संदर्भ जनरेट करें",
+  "workspace.home.feature.cinematic.bullet2":
+    "इमेज कॉन्सेप्ट को वीडियो जनरेशन में आसानी से ले जाएँ",
+  "workspace.home.feature.cinematic.bullet3":
+    "क्लाइंट्स और टीमों के लिए सीन बोर्ड पठनीय रखें",
+  "workspace.home.feature.3d.title": "3D",
+  "workspace.home.feature.3d.kicker":
+    "संदर्भों को 3D-तैयार क्रिएटिव दिशा में बदलें।",
+  "workspace.home.feature.3d.description":
+    "स्केच या संदर्भ इमेज से मॉडल, मटीरियल और एनिमेशन-तैयार खोज तक बढ़ें।",
+  "workspace.home.feature.3d.bullet1":
+    "संदर्भों का उपयोग करके मॉडल-तैयार आइडिया जनरेट करें",
+  "workspace.home.feature.3d.bullet2":
+    "एसेट एक्सपोर्ट करने से पहले विज़ुअल दिशा का पूर्वावलोकन करें",
+  "workspace.home.feature.3d.bullet3":
+    "कैरेक्टर, मटीरियल और सीन संदर्भों को एक साथ रखें",
+  "workspace.home.feature.editing.title": "एडिटिंग",
+  "workspace.home.feature.editing.kicker":
+    "इमेजेज़ को प्रोडक्शन-तैयार एसेट्स में निखारें।",
+  "workspace.home.feature.editing.description":
+    "स्रोत सामग्री को वर्कफ़्लो के पास रखते हुए विज़ुअल आइडिया को क्रॉप, रीमिक्स, रीस्टाइल और पुनर्निर्माण करें।",
+  "workspace.home.feature.editing.bullet1":
+    "जनरेट की गई इमेजेज़ को समीक्षा और एडिट के लिए खोलें",
+  "workspace.home.feature.editing.bullet2":
+    "संदर्भ खोए बिना संदर्भों से variations को मार्गदर्शन दें",
+  "workspace.home.feature.editing.bullet3":
+    "एडिट किए गए एसेट्स को कैनवस वर्कफ़्लो में वापस ले जाएँ",
+  "workspace.home.feature.sound.title": "साउंड और वॉइस",
+  "workspace.home.feature.sound.kicker":
+    "वॉइस, नैरेशन और ऑडियो लेयर बनाएँ।",
+  "workspace.home.feature.sound.description":
+    "स्क्रिप्ट्स को उपयोगी वॉइस एसेट्स में बदलें और ऑडियो को आसपास की इमेजेज़, सीन और वीडियो से जोड़े रखें।",
+  "workspace.home.feature.sound.bullet1":
+    "स्क्रिप्ट और दिशा से वॉइस जनरेट करें",
+  "workspace.home.feature.sound.bullet2":
+    "विज़ुअल बोर्ड के साथ ऑडियो एसेट्स को उपलब्ध रखें",
+  "workspace.home.feature.sound.bullet3":
+    "साउंड को वीडियो और प्रोडक्शन वर्कफ़्लो में रूट करें",
+  "workspace.home.feature.academy.title": "लर्निंग",
+  "workspace.home.feature.academy.kicker":
+    "प्रोडक्ट के अंदर सीधे वर्कफ़्लो सीखें।",
+  "workspace.home.feature.academy.description":
+    "गाइडेड उदाहरण, क्रिएटिव रेसिपी और बेहतर AI प्रोजेक्ट बनाने के लिए व्यावहारिक वर्कफ़्लो खोजें।",
+  "workspace.home.feature.academy.bullet1":
+    "होम सतह से लर्निंग कंटेंट ब्राउज़ करें",
+  "workspace.home.feature.academy.bullet2":
+    "उदाहरणों को असली प्रोजेक्ट के शुरुआती बिंदु के रूप में उपयोग करें",
+  "workspace.home.feature.academy.bullet3":
+    "प्रोडक्ट लर्निंग को टूल्स के पास रखें",
+
+  "workspace.home.academy_video.scene_monitor_fn.title":
+    "Scene Monitor FN ट्यूटोरियल",
+  "workspace.home.academy_video.scene_monitor_fn.description":
+    "पूरा सीन बनाने के लिए वर्कफ़्लो ट्यूटोरियल।",
+  "workspace.home.academy_video.full_screen.title": "फ़ुल स्क्रीन वर्कफ़्लो",
+  "workspace.home.academy_video.full_screen.description":
+    "फ़ुल-स्क्रीन workspace का स्टेप-बाय-स्टेप वॉकथ्रू।",
+
+  "workspace.home.education_status.passed": "पास",
+  "workspace.home.education_status.ended": "समाप्त",
+  "workspace.home.education_status.submitted": "सबमिट",
+
+  "workspace.home.owner.team_project": "टीम प्रोजेक्ट",
+  "workspace.home.owner.owned_by_you": "आपका स्वामित्व",
+
   "workspace.spaces.title": "रिक्त स्थान",
   "workspace.spaces.subtitle":
     "नोड-आधारित जेनरेटिव वर्कफ़्लो बनाएं और अपने विचारों को जीवन में लाएं।",
@@ -2286,6 +2391,8 @@ export const hi = {
   "workspace.standalone.tools": "उपकरण",
   "workspace.standalone.tool.image_gen.nav": "छवि",
   "workspace.standalone.tool.image_gen.title": "छवि जनरेटर",
+  "workspace.standalone.tool.image_upscale.nav": "अपस्केल",
+  "workspace.standalone.tool.image_upscale.title": "मीडिया अपस्केल करें",
   "workspace.standalone.tool.video_gen.nav": "वीडियो",
   "workspace.standalone.tool.video_gen.title": "वीडियो जनरेशन",
   "workspace.standalone.tool.voice_gen.nav": "ऑडियो",
@@ -2503,6 +2610,8 @@ export const hi = {
     "पिछली जनरेशन का सीडड्रीम - व्यापक शैली कवरेज।",
   "workspace.standalone.model.gpt_image_2.desc":
     "सटीक शैली और गुणवत्ता नियंत्रण के लिए सर्वोत्तम।",
+  "workspace.standalone.model.magnific_upscale_precision_v2.desc":
+    "उन्नत नियंत्रणों के ऊपर सरल प्रीसेट के साथ Magnific इमेज और वीडियो अपस्केलिंग।",
   "workspace.standalone.model.kling_v2_6_pro.desc":
     "क्लासिक टेक्स्ट/इमेज-टू-वीडियो वर्कफ़्लो।",
   "workspace.standalone.model.kling_v2_6_motion_pro.desc":
@@ -2549,6 +2658,8 @@ export const hi = {
     "बाइटप्लस इमेज-टू-3 डी — ट्रिपो का वैकल्पिक इंजन।",
   "workspace.standalone.validation.image_prompt":
     "छवि निर्माण के लिए प्रॉम्प्ट की आवश्यकता होती है।",
+  "workspace.standalone.validation.upscale_image":
+    "अपस्केल के लिए एक स्रोत इमेज या वीडियो आवश्यक है।",
   "workspace.standalone.validation.motion_refs":
     "मोशन वीडियो के लिए एक संदर्भ छवि और एक मोशन वीडियो की आवश्यकता होती है।",
   "workspace.standalone.validation.end_needs_start":
@@ -2804,6 +2915,9 @@ export const hi = {
   "workspace.toolnames.audio_gen": "ऑडियो जेनरेटर",
   "workspace.toolnames.audio_gen_desc":
     "GeminiTTS के साथ टेक्स्ट-टू-स्पीच - 30 नामित आवाजें, प्रति-क्लिप शैली दिशा।",
+  "workspace.toolnames.voice_translate": "डबिंग",
+  "workspace.toolnames.voice_translate_desc":
+    "ElevenLabs डबिंग और वॉइस संरक्षण के साथ MP3/MP4 स्पीच का अनुवाद करें।",
   "workspace.toolnames.video_to_prompt": "वीडियो से प्रॉम्प्ट",
   "workspace.toolnames.video_to_prompt_desc":
     "वीडियो का विश्लेषण करें और हर दृश्य के लिए प्रॉम्प्ट बनाएं",
@@ -2816,12 +2930,18 @@ export const hi = {
   "workspace.toolnames.stock": "स्टॉक",
   "workspace.toolnames.stock_desc":
     "प्रीमियम स्टॉक फ़ोटो, वैक्टर और वीडियो खोजें।",
+  "workspace.toolnames.url_asset": "URL को एसेट में",
+  "workspace.toolnames.url_asset_desc":
+    "MP4, MP3, या PNG URL को सीधे workspace एसेट के रूप में आयात करें।",
   "workspace.toolnames.kling_element": "Kling तत्व",
   "workspace.toolnames.kling_element_desc":
     "किसी वर्ण या ऑब्जेक्ट को पुन: प्रयोज्य Kling ओमनी तत्व के रूप में सहेजें। 4 रेफरी + 1 फ्रंटल।",
   "workspace.toolnames.remove_bg": "बीजी हटाएँ",
   "workspace.toolnames.remove_bg_desc":
     "Freepik/Magnific से किसी छवि की पृष्ठभूमि निकालें।",
+  "workspace.toolnames.upscale": "अपस्केल",
+  "workspace.toolnames.upscale_desc":
+    "Magnific के साथ इमेज या वीडियो रिज़ॉल्यूशन बढ़ाएँ।",
   "workspace.toolnames.image_to_3d": "3D में छवि",
   "workspace.toolnames.image_to_3d_desc":
     "Tripo3D के माध्यम से एक संदर्भ छवि को GLB में बदलें।",
@@ -2829,6 +2949,7 @@ export const hi = {
   "workspace.toolnames.merge_av_desc":
     "एक ऑडियो ट्रैक को वीडियो क्लिप पर मक्स करें। आउटपुट MP4 है.",
   "workspace.tools.add_node": "नोड जोड़ें",
+  "workspace.tools.assets": "एसेट खोलें",
   "workspace.tools.select": "चुनें",
   "workspace.tools.hand": "हैंड (Space दबाकर पैन करें)",
   "workspace.tools.cut_connector": "कनेक्टर को काटें",
@@ -3861,8 +3982,14 @@ export const hi = {
   "workspace.picker.port.cutout": "कटआउट",
   "workspace.picker.port.to_video": "→ वीडियो",
   "workspace.picker.port.to_audio": "→ ऑडियो",
+  "workspace.picker.port.to_media": "→ MP3/MP4",
   "workspace.picker.port.to_context": "→ context",
   "workspace.picker.port.to_script": "→ स्क्रिप्ट",
+  "workspace.picker.port.to_url": "→ URL",
   "workspace.picker.port.audio": "ऑडियो",
+  "workspace.picker.port.media": "MP3/MP4",
+  "workspace.picker.port.png": "PNG",
+  "workspace.picker.port.mp3": "MP3",
+  "workspace.picker.port.mp4": "MP4",
   "workspace.picker.port.prompt": "Prompt",
 } satisfies TranslationMap;

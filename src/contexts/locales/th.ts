@@ -1165,6 +1165,12 @@ export const th = {
   "workspace.toolNode.variationStepperTip": "สร้างหลายรูปแบบเมื่อกดรัน",
   "workspace.toolNode.decreaseVariation": "ลดจำนวนรูปแบบ",
   "workspace.toolNode.increaseVariation": "เพิ่มจำนวนรูปแบบ",
+  "workspace.toolNode.voicePreviewPlay": "เล่นตัวอย่างเสียง {voiceId}",
+  "workspace.toolNode.voicePreviewStop": "หยุดตัวอย่างเสียง {voiceId}",
+  "workspace.toolNode.voicePreviewFailed": "เล่นตัวอย่างเสียงไม่สำเร็จ",
+  "workspace.toolNode.runVariationsToast": "กำลังสร้าง {n} รูปแบบพร้อมกัน",
+  "workspace.toolNode.connectionsExceedLimit":
+    "บางการเชื่อมต่อเกินขีดจำกัดของโมเดลใหม่:\n{lines}\nกรุณาลบสายที่เกินออกก่อนรัน",
   "createImagePanel.video": "วิดีโอ",
   "createImagePanel.image": "รูปภาพ",
   "createImagePanel.audio": "เสียง",
@@ -2211,7 +2217,7 @@ export const th = {
   "workspace.sidebar.image_upscale": "ขยายภาพ",
   "workspace.sidebar.video_gen": "สร้างวิดีโอ",
   "workspace.sidebar.voice_gen": "สร้างเสียง",
-  "workspace.sidebar.voice_translate": "Translate",
+  "workspace.sidebar.voice_translate": "แปลเสียง",
   "workspace.sidebar.threed_gen": "สร้าง 3D",
   "workspace.sidebar.create": "สร้าง",
   "workspace.sidebar.tools": "Tools",
@@ -2349,6 +2355,103 @@ export const th = {
   "workspace.home.delete_dialog_confirm": "ลบโปรเจกต์",
   "workspace.home.untitled_project_prompt": "ชื่อโปรเจกต์:",
   "workspace.home.untitled_project_default": "โปรเจกต์ไม่มีชื่อ",
+
+  // Dashboard home — document title, feature showcase, inspirations, academy
+  "workspace.home.document_title": "Workspace — MediaForge",
+
+  "workspace.home.inspiration.thumbnail_ui": "ภาพปก UI",
+  "workspace.home.inspiration.full_screen": "เต็มจอ",
+  "workspace.home.inspiration.magnific_motion_1": "Magnific Motion 1",
+  "workspace.home.inspiration.magnific_motion_2": "Magnific Motion 2",
+  "workspace.home.inspiration.sketch_3": "สเก็ตช์ 3",
+  "workspace.home.inspiration.sketch_1": "สเก็ตช์ 1",
+  "workspace.home.inspiration.concept_art_3_4": "Concept Art 3/4",
+  "workspace.home.inspiration.concept_art": "Concept Art",
+  "workspace.home.inspiration.collage": "ภาพคอลลาจ",
+  "workspace.home.inspiration.character_sheet": "ชีตตัวละคร",
+
+  "workspace.home.feature.action_label": "ดูเพิ่มเติม",
+  "workspace.home.feature.workspace.title": "Workspace",
+  "workspace.home.feature.workspace.kicker":
+    "หนึ่งแคนวาสสำหรับทุกเวิร์กโฟลว์ AI",
+  "workspace.home.feature.workspace.description":
+    "สร้างบอร์ดที่เชื่อมโยงงานภาพ วิดีโอ เสียง และ 3D โดยไม่เสียบริบทระหว่างเครื่องมือ",
+  "workspace.home.feature.workspace.bullet1":
+    "ลาก วาง และเชื่อมต่อแอสเซ็ตบนแคนวาสได้โดยตรง",
+  "workspace.home.feature.workspace.bullet2":
+    "ส่งต่อผลลัพธ์ไปยังเครื่องมือ AI ถัดไปพร้อมบริบทที่มองเห็นได้",
+  "workspace.home.feature.workspace.bullet3":
+    "จัดระเบียบไอเดียตามโปรเจกต์ สเปซ และบอร์ด",
+  "workspace.home.feature.cinematic.title": "ภาพยนตร์",
+  "workspace.home.feature.cinematic.kicker":
+    "สร้างภาพเล่าเรื่อง ช็อต และคอนเซปต์วิดีโอ",
+  "workspace.home.feature.cinematic.description":
+    "ออกแบบซีนภาพยนตร์จากพรอมป์ ภาพอ้างอิง และสตอรี่บอร์ด ให้จบในโฟลว์การผลิตเดียว",
+  "workspace.home.feature.cinematic.bullet1":
+    "สร้างคีย์เฟรม ไอเดียช็อต และภาพอ้างอิง",
+  "workspace.home.feature.cinematic.bullet2":
+    "ต่อยอดคอนเซปต์ภาพไปสู่การสร้างวิดีโอได้อย่างเป็นระบบ",
+  "workspace.home.feature.cinematic.bullet3":
+    "ทำให้บอร์ดฉากอ่านง่ายสำหรับลูกค้าและทีม",
+  "workspace.home.feature.3d.title": "3D",
+  "workspace.home.feature.3d.kicker":
+    "เปลี่ยนภาพอ้างอิงให้เป็นแนวทางสร้างสรรค์ที่พร้อมต่อยอดเป็นงาน 3D",
+  "workspace.home.feature.3d.description":
+    "ต่อยอดจากสเก็ตช์หรือภาพอ้างอิงไปสู่การสำรวจโมเดล วัสดุ และแอนิเมชันที่พร้อมใช้งาน",
+  "workspace.home.feature.3d.bullet1":
+    "ใช้ภาพอ้างอิงเพื่อสร้างไอเดียที่พร้อมต่อยอดเป็นโมเดล",
+  "workspace.home.feature.3d.bullet2":
+    "ดูทิศทางภาพก่อนส่งออกแอสเซ็ต",
+  "workspace.home.feature.3d.bullet3":
+    "เก็บภาพอ้างอิงของตัวละคร วัสดุ และฉากไว้ด้วยกัน",
+  "workspace.home.feature.editing.title": "ตัดต่อ",
+  "workspace.home.feature.editing.kicker":
+    "ปรับภาพให้เป็นแอสเซ็ตที่พร้อมใช้ในงานจริง",
+  "workspace.home.feature.editing.description":
+    "ครอป รีมิกซ์ ปรับสไตล์ และต่อยอดไอเดียภาพ โดยยังเก็บไฟล์ต้นฉบับไว้ใกล้กับเวิร์กโฟลว์",
+  "workspace.home.feature.editing.bullet1":
+    "เปิดภาพที่สร้างไว้เพื่อตรวจสอบและแก้ไข",
+  "workspace.home.feature.editing.bullet2":
+    "ใช้ภาพอ้างอิงเพื่อกำหนดรูปแบบใหม่โดยไม่เสียบริบท",
+  "workspace.home.feature.editing.bullet3":
+    "ย้ายแอสเซ็ตที่แก้ไขแล้วกลับเข้าสู่เวิร์กโฟลว์บนแคนวาส",
+  "workspace.home.feature.sound.title": "เสียง & พากย์",
+  "workspace.home.feature.sound.kicker":
+    "สร้างเสียงพูด เสียงบรรยาย และเลเยอร์เสียงต่าง ๆ",
+  "workspace.home.feature.sound.description":
+    "เปลี่ยนสคริปต์ให้เป็นไฟล์เสียงที่ใช้งานได้จริง และเชื่อมเสียงเข้ากับรูปภาพ ฉาก และวิดีโอที่เกี่ยวข้อง",
+  "workspace.home.feature.sound.bullet1":
+    "สร้างเสียงจากสคริปต์และคำสั่งกำกับ",
+  "workspace.home.feature.sound.bullet2":
+    "เก็บไฟล์เสียงไว้ใช้งานข้างบอร์ดภาพ",
+  "workspace.home.feature.sound.bullet3":
+    "ส่งเสียงเข้าสู่เวิร์กโฟลว์วิดีโอและการผลิต",
+  "workspace.home.feature.academy.title": "สื่อการสอน",
+  "workspace.home.feature.academy.kicker":
+    "เรียนรู้เวิร์กโฟลว์ได้จากในผลิตภัณฑ์โดยตรง",
+  "workspace.home.feature.academy.description":
+    "ค้นพบตัวอย่างพร้อมคำแนะนำ สูตรสร้างสรรค์ และเวิร์กโฟลว์ที่ใช้งานได้จริง เพื่อสร้างโปรเจกต์ AI ให้ดียิ่งขึ้น",
+  "workspace.home.feature.academy.bullet1":
+    "เลือกดูคอนเทนต์การเรียนรู้จากหน้าแรก",
+  "workspace.home.feature.academy.bullet2":
+    "ใช้ตัวอย่างเป็นจุดเริ่มต้นสำหรับโปรเจกต์จริง",
+  "workspace.home.feature.academy.bullet3":
+    "เรียนรู้การใช้งานควบคู่ไปกับเครื่องมือโดยตรง",
+
+  "workspace.home.academy_video.scene_monitor_fn.title":
+    "บทเรียน Scene Monitor FN",
+  "workspace.home.academy_video.scene_monitor_fn.description":
+    "บทเรียนเวิร์กโฟลว์สำหรับสร้างซีนแบบครบจบ",
+  "workspace.home.academy_video.full_screen.title": "เวิร์กโฟลว์เต็มจอ",
+  "workspace.home.academy_video.full_screen.description":
+    "เดินผ่านการใช้ workspace แบบเต็มจอทีละขั้น",
+
+  "workspace.home.education_status.passed": "ผ่าน",
+  "workspace.home.education_status.ended": "สิ้นสุด",
+  "workspace.home.education_status.submitted": "ส่งแล้ว",
+
+  "workspace.home.owner.team_project": "โปรเจกต์ทีม",
+  "workspace.home.owner.owned_by_you": "คุณเป็นเจ้าของ",
 
   // Spaces view
   "workspace.spaces.title": "Spaces",

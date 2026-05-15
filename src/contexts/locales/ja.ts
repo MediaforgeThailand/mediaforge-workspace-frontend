@@ -1138,6 +1138,12 @@ export const ja = {
     "実行時に複数のバリエーションを生成",
   "workspace.toolNode.decreaseVariation": "バリエーション数を減らす",
   "workspace.toolNode.increaseVariation": "バリエーション数を増やす",
+  "workspace.toolNode.voicePreviewPlay": "{voiceId} のプレビューを再生",
+  "workspace.toolNode.voicePreviewStop": "{voiceId} のプレビューを停止",
+  "workspace.toolNode.voicePreviewFailed": "ボイスプレビューを再生できませんでした",
+  "workspace.toolNode.runVariationsToast": "{n} 件のバリエーションを並列生成中",
+  "workspace.toolNode.connectionsExceedLimit":
+    "新しいモデルの上限を超えた接続があります:\n{lines}\n実行前に余分な接続を削除してください。",
   "createImagePanel.video": "動画",
   "createImagePanel.image": "画像",
   "createImagePanel.audio": "音声",
@@ -2084,6 +2090,7 @@ export const ja = {
   "workspace.sidebar.stock": "ストック素材",
   "workspace.sidebar.spaces": "スペース",
   "workspace.sidebar.image_gen": "画像生成器",
+  "workspace.sidebar.image_upscale": "アップスケール",
   "workspace.sidebar.video_gen": "動画生成",
   "workspace.sidebar.voice_gen": "音声ジェネレーター",
   "workspace.sidebar.voice_translate": "翻訳",
@@ -2165,6 +2172,7 @@ export const ja = {
   "workspace.settings.security_sso": "セキュリティ SSO",
   "workspace.settings.preferences": "設定",
   "workspace.settings.plan_billing": "プランと請求",
+  "workspace.settings.system_preferences": "システム環境設定",
   "workspace.settings.coming_soon_pill": "もうすぐ",
   "workspace.settings.fallback_title": "設定",
   "workspace.settings.coming_soon_title": "近日公開予定",
@@ -2216,6 +2224,103 @@ export const ja = {
   "workspace.home.delete_dialog_confirm": "プロジェクトの削除",
   "workspace.home.untitled_project_prompt": "プロジェクト名:",
   "workspace.home.untitled_project_default": "無題のプロジェクト",
+
+  "workspace.home.document_title": "Workspace — MediaForge",
+
+  "workspace.home.inspiration.thumbnail_ui": "サムネイル UI",
+  "workspace.home.inspiration.full_screen": "フルスクリーン",
+  "workspace.home.inspiration.magnific_motion_1": "Magnific Motion 1",
+  "workspace.home.inspiration.magnific_motion_2": "Magnific Motion 2",
+  "workspace.home.inspiration.sketch_3": "スケッチ 3",
+  "workspace.home.inspiration.sketch_1": "スケッチ 1",
+  "workspace.home.inspiration.concept_art_3_4": "Concept Art 3/4",
+  "workspace.home.inspiration.concept_art": "Concept Art",
+  "workspace.home.inspiration.collage": "コラージュ",
+  "workspace.home.inspiration.character_sheet": "キャラクターシート",
+
+  "workspace.home.feature.action_label": "もっと見る",
+  "workspace.home.feature.workspace.title": "Workspace",
+  "workspace.home.feature.workspace.kicker":
+    "あらゆる AI ワークフローのための一枚のキャンバス。",
+  "workspace.home.feature.workspace.description":
+    "画像・動画・音声・3D の作業をツール間でコンテキストを失わずに接続するボードを構築。",
+  "workspace.home.feature.workspace.bullet1":
+    "キャンバス上で素材を直接ドラッグ・貼り付け・接続",
+  "workspace.home.feature.workspace.bullet2":
+    "可視のコンテキストとともに次の AI ツールへ出力を連鎖",
+  "workspace.home.feature.workspace.bullet3":
+    "プロジェクト・スペース・ボードでアイデアを整理",
+  "workspace.home.feature.cinematic.title": "映画",
+  "workspace.home.feature.cinematic.kicker":
+    "ストーリーのビジュアル、ショット、動画コンセプトを作成。",
+  "workspace.home.feature.cinematic.description":
+    "プロンプト、画像リファレンス、絵コンテ素材からシネマティックなシーンを 1 つのプロダクションフローで形作る。",
+  "workspace.home.feature.cinematic.bullet1":
+    "キーフレーム、ショットのアイデア、ビジュアルリファレンスを生成",
+  "workspace.home.feature.cinematic.bullet2":
+    "画像コンセプトを動画生成へスムーズに引き継ぎ",
+  "workspace.home.feature.cinematic.bullet3":
+    "クライアントやチーム向けに読みやすいシーンボードを維持",
+  "workspace.home.feature.3d.title": "3D",
+  "workspace.home.feature.3d.kicker":
+    "リファレンスから 3D 対応のクリエイティブ方向性へ。",
+  "workspace.home.feature.3d.description":
+    "スケッチや参照画像からモデル・マテリアル・アニメーションへつながる探索へ進む。",
+  "workspace.home.feature.3d.bullet1":
+    "リファレンスからモデル化に適したアイデアを生成",
+  "workspace.home.feature.3d.bullet2":
+    "素材を書き出す前にビジュアルの方向性をプレビュー",
+  "workspace.home.feature.3d.bullet3":
+    "キャラクター・マテリアル・シーンのリファレンスをまとめて管理",
+  "workspace.home.feature.editing.title": "編集",
+  "workspace.home.feature.editing.kicker":
+    "画像をプロダクション準備の素材へ磨き上げる。",
+  "workspace.home.feature.editing.description":
+    "トリミング、リミックス、スタイル変更、ビジュアルアイデアの再構築を、素材をワークフロー近くに保ちながら実行。",
+  "workspace.home.feature.editing.bullet1":
+    "生成画像を開いてレビューと編集",
+  "workspace.home.feature.editing.bullet2":
+    "コンテキストを保ったままバリエーションをリファレンスで誘導",
+  "workspace.home.feature.editing.bullet3":
+    "編集済みの素材をキャンバスのワークフローへ戻す",
+  "workspace.home.feature.sound.title": "サウンド & 音声",
+  "workspace.home.feature.sound.kicker":
+    "音声、ナレーション、オーディオレイヤーを作成。",
+  "workspace.home.feature.sound.description":
+    "スクリプトを使える音声素材に変え、周囲の画像・シーン・動画と音声を結び付けたまま管理。",
+  "workspace.home.feature.sound.bullet1":
+    "スクリプトと演出指示から音声を生成",
+  "workspace.home.feature.sound.bullet2":
+    "ビジュアルボードの隣にオーディオ素材を配置",
+  "workspace.home.feature.sound.bullet3":
+    "サウンドを動画とプロダクションのワークフローへ流し込む",
+  "workspace.home.feature.academy.title": "学習",
+  "workspace.home.feature.academy.kicker":
+    "プロダクト内でワークフローを直接学ぶ。",
+  "workspace.home.feature.academy.description":
+    "ガイド付きの例、クリエイティブなレシピ、実践的なワークフローを見つけて、より良い AI プロジェクトを構築。",
+  "workspace.home.feature.academy.bullet1":
+    "ホーム画面から学習コンテンツを閲覧",
+  "workspace.home.feature.academy.bullet2":
+    "実プロジェクトの出発点として例を活用",
+  "workspace.home.feature.academy.bullet3":
+    "プロダクトの学びをツールの近くに保つ",
+
+  "workspace.home.academy_video.scene_monitor_fn.title":
+    "Scene Monitor FN チュートリアル",
+  "workspace.home.academy_video.scene_monitor_fn.description":
+    "完全なシーンを構築するためのワークフローチュートリアル。",
+  "workspace.home.academy_video.full_screen.title": "フルスクリーンワークフロー",
+  "workspace.home.academy_video.full_screen.description":
+    "フルスクリーン workspace を段階的に解説。",
+
+  "workspace.home.education_status.passed": "合格",
+  "workspace.home.education_status.ended": "終了",
+  "workspace.home.education_status.submitted": "提出済み",
+
+  "workspace.home.owner.team_project": "チームのプロジェクト",
+  "workspace.home.owner.owned_by_you": "あなたが所有",
+
   "workspace.spaces.title": "スペース",
   "workspace.spaces.subtitle":
     "ノードベースの生成ワークフローを構築し、アイデアを実現します。",
@@ -2284,6 +2389,8 @@ export const ja = {
   "workspace.standalone.tools": "ツール",
   "workspace.standalone.tool.image_gen.nav": "画像",
   "workspace.standalone.tool.image_gen.title": "画像生成器",
+  "workspace.standalone.tool.image_upscale.nav": "アップスケール",
+  "workspace.standalone.tool.image_upscale.title": "メディアをアップスケール",
   "workspace.standalone.tool.video_gen.nav": "動画",
   "workspace.standalone.tool.video_gen.title": "動画生成",
   "workspace.standalone.tool.voice_gen.nav": "オーディオ",
@@ -2497,6 +2604,8 @@ export const ja = {
     "旧版の SeedDream — 幅広いスタイルをカバーします。",
   "workspace.standalone.model.gpt_image_2.desc":
     "正確なスタイルと品質管理に最適です。",
+  "workspace.standalone.model.magnific_upscale_precision_v2.desc":
+    "高度な制御をシンプルなプリセットでまとめた Magnific の画像・動画アップスケーリング。",
   "workspace.standalone.model.kling_v2_6_pro.desc":
     "古典的なテキスト/画像から動画へのワークフロー。",
   "workspace.standalone.model.kling_v2_6_motion_pro.desc":
@@ -2545,6 +2654,8 @@ export const ja = {
     "BytePlus image-to-3D — Tripo の代替エンジン。",
   "workspace.standalone.validation.image_prompt":
     "画像生成にはプロンプトが必要です。",
+  "workspace.standalone.validation.upscale_image":
+    "アップスケールには元の画像または動画が 1 つ必要です。",
   "workspace.standalone.validation.motion_refs":
     "動画には参照画像と動画が必要です。",
   "workspace.standalone.validation.end_needs_start":
@@ -2806,6 +2917,9 @@ export const ja = {
   "workspace.toolnames.audio_gen": "オーディオジェネレーター",
   "workspace.toolnames.audio_gen_desc":
     "Gemini TTS によるテキスト読み上げ — 30 の名前付き音声、クリップごとのスタイル方向。",
+  "workspace.toolnames.voice_translate": "吹き替え",
+  "workspace.toolnames.voice_translate_desc":
+    "ElevenLabs ダビングで MP3/MP4 の音声を翻訳しつつ声を保持。",
   "workspace.toolnames.video_to_prompt": "動画からプロンプトを生成",
   "workspace.toolnames.video_to_prompt_desc":
     "動画を読み取り、シーンごとのプロンプトを生成します。",
@@ -2818,12 +2932,18 @@ export const ja = {
   "workspace.toolnames.stock": "ストック素材",
   "workspace.toolnames.stock_desc":
     "プレミアムストック写真、ベクター、動画を検索します。",
+  "workspace.toolnames.url_asset": "URL を素材に",
+  "workspace.toolnames.url_asset_desc":
+    "MP4 / MP3 / PNG の URL をワークスペース素材として読み込みます。",
   "workspace.toolnames.kling_element": "Kling 要素",
   "workspace.toolnames.kling_element_desc":
     "キャラクターまたはオブジェクトを再利用可能な Kling Omni 要素として保存します。レフト4枚+フロント1枚。",
   "workspace.toolnames.remove_bg": "BG を削除",
   "workspace.toolnames.remove_bg_desc":
     "Freepik/Magnific で画像から背景を取り除きます。",
+  "workspace.toolnames.upscale": "アップスケール",
+  "workspace.toolnames.upscale_desc":
+    "Magnific で画像または動画の解像度を上げます。",
   "workspace.toolnames.image_to_3d": "画像を 3D に変換",
   "workspace.toolnames.image_to_3d_desc":
     "Tripo3D を介して参照画像を GLB に変換します。",
@@ -2831,6 +2951,7 @@ export const ja = {
   "workspace.toolnames.merge_av_desc":
     "オーディオ トラックを動画 クリップに多重化します。出力はMP4です。",
   "workspace.tools.add_node": "ノードの追加",
+  "workspace.tools.assets": "アセットを開く",
   "workspace.tools.select": "選択",
   "workspace.tools.hand": "手 (スペースを保持)",
   "workspace.tools.cut_connector": "カットコネクタ",
@@ -3880,8 +4001,14 @@ export const ja = {
   "workspace.picker.port.cutout": "切り抜き",
   "workspace.picker.port.to_video": "→ 動画",
   "workspace.picker.port.to_audio": "→ 音声",
+  "workspace.picker.port.to_media": "→ MP3/MP4",
   "workspace.picker.port.to_context": "→ コンテキスト",
   "workspace.picker.port.to_script": "→ スクリプト",
+  "workspace.picker.port.to_url": "→ URL",
   "workspace.picker.port.audio": "音声",
+  "workspace.picker.port.media": "MP3/MP4",
+  "workspace.picker.port.png": "PNG",
+  "workspace.picker.port.mp3": "MP3",
+  "workspace.picker.port.mp4": "MP4",
   "workspace.picker.port.prompt": "プロンプト",
 } satisfies TranslationMap;

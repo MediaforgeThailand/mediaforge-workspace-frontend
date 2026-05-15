@@ -33,6 +33,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage, getLanguageLocale, type Language } from "@/contexts/LanguageContext";
+import type { TranslationKey } from "@/contexts/locales/en";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
 import WorkspaceErrorBoundary from "@/components/workspace/WorkspaceErrorBoundary";
 import {
@@ -536,7 +537,7 @@ const STALE_BODY_CLASSES = ["ws-lightbox-open", "ws-resizing"];
 
 const WorkspaceDashboardInner = () => {
   const { t, t: i18n } = useLanguage();
-  useDocumentTitle("Workspace — MediaForge");
+  useDocumentTitle(t("workspace.home.document_title"));
   // Force-clear any canvas-only body classes that might have leaked
   // from the previous route. Runs once on mount — the cleanup return
   // is intentionally absent because we do NOT want to re-add them
@@ -1025,7 +1026,7 @@ const HOME_TOOLS: HomeTool[] = STANDALONE_TOOL_ORDER.map((key) => {
 
 interface HomeInspiration {
   id: string;
-  title: string;
+  titleKey: TranslationKey;
   src: string;
   kind: "image" | "video";
   previewSrc?: string;
@@ -1036,7 +1037,7 @@ interface HomeInspiration {
 const HOME_INSPIRATIONS: HomeInspiration[] = [
   {
     id: "thumbnail-ui",
-    title: "Thumbnail UI",
+    titleKey: "workspace.home.inspiration.thumbnail_ui",
     src: "/inspire/thumbnail-ui.webm",
     previewVideoSrc: "/inspire/previews/thumbnail-ui-preview.webm",
     posterSrc: "/inspire/previews/thumbnail-ui-poster.webp",
@@ -1044,7 +1045,7 @@ const HOME_INSPIRATIONS: HomeInspiration[] = [
   },
   {
     id: "full-screen",
-    title: "Full Screen",
+    titleKey: "workspace.home.inspiration.full_screen",
     src: "/inspire/full-screen.webm",
     previewVideoSrc: "/inspire/previews/full-screen-preview.webm",
     posterSrc: "/inspire/previews/full-screen-poster.webp",
@@ -1052,7 +1053,7 @@ const HOME_INSPIRATIONS: HomeInspiration[] = [
   },
   {
     id: "magnific-2882506457",
-    title: "Magnific Motion 1",
+    titleKey: "workspace.home.inspiration.magnific_motion_1",
     src: "/inspire/magnific-2882506457.webm",
     previewVideoSrc: "/inspire/previews/magnific-2882506457-preview.webm",
     posterSrc: "/inspire/previews/magnific-2882506457-poster.webp",
@@ -1060,7 +1061,7 @@ const HOME_INSPIRATIONS: HomeInspiration[] = [
   },
   {
     id: "magnific-2886588619",
-    title: "Magnific Motion 2",
+    titleKey: "workspace.home.inspiration.magnific_motion_2",
     src: "/inspire/magnific-2886588619.webm",
     previewVideoSrc: "/inspire/previews/magnific-2886588619-preview.webm",
     posterSrc: "/inspire/previews/magnific-2886588619-poster.webp",
@@ -1068,42 +1069,42 @@ const HOME_INSPIRATIONS: HomeInspiration[] = [
   },
   {
     id: "sketch-3",
-    title: "Sketch 3",
+    titleKey: "workspace.home.inspiration.sketch_3",
     src: "/inspire/sketch-3.png",
     previewSrc: "/inspire/previews/sketch-3.webp",
     kind: "image",
   },
   {
     id: "sketch-1",
-    title: "Sketch 1",
+    titleKey: "workspace.home.inspiration.sketch_1",
     src: "/inspire/sketch-1.png",
     previewSrc: "/inspire/previews/sketch-1.webp",
     kind: "image",
   },
   {
     id: "concept-art-3-4",
-    title: "Concept Art 3/4",
+    titleKey: "workspace.home.inspiration.concept_art_3_4",
     src: "/inspire/concept-art-3-4.png",
     previewSrc: "/inspire/previews/concept-art-3-4.webp",
     kind: "image",
   },
   {
     id: "concept-art",
-    title: "Concept Art",
+    titleKey: "workspace.home.inspiration.concept_art",
     src: "/inspire/concept-art.png",
     previewSrc: "/inspire/previews/concept-art.webp",
     kind: "image",
   },
   {
     id: "collage",
-    title: "Collage",
+    titleKey: "workspace.home.inspiration.collage",
     src: "/inspire/collage.png",
     previewSrc: "/inspire/previews/collage.webp",
     kind: "image",
   },
   {
     id: "character-sheet",
-    title: "Character Sheet",
+    titleKey: "workspace.home.inspiration.character_sheet",
     src: "/inspire/character-sheet.png",
     previewSrc: "/inspire/previews/character-sheet.webp",
     kind: "image",
@@ -1112,14 +1113,13 @@ const HOME_INSPIRATIONS: HomeInspiration[] = [
 
 interface HomeFeatureShowcaseItem {
   id: string;
-  title: string;
-  kicker: string;
-  description: string;
-  bullets: string[];
+  titleKey: TranslationKey;
+  kickerKey: TranslationKey;
+  descriptionKey: TranslationKey;
+  bulletKeys: [TranslationKey, TranslationKey, TranslationKey];
   tileImage: string;
   heroImage: string;
   tint: string;
-  actionLabel: string;
   actionSection?: Section;
   actionAnchor?: string;
 }
@@ -1127,109 +1127,98 @@ interface HomeFeatureShowcaseItem {
 const HOME_FEATURE_SHOWCASE: HomeFeatureShowcaseItem[] = [
   {
     id: "workspace",
-    title: "Workspace",
-    kicker: "One canvas for every AI workflow.",
-    description:
-      "Build connected boards for image, video, voice, and 3D work without losing context between tools.",
-    bullets: [
-      "Drag, paste, and connect assets directly on the canvas",
-      "Chain outputs into the next AI tool with visible context",
-      "Organize ideas by project, space, and board",
+    titleKey: "workspace.home.feature.workspace.title",
+    kickerKey: "workspace.home.feature.workspace.kicker",
+    descriptionKey: "workspace.home.feature.workspace.description",
+    bulletKeys: [
+      "workspace.home.feature.workspace.bullet1",
+      "workspace.home.feature.workspace.bullet2",
+      "workspace.home.feature.workspace.bullet3",
     ],
     tileImage: academyHeaderWorkspace,
     heroImage: homeFeatureWorkspaceHero,
     tint: "from-[#eeff15]/95 via-lime-300/65 to-white/40",
-    actionLabel: "Explore More",
     actionSection: "spaces",
   },
   {
     id: "cinematic",
-    title: "Cinematic",
-    kicker: "Create story visuals, shots, and video concepts.",
-    description:
-      "Shape cinematic scenes from prompt, image references, and storyboard assets in one production flow.",
-    bullets: [
-      "Generate keyframes, shot ideas, and visual references",
-      "Move image concepts into video generation cleanly",
-      "Keep scene boards readable for clients and teams",
+    titleKey: "workspace.home.feature.cinematic.title",
+    kickerKey: "workspace.home.feature.cinematic.kicker",
+    descriptionKey: "workspace.home.feature.cinematic.description",
+    bulletKeys: [
+      "workspace.home.feature.cinematic.bullet1",
+      "workspace.home.feature.cinematic.bullet2",
+      "workspace.home.feature.cinematic.bullet3",
     ],
     tileImage: academyHeaderCinematic,
     heroImage: homeFeatureCinematicHero,
     tint: "from-[#eeff15]/95 via-yellow-200/55 to-white/35",
-    actionLabel: "Explore More",
     actionSection: "video_gen",
   },
   {
     id: "3d",
-    title: "3D",
-    kicker: "Turn references into 3D-ready creative direction.",
-    description:
-      "Move from a sketch or reference image into model, material, and animation-ready exploration.",
-    bullets: [
-      "Use references to generate model-ready ideas",
-      "Preview visual direction before exporting assets",
-      "Keep character, material, and scene references together",
+    titleKey: "workspace.home.feature.3d.title",
+    kickerKey: "workspace.home.feature.3d.kicker",
+    descriptionKey: "workspace.home.feature.3d.description",
+    bulletKeys: [
+      "workspace.home.feature.3d.bullet1",
+      "workspace.home.feature.3d.bullet2",
+      "workspace.home.feature.3d.bullet3",
     ],
     tileImage: academyHeader3d,
     heroImage: homeFeature3dHero,
     tint: "from-[#eeff15]/90 via-amber-200/55 to-white/35",
-    actionLabel: "Explore More",
     actionSection: "image_to_3d",
   },
   {
     id: "editing",
-    title: "Editing",
-    kicker: "Refine images into production-ready assets.",
-    description:
-      "Crop, remix, restyle, and rebuild visual ideas while keeping source material close to the workflow.",
-    bullets: [
-      "Open generated images for review and edits",
-      "Use references to guide variations without losing context",
-      "Move edited assets back into canvas workflows",
+    titleKey: "workspace.home.feature.editing.title",
+    kickerKey: "workspace.home.feature.editing.kicker",
+    descriptionKey: "workspace.home.feature.editing.description",
+    bulletKeys: [
+      "workspace.home.feature.editing.bullet1",
+      "workspace.home.feature.editing.bullet2",
+      "workspace.home.feature.editing.bullet3",
     ],
     tileImage: academyHeaderEditing,
     heroImage: homeFeatureEditingHero,
     tint: "from-[#eeff15]/90 via-cyan-100/45 to-white/30",
-    actionLabel: "Explore More",
     actionSection: "image_gen",
   },
   {
     id: "sound",
-    title: "Sound & Voice",
-    kicker: "Create voice, narration, and audio layers.",
-    description:
-      "Turn scripts into usable voice assets and keep audio connected with the images, scenes, and videos around it.",
-    bullets: [
-      "Generate voice from scripts and direction",
-      "Keep audio assets available beside visual boards",
-      "Route sound into video and production workflows",
+    titleKey: "workspace.home.feature.sound.title",
+    kickerKey: "workspace.home.feature.sound.kicker",
+    descriptionKey: "workspace.home.feature.sound.description",
+    bulletKeys: [
+      "workspace.home.feature.sound.bullet1",
+      "workspace.home.feature.sound.bullet2",
+      "workspace.home.feature.sound.bullet3",
     ],
     tileImage: academyHeaderVoiceSound,
     heroImage: homeFeatureSoundHero,
     tint: "from-[#eeff15]/90 via-emerald-100/45 to-white/30",
-    actionLabel: "Explore More",
     actionSection: "voice_gen",
   },
   {
     id: "academy",
-    title: "Academy",
-    kicker: "Learn workflows directly inside the product.",
-    description:
-      "Discover guided examples, creative recipes, and practical workflows for building better AI projects.",
-    bullets: [
-      "Browse learning content from the home surface",
-      "Use examples as a starting point for real projects",
-      "Keep product learning close to the tools",
+    titleKey: "workspace.home.feature.academy.title",
+    kickerKey: "workspace.home.feature.academy.kicker",
+    descriptionKey: "workspace.home.feature.academy.description",
+    bulletKeys: [
+      "workspace.home.feature.academy.bullet1",
+      "workspace.home.feature.academy.bullet2",
+      "workspace.home.feature.academy.bullet3",
     ],
     tileImage: academyHeaderAcademy,
     heroImage: homeFeatureAcademyImage,
     tint: "from-[#eeff15]/90 via-orange-100/45 to-white/30",
-    actionLabel: "Explore More",
     actionAnchor: "workspace-inspirations",
   },
 ];
 
 const HomeFeatureShowcase = ({ onSection }: { onSection: (section: Section) => void }) => {
+  const { t } = useLanguage();
   const [activeId, setActiveId] = useState(HOME_FEATURE_SHOWCASE[0].id);
   const activeFeature =
     HOME_FEATURE_SHOWCASE.find((item) => item.id === activeId) ??
@@ -1291,7 +1280,7 @@ const HomeFeatureShowcase = ({ onSection }: { onSection: (section: Section) => v
                   isActive && "text-[#eeff15] drop-shadow-[0_0_18px_rgba(238,255,21,0.28)]",
                 )}
               >
-                {item.title}
+                {t(item.titleKey)}
               </span>
             </button>
           );
@@ -1301,21 +1290,21 @@ const HomeFeatureShowcase = ({ onSection }: { onSection: (section: Section) => v
       <div className="mt-7 grid gap-7 lg:grid-cols-2 lg:items-start">
         <div className="min-w-0">
           <h2 className="text-[42px] font-semibold leading-[0.92] tracking-[-0.02em] text-white sm:text-[56px] lg:text-[62px]">
-            {activeFeature.title}
+            {t(activeFeature.titleKey)}
           </h2>
           <p className="mt-3 max-w-[560px] text-[15px] font-semibold leading-5 text-[#eeff15]">
-            {activeFeature.kicker}
+            {t(activeFeature.kickerKey)}
           </p>
           <p className="mt-4 max-w-[620px] text-[15px] leading-5 text-white/76">
-            {activeFeature.description}
+            {t(activeFeature.descriptionKey)}
           </p>
           <ul className="mt-4 space-y-2">
-            {activeFeature.bullets.map((bullet) => (
-              <li key={bullet} className="flex items-start gap-3 text-[14px] font-medium leading-5 text-white/86">
+            {activeFeature.bulletKeys.map((bulletKey) => (
+              <li key={bulletKey} className="flex items-start gap-3 text-[14px] font-medium leading-5 text-white/86">
                 <span className="mt-0.5 grid h-5 w-5 flex-none place-items-center rounded-full bg-[#eeff15] text-black">
                   <ChevronRight className="h-3.5 w-3.5" />
                 </span>
-                <span>{bullet}</span>
+                <span>{t(bulletKey)}</span>
               </li>
             ))}
           </ul>
@@ -1324,7 +1313,7 @@ const HomeFeatureShowcase = ({ onSection }: { onSection: (section: Section) => v
             onClick={handleAction}
             className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,#f6ff25_0%,#e5cf35_48%,#fff57a_100%)] px-7 text-[15px] font-semibold text-black shadow-[0_0_24px_rgba(238,255,21,0.24),inset_0_1px_0_rgba(255,255,255,0.72)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_34px_rgba(238,255,21,0.34),inset_0_1px_0_rgba(255,255,255,0.8)]"
           >
-            {activeFeature.actionLabel}
+            {t("workspace.home.feature.action_label")}
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>
@@ -1333,7 +1322,7 @@ const HomeFeatureShowcase = ({ onSection }: { onSection: (section: Section) => v
           <img
             key={activeFeature.heroImage}
             src={activeFeature.heroImage}
-            alt={activeFeature.title}
+            alt={t(activeFeature.titleKey)}
             className="max-h-[520px] w-full object-contain transition duration-500"
             loading="lazy"
             decoding="async"
@@ -1346,8 +1335,8 @@ const HomeFeatureShowcase = ({ onSection }: { onSection: (section: Section) => v
 
 interface AcademyVideo {
   id: string;
-  title: string;
-  description: string;
+  titleKey: TranslationKey;
+  descriptionKey: TranslationKey;
   duration: string;
   src: string;
   poster: string;
@@ -1356,16 +1345,16 @@ interface AcademyVideo {
 const ACADEMY_VIDEOS: AcademyVideo[] = [
   {
     id: "scene-monitor-fn",
-    title: "Scene Monitor FN tutorial",
-    description: "Workflow tutorial for building a complete scene.",
+    titleKey: "workspace.home.academy_video.scene_monitor_fn.title",
+    descriptionKey: "workspace.home.academy_video.scene_monitor_fn.description",
     duration: "1:21",
     src: "/videos/academy/scene-monitor-fn.mp4",
     poster: "/videos/academy/scene-monitor-fn-poster.jpg",
   },
   {
     id: "full-screen",
-    title: "Full Screen workflow",
-    description: "Step-by-step full-screen workspace walkthrough.",
+    titleKey: "workspace.home.academy_video.full_screen.title",
+    descriptionKey: "workspace.home.academy_video.full_screen.description",
     duration: "1:05",
     src: "/videos/academy/full-screen.mp4",
     poster: "/videos/academy/full-screen-poster.jpg",
@@ -1696,7 +1685,7 @@ const HomeView = ({
                       ) : (
                         <img
                           src={item.previewSrc ?? item.src}
-                          alt={item.title}
+                          alt={t(item.titleKey)}
                           className="block h-auto w-full rounded-[13px] object-contain transition duration-500 group-hover:scale-[1.012]"
                           loading={index < 3 ? "eager" : "lazy"}
                           decoding="async"
@@ -2098,10 +2087,13 @@ function normalizeEducationStatus(value: unknown): WorkspaceMeta["educationStatu
     : null;
 }
 
-function getEducationStatusLabel(status: WorkspaceMeta["educationStatus"]) {
-  if (status === "passed") return "Pass";
-  if (status === "ended") return "Ended";
-  if (status === "submitted") return "Submitted";
+function getEducationStatusLabel(
+  status: WorkspaceMeta["educationStatus"],
+  t: (key: TranslationKey) => string,
+) {
+  if (status === "passed") return t("workspace.home.education_status.passed");
+  if (status === "ended") return t("workspace.home.education_status.ended");
+  if (status === "submitted") return t("workspace.home.education_status.submitted");
   return status;
 }
 
@@ -2289,7 +2281,7 @@ const SpacesShowcaseCard = ({
                   </div>
                   {ws.educationStatus && ws.educationStatus !== "active" && (
                     <span className="inline-flex shrink-0 rounded bg-emerald-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-emerald-200">
-                      {getEducationStatusLabel(ws.educationStatus)}
+                      {getEducationStatusLabel(ws.educationStatus, t)}
                     </span>
                   )}
                 </div>
@@ -2352,33 +2344,36 @@ const ToolsCard = ({
   );
 };
 
-const AcademyVideoTile = ({ video }: { video: AcademyVideo }) => (
-  <li className="overflow-hidden rounded-2xl bg-[hsl(0_0%_7%)]">
-    <video
-      className="aspect-video w-full bg-black object-cover"
-      controls
-      playsInline
-      preload="none"
-      poster={video.poster}
-      aria-label={video.title}
-    >
-      <source src={video.src} type="video/mp4" />
-    </video>
-    <div className="flex items-start justify-between gap-4 p-4">
-      <div className="min-w-0">
-        <h3 className="truncate text-[14.5px] font-semibold text-zinc-100">
-          {video.title}
-        </h3>
-        <p className="mt-1 line-clamp-2 text-[14.5px] leading-5 text-zinc-500">
-          {video.description}
-        </p>
+const AcademyVideoTile = ({ video }: { video: AcademyVideo }) => {
+  const { t } = useLanguage();
+  return (
+    <li className="overflow-hidden rounded-2xl bg-[hsl(0_0%_7%)]">
+      <video
+        className="aspect-video w-full bg-black object-cover"
+        controls
+        playsInline
+        preload="none"
+        poster={video.poster}
+        aria-label={t(video.titleKey)}
+      >
+        <source src={video.src} type="video/mp4" />
+      </video>
+      <div className="flex items-start justify-between gap-4 p-4">
+        <div className="min-w-0">
+          <h3 className="truncate text-[14.5px] font-semibold text-zinc-100">
+            {t(video.titleKey)}
+          </h3>
+          <p className="mt-1 line-clamp-2 text-[14.5px] leading-5 text-zinc-500">
+            {t(video.descriptionKey)}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-1 text-[13.5px] font-semibold text-zinc-400">
+          {video.duration}
+        </span>
       </div>
-      <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-1 text-[13.5px] font-semibold text-zinc-400">
-        {video.duration}
-      </span>
-    </div>
-  </li>
-);
+    </li>
+  );
+};
 
 /* ════════════════════════════════════════════════════════════
  * Spaces view — full grid (the original workspace dashboard)
@@ -2614,8 +2609,8 @@ const ProjectsManagerView = ({
   }, [activeProjectId, canvasIndex, filter, graphs, selectedProjectId, user?.id, workspaces]);
 
   const ownerLabel = selectedProject?.ownerId && selectedProject.ownerId !== user?.id
-    ? "Team project"
-    : "Owned by you";
+    ? t("workspace.home.owner.team_project")
+    : t("workspace.home.owner.owned_by_you");
 
   const handleNewSpace = async () => {
     const projectId = selectedProject?.id ?? activeProjectId;
@@ -3470,7 +3465,7 @@ const SpaceCard = memo(function SpaceCard({
             )}
             {ws.educationStatus && ws.educationStatus !== "active" && (
               <span className="inline-flex shrink-0 items-center gap-1 rounded bg-emerald-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
-                {getEducationStatusLabel(ws.educationStatus)}
+                {getEducationStatusLabel(ws.educationStatus, t)}
               </span>
             )}
           </div>

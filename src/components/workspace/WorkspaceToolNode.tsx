@@ -168,18 +168,21 @@ function VoicePreviewItemButton({
   isLoading: boolean;
   onPlay: (voiceId: string) => void;
 }) {
+  const { t } = useLanguage();
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onPlay(voiceId);
   };
+  const previewLabel = t(
+    isPlaying ? "workspace.toolNode.voicePreviewStop" : "workspace.toolNode.voicePreviewPlay",
+    { voiceId },
+  );
   return (
     <button
       type="button"
       onClick={handleClick}
-      title={isPlaying ? `Stop ${voiceId} preview` : `Play ${voiceId} preview`}
-      aria-label={
-        isPlaying ? `Stop ${voiceId} preview` : `Play ${voiceId} preview`
-      }
+      title={previewLabel}
+      aria-label={previewLabel}
       className={cn(
         "grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-full transition",
         "bg-white/[0.08] text-zinc-200 hover:bg-white/[0.16] hover:text-white",
@@ -2657,9 +2660,9 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       ]);
       setEdges((eds) => [...eds, ...newEdges]);
       void runNode();
-      toast.success(`Generating ${n} variations in parallel`);
+      toast.success(t("workspace.toolNode.runVariationsToast", { n }));
     },
-    [getEdges, getNodes, id, isNodeCurrentlyProcessing, isViewer, runNode, setEdges, setNodes],
+    [getEdges, getNodes, id, isNodeCurrentlyProcessing, isViewer, runNode, setEdges, setNodes, t],
   );
 
   const recoveryJobs = useCanvasRecoveryJobsForNode(id);
@@ -3058,7 +3061,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                 .map((o) => `${o.label}: ${o.count} wires, max ${o.max}`)
                 .join("\n");
               toast.warning(
-                `Some connections exceed the new model's limit:\n${lines}\nDelete extras manually before running.`,
+                t("workspace.toolNode.connectionsExceedLimit", { lines }),
               );
             }
             return { ...n, data: { ...n.data, params: cleaned } };
@@ -3067,7 +3070,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         }),
       );
     },
-    [id, setNodes, setEdges, schemaKey, edges],
+    [id, setNodes, setEdges, schemaKey, edges, t],
   );
 
   const updateNodeField = useCallback(
@@ -3480,7 +3483,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                         toast.error(
                           err instanceof Error
                             ? err.message
-                            : "Couldn't play voice preview",
+                            : t("workspace.toolNode.voicePreviewFailed"),
                         );
                       });
                   }}
