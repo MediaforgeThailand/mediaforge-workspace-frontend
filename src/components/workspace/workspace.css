@@ -1443,6 +1443,7 @@ body[data-rfc="true"]
   align-items: center;
   gap: 5px;
   padding: 4px 10px;
+  font-family: inherit;
   font-size: 11px;
   font-weight: 500;
   color: hsl(0 0% 92%);
@@ -1472,6 +1473,7 @@ body[data-rfc="true"]
   padding: 4px 10px;
   height: 25px;
   min-height: 0;
+  font-family: inherit;
   font-size: 11px;
   font-weight: 500;
   color: hsl(0 0% 92%);
@@ -1500,6 +1502,46 @@ body[data-rfc="true"]
   opacity: 0.65;
 }
 
+.ws-compact-select-content,
+.ws-compact-command-content {
+  font-family: inherit;
+  border-radius: 10px;
+}
+
+.ws-compact-select-content [role="option"],
+.ws-compact-select-item {
+  height: 30px !important;
+  min-height: 30px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  padding-left: 27px !important;
+  padding-right: 8px !important;
+  border-radius: 8px !important;
+  font-family: inherit !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
+}
+
+.ws-compact-select-content [role="option"] > span:first-child {
+  left: 8px !important;
+  width: 13px !important;
+  height: 13px !important;
+}
+
+.ws-compact-select-content [role="option"] svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+.ws-compact-command-content [cmdk-item] {
+  min-height: 30px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  font-family: inherit !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
+}
+
 /* TogglePill — switch + label, pill-rounded floating button. */
 .ws-toggle-pill {
   display: inline-flex;
@@ -1507,6 +1549,7 @@ body[data-rfc="true"]
   gap: 6px;
   padding: 4px 10px 4px 6px;
   height: 25px;
+  font-family: inherit;
   font-size: 11px;
   font-weight: 500;
   color: hsl(0 0% 80%);
@@ -1597,6 +1640,7 @@ body[data-rfc="true"]
   display: flex;
   align-items: center;
   padding: 0 7px;
+  font-family: inherit;
   font-size: 11px;
   font-weight: 500;
   color: hsl(0 0% 96%);

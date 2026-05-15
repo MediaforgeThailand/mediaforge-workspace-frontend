@@ -77,6 +77,11 @@ export function isBinarySelect(options: string[] | undefined): boolean {
   return options.every((o) => ON_OFF_VALUES.has(o.toLowerCase()));
 }
 
+const MINI_SELECT_CONTENT_CLASS =
+  "ws-compact-select-content border-0 bg-popover z-[9999] max-h-[220px] shadow-2xl shadow-black/40";
+const MINI_SELECT_ITEM_CLASS =
+  "ws-compact-select-item h-[30px] min-h-[30px] rounded-md py-0 pl-7 pr-2 text-[11px] leading-none text-popover-foreground focus:bg-white/[0.08] focus:text-white";
+
 /* ── TogglePill ──────────────────────────────────────────── */
 
 interface TogglePillProps {
@@ -203,15 +208,11 @@ export function MiniSelect({
             {prefix ? `${prefix} ${truncated}` : truncated}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent
-          className="bg-popover border-0 z-[9999] max-h-[260px] shadow-2xl shadow-black/40"
-          position="popper"
-          sideOffset={4}
-        >
+        <SelectContent className={MINI_SELECT_CONTENT_CLASS} position="popper" sideOffset={4}>
           {options.map((opt) => {
             const label = labelOf(opt);
             const preview = modelPreviewFor({ id: opt, label });
-            const content = <span className="block truncate">{label}</span>;
+            const content = <span className="block truncate leading-none">{label}</span>;
             return (
             <SelectItem
               key={opt}
@@ -225,8 +226,8 @@ export function MiniSelect({
                *  conflicting font-size declarations and the larger
                *  one stuck visually. Inline `style.fontSize` has
                *  the highest specificity — it always wins. */
-              style={{ fontSize: "11px" }}
-              className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
+              style={{ fontSize: "11px", lineHeight: 1 }}
+              className={MINI_SELECT_ITEM_CLASS}
             >
               {preview ? (
                 <ModelHoverPreview
@@ -291,7 +292,7 @@ function SearchableMiniSelect({
         <PopoverContent
           align="start"
           sideOffset={4}
-          className="z-[9999] w-[260px] overflow-hidden border-0 bg-popover p-0 shadow-2xl shadow-black/40"
+          className="ws-compact-command-content z-[9999] w-[240px] overflow-hidden border-0 bg-popover p-0 shadow-2xl shadow-black/40"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <Command className="bg-transparent">
@@ -310,13 +311,13 @@ function SearchableMiniSelect({
                  *  guess at class-merge order. Matches the trigger
                  *  pill (`.ws-mini-select-trigger` = 11px). */
                 style={{ fontSize: "11px" }}
-                className="h-8 w-full border-0 bg-transparent px-0 py-0 outline-none placeholder:text-muted-foreground"
+                className="h-7 w-full border-0 bg-transparent px-0 py-0 leading-none outline-none placeholder:text-muted-foreground"
               />
             </div>
-            <CommandList className="ws-picker-scroll max-h-[260px]">
+            <CommandList className="ws-picker-scroll max-h-[220px]">
               <CommandEmpty
                 style={{ fontSize: "11px" }}
-                className="py-4 text-center text-muted-foreground"
+                className="py-3 text-center leading-none text-muted-foreground"
               >
                 {i18n("workspace.params.noResults")}
               </CommandEmpty>
@@ -337,9 +338,9 @@ function SearchableMiniSelect({
                      *  base cmdk CommandItem ships `text-sm`, which
                      *  tailwind-merge didn't strip when we tried
                      *  layering `text-[11px]` via className. */
-                    style={{ fontSize: "11px" }}
+                    style={{ fontSize: "11px", lineHeight: 1 }}
                     className={cn(
-                      "mx-1 my-px cursor-pointer rounded-md px-2 py-1.5 aria-selected:bg-accent",
+                      "mx-1 my-px min-h-[30px] cursor-pointer rounded-md px-2 py-0 leading-none aria-selected:bg-white/[0.08]",
                       opt === value && "bg-accent/40 font-medium",
                       action && "pr-1",
                     )}
@@ -383,7 +384,7 @@ function SearchableMiniSelect({
               })}
             </CommandList>
             {/* Footer — same tinted-fill trick as the search row. */}
-            <div className="flex items-center justify-between bg-white/[0.03] px-3 py-1.5 text-[10.5px] uppercase tracking-wide text-muted-foreground">
+            <div className="flex items-center justify-between bg-white/[0.03] px-3 py-1 text-[10.5px] uppercase leading-none tracking-wide text-muted-foreground">
               <span>{searchFooter ?? i18n("workspace.params.allOptions")}</span>
               <span className="flex items-center gap-1">
                 <kbd className="rounded bg-white/10 px-1 py-px font-mono text-[9px]">
