@@ -2094,6 +2094,8 @@ export const hi = {
   "workspace.sidebar.voice_translate": "अनुवाद",
   "workspace.sidebar.threed_gen": "3 डी जेनरेटर",
   "workspace.sidebar.create": "बनाएं",
+  "workspace.sidebar.tools": "Tools",
+  "workspace.sidebar.editor_new": "New",
   "workspace.sidebar.assets": "एसेट्स",
   "workspace.sidebar.inspire": "प्रेरित करें",
   "workspace.sidebar.collapse": "साइडबार को संक्षिप्त करें",

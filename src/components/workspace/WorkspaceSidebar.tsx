@@ -28,6 +28,7 @@ import {
   BookOpen,
   ChevronDown,
   FolderOpen,
+  Clapperboard,
   Home as HomeIcon,
   History as HistoryIcon,
   Workflow,
@@ -76,6 +77,7 @@ export type SectionKey =
   | "voice_gen"
   | "voice_translate"
   | "image_to_3d"
+  | "editor"
   | "assistant"
   | "tools"; // legacy "All tools" placeholder — still accepted
 
@@ -96,15 +98,18 @@ type NavItem = {
     | "workspace.sidebar.video_gen"
     | "workspace.sidebar.voice_gen"
     | "workspace.sidebar.voice_translate"
-    | "workspace.sidebar.threed_gen";
+    | "workspace.sidebar.threed_gen"
+    | "workspace.sidebar.editor_new";
   displayLabel?: string;
   icon: LucideIcon;
   width?: "full" | "half";
+  tone?: "default" | "accent";
 };
 
 type SidebarSection = {
   labelKey:
     | "workspace.sidebar.create"
+    | "workspace.sidebar.tools"
     | "workspace.sidebar.assets";
   variant: "tool" | "list";
   rows: NavItem[][];
@@ -127,6 +132,13 @@ const NAV_SECTIONS: SidebarSection[] = [
       [{ id: "image_upscale", labelKey: "workspace.sidebar.image_upscale", displayLabel: "Upscale", icon: Maximize2, width: "full" }],
       [{ id: "voice_translate", labelKey: "workspace.sidebar.voice_translate", displayLabel: "Translate", icon: Languages, width: "full" }],
       [{ id: "image_to_3d", labelKey: "workspace.sidebar.threed_gen", displayLabel: "3D Generator", icon: Box, width: "full" }],
+    ],
+  },
+  {
+    labelKey: "workspace.sidebar.tools",
+    variant: "tool",
+    rows: [
+      [{ id: "editor", labelKey: "workspace.sidebar.editor_new", displayLabel: "New", icon: Clapperboard, width: "full", tone: "accent" }],
     ],
   },
   {
@@ -222,6 +234,10 @@ export default function WorkspaceSidebar({
     null;
 
   const handleClick = (s: SectionKey) => {
+    if (s === "editor") {
+      navigate("/app/editor");
+      return;
+    }
     if (onNavigate) onNavigate(s);
     else navigate(`/app/workspace?section=${s}`);
   };
@@ -653,6 +669,7 @@ const SidebarNavSection = ({
                 onClick={() => onSelect(item.id)}
                 compact={compactToolRow || row.length > 1}
                 variant={variant}
+                tone={item.tone}
               />
             ))}
             {splitToolRow && row.length === 1 && <span className="flex-1" aria-hidden />}
@@ -670,6 +687,7 @@ const NavLink = ({
   onClick,
   compact = false,
   variant = "list",
+  tone = "default",
 }: {
   label: string;
   icon: LucideIcon;
@@ -677,6 +695,7 @@ const NavLink = ({
   onClick: () => void;
   compact?: boolean;
   variant?: "tool" | "list";
+  tone?: "default" | "accent";
 }) => (
   <button
     type="button"
@@ -685,23 +704,36 @@ const NavLink = ({
       /* 2026-05: drop the inset 1px stroke on active — bg lift alone
        *  is enough now that the sidebar is a Layer-1 panel. */
       "group relative flex h-[32px] min-w-0 items-center gap-[10px] text-left text-[12px] font-medium transition-colors",
-      variant === "tool"
+      variant === "tool" && tone === "accent"
+        ? "overflow-hidden rounded-[7px] border border-cyan-300/35 bg-cyan-950/50 px-[8px] text-cyan-50 shadow-[inset_0_1px_0_rgba(255,255,255,.08),0_0_18px_-12px_rgba(34,211,238,.95)]"
+        : variant === "tool"
         ? "overflow-hidden rounded-[7px] border border-white/[0.075] bg-[#171a19] px-[8px] shadow-[inset_0_1px_0_rgba(255,255,255,.035)]"
         : "mx-[12px] rounded-md bg-transparent px-[4px]",
       variant === "tool" && !compact && "w-full",
       compact && variant === "tool" && "mx-0 flex-1 gap-[7px] px-[7px] text-[12px]",
       compact && variant === "list" && "mx-[12px]",
-      active && variant === "tool"
+      active && variant === "tool" && tone === "accent"
+        ? "border-cyan-200/80 bg-cyan-500/20 text-white shadow-[0_0_18px_-8px_rgba(34,211,238,.95),inset_0_0_0_1px_rgba(255,255,255,.08)]"
+        : active && variant === "tool"
         ? "border-[#eaff00]/70 bg-[#121411] text-white shadow-[0_0_16px_-8px_rgba(234,255,0,.95),inset_0_0_0_1px_rgba(255,255,255,.05)]"
         : active
           ? "text-white"
           : variant === "tool"
-            ? "text-[#e4e7e9] hover:border-[#eaff00]/30 hover:bg-[#20231f] hover:text-white"
+            ? tone === "accent"
+              ? "hover:border-cyan-200/70 hover:bg-cyan-500/20 hover:text-white"
+              : "text-[#e4e7e9] hover:border-[#eaff00]/30 hover:bg-[#20231f] hover:text-white"
             : "text-[#b0b4ba] hover:text-white",
     )}
   >
     {variant === "tool" && !active && (
-      <span className="pointer-events-none absolute inset-0 rounded-[7px] bg-[linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0)_44%),radial-gradient(90%_120%_at_0%_0%,rgba(234,255,0,.045),transparent_42%)] transition-opacity group-hover:opacity-0" />
+      <span
+        className={cn(
+          "pointer-events-none absolute inset-0 rounded-[7px] bg-[linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0)_44%)] transition-opacity group-hover:opacity-0",
+          tone === "accent"
+            ? "bg-[linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,0)_44%),radial-gradient(90%_120%_at_0%_0%,rgba(34,211,238,.28),transparent_48%)]"
+            : "bg-[linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0)_44%),radial-gradient(90%_120%_at_0%_0%,rgba(234,255,0,.045),transparent_42%)]",
+        )}
+      />
     )}
     {variant === "tool" && active && (
       <span className="pointer-events-none absolute inset-[-1px] rounded-[8px] shadow-[inset_0_-3px_8px_0_rgba(234,255,0,.30),inset_0_1px_8px_0_rgba(255,255,255,.16),0_0_12px_rgba(234,255,0,.32)]" />

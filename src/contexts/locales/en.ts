@@ -2252,6 +2252,8 @@ export const en = {
   "workspace.sidebar.voice_translate": "Translate",
   "workspace.sidebar.threed_gen": "3D Generator",
   "workspace.sidebar.create": "Create",
+  "workspace.sidebar.tools": "Tools",
+  "workspace.sidebar.editor_new": "New",
   "workspace.sidebar.assets": "Assets",
   "workspace.sidebar.inspire": "Inspire",
   "workspace.sidebar.collapse": "Collapse sidebar",
@@ -2994,6 +2996,9 @@ export const en = {
   "workspace.toolnames.stock": "Stock",
   "workspace.toolnames.stock_desc":
     "Search premium stock photos, vectors, and videos.",
+  "workspace.toolnames.url_asset": "URL to Asset",
+  "workspace.toolnames.url_asset_desc":
+    "Import a direct MP4, MP3, or PNG URL as a workspace asset.",
   "workspace.toolnames.kling_element": "Kling Element",
   "workspace.toolnames.kling_element_desc":
     "Save a character or object as a reusable Kling Omni element. 4 ref + 1 frontal.",
@@ -4053,10 +4058,14 @@ export const en = {
   "workspace.picker.port.to_video": "→ video",
   "workspace.picker.port.to_audio": "→ audio",
   "workspace.picker.port.to_media": "→ MP3/MP4",
+  "workspace.picker.port.to_url": "→ URL",
   "workspace.picker.port.to_context": "→ context",
   "workspace.picker.port.to_script": "→ script",
   "workspace.picker.port.audio": "audio",
   "workspace.picker.port.media": "MP3/MP4",
+  "workspace.picker.port.png": "PNG",
+  "workspace.picker.port.mp3": "MP3",
+  "workspace.picker.port.mp4": "MP4",
   "workspace.picker.port.prompt": "prompt",
 } as const;
 
