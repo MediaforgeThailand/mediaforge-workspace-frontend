@@ -2382,7 +2382,7 @@ export const th = {
     "ส่งผลลัพธ์ต่อไปยังเครื่องมือ AI ตัวถัดไปโดยเห็นบริบทตลอด",
   "workspace.home.feature.workspace.bullet3":
     "จัดระเบียบไอเดียตามโปรเจกต์ สเปซ และบอร์ด",
-  "workspace.home.feature.cinematic.title": "Cinematic",
+  "workspace.home.feature.cinematic.title": "ภาพยนตร์",
   "workspace.home.feature.cinematic.kicker":
     "สร้างภาพเล่าเรื่อง ช็อต และคอนเซ็ปต์วิดีโอ",
   "workspace.home.feature.cinematic.description":
@@ -2404,7 +2404,7 @@ export const th = {
     "พรีวิวทิศทางภาพก่อนส่งออก asset",
   "workspace.home.feature.3d.bullet3":
     "เก็บภาพอ้างอิงตัวละคร วัสดุ และซีนไว้ในที่เดียว",
-  "workspace.home.feature.editing.title": "ตัดต่อภาพ",
+  "workspace.home.feature.editing.title": "ตัดต่อ",
   "workspace.home.feature.editing.kicker":
     "ขัดเกลาภาพให้กลายเป็น asset พร้อมใช้งานจริง",
   "workspace.home.feature.editing.description":
@@ -2426,7 +2426,7 @@ export const th = {
     "เก็บ asset เสียงไว้ข้างบอร์ดภาพ",
   "workspace.home.feature.sound.bullet3":
     "ส่งเสียงเข้าสู่เวิร์กโฟลว์วิดีโอและงานโปรดักชัน",
-  "workspace.home.feature.academy.title": "Academy",
+  "workspace.home.feature.academy.title": "สื่อการสอน",
   "workspace.home.feature.academy.kicker":
     "เรียนรู้เวิร์กโฟลว์ในตัวโปรดักต์โดยตรง",
   "workspace.home.feature.academy.description":

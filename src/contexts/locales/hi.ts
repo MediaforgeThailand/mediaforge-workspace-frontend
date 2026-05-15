@@ -2254,7 +2254,7 @@ export const hi = {
     "दिखाई देने वाले संदर्भ के साथ आउटपुट को अगले AI टूल में जोड़ें",
   "workspace.home.feature.workspace.bullet3":
     "प्रोजेक्ट, स्पेस और बोर्ड के अनुसार विचार व्यवस्थित करें",
-  "workspace.home.feature.cinematic.title": "सिनेमैटिक",
+  "workspace.home.feature.cinematic.title": "सिनेमा",
   "workspace.home.feature.cinematic.kicker":
     "कहानी के विज़ुअल, शॉट और वीडियो कॉन्सेप्ट बनाएँ।",
   "workspace.home.feature.cinematic.description":
@@ -2298,7 +2298,7 @@ export const hi = {
     "विज़ुअल बोर्ड के साथ ऑडियो एसेट्स को उपलब्ध रखें",
   "workspace.home.feature.sound.bullet3":
     "साउंड को वीडियो और प्रोडक्शन वर्कफ़्लो में रूट करें",
-  "workspace.home.feature.academy.title": "Academy",
+  "workspace.home.feature.academy.title": "लर्निंग",
   "workspace.home.feature.academy.kicker":
     "प्रोडक्ट के अंदर सीधे वर्कफ़्लो सीखें।",
   "workspace.home.feature.academy.description":

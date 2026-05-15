@@ -2496,7 +2496,7 @@ export const es = {
     "Encadena resultados a la siguiente herramienta de IA con contexto visible",
   "workspace.home.feature.workspace.bullet3":
     "Organiza ideas por proyecto, espacio y panel",
-  "workspace.home.feature.cinematic.title": "Cinemático",
+  "workspace.home.feature.cinematic.title": "Cine",
   "workspace.home.feature.cinematic.kicker":
     "Crea visuales narrativos, tomas y conceptos de vídeo.",
   "workspace.home.feature.cinematic.description":
@@ -2540,7 +2540,7 @@ export const es = {
     "Mantén los assets de audio disponibles junto a los paneles visuales",
   "workspace.home.feature.sound.bullet3":
     "Encamina el sonido hacia los flujos de vídeo y producción",
-  "workspace.home.feature.academy.title": "Academia",
+  "workspace.home.feature.academy.title": "Aprendizaje",
   "workspace.home.feature.academy.kicker":
     "Aprende flujos de trabajo directamente dentro del producto.",
   "workspace.home.feature.academy.description":

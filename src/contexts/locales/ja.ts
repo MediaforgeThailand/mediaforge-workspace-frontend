@@ -2250,7 +2250,7 @@ export const ja = {
     "可視のコンテキストとともに次の AI ツールへ出力を連鎖",
   "workspace.home.feature.workspace.bullet3":
     "プロジェクト・スペース・ボードでアイデアを整理",
-  "workspace.home.feature.cinematic.title": "シネマティック",
+  "workspace.home.feature.cinematic.title": "映画",
   "workspace.home.feature.cinematic.kicker":
     "ストーリーのビジュアル、ショット、動画コンセプトを作成。",
   "workspace.home.feature.cinematic.description":
@@ -2294,7 +2294,7 @@ export const ja = {
     "ビジュアルボードの隣にオーディオ素材を配置",
   "workspace.home.feature.sound.bullet3":
     "サウンドを動画とプロダクションのワークフローへ流し込む",
-  "workspace.home.feature.academy.title": "アカデミー",
+  "workspace.home.feature.academy.title": "学習",
   "workspace.home.feature.academy.kicker":
     "プロダクト内でワークフローを直接学ぶ。",
   "workspace.home.feature.academy.description":
