@@ -186,7 +186,70 @@ function normalizeEmbeddedHtmlUrls(html: string): string {
     .replace(/&amp;/g, "&");
 }
 
-function extractSocialImageCandidates(html: string): string[] {
+function isYoutubeHost(hostname: string): boolean {
+  return /(^|\.)youtube\.com$/i.test(hostname) || /(^|\.)youtu\.be$/i.test(hostname);
+}
+
+function isFacebookHost(hostname: string): boolean {
+  return /(^|\.)facebook\.com$/i.test(hostname) || /(^|\.)fb\.watch$/i.test(hostname);
+}
+
+function isInstagramHost(hostname: string): boolean {
+  return /(^|\.)instagram\.com$/i.test(hostname);
+}
+
+function isLikelyLogoOrPlaceholderUrl(value: string): boolean {
+  const lower = value.toLowerCase();
+  return (
+    lower.includes("logo") ||
+    lower.includes("favicon") ||
+    lower.includes("sprite") ||
+    lower.includes("placeholder") ||
+    lower.includes("profile_picture") ||
+    lower.includes("mascot-logo") ||
+    lower.includes("/rsrc.php/") ||
+    lower.includes("static.xx.fbcdn.net") ||
+    lower.includes("/t1.30497-1/")
+  );
+}
+
+function isLikelySocialPostImage(value: string, pageUrl: URL): boolean {
+  if (isLikelyLogoOrPlaceholderUrl(value)) return false;
+
+  let imageUrl: URL;
+  try {
+    imageUrl = new URL(value);
+  } catch {
+    return false;
+  }
+
+  const host = imageUrl.hostname.toLowerCase();
+  const lower = imageUrl.toString().toLowerCase();
+
+  if (isYoutubeHost(pageUrl.hostname)) {
+    return /(^|\.)ytimg\.com$/i.test(host) || /(^|\.)googleusercontent\.com$/i.test(host);
+  }
+
+  if (isFacebookHost(pageUrl.hostname)) {
+    return (
+      /(^|\.)fbcdn\.net$/i.test(host) ||
+      /(^|\.)cdninstagram\.com$/i.test(host) ||
+      host.includes("scontent.")
+    ) && !lower.includes("safe_image.php");
+  }
+
+  if (isInstagramHost(pageUrl.hostname)) {
+    return (
+      /(^|\.)cdninstagram\.com$/i.test(host) ||
+      /(^|\.)fbcdn\.net$/i.test(host) ||
+      host.includes("scontent.")
+    );
+  }
+
+  return /\.(?:png|jpe?g|webp)(?:[?#]|$)/i.test(value);
+}
+
+function extractSocialImageCandidates(html: string, pageUrl: URL): string[] {
   const candidates = new Set<string>();
   const normalized = normalizeEmbeddedHtmlUrls(html);
 
@@ -195,7 +258,7 @@ function extractSocialImageCandidates(html: string): string[] {
     const key = (htmlAttr(tag, "property") || htmlAttr(tag, "name") || "").toLowerCase();
     if (key === "og:image" || key === "og:image:url" || key === "twitter:image" || key === "twitter:image:src") {
       const content = htmlAttr(tag, "content");
-      if (content) candidates.add(content);
+      if (content && isLikelySocialPostImage(content, pageUrl)) candidates.add(content);
     }
   }
 
@@ -207,7 +270,7 @@ function extractSocialImageCandidates(html: string): string[] {
       lower.includes("fbcdn.net") ||
       lower.includes("cdninstagram.com") ||
       lower.includes("scontent.");
-    if (looksLikeImage) candidates.add(value);
+    if (looksLikeImage && isLikelySocialPostImage(value, pageUrl)) candidates.add(value);
   }
 
   return [...candidates].filter((value) => {
@@ -235,6 +298,98 @@ function socialImageScore(url: string): number {
     score += 1500;
   }
   return score;
+}
+
+function readUint32BE(bytes: Uint8Array, offset: number): number {
+  return (
+    ((bytes[offset] ?? 0) << 24) |
+    ((bytes[offset + 1] ?? 0) << 16) |
+    ((bytes[offset + 2] ?? 0) << 8) |
+    (bytes[offset + 3] ?? 0)
+  ) >>> 0;
+}
+
+function readUint16BE(bytes: Uint8Array, offset: number): number {
+  return (((bytes[offset] ?? 0) << 8) | (bytes[offset + 1] ?? 0)) >>> 0;
+}
+
+function readUint16LE(bytes: Uint8Array, offset: number): number {
+  return ((bytes[offset] ?? 0) | ((bytes[offset + 1] ?? 0) << 8)) >>> 0;
+}
+
+function readUint24LE(bytes: Uint8Array, offset: number): number {
+  return (bytes[offset] ?? 0) | ((bytes[offset + 1] ?? 0) << 8) | ((bytes[offset + 2] ?? 0) << 16);
+}
+
+function readImageDimensions(bytes: Uint8Array, contentType: string): { width: number; height: number } | null {
+  const cleanType = contentType.split(";")[0]?.trim().toLowerCase();
+  if (cleanType === "image/png" && bytes.byteLength >= 24) {
+    return { width: readUint32BE(bytes, 16), height: readUint32BE(bytes, 20) };
+  }
+
+  if ((cleanType === "image/jpeg" || cleanType === "image/jpg") && bytes.byteLength > 8) {
+    let offset = 2;
+    while (offset + 9 < bytes.byteLength) {
+      if (bytes[offset] !== 0xff) break;
+      const marker = bytes[offset + 1] ?? 0;
+      const length = readUint16BE(bytes, offset + 2);
+      if (length < 2) break;
+      if (
+        (marker >= 0xc0 && marker <= 0xc3) ||
+        (marker >= 0xc5 && marker <= 0xc7) ||
+        (marker >= 0xc9 && marker <= 0xcb) ||
+        (marker >= 0xcd && marker <= 0xcf)
+      ) {
+        return { width: readUint16BE(bytes, offset + 7), height: readUint16BE(bytes, offset + 5) };
+      }
+      offset += 2 + length;
+    }
+  }
+
+  if (cleanType === "image/webp" && bytes.byteLength >= 30) {
+    const header = String.fromCharCode(...bytes.slice(0, 4));
+    const webp = String.fromCharCode(...bytes.slice(8, 12));
+    const chunk = String.fromCharCode(...bytes.slice(12, 16));
+    if (header !== "RIFF" || webp !== "WEBP") return null;
+    if (chunk === "VP8X" && bytes.byteLength >= 30) {
+      return { width: readUint24LE(bytes, 24) + 1, height: readUint24LE(bytes, 27) + 1 };
+    }
+    if (chunk === "VP8 " && bytes.byteLength >= 30) {
+      return { width: readUint16LE(bytes, 26) & 0x3fff, height: readUint16LE(bytes, 28) & 0x3fff };
+    }
+    if (chunk === "VP8L" && bytes.byteLength >= 25) {
+      const b0 = bytes[21] ?? 0;
+      const b1 = bytes[22] ?? 0;
+      const b2 = bytes[23] ?? 0;
+      const b3 = bytes[24] ?? 0;
+      return { width: 1 + (((b1 & 0x3f) << 8) | b0), height: 1 + ((b3 << 6) | (b2 >> 2) | ((b1 & 0xc0) << 6)) };
+    }
+  }
+
+  return null;
+}
+
+function assertUsableSocialImage(candidate: string, bytes: Uint8Array, contentType: string): { width?: number; height?: number } {
+  if (isLikelyLogoOrPlaceholderUrl(candidate)) {
+    throw new Error("social page exposed a logo or placeholder instead of the post image");
+  }
+
+  const dimensions = readImageDimensions(bytes, contentType);
+  if (dimensions) {
+    const pixels = dimensions.width * dimensions.height;
+    if (dimensions.width < 200 || dimensions.height < 120 || pixels < 60_000) {
+      throw new Error(
+        `social image candidate looked like a logo or thumbnail placeholder (${dimensions.width}x${dimensions.height})`,
+      );
+    }
+    return dimensions;
+  }
+
+  if (bytes.byteLength < 12_000) {
+    throw new Error("social image candidate was too small and looked like a logo or placeholder");
+  }
+
+  return {};
 }
 
 function extensionForImageContentType(contentType: string, imageUrl: URL): string {
@@ -269,9 +424,17 @@ async function downloadImageCandidate(candidate: string, tempDir: string, prefix
   if (bytes.byteLength > maxBytes) {
     throw new Error(`PNG source image is larger than ${Math.round(maxBytes / (1024 * 1024))} MB.`);
   }
+  const dimensions = assertUsableSocialImage(imageUrl.toString(), bytes, contentType);
   const inputPath = path.join(tempDir, `${prefix}_source.${extensionForImageContentType(contentType, imageUrl)}`);
   await fs.writeFile(inputPath, bytes);
-  return { inputPath, sourceUrl: imageUrl.toString(), sourceContentType: contentType, bytes: bytes.byteLength };
+  return {
+    inputPath,
+    sourceUrl: imageUrl.toString(),
+    sourceContentType: contentType,
+    bytes: bytes.byteLength,
+    width: dimensions.width,
+    height: dimensions.height,
+  };
 }
 
 function socialPageVariants(source: URL): URL[] {
@@ -339,6 +502,74 @@ async function convertImageToPng(inputPath: string, outputPath: string): Promise
   });
 }
 
+function youtubeVideoId(source: URL): string | null {
+  if (/youtu\.be$/i.test(source.hostname)) {
+    return source.pathname.split("/").filter(Boolean)[0] || null;
+  }
+  if (/youtube\.com$/i.test(source.hostname)) {
+    if (source.pathname === "/watch") return source.searchParams.get("v")?.trim() || null;
+    const parts = source.pathname.split("/").filter(Boolean);
+    if ((parts[0] === "shorts" || parts[0] === "embed" || parts[0] === "live") && parts[1]) {
+      return parts[1];
+    }
+  }
+  return null;
+}
+
+function youtubeThumbnailCandidates(source: URL): string[] {
+  const id = youtubeVideoId(source);
+  if (!id) return [];
+  const safeId = encodeURIComponent(id);
+  return [
+    `https://i.ytimg.com/vi/${safeId}/maxresdefault.jpg`,
+    `https://i.ytimg.com/vi/${safeId}/sddefault.jpg`,
+    `https://i.ytimg.com/vi/${safeId}/hqdefault.jpg`,
+    `https://i.ytimg.com/vi/${safeId}/mqdefault.jpg`,
+  ];
+}
+
+async function downloadYoutubeThumbnailAsPng(args: {
+  source: URL;
+  tempDir: string;
+  prefix: string;
+  maxBytes: number;
+}): Promise<{ filePath: string; sourceUrl: string; sourceContentType: string; bytes: number; extractor: string; cleanup: string[] }> {
+  const candidates = youtubeThumbnailCandidates(args.source);
+  if (candidates.length === 0) {
+    throw new Error("This YouTube link does not contain a video ID. Paste a normal YouTube video URL.");
+  }
+
+  const errors: string[] = [];
+  for (const candidate of candidates) {
+    const cleanupPaths: string[] = [];
+    try {
+      const downloaded = await downloadImageCandidate(candidate, args.tempDir, args.prefix, args.maxBytes, args.source.toString());
+      cleanupPaths.push(downloaded.inputPath);
+      const outputPath = path.join(args.tempDir, `${args.prefix}.png`);
+      await convertImageToPng(downloaded.inputPath, outputPath);
+      cleanupPaths.push(outputPath);
+      const stat = await fs.stat(outputPath);
+      if (stat.size <= 0) throw new Error("converted thumbnail was empty");
+      if (stat.size > args.maxBytes) {
+        throw new Error(`PNG file is larger than ${Math.round(args.maxBytes / (1024 * 1024))} MB.`);
+      }
+      return {
+        filePath: outputPath,
+        sourceUrl: downloaded.sourceUrl,
+        sourceContentType: downloaded.sourceContentType,
+        bytes: stat.size,
+        extractor: "youtube-thumbnail",
+        cleanup: cleanupPaths,
+      };
+    } catch (error) {
+      errors.push(errorPart((error as Error)?.message) || "thumbnail candidate failed");
+      await cleanup(cleanupPaths);
+    }
+  }
+
+  throw new Error(errors[0] || "This YouTube thumbnail could not be downloaded. Try another public video link.");
+}
+
 async function downloadSocialPageImageAsPng(args: {
   source: URL;
   tempDir: string;
@@ -346,9 +577,11 @@ async function downloadSocialPageImageAsPng(args: {
   maxBytes: number;
 }): Promise<{ filePath: string; sourceUrl: string; sourceContentType: string; bytes: number; extractor: string; cleanup: string[] }> {
   const { html, pageUrl } = await fetchSocialPageHtml(args.source);
-  const candidates = extractSocialImageCandidates(html).sort((a, b) => socialImageScore(b) - socialImageScore(a));
+  const candidates = extractSocialImageCandidates(html, pageUrl).sort((a, b) => socialImageScore(b) - socialImageScore(a));
   if (candidates.length === 0) {
-    throw new Error("This social page did not expose a public image. Try another public link or upload the image directly.");
+    throw new Error(
+      "This social page only exposed logos or private placeholders, not the post image. Try another public link or upload the image directly.",
+    );
   }
 
   const errors: string[] = [];
@@ -380,7 +613,7 @@ async function downloadSocialPageImageAsPng(args: {
   }
 
   throw new Error(
-    errors[0] || "This social image could not be downloaded from our server. Try another public link or upload the image directly.",
+    errors[0] || "This social page did not expose a usable post image. Try another public link or upload the image directly.",
   );
 }
 
@@ -494,7 +727,9 @@ export default async function handler(req: any, res: any) {
     let sourceUrl = source.toString();
 
     if (format === "png") {
-      const pageImage = await downloadSocialPageImageAsPng({ source, tempDir, prefix, maxBytes });
+      const pageImage = isYoutubeHost(source.hostname)
+        ? await downloadYoutubeThumbnailAsPng({ source, tempDir, prefix, maxBytes })
+        : await downloadSocialPageImageAsPng({ source, tempDir, prefix, maxBytes });
       outputFile = pageImage.filePath;
       extractor = pageImage.extractor;
       sourceContentType = pageImage.sourceContentType;
