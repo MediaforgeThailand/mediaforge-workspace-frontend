@@ -80,7 +80,7 @@ export function isBinarySelect(options: string[] | undefined): boolean {
 const MINI_SELECT_CONTENT_CLASS =
   "ws-compact-select-content border-0 bg-popover z-[9999] max-h-[220px] shadow-2xl shadow-black/40";
 const MINI_SELECT_ITEM_CLASS =
-  "ws-compact-select-item h-[30px] min-h-[30px] rounded-md py-0 pl-7 pr-2 text-[11px] leading-none text-popover-foreground focus:bg-white/[0.08] focus:text-white";
+  "ws-compact-select-item h-[34px] min-h-[34px] rounded-md py-0 pl-7 pr-2 text-[15px] leading-none text-popover-foreground focus:bg-white/[0.08] focus:text-white";
 
 /* ── TogglePill ──────────────────────────────────────────── */
 
@@ -220,13 +220,13 @@ export function MiniSelect({
               /* The shadcn `SelectItem` base className includes
                *  `text-sm` (14px). tailwind-merge inside `cn()`
                *  doesn't always resolve `text-sm` against an
-               *  arbitrary `text-[11px]` (the arbitrary form isn't
+               *  arbitrary `text-[17px]` (the arbitrary form isn't
                *  recognised as the same utility group on every
                *  version), so the previous attempt left two
                *  conflicting font-size declarations and the larger
                *  one stuck visually. Inline `style.fontSize` has
                *  the highest specificity — it always wins. */
-              style={{ fontSize: "11px", lineHeight: 1 }}
+              style={{ fontSize: "15px", lineHeight: 1 }}
               className={MINI_SELECT_ITEM_CLASS}
             >
               {preview ? (
@@ -309,14 +309,14 @@ function SearchableMiniSelect({
                 /* Inline style — beats whatever font-size the base
                  *  cmdk `Input` ships with so we don't have to
                  *  guess at class-merge order. Matches the trigger
-                 *  pill (`.ws-mini-select-trigger` = 11px). */
-                style={{ fontSize: "11px" }}
-                className="h-7 w-full border-0 bg-transparent px-0 py-0 leading-none outline-none placeholder:text-muted-foreground"
+                 *  pill (`.ws-mini-select-trigger` = 17px). */
+                style={{ fontSize: "15px" }}
+                className="h-8 w-full border-0 bg-transparent px-0 py-0 leading-none outline-none placeholder:text-muted-foreground"
               />
             </div>
             <CommandList className="ws-picker-scroll max-h-[220px]">
               <CommandEmpty
-                style={{ fontSize: "11px" }}
+                style={{ fontSize: "15px" }}
                 className="py-3 text-center leading-none text-muted-foreground"
               >
                 {i18n("workspace.params.noResults")}
@@ -337,10 +337,10 @@ function SearchableMiniSelect({
                     /* Inline font-size — see SelectItem above. The
                      *  base cmdk CommandItem ships `text-sm`, which
                      *  tailwind-merge didn't strip when we tried
-                     *  layering `text-[11px]` via className. */
-                    style={{ fontSize: "11px", lineHeight: 1 }}
+                     *  layering `text-[15px]` via className. */
+                    style={{ fontSize: "15px", lineHeight: 1 }}
                     className={cn(
-                      "mx-1 my-px min-h-[30px] cursor-pointer rounded-md px-2 py-0 leading-none aria-selected:bg-white/[0.08]",
+                      "mx-1 my-px min-h-[34px] cursor-pointer rounded-md px-2 py-0 leading-none aria-selected:bg-white/[0.08]",
                       opt === value && "bg-accent/40 font-medium",
                       action && "pr-1",
                     )}

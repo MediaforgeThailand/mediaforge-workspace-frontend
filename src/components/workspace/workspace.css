@@ -1441,10 +1441,10 @@ body[data-rfc="true"]
 .ws-mini-pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
+  gap: 6px;
+  padding: 6px 14px;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 17px;
   font-weight: 500;
   color: hsl(0 0% 92%);
   background: hsl(0 0% 8% / 0.78);
@@ -1452,7 +1452,7 @@ body[data-rfc="true"]
   border-radius: 999px;
   cursor: pointer;
   white-space: nowrap;
-  height: 25px;
+  height: 32px;
   line-height: 1;
   box-shadow: 0 1px 4px hsl(0 0% 0% / 0.4);
   transition: background 100ms var(--ws-ease);
@@ -1469,12 +1469,12 @@ body[data-rfc="true"]
 .ws-mini-select-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  height: 25px;
+  gap: 6px;
+  padding: 6px 14px;
+  height: 32px;
   min-height: 0;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 17px;
   font-weight: 500;
   color: hsl(0 0% 92%);
   background: hsl(0 0% 8% / 0.78);
@@ -1497,8 +1497,8 @@ body[data-rfc="true"]
 }
 /* Shrink the chevron in the Radix-rendered select trigger. */
 .ws-mini-select-trigger > svg {
-  width: 10.5px;
-  height: 10.5px;
+  width: 14px;
+  height: 14px;
   opacity: 0.65;
 }
 
@@ -1510,35 +1510,35 @@ body[data-rfc="true"]
 
 .ws-compact-select-content [role="option"],
 .ws-compact-select-item {
-  height: 30px !important;
-  min-height: 30px !important;
+  height: 34px !important;
+  min-height: 34px !important;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
   padding-left: 27px !important;
   padding-right: 8px !important;
   border-radius: 8px !important;
   font-family: inherit !important;
-  font-size: 11px !important;
+  font-size: 15px !important;
   line-height: 1 !important;
 }
 
 .ws-compact-select-content [role="option"] > span:first-child {
   left: 8px !important;
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.ws-compact-select-content [role="option"] svg {
   width: 13px !important;
   height: 13px !important;
 }
 
-.ws-compact-select-content [role="option"] svg {
-  width: 12px !important;
-  height: 12px !important;
-}
-
 .ws-compact-command-content [cmdk-item] {
-  min-height: 30px !important;
+  min-height: 34px !important;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
   font-family: inherit !important;
-  font-size: 11px !important;
+  font-size: 15px !important;
   line-height: 1 !important;
 }
 
@@ -1546,11 +1546,11 @@ body[data-rfc="true"]
 .ws-toggle-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px 4px 6px;
-  height: 25px;
+  gap: 8px;
+  padding: 6px 14px 6px 8px;
+  height: 32px;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 17px;
   font-weight: 500;
   color: hsl(0 0% 80%);
   background: hsl(0 0% 8% / 0.78);
@@ -1576,8 +1576,8 @@ body[data-rfc="true"]
 }
 .ws-toggle-pill-track {
   position: relative;
-  width: 18px;
-  height: 10px;
+  width: 24px;
+  height: 14px;
   border-radius: 999px;
   background: hsl(0 0% 100% / 0.18);
   flex-shrink: 0;
@@ -1590,15 +1590,15 @@ body[data-rfc="true"]
   position: absolute;
   top: 1px;
   left: 1px;
-  width: 8px;
-  height: 8px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: hsl(0 0% 100%);
   transition: transform 120ms var(--ws-ease);
   box-shadow: 0 1px 2px hsl(0 0% 0% / 0.4);
 }
 .ws-toggle-pill.is-on .ws-toggle-pill-knob {
-  transform: translateX(8px);
+  transform: translateX(10px);
 }
 
 /* NumberStepper — `−  N  +` capsule cluster. Matches the other
@@ -1606,7 +1606,7 @@ body[data-rfc="true"]
 .ws-stepper {
   display: inline-flex;
   align-items: stretch;
-  height: 25px;
+  height: 32px;
   background: hsl(0 0% 8% / 0.78);
   border: none;
   border-radius: 999px;
@@ -1617,8 +1617,8 @@ body[data-rfc="true"]
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 23px;
-  height: 25px;
+  width: 28px;
+  height: 32px;
   background: transparent;
   border: none;
   color: hsl(0 0% 85%);
@@ -1633,18 +1633,18 @@ body[data-rfc="true"]
   cursor: not-allowed;
 }
 .ws-stepper-btn svg {
-  width: 11.5px;
-  height: 11.5px;
+  width: 14px;
+  height: 14px;
 }
 .ws-stepper-value {
   display: flex;
   align-items: center;
-  padding: 0 7px;
+  padding: 0 10px;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 17px;
   font-weight: 500;
   color: hsl(0 0% 96%);
-  min-width: 25px;
+  min-width: 32px;
   justify-content: center;
   line-height: 1;
 }

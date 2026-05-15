@@ -283,8 +283,8 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
         : isEducationOrg
           ? credits?.organization_name || t("workspace.userMenu.sharedCredits")
           : t("common.companyPool");
-  const triggerSize = compact ? 52 : 48;
-  const ringSize = compact ? 52 : 50;
+  const triggerSize = compact ? 40 : 48;
+  const ringSize = compact ? 40 : 50;
 
   const handleSignOut = async () => {
     await signOut();
@@ -303,7 +303,14 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
       }}
     >
       <DropdownMenuTrigger
-        className="fixed right-4 top-4 z-[70] flex items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/50 md:right-6 lg:right-8"
+        className={cn(
+          "flex items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/50",
+          // CanvasHeader (space page) renders the trigger inline inside
+          // its own right-cluster, so suppress the standalone fixed
+          // positioning when compact. Other surfaces (dashboard
+          // PageHeader, etc.) still rely on the fixed top-right anchor.
+          !compact && "fixed right-4 top-4 z-[70] md:right-6 lg:right-8",
+        )}
         style={{ width: triggerSize, height: triggerSize }}
         aria-label={t("workspace.usermenu.account")}
       >
