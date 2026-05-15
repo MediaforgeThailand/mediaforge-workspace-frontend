@@ -35,6 +35,10 @@ const FORMAT_META: Record<OutputFormat, { extension: string; contentType: string
 };
 
 const execFileAsync = promisify(execFile);
+const CHROME_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36";
+const FACEBOOK_CRAWLER_USER_AGENT =
+  "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)";
 
 function sendJson(res: any, status: number, body: Record<string, unknown>) {
   res.statusCode = status;
@@ -250,7 +254,7 @@ async function downloadImageCandidate(candidate: string, tempDir: string, prefix
       Accept: "image/avif,image/webp,image/png,image/jpeg,image/*,*/*;q=0.8",
       "Accept-Language": "en-US,en;q=0.9",
       ...(referer ? { Referer: referer } : {}),
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+      "User-Agent": CHROME_USER_AGENT,
     },
   });
   if (!response.ok) {
@@ -277,7 +281,11 @@ function socialPageVariants(source: URL): URL[] {
     const fbid = source.searchParams.get("fbid");
     if (fbid) {
       const query = source.searchParams.toString();
-      for (const base of ["https://www.facebook.com/photo.php", "https://m.facebook.com/photo.php"]) {
+      for (const base of [
+        "https://www.facebook.com/photo.php",
+        "https://m.facebook.com/photo.php",
+        "https://mbasic.facebook.com/photo.php",
+      ]) {
         const candidate = new URL(base);
         candidate.search = query;
         if (!variants.some((item) => item.toString() === candidate.toString())) {
@@ -292,24 +300,30 @@ function socialPageVariants(source: URL): URL[] {
 async function fetchSocialPageHtml(source: URL): Promise<{ html: string; pageUrl: URL }> {
   const errors: string[] = [];
   for (const pageUrl of socialPageVariants(source)) {
-    try {
-      const response = await fetch(pageUrl, {
-        headers: {
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "en-US,en;q=0.9",
-          "Cache-Control": "no-cache",
-          Pragma: "no-cache",
-          "Upgrade-Insecure-Requests": "1",
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-        },
-      });
-      if (!response.ok) {
-        errors.push(`${pageUrl.hostname} HTTP ${response.status}`);
-        continue;
+    const isFacebook = /(^|\.)facebook\.com$/i.test(pageUrl.hostname);
+    const userAgents = isFacebook
+      ? [CHROME_USER_AGENT, FACEBOOK_CRAWLER_USER_AGENT]
+      : [CHROME_USER_AGENT];
+    for (const userAgent of userAgents) {
+      try {
+        const response = await fetch(pageUrl, {
+          headers: {
+            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+            "Upgrade-Insecure-Requests": "1",
+            "User-Agent": userAgent,
+          },
+        });
+        if (!response.ok) {
+          errors.push(`${pageUrl.hostname} HTTP ${response.status}`);
+          continue;
+        }
+        return { html: await response.text(), pageUrl };
+      } catch (error) {
+        errors.push(`${pageUrl.hostname} ${errorPart((error as Error)?.message) || "fetch failed"}`);
       }
-      return { html: await response.text(), pageUrl };
-    } catch (error) {
-      errors.push(`${pageUrl.hostname} ${errorPart((error as Error)?.message) || "fetch failed"}`);
     }
   }
   throw new Error(`Social page returned ${errors.join(", ") || "an empty response"}.`);
