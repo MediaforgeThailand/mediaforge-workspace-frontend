@@ -7600,7 +7600,6 @@ function CreationTile({
       });
     }
   };
-
   const handleDownload = async () => {
     if (!downloadUrl) return;
     try {
