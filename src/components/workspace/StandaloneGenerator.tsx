@@ -1351,6 +1351,7 @@ type StandaloneInlineLabelKey =
   | "negativePrompt"
   | "off"
   | "on"
+  | "orientation"
   | "originalSound"
   | "people"
   | "quality"
@@ -1395,6 +1396,7 @@ const STANDALONE_INLINE_LABELS: Record<
   negativePrompt: { en: "Negative prompt", th: "คำสั่งที่ไม่ต้องการ" },
   off: { en: "Off", th: "ปิด" },
   on: { en: "On", th: "เปิด" },
+  orientation: { en: "Orientation", th: "ทิศทาง" },
   originalSound: { en: "Original sound", th: "เสียงต้นฉบับ" },
   people: { en: "People", th: "บุคคล" },
   quality: { en: "Quality", th: "คุณภาพ" },
