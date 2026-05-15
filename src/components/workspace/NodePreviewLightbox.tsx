@@ -55,6 +55,9 @@ export interface PreviewPayload {
   prompt?: string;
   /** Compact settings chips shown in the inspector sidebar. */
   settings?: PreviewSetting[];
+  /** Optional custom download path for media that needs a fresh signed/provider URL. */
+  onDownload?: () => Promise<void> | void;
+  downloadName?: string;
 }
 
 export type PreviewSetting =
@@ -223,6 +226,19 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
       console.warn("[NodePreviewLightbox] copy URL failed:", err);
     }
   };
+  const downloadPreview = async () => {
+    try {
+      if (preview.onDownload) {
+        await preview.onDownload();
+        return;
+      }
+      if (preview.url) {
+        await downloadFromUrl(preview.url, preview.downloadName ?? preview.label);
+      }
+    } catch (err) {
+      console.warn("[NodePreviewLightbox] download failed:", err);
+    }
+  };
 
   const previewTools = (mobile = false) => (
     <div
@@ -248,7 +264,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
           icon={Download}
           label={t("workspace.lightbox.download")}
           title={t("workspace.lightbox.download")}
-          onClick={() => void downloadFromUrl(preview.url!, preview.label)}
+          onClick={() => void downloadPreview()}
           mobile={mobile}
           tone="primary"
         />
@@ -281,14 +297,14 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
             {
               icon: Download,
               label: i18n("common.download"),
-              onClick: () => void downloadFromUrl(preview.url!, preview.label),
+              onClick: () => void downloadPreview(),
             },
           ]
         : [
             {
               icon: Download,
               label: i18n("workspace.lightbox.downloadVideo"),
-              onClick: () => void downloadFromUrl(preview.url!, preview.label),
+              onClick: () => void downloadPreview(),
             },
           ];
 
@@ -349,7 +365,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
               <InspectorIconButton
                 icon={Download}
                 label={i18n("common.download")}
-                onClick={() => void downloadFromUrl(preview.url!, preview.label)}
+                onClick={() => void downloadPreview()}
               />
             </div>
 
@@ -513,7 +529,7 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
               <button
                 type="button"
                 onClick={() =>
-                  void downloadFromUrl(preview.url!, preview.label)
+                  void downloadPreview()
                 }
                 title={t("workspace.lightbox.download")}
                 aria-label={t("workspace.lightbox.download")}

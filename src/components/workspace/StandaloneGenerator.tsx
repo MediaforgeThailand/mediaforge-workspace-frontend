@@ -7151,6 +7151,43 @@ function getStandalonePosterUrl(
   return poster;
 }
 
+function getStandaloneMediaUrl(result: StandaloneResult | null | undefined): string | undefined {
+  const outputs = result?.outputs ?? {};
+  return firstText(
+    result?.url,
+    (result as (StandaloneResult & { result_url?: unknown }) | null | undefined)?.result_url,
+    outputs.url,
+    outputs.result_url,
+    outputs.output_url,
+    outputs.video_url,
+    outputs.output_video,
+    outputs.audio_url,
+    outputs.output_audio,
+    outputs.image_url,
+    outputs.output_image,
+    outputs.provider_video_url,
+    outputs.provider_audio_url,
+  );
+}
+
+function normalizeStandaloneResultType(
+  result: StandaloneResult | null | undefined,
+  url?: string,
+  modelUrl?: string,
+): string {
+  const raw = String(result?.type ?? result?.output_type ?? "").toLowerCase();
+  if (raw === "video_url") return "video";
+  if (raw === "audio_url") return "audio";
+  if (raw === "image_url") return "image";
+  if (raw) return raw;
+  if (modelUrl) return "model3d";
+  const cleanUrl = (url ?? "").split(/[?#]/)[0].toLowerCase();
+  if (/\.(mp4|mov|webm|m4v)$/.test(cleanUrl)) return "video";
+  if (/\.(mp3|m4a|aac|wav)$/.test(cleanUrl)) return "audio";
+  if (/\.(png|jpe?g|webp|gif)$/.test(cleanUrl)) return "image";
+  return "";
+}
+
 function inferReferenceMime(url: string | undefined, fallback?: unknown): string {
   const value = typeof fallback === "string" ? fallback.toLowerCase() : "";
   if (value.startsWith("image/") || value.startsWith("video/") || value.startsWith("audio/")) return value;
@@ -7363,7 +7400,7 @@ async function freshElevenLabsDubbingDownloadUrl(
     error?: string;
   } | null;
   if (payload?.error) throw new Error(payload.error);
-  return firstText(payload?.output_url, result.url) ?? null;
+  return firstText(payload?.output_url, getStandaloneMediaUrl(result)) ?? null;
 }
 
 function withElevenLabsDownloadIntent(url: string): string {
@@ -7421,21 +7458,9 @@ function CreationTile({
         job.model ??
         t("workspace.standalone.generation_fallback"),
     );
-  const url = firstText(
-    result?.url,
-    (result as StandaloneResult & { result_url?: unknown } | null)?.result_url,
-    result?.outputs?.output_video,
-    result?.outputs?.audio_url,
-    result?.outputs?.output_audio,
-  );
+  const url = getStandaloneMediaUrl(result);
   const modelUrl = getStandaloneModelUrl(result);
-  const resultTypeRaw = String(result?.type ?? result?.output_type ?? "");
-  const resultType =
-    resultTypeRaw === "video_url"
-      ? "video"
-      : resultTypeRaw === "audio_url"
-        ? "audio"
-        : resultTypeRaw;
+  const resultType = normalizeStandaloneResultType(result, url, modelUrl);
   const isModel3d = resultType === "model_3d" || resultType === "model3d" || !!modelUrl;
   const rawPreviewUrl = isModel3d ? getStandalonePosterUrl(result, modelUrl) : url;
   const mediaUrl = useFreshSignedUrl(url);
@@ -7544,6 +7569,8 @@ function CreationTile({
         caption: modelName,
         prompt: prompt.trim() || title,
         settings: previewSettings,
+        downloadName,
+        onDownload: handleDownload,
       });
       return;
     }
@@ -7555,6 +7582,8 @@ function CreationTile({
         caption: modelName,
         prompt: prompt.trim() || title,
         settings: previewSettings,
+        downloadName,
+        onDownload: handleDownload,
       });
       return;
     }
@@ -7566,9 +7595,10 @@ function CreationTile({
         caption: modelName,
         prompt: prompt.trim() || title,
         settings: previewSettings,
+        downloadName,
+        onDownload: handleDownload,
       });
     }
-  };
   const handleDownload = async () => {
     if (!downloadUrl) return;
     try {
@@ -7660,7 +7690,11 @@ function CreationTile({
         {downloadUrl && (
           <button
             type="button"
-            onClick={() => void handleDownload()}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              void handleDownload();
+            }}
             data-testid="standalone-download"
             className="grid h-7 w-7 place-items-center rounded-full bg-black/62 text-white backdrop-blur transition hover:bg-white hover:text-zinc-950"
             aria-label={t("workspace.standalone.download")}
@@ -7772,9 +7806,9 @@ function CreationRow({
       : job.status === "failed" || job.status === "permanent_failed"
         ? "text-red-300"
         : "text-amber-300";
-  const url = result?.url;
+  const url = getStandaloneMediaUrl(result);
   const modelUrl = getStandaloneModelUrl(result);
-  const resultType = String(result?.type ?? "");
+  const resultType = normalizeStandaloneResultType(result, url, modelUrl);
   const isModel3d = resultType === "model_3d" || resultType === "model3d" || !!modelUrl;
   const rawPreviewUrl = isModel3d ? getStandalonePosterUrl(result, modelUrl) : url;
   const mediaUrl = useFreshSignedUrl(url);
@@ -7837,6 +7871,8 @@ function CreationRow({
         url: displayPreviewUrl,
         label: title,
         caption: modelName,
+        downloadName,
+        onDownload: handleDownload,
       });
       return;
     }
@@ -7846,6 +7882,8 @@ function CreationRow({
         url: playbackUrl,
         label: title,
         caption: modelName,
+        downloadName,
+        onDownload: handleDownload,
       });
       return;
     }
@@ -7855,6 +7893,8 @@ function CreationRow({
         url: playbackUrl,
         label: title,
         caption: modelName,
+        downloadName,
+        onDownload: handleDownload,
       });
     }
   };
@@ -7936,10 +7976,10 @@ function CreationRow({
               </div>
             </div>
           )}
-          {(result?.type === "image" || isModel3d) && displayPreviewUrl && (
+          {(resultType === "image" || isModel3d) && displayPreviewUrl && (
             <img src={displayPreviewUrl} alt="" className="h-full w-full object-cover" />
           )}
-          {result?.type === "video" && playbackUrl && (
+          {resultType === "video" && playbackUrl && (
             <video
               src={playbackUrl}
               controls
@@ -7947,7 +7987,7 @@ function CreationRow({
               className="h-full w-full object-cover"
             />
           )}
-          {result?.type === "audio" && playbackUrl && (
+          {resultType === "audio" && playbackUrl && (
             <div className="flex h-full w-full items-center justify-center p-4">
               <AudioPlayButton
                 src={playbackUrl}
@@ -7962,9 +8002,9 @@ function CreationRow({
             </div>
           )}
           <div className="absolute bottom-2 left-2 rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">
-            {result?.type === "audio"
+            {resultType === "audio"
               ? t("workspace.standalone.result.audio")
-              : result?.type === "video"
+              : resultType === "video"
                 ? t("workspace.standalone.result.video")
                 : isModel3d
                   ? t("workspace.standalone.result.model_3d")
@@ -8015,7 +8055,11 @@ function CreationRow({
             <>
               <button
                 type="button"
-                onClick={() => void handleDownload()}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  void handleDownload();
+                }}
                 data-testid="standalone-download"
                 className="grid h-9 w-9 place-items-center rounded-lg bg-white text-zinc-950 hover:bg-zinc-200"
                 aria-label={t("workspace.standalone.download")}
