@@ -104,7 +104,12 @@ import {
 } from "./standaloneGenerationCatalog";
 import { GEMINI_TTS_VOICES, DEFAULT_GEMINI_TTS_VOICE } from "./workspaceSchema";
 import { useVoicePreview } from "@/hooks/useVoicePreview";
-import { modelLogoFor, orderModelsByRecommendation } from "./modelDisplay";
+import {
+  modelLogoFor,
+  orderModelsByRecommendation,
+  recommendedModelPreviewFor,
+  type ModelPreviewMeta,
+} from "./modelDisplay";
 import { getProjectAvatar } from "./projectAvatars";
 import MediaContextMenu from "./MediaContextMenu";
 import { buildMediaMenuItems } from "./mediaMenuItems";
@@ -1621,7 +1626,12 @@ export default function StandaloneGenerator({
         isVoiceTranslateStandaloneJob(job) &&
         (job.status === "queued" || job.status === "running"),
     );
-    if (!translateJob) return;
+    if (!translateJob) {
+      setTranslateTask((prev) =>
+        prev?.status === "failed" || prev?.status === "completed" ? null : prev,
+      );
+      return;
+    }
     if (
       (translateJob.node_type === "audioGenNode" || translateJob.node_type === "mergeAudioNode") &&
       isLocalVoiceDubJob(translateJob)
@@ -4725,6 +4735,7 @@ function ModelPicker({
                   {recommendedModels.map((model) => {
                     const active = model.id === value;
                     const visual = modelVisualFor(model);
+                    const preview = recommendedModelPreviewFor(model);
                     return (
                       <button
                         key={model.id}
@@ -4741,7 +4752,8 @@ function ModelPicker({
                         )}
                         style={{ background: visual.gradient }}
                       >
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
+                        {preview && <RecommendedModelPreview preview={preview} />}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/25 to-transparent" />
                         <div className="absolute bottom-0 left-0 right-0 min-w-0 p-3">
                           <div className="truncate font-semibold text-white">
                             {model.label}
@@ -4844,6 +4856,34 @@ function ModelPicker({
       )}
     </div>
   );
+}
+
+function RecommendedModelPreview({ preview }: { preview: ModelPreviewMeta }) {
+  if (preview.videoSrc) {
+    return (
+      <video
+        src={preview.videoSrc}
+        autoPlay
+        muted
+        loop
+        playsInline
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+    );
+  }
+
+  if (preview.imageSrc) {
+    return (
+      <img
+        src={preview.imageSrc}
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover"
+        draggable={false}
+      />
+    );
+  }
+
+  return null;
 }
 
 function ModelBadge({

@@ -161,9 +161,54 @@ const MODEL_PREVIEW_META: Record<string, ModelPreviewMeta> = {
     title: "Google Veo 3.1",
     subtitle: "Google video generation preview",
   },
+  "gemini-3-1-tts": {
+    imageSrc: "/model-previews/recommend-gemini-3-1.webp",
+    title: "Gemini 3.1 Flash Preview TTS",
+    subtitle: "Google expressive text-to-speech preview",
+  },
+  "tripo3d-v3-1": {
+    imageSrc: "/model-previews/recommend-tripo3d-v3-1.webp",
+    title: "Tripo3D v3.1",
+    subtitle: "Detailed image-to-3D model preview",
+  },
 };
 
-export function modelPreviewFor(model: ModelLogoInput | string): ModelPreviewMeta | undefined {
+type ModelPreviewKey = keyof typeof MODEL_PREVIEW_META;
+
+const MODEL_RECOMMENDED_PREVIEW_META: Partial<Record<ModelPreviewKey, ModelPreviewMeta>> = {
+  "gpt-image-2": {
+    videoSrc: "/model-previews/recommend-gpt-image-2.webm",
+    title: "GPT Image 2",
+    subtitle: "OpenAI image generation preview",
+  },
+  "nano-banana-2": {
+    videoSrc: "/model-previews/recommend-nano-banana-2.webm",
+    title: "Nano Banana 2",
+    subtitle: "Reference-heavy Google image generation preview",
+  },
+  "kling-3-0": {
+    videoSrc: "/model-previews/recommend-kling-3-0.webm",
+    title: "Kling 3.0 Pro",
+    subtitle: "Kling 3 video generation preview",
+  },
+  "kling-3-0-omni": {
+    videoSrc: "/model-previews/recommend-kling-3-0-omni.webm",
+    title: "Kling 3.0 Omni",
+    subtitle: "Kling Omni multi-input preview",
+  },
+  "seedance-2-0": {
+    videoSrc: "/model-previews/recommend-seedance-2-0.webm",
+    title: "Seedance 2.0",
+    subtitle: "Premium BytePlus video generation preview",
+  },
+  "seedance-2-0-fast": {
+    videoSrc: "/model-previews/recommend-seedance-2-0.webm",
+    title: "Seedance 2.0 Fast",
+    subtitle: "Fast BytePlus video generation preview",
+  },
+};
+
+function modelPreviewKeyFor(model: ModelLogoInput | string): ModelPreviewKey | undefined {
   const input = typeof model === "string" ? { id: model } : model;
   const haystack = `${input.id ?? ""} ${input.label ?? ""} ${input.name ?? ""} ${input.provider ?? ""}`.toLowerCase();
   const normalized = haystack.replace(/[^a-z0-9]+/g, "-");
@@ -179,49 +224,69 @@ export function modelPreviewFor(model: ModelLogoInput | string): ModelPreviewMet
     has("seedream-5-0-lite") ||
     (normalized.includes("seedream") && normalized.includes("5") && normalized.includes("lite"))
   ) {
-    return MODEL_PREVIEW_META["seedream-5-0-lite"];
+    return "seedream-5-0-lite";
   }
   if (has("seedream-5-0") || (normalized.includes("seedream") && normalized.includes("5"))) {
-    return MODEL_PREVIEW_META["seedream-5-0"];
+    return "seedream-5-0";
   }
   if (has("seedream-4-5") || (normalized.includes("seedream") && normalized.includes("4-5"))) {
-    return MODEL_PREVIEW_META["seedream-4-5"];
+    return "seedream-4-5";
   }
   if (has("nano-banana-pro") || has("banana-pro")) {
-    return MODEL_PREVIEW_META["nano-banana-pro"];
+    return "nano-banana-pro";
   }
   if (has("nano-banana-2") || has("banana-2")) {
-    return MODEL_PREVIEW_META["nano-banana-2"];
+    return "nano-banana-2";
   }
   if (has("gpt-image-2") || has("gpt-2")) {
-    return MODEL_PREVIEW_META["gpt-image-2"];
+    return "gpt-image-2";
   }
   if (has("seedance-2-0-lite") || (has("seedance-2-0") && normalized.includes("fast"))) {
-    return MODEL_PREVIEW_META["seedance-2-0-fast"];
+    return "seedance-2-0-fast";
   }
   if (has("seedance-2-0-pro") || has("seedance-2-0")) {
-    return MODEL_PREVIEW_META["seedance-2-0"];
+    return "seedance-2-0";
   }
   if (has("veo-3-1")) {
-    return MODEL_PREVIEW_META["veo-3-1"];
+    return "veo-3-1";
   }
   if (has("kling-3-0-omni") || has("kling-3-omni")) {
-    return MODEL_PREVIEW_META["kling-3-0-omni"];
+    return "kling-3-0-omni";
   }
   if (has("kling-3-0-motion-pro") || has("kling-3-motion-pro") || has("kling-3-motion")) {
-    return MODEL_PREVIEW_META["kling-3-0-motion-pro"];
+    return "kling-3-0-motion-pro";
   }
   if (has("kling-3-0-pro") || has("kling-3-0") || has("kling-3-pro")) {
-    return MODEL_PREVIEW_META["kling-3-0"];
+    return "kling-3-0";
   }
   if (has("kling-2-6-motion-pro") || has("kling-2-6-motion")) {
-    return MODEL_PREVIEW_META["kling-2-6-motion"];
+    return "kling-2-6-motion";
   }
   if (has("kling-2-6-pro") || has("kling-2-6")) {
-    return MODEL_PREVIEW_META["kling-2-6"];
+    return "kling-2-6";
+  }
+  if (has("tripo3d-v3-1") || has("tripo3d-3-1") || has("tripo-v3-1") || has("tripo-3-1")) {
+    return "tripo3d-v3-1";
+  }
+  if (
+    has("gemini-3-1") ||
+    (normalized.includes("gemini") && (normalized.includes("tts") || normalized.includes("voice") || normalized.includes("audio")))
+  ) {
+    return "gemini-3-1-tts";
   }
 
   return undefined;
+}
+
+export function modelPreviewFor(model: ModelLogoInput | string): ModelPreviewMeta | undefined {
+  const key = modelPreviewKeyFor(model);
+  return key ? MODEL_PREVIEW_META[key] : undefined;
+}
+
+export function recommendedModelPreviewFor(model: ModelLogoInput | string): ModelPreviewMeta | undefined {
+  const key = modelPreviewKeyFor(model);
+  if (!key) return undefined;
+  return MODEL_RECOMMENDED_PREVIEW_META[key] ?? MODEL_PREVIEW_META[key];
 }
 
 export function modelLogoFor(model: ModelLogoInput): ModelLogoMeta {

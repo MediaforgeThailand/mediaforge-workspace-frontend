@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
@@ -8,6 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   User,
   Camera,
@@ -34,7 +41,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import SettingsLayout, { type SettingsSectionKey } from "@/components/settings/SettingsLayout";
-import ComingSoon from "@/components/settings/ComingSoon";
 import PlanBilling from "@/components/settings/PlanBilling";
 import { DeleteAccountDialog } from "@/components/settings/DeleteAccountDialog";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
@@ -63,7 +69,6 @@ type StudentClassProfile = {
  *   - Profile           — display name + company + avatar (existing)
  *   - Stock downloads / collections / Following — placeholders
  *   - My Team / People / Security SSO            — placeholders
- *   - Preferences       — language toggle (existing)
  *   - Plan & billing    — NEW (subscriptions, credits, payments)
  *
  * The previous "Usage" tab is gone from the rail (it lives at
@@ -87,7 +92,7 @@ const Settings = () => {
       : tabParam === "team"
       ? "organization.my-team"
       : tabParam === "preferences"
-      ? "organization.preferences"
+      ? "account.profile"
       : "account.profile";
 
   const [activeKey, setActiveKey] = useState<SettingsSectionKey>(initialKey);
@@ -196,38 +201,40 @@ const Settings = () => {
   };
 
   const getPlanBadge = () => {
+    const compactPill = (children: ReactNode, className: string) => (
+      <span
+        className={cn(
+          "inline-flex h-[24px] items-center rounded-full border px-[12px] text-[12px] font-semibold leading-none",
+          className,
+        )}
+      >
+        {children}
+      </span>
+    );
+
     if ((profile as { plan_name?: string | null } | null)?.plan_name) {
-      return (
-        <Badge className="bg-primary/20 text-primary border-primary/30">
-          {(profile as { plan_name?: string }).plan_name}
-        </Badge>
-      );
+      return compactPill((profile as { plan_name?: string }).plan_name, "border-primary/30 bg-primary/15 text-primary");
     }
     if (profile?.subscription_status && profile.subscription_status !== "free") {
-      return (
-        <Badge className="bg-primary/20 text-primary border-primary/30">
-          {profile.subscription_status === "agency" ? t("planAgency") : t("planPro")}
-        </Badge>
+      return compactPill(
+        profile.subscription_status === "agency" ? t("planAgency") : t("planPro"),
+        "border-primary/30 bg-primary/15 text-primary",
       );
     }
-    return (
-      <Badge variant="outline" className="text-muted-foreground">
-        {t("planFree")}
-      </Badge>
-    );
+    return compactPill(t("planFree"), "border-white/12 bg-white/[0.03] text-zinc-300");
   };
 
   // ── Section dispatch ────────────────────────────────────────
   const renderProfile = () => (
-    <div className="max-w-4xl space-y-[24px]">
+    <div className="max-w-[920px] space-y-[24px]">
       <div>
-        <h2 className="text-[23px] font-semibold leading-[28px] text-zinc-50">{t("profile")}</h2>
+        <h2 className="text-[20px] font-semibold leading-[26px] text-zinc-50">{t("profile")}</h2>
       </div>
 
       <div className="space-y-[8px]">
-        <Label className="text-[14px] font-medium leading-[18px] text-zinc-100">{t("Avatar")}</Label>
-        <div className="relative group h-[56px] w-[56px]">
-          <Avatar className="h-[56px] w-[56px] border border-white/10">
+        <Label className="text-[13px] font-semibold leading-[16px] text-zinc-100">{t("Avatar")}</Label>
+        <div className="relative group h-[58px] w-[58px]">
+          <Avatar className="h-[58px] w-[58px] border border-white/10">
             <AvatarImage src={avatarUrl} />
             <AvatarFallback className="bg-primary/20 text-primary text-[23px]">
               {displayName?.charAt(0)?.toUpperCase() || "U"}
@@ -241,30 +248,30 @@ const Settings = () => {
       </div>
 
       <div className="max-w-[330px] space-y-[6px]">
-        <Label htmlFor="displayName" className="text-[14px] font-medium leading-[18px] text-zinc-100">{t("displayName")}</Label>
+        <Label htmlFor="displayName" className="text-[13px] font-semibold leading-[16px] text-zinc-100">{t("displayName")}</Label>
         <Input
           id="displayName"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           placeholder={t("displayName")}
-          className="h-[36px] rounded-md border-white/10 bg-black/30 px-[12px] text-[14px] text-zinc-100"
+          className="h-[36px] rounded-md border-white/15 bg-[#232323] px-[12px] text-[13px] text-zinc-100"
         />
       </div>
 
       <div className="max-w-[330px] space-y-[6px]">
-        <Label htmlFor="company" className="text-[14px] font-medium leading-[18px] text-zinc-100">{t("company")}</Label>
+        <Label htmlFor="company" className="text-[13px] font-semibold leading-[16px] text-zinc-100">{t("company")}</Label>
         <Input
           id="company"
           value={company}
           onChange={(e) => setCompany(e.target.value)}
           placeholder={t("companyPlaceholder")}
-          className="h-[36px] rounded-md border-white/10 bg-black/30 px-[12px] text-[14px] text-zinc-100"
+          className="h-[36px] rounded-md border-white/15 bg-[#232323] px-[12px] text-[13px] text-zinc-100"
         />
       </div>
 
       <div className="space-y-[6px]">
-        <Label className="text-[14px] font-medium leading-[18px] text-zinc-100">{t("authEmailLabel")}</Label>
-        <p className="text-[14px] leading-[20px] text-zinc-200">{user?.email}</p>
+        <Label className="text-[13px] font-semibold leading-[16px] text-zinc-100">{t("authEmailLabel")}</Label>
+        <p className="text-[13px] leading-[20px] text-zinc-200">{user?.email}</p>
       </div>
 
       {studentClassProfiles.length > 0 && (
@@ -327,11 +334,37 @@ const Settings = () => {
         </div>
       )}
 
-      <Separator className="bg-white/5" />
+      <Separator className="bg-white/10" />
+
+      <div className="space-y-[14px]">
+        <h3 className="text-[17px] font-semibold leading-[22px] text-zinc-50">
+          {t("workspace.settings.system_preferences")}
+        </h3>
+        <div className="grid max-w-[330px] grid-cols-1 gap-[16px]">
+          <div className="space-y-[6px]">
+            <Label className="flex items-center gap-[7px] text-[12.5px] font-semibold leading-[16px] text-zinc-100">
+              <Globe className="h-[14px] w-[14px] text-zinc-500" />
+              {t("language")}
+            </Label>
+            <Select value={language} onValueChange={(value) => setLanguage(value as typeof language)}>
+              <SelectTrigger className="h-[36px] rounded-md border-white/15 bg-[#232323] px-[12px] text-[13px] font-semibold text-zinc-100 focus:ring-0 focus:ring-offset-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="border-white/10 bg-[#1b1b1b] text-zinc-100">
+                {SUPPORTED_LANGUAGES.map((option) => (
+                  <SelectItem key={option} value={option} className="text-[13px] focus:bg-white/[0.08] focus:text-zinc-50">
+                    {getLanguageNativeLabel(option)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
 
       <div className="space-y-[8px]">
         <div className="flex items-center gap-[12px]">
-          <span className="text-[14px] leading-[20px] text-zinc-200">{t("currentPlan")}</span>
+          <span className="text-[13px] leading-[20px] text-zinc-200">{t("currentPlan")}</span>
           {getPlanBadge()}
         </div>
         {profile?.current_period_end && profile?.subscription_status !== "free" && (
@@ -361,7 +394,7 @@ const Settings = () => {
         )}
       </div>
 
-      <Button onClick={handleSave} disabled={saving} className="h-[36px] px-[14px] text-[14px]">
+      <Button onClick={handleSave} disabled={saving} className="h-[36px] rounded-full px-[18px] text-[13px]">
         {saving ? <Loader2 className="mr-[6px] h-[14px] w-[14px] animate-spin" /> : <Save className="mr-[6px] h-[14px] w-[14px]" />}
         {t("saveChanges")}
       </Button>
@@ -371,7 +404,7 @@ const Settings = () => {
        * "request deletion of your data" in Privacy Policy but had
        * no actual UI — non-compliance the moment any user files
        * a request. This block is the user-facing entry point. */}
-      <Separator className="bg-white/5" />
+      <Separator className="bg-white/10" />
       <div className="max-w-xl rounded-lg border border-red-500/20 bg-red-500/[0.04] p-[16px]">
         <h3 className="text-[15px] font-semibold leading-[20px] text-red-200">
           {i18n("settings.team.dangerZone")}
@@ -390,32 +423,19 @@ const Settings = () => {
     </div>
   );
 
-  const renderPreferences = () => (
-    <div className="max-w-2xl space-y-[20px]">
-      <h2 className="text-[23px] font-semibold leading-[28px] text-zinc-50">{t("workspace.settings.preferences")}</h2>
-      <div className="max-w-lg space-y-[4px]">
-        <div className="flex items-center justify-between py-[8px]">
-          <span className="flex items-center gap-[8px] text-[14px] leading-[20px] text-zinc-100">
-            <Globe className="h-[16px] w-[16px] text-zinc-500" />
-            {t("language")}
-          </span>
-          <div className="flex items-center gap-1 rounded-md bg-white/[0.05] p-1">
-            {SUPPORTED_LANGUAGES.map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => setLanguage(option)}
-                className={cn(
-                  "rounded px-[10px] py-[5px] text-[13px] font-medium transition-colors",
-                  language === option
-                    ? "bg-white text-zinc-950"
-                    : "text-zinc-300 hover:bg-white/[0.06] hover:text-zinc-100",
-                )}
-              >
-                {getLanguageNativeLabel(option)}
-              </button>
-            ))}
-          </div>
+  const renderCompactPlaceholder = (
+    Icon: typeof Download,
+    title: string,
+    description: string,
+  ) => (
+    <div className="max-w-[520px] rounded-[14px] border border-white/8 bg-[#181818] p-[18px]">
+      <div className="flex items-start gap-[12px]">
+        <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] bg-white/[0.06] text-zinc-300">
+          <Icon className="h-[16px] w-[16px]" />
+        </span>
+        <div className="min-w-0 space-y-[5px]">
+          <h2 className="text-[15px] font-semibold leading-[20px] text-zinc-50">{title}</h2>
+          <p className="text-[12.5px] leading-[18px] text-zinc-400">{description}</p>
         </div>
       </div>
     </div>
@@ -430,49 +450,17 @@ const Settings = () => {
       case "account.profile":
         return renderProfile();
       case "account.stock-downloads":
-        return (
-          <ComingSoon
-            icon={Download}
-            title={t("workspace.settings.stock_downloads")}
-            description={t("workspace.settings.stock_downloads_desc")}
-          />
-        );
+        return renderCompactPlaceholder(Download, t("workspace.settings.stock_downloads"), t("workspace.settings.stock_downloads_desc"));
       case "account.stock-collections":
-        return (
-          <ComingSoon
-            icon={Bookmark}
-            title={t("workspace.settings.stock_collections")}
-            description={t("workspace.settings.stock_collections_desc")}
-          />
-        );
+        return renderCompactPlaceholder(Bookmark, t("workspace.settings.stock_collections"), t("workspace.settings.stock_collections_desc"));
       case "account.following":
-        return (
-          <ComingSoon
-            icon={UserPlus}
-            title={t("workspace.settings.following")}
-            description={t("workspace.settings.following_desc")}
-          />
-        );
+        return renderCompactPlaceholder(UserPlus, t("workspace.settings.following"), t("workspace.settings.following_desc"));
       case "organization.my-team":
         return renderTeamSettings();
       case "organization.people":
-        return (
-          <ComingSoon
-            icon={Users}
-            title={t("workspace.settings.people")}
-            description={t("workspace.settings.people_desc")}
-          />
-        );
+        return renderCompactPlaceholder(Users, t("workspace.settings.people"), t("workspace.settings.people_desc"));
       case "organization.security-sso":
-        return (
-          <ComingSoon
-            icon={KeyRound}
-            title={t("workspace.settings.security_sso")}
-            description={t("workspace.settings.security_sso_desc")}
-          />
-        );
-      case "organization.preferences":
-        return renderPreferences();
+        return renderCompactPlaceholder(KeyRound, t("workspace.settings.security_sso"), t("workspace.settings.security_sso_desc"));
       case "organization.plan-billing":
         return <PlanBilling />;
       default:

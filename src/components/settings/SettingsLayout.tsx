@@ -6,7 +6,6 @@ import {
   UserPlus,
   Users,
   KeyRound,
-  Settings as SettingsIcon,
   CreditCard,
   type LucideIcon,
 } from "lucide-react";
@@ -35,7 +34,6 @@ export type SettingsSectionKey =
   | "organization.my-team"
   | "organization.people"
   | "organization.security-sso"
-  | "organization.preferences"
   | "organization.plan-billing";
 
 /** Translation keys for the rail labels. We carry the key (not the
@@ -49,7 +47,6 @@ export type SettingsSectionLabelKey =
   | "workspace.settings.my_team"
   | "workspace.settings.people"
   | "workspace.settings.security_sso"
-  | "workspace.settings.preferences"
   | "workspace.settings.plan_billing";
 
 export interface SettingsSection {
@@ -57,22 +54,19 @@ export interface SettingsSection {
   /** Translation key for the visible label. */
   labelKey: SettingsSectionLabelKey;
   icon: LucideIcon;
-  /** When true, the rail item shows a "Soon" pill. */
-  comingSoon?: boolean;
 }
 
 export const ACCOUNT_SECTIONS: SettingsSection[] = [
   { key: "account.profile", labelKey: "workspace.settings.profile", icon: User },
-  { key: "account.stock-downloads", labelKey: "workspace.settings.stock_downloads", icon: Download, comingSoon: true },
-  { key: "account.stock-collections", labelKey: "workspace.settings.stock_collections", icon: Bookmark, comingSoon: true },
-  { key: "account.following", labelKey: "workspace.settings.following", icon: UserPlus, comingSoon: true },
+  { key: "account.stock-downloads", labelKey: "workspace.settings.stock_downloads", icon: Download },
+  { key: "account.stock-collections", labelKey: "workspace.settings.stock_collections", icon: Bookmark },
+  { key: "account.following", labelKey: "workspace.settings.following", icon: UserPlus },
 ];
 
 export const ORG_SECTIONS: SettingsSection[] = [
   { key: "organization.my-team", labelKey: "workspace.settings.my_team", icon: Users },
-  { key: "organization.people", labelKey: "workspace.settings.people", icon: Users, comingSoon: true },
-  { key: "organization.security-sso", labelKey: "workspace.settings.security_sso", icon: KeyRound, comingSoon: true },
-  { key: "organization.preferences", labelKey: "workspace.settings.preferences", icon: SettingsIcon },
+  { key: "organization.people", labelKey: "workspace.settings.people", icon: Users },
+  { key: "organization.security-sso", labelKey: "workspace.settings.security_sso", icon: KeyRound },
   { key: "organization.plan-billing", labelKey: "workspace.settings.plan_billing", icon: CreditCard },
 ];
 
@@ -87,7 +81,7 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
 
   const renderGroup = (heading: string, items: SettingsSection[]) => (
     <div className="space-y-[4px]">
-      <p className="mb-[6px] px-[8px] text-[12.75px] font-semibold uppercase leading-[16px] text-zinc-300">
+      <p className="mb-[6px] px-[8px] text-[10.5px] font-medium uppercase tracking-[0.03em] leading-[14px] text-zinc-500">
         {heading}
       </p>
       {items.map((item) => {
@@ -99,19 +93,14 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
             onClick={() => onChange(item.key)}
             title={t(item.labelKey)}
             className={cn(
-              "group flex min-h-[32px] w-full items-center gap-[8px] rounded-md px-[8px] py-[6px] text-[14px] font-medium leading-[18px] transition-colors",
+              "group flex h-[32px] w-full items-center gap-[8px] rounded-md px-[10px] text-[12.5px] font-semibold leading-none transition-colors",
               active
-                ? "bg-white/[0.07] text-zinc-50"
-                : "text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.04]",
+                ? "bg-white/[0.18] text-zinc-50"
+                : "text-zinc-300 hover:bg-white/[0.08] hover:text-zinc-50",
             )}
           >
-            <item.icon className="h-[15px] w-[15px] flex-shrink-0" />
+            <item.icon className="h-[13px] w-[13px] flex-shrink-0" />
             <span className="min-w-0 flex-1 truncate text-left">{t(item.labelKey)}</span>
-            {item.comingSoon && (
-              <span className="flex-shrink-0 text-[11.75px] font-semibold uppercase leading-[14px] text-zinc-500 group-hover:text-zinc-400">
-                {t("workspace.settings.coming_soon_pill")}
-              </span>
-            )}
           </button>
         );
       })}
@@ -126,10 +115,10 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
     : t("workspace.settings.fallback_title");
 
   return (
-    <div className="min-h-full">
+    <div className="min-h-full bg-[#1a1a1a]">
       {/* Mobile horizontal scroller — the rail collapses to a tab bar
           on narrow screens. 2026-05: bg lifts to Layer 1, no hairline. */}
-      <div className="md:hidden bg-[hsl(var(--surface-1))] sticky top-0 z-10">
+      <div className="sticky top-0 z-10 bg-[#151515] md:hidden">
         <div className="flex gap-1 overflow-x-auto px-4 py-2 scrollbar-none">
           {allSections.map((s) => {
             const active = activeKey === s.key;
@@ -139,7 +128,7 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
                 type="button"
                 onClick={() => onChange(s.key)}
                 className={cn(
-                  "flex min-h-[36px] flex-shrink-0 items-center gap-[6px] whitespace-nowrap rounded-md px-[12px] py-[6px] text-[14px] transition-colors",
+                  "flex h-[32px] flex-shrink-0 items-center gap-[6px] whitespace-nowrap rounded-md px-[10px] text-[12.5px] transition-colors",
                   active
                     ? "bg-white/[0.08] text-zinc-50"
                     : "text-zinc-400 hover:text-zinc-100",
@@ -156,15 +145,15 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
       <div className="flex min-h-full">
         {/* Desktop left rail. 2026-05: rail = Layer 1 panel, no hairline.
          *  Width tightened 206→200 to align with the workspace sidebar. */}
-        <aside className="hidden min-h-[calc(100vh-48px)] w-[200px] shrink-0 bg-[hsl(var(--surface-1))] px-[12px] py-[20px] md:block">
-          <div className="space-y-[20px]">
+        <aside className="hidden min-h-[calc(100vh-48px)] w-[200px] shrink-0 bg-[#151515] px-[14px] py-[22px] md:block">
+          <div className="space-y-[18px]">
           {renderGroup(t("workspace.settings.account"), ACCOUNT_SECTIONS)}
           {renderGroup(t("workspace.settings.organization"), ORG_SECTIONS)}
           </div>
         </aside>
 
         {/* Content */}
-        <div className="min-w-0 flex-1 px-[24px] py-[32px] md:px-[32px] md:py-[32px]">
+        <div className="min-w-0 flex-1 px-[24px] py-[28px] md:px-[28px] md:py-[28px]">
           <div className="mb-3 text-[14px] leading-5 text-zinc-400 md:hidden">{currentLabel}</div>
           {children}
         </div>

@@ -11,6 +11,7 @@ interface ModelHoverPreviewProps {
   model: ModelLogoInput | string;
   label?: string;
   className?: string;
+  disabled?: boolean;
   children: React.ReactNode;
 }
 
@@ -94,12 +95,13 @@ export default function ModelHoverPreview({
   model,
   label,
   className,
+  disabled = false,
   children,
 }: ModelHoverPreviewProps) {
   const preview = useMemo(() => modelPreviewFor(model), [model]);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
 
-  if (!preview) {
+  if (disabled || !preview) {
     return <>{children}</>;
   }
 

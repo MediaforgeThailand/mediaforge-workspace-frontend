@@ -560,7 +560,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
         )}
       >
         {/* Model Selector */}
-        <ModelHoverPreview model={{ id: selectedModelId, label: modelLabel }} label={modelLabel} className="block w-full shrink-0">
+        <ModelHoverPreview model={{ id: selectedModelId, label: modelLabel }} label={modelLabel} className="block w-full shrink-0" disabled>
           <button
             type="button"
             onClick={() => setModelOpen(true)}
@@ -1071,7 +1071,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           />
         </div>
 
-        <ModelHoverPreview model={{ id: selectedModelId, label: modelLabel }} label={modelLabel} className="block w-full shrink-0">
+        <ModelHoverPreview model={{ id: selectedModelId, label: modelLabel }} label={modelLabel} className="block w-full shrink-0" disabled>
           <button
             type="button"
             onClick={() => setModelOpen(true)}
