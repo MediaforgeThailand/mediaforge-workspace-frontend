@@ -1418,6 +1418,9 @@ function standaloneCreateButtonLabel(
   if (tool === "image_upscale") {
     return language === "th" ? "ขยายสื่อ" : "Upscale";
   }
+  if (tool === "url_asset") {
+    return "Import";
+  }
   return language === "th" ? "สร้าง" : "Generate";
 }
 
@@ -3601,9 +3604,12 @@ export default function StandaloneGenerator({
       ? [
           {
             id: "source-url",
-            label: language === "th" ? "Source URL" : "Source URL",
+            label: language === "th" ? "YouTube / Source URL" : "YouTube / Source URL",
             value: form.urlAssetSource ?? "",
-            placeholder: "https://example.com/file.png",
+            placeholder:
+              form.model === "url-to-mp3" || form.model === "url-to-mp4"
+                ? "https://www.youtube.com/watch?v=..."
+                : "https://example.com/file.png",
             rows: 1,
             onChange: (urlAssetSource: string) => updateForm({ urlAssetSource }),
           },
@@ -3614,6 +3620,23 @@ export default function StandaloneGenerator({
             placeholder: "Optional file name",
             rows: 1,
             onChange: (urlAssetFileName: string) => updateForm({ urlAssetFileName }),
+          },
+        ]
+      : [];
+  const urlAssetPanelSettings =
+    activeTool === "url_asset"
+      ? [
+          {
+            id: "url-output-format",
+            label: language === "th" ? "Output" : "Output",
+            value: form.model,
+            kind: "select" as const,
+            options: [
+              { value: "url-to-mp4", label: "MP4 Video" },
+              { value: "url-to-mp3", label: "MP3 Audio" },
+              { value: "url-to-png", label: "PNG Image" },
+            ],
+            onChange: setToolModel,
           },
         ]
       : [];
@@ -4042,6 +4065,7 @@ export default function StandaloneGenerator({
                         : [],
               }))}
               onModelChange={setToolModel}
+              showModelSelector={activeTool !== "url_asset"}
               references={panelReferences}
               maxReferences={panelMaxReferences}
               showReferences={activeTool !== "voice_gen" && activeTool !== "url_asset"}
@@ -4089,6 +4113,8 @@ export default function StandaloneGenerator({
                     ? upscalePanelSettings
                   : activeTool === "image_to_3d"
                     ? threeDPanelSettings
+                    : activeTool === "url_asset"
+                      ? urlAssetPanelSettings
                     : []
               }
               textControls={activeTool === "url_asset" ? urlAssetTextControls : []}

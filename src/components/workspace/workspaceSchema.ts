@@ -1283,7 +1283,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     category: "AI PROCESS",
     accentColor: "zinc",
     supportedModels: [...URL_ASSET_MODELS],
-    defaultModel: "url-to-png",
+    defaultModel: "url-to-mp4",
     inputs: [],
     outputs: [
       { id: "image", label: "PNG", color: "emerald", supportedModels: ["url-to-png"] },
@@ -1301,7 +1301,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
           "url-to-mp3": "MP3",
           "url-to-mp4": "MP4",
         },
-        default: "url-to-png",
+        default: "url-to-mp4",
         required: true,
       },
       {

@@ -133,6 +133,7 @@ interface CreateImagePanelProps {
   modelValue?: string;
   modelOptions?: CreateImagePanelModel[];
   onModelChange?: (model: string) => void;
+  showModelSelector?: boolean;
   references?: CreateImagePanelReference[];
   maxReferences?: number;
   showReferences?: boolean;
@@ -412,6 +413,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   modelValue,
   modelOptions = [],
   onModelChange,
+  showModelSelector = true,
   references = [],
   maxReferences = 10,
   showReferences = true,
@@ -562,30 +564,34 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
         )}
       >
         {/* Model Selector */}
-        <ModelHoverPreview model={{ id: selectedModelId, label: modelLabel }} label={modelLabel} className="block w-full shrink-0" disabled>
-          <button
-            type="button"
-            onClick={() => setModelOpen(true)}
-            className="standalone-model-card group relative inline-flex min-h-[50px] w-full shrink-0 items-center gap-[10px] overflow-hidden rounded-[14px] border border-white/[0.02] bg-[#16181a] py-[6px] pl-[8px] pr-[10px] transition-colors hover:bg-[#1c1f22]"
-          >
-            <ModelLogoBadge model={{ id: selectedModelId, label: modelLabel }} size="md" />
-            <div className="flex-1 flex flex-col items-start min-w-0">
-              <span className="text-[16px] leading-[20px] text-neutral-400">{resolvedModelCaption}</span>
-              <span className="text-[15px] leading-[20px] font-semibold text-white">{cleanModelDisplayName(modelLabel)}</span>
-            </div>
-            <ChevronRight className="h-[16px] w-[16px] text-neutral-500" />
-          </button>
-        </ModelHoverPreview>
-        <ModelsPopover
-          open={modelOpen}
-          onClose={() => setModelOpen(false)}
-          models={buildModels(modelOptions, modelLabel, selectedModelId, copy)}
-          selectedIds={[selectedModelId]}
-          onToggle={(id) => {
-            onModelChange?.(id);
-            setModelOpen(false);
-          }}
-        />
+        {showModelSelector && (
+          <>
+            <ModelHoverPreview model={{ id: selectedModelId, label: modelLabel }} label={modelLabel} className="block w-full shrink-0" disabled>
+              <button
+                type="button"
+                onClick={() => setModelOpen(true)}
+                className="standalone-model-card group relative inline-flex min-h-[50px] w-full shrink-0 items-center gap-[10px] overflow-hidden rounded-[14px] border border-white/[0.02] bg-[#16181a] py-[6px] pl-[8px] pr-[10px] transition-colors hover:bg-[#1c1f22]"
+              >
+                <ModelLogoBadge model={{ id: selectedModelId, label: modelLabel }} size="md" />
+                <div className="flex-1 flex flex-col items-start min-w-0">
+                  <span className="text-[16px] leading-[20px] text-neutral-400">{resolvedModelCaption}</span>
+                  <span className="text-[15px] leading-[20px] font-semibold text-white">{cleanModelDisplayName(modelLabel)}</span>
+                </div>
+                <ChevronRight className="h-[16px] w-[16px] text-neutral-500" />
+              </button>
+            </ModelHoverPreview>
+            <ModelsPopover
+              open={modelOpen}
+              onClose={() => setModelOpen(false)}
+              models={buildModels(modelOptions, modelLabel, selectedModelId, copy)}
+              selectedIds={[selectedModelId]}
+              onToggle={(id) => {
+                onModelChange?.(id);
+                setModelOpen(false);
+              }}
+            />
+          </>
+        )}
         <ReferencePicker
           open={referenceOpen}
           onClose={() => setReferenceOpen(false)}

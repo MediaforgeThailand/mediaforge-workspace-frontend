@@ -443,7 +443,7 @@ export const STANDALONE_TOOLS: Record<StandaloneToolKey, StandaloneToolDefinitio
     icon: Link,
     outputType: "image",
     accent: "hsl(204 90% 58%)",
-    defaultModel: "url-to-png",
+    defaultModel: "url-to-mp4",
     models: [
       {
         id: "url-to-png",
