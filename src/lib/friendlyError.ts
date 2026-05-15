@@ -63,6 +63,12 @@ const MAPPINGS: ErrorMapping[] = [
     en: "Credit system error — our team has been notified.",
     ja: "クレジットシステムで問題が発生しました。チームに通知済みです。",
   },
+  {
+    match: /Pricing configuration missing|pricing.*missing|credit_costs/i,
+    th: "ยังไม่ได้ตั้งราคาสำหรับโมเดลนี้ ทีมงานกำลังแก้ไขครับ",
+    en: "Pricing is not configured for this model yet. Our team is fixing it.",
+    ja: "このモデルの料金設定がまだありません。チームが対応中です。",
+  },
 
   // ── Auth / session ──────────────────────────────────────────
   {

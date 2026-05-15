@@ -4782,11 +4782,8 @@ function ModelPicker({
                         {preview && <RecommendedModelPreview preview={preview} />}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/25 to-transparent" />
                         <div className="absolute bottom-0 left-0 right-0 min-w-0 p-3">
-                          <div className="truncate font-semibold text-white">
+                          <div className="line-clamp-2 text-[22px] font-semibold leading-[1.05] text-white">
                             {model.label}
-                          </div>
-                          <div className="line-clamp-2 text-xs text-white/70">
-                            {standaloneModelDescription(model.id, model.description, t)}
                           </div>
                         </div>
                       </button>
