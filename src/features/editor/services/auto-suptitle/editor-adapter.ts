@@ -2,7 +2,10 @@ import type { Track } from "@/lib/openreel-core";
 import { useProjectStore } from "../../stores/project-store";
 import { AUTO_SUPTITLE_TRACK_NAME, type AutoSuptitleMaterializeArgs, type AutoSuptitleMaterializeResult } from "./types";
 import { buildAutoSuptitleStyle } from "./style";
-import { normalizeAutoSuptitleCuesForDuration } from "./segmenter";
+import {
+  formatAutoSuptitleCueText,
+  normalizeAutoSuptitleCuesForDuration,
+} from "./segmenter";
 
 async function ensureAutoSuptitleTrack(trackName: string): Promise<Track | null> {
   const state = useProjectStore.getState();
@@ -63,7 +66,11 @@ export async function materializeAutoSuptitleTrack(
       trackId: track.id,
       startTime: cue.startTime,
       duration: Math.max(0.05, cue.endTime - cue.startTime),
-      text: cue.text,
+      text: formatAutoSuptitleCueText(
+        cue.text,
+        settings.wordsPerLine,
+        result.meta.language,
+      ),
       style,
       transform,
       words: cue.words,

@@ -4,6 +4,7 @@ import {
   algorithmFromCaptionSettings,
   buildAutoSuptitleCues,
   DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+  formatAutoSuptitleCueText,
   normalizeAutoSuptitleCuesForDuration,
 } from "../segmenter";
 import { exportAutoSuptitleSRT } from "../subtitle-export";
@@ -23,7 +24,7 @@ describe("Auto Suptitle segmenter", () => {
     expect(cues).toHaveLength(1);
     expect(cues[0].text).toBe("HELLO WORLD");
     expect(cues[0].startTime).toBeCloseTo(10);
-    expect(cues[0].endTime).toBeCloseTo(10.7);
+    expect(cues[0].endTime).toBeCloseTo(12.2);
     expect(cues[0].words[1]).toEqual({ text: "world", start: 10.32, end: 10.7 });
   });
 
@@ -48,6 +49,52 @@ describe("Auto Suptitle segmenter", () => {
     );
 
     expect(cues.map((cue) => cue.text)).toEqual(["SHORT LINE", "AFTER PAUSE"]);
+  });
+
+  it("treats wordsPerLine as line wrapping, not a hard cue split", () => {
+    const cues = buildAutoSuptitleCues(
+      [
+        { word: "one", start: 0, end: 0.1 },
+        { word: "two", start: 0.12, end: 0.22 },
+        { word: "three", start: 0.24, end: 0.34 },
+        { word: "four", start: 0.36, end: 0.46 },
+        { word: "five", start: 0.48, end: 0.58 },
+        { word: "six", start: 0.6, end: 0.7 },
+      ],
+      0,
+      DEFAULT_CAPTION_SETTINGS,
+      { ...DEFAULT_AUTO_SUPTITLE_ALGORITHM, wordsPerLine: 3, maxLinesPerCue: 2 },
+    );
+
+    expect(cues).toHaveLength(1);
+    expect(cues[0].text).toBe("ONE TWO THREE FOUR FIVE SIX");
+    expect(formatAutoSuptitleCueText(cues[0].text, 3)).toBe("ONE TWO THREE\nFOUR FIVE SIX");
+  });
+
+  it("keeps a cue visible until the next cue or up to 1.5s after speech", () => {
+    const cues = buildAutoSuptitleCues(
+      [
+        { word: "first", start: 0, end: 0.2 },
+        { word: "second", start: 1.0, end: 1.2 },
+        { word: "third", start: 3.0, end: 3.2 },
+      ],
+      0,
+      DEFAULT_CAPTION_SETTINGS,
+      {
+        ...DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+        wordsPerLine: 1,
+        maxLinesPerCue: 1,
+        maxLineDuration: 10,
+        maxCharsPerLine: 80,
+        maxSilenceGap: 10,
+        maxHoldAfterSpeech: 1.5,
+        splitOnPunctuation: false,
+      },
+    );
+
+    expect(cues).toHaveLength(3);
+    expect(cues[0].endTime).toBeCloseTo(1.0);
+    expect(cues[1].endTime).toBeCloseTo(2.7);
   });
 
   it("splits on sentence punctuation including full-width punctuation", () => {

@@ -4,7 +4,7 @@ import { getFFmpegFallback } from "@/lib/openreel-core/media/ffmpeg-fallback";
 import { transcribeAudio } from "../captions-client";
 import {
   algorithmFromCaptionSettings,
-  buildAutoSuptitleCues,
+  buildAutoSuptitleCuesFromResponse,
 } from "./segmenter";
 import {
   AUTO_SUPTITLE_GROUP_PREFIX,
@@ -38,7 +38,7 @@ export async function generateAutoSuptitle(
     language,
     prompt,
     maxSegmentDuration: algorithm.maxLineDuration,
-    maxWordsPerSegment: algorithm.wordsPerLine,
+    maxWordsPerSegment: algorithm.wordsPerLine * algorithm.maxLinesPerCue,
   });
 
   try {
@@ -83,11 +83,12 @@ export async function generateAutoSuptitle(
       message: "Building Auto Suptitle text track...",
     });
 
-    const cues = buildAutoSuptitleCues(
-      whisperResponse.words ?? [],
+    const cues = buildAutoSuptitleCuesFromResponse(
+      whisperResponse,
       clip.startTime,
       settings,
       algorithm,
+      language,
     );
 
     const meta = {

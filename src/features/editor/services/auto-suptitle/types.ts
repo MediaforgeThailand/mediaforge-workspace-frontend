@@ -15,8 +15,10 @@ export const AUTO_SUPTITLE_TRACK_NAME = "Auto Suptitle";
 export const AUTO_SUPTITLE_GROUP_PREFIX = "auto-suptitle";
 
 export interface AutoSuptitleAlgorithmSettings {
-  /** Maximum spoken words per generated text clip. */
+  /** Maximum visible words per rendered caption line. */
   wordsPerLine: number;
+  /** Maximum rendered lines per generated text clip. */
+  maxLinesPerCue: number;
   /** Maximum generated clip duration in seconds. */
   maxLineDuration: number;
   /** Soft maximum characters per generated text clip. */
@@ -25,6 +27,8 @@ export interface AutoSuptitleAlgorithmSettings {
   minLineDuration: number;
   /** Start a new cue after this much silence between words. */
   maxSilenceGap: number;
+  /** Keep a cue visible until the next cue, capped after speech ends. */
+  maxHoldAfterSpeech: number;
   /** Split early after sentence punctuation when the cue has enough words. */
   splitOnPunctuation: boolean;
 }
@@ -71,3 +75,4 @@ export interface AutoSuptitleStyle {
 }
 
 export type AutoSuptitleWhisperWord = CloudflareWhisperWord;
+export type AutoSuptitleWhisperSegment = NonNullable<CloudflareWhisperResponse["segments"]>[number];

@@ -133,7 +133,7 @@ import {
   AUTO_SUPTITLE_GROUP_PREFIX,
   AUTO_SUPTITLE_TRACK_NAME,
   algorithmFromCaptionSettings,
-  buildAutoSuptitleCues,
+  buildAutoSuptitleCuesFromResponse,
   normalizeAutoSuptitleCuesForDuration,
   type AutoSuptitleResult,
 } from "@/features/editor/services/auto-suptitle";
@@ -3336,11 +3336,12 @@ export default function StandaloneGenerator({
         granularity: "word",
       });
       const algorithm = algorithmFromCaptionSettings(settings);
-      const rawCues = buildAutoSuptitleCues(
-        whisperResponse.words ?? [],
+      const rawCues = buildAutoSuptitleCuesFromResponse(
+        whisperResponse,
         0,
         settings,
         algorithm,
+        form.autoSubtitleLanguage,
       );
       if (rawCues.length === 0) {
         throw new Error("No speech was detected in this video.");
@@ -5143,7 +5144,7 @@ function AutoSubtitlePanel({
     font: th ? "ฟอนต์" : "Font",
     position: th ? "ตำแหน่ง" : "Position",
     size: th ? "ขนาด" : "Size",
-    words: th ? "คำต่อบรรทัด" : "Words",
+    words: th ? "คำต่อบรรทัด" : "Words / line",
     stroke: th ? "เส้นขอบ" : "Stroke",
     background: th ? "พื้นหลัง" : "Background",
     ready: th

@@ -1,5 +1,8 @@
 import type { CaptionStyleSettings } from "@/features/editor/services/caption-presets";
-import { normalizeAutoSuptitleCuesForDuration } from "@/features/editor/services/auto-suptitle";
+import {
+  formatAutoSuptitleCueText,
+  normalizeAutoSuptitleCuesForDuration,
+} from "@/features/editor/services/auto-suptitle";
 import type {
   AutoSuptitleCue,
   AutoSuptitleResult,
@@ -243,22 +246,30 @@ function wrapCaptionText(
   ctx: CanvasRenderingContext2D,
   text: string,
   maxWidth: number,
+  wordsPerLine: number,
 ): string[] {
-  const words = text.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
-  if (words.length === 0) return [];
+  const maxWords = Math.max(1, Math.floor(wordsPerLine));
   const lines: string[] = [];
-  let current = "";
-  for (const word of words) {
-    const next = current ? `${current} ${word}` : word;
-    if (ctx.measureText(next).width > maxWidth && current) {
-      lines.push(current);
-      current = word;
-    } else {
-      current = next;
+  for (const sourceLine of text.split("\n")) {
+    const words = sourceLine.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+    let current = "";
+    let currentCount = 0;
+    for (const word of words) {
+      const next = current ? `${current} ${word}` : word;
+      const countLimitReached = currentCount >= maxWords;
+      const widthLimitReached = ctx.measureText(next).width > maxWidth;
+      if ((countLimitReached || widthLimitReached) && current) {
+        lines.push(current);
+        current = word;
+        currentCount = 1;
+      } else {
+        current = next;
+        currentCount += 1;
+      }
     }
+    if (current) lines.push(current);
   }
-  if (current) lines.push(current);
-  return lines.slice(0, 3);
+  return lines;
 }
 
 function drawRoundedRect(
@@ -304,7 +315,8 @@ function drawCue(
   ctx.textBaseline = "middle";
   ctx.textAlign = settings.positionH === "left" ? "left" : settings.positionH === "right" ? "right" : "center";
 
-  const lines = wrapCaptionText(ctx, cue.text, maxWidth);
+  const formattedText = formatAutoSuptitleCueText(cue.text, settings.wordsPerLine);
+  const lines = wrapCaptionText(ctx, formattedText, maxWidth, settings.wordsPerLine);
   if (lines.length === 0) {
     ctx.restore();
     return;
@@ -431,7 +443,7 @@ export async function renderAutoSubtitleVideo(
       ctx.clearRect(0, 0, width, height);
       ctx.drawImage(video, 0, 0, width, height);
       const activeCue = cues.find(
-        (cue) => video.currentTime >= cue.startTime && video.currentTime <= cue.endTime,
+        (cue) => video.currentTime >= cue.startTime && video.currentTime < cue.endTime,
       );
       drawCue(ctx, activeCue, options.settings, width, height);
       options.onProgress?.(

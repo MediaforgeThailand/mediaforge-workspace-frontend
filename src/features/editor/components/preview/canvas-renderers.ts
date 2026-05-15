@@ -955,14 +955,13 @@ export const renderTextClipToCanvas = (
       textClip.words.length > 0;
 
     if (wantsWordHighlight) {
-      // We only render onto one line — caption lines are short by design
-      // (settings.wordsPerLine is the cap). Treat the visibleText as the
-      // single line so existing line-break-on-newline still works for the
-      // rare multiline case.
+      // Captions may contain explicit line breaks from the Auto Suptitle
+      // segmenter, so keep one word cursor across all rendered lines.
       // `time` is the absolute timeline time. `textClip.words[i].{start,end}`
       // are also in absolute timeline seconds.
       const highlightColor = textClip.captionMeta!.highlightColor;
       const baseColor = style.color;
+      let wordCursor = 0;
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -990,7 +989,6 @@ export const renderTextClipToCanvas = (
         // punctuation on the trailing word, so we tokenize on whitespace.
         const tokens = line.split(/\s+/).filter(Boolean);
         let cursorX = startX;
-        let wordCursor = 0;
         const spaceWidth = ctx.measureText(" ").width;
 
         for (let tIdx = 0; tIdx < tokens.length; tIdx++) {
