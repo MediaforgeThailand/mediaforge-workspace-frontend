@@ -21,6 +21,8 @@ import {
   modelLogoFor,
   orderModelsByRecommendation,
   recommendationRankForModel,
+  recommendedModelPreviewFor,
+  type ModelPreviewMeta,
 } from "./modelDisplay";
 
 type BottomTab = "video" | "image" | "upscale" | "translate" | "3d" | "audio";
@@ -2741,49 +2743,83 @@ const RecommendedCard: React.FC<RecommendedCardProps> = ({
   selected,
   onClick,
   showNext = false,
-}) => (
-  <ModelHoverPreview model={model} label={model.name} className="shrink-0">
-    <div
-      onClick={onClick}
-      className={clsx(
-        "transition-all duration-300 ease-out shrink-0 rounded-[12px]",
-        "h-[112px] w-[248px] p-[2px] cursor-pointer border-[1.5px] relative overflow-hidden",
-        selected ? "border-[#f4ff00]" : "border-transparent",
-      )}
-    >
+}) => {
+  const preview = recommendedModelPreviewFor(model);
+
+  return (
+    <ModelHoverPreview model={model} label={model.name} className="shrink-0" disabled={selected}>
       <div
+        onClick={onClick}
         className={clsx(
-          "relative w-full h-full rounded-[10px] overflow-hidden",
-          recommendedGradientFor(index),
+          "transition-all duration-300 ease-out shrink-0 rounded-[12px]",
+          "h-[112px] w-[248px] p-[2px] cursor-pointer border-[1.5px] relative overflow-hidden",
+          selected ? "border-[#f4ff00]" : "border-transparent",
         )}
       >
-        {model.coverSrc && (
-          <img
-            src={model.coverSrc}
-            alt={model.name}
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+        <div
+          className={clsx(
+            "relative w-full h-full rounded-[10px] overflow-hidden",
+            recommendedGradientFor(index),
+          )}
+        >
+          {preview ? (
+            <RecommendedCardMedia preview={preview} />
+          ) : model.coverSrc ? (
+            <img
+              src={model.coverSrc}
+              alt={model.name}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          ) : null}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
 
-        {showNext && (
-          <span className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 backdrop-blur-md">
-            <ChevronRight className="h-4 w-4 text-white" />
-          </span>
-        )}
+          {showNext && (
+            <span className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 backdrop-blur-md">
+              <ChevronRight className="h-4 w-4 text-white" />
+            </span>
+          )}
 
-        <div className="absolute bottom-[10px] left-[12px] right-[48px]">
-          <h4 className="truncate text-[15px] font-bold leading-tight text-white">
-            {model.name}
-          </h4>
-          <p className="mt-1 line-clamp-1 text-[11px] text-white/80">
-            {model.description}
-          </p>
+          <div className="absolute bottom-[10px] left-[12px] right-[48px]">
+            <h4 className="truncate text-[15px] font-bold leading-tight text-white">
+              {model.name}
+            </h4>
+            <p className="mt-1 line-clamp-1 text-[11px] text-white/80">
+              {model.description}
+            </p>
+          </div>
         </div>
       </div>
-    </div>
-  </ModelHoverPreview>
-);
+    </ModelHoverPreview>
+  );
+};
+
+function RecommendedCardMedia({ preview }: { preview: ModelPreviewMeta }) {
+  if (preview.videoSrc) {
+    return (
+      <video
+        src={preview.videoSrc}
+        autoPlay
+        muted
+        loop
+        playsInline
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+      />
+    );
+  }
+
+  if (preview.imageSrc) {
+    return (
+      <img
+        src={preview.imageSrc}
+        alt=""
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+        draggable={false}
+      />
+    );
+  }
+
+  return null;
+}
 
 interface ModelListItemProps {
   model: Model;
@@ -2792,7 +2828,7 @@ interface ModelListItemProps {
 }
 
 const ModelListItem: React.FC<ModelListItemProps> = ({ model, selected, onClick }) => (
-  <ModelHoverPreview model={model} label={model.name} className="block w-full">
+  <ModelHoverPreview model={model} label={model.name} className="block w-full" disabled={selected}>
     <button
       type="button"
       onClick={onClick}

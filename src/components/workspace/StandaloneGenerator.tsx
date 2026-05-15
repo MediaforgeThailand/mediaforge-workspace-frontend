@@ -336,18 +336,41 @@ interface UploadedRef {
   durationSec?: number;
 }
 
+const TRANSLATE_VIDEO_EXTENSION_RE = /\.(mp4|mov|webm|m4v)(?:[?#].*)?$/i;
+const TRANSLATE_AUDIO_EXTENSION_RE = /\.(mp3|wav|m4a|aac|flac|ogg|oga|opus|weba)(?:[?#].*)?$/i;
+
 function translateOutputTypeForMedia(
-  _media: UploadedRef | null | undefined,
+  media: UploadedRef | null | undefined,
 ): "audio" | "video" {
-  return "audio";
+  const mime = media?.mime?.trim().toLowerCase() ?? "";
+  if (mime.startsWith("video/")) return "video";
+  if (mime.startsWith("audio/")) return "audio";
+  const name = media?.name ?? "";
+  const url = media?.url ?? "";
+  if (TRANSLATE_VIDEO_EXTENSION_RE.test(name) || TRANSLATE_VIDEO_EXTENSION_RE.test(url)) {
+    return "video";
+  }
+  if (TRANSLATE_AUDIO_EXTENSION_RE.test(name) || TRANSLATE_AUDIO_EXTENSION_RE.test(url)) {
+    return "audio";
+  }
+  return "video";
 }
 
-function translateOutputFormatLabel(_media: UploadedRef | null | undefined): string {
-  return "MP3 / audio";
+function translateSourceContentTypeForMedia(
+  media: UploadedRef | null | undefined,
+): string | null {
+  if (!media) return null;
+  const mime = media?.mime?.trim();
+  if (mime) return mime;
+  return translateOutputTypeForMedia(media) === "video" ? "video/mp4" : "audio/mpeg";
 }
 
-function translateOutputShortLabel(_media: UploadedRef | null | undefined): string {
-  return "MP3";
+function translateOutputFormatLabel(media: UploadedRef | null | undefined): string {
+  return translateOutputTypeForMedia(media) === "video" ? "MP4 / video" : "MP3 / audio";
+}
+
+function translateOutputShortLabel(media: UploadedRef | null | undefined): string {
+  return translateOutputTypeForMedia(media) === "video" ? "MP4" : "MP3";
 }
 
 interface StandaloneSceneBlock {
@@ -2970,7 +2993,7 @@ export default function StandaloneGenerator({
       toast.error(unsupportedElevenLabsDubbingLanguageMessage(outputLanguage, language));
       return;
     }
-    const outputType: "audio" = "audio";
+    const outputType = translateOutputTypeForMedia(video);
     const toastId = toast.loading(
       language === "th"
         ? "กำลังส่งไฟล์เข้า ElevenLabs voice clone dubbing..."
@@ -2994,7 +3017,8 @@ export default function StandaloneGenerator({
           project_id: activeProject.id,
           source_storage_bucket: providerMedia.storageBucket,
           source_storage_path: providerMedia.storagePath,
-          source_content_type: providerMedia.mime,
+          source_content_type: translateSourceContentTypeForMedia(providerMedia),
+          source_media_type: outputType,
           source_name: providerMedia.name,
           consent: form.translateConsent,
         },
@@ -3008,6 +3032,7 @@ export default function StandaloneGenerator({
       job_id?: string;
       dubbing_id?: string;
       status?: VoiceTranslateTask["status"];
+      output_type?: "audio" | "video";
       error?: string;
     } | null;
     if (result?.error) {
@@ -3018,6 +3043,10 @@ export default function StandaloneGenerator({
       toast.dismiss(toastId);
       throw new Error("ElevenLabs did not return a dubbing_id.");
     }
+    const startedOutputType =
+      result?.output_type === "video" || result?.output_type === "audio"
+        ? result.output_type
+        : outputType;
     setTranslateTask({
       id: result.dubbing_id,
       jobId: result.job_id,
@@ -3026,15 +3055,13 @@ export default function StandaloneGenerator({
       sourceName: video.name,
       engine: "elevenlabs_dubbing_clone",
       stage: "submitted",
-      outputType,
+      outputType: startedOutputType,
       sourceStorageBucket: providerMedia.storageBucket,
       sourceStoragePath: providerMedia.storagePath,
     });
     void refetchJobs();
     toast.success(
-      language === "th"
-        ? "เริ่มแปลเสียงแบบ MP3 แล้ว ผลลัพธ์จะแสดงทางขวาเมื่อพร้อม"
-        : "MP3 dubbing queued. The result will appear on the right.",
+      `${startedOutputType === "video" ? "MP4" : "MP3"} dubbing queued. The result will appear on the right.`,
       { id: toastId },
     );
   };
@@ -4307,7 +4334,7 @@ function VoiceTranslatePanel({
     remove: th ? "ลบไฟล์" : "Remove file",
   };
   const media = form.translateVideo;
-  const isAudio = media?.mime.startsWith("audio/");
+  const isAudio = translateOutputTypeForMedia(media) === "audio";
 
   const addFiles = (files: File[]) => {
     if (files.length > 0) onVideoFiles(files.slice(0, 1));
@@ -7347,6 +7374,22 @@ async function freshElevenLabsDubbingDownloadUrl(
   return firstText(payload?.output_url, result.url) ?? null;
 }
 
+function withElevenLabsDownloadIntent(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (
+      parsed.searchParams.get("action") === "download" &&
+      parsed.pathname.includes("/elevenlabs-dubbing")
+    ) {
+      parsed.searchParams.set("download", "1");
+      return parsed.toString();
+    }
+  } catch {
+    // Keep the original URL if it is relative or otherwise unparsable.
+  }
+  return url;
+}
+
 function mergeReferenceOptions(
   references: Array<UploadedRef | null | undefined>,
   limit = 120,
@@ -7538,7 +7581,7 @@ function CreationTile({
     if (!downloadUrl) return;
     try {
       const freshUrl = await freshElevenLabsDubbingDownloadUrl(job);
-      await downloadFromUrl(freshUrl || downloadUrl, downloadName);
+      await downloadFromUrl(withElevenLabsDownloadIntent(freshUrl || downloadUrl), downloadName);
     } catch (err) {
       toast.error(friendlyError(err, language === "th" ? "th" : "en"));
     }
@@ -7827,7 +7870,7 @@ function CreationRow({
     if (!downloadUrl) return;
     try {
       const freshUrl = await freshElevenLabsDubbingDownloadUrl(job);
-      await downloadFromUrl(freshUrl || downloadUrl, downloadName);
+      await downloadFromUrl(withElevenLabsDownloadIntent(freshUrl || downloadUrl), downloadName);
     } catch (err) {
       toast.error(friendlyError(err, language === "th" ? "th" : "en"));
     }
@@ -8513,6 +8556,7 @@ function buildCurrentParams(
     });
   }
   if (tool === "voice_translate") {
+    const outputType = translateOutputTypeForMedia(form.translateVideo);
     return {
       model_name: "elevenlabs-dubbing-voice-clone",
       translate_engine: "elevenlabs_dubbing_clone",
@@ -8522,9 +8566,11 @@ function buildCurrentParams(
           ? form.translateSourceLanguage.trim()
           : "auto",
       output_language: form.translateOutputLanguage.trim(),
-      output_type: translateOutputTypeForMedia(form.translateVideo),
+      output_type: outputType,
       speaker_num: form.translateSpeakerNum,
-      source_content_type: form.translateVideo?.mime ?? null,
+      source_content_type: translateSourceContentTypeForMedia(form.translateVideo),
+      source_media_type: outputType,
+      source_name: form.translateVideo?.name ?? null,
       voice_cloning: true,
       disable_voice_cloning: false,
     };
@@ -8609,7 +8655,14 @@ function buildCurrentInputs(
     };
   }
   if (tool === "voice_translate") {
-    return form.translateVideo ? { video_url: form.translateVideo.url } : {};
+    if (!form.translateVideo) return {};
+    const outputType = translateOutputTypeForMedia(form.translateVideo);
+    return {
+      media_url: form.translateVideo.url,
+      ...(outputType === "audio"
+        ? { audio_url: form.translateVideo.url }
+        : { video_url: form.translateVideo.url }),
+    };
   }
   return {};
 }

@@ -229,7 +229,12 @@ export function MiniSelect({
               className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
             >
               {preview ? (
-                <ModelHoverPreview model={{ id: opt, label }} label={label} className="block min-w-0">
+                <ModelHoverPreview
+                  model={{ id: opt, label }}
+                  label={label}
+                  className="block min-w-0"
+                  disabled={opt === value}
+                >
                   {content}
                 </ModelHoverPreview>
               ) : (
@@ -340,7 +345,12 @@ function SearchableMiniSelect({
                     )}
                   >
                     {preview ? (
-                      <ModelHoverPreview model={{ id: opt, label }} label={label} className="flex min-w-0 flex-1">
+                      <ModelHoverPreview
+                        model={{ id: opt, label }}
+                        label={label}
+                        className="flex min-w-0 flex-1"
+                        disabled={opt === value}
+                      >
                         {labelNode}
                       </ModelHoverPreview>
                     ) : (
