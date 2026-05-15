@@ -12,7 +12,9 @@ import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
 import { UserMenu } from "@/components/workspace/UserMenu";
 import {
-  WORKSPACE_CURRENCIES,
+  // `WORKSPACE_CURRENCIES` previously fed the now-removed
+  // currency-picker dropdown. Auto-detection happens via
+  // `detectWorkspaceCurrency()` below — no user-visible choice.
   detectWorkspaceCurrency,
   formatWorkspaceMoneyFromThb,
   type SupportedWorkspaceCurrency,
@@ -165,7 +167,16 @@ const Pricing = () => {
   const [topupPackages, setTopupPackages] = useState<TopupPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [cycle, setCycle] = useState<CycleTab>("monthly");
-  const [currency, setCurrency] = useState<SupportedWorkspaceCurrency>(() => detectWorkspaceCurrency());
+  /* Currency is auto-detected from the visitor's country and never
+   *  changes during the session — the user explicitly asked for the
+   *  picker dropdown to be removed (visitors in TH always see THB,
+   *  everyone else gets USD). Using `useMemo` instead of `useState`
+   *  drops the unused `setCurrency` setter and the ESLint
+   *  unused-binding warning that came with it. */
+  const currency = useMemo<SupportedWorkspaceCurrency>(
+    () => detectWorkspaceCurrency(),
+    [],
+  );
   const [submittingPlanId, setSubmittingPlanId] = useState<string | null>(null);
   const [, setOpeningPortal] = useState(false);
   const [checkoutPlan, setCheckoutPlan] = useState<SubscriptionPlan | null>(null);
@@ -353,19 +364,16 @@ const Pricing = () => {
                 </span>
               </button>
             </div>
-              <label className="sr-only" htmlFor="workspace-currency">{i18n("pricing.currency.label")}</label>
-              <select
-                id="workspace-currency"
-                value={currency}
-                onChange={(event) => setCurrency(event.target.value as SupportedWorkspaceCurrency)}
-                className="h-[38px] rounded-full border border-white/10 bg-[#252525] px-4 text-[12.5px] font-semibold text-white outline-none transition-colors hover:bg-white/[0.08] focus:border-yellow-400/70"
-              >
-                {WORKSPACE_CURRENCIES.map((item) => (
-                  <option key={item.currency} value={item.currency} className="bg-[#1b1b1b] text-white">
-                    {item.currency.toUpperCase()} {item.currency === "thb" ? i18n("pricing.currency.promptPay") : i18n("pricing.currency.cardSubscription")}
-                  </option>
-                ))}
-              </select>
+              {/* Currency selector intentionally removed — user
+               *  asked for the currency to be auto-detected from
+               *  the visitor's country (see `detectWorkspaceCurrency`
+               *  in the `useState` initializer above) with no
+               *  user-visible choice. Keeping the state + setter
+               *  unwired below so any non-UI caller (e.g. the
+               *  invoice preview) still gets a value, but no
+               *  picker renders. To re-enable the picker, restore
+               *  the `<select id="workspace-currency">` block from
+               *  git history. */}
             </div>
           </div>
 
