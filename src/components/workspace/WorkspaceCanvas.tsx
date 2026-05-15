@@ -57,7 +57,7 @@ import ElementNode from "./ElementNode";
 import TextNode from "./TextNode";
 import GroupNode from "./GroupNode";
 import StickyNoteNode from "./StickyNoteNode";
-import { cloneNodeFresh } from "./cloneNode";
+import { cloneNodeFresh, remapNodeMentionRefs } from "./cloneNode";
 import MultiSelectionFrame from "./MultiSelectionFrame";
 import NodePreviewLightbox, {
   getNodePreview,
@@ -1531,7 +1531,7 @@ const Inner = () => {
           position: { x: n.position.x + 30, y: n.position.y + 30 },
           selected: true,
         };
-      });
+      }).map((n) => remapNodeMentionRefs(n, idMap));
       // Keep edges that are fully internal to the duplicated subgraph.
       const internalEdges = getEdges()
         .filter((e) => idMap.has(e.source) && idMap.has(e.target))
@@ -2131,7 +2131,7 @@ const Inner = () => {
         // → "Foo copy 2") so the two are distinguishable in the
         // title bar without renaming.
         return cloneNodeFresh(n, newId);
-      });
+      }).map((n) => remapNodeMentionRefs(n, idMap));
 
       const allEdges = getEdges();
       const clonedEdges: Edge[] = [];

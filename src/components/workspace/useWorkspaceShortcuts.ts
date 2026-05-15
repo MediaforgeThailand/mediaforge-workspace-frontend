@@ -38,6 +38,7 @@ import { useReactFlow, type Edge, type Node } from "@xyflow/react";
 import { toast } from "sonner";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { remapNodeMentionRefs } from "./cloneNode";
 
 interface ClipboardSnapshot {
   nodes: Node[];
@@ -156,7 +157,7 @@ export function useWorkspaceShortcuts({
           // doesn't paste with a leftover spinner.
           data: { ...(structuredClone(n.data) as Record<string, unknown>), status: "idle" },
         };
-      });
+      }).map((n) => remapNodeMentionRefs(n, idMap));
 
       // Deselect everything else so the freshly-pasted set IS the new
       // selection — matches Figma / Photoshop expectations.

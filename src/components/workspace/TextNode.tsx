@@ -131,7 +131,8 @@ Do not add new references. Do not invent unsupported model features.`;
 
 const PROMPT_MEDIA_UNDERSTANDING_SYSTEM_PROMPT = `You are a MediaForge visual understanding prompt writer.
 Use attached images and videos only as source material to understand subject, identity, scene, style, motion, composition, and mood.
-Help the user turn their intent and the attached media into a useful prompt.
+Turn the user's intent and the attached media into one ready-to-use generation prompt.
+Return only the final prompt text. Do not include explanations, headings, markdown labels, code fences, notes, translations, "Prompt:" prefixes, or mention tokens.
 Follow the user's requested language, format, and level of detail when possible.`;
 
 type MentionableNode = {
@@ -578,11 +579,38 @@ function protectPromptTokens(
 }
 
 function stripPromptWrapper(text: string): string {
-  return text
+  let cleaned = text
     .trim()
-    .replace(/^```(?:text|prompt)?\s*/i, "")
+    .replace(/^```(?:text|prompt|markdown)?\s*/i, "")
     .replace(/\s*```$/i, "")
-    .replace(/^(optimized prompt|final prompt|prompt)\s*:\s*/i, "")
+    .trim();
+
+  const labeledPrompt = /(?:^|\n)\s*(?:#{1,6}\s*)?(?:\*\*)?(?:optimized\s+prompt|final\s+prompt|generation\s+prompt|ready[-\s]*to[-\s]*use\s+prompt|prompt)(?:\*\*)?\s*[:：]\s*/i.exec(
+    cleaned,
+  );
+  if (labeledPrompt?.index != null) {
+    cleaned = cleaned.slice(labeledPrompt.index + labeledPrompt[0].length);
+  } else {
+    const lines = cleaned.split(/\r?\n/);
+    while (
+      lines.length > 1 &&
+      /^(?:here(?:'s| is)|sure[, ]|of course|นี่คือ|ด้านล่าง|ต่อไปนี้|แน่นอน|ได้เลย)(?:\s|[:：,.!?\-]|$)/i.test(
+        lines[0]?.trim() ?? "",
+      )
+    ) {
+      lines.shift();
+    }
+    cleaned = lines.join("\n");
+  }
+
+  return cleaned
+    .trim()
+    .replace(/^```(?:text|prompt|markdown)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .replace(
+      /^\s*(?:[-*]\s*)?(?:\*\*)?(?:optimized\s+prompt|final\s+prompt|generation\s+prompt|ready[-\s]*to[-\s]*use\s+prompt|prompt)(?:\*\*)?\s*[:：]\s*/i,
+      "",
+    )
     .trim();
 }
 
@@ -764,6 +792,7 @@ function buildMediaUnderstandingUserMessage(
 
   return [
     "Create or improve a generation prompt from the user's intent and the attached media.",
+    "Output only one final ready-to-use prompt. Do not include an intro, explanation, heading, markdown, code fence, list of refs, or a Prompt/Final Prompt label.",
     "The user may write Thai or mixed Thai/English. Match the user's requested language or format when they specify one.",
     "Use the attached media to understand visual/video details such as subject, identity, scene, composition, lighting, style, action, and camera/motion.",
     "If the user wants a reusable prompt, describe the media naturally instead of relying on node labels or filenames.",

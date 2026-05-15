@@ -35,6 +35,8 @@
 
 import type { Node } from "@xyflow/react";
 
+const SERIALIZED_MEDIA_TOKEN_RE = /([#@])\[([^\]]+)\]\(([^)]+)\)/g;
+
 /** Append " copy" to a name, or increment an existing copy counter. */
 function bumpCopySuffix(name: string): string {
   const m = name.match(/^(.*) copy(?: (\d+))?$/i);
@@ -123,6 +125,50 @@ function bumpDisplayLabel(
     return data;
   }
   return data;
+}
+
+function remapSerializedMentionTokens(
+  value: unknown,
+  idMap: ReadonlyMap<string, string>,
+): unknown {
+  if (typeof value !== "string" || !value.includes("](")) return value;
+  return value.replace(
+    SERIALIZED_MEDIA_TOKEN_RE,
+    (full: string, sigil: string, label: string, nodeId: string) => {
+      const nextId = idMap.get(nodeId);
+      return nextId ? `${sigil}[${label}](${nextId})` : full;
+    },
+  );
+}
+
+export function remapNodeMentionRefs(
+  node: Node,
+  idMap: ReadonlyMap<string, string>,
+): Node {
+  if (node.type !== "textNode") return node;
+  const data = node.data as Record<string, unknown> | undefined;
+  if (!data) return node;
+
+  const nextInputContent = remapSerializedMentionTokens(
+    data.inputContent,
+    idMap,
+  );
+  const nextContent = remapSerializedMentionTokens(data.content, idMap);
+  if (
+    nextInputContent === data.inputContent &&
+    nextContent === data.content
+  ) {
+    return node;
+  }
+
+  return {
+    ...node,
+    data: {
+      ...data,
+      inputContent: nextInputContent,
+      content: nextContent,
+    },
+  };
 }
 
 /**
