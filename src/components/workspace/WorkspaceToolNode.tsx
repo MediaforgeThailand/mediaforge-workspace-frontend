@@ -75,7 +75,6 @@ import {
   selectIsViewer,
   useWorkspaceShareRole,
 } from "@/store/useWorkspaceShareRole";
-import NodeResultDialog from "./NodeResultDialog";
 import { RunTimer } from "./RunTimer";
 import type { Generation } from "./NodeResultBar";
 import { AudioPlayButton } from "./AudioPlayButton";
@@ -2081,10 +2080,24 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           prompt_source?: string;
           provider_meta?: {
             model_url?: string;
+            batch_urls?: string[];
           };
         };
 
-        storeState.addGeneration(id, {
+        // SeedDream batch mode returns multiple thematically-related
+        // images in one job. `provider_meta.batch_urls` carries the
+        // full list (first entry already matches `r.url`); push one
+        // generation entry per URL so the asset library + node
+        // carousel see every output instead of just the primary.
+        // Iterate in reverse so the first URL lands at index 0 of the
+        // node's generations array (matches the primary `r.url` used
+        // for output edges and preview thumbnails).
+        const batchUrls = Array.isArray(r.provider_meta?.batch_urls)
+          ? (r.provider_meta!.batch_urls as unknown[]).filter(
+              (u): u is string => typeof u === "string" && u.length > 0,
+            )
+          : [];
+        const baseGen = {
           id: (globalThis.crypto?.randomUUID?.() ?? String(Date.now())),
           job_id: jobId,
           type: r.type,
@@ -2094,7 +2107,19 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           prompt_used: r.prompt_used,
           prompt_source: r.prompt_source,
           createdAt: Date.now(),
-        } as any);
+        };
+        if (batchUrls.length > 1) {
+          for (let i = batchUrls.length - 1; i >= 0; i--) {
+            storeState.addGeneration(id, {
+              ...baseGen,
+              id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${i}`,
+              url: batchUrls[i],
+              createdAt: Date.now() + i,
+            } as any);
+          }
+        } else {
+          storeState.addGeneration(id, baseGen as any);
+        }
 
         patchNodeDataNow(
           {
@@ -3603,11 +3628,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   // node looks consistent before AND after a 3D generation lands.
   const forceSquarePreview = schemaKey === "imageTo3dNode";
 
-  // History dialog — opens when user clicks the preview's expand
-  // affordance so they can scrub through previous generations.
-  const [historyOpen, setHistoryOpen] = useState(false);
+  // History scrubbing now lives in NodePreviewLightbox (the same
+  // viewer the double-click gesture opens). The top-left "n/N"
+  // affordance just dispatches `workspace-open-node-preview`.
   const showInteractiveControls =
-    selected || isHovered || isRunning || runStatus === "error" || historyOpen;
+    selected || isHovered || isRunning || runStatus === "error";
 
   /* ── Manual resize via the bottom-right corner handle ──────
    * Drag the small dot in the corner to scale the node's body
@@ -3645,10 +3670,6 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       document.body.classList.add("ws-resizing");
     },
     [id, d.compactWidth, setNodes],
-  );
-  const onSelectHistoryIndex = useCallback(
-    (i: number) => updateNodeField("selectedGenIndex", i),
-    [updateNodeField],
   );
   const onDeleteNode = useCallback(() => {
     setEdges((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
@@ -3889,13 +3910,20 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             <div className="ws-compact-preview-badge">{previewBadge}</div>
           )}
 
-          {/* Multi-history affordance — only show when 2+ generations */}
+          {/* Multi-history affordance — only show when 2+ generations.
+           *  Opens the unified preview lightbox (same view as
+           *  double-clicking the node) which renders the prompt
+           *  panel + history filmstrip together. */}
           {showInteractiveControls && generations.length > 1 && (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setHistoryOpen(true);
+                window.dispatchEvent(
+                  new CustomEvent("workspace-open-node-preview", {
+                    detail: { nodeId: id },
+                  }),
+                );
               }}
               onMouseDown={(e) => e.stopPropagation()}
               className="ws-history-toggle absolute left-2 top-2 nodrag flex items-center gap-1 rounded bg-black/65 px-1.5 py-0.5 text-[10px] text-white/80 backdrop-blur-sm hover:bg-black/80"
@@ -4141,17 +4169,6 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         />
         </div> {/* end ws-compact-node body card */}
       </div>
-
-      {/* History dialog (shared with the legacy NodeResultBar). */}
-      {historyOpen && generations.length > 0 && (
-        <NodeResultDialog
-          open={historyOpen}
-          onOpenChange={setHistoryOpen}
-          generations={generations}
-          selectedIndex={selectedGenIndex}
-          onSelect={onSelectHistoryIndex}
-        />
-      )}
 
       {/* ── Port icon cluster ── */}
       {visibleInputs.map((inp, i) => (
