@@ -120,6 +120,20 @@ export async function createAutoSubtitleEditorProject(
     throw new Error(importResult.error?.message || "Could not import source video into the editor.");
   }
 
+  useProjectStore.setState((state) => ({
+    project: {
+      ...state.project,
+      mediaLibrary: {
+        ...state.project.mediaLibrary,
+        items: state.project.mediaLibrary.items.map((item) =>
+          item.id === importResult.actionId
+            ? { ...item, originalUrl: handoff.source.url }
+            : item,
+        ),
+      },
+    },
+  }));
+
   const clipResult = await useProjectStore.getState().addClipToNewTrack(importResult.actionId, 0);
   if (!clipResult.success) {
     throw new Error(clipResult.error?.message || "Could not add the source video to the editor timeline.");
@@ -243,33 +257,12 @@ async function startVideoPlayback(video: HTMLVideoElement): Promise<void> {
 }
 
 function wrapCaptionText(
-  ctx: CanvasRenderingContext2D,
   text: string,
-  maxWidth: number,
-  wordsPerLine: number,
 ): string[] {
-  const maxWords = Math.max(1, Math.floor(wordsPerLine));
-  const lines: string[] = [];
-  for (const sourceLine of text.split("\n")) {
-    const words = sourceLine.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
-    let current = "";
-    let currentCount = 0;
-    for (const word of words) {
-      const next = current ? `${current} ${word}` : word;
-      const countLimitReached = currentCount >= maxWords;
-      const widthLimitReached = ctx.measureText(next).width > maxWidth;
-      if ((countLimitReached || widthLimitReached) && current) {
-        lines.push(current);
-        current = word;
-        currentCount = 1;
-      } else {
-        current = next;
-        currentCount += 1;
-      }
-    }
-    if (current) lines.push(current);
-  }
-  return lines;
+  return text
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
 }
 
 function drawRoundedRect(
@@ -308,7 +301,6 @@ function drawCue(
   const family = settings.font || "Inter";
   const lineHeight = fontSize * 1.18;
   const margin = Math.max(24, settings.margin * scale);
-  const maxWidth = width - margin * 2;
 
   ctx.save();
   ctx.font = `${settings.italic ? "italic " : ""}${weight} ${fontSize}px ${family}, Inter, Arial, sans-serif`;
@@ -316,7 +308,7 @@ function drawCue(
   ctx.textAlign = settings.positionH === "left" ? "left" : settings.positionH === "right" ? "right" : "center";
 
   const formattedText = formatAutoSuptitleCueText(cue.text, settings.wordsPerLine);
-  const lines = wrapCaptionText(ctx, formattedText, maxWidth, settings.wordsPerLine);
+  const lines = wrapCaptionText(formattedText);
   if (lines.length === 0) {
     ctx.restore();
     return;

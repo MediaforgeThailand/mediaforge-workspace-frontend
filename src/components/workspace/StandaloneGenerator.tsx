@@ -134,10 +134,13 @@ import {
   AUTO_SUPTITLE_TRACK_NAME,
   algorithmFromCaptionSettings,
   buildAutoSuptitleCuesFromResponse,
+  formatAutoSuptitleCueText,
   normalizeAutoSuptitleCuesForDuration,
+  type AutoSuptitleAlgorithmSettings,
   type AutoSuptitleResult,
 } from "@/features/editor/services/auto-suptitle";
 import {
+  applyCaptionCase,
   BUILTIN_CAPTION_PRESETS,
   DEFAULT_CAPTION_SETTINGS,
   type CaptionStyleSettings,
@@ -171,6 +174,8 @@ If selected references are listed, include the relevant @mention tokens when the
 Do not invent references, models, parameters, or provider capabilities.`;
 const STANDALONE_CANVAS_ID = "standalone";
 const STORAGE_BUCKET = "ai-media";
+const AUTO_SUBTITLE_RESULT_SOURCE = "auto_subtitle";
+const AUTO_SUBTITLE_RESULT_METADATA_TOOL = "auto_subtitle_result";
 const SIGNED_URL_TTL_SEC = 60 * 60 * 24 * 365;
 const IMAGE_REFERENCE_UPLOAD_MAX_BYTES = 4 * 1024 * 1024;
 const IMAGE_REFERENCE_UPLOAD_MAX_SIDE = 1600;
@@ -188,6 +193,16 @@ const AUTO_SUBTITLE_FONT_OPTIONS = [
   "Arial",
   "Montserrat",
 ];
+const AUTO_SUBTITLE_COLOR_OPTIONS = [
+  "#ffffff",
+  "#F4FF00",
+  "#8CF7FF",
+  "#7CFF8A",
+  "#FF8FB3",
+  "#FFB84D",
+];
+const AUTO_SUBTITLE_MAX_WORD_SPLIT = 6;
+const AUTO_SUBTITLE_WORD_SPLIT_OPTIONS = [1, 2, 3, 4, 5, 6];
 const SHOW_LOCAL_VOICE_DUB_ENGINES = false;
 const STANDALONE_JOB_SELECT =
   "id,node_type,provider,model,request,status,attempts,result,error,last_error,created_at,completed_at,run_after,deadline_at,locked_by,lock_expires_at,credits_charged,credits_refunded";
@@ -584,12 +599,15 @@ interface VoiceTranslateTask {
 
 interface AutoSubtitleResultItem {
   id: string;
+  assetId?: string;
   sourceName: string;
   sourceUrl: string;
   outputUrl: string;
   outputName: string;
   outputMime: string;
   outputExtension: "mp4" | "webm";
+  outputStorageBucket?: "ai-media" | "user_assets";
+  outputStoragePath?: string;
   cueCount: number;
   transcriptText: string;
   handoffId: string;
@@ -610,6 +628,7 @@ type VoiceTranslateEngine =
   | "elevenlabs_ivc_tts"
   | "local_gemini_tts"
   | "local_google_tts";
+type AutoSubtitleSegmentationMode = "sentence" | "words";
 
 interface StandaloneFormState {
   model: string;
@@ -679,10 +698,13 @@ interface StandaloneFormState {
   autoSubtitlePresetId: string;
   autoSubtitleFont: string;
   autoSubtitleSize: number;
+  autoSubtitleFill: string;
+  autoSubtitleHighlightColor: string;
   autoSubtitlePosition: "top" | "middle" | "bottom";
   autoSubtitleStroke: boolean;
   autoSubtitleStrokeWidth: number;
   autoSubtitleBackground: boolean;
+  autoSubtitleSegmentationMode: AutoSubtitleSegmentationMode;
   autoSubtitleWordsPerLine: number;
   upscaleImage: UploadedRef | null;
   upscalePreset: UpscalePreset;
@@ -743,10 +765,13 @@ const DEFAULT_AUTO_SUBTITLE_PARAMS = {
   autoSubtitlePresetId: "tiktok-yellow",
   autoSubtitleFont: "Inter",
   autoSubtitleSize: 56,
+  autoSubtitleFill: "#ffffff",
+  autoSubtitleHighlightColor: "#F4FF00",
   autoSubtitlePosition: "bottom" as const,
   autoSubtitleStroke: true,
   autoSubtitleStrokeWidth: 6,
   autoSubtitleBackground: false,
+  autoSubtitleSegmentationMode: "sentence" as const,
   autoSubtitleWordsPerLine: 4,
 };
 
@@ -1797,6 +1822,7 @@ export default function StandaloneGenerator({
 
   const jobsQuery = useStandaloneJobs(user?.id, activeProject?.id);
   const projectReferencesQuery = useProjectReferenceAssets(user?.id, activeProject?.id);
+  const autoSubtitleResultsQuery = useAutoSubtitleResultAssets(user?.id, activeProject?.id);
   const refetchJobs = jobsQuery.refetch;
   const refetchProjectReferences = projectReferencesQuery.refetch;
   const hasActiveJobs = (jobsQuery.data ?? []).some((job) =>
@@ -1841,6 +1867,16 @@ export default function StandaloneGenerator({
   useEffect(() => {
     setTranslateTask(null);
   }, [activeProject?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !activeProject?.id) {
+      setAutoSubtitleResults([]);
+      return;
+    }
+    if (autoSubtitleResultsQuery.data) {
+      setAutoSubtitleResults(autoSubtitleResultsQuery.data);
+    }
+  }, [activeProject?.id, autoSubtitleResultsQuery.data, user?.id]);
 
   useEffect(() => {
     if (activeTool !== "voice_translate") return;
@@ -1972,6 +2008,23 @@ export default function StandaloneGenerator({
           });
           void queryClient.invalidateQueries({
             queryKey: ["standalone-project-reference-assets", user.id, activeProject.id],
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "user_assets",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          void queryClient.invalidateQueries({
+            queryKey: ["standalone-project-reference-assets", user.id, activeProject.id],
+          });
+          void queryClient.invalidateQueries({
+            queryKey: ["standalone-auto-subtitle-results", user.id, activeProject.id],
           });
         },
       )
@@ -3318,6 +3371,12 @@ export default function StandaloneGenerator({
     if (!source) {
       throw new Error("Upload an MP4 video before generating subtitles.");
     }
+    if (!user?.id) {
+      throw new Error("Please sign in before generating subtitles.");
+    }
+    if (!activeProject?.id) {
+      throw new Error("Create or select a project before generating subtitles.");
+    }
     const settings = autoSubtitleStyleFromForm(form);
     const toastId = toast.loading("Generating subtitles...");
     setAutoSubtitleProgress({ progress: 8, message: "Preparing source video..." });
@@ -3334,8 +3393,9 @@ export default function StandaloneGenerator({
       const whisperResponse = await transcribeAudio(audio, {
         language: form.autoSubtitleLanguage,
         granularity: "word",
+        segmentationMode: form.autoSubtitleSegmentationMode,
       });
-      const algorithm = algorithmFromCaptionSettings(settings);
+      const algorithm = autoSubtitleAlgorithmFromForm(form, settings);
       const rawCues = buildAutoSuptitleCuesFromResponse(
         whisperResponse,
         0,
@@ -3373,8 +3433,8 @@ export default function StandaloneGenerator({
           highlightColor: settings.highlightColor,
         },
       };
-      const outputUrl = URL.createObjectURL(rendered.blob);
       const outputName = autoSubtitleOutputName(source.name, rendered.extension);
+      const outputMime = storageSafeAutoSubtitleMime(rendered.mime, rendered.extension);
       const handoff = {
         version: 1,
         feature: "auto-suptitle",
@@ -3405,29 +3465,73 @@ export default function StandaloneGenerator({
         console.warn("[AutoSubtitle] editor project creation failed:", projectErr);
       }
 
+      setAutoSubtitleProgress({ progress: 99, message: "Saving result..." });
+      const transcriptText = whisperResponse.text ?? cues.map((cue) => cue.text).join(" ");
+      const createdAt = Date.now();
+      let persistedResult: Awaited<ReturnType<typeof persistAutoSubtitleResultAsset>> | null = null;
+      try {
+        persistedResult = await persistAutoSubtitleResultAsset({
+          blob: rendered.blob,
+          userId: user.id,
+          projectId: activeProject.id,
+          source,
+          outputName,
+          outputMime,
+          outputExtension: rendered.extension,
+          cueCount: cues.length,
+          transcriptText,
+          handoffId,
+          editorProjectId,
+          editorProjectError,
+          duration: rendered.duration,
+          createdAt,
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ["standalone-project-reference-assets", user.id, activeProject.id],
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ["standalone-auto-subtitle-results", user.id, activeProject.id],
+        });
+      } catch (saveErr) {
+        console.warn("[AutoSubtitle] result persistence failed:", saveErr);
+      }
+      const outputUrl = persistedResult?.outputUrl ?? URL.createObjectURL(rendered.blob);
+
       setAutoSubtitleResults((items) => [
         {
-          id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`,
+          id: persistedResult?.assetId ?? globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`,
+          assetId: persistedResult?.assetId,
           sourceName: source.name,
           sourceUrl: source.url,
           outputUrl,
           outputName,
-          outputMime: rendered.mime,
+          outputMime,
           outputExtension: rendered.extension,
+          outputStorageBucket: persistedResult?.storageBucket,
+          outputStoragePath: persistedResult?.storagePath,
           cueCount: cues.length,
-          transcriptText: whisperResponse.text ?? cues.map((cue) => cue.text).join(" "),
+          transcriptText,
           handoffId,
           editorProjectId,
           editorProjectError,
-          createdAt: Date.now(),
+          createdAt,
           duration: rendered.duration,
         },
         ...items,
       ]);
-      toast.success(
-        editorProjectId ? "Subtitle video and editor project ready." : "Subtitle video ready.",
-        { id: toastId },
-      );
+      if (persistedResult) {
+        toast.success(
+          editorProjectId
+            ? "Subtitle video saved with an editable project."
+            : "Subtitle video saved.",
+          { id: toastId },
+        );
+      } else {
+        toast.warning(
+          "Subtitle video is ready, but it could not be saved. It may disappear after refresh.",
+          { id: toastId },
+        );
+      }
     } catch (err) {
       toast.error(friendlyError(err, language === "th" ? "th" : "en"), { id: toastId });
     } finally {
@@ -3441,6 +3545,30 @@ export default function StandaloneGenerator({
       return;
     }
     navigate(`/app/editor?autoSubtitleHandoff=${encodeURIComponent(result.handoffId)}`);
+  };
+
+  const deleteAutoSubtitleResult = (id: string) => {
+    const target = autoSubtitleResults.find((item) => item.id === id);
+    if (!target) return;
+    setAutoSubtitleResults((items) => items.filter((item) => item.id !== id));
+    if (target.outputUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(target.outputUrl);
+    }
+    if (!target.assetId && !target.outputStoragePath) return;
+    void deleteAutoSubtitleResultAsset(target)
+      .then(() => {
+        if (user?.id && activeProject?.id) {
+          void queryClient.invalidateQueries({
+            queryKey: ["standalone-project-reference-assets", user.id, activeProject.id],
+          });
+          void queryClient.invalidateQueries({
+            queryKey: ["standalone-auto-subtitle-results", user.id, activeProject.id],
+          });
+        }
+      })
+      .catch((err) => {
+        toast.error(friendlyError(err, language === "th" ? "th" : "en"));
+      });
   };
 
   const videoRatioOptions = videoRatioOptionsForModel(form.model);
@@ -3922,7 +4050,7 @@ export default function StandaloneGenerator({
         <aside className="ws-scroll-hide mx-auto flex min-h-[calc(100dvh-68px)] w-full max-w-[480px] shrink-0 flex-col bg-transparent px-[12px] pb-[12px] pt-[4px] lg:mx-0 lg:h-full lg:min-h-0 lg:w-[488px] lg:max-w-none lg:pb-0 lg:pl-2 lg:pr-0 lg:pt-0">
           {STANDALONE_TOOL_ORDER.includes(activeTool) ? (
             activeTool === "auto_subtitle" ? (
-            <AutoSubtitlePanel
+            <AutoSubtitlePanelV2
               form={form}
               uploading={uploading === "auto-subtitle-video"}
               running={running}
@@ -4274,13 +4402,7 @@ export default function StandaloneGenerator({
                   running={running}
                   progress={autoSubtitleProgress}
                   onEdit={openAutoSubtitleEditor}
-                  onDelete={(id) => {
-                    setAutoSubtitleResults((items) => {
-                      const target = items.find((item) => item.id === id);
-                      if (target) URL.revokeObjectURL(target.outputUrl);
-                      return items.filter((item) => item.id !== id);
-                    });
-                  }}
+                  onDelete={deleteAutoSubtitleResult}
                 />
               ) : (
                 <CreationFeed
@@ -4763,10 +4885,13 @@ function autoSubtitleStyleFromForm(form: StandaloneFormState): CaptionStyleSetti
   const preset =
     BUILTIN_CAPTION_PRESETS.find((item) => item.id === form.autoSubtitlePresetId)?.settings ??
     DEFAULT_CAPTION_SETTINGS;
+  const rawWordsPerLine = Number(form.autoSubtitleWordsPerLine);
   return {
     ...preset,
     font: form.autoSubtitleFont,
     size: Math.max(24, Math.min(96, Number(form.autoSubtitleSize) || preset.size)),
+    fill: form.autoSubtitleFill || preset.fill,
+    highlightColor: form.autoSubtitleHighlightColor || preset.highlightColor,
     stroke: {
       ...preset.stroke,
       enabled: form.autoSubtitleStroke,
@@ -4776,15 +4901,100 @@ function autoSubtitleStyleFromForm(form: StandaloneFormState): CaptionStyleSetti
       ...preset.background,
       enabled: form.autoSubtitleBackground,
     },
-    wordsPerLine: Math.max(1, Math.min(8, Number(form.autoSubtitleWordsPerLine) || preset.wordsPerLine)),
+    wordsPerLine:
+      rawWordsPerLine <= 0
+        ? AUTO_SUBTITLE_MAX_WORD_SPLIT
+        : Math.max(1, Math.min(AUTO_SUBTITLE_MAX_WORD_SPLIT, rawWordsPerLine || preset.wordsPerLine)),
     positionV: form.autoSubtitlePosition,
     positionH: "center",
   };
 }
 
+function autoSubtitleAlgorithmFromForm(
+  form: StandaloneFormState,
+  settings: CaptionStyleSettings,
+): AutoSuptitleAlgorithmSettings {
+  const segmentationMode = form.autoSubtitleSegmentationMode ?? "sentence";
+  if (segmentationMode === "sentence") {
+    return algorithmFromCaptionSettings(settings, {
+      segmentationMode,
+      maxLineDuration: Math.max(settings.maxLineDuration, 4.5),
+      maxCharsPerLine: 72,
+      maxSilenceGap: 0.75,
+      splitOnPunctuation: true,
+    });
+  }
+
+  return algorithmFromCaptionSettings(settings, {
+    segmentationMode,
+  });
+}
+
 function autoSubtitleOutputName(sourceName: string, extension: string): string {
   const base = sourceName.replace(/\.[^.]+$/, "") || "auto-subtitle";
   return `${base}-auto-subtitle.${extension}`;
+}
+
+function storageSafeAutoSubtitleMime(mime: string | undefined, extension: "mp4" | "webm"): string {
+  const base = mime?.split(";")[0]?.trim().toLowerCase();
+  if (base === "video/mp4" || base === "video/webm") return base;
+  return extension === "webm" ? "video/webm" : "video/mp4";
+}
+
+const AUTO_SUBTITLE_PREVIEW_WORDS_TH = [
+  "อย่าลืม",
+  "เข้ามา",
+  "ทดลองใช้",
+  "มีเดียร์ฟอร์จ",
+  "สร้างงาน",
+  "กันนะครับ",
+] as const;
+
+const AUTO_SUBTITLE_PREVIEW_WORDS_EN = [
+  "Come",
+  "try",
+  "MediaForge",
+  "and",
+  "create",
+  "faster",
+] as const;
+
+const AUTO_SUBTITLE_PREVIEW_SENTENCES_TH = [
+  "อย่าลืมเข้ามา",
+  "ทดลองใช้",
+  "มีเดียร์ฟอร์จ",
+  "กันนะครับ",
+] as const;
+
+const AUTO_SUBTITLE_PREVIEW_SENTENCES_EN = [
+  "Come try MediaForge",
+  "build faster",
+  "edit the result",
+  "and publish today",
+] as const;
+
+function autoSubtitlePreviewPhrases(
+  language: ReturnType<typeof useLanguage>["language"],
+  wordsPerLine: number,
+  segmentationMode: AutoSubtitleSegmentationMode,
+): readonly string[] {
+  if (segmentationMode === "sentence") {
+    return language === "th"
+      ? AUTO_SUBTITLE_PREVIEW_SENTENCES_TH
+      : AUTO_SUBTITLE_PREVIEW_SENTENCES_EN;
+  }
+
+  const words =
+    language === "th" ? AUTO_SUBTITLE_PREVIEW_WORDS_TH : AUTO_SUBTITLE_PREVIEW_WORDS_EN;
+  const chunkSize =
+    wordsPerLine <= 0
+      ? words.length
+      : Math.max(1, Math.min(AUTO_SUBTITLE_MAX_WORD_SPLIT, Math.floor(wordsPerLine)));
+  const chunks: string[] = [];
+  for (let index = 0; index < words.length; index += chunkSize) {
+    chunks.push(words.slice(index, index + chunkSize).join(" "));
+  }
+  return chunks;
 }
 
 function VoiceTranslatePanel({
@@ -5104,6 +5314,736 @@ function VoiceTranslatePanel({
   );
 }
 
+function AutoSubtitlePanelV2({
+  form,
+  uploading,
+  running,
+  progress,
+  language,
+  onChange,
+  onUpload,
+  onVideoFiles,
+  onRemoveVideo,
+  onCreate,
+  onToolChange,
+}: {
+  form: StandaloneFormState;
+  uploading: boolean;
+  running: boolean;
+  progress: AutoSubtitleProgress | null;
+  language: ReturnType<typeof useLanguage>["language"];
+  onChange: (patch: Partial<StandaloneFormState>) => void;
+  onUpload: () => void;
+  onVideoFiles: (files: File[]) => void;
+  onRemoveVideo: () => void;
+  onCreate: () => void;
+  onToolChange: (tool: StandaloneToolKey) => void;
+}) {
+  const [showMoreStyles, setShowMoreStyles] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const th = language === "th";
+  const media = form.autoSubtitleVideo;
+  const selectedPreset =
+    BUILTIN_CAPTION_PRESETS.find((preset) => preset.id === form.autoSubtitlePresetId) ??
+    BUILTIN_CAPTION_PRESETS[0];
+  const selectedSettings = autoSubtitleStyleFromForm(form);
+  const visiblePresets = showMoreStyles
+    ? BUILTIN_CAPTION_PRESETS
+    : BUILTIN_CAPTION_PRESETS.slice(0, 4);
+
+  const copy = {
+    title: "Auto Subtitle",
+    subtitle: th
+      ? "อัปโหลด MP4 เพื่อสร้างซับอัตโนมัติและเก็บโปรเจกต์ไว้แก้ต่อ"
+      : "Upload an MP4, generate subtitles, and keep an editable project.",
+    tabSubtitle: "AI Subtitle",
+    tabRepurpose: "AI Repurposing Video",
+    settingsTitle: "AI SETTINGS",
+    sourceVideo: th ? "วิดีโอต้นฉบับ" : "Source video",
+    uploadHint: th ? "ลาก MP4 มาวาง หรือคลิกเพื่ออัปโหลด" : "Drop an MP4 here or click to upload",
+    uploadLimit: th ? "รองรับ MP4/MOV/WEBM สูงสุด 1 GB" : "MP4/MOV/WEBM, up to 1 GB",
+    aspect: th ? "สัดส่วนวิดีโอ" : "Aspect ratio",
+    keepSource: th ? "ตามต้นฉบับ" : "Keep source",
+    locked: th ? "เร็วๆ นี้" : "Soon",
+    style: th ? "สไตล์ซับไตเติล" : "Subtitle style",
+    moreStyles: th ? "แสดงสไตล์ทั้งหมด" : "Show all styles",
+    fewerStyles: th ? "แสดงน้อยลง" : "Show less",
+    advanced: th ? "ปรับตำแหน่ง ฟอนต์ และสีซับไตเติล" : "Adjust position, font, and subtitle colors",
+    speech: th ? "ภาษาพูด" : "Speech",
+    font: th ? "ฟอนต์" : "Font",
+    position: th ? "ตำแหน่ง" : "Position",
+    size: th ? "ขนาด" : "Size",
+    algorithm: th ? "วิธีแบ่งซับ" : "Algorithm",
+    sentenceMode: th ? "ตามประโยค" : "Sentence",
+    sentenceModeHint: th ? "อิงจังหวะพูดและช่วงเว้น" : "Uses speech pauses",
+    wordMode: th ? "กำหนดจำนวนคำ" : "Word split",
+    wordModeHint: th ? "ตัดตามจำนวนคำที่เลือก" : "Fixed word groups",
+    words: th ? "จำนวนคำต่อกลุ่ม" : "Words per group",
+    textColor: th ? "สีตัวอักษร" : "Text color",
+    highlightColor: th ? "สีไฮไลต์" : "Highlight",
+    stroke: th ? "เส้นขอบ" : "Stroke",
+    background: th ? "พื้นหลัง" : "Background",
+    translation: th ? "การแปลภาษา" : "Translation",
+    noTranslation: th ? "ไม่แปลภาษา" : "No translation",
+    translateThai: th ? "แปลภาษาไทย" : "Translate Thai",
+    bilingual: "Bilingual",
+    previewText: th ? "ตัวอย่างซับไตเติล" : "Sample subtitle",
+    ready: th
+      ? "ผลลัพธ์จะแสดงด้านขวา พร้อมโปรเจกต์ editor และ track subtitle สำหรับแก้ต่อ"
+      : "Results appear on the right with an editable editor project.",
+    action: "Auto Subtitle",
+    processing: th ? "กำลังสร้างซับ" : "Generating",
+    remove: th ? "ลบวิดีโอ" : "Remove video",
+  };
+
+  const addFiles = (files: File[]) => {
+    if (files.length > 0) onVideoFiles(files.slice(0, 1));
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    addFiles(autoSubtitleVideoFilesFromTransfer(event.dataTransfer));
+  };
+
+  const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    const files = autoSubtitleVideoFilesFromTransfer(event.clipboardData);
+    if (files.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    addFiles(files);
+  };
+
+  const speechLabel =
+    CAPTIONS_LANGUAGES.find((item) => item.code === form.autoSubtitleLanguage)?.label ??
+    form.autoSubtitleLanguage;
+  const positionLabel =
+    form.autoSubtitlePosition === "top"
+      ? th ? "บน" : "Top"
+      : form.autoSubtitlePosition === "middle"
+        ? th ? "กลาง" : "Middle"
+        : th ? "ล่าง" : "Bottom";
+  const aspectLabel =
+    media?.width && media.height ? `${media.width}:${media.height}` : th ? "ต้นฉบับ" : "Source";
+  const wordSplitLabel =
+    th ? `${form.autoSubtitleWordsPerLine} คำ` : `${form.autoSubtitleWordsPerLine} words`;
+  const segmentationLabel =
+    form.autoSubtitleSegmentationMode === "sentence" ? copy.sentenceMode : copy.wordMode;
+  const previewSamplePhrases = useMemo(
+    () =>
+      autoSubtitlePreviewPhrases(
+        language,
+        form.autoSubtitleWordsPerLine,
+        form.autoSubtitleSegmentationMode,
+      ),
+    [form.autoSubtitleSegmentationMode, form.autoSubtitleWordsPerLine, language],
+  );
+
+  const applyPreset = (presetId: string) => {
+    const preset = BUILTIN_CAPTION_PRESETS.find((item) => item.id === presetId);
+    if (!preset) return;
+    onChange({
+      autoSubtitlePresetId: presetId,
+      autoSubtitleFont: preset.settings.font,
+      autoSubtitleSize: preset.settings.size,
+      autoSubtitleFill: preset.settings.fill,
+      autoSubtitleHighlightColor: preset.settings.highlightColor,
+      autoSubtitleStroke: preset.settings.stroke.enabled,
+      autoSubtitleStrokeWidth: preset.settings.stroke.width,
+      autoSubtitleBackground: preset.settings.background.enabled,
+      autoSubtitlePosition: preset.settings.positionV,
+      autoSubtitleWordsPerLine: Math.max(
+        1,
+        Math.min(AUTO_SUBTITLE_MAX_WORD_SPLIT, preset.settings.wordsPerLine),
+      ),
+    });
+  };
+
+  return (
+    <section className="standalone-create-panel standalone-translate-panel flex h-full w-full max-w-[480px] flex-col overflow-hidden rounded-[20px] border border-white/[0.02] bg-[#121314]">
+      <div className="flex h-[56px] shrink-0 items-center gap-[10px] border-b border-white/[0.035] px-[18px]">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-[var(--brand-primary)]/10 text-[var(--brand-soft)]">
+          <Captions className="h-[16px] w-[16px]" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="truncate text-[16px] font-semibold leading-[20px] tracking-[-0.12px] text-white">{copy.title}</h2>
+          <p className="mt-[2px] truncate text-[11px] leading-[14px] text-zinc-400">{copy.subtitle}</p>
+        </div>
+      </div>
+
+      <div className="ws-scroll-hide min-h-0 flex-1 overflow-y-auto px-[12px] py-[10px]">
+        <div className="space-y-[10px]">
+          <div className="inline-flex gap-[6px] rounded-full bg-[#16181a] p-[3px]">
+            <button
+              type="button"
+              className="h-[30px] rounded-full bg-white px-[14px] text-[12px] font-bold leading-[14px] text-black"
+            >
+              {copy.tabSubtitle}
+            </button>
+            <button
+              type="button"
+              disabled
+              className="h-[30px] cursor-not-allowed rounded-full bg-white/[0.05] px-[14px] text-[12px] font-semibold leading-[14px] text-zinc-500"
+            >
+              {copy.tabRepurpose}
+            </button>
+          </div>
+
+          <div
+            role={!media ? "button" : undefined}
+            tabIndex={!media ? 0 : undefined}
+            onClick={!media ? onUpload : undefined}
+            onKeyDown={(event) => {
+              if (!media && (event.key === "Enter" || event.key === " ")) {
+                event.preventDefault();
+                onUpload();
+              }
+            }}
+            onPaste={handlePaste}
+            onDragOver={(event) => {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "copy";
+            }}
+            onDrop={handleDrop}
+            className={cn(
+              "group relative flex min-h-[92px] w-full overflow-hidden rounded-[14px] border text-left transition",
+              media
+                ? "border-white/[0.06] bg-black/35"
+                : "border-dashed border-[var(--brand-primary)]/45 bg-[var(--brand-primary)]/[0.04] hover:border-[var(--brand-primary)]/80 hover:bg-[var(--brand-primary)]/[0.07]",
+            )}
+          >
+            {media ? (
+              <>
+                <video
+                  src={media.url}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="aspect-video max-h-[150px] w-full bg-black object-contain"
+                />
+                <span className="absolute left-[10px] top-[10px] max-w-[70%] truncate rounded-full border border-black/30 bg-black/70 px-[10px] py-[4px] text-[11px] font-semibold leading-[14px] text-white backdrop-blur">
+                  {media.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRemoveVideo();
+                  }}
+                  className="absolute right-[8px] top-[8px] grid h-[28px] w-[28px] place-items-center rounded-full bg-black/70 text-white transition hover:bg-white/15"
+                  aria-label={copy.remove}
+                >
+                  <X className="h-[14px] w-[14px]" />
+                </button>
+              </>
+            ) : (
+              <div className="flex w-full items-center gap-[10px] px-[12px] py-[12px]">
+                <span className="grid h-[36px] w-[36px] shrink-0 place-items-center rounded-[10px] bg-[var(--brand-primary)]/10 text-[var(--brand-soft)]">
+                  {uploading ? (
+                    <Loader2 className="h-[16px] w-[16px] animate-spin" />
+                  ) : (
+                    <UploadCloud className="h-[16px] w-[16px]" />
+                  )}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-bold leading-[16px] text-white">{copy.sourceVideo}</p>
+                  <p className="mt-[3px] truncate text-[12px] leading-[15px] text-zinc-400">{copy.uploadHint}</p>
+                  <p className="mt-[3px] text-[11px] font-semibold leading-[14px] text-[var(--brand-soft)]/80">
+                    {copy.uploadLimit}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-[16px] border border-white/[0.035] bg-[#151719] p-[10px] shadow-[inset_0_1px_0_rgba(255,255,255,.035)]">
+            <div className="mb-[10px] flex items-center gap-[8px] text-[14px] font-bold leading-[18px] tracking-[-0.08px] text-white">
+              <Sparkles className="h-[15px] w-[15px] text-[var(--brand-soft)]" />
+              {copy.settingsTitle}
+            </div>
+
+            <AutoSubtitleSectionTitle label={copy.aspect} />
+            <div className="grid grid-cols-4 gap-[7px]">
+              <AutoSubtitleChoiceButton active label={aspectLabel} subLabel={copy.keepSource} />
+              {["9:16", "1:1", "16:9"].map((ratio) => (
+                <AutoSubtitleChoiceButton key={ratio} disabled label={ratio} badge={copy.locked} />
+              ))}
+            </div>
+
+            <AutoSubtitleSectionTitle label={copy.style} className="mt-[12px]" />
+            <div className="grid grid-cols-2 gap-[7px]">
+              {visiblePresets.map((preset) => (
+                <AutoSubtitlePresetCard
+                  key={preset.id}
+                  preset={preset}
+                  selected={preset.id === form.autoSubtitlePresetId}
+                  sampleText={copy.previewText}
+                  onSelect={() => applyPreset(preset.id)}
+                />
+              ))}
+            </div>
+            {BUILTIN_CAPTION_PRESETS.length > 4 && (
+              <button
+                type="button"
+                onClick={() => setShowMoreStyles((value) => !value)}
+                className="mt-[8px] h-[32px] w-full rounded-[8px] border border-white/10 bg-white/[0.03] text-[12px] font-semibold leading-[15px] text-zinc-300 transition hover:border-[var(--brand-primary)]/45 hover:text-white"
+              >
+                {showMoreStyles ? copy.fewerStyles : copy.moreStyles}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((value) => !value)}
+              className="mt-[9px] flex h-[34px] w-full items-center justify-center gap-[7px] rounded-[10px] border border-dashed border-white/12 bg-black/20 text-[12px] font-bold leading-[15px] text-zinc-200 transition hover:border-[var(--brand-primary)]/45 hover:bg-[var(--brand-primary)]/[0.05]"
+            >
+              <SlidersHorizontal className="h-[14px] w-[14px]" />
+              {copy.advanced}
+            </button>
+
+            {showAdvanced && (
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <VoiceTranslateSelectCard
+                  label={copy.algorithm}
+                  value={form.autoSubtitleSegmentationMode}
+                  displayValue={segmentationLabel}
+                  icon={<SlidersHorizontal className="h-[14px] w-[14px]" />}
+                  options={[
+                    { value: "sentence", label: copy.sentenceMode },
+                    { value: "words", label: copy.wordMode },
+                  ]}
+                  onChange={(value) =>
+                    onChange({
+                      autoSubtitleSegmentationMode: value as AutoSubtitleSegmentationMode,
+                    })
+                  }
+                />
+                <VoiceTranslateSelectCard
+                  label={copy.font}
+                  value={form.autoSubtitleFont}
+                  displayValue={form.autoSubtitleFont}
+                  icon={<BookOpen className="h-4 w-4" />}
+                  options={AUTO_SUBTITLE_FONT_OPTIONS.map((font) => ({ value: font, label: font }))}
+                  onChange={(value) => onChange({ autoSubtitleFont: value })}
+                />
+                <VoiceTranslateSelectCard
+                  label={copy.position}
+                  value={form.autoSubtitlePosition}
+                  displayValue={positionLabel}
+                  icon={<SlidersHorizontal className="h-[14px] w-[14px]" />}
+                  options={[
+                    { value: "top", label: th ? "บน" : "Top" },
+                    { value: "middle", label: th ? "กลาง" : "Middle" },
+                    { value: "bottom", label: th ? "ล่าง" : "Bottom" },
+                  ]}
+                  onChange={(value) =>
+                    onChange({ autoSubtitlePosition: value as StandaloneFormState["autoSubtitlePosition"] })
+                  }
+                />
+                <VoiceTranslateSelectCard
+                  label={copy.size}
+                  value={String(form.autoSubtitleSize)}
+                  displayValue={`${form.autoSubtitleSize}px`}
+                  icon={<SlidersHorizontal className="h-[14px] w-[14px]" />}
+                  options={[36, 44, 56, 68, 80, 92].map((size) => ({
+                    value: String(size),
+                    label: `${size}px`,
+                  }))}
+                  onChange={(value) => onChange({ autoSubtitleSize: Number(value) || 56 })}
+                />
+                {form.autoSubtitleSegmentationMode === "words" && (
+                  <VoiceTranslateSelectCard
+                    label={copy.words}
+                    value={String(form.autoSubtitleWordsPerLine)}
+                    displayValue={wordSplitLabel}
+                    icon={<SlidersHorizontal className="h-[14px] w-[14px]" />}
+                    options={AUTO_SUBTITLE_WORD_SPLIT_OPTIONS.map((count) => ({
+                      value: String(count),
+                      label: th ? `${count} คำ` : `${count} words`,
+                    }))}
+                    onChange={(value) => onChange({ autoSubtitleWordsPerLine: Number(value) || 4 })}
+                  />
+                )}
+                <AutoSubtitleColorPicker
+                  label={copy.textColor}
+                  value={form.autoSubtitleFill}
+                  onChange={(value) => onChange({ autoSubtitleFill: value })}
+                />
+                <AutoSubtitleColorPicker
+                  label={copy.highlightColor}
+                  value={form.autoSubtitleHighlightColor}
+                  onChange={(value) => onChange({ autoSubtitleHighlightColor: value })}
+                />
+                <AutoSubtitleToggle
+                  label={copy.stroke}
+                  checked={form.autoSubtitleStroke}
+                  onChange={(checked) => onChange({ autoSubtitleStroke: checked })}
+                />
+                <AutoSubtitleToggle
+                  label={copy.background}
+                  checked={form.autoSubtitleBackground}
+                  onChange={(checked) => onChange({ autoSubtitleBackground: checked })}
+                />
+              </div>
+            )}
+
+            <AutoSubtitleSectionTitle label={copy.translation} className="mt-4" />
+            <div className="grid grid-cols-3 gap-2">
+              <AutoSubtitleChoiceButton active label={copy.noTranslation} />
+              <AutoSubtitleChoiceButton disabled label={copy.translateThai} badge={copy.locked} />
+              <AutoSubtitleChoiceButton disabled label={copy.bilingual} badge={copy.locked} />
+            </div>
+
+            <AutoSubtitleSectionTitle label={copy.algorithm} className="mt-4" />
+            <div className="grid grid-cols-2 gap-2">
+              <AutoSubtitleChoiceButton
+                active={form.autoSubtitleSegmentationMode === "sentence"}
+                label={copy.sentenceMode}
+                subLabel={copy.sentenceModeHint}
+                onClick={() => onChange({ autoSubtitleSegmentationMode: "sentence" })}
+              />
+              <AutoSubtitleChoiceButton
+                active={form.autoSubtitleSegmentationMode === "words"}
+                label={copy.wordMode}
+                subLabel={copy.wordModeHint}
+                onClick={() => onChange({ autoSubtitleSegmentationMode: "words" })}
+              />
+            </div>
+
+            {form.autoSubtitleSegmentationMode === "words" && (
+              <>
+                <AutoSubtitleSectionTitle label={copy.words} className="mt-4" />
+                <div className="grid grid-cols-6 gap-1.5">
+                  {AUTO_SUBTITLE_WORD_SPLIT_OPTIONS.map((count) => (
+                <AutoSubtitleChoiceButton
+                  key={count}
+                  active={form.autoSubtitleWordsPerLine === count}
+                  label={th ? `${count} คำ` : String(count)}
+                  onClick={() => onChange({ autoSubtitleWordsPerLine: count })}
+                />
+                  ))}
+                </div>
+              </>
+            )}
+
+            <div className="mt-3 overflow-hidden rounded-[12px] border border-white/10 bg-black">
+              <div className="relative h-[106px]">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,.12),transparent_32%),linear-gradient(180deg,rgba(34,197,94,.12),rgba(0,0,0,0))]" />
+                <div
+                  className={cn(
+                    "absolute left-3 right-3 flex justify-center",
+                    form.autoSubtitlePosition === "top" && "top-3",
+                    form.autoSubtitlePosition === "middle" && "top-1/2 -translate-y-1/2",
+                    form.autoSubtitlePosition === "bottom" && "bottom-3",
+                  )}
+                >
+                  <AutoSubtitleAnimatedPreview
+                    settings={selectedSettings}
+                    phrases={previewSamplePhrases}
+                    language={th ? "th" : "en"}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <VoiceTranslateSelectCard
+              label={copy.speech}
+              value={form.autoSubtitleLanguage}
+              displayValue={speechLabel}
+              icon={<Languages className="h-4 w-4" />}
+              options={CAPTIONS_LANGUAGES.map((item) => ({ value: item.code, label: item.label }))}
+              onChange={(value) => onChange({ autoSubtitleLanguage: value })}
+            />
+            <VoiceTranslateSelectCard
+              label={copy.style}
+              value={form.autoSubtitlePresetId}
+              displayValue={selectedPreset?.name ?? form.autoSubtitlePresetId}
+              icon={<Captions className="h-4 w-4" />}
+              options={BUILTIN_CAPTION_PRESETS.map((preset) => ({ value: preset.id, label: preset.name }))}
+              onChange={applyPreset}
+            />
+          </div>
+
+          <p className="rounded-[10px] border border-[var(--border-faint)] bg-black/20 px-2.5 py-2 text-[13px] font-medium leading-[18px] text-zinc-400">
+            {copy.ready}
+          </p>
+
+          {progress && (
+            <div className="rounded-[10px] border border-cyan-300/15 bg-cyan-300/[0.045] px-3 py-2">
+              <div className="flex items-center justify-between gap-2 text-[12px] font-semibold text-cyan-100">
+                <span>{progress.message}</span>
+                <span>{Math.round(progress.progress)}%</span>
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-cyan-200 transition-all"
+                  style={{ width: `${Math.max(4, Math.min(100, progress.progress))}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="shrink-0 border-t border-white/[0.05] bg-[var(--bg-sidebar)] px-3 py-2.5">
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="flex h-[40px] items-center gap-2 rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-2.5 text-[13px] font-semibold text-zinc-300">
+            <Film className="h-3.5 w-3.5 text-zinc-400" />
+            <span className="truncate">{media ? "MP4" : "Media"}</span>
+          </div>
+          <button
+            type="button"
+            onClick={onCreate}
+            disabled={running || uploading || !media}
+            className="btn-cta flex !h-10 w-full items-center justify-center gap-2 text-[13px] disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-300 disabled:shadow-none disabled:opacity-70"
+          >
+            {running ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <GenerateIcon className="h-3.5 w-3.5" />
+            )}
+            {running ? copy.processing : copy.action}
+          </button>
+        </div>
+      </div>
+      <ToolTabs activeTool="auto_subtitle" onToolChange={onToolChange} className="hidden shrink-0 lg:flex" />
+    </section>
+  );
+}
+
+function AutoSubtitleSectionTitle({
+  label,
+  className,
+}: {
+  label: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("mb-2 text-[11px] font-semibold text-zinc-500", className)}>
+      {label}
+    </div>
+  );
+}
+
+function AutoSubtitleChoiceButton({
+  label,
+  subLabel,
+  active,
+  disabled,
+  badge,
+  onClick,
+}: {
+  label: string;
+  subLabel?: string;
+  active?: boolean;
+  disabled?: boolean;
+  badge?: string;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      aria-pressed={Boolean(active)}
+      onClick={onClick}
+      className={cn(
+        "relative min-h-[38px] rounded-[8px] border px-2 py-1.5 text-center transition",
+        active
+          ? "border-white bg-white text-black"
+          : "border-white/8 bg-white/[0.04] text-zinc-300 hover:border-cyan-200/35 hover:text-white",
+        disabled && "cursor-not-allowed opacity-45 hover:border-white/8 hover:text-zinc-300",
+      )}
+    >
+      <span className="block truncate text-[12px] font-bold leading-[14px]">{label}</span>
+      {subLabel && <span className="mt-0.5 block truncate text-[9px] font-semibold opacity-60">{subLabel}</span>}
+      {badge && (
+        <span className="mt-0.5 block truncate text-[9px] font-semibold uppercase tracking-wide opacity-60">
+          {badge}
+        </span>
+      )}
+    </button>
+  );
+}
+
+function AutoSubtitlePresetCard({
+  preset,
+  selected,
+  sampleText,
+  onSelect,
+}: {
+  preset: (typeof BUILTIN_CAPTION_PRESETS)[number];
+  selected: boolean;
+  sampleText: string;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "group overflow-hidden rounded-[10px] border bg-white/[0.04] p-1.5 text-left transition",
+        selected
+          ? "border-white shadow-[0_0_0_1px_rgba(255,255,255,.4)]"
+          : "border-white/8 hover:border-cyan-200/35",
+      )}
+    >
+      <div className="grid h-[52px] place-items-center rounded-[7px] bg-[#1f2937] px-1">
+        <AutoSubtitlePreviewText settings={preset.settings} text={sampleText} compact activeWord />
+      </div>
+      <div className="mt-1 flex min-w-0 items-center justify-between gap-1">
+        <span className="truncate text-[10px] font-semibold text-zinc-300">{preset.name}</span>
+        {selected && <Check className="h-3 w-3 shrink-0 text-cyan-200" />}
+      </div>
+    </button>
+  );
+}
+
+function AutoSubtitleColorPicker({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="standalone-setting-card rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-[9px] py-[7px]">
+      <div className="mb-2 text-[13px] font-semibold leading-[16px] text-zinc-200">{label}</div>
+      <div className="flex flex-wrap gap-1.5">
+        {AUTO_SUBTITLE_COLOR_OPTIONS.map((color) => (
+          <button
+            key={color}
+            type="button"
+            onClick={() => onChange(color)}
+            className={cn(
+              "h-5 w-5 rounded-full border transition",
+              value.toLowerCase() === color.toLowerCase()
+                ? "border-white ring-2 ring-cyan-200/80"
+                : "border-white/20 hover:border-white/60",
+            )}
+            style={{ backgroundColor: color }}
+            aria-label={`${label} ${color}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AutoSubtitleAnimatedPreview({
+  settings,
+  phrases,
+  language,
+}: {
+  settings: CaptionStyleSettings;
+  phrases: readonly string[];
+  language?: string | null;
+}) {
+  const [phraseIndex, setPhraseIndex] = useState(0);
+  const safePhrases = phrases.length > 0 ? phrases : AUTO_SUBTITLE_PREVIEW_WORDS_EN;
+
+  useEffect(() => {
+    setPhraseIndex(0);
+    if (safePhrases.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setPhraseIndex((index) => (index + 1) % safePhrases.length);
+    }, 1350);
+    return () => window.clearInterval(timer);
+  }, [safePhrases]);
+
+  const text = safePhrases[phraseIndex % safePhrases.length] ?? "";
+
+  return (
+    <div className="relative flex h-[44px] w-full items-center justify-center overflow-hidden px-2">
+      <style>
+        {`
+          @keyframes autoSubtitlePreviewSwap {
+            0% { opacity: 0; transform: translateY(8px) scale(.96); filter: blur(2px); }
+            45% { opacity: 1; transform: translateY(0) scale(1.02); filter: blur(0); }
+            100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+          }
+        `}
+      </style>
+      <div
+        key={`${phraseIndex}-${text}`}
+        className="flex max-w-full justify-center"
+        style={{ animation: "autoSubtitlePreviewSwap 420ms ease-out both" }}
+      >
+        <AutoSubtitlePreviewText settings={settings} text={text} language={language} />
+      </div>
+    </div>
+  );
+}
+
+function AutoSubtitlePreviewText({
+  settings,
+  text,
+  compact,
+  activeWord,
+  wordsPerLine,
+  language,
+}: {
+  settings: CaptionStyleSettings;
+  text: string;
+  compact?: boolean;
+  activeWord?: boolean;
+  wordsPerLine?: number;
+  language?: string | null;
+}) {
+  const transformed = applyCaptionCase(text, settings.case);
+  const displayText = wordsPerLine
+    ? formatAutoSuptitleCueText(transformed, wordsPerLine, language)
+    : transformed;
+  const firstTokenMatch = displayText.match(/\S+/);
+  const highlightedWord = firstTokenMatch?.[0] ?? displayText;
+  const restText = firstTokenMatch
+    ? displayText.slice((firstTokenMatch.index ?? 0) + highlightedWord.length)
+    : "";
+  const previewStyle: React.CSSProperties = {
+    fontFamily: `"${settings.font}", Inter, sans-serif`,
+    fontSize: compact ? 10 : 18,
+    fontWeight: settings.weight,
+    fontStyle: settings.italic ? "italic" : "normal",
+    color: settings.fill,
+    WebkitTextStroke: settings.stroke.enabled
+      ? `${compact ? Math.min(1.2, settings.stroke.width / 5) : Math.max(1, settings.stroke.width / 2)}px ${settings.stroke.color}`
+      : undefined,
+    paintOrder: "stroke fill",
+    textShadow: settings.shadow.enabled
+      ? `${settings.shadow.offsetX}px ${settings.shadow.offsetY}px ${settings.shadow.blur}px ${settings.shadow.color}`
+      : "0 1px 8px rgba(0,0,0,.55)",
+    backgroundColor: settings.background.enabled ? settings.background.color : undefined,
+    borderRadius: settings.background.enabled ? Math.max(4, settings.background.cornerRadius / 2) : undefined,
+    padding: settings.background.enabled ? (compact ? "2px 5px" : "4px 9px") : undefined,
+    lineHeight: compact ? "12px" : "22px",
+    letterSpacing: 0,
+    whiteSpace: "nowrap",
+  };
+
+  return (
+    <div
+      className={cn(
+        "max-w-full text-center uppercase",
+        compact ? "truncate" : "overflow-hidden text-ellipsis whitespace-nowrap",
+        compact ? "px-1" : "px-2",
+      )}
+      style={previewStyle}
+    >
+      {activeWord && settings.animation === "wordHighlight" && restText.trim().length > 0 ? (
+        <span className="inline-flex max-w-full items-baseline overflow-hidden whitespace-nowrap">
+          <span style={{ color: settings.highlightColor }}>{highlightedWord}</span>
+          <span>{restText}</span>
+        </span>
+      ) : (
+        displayText
+      )}
+    </div>
+  );
+}
+
 function AutoSubtitlePanel({
   form,
   uploading,
@@ -5292,7 +6232,13 @@ function AutoSubtitlePanel({
                   autoSubtitleStrokeWidth: preset?.settings.stroke.width ?? form.autoSubtitleStrokeWidth,
                   autoSubtitleBackground: preset?.settings.background.enabled ?? form.autoSubtitleBackground,
                   autoSubtitlePosition: preset?.settings.positionV ?? form.autoSubtitlePosition,
-                  autoSubtitleWordsPerLine: preset?.settings.wordsPerLine ?? form.autoSubtitleWordsPerLine,
+                  autoSubtitleWordsPerLine: Math.max(
+                    1,
+                    Math.min(
+                      AUTO_SUBTITLE_MAX_WORD_SPLIT,
+                      preset?.settings.wordsPerLine ?? form.autoSubtitleWordsPerLine,
+                    ),
+                  ),
                 });
               }}
             />
@@ -8255,6 +9201,28 @@ function standaloneReferencesMatch(
   return standaloneReferenceKey(a) === standaloneReferenceKey(b);
 }
 
+function storageObjectUrl(bucket: "ai-media" | "user_assets", path: string): string {
+  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl ?? `${bucket}/${path}`;
+}
+
+async function createStorageSignedUrl(
+  bucket: "ai-media" | "user_assets",
+  path: string,
+): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(path, SIGNED_URL_TTL_SEC);
+  if (error || !data?.signedUrl) {
+    throw new Error(`Could not create signed URL: ${error?.message ?? ""}`);
+  }
+  return data.signedUrl;
+}
+
+function isMissingProjectIdColumn(error: { code?: string; message?: string } | null | undefined): boolean {
+  const message = String(error?.message ?? "");
+  return error?.code === "42703" || error?.code === "PGRST204" || /project_id/i.test(message);
+}
+
 async function fetchProjectUserAssets(
   userId: string,
   projectId: string,
@@ -8282,6 +9250,36 @@ async function fetchProjectUserAssets(
   const fallback = await base();
   if (fallback.error) {
     console.warn("[StandaloneGenerator] user_assets fallback failed:", fallback.error.message);
+    return [];
+  }
+  return (fallback.data ?? []) as ProjectReferenceAssetRow[];
+}
+
+async function fetchProjectAutoSubtitleResultAssets(
+  userId: string,
+  projectId: string,
+): Promise<ProjectReferenceAssetRow[]> {
+  const select = "*";
+  const base = () =>
+    supabase
+      .from("user_assets")
+      .select(select)
+      .eq("user_id", userId)
+      .eq("source", AUTO_SUBTITLE_RESULT_SOURCE)
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+  const scoped = await base().eq("project_id", projectId);
+  if (!scoped.error) return (scoped.data ?? []) as ProjectReferenceAssetRow[];
+
+  if (!isMissingProjectIdColumn(scoped.error)) {
+    console.warn("[AutoSubtitle] result load failed:", scoped.error.message);
+    return [];
+  }
+
+  const fallback = await base();
+  if (fallback.error) {
+    console.warn("[AutoSubtitle] result load fallback failed:", fallback.error.message);
     return [];
   }
   return (fallback.data ?? []) as ProjectReferenceAssetRow[];
@@ -9195,6 +10193,31 @@ function useProjectReferenceAssets(
   });
 }
 
+function useAutoSubtitleResultAssets(
+  userId: string | undefined,
+  projectId: string | undefined,
+) {
+  return useQuery<AutoSubtitleResultItem[], Error>({
+    queryKey: ["standalone-auto-subtitle-results", userId, projectId],
+    enabled: !!userId && !!projectId,
+    staleTime: 20_000,
+    queryFn: async () => {
+      if (!userId || !projectId) return [];
+      const rows = await fetchProjectAutoSubtitleResultAssets(userId, projectId);
+      const results: AutoSubtitleResultItem[] = [];
+      for (const row of rows) {
+        try {
+          const result = await autoSubtitleResultFromUserAsset(row);
+          if (result) results.push(result);
+        } catch (err) {
+          console.warn("[AutoSubtitle] could not load saved result:", err);
+        }
+      }
+      return results.sort((a, b) => b.createdAt - a.createdAt);
+    },
+  });
+}
+
 async function uploadReference(
   file: File,
   userId: string | undefined,
@@ -9251,6 +10274,199 @@ async function uploadReference(
     width: imageDimensions?.width,
     height: imageDimensions?.height,
   };
+}
+
+async function autoSubtitleResultFromUserAsset(
+  row: ProjectReferenceAssetRow,
+): Promise<AutoSubtitleResultItem | null> {
+  const metadata =
+    row.metadata && typeof row.metadata === "object"
+      ? (row.metadata as Record<string, unknown>)
+      : {};
+  const tool = firstText(metadata.tool, metadata.feature, row.source);
+  if (tool !== AUTO_SUBTITLE_RESULT_METADATA_TOOL && tool !== AUTO_SUBTITLE_RESULT_SOURCE) {
+    return null;
+  }
+  const rawUrl = firstText(
+    row.file_url,
+    row.url,
+    row.public_url,
+    metadata.file_url,
+    metadata.output_url,
+    metadata.storage_url,
+  );
+  const storedBucket = firstText(
+    metadata.storage_bucket,
+    metadata.output_storage_bucket,
+  ) as "ai-media" | "user_assets" | undefined;
+  const storedPath = firstText(metadata.storage_path, metadata.output_storage_path);
+  const pointer = rawUrl ? storagePointerFromReferenceUrl(rawUrl) : {};
+  const outputStorageBucket =
+    storedBucket === "ai-media" || storedBucket === "user_assets"
+      ? storedBucket
+      : pointer.storageBucket;
+  const outputStoragePath = storedPath ?? pointer.storagePath;
+  if (!rawUrl && (!outputStorageBucket || !outputStoragePath)) return null;
+
+  let outputUrl: string;
+  if (outputStorageBucket && outputStoragePath) {
+    outputUrl = await createStorageSignedUrl(outputStorageBucket, outputStoragePath);
+  } else {
+    outputUrl = await getSignedUrl(rawUrl ?? "");
+  }
+
+  const outputName =
+    firstText(metadata.output_name, row.name, metadata.name) ??
+    autoSubtitleOutputName("auto-subtitle", "mp4");
+  const extension =
+    firstText(metadata.output_extension)?.toLowerCase() === "webm" ||
+    /\.webm(?:$|\?)/i.test(outputName)
+      ? "webm"
+      : "mp4";
+  const rawMime = firstText(metadata.output_mime, row.file_type, metadata.mime_type);
+  const outputMime = storageSafeAutoSubtitleMime(rawMime, extension);
+  const parsedCreatedAt = Date.parse(firstText(row.created_at) ?? "");
+
+  return {
+    id: String(row.id ?? outputStoragePath ?? rawUrl),
+    assetId: row.id != null ? String(row.id) : undefined,
+    sourceName: firstText(metadata.source_name, metadata.source_file_name) ?? "Source video",
+    sourceUrl: firstText(metadata.source_url) ?? "",
+    outputUrl,
+    outputName,
+    outputMime,
+    outputExtension: extension,
+    outputStorageBucket,
+    outputStoragePath,
+    cueCount: firstFiniteNumber(metadata.cue_count) ?? 0,
+    transcriptText: firstText(metadata.transcript_text) ?? "",
+    handoffId: firstText(metadata.handoff_id) ?? "",
+    editorProjectId: firstText(metadata.editor_project_id),
+    editorProjectError: firstText(metadata.editor_project_error),
+    createdAt: firstFiniteNumber(metadata.created_at_ms) ?? (Number.isFinite(parsedCreatedAt) ? parsedCreatedAt : Date.now()),
+    duration: firstFiniteNumber(metadata.duration) ?? 0,
+  };
+}
+
+async function persistAutoSubtitleResultAsset({
+  blob,
+  userId,
+  projectId,
+  source,
+  outputName,
+  outputMime,
+  outputExtension,
+  cueCount,
+  transcriptText,
+  handoffId,
+  editorProjectId,
+  editorProjectError,
+  duration,
+  createdAt,
+}: {
+  blob: Blob;
+  userId: string;
+  projectId: string;
+  source: UploadedRef;
+  outputName: string;
+  outputMime: string;
+  outputExtension: "mp4" | "webm";
+  cueCount: number;
+  transcriptText: string;
+  handoffId: string;
+  editorProjectId?: string;
+  editorProjectError?: string;
+  duration: number;
+  createdAt: number;
+}): Promise<{
+  assetId: string;
+  outputUrl: string;
+  storageBucket: "ai-media";
+  storagePath: string;
+}> {
+  const safeName =
+    outputName.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 96) ||
+    `auto-subtitle.${outputExtension}`;
+  const storagePath = `${userId}/standalone/${projectId}/auto-subtitle/${Date.now()}-${safeName}`;
+  const { error: uploadError } = await uploadSupabaseStorageFile(
+    STORAGE_BUCKET,
+    storagePath,
+    blob,
+    {
+      contentType: outputMime,
+      upsert: true,
+    },
+  );
+  if (uploadError) throw new Error(`Could not save subtitle result: ${uploadError.message}`);
+
+  const storageUrl = storageObjectUrl(STORAGE_BUCKET, storagePath);
+  const metadata = {
+    tool: AUTO_SUBTITLE_RESULT_METADATA_TOOL,
+    feature: AUTO_SUBTITLE_RESULT_SOURCE,
+    storage_bucket: STORAGE_BUCKET,
+    storage_path: storagePath,
+    output_name: outputName,
+    output_mime: outputMime,
+    output_extension: outputExtension,
+    source_name: source.name,
+    source_url: source.url,
+    source_mime: source.mime,
+    source_duration: source.durationSec,
+    cue_count: cueCount,
+    transcript_text: transcriptText,
+    handoff_id: handoffId,
+    editor_project_id: editorProjectId,
+    editor_project_error: editorProjectError,
+    duration,
+    created_at_ms: createdAt,
+  };
+  const payload: Record<string, unknown> = {
+    user_id: userId,
+    project_id: projectId,
+    name: outputName,
+    file_url: storageUrl,
+    file_type: outputMime,
+    source: AUTO_SUBTITLE_RESULT_SOURCE,
+    category: "video",
+    metadata,
+  };
+
+  let insert = await supabase
+    .from("user_assets")
+    .insert(payload as any)
+    .select("*")
+    .single();
+  if (insert.error && isMissingProjectIdColumn(insert.error)) {
+    const { project_id: _projectId, ...fallbackPayload } = payload;
+    insert = await supabase
+      .from("user_assets")
+      .insert(fallbackPayload as any)
+      .select("*")
+      .single();
+  }
+  if (insert.error || !insert.data) {
+    throw new Error(`Could not save subtitle asset: ${insert.error?.message ?? ""}`);
+  }
+
+  return {
+    assetId: String((insert.data as ProjectReferenceAssetRow).id ?? storagePath),
+    outputUrl: await createStorageSignedUrl(STORAGE_BUCKET, storagePath),
+    storageBucket: STORAGE_BUCKET,
+    storagePath,
+  };
+}
+
+async function deleteAutoSubtitleResultAsset(result: AutoSubtitleResultItem): Promise<void> {
+  if (result.assetId) {
+    const { error } = await supabase.from("user_assets").delete().eq("id", result.assetId);
+    if (error) throw new Error(error.message);
+  }
+  if (result.outputStorageBucket && result.outputStoragePath) {
+    const { error } = await supabase.storage
+      .from(result.outputStorageBucket)
+      .remove([result.outputStoragePath]);
+    if (error) throw new Error(error.message);
+  }
 }
 
 interface StandaloneMentionedAsset {
@@ -9580,7 +10796,10 @@ function buildCurrentParams(
       language: form.autoSubtitleLanguage,
       preset: form.autoSubtitlePresetId,
       font: form.autoSubtitleFont,
+      fill: form.autoSubtitleFill,
+      highlight_color: form.autoSubtitleHighlightColor,
       position: form.autoSubtitlePosition,
+      segmentation_mode: form.autoSubtitleSegmentationMode,
       words_per_line: form.autoSubtitleWordsPerLine,
     };
   }

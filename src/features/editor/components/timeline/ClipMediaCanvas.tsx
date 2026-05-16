@@ -413,7 +413,11 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
   isAudioTrack,
   isInteractingExternal,
 }) => {
-  const cache = useClipWaveformCache();
+  const getWaveformEntry = useClipWaveformCache((state) => state.get);
+  const markWaveformInFlight = useClipWaveformCache((state) => state.markInFlight);
+  const setWaveformEntry = useClipWaveformCache((state) => state.set);
+  const clearWaveformInFlight = useClipWaveformCache((state) => state.clearInFlight);
+  const binBucketForWaveform = useClipWaveformCache((state) => state.binBucketFor);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const updateClipVolume = useProjectStore((s) => s.updateClipVolume);
@@ -424,12 +428,12 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
   const waveformOwnershipRef = useRef<{ cacheId: string; binBucket: number } | null>(null);
 
   const binCount = Math.max(16, Math.floor(width / 3));
-  const binBucket = cache.binBucketFor(binCount);
+  const binBucket = binBucketForWaveform(binCount);
   const waveformCacheId = useMemo(
     () => `${clip.id}:${clip.inPoint.toFixed(3)}:${clip.outPoint.toFixed(3)}`,
     [clip.id, clip.inPoint, clip.outPoint],
   );
-  const entry = cache.get(waveformCacheId, binBucket);
+  const entry = getWaveformEntry(waveformCacheId, binBucket);
   const [, forceRender] = useState(0);
 
   const sourceDuration = mediaItem.metadata?.duration ?? 0;
@@ -461,7 +465,7 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
   useEffect(() => {
     if (height <= 0) return;
     // Fresh-read the entry so we don't reason from a stale closure copy.
-    const current = cache.get(waveformCacheId, binBucket);
+    const current = getWaveformEntry(waveformCacheId, binBucket);
     // Already settled at the right resolution → nothing to do.
     if (current && current.peaks.length === binBucket && !current.inFlight) return;
     // Someone else (the previous mount of THIS clip at THIS bucket) is
@@ -477,7 +481,7 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
         clip.outPoint,
         binBucket,
       );
-      cache.set(waveformCacheId, binBucket, peaks);
+      setWaveformEntry(waveformCacheId, binBucket, peaks);
       forceRender((n) => n + 1);
       return;
     }
@@ -489,7 +493,7 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
     // are dropped silently.
     const ownership = { cacheId: waveformCacheId, binBucket };
     waveformOwnershipRef.current = ownership;
-    cache.markInFlight(waveformCacheId, binBucket);
+    markWaveformInFlight(waveformCacheId, binBucket);
 
     // Safety timeout — if the decode pipeline hangs (rare codec, oversize
     // buffer, browser tab background-throttled mid-decode), release the
@@ -499,7 +503,7 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
     const timeoutMs = 15000;
     const timeoutHandle = window.setTimeout(() => {
       if (waveformOwnershipRef.current !== ownership) return;
-      cache.clearInFlight(waveformCacheId, binBucket);
+      clearWaveformInFlight(waveformCacheId, binBucket);
       forceRender((n) => n + 1);
     }, timeoutMs);
 
@@ -512,7 +516,7 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
         if (typeof window !== "undefined") {
           (window as unknown as { __or_lastWaveformDecodeMs?: number }).__or_lastWaveformDecodeMs = dt;
         }
-        cache.set(waveformCacheId, binBucket, peaks);
+        setWaveformEntry(waveformCacheId, binBucket, peaks);
         forceRender((n) => n + 1);
       })
       .catch(() => {
@@ -520,7 +524,7 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
         window.clearTimeout(timeoutHandle);
         // Failed → commit empty peaks so we don't infinitely retry, but
         // still drop the inFlight flag.
-        cache.set(waveformCacheId, binBucket, new Float32Array(binBucket));
+        setWaveformEntry(waveformCacheId, binBucket, new Float32Array(binBucket));
         forceRender((n) => n + 1);
       });
 
@@ -532,7 +536,7 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
         waveformOwnershipRef.current = null;
       }
       window.clearTimeout(timeoutHandle);
-      cache.clearInFlight(waveformCacheId, binBucket);
+      clearWaveformInFlight(waveformCacheId, binBucket);
     };
   }, [
     clip.id,
@@ -543,7 +547,10 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
     binBucket,
     sourceDuration,
     height,
-    cache,
+    getWaveformEntry,
+    markWaveformInFlight,
+    setWaveformEntry,
+    clearWaveformInFlight,
   ]);
 
   // Render to canvas whenever peaks or sizes change.

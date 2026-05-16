@@ -14,6 +14,8 @@ export interface CaptionsTranscribeOptions {
   prompt?: string;
   /** "word" (default) requests Whisper word-level timestamps. */
   granularity?: "word" | "segment";
+  /** Subtitle grouping preference for GPT transcript normalization. */
+  segmentationMode?: "sentence" | "words";
 }
 
 /**
@@ -47,6 +49,9 @@ export async function transcribeAudio(
   }
   if (options.granularity) {
     formData.append("granularity", options.granularity);
+  }
+  if (options.segmentationMode) {
+    formData.append("segmentation_mode", options.segmentationMode);
   }
 
   const { data, error } = await supabase.functions.invoke(

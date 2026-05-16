@@ -15,6 +15,8 @@ export const AUTO_SUPTITLE_TRACK_NAME = "Auto Suptitle";
 export const AUTO_SUPTITLE_GROUP_PREFIX = "auto-suptitle";
 
 export interface AutoSuptitleAlgorithmSettings {
+  /** How subtitle cues are grouped before rendering. */
+  segmentationMode: "sentence" | "words";
   /** Maximum visible words per rendered caption line. */
   wordsPerLine: number;
   /** Maximum rendered lines per generated text clip. */
