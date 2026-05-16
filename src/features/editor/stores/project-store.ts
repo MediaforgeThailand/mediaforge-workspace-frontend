@@ -285,6 +285,7 @@ export interface ProjectState {
       duration: number;
       style?: Partial<TextStyle>;
       transform?: Partial<Transform>;
+      animation?: TextAnimation;
       words?: ReadonlyArray<{ text: string; start: number; end: number }>;
       captionMeta?: import("@/lib/openreel-core").CaptionClipMeta;
     },
@@ -3098,6 +3099,7 @@ export const useProjectStore = create<ProjectState>()(
           duration: options.duration,
           style: options.style,
           transform: options.transform,
+          animation: options.animation,
           words: options.words,
           captionMeta: options.captionMeta,
         });

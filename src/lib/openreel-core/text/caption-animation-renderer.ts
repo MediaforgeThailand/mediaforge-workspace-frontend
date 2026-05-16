@@ -268,11 +268,11 @@ export function renderAnimatedCaption(
 
   switch (animationStyle) {
     case "word-highlight":
-      return renderWordHighlight(subtitle, currentTime);
+      return renderNone(subtitle);
     case "word-by-word":
       return renderWordByWord(subtitle, currentTime);
     case "karaoke":
-      return renderKaraoke(subtitle, currentTime);
+      return renderNone(subtitle);
     case "bounce":
       return renderBounce(subtitle, currentTime);
     case "typewriter":
@@ -299,9 +299,7 @@ export function getAnimationStyleDisplayName(
 
 export const CAPTION_ANIMATION_STYLES: CaptionAnimationStyle[] = [
   "none",
-  "word-highlight",
   "word-by-word",
-  "karaoke",
   "bounce",
   "typewriter",
 ];

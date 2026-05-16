@@ -418,7 +418,6 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   maxReferences = 10,
   showReferences = true,
   referenceTitle,
-  referenceBadge,
   referenceHint,
   referenceAccept = "image/*",
   referenceAssets = [],
@@ -1889,7 +1888,7 @@ function cleanReferenceFileName(value: string | undefined): string | undefined {
     .filter(Boolean)
     .pop()
     ?.replace(/^[0-9]{10,}[-_]/, "")
-    .replace(/[\[\]()]/g, " ")
+    .replace(/(?:\[|\]|\(|\))/g, " ")
     .replace(/\s+/g, " ")
     .trim();
   return cleaned || undefined;

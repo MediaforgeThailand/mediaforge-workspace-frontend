@@ -25,7 +25,7 @@ export function useModelCreditCost() {
 
   /**
    * Get credit cost for a feature+model combo.
-   * For per_second pricing, pass durationSeconds to get total cost.
+   * For per_second/per_minute pricing, pass durationSeconds to get total cost.
    * For fixed pricing, pass durationSeconds and hasAudio to find exact row.
    * For per_operation, just pass feature and model.
    */
@@ -59,6 +59,12 @@ export function useModelCreditCost() {
         const entry = modelEntries[0];
         if (durationSeconds) return entry.cost * durationSeconds;
         return entry.cost; // return per-second cost if no duration specified
+      }
+
+      if (pricingType === "per_minute") {
+        const entry = modelEntries[0];
+        if (durationSeconds) return Math.ceil((entry.cost * durationSeconds) / 60);
+        return entry.cost;
       }
 
       if (pricingType === "fixed") {
@@ -118,8 +124,8 @@ export function useModelCreditCost() {
     const entries = costs.filter(c => c.feature === feature && c.model === model);
     if (!entries.length) return null;
     const pricingType = entries[0].pricing_type;
-    if (pricingType === "per_second") {
-      // For per_second, min/max are the same (single rate)
+    if (pricingType === "per_second" || pricingType === "per_minute") {
+      // Unit-rate rows have a single base rate.
       const allCosts = entries.map(c => c.cost);
       return { min: Math.min(...allCosts), max: Math.max(...allCosts), pricingType };
     }

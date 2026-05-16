@@ -77,20 +77,25 @@ const IN_ANIMATION_OPTIONS: { id: TextAnimationPreset; label: string }[] = [
   { id: "fade", label: "Fade" },
   { id: "slide-left", label: "Slide L" },
   { id: "slide-right", label: "Slide R" },
+  { id: "slide-up", label: "Slide U" },
+  { id: "slide-down", label: "Slide D" },
   { id: "scale", label: "Zoom In" },
+  { id: "pop", label: "Pop" },
   { id: "typewriter", label: "Typewriter" },
   { id: "bounce", label: "Bounce" },
 ];
 
-// We re-use the same preset set for "out" — the existing engine doesn't
-// distinguish entry vs exit animations, so we apply whichever preset the user
-// picks. This is documented as a partial limitation.
+// Exit transitions can be set independently from entry transitions through
+// `outPreset`, while still sharing the same compact preset vocabulary.
 const OUT_ANIMATION_OPTIONS: { id: TextAnimationPreset; label: string }[] = [
   { id: "none", label: "None" },
   { id: "fade", label: "Fade Out" },
   { id: "slide-left", label: "Slide L" },
   { id: "slide-right", label: "Slide R" },
+  { id: "slide-up", label: "Slide U" },
+  { id: "slide-down", label: "Slide D" },
   { id: "scale", label: "Zoom Out" },
+  { id: "pop", label: "Pop" },
 ];
 
 const TopTabs: React.FC<{

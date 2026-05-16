@@ -664,7 +664,12 @@ export const InspectorPanel: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-text-secondary">Style</span>
                   <Select
-                    value={selectedSubtitle.animationStyle || "none"}
+                    value={
+                      selectedSubtitle.animationStyle === "karaoke" ||
+                      selectedSubtitle.animationStyle === "word-highlight"
+                        ? "none"
+                        : selectedSubtitle.animationStyle || "none"
+                    }
                     onValueChange={(v) =>
                       updateSubtitle(selectedSubtitle.id, {
                         animationStyle: v as CaptionAnimationStyle,
@@ -684,10 +689,6 @@ export const InspectorPanel: React.FC = () => {
                   </Select>
                 </div>
                 <p className="text-[9px] text-text-muted">
-                  {selectedSubtitle.animationStyle === "karaoke" &&
-                    "Words fill with color as they're spoken"}
-                  {selectedSubtitle.animationStyle === "word-highlight" &&
-                    "Current word is highlighted and scaled"}
                   {selectedSubtitle.animationStyle === "word-by-word" &&
                     "Shows one word at a time"}
                   {selectedSubtitle.animationStyle === "bounce" &&
@@ -695,79 +696,20 @@ export const InspectorPanel: React.FC = () => {
                   {selectedSubtitle.animationStyle === "typewriter" &&
                     "Words appear progressively like typing"}
                   {(!selectedSubtitle.animationStyle ||
-                    selectedSubtitle.animationStyle === "none") &&
+                    selectedSubtitle.animationStyle === "none" ||
+                    selectedSubtitle.animationStyle === "karaoke" ||
+                    selectedSubtitle.animationStyle === "word-highlight") &&
                     "Static text, no animation"}
                 </p>
                 {selectedSubtitle.animationStyle &&
                   selectedSubtitle.animationStyle !== "none" &&
+                  selectedSubtitle.animationStyle !== "karaoke" &&
+                  selectedSubtitle.animationStyle !== "word-highlight" &&
                   !selectedSubtitle.words?.length && (
                     <p className="text-[9px] text-amber-400 bg-amber-400/10 p-2 rounded">
                       ⚠️ No word-level timing data. Re-generate captions to
                       enable animation.
                     </p>
-                  )}
-                {selectedSubtitle.animationStyle &&
-                  selectedSubtitle.animationStyle !== "none" &&
-                  selectedSubtitle.animationStyle !== "typewriter" &&
-                  selectedSubtitle.animationStyle !== "word-by-word" && (
-                    <div className="pt-2 border-t border-border space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-text-secondary">
-                          Highlight Color
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={
-                              selectedSubtitle.style?.highlightColor ||
-                              "#ffff00"
-                            }
-                            onChange={(e) =>
-                              updateSubtitle(selectedSubtitle.id, {
-                                style: {
-                                  ...(selectedSubtitle.style || {}),
-                                  highlightColor: e.target.value,
-                                } as typeof selectedSubtitle.style,
-                              })
-                            }
-                            className="w-6 h-6 rounded border border-border cursor-pointer"
-                          />
-                          <span className="text-[9px] font-mono text-text-muted uppercase">
-                            {selectedSubtitle.style?.highlightColor ||
-                              "#ffff00"}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-6 gap-1">
-                        {[
-                          "#ffff00",
-                          "#00ff00",
-                          "#ff6b6b",
-                          "#4ecdc4",
-                          "#ff9f43",
-                          "#a55eea",
-                        ].map((color) => (
-                          <button
-                            key={color}
-                            onClick={() =>
-                              updateSubtitle(selectedSubtitle.id, {
-                                style: {
-                                  ...(selectedSubtitle.style || {}),
-                                  highlightColor: color,
-                                } as typeof selectedSubtitle.style,
-                              })
-                            }
-                            className={`w-6 h-6 rounded border-2 transition-transform hover:scale-110 ${
-                              (selectedSubtitle.style?.highlightColor ||
-                                "#ffff00") === color
-                                ? "border-white"
-                                : "border-transparent"
-                            }`}
-                            style={{ backgroundColor: color }}
-                          />
-                        ))}
-                      </div>
-                    </div>
                   )}
               </div>
             </Section>

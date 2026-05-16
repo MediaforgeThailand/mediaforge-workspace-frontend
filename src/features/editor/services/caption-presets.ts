@@ -10,7 +10,11 @@ export type CaptionAnimation =
   | "wordHighlight"
   | "typewriter"
   | "slideIn"
-  | "fade";
+  | "fade"
+  | "slideUp"
+  | "slideDown"
+  | "scale"
+  | "pop";
 
 export type CaptionCase = "normal" | "upper" | "lower" | "title";
 export type CaptionPositionV = "top" | "middle" | "bottom";
@@ -56,7 +60,7 @@ export interface CaptionStyleSettings {
   shadow: CaptionShadowStyle;
   /** Highlight rectangle behind text. */
   background: CaptionBackgroundStyle;
-  /** Active-word highlight color (only used when animation = wordHighlight). */
+  /** Legacy highlight color field kept for older saved presets. */
   highlightColor: string;
   /** Animation style. */
   animation: CaptionAnimation;
@@ -85,6 +89,54 @@ export interface CaptionPreset {
   settings: CaptionStyleSettings;
 }
 
+export interface CaptionTransitionOption {
+  id: CaptionAnimation;
+  label: string;
+  description: string;
+}
+
+export const CAPTION_TRANSITION_OPTIONS: CaptionTransitionOption[] = [
+  {
+    id: "none",
+    label: "None",
+    description: "Text swaps instantly.",
+  },
+  {
+    id: "fade",
+    label: "Fade",
+    description: "Soft fade in and out between subtitle lines.",
+  },
+  {
+    id: "slideUp",
+    label: "Slide up",
+    description: "New text rises gently into place.",
+  },
+  {
+    id: "slideDown",
+    label: "Slide down",
+    description: "New text drops gently into place.",
+  },
+  {
+    id: "scale",
+    label: "Zoom",
+    description: "Text scales in and out cleanly.",
+  },
+  {
+    id: "pop",
+    label: "Pop",
+    description: "Text pops in with a small bounce.",
+  },
+];
+
+export function captionTransitionOptionFor(
+  animation: CaptionAnimation,
+): CaptionTransitionOption {
+  return (
+    CAPTION_TRANSITION_OPTIONS.find((option) => option.id === animation) ??
+    CAPTION_TRANSITION_OPTIONS[0]
+  );
+}
+
 /** Default settings — used when the panel first opens and no preset is selected. */
 export const DEFAULT_CAPTION_SETTINGS: CaptionStyleSettings = {
   font: "Inter",
@@ -97,7 +149,7 @@ export const DEFAULT_CAPTION_SETTINGS: CaptionStyleSettings = {
   shadow: { enabled: false, offsetX: 2, offsetY: 2, blur: 4, color: "rgba(0,0,0,0.5)" },
   background: { enabled: false, color: "rgba(0,0,0,0.6)", padding: 12, cornerRadius: 8 },
   highlightColor: "#F4FF00",
-  animation: "wordHighlight",
+  animation: "none",
   wordsPerLine: 3,
   maxLineDuration: 2.5,
   positionV: "middle",
@@ -120,7 +172,7 @@ export const BUILTIN_CAPTION_PRESETS: CaptionPreset[] = [
       shadow: { enabled: false, offsetX: 2, offsetY: 2, blur: 4, color: "rgba(0,0,0,0.5)" },
       background: { enabled: false, color: "rgba(0,0,0,0.6)", padding: 12, cornerRadius: 8 },
       highlightColor: "#F4FF00",
-      animation: "wordHighlight",
+      animation: "none",
       case: "upper",
       positionV: "middle",
       positionH: "center",
@@ -188,8 +240,8 @@ export const BUILTIN_CAPTION_PRESETS: CaptionPreset[] = [
       stroke: { enabled: true, color: "#000000", width: 8 },
       shadow: { enabled: false, offsetX: 2, offsetY: 2, blur: 4, color: "rgba(0,0,0,0.5)" },
       background: { enabled: false, color: "rgba(0,0,0,0.6)", padding: 12, cornerRadius: 8 },
-      highlightColor: "#ff4d6d",
-      animation: "wordHighlight",
+      highlightColor: "#ffffff",
+      animation: "none",
       case: "upper",
       positionV: "middle",
       positionH: "center",
@@ -234,8 +286,8 @@ export const BUILTIN_CAPTION_PRESETS: CaptionPreset[] = [
       stroke: { enabled: true, color: "#000000", width: 7 },
       shadow: { enabled: false, offsetX: 0, offsetY: 0, blur: 0, color: "rgba(0,0,0,0.5)" },
       background: { enabled: false, color: "rgba(0,0,0,0)", padding: 0, cornerRadius: 0 },
-      highlightColor: "#ffffff",
-      animation: "wordHighlight",
+      highlightColor: "#F4FF00",
+      animation: "none",
       case: "upper",
       positionV: "middle",
       positionH: "center",
@@ -257,8 +309,8 @@ export const BUILTIN_CAPTION_PRESETS: CaptionPreset[] = [
       stroke: { enabled: true, color: "#06220a", width: 4 },
       shadow: { enabled: true, offsetX: 0, offsetY: 0, blur: 14, color: "rgba(124,255,138,0.45)" },
       background: { enabled: false, color: "rgba(0,0,0,0)", padding: 0, cornerRadius: 0 },
-      highlightColor: "#ffffff",
-      animation: "wordHighlight",
+      highlightColor: "#7CFF8A",
+      animation: "none",
       case: "upper",
       positionV: "middle",
       positionH: "center",
@@ -280,8 +332,8 @@ export const BUILTIN_CAPTION_PRESETS: CaptionPreset[] = [
       stroke: { enabled: true, color: "#1b1020", width: 5 },
       shadow: { enabled: false, offsetX: 0, offsetY: 0, blur: 0, color: "rgba(0,0,0,0.5)" },
       background: { enabled: true, color: "rgba(255,72,154,0.82)", padding: 10, cornerRadius: 10 },
-      highlightColor: "#FFE66D",
-      animation: "wordHighlight",
+      highlightColor: "#ffffff",
+      animation: "none",
       case: "upper",
       positionV: "middle",
       positionH: "center",
@@ -326,8 +378,8 @@ export const BUILTIN_CAPTION_PRESETS: CaptionPreset[] = [
       stroke: { enabled: true, color: "#001114", width: 4 },
       shadow: { enabled: true, offsetX: 0, offsetY: 0, blur: 14, color: "rgba(140,247,255,0.5)" },
       background: { enabled: false, color: "rgba(0,0,0,0)", padding: 0, cornerRadius: 0 },
-      highlightColor: "#F4FF00",
-      animation: "wordHighlight",
+      highlightColor: "#8CF7FF",
+      animation: "none",
       case: "upper",
       positionV: "middle",
       positionH: "center",

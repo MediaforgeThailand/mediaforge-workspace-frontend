@@ -2,6 +2,7 @@ import {
   buildDownloadFilename,
   fetchAsBlob,
 } from "./downloadAsset";
+import { getFFmpegFallback } from "@/lib/openreel-core/media/ffmpeg-fallback";
 
 const AUDIO_WAV_MIME = "audio/wav";
 const MUTED_VIDEO_MIME = "video/webm";
@@ -79,6 +80,23 @@ export async function extractAudioBlobFromVideo(
   } finally {
     void ctx.close();
   }
+}
+
+export async function extractCompressedAudioBlobFromVideo(
+  videoUrl: string,
+  options: {
+    bitrate?: string;
+    sampleRate?: number;
+    channels?: number;
+  } = {},
+): Promise<Blob> {
+  const source = await fetchAsBlob(videoUrl);
+  const ffmpeg = getFFmpegFallback();
+  return ffmpeg.convertAudio(source, "mp3", {
+    bitrate: options.bitrate ?? "96k",
+    sampleRate: options.sampleRate ?? 16000,
+    channels: options.channels ?? 1,
+  });
 }
 
 function canRecordWebm(): boolean {

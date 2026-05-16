@@ -580,6 +580,45 @@ const applyTextTransform = (
   return s.replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
+const textClipFontWeight = (style: TextClip["style"]): number => {
+  if (typeof style.fontWeight === "number") return style.fontWeight;
+  return style.fontWeight === "bold" ? 700 : 400;
+};
+
+const canvasTextFont = (
+  style: TextClip["style"],
+  fontSize = style.fontSize,
+): string =>
+  `${style.fontStyle} ${textClipFontWeight(style)} ${fontSize}px "${style.fontFamily}"`;
+
+const autoCaptionSafeWidth = (
+  canvasWidth: number,
+  scaleX: number,
+): number => Math.max(80, (canvasWidth * 0.86) / Math.max(0.1, Math.abs(scaleX)));
+
+const fitAutoCaptionFontSize = (
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  style: TextClip["style"],
+  maxWidth: number,
+): number => {
+  const lines = text.split("\n").filter(Boolean);
+  if (lines.length === 0) return style.fontSize;
+
+  const minFontSize = Math.max(14, Math.floor(style.fontSize * 0.52));
+  let nextFontSize = style.fontSize;
+
+  while (nextFontSize > minFontSize) {
+    ctx.font = canvasTextFont(style, nextFontSize);
+    const widest = Math.max(...lines.map((line) => ctx.measureText(line).width), 0);
+    if (widest <= maxWidth) break;
+    nextFontSize -= 1;
+  }
+
+  ctx.font = canvasTextFont(style, nextFontSize);
+  return nextFontSize;
+};
+
 /**
  * Draw a speech-bubble-style background path centered at (0,0). Width/height
  * describe the inner text box (already padded). Returns true if it rendered
@@ -780,18 +819,27 @@ export const renderTextClipToCanvas = (
   ctx.scale(transform.scale.x, transform.scale.y);
   ctx.globalAlpha = opacity;
 
-  const fontWeight =
-    typeof style.fontWeight === "number"
-      ? style.fontWeight
-      : style.fontWeight === "bold"
-        ? 700
-        : 400;
-  ctx.font = `${style.fontStyle} ${fontWeight} ${style.fontSize}px "${style.fontFamily}"`;
+  ctx.font = canvasTextFont(style);
   ctx.textAlign = style.textAlign as CanvasTextAlign;
   ctx.textBaseline = "middle";
 
   // Apply textTransform on the rendered string (clip.text stays raw).
   visibleText = applyTextTransform(visibleText, style.textTransform);
+  const maxCaptionTextWidth = textClip.captionMeta
+    ? autoCaptionSafeWidth(canvasWidth, transform.scale.x)
+    : undefined;
+  if (maxCaptionTextWidth) {
+    const fittedFontSize = fitAutoCaptionFontSize(
+      ctx,
+      visibleText,
+      style,
+      maxCaptionTextWidth,
+    );
+    if (fittedFontSize !== style.fontSize) {
+      style = { ...style, fontSize: fittedFontSize };
+      ctx.font = canvasTextFont(style);
+    }
+  }
 
   // Effects bag — used by the inspector's Effects sub-tab. Each one is opt-in
   // via .enabled. Shadow falls back to the legacy shadowColor/shadowBlur
@@ -828,10 +876,13 @@ export const renderTextClipToCanvas = (
   const letterSpacingExtra =
     (style.letterSpacing || 0) *
     Math.max(...lines.map((l) => Math.max(0, l.length - 1)), 0);
-  const maxLineWidth = Math.max(
+  const measuredMaxLineWidth = Math.max(
     ...lines.map((l) => ctx.measureText(l).width),
     0,
   ) + letterSpacingExtra;
+  const maxLineWidth = maxCaptionTextWidth
+    ? Math.min(measuredMaxLineWidth, maxCaptionTextWidth)
+    : measuredMaxLineWidth;
 
   // Bubble background (new effects). Rendered before text so text sits on top.
   if (style.bubbleStyle && style.bubbleStyle !== "none") {
@@ -944,15 +995,10 @@ export const renderTextClipToCanvas = (
       charIdx++;
     }
   } else {
-    // Word-highlight caption mode: when the clip carries caption-group
-    // metadata with animation="wordHighlight" AND word-level timestamps,
-    // we draw words individually so the currently-spoken word can use the
-    // group's highlightColor instead of the base fill color. Otherwise
-    // we fall back to the standard line-by-line render.
-    const wantsWordHighlight =
-      textClip.captionMeta?.animation === "wordHighlight" &&
-      textClip.words &&
-      textClip.words.length > 0;
+    // Auto Suptitle styles are static font styles. Older projects may still
+    // carry wordHighlight metadata, but the preview should no longer render
+    // karaoke-style per-word color changes.
+    const wantsWordHighlight = false;
 
     if (wantsWordHighlight) {
       // Captions may contain explicit line breaks from the Auto Suptitle
@@ -970,15 +1016,18 @@ export const renderTextClipToCanvas = (
         // Compute total width of the line so we can position the cursor at
         // the left edge respecting textAlign.
         const lineMetrics = ctx.measureText(line);
+        const lineWidth = maxCaptionTextWidth
+          ? Math.min(lineMetrics.width, maxCaptionTextWidth)
+          : lineMetrics.width;
         const startX =
           style.textAlign === "center"
-            ? -lineMetrics.width / 2
+            ? -lineWidth / 2
             : style.textAlign === "right"
-              ? -lineMetrics.width
+              ? -lineWidth
               : 0;
 
         if (style.backgroundColor) {
-          const bgWidth = lineMetrics.width + 20;
+          const bgWidth = lineWidth + 20;
           const bgHeight = lineHeight;
           ctx.fillStyle = style.backgroundColor;
           ctx.fillRect(-bgWidth / 2, y - bgHeight / 2, bgWidth, bgHeight);
@@ -1008,8 +1057,8 @@ export const renderTextClipToCanvas = (
             ctx.shadowBlur = 8 + effects.glow.intensity * 24;
             ctx.fillStyle = effects.glow.color;
             ctx.textAlign = "left";
-            ctx.fillText(token, cursorX, y);
-            ctx.fillText(token, cursorX, y);
+            ctx.fillText(token, cursorX, y, maxCaptionTextWidth);
+            ctx.fillText(token, cursorX, y, maxCaptionTextWidth);
             ctx.restore();
           }
 
@@ -1020,7 +1069,7 @@ export const renderTextClipToCanvas = (
             ctx.lineWidth = outline.width;
             ctx.lineJoin = "round";
             ctx.textAlign = "left";
-            ctx.strokeText(token, cursorX, y);
+            ctx.strokeText(token, cursorX, y, maxCaptionTextWidth);
             ctx.restore();
           } else if (style.strokeColor && style.strokeWidth) {
             ctx.save();
@@ -1028,7 +1077,7 @@ export const renderTextClipToCanvas = (
             ctx.lineWidth = style.strokeWidth;
             ctx.lineJoin = "round";
             ctx.textAlign = "left";
-            ctx.strokeText(token, cursorX, y);
+            ctx.strokeText(token, cursorX, y, maxCaptionTextWidth);
             ctx.restore();
           }
 
@@ -1036,7 +1085,7 @@ export const renderTextClipToCanvas = (
           ctx.save();
           ctx.fillStyle = color;
           ctx.textAlign = "left";
-          ctx.fillText(token, cursorX, y);
+          ctx.fillText(token, cursorX, y, maxCaptionTextWidth);
           ctx.restore();
 
           cursorX += ctx.measureText(token).width + spaceWidth;
@@ -1052,7 +1101,9 @@ export const renderTextClipToCanvas = (
 
       if (style.backgroundColor) {
         const metrics = ctx.measureText(line);
-        const bgWidth = metrics.width + 20;
+        const bgWidth = (maxCaptionTextWidth
+          ? Math.min(metrics.width, maxCaptionTextWidth)
+          : metrics.width) + 20;
         const bgHeight = lineHeight;
         ctx.fillStyle = style.backgroundColor;
         ctx.fillRect(-bgWidth / 2, y - bgHeight / 2, bgWidth, bgHeight);
@@ -1061,7 +1112,7 @@ export const renderTextClipToCanvas = (
       // Glow pass (behind text) — only when the effects.glow.enabled flag
       // is set. Drawn twice to thicken the halo before the main fill.
       drawGlowIfEnabled(() => {
-        ctx.fillText(line, 0, y);
+        ctx.fillText(line, 0, y, maxCaptionTextWidth);
       });
 
       // Outline pass — either the legacy stroke fields or the new
@@ -1071,22 +1122,24 @@ export const renderTextClipToCanvas = (
         ctx.strokeStyle = outline.color;
         ctx.lineWidth = outline.width;
         ctx.lineJoin = "round";
-        ctx.strokeText(line, 0, y);
+        ctx.strokeText(line, 0, y, maxCaptionTextWidth);
         ctx.restore();
       } else if (style.strokeColor && style.strokeWidth) {
         ctx.strokeStyle = style.strokeColor;
         ctx.lineWidth = style.strokeWidth;
-        ctx.strokeText(line, 0, y);
+        ctx.strokeText(line, 0, y, maxCaptionTextWidth);
       }
 
       ctx.fillStyle = style.color;
-      ctx.fillText(line, 0, y);
+      ctx.fillText(line, 0, y, maxCaptionTextWidth);
 
       // Underline — implemented as a horizontal line below the baseline.
       // The renderer didn't honor textDecoration before; this adds it for
       // the simple-text path.
       if (style.textDecoration === "underline") {
-        const lineW = ctx.measureText(line).width;
+        const lineW = maxCaptionTextWidth
+          ? Math.min(ctx.measureText(line).width, maxCaptionTextWidth)
+          : ctx.measureText(line).width;
         const startX =
           style.textAlign === "center"
             ? -lineW / 2

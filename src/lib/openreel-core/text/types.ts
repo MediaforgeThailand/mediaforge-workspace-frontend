@@ -41,7 +41,16 @@ export interface CaptionClipMeta {
   /** Source media clip ID that was transcribed. */
   readonly sourceClipId: string;
   /** Caption animation style. */
-  readonly animation: "none" | "wordHighlight" | "typewriter" | "slideIn" | "fade";
+  readonly animation:
+    | "none"
+    | "wordHighlight"
+    | "typewriter"
+    | "slideIn"
+    | "fade"
+    | "slideUp"
+    | "slideDown"
+    | "scale"
+    | "pop";
   /** Word-highlight color (used when animation = wordHighlight). */
   readonly highlightColor: string;
 }

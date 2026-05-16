@@ -10,6 +10,24 @@ import {
 } from "../segmenter";
 import { exportAutoSuptitleSRT } from "../subtitle-export";
 
+function visualTextLength(text: string): number {
+  const normalized = text.normalize("NFC");
+  const Segmenter = (
+    Intl as unknown as {
+      Segmenter?: new (
+        locales?: string | string[],
+        options?: { granularity?: "grapheme" },
+      ) => { segment(input: string): Iterable<{ segment: string }> };
+    }
+  ).Segmenter;
+  if (Segmenter) {
+    return Array.from(
+      new Segmenter(undefined, { granularity: "grapheme" }).segment(normalized),
+    ).length;
+  }
+  return Array.from(normalized.replace(/\p{Mark}/gu, "")).length;
+}
+
 describe("Auto Suptitle segmenter", () => {
   it("builds editable text-track cues with absolute timeline timing", () => {
     const cues = buildAutoSuptitleCues(
@@ -146,7 +164,7 @@ describe("Auto Suptitle segmenter", () => {
     expect(joined).toContain("CONTROL");
     expect(joined).toContain("AI");
     expect(joined).toContain("MEDIAPOD");
-    expect(Math.max(...cues.map((cue) => cue.text.length))).toBeLessThanOrEqual(34);
+    expect(Math.max(...cues.map((cue) => visualTextLength(cue.text)))).toBeLessThanOrEqual(34);
   });
 
   it("carries the previous Thai phrase unit when a long cue overflows", () => {
@@ -154,8 +172,8 @@ describe("Auto Suptitle segmenter", () => {
       {
         language: "thai",
         duration: 3,
-        text: "วันนี้เป็นวันที่อากาศดีมาก",
-        suggested_cues: ["วันนี้เป็นวันที่อากาศดีมาก"],
+        text: "วันนี้เป็นวันที่อากาศดีมากเลยครับ",
+        suggested_cues: ["วันนี้เป็นวันที่อากาศดีมากเลยครับ"],
         words: [
           { word: "วัน", start: 0, end: 0.18 },
           { word: "นี้", start: 0.18, end: 0.32 },
@@ -165,6 +183,8 @@ describe("Auto Suptitle segmenter", () => {
           { word: "อากาศ", start: 0.86, end: 1.25 },
           { word: "ดี", start: 1.25, end: 1.48 },
           { word: "มาก", start: 1.48, end: 1.8 },
+          { word: "เลย", start: 1.8, end: 2.05 },
+          { word: "ครับ", start: 2.05, end: 2.3 },
         ],
       },
       0,
@@ -172,14 +192,188 @@ describe("Auto Suptitle segmenter", () => {
       {
         ...DEFAULT_AUTO_SUPTITLE_ALGORITHM,
         segmentationMode: "sentence",
-        maxCharsPerLine: 21,
+        maxCharsPerLine: 18,
         maxLineDuration: 3,
         maxSilenceGap: 0.75,
       },
       "th",
     );
 
-    expect(cues.map((cue) => cue.text)).toEqual(["วันนี้เป็นวันที่", "อากาศดีมาก"]);
+    expect(cues.map((cue) => cue.text)).toEqual([
+      "วันนี้เป็นวันที่",
+      "อากาศดีมากเลยครับ",
+    ]);
+  });
+
+  it("keeps a leading Motion Control domain cue separate in sentence mode", () => {
+    const cues = buildAutoSuptitleCuesFromResponse(
+      {
+        language: "thai",
+        duration: 5,
+        text: "Motion Control ช่วยเปลี่ยนภาพนิ่งให้เป็นวิดีโอขยับได้",
+        suggested_cues: ["Motion Control ช่วยเปลี่ยนภาพนิ่งให้เป็นวิดีโอขยับได้"],
+        words: [
+          { word: "Motion", start: 0, end: 0.32 },
+          { word: "Control", start: 0.32, end: 0.7 },
+          { word: "ช่วย", start: 0.7, end: 1.0 },
+          { word: "เปลี่ยน", start: 1.0, end: 1.36 },
+          { word: "ภาพ", start: 1.36, end: 1.65 },
+          { word: "นิ่ง", start: 1.65, end: 1.95 },
+          { word: "ให้", start: 1.95, end: 2.15 },
+          { word: "เป็น", start: 2.15, end: 2.4 },
+          { word: "วิดีโอ", start: 2.4, end: 2.9 },
+          { word: "ขยับ", start: 2.9, end: 3.28 },
+          { word: "ได้", start: 3.28, end: 3.6 },
+        ],
+      },
+      0,
+      DEFAULT_CAPTION_SETTINGS,
+      {
+        ...DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+        segmentationMode: "sentence",
+        maxCharsPerLine: 32,
+        maxLineDuration: 2.4,
+        maxSilenceGap: 0.45,
+      },
+      "th",
+    );
+
+    expect(cues[0].text).toBe("MOTION CONTROL");
+    expect(cues[1].text.replace(/\s+/g, "")).toContain("ช่วยเปลี่ยนภาพนิ่ง");
+    expect(cues.map((cue) => cue.text)).not.toContain("MOTION CONTROL ช่วยเปลี่ยนภาพ");
+    expect(cues.some((cue) => cue.text.startsWith("นิ่ง"))).toBe(false);
+  });
+
+  it("repairs protected Thai compounds when GPT cue boundaries split them", () => {
+    const cues = buildAutoSuptitleCuesFromResponse(
+      {
+        language: "thai",
+        duration: 5,
+        text: "Motion Control ช่วยเปลี่ยนภาพนิ่งให้เป็นวิดีโอขยับได้",
+        suggested_cues: [
+          "Motion Control ช่วยเปลี่ยนภาพ",
+          "นิ่งให้เป็นวิดีโอขยับได้",
+        ],
+        words: [
+          { word: "Motion", start: 0, end: 0.32 },
+          { word: "Control", start: 0.32, end: 0.7 },
+          { word: "ช่วย", start: 0.7, end: 1.0 },
+          { word: "เปลี่ยน", start: 1.0, end: 1.36 },
+          { word: "ภาพ", start: 1.36, end: 1.65 },
+          { word: "นิ่ง", start: 1.65, end: 1.95 },
+          { word: "ให้", start: 1.95, end: 2.15 },
+          { word: "เป็น", start: 2.15, end: 2.4 },
+          { word: "วิดีโอ", start: 2.4, end: 2.9 },
+          { word: "ขยับ", start: 2.9, end: 3.28 },
+          { word: "ได้", start: 3.28, end: 3.6 },
+        ],
+      },
+      0,
+      DEFAULT_CAPTION_SETTINGS,
+      {
+        ...DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+        segmentationMode: "sentence",
+        maxCharsPerLine: 32,
+        maxLineDuration: 2.4,
+        maxSilenceGap: 0.45,
+      },
+      "th",
+    );
+
+    const compactCues = cues.map((cue) => cue.text.replace(/\s+/g, ""));
+    expect(cues[0].text).toBe("MOTION CONTROL");
+    expect(compactCues.some((text) => text.includes("ช่วยเปลี่ยนภาพนิ่ง"))).toBe(true);
+    expect(compactCues.some((text) => text.startsWith("นิ่ง"))).toBe(false);
+  });
+
+  it("keeps Thai loanword compounds with the surrounding phrase on overflow", () => {
+    const cues = buildAutoSuptitleCuesFromResponse(
+      {
+        language: "thai",
+        duration: 6,
+        text: "AI ก็จะถ่ายทอดท่าทาง จังหวะ และแอ็กชั่น ออกมาเป็นวิดีโอ",
+        suggested_cues: [
+          "AI ก็จะถ่ายทอดท่าทาง จังหวะ และแอ็กชั่น ออกมาเป็นวิดีโอ",
+        ],
+        words: [
+          { word: "AI", start: 0, end: 0.24 },
+          { word: "ก็", start: 0.24, end: 0.38 },
+          { word: "จะ", start: 0.38, end: 0.52 },
+          { word: "ถ่ายทอด", start: 0.52, end: 1.0 },
+          { word: "ท่าทาง", start: 1.0, end: 1.42 },
+          { word: "จังหวะ", start: 1.42, end: 1.82 },
+          { word: "และ", start: 1.82, end: 2.0 },
+          { word: "แอ็", start: 2.0, end: 2.12 },
+          { word: "กชั่น", start: 2.12, end: 2.48 },
+          { word: "ออกมา", start: 2.48, end: 2.92 },
+          { word: "เป็น", start: 2.92, end: 3.12 },
+          { word: "วิดีโอ", start: 3.12, end: 3.6 },
+        ],
+      },
+      0,
+      { ...DEFAULT_CAPTION_SETTINGS, case: "normal" },
+      {
+        ...DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+        segmentationMode: "sentence",
+        maxCharsPerLine: 30,
+        maxLineDuration: 2.4,
+        maxSilenceGap: 0.45,
+      },
+      "th",
+    );
+
+    const compactCues = cues.map((cue) => cue.text.replace(/\s+/g, ""));
+    expect(compactCues.some((text) => text.includes("จังหวะและแอ็กชั่น"))).toBe(true);
+    expect(cues.some((cue) => cue.text.endsWith("แอ็"))).toBe(false);
+    expect(cues.some((cue) => cue.text.startsWith("กชั่น"))).toBe(false);
+  });
+
+  it("does not leave Thai connectors or protected compound heads dangling at cue ends", () => {
+    const cues = buildAutoSuptitleCuesFromResponse(
+      {
+        language: "thai",
+        duration: 8,
+        text: "เพียงใส่ภาพคาแรกเตอร์และวิดีโออ้างอิงการเคลื่อนไหว แอ็กชั่นออกมาเป็นวิดีโอ",
+        suggested_cues: [
+          "เพียงใส่ภาพคาแรกเตอร์และวิดีโออ้างอิงการเคลื่อนไหว",
+          "แอ็กชั่นออกมาเป็นวิดีโอ",
+        ],
+        words: [
+          { word: "เพียง", start: 0, end: 0.28 },
+          { word: "ใส่", start: 0.28, end: 0.56 },
+          { word: "ภาพ", start: 0.56, end: 0.82 },
+          { word: "คา", start: 0.82, end: 1.0 },
+          { word: "แรก", start: 1.0, end: 1.22 },
+          { word: "เตอร์", start: 1.22, end: 1.52 },
+          { word: "และ", start: 1.52, end: 1.72 },
+          { word: "วิดีโอ", start: 1.72, end: 2.18 },
+          { word: "อ้างอิง", start: 2.18, end: 2.72 },
+          { word: "การ", start: 2.72, end: 2.94 },
+          { word: "เคลื่อนไหว", start: 2.94, end: 3.6 },
+          { word: "แอ็", start: 4.0, end: 4.14 },
+          { word: "กชั่น", start: 4.14, end: 4.5 },
+          { word: "ออก", start: 4.5, end: 4.78 },
+          { word: "มา", start: 4.78, end: 5.0 },
+          { word: "เป็น", start: 5.0, end: 5.22 },
+          { word: "วิดีโอ", start: 5.22, end: 5.7 },
+        ],
+      },
+      0,
+      { ...DEFAULT_CAPTION_SETTINGS, case: "normal" },
+      {
+        ...DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+        segmentationMode: "sentence",
+        maxCharsPerLine: 30,
+        maxLineDuration: 2.4,
+        maxSilenceGap: 0.45,
+      },
+      "th",
+    );
+
+    expect(cues.some((cue) => cue.text.endsWith("และ"))).toBe(false);
+    expect(cues.some((cue) => cue.text.endsWith("ออก"))).toBe(false);
+    expect(cues.some((cue) => cue.text.startsWith("มา"))).toBe(false);
+    expect(cues.map((cue) => cue.text).join(" ")).toContain("ออกมา");
   });
 
   it("carries the previous Thai phrase unit when word split overflows", () => {
@@ -445,6 +639,55 @@ describe("Auto Suptitle segmenter", () => {
     expect(cues[0].endTime).toBeCloseTo(1.35);
   });
 
+  it("uses zero-duration Thai fragments for text matching without using them as cue timing", () => {
+    const cues = buildAutoSuptitleCuesFromResponse(
+      {
+        language: "thai",
+        duration: 4,
+        text: "Motion Control ช่วยเปลี่ยนภาพนิ่ง",
+        suggested_cues: ["Motion Control", "ช่วยเปลี่ยนภาพนิ่ง"],
+        words: [
+          { word: "M", start: 0, end: 0.14 },
+          { word: "otion", start: 0.14, end: 0.44 },
+          { word: "Control", start: 0.44, end: 1.0 },
+          { word: "ช", start: 1.26, end: 1.32 },
+          { word: "่", start: 1.32, end: 1.32 },
+          { word: "วย", start: 1.32, end: 1.38 },
+          { word: "เป", start: 1.38, end: 1.56 },
+          { word: "ล", start: 1.56, end: 1.56 },
+          { word: "ี่", start: 1.56, end: 1.56 },
+          { word: "ย", start: 1.56, end: 1.56 },
+          { word: "น", start: 1.56, end: 1.74 },
+          { word: "ภ", start: 1.74, end: 1.82 },
+          { word: "า", start: 1.82, end: 1.9 },
+          { word: "พ", start: 1.9, end: 1.9 },
+          { word: "น", start: 1.9, end: 2.1 },
+          { word: "ิ", start: 2.1, end: 2.1 },
+          { word: "่", start: 2.1, end: 2.1 },
+          { word: "ง", start: 2.1, end: 2.18 },
+        ],
+      },
+      0,
+      { ...DEFAULT_CAPTION_SETTINGS, case: "normal" },
+      {
+        ...DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+        segmentationMode: "sentence",
+        maxCharsPerLine: 40,
+        maxLineDuration: 3,
+        maxSilenceGap: 0.45,
+        maxHoldAfterSpeech: 0.5,
+      },
+      "th",
+    );
+
+    expect(cues.map((cue) => cue.text)).toEqual(["Motion Control", "ช่วยเปลี่ยนภาพนิ่ง"]);
+    expect(cues[0].startTime).toBeCloseTo(0);
+    expect(cues[0].words[0].end).toBeCloseTo(1.0);
+    expect(cues[0].endTime).toBeCloseTo(1.26);
+    expect(cues[1].startTime).toBeCloseTo(1.26);
+    expect(cues[1].words[0].end).toBeCloseTo(2.18);
+  });
+
   it("caps GPT-planned cue chunks to the selected single-line word split", () => {
     const cues = buildAutoSuptitleCuesFromResponse(
       {
@@ -476,12 +719,55 @@ describe("Auto Suptitle segmenter", () => {
     }
   });
 
-  it("ends cues 0.5s after speech when the next speech is later", () => {
+  it("preserves GPT-planned Thai phrase spacing and mixed English terms in sentence mode", () => {
+    const cues = buildAutoSuptitleCuesFromResponse(
+      {
+        language: "thai",
+        duration: 8,
+        text: "AI ก็จะถ่ายทอดท่าทาง จังหวะ และแอ็กชั่น ผ่าน MediaPods Workspace ครับ",
+        suggested_cues: [
+          "AI ก็จะถ่ายทอดท่าทาง จังหวะ และแอ็กชั่น",
+          "ผ่าน MediaPods Workspace ครับ",
+        ],
+        words: [
+          { word: "A", start: 0, end: 0.1 },
+          { word: "I", start: 0.1, end: 0.2 },
+          { word: "ก็", start: 0.2, end: 0.5 },
+          { word: "แอ็กชั่น", start: 3.1, end: 3.7 },
+          { word: "MediaPods", start: 5.4, end: 6.2 },
+          { word: "Workspace", start: 6.2, end: 7 },
+          { word: "ครับ", start: 7, end: 7.6 },
+        ],
+      },
+      0,
+      DEFAULT_CAPTION_SETTINGS,
+      {
+        ...DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+        segmentationMode: "sentence",
+        wordsPerLine: 6,
+        maxCharsPerLine: 80,
+      },
+      "th",
+    );
+
+    expect(cues.map((cue) => cue.text)).toEqual([
+      "AI ก็จะถ่ายทอดท่าทาง จังหวะ และแอ็กชั่น",
+      "ผ่าน MEDIAPODS WORKSPACE ครับ",
+    ]);
+    expect(formatAutoSuptitleCueText("ผ่าน MediaPods Workspace ครับ", 6, "th")).toBe(
+      "ผ่าน MediaPods Workspace ครับ",
+    );
+    expect(
+      formatAutoSuptitleCueText("AI ก็จะถ่ายทอดท่าทาง จังหวะ และแอ็กชั่น", 6, "th"),
+    ).toBe("AI ก็จะถ่ายทอดท่าทาง จังหวะ และแอ็กชั่น");
+    expect(cues[0].endTime).toBeCloseTo(cues[1].startTime);
+  });
+
+  it("does not force subtitle cues to bridge short dead air", () => {
     const cues = buildAutoSuptitleCues(
       [
         { word: "first", start: 0, end: 0.2 },
         { word: "second", start: 1.0, end: 1.2 },
-        { word: "third", start: 3.0, end: 3.2 },
       ],
       0,
       DEFAULT_CAPTION_SETTINGS,
@@ -497,10 +783,35 @@ describe("Auto Suptitle segmenter", () => {
       },
     );
 
-    expect(cues).toHaveLength(3);
+    expect(cues).toHaveLength(2);
     expect(cues[0].endTime).toBeCloseTo(0.7);
+    expect(cues[1].startTime).toBeCloseTo(1.0);
     expect(cues[1].endTime).toBeCloseTo(1.7);
-    expect(cues[2].endTime).toBeCloseTo(3.7);
+  });
+
+  it("hides a cue after 0.5s when the next cue is a real long pause", () => {
+    const cues = buildAutoSuptitleCues(
+      [
+        { word: "first", start: 0, end: 0.2 },
+        { word: "second", start: 2.2, end: 2.4 },
+      ],
+      0,
+      DEFAULT_CAPTION_SETTINGS,
+      {
+        ...DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+        wordsPerLine: 1,
+        maxLinesPerCue: 1,
+        maxLineDuration: 10,
+        maxCharsPerLine: 80,
+        maxSilenceGap: 10,
+        maxHoldAfterSpeech: 0.5,
+        splitOnPunctuation: false,
+      },
+    );
+
+    expect(cues).toHaveLength(2);
+    expect(cues[0].endTime).toBeCloseTo(0.7);
+    expect(cues[1].endTime).toBeCloseTo(2.9);
   });
 
   it("splits on sentence punctuation including full-width punctuation", () => {

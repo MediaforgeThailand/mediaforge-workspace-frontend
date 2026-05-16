@@ -40,7 +40,11 @@ export class TextAnimationEngine {
     if (keyframes && keyframes.length > 0) {
       return this.applyKeyframeAnimation(clip, time);
     }
-    if (!animation || animation.preset === "none") {
+    if (
+      !animation ||
+      (animation.preset === "none" &&
+        (!animation.outPreset || animation.outPreset === "none"))
+    ) {
       return {
         opacity: transform.opacity,
         transform,

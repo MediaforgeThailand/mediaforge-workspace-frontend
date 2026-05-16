@@ -45,12 +45,15 @@ import {
 } from "../../services/captions-generator";
 import {
   AUTO_SUPTITLE_TRACK_NAME,
+  autoSuptitleSettingsToTextAnimation,
   materializeAutoSuptitleTrack,
 } from "../../services/auto-suptitle";
 import { CAPTIONS_LANGUAGES } from "../../services/captions-client";
 import {
   BUILTIN_CAPTION_PRESETS,
+  CAPTION_TRANSITION_OPTIONS,
   applyCaptionCase,
+  captionTransitionOptionFor,
   deleteUserPreset,
   listAllPresets,
   loadUserPresets,
@@ -168,6 +171,7 @@ export const CaptionsPanel: React.FC = () => {
   const deleteTextClip = useProjectStore((s) => s.deleteTextClip);
   const updateTextStyle = useProjectStore((s) => s.updateTextStyle);
   const updateTextTransform = useProjectStore((s) => s.updateTextTransform);
+  const updateTextAnimation = useProjectStore((s) => s.updateTextAnimation);
   const seekTo = useTimelineStore((s) => s.seekTo);
 
   const [savedFonts, setSavedFonts] = useState<Array<{ name: string; fileName: string }>>([]);
@@ -431,9 +435,13 @@ export const CaptionsPanel: React.FC = () => {
     const refWidth = project.settings.width || 1920;
     const transformPos = captionPositionToTransform(settings, refHeight, refWidth);
     const baseStyle = captionSettingsToTextStyle(settings);
+    const animation = autoSuptitleSettingsToTextAnimation(settings);
     for (const clip of activeGroup.clips) {
       updateTextStyle(clip.id, baseStyle);
       updateTextTransform(clip.id, { position: transformPos });
+      if (animation) {
+        updateTextAnimation(clip.id, animation);
+      }
     }
     toast.success(`Restyled ${activeGroup.clips.length} caption clips`);
   };
@@ -779,24 +787,23 @@ export const CaptionsPanel: React.FC = () => {
             </div>
           </Section>
 
-          {/* ─────── 6. ANIMATION ─────── */}
-          <Section title="Animation">
+          {/* ─────── 6. TEXT TRANSITION ─────── */}
+          <Section title="Text transition">
             <div className="grid grid-cols-2 gap-1">
-              {(["none", "wordHighlight", "typewriter", "slideIn", "fade"] as const).map((a) => (
+              {CAPTION_TRANSITION_OPTIONS.map((option) => (
                 <Toggle
-                  key={a}
-                  active={settings.animation === a}
-                  onClick={() => updateSettings({ animation: a })}
+                  key={option.id}
+                  active={settings.animation === option.id}
+                  onClick={() => updateSettings({ animation: option.id })}
+                  title={option.description}
                 >
-                  {a === "wordHighlight" ? "Word HL" : a === "slideIn" ? "Slide in" : a[0].toUpperCase() + a.slice(1)}
+                  {option.label}
                 </Toggle>
               ))}
             </div>
-            {settings.animation === "wordHighlight" && (
-              <LabelRow label="Highlight">
-                <ColorSwatch value={settings.highlightColor} onChange={(v) => updateSettings({ highlightColor: v })} testId="captions-highlight-color" />
-              </LabelRow>
-            )}
+            <p className="text-[10px] leading-relaxed text-text-muted">
+              {captionTransitionOptionFor(settings.animation).description}
+            </p>
           </Section>
 
           {/* ─────── 7. PRESETS ─────── */}
@@ -961,10 +968,6 @@ const CaptionPreview: React.FC<{ settings: CaptionStyleSettings }> = ({ settings
       }
     : {};
 
-  // Word highlight: split into words; the middle word is the "active" one.
-  const words = sample.split(/\s+/);
-  const midIdx = Math.floor(words.length / 2);
-
   return (
     <div
       data-testid="captions-preview"
@@ -990,21 +993,7 @@ const CaptionPreview: React.FC<{ settings: CaptionStyleSettings }> = ({ settings
           textAlign: "center",
         }}
       >
-        {settings.animation === "wordHighlight" ? (
-          words.map((w, i) => (
-            <span
-              key={i}
-              style={{
-                color: i === midIdx ? settings.highlightColor : settings.fill,
-                marginRight: "0.3em",
-              }}
-            >
-              {w}
-            </span>
-          ))
-        ) : (
-          sample
-        )}
+        {sample}
       </div>
     </div>
   );

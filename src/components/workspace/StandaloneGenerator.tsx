@@ -18,6 +18,7 @@ import {
   GripVertical,
   ImagePlus,
   Languages,
+  LayoutGrid,
   Loader2,
   Menu,
   Music,
@@ -26,6 +27,7 @@ import {
   Plus,
   Search,
   Sparkles,
+  Rows3,
   SlidersHorizontal,
   Trash2,
   UploadCloud,
@@ -130,6 +132,7 @@ import { buildMediaMenuItems } from "./mediaMenuItems";
 import { useMediaContextMenu } from "./useMediaContextMenu";
 import {
   buildExtractedAudioFile,
+  extractCompressedAudioBlobFromVideo,
   extractAudioBlobFromVideo,
 } from "./videoAudioActions";
 import {
@@ -149,7 +152,10 @@ import {
 import {
   applyCaptionCase,
   BUILTIN_CAPTION_PRESETS,
+  CAPTION_TRANSITION_OPTIONS,
+  captionTransitionOptionFor,
   DEFAULT_CAPTION_SETTINGS,
+  type CaptionAnimation,
   type CaptionStyleSettings,
 } from "@/features/editor/services/caption-presets";
 import {
@@ -191,6 +197,11 @@ const TRANSLATE_VIDEO_UPLOAD_MAX_BYTES = 1024 * 1024 * 1024;
 const TRANSLATE_VIDEO_UPLOAD_MAX_LABEL = "1 GB";
 const TRANSLATE_MEDIA_ACCEPT = "video/*,audio/*,.mp3,.wav,.m4a,.aac";
 const AUTO_SUBTITLE_MEDIA_ACCEPT = "video/*,.mp4,.mov,.webm,.m4v";
+const AUTO_SUBTITLE_UPLOAD_MAX_BYTES = 1024 * 1024 * 1024;
+const AUTO_SUBTITLE_UPLOAD_MAX_LABEL = "1 GB";
+const AUTO_SUBTITLE_MAX_DURATION_SEC = 10 * 60;
+const AUTO_SUBTITLE_MAX_DURATION_LABEL = "10 minutes";
+const AUTO_SUBTITLE_MAX_DURATION_LABEL_TH = "10 นาที";
 const AUTO_SUBTITLE_AUDIO_MAX_BYTES = 24 * 1024 * 1024;
 const AUTO_SUBTITLE_FONT_OPTIONS = [
   "Inter",
@@ -232,6 +243,32 @@ function seedanceReferenceVideoDurationMessage(durationSec?: number | null): str
 
 function unreadableSeedanceReferenceVideoMessage(): string {
   return "Could not read the reference video duration. Upload an MP4/MOV video between 2 and 15 seconds.";
+}
+
+function isAutoSubtitleDurationValid(durationSec?: number | null): durationSec is number {
+  return (
+    typeof durationSec === "number" &&
+    Number.isFinite(durationSec) &&
+    durationSec > 0 &&
+    durationSec <= AUTO_SUBTITLE_MAX_DURATION_SEC
+  );
+}
+
+function autoSubtitleDurationMessage(durationSec?: number | null): string {
+  const suffix =
+    typeof durationSec === "number" && Number.isFinite(durationSec)
+      ? ` (${durationSec.toFixed(1)}s)`
+      : "";
+  return `Auto Subtitle supports MP4/MOV/WebM videos up to ${AUTO_SUBTITLE_MAX_DURATION_LABEL}${suffix}.`;
+}
+
+function autoSubtitleUploadSizeMessage(): string {
+  return `Auto Subtitle accepts videos up to ${AUTO_SUBTITLE_UPLOAD_MAX_LABEL}.`;
+}
+
+function autoSubtitleAudioBitrate(durationSec?: number | null): string {
+  if (typeof durationSec === "number" && durationSec >= 8 * 60) return "64k";
+  return "96k";
 }
 
 function translateVideoUploadSizeMessage(language: string): string {
@@ -711,6 +748,7 @@ interface StandaloneFormState {
   autoSubtitleStroke: boolean;
   autoSubtitleStrokeWidth: number;
   autoSubtitleBackground: boolean;
+  autoSubtitleTransition: CaptionAnimation;
   autoSubtitleSegmentationMode: AutoSubtitleSegmentationMode;
   autoSubtitleWordsPerLine: number;
   upscaleImage: UploadedRef | null;
@@ -778,6 +816,7 @@ const DEFAULT_AUTO_SUBTITLE_PARAMS = {
   autoSubtitleStroke: true,
   autoSubtitleStrokeWidth: 6,
   autoSubtitleBackground: false,
+  autoSubtitleTransition: "fade" as const,
   autoSubtitleSegmentationMode: "sentence" as const,
   autoSubtitleWordsPerLine: 4,
 };
@@ -2722,6 +2761,10 @@ export default function StandaloneGenerator({
           toast.error(translateVideoUploadSizeMessage(language));
           continue;
         }
+        if (needsAutoSubtitleMedia && file.size > AUTO_SUBTITLE_UPLOAD_MAX_BYTES) {
+          toast.error(autoSubtitleUploadSizeMessage());
+          continue;
+        }
         let durationSec: number | null = null;
         if (
           needsVideo &&
@@ -2741,6 +2784,10 @@ export default function StandaloneGenerator({
           durationSec = await readVideoFileDuration(file);
           if (durationSec == null) {
             toast.error("Could not read the video duration for Auto Subtitle.");
+            continue;
+          }
+          if (!isAutoSubtitleDurationValid(durationSec)) {
+            toast.error(autoSubtitleDurationMessage(durationSec));
             continue;
           }
         }
@@ -2819,6 +2866,17 @@ export default function StandaloneGenerator({
       }
       if (!isSeedanceReferenceVideoDurationValid(durationSec)) {
         toast.error(seedanceReferenceVideoDurationMessage(durationSec));
+        return;
+      }
+    }
+    if (expectsAutoSubtitleMedia) {
+      durationSec = durationSec ?? (await readVideoUrlDuration(reference.url)) ?? undefined;
+      if (durationSec == null) {
+        toast.error("Could not read the video duration for Auto Subtitle.");
+        return;
+      }
+      if (!isAutoSubtitleDurationValid(durationSec)) {
+        toast.error(autoSubtitleDurationMessage(durationSec));
         return;
       }
     }
@@ -3394,7 +3452,7 @@ export default function StandaloneGenerator({
   };
 
   const startAutoSubtitle = async () => {
-    const source = form.autoSubtitleVideo;
+    let source = form.autoSubtitleVideo;
     if (!source) {
       throw new Error("Upload an MP4 video before generating subtitles.");
     }
@@ -3409,11 +3467,39 @@ export default function StandaloneGenerator({
     const toastId = toast.loading("Generating subtitles...");
     setAutoSubtitleProgress({ progress: 8, message: "Preparing source video..." });
     try {
-      const audio = await extractAudioBlobFromVideo(source.url);
+      const sourceDuration = source.durationSec ?? (await readVideoUrlDuration(source.url));
+      if (sourceDuration == null) {
+        throw new Error("Could not read the video duration for Auto Subtitle.");
+      }
+      if (!isAutoSubtitleDurationValid(sourceDuration)) {
+        throw new Error(autoSubtitleDurationMessage(sourceDuration));
+      }
+      if (source.durationSec !== sourceDuration) {
+        source = { ...source, durationSec: sourceDuration };
+        updateForm({ autoSubtitleVideo: source });
+      }
+
+      setAutoSubtitleProgress({ progress: 12, message: "Compressing audio for transcription..." });
+      let audio: Blob;
+      try {
+        audio = await extractCompressedAudioBlobFromVideo(source.url, {
+          bitrate: autoSubtitleAudioBitrate(source.durationSec),
+          sampleRate: 16000,
+          channels: 1,
+        });
+      } catch (compressionErr) {
+        console.warn("[AutoSubtitle] compressed audio extraction failed:", compressionErr);
+        if ((source.durationSec ?? 0) > 120) {
+          throw new Error(
+            "Could not compress audio for a long Auto Subtitle video. Try a shorter clip or re-upload as MP4.",
+          );
+        }
+        audio = await extractAudioBlobFromVideo(source.url);
+      }
       if (audio.size > AUTO_SUBTITLE_AUDIO_MAX_BYTES) {
         const mb = (audio.size / (1024 * 1024)).toFixed(1);
         throw new Error(
-          `Extracted audio is ${mb} MB. Trim the video or use a shorter clip for Auto Subtitle.`,
+          `Compressed audio is ${mb} MB. Trim the video or use a shorter clip for Auto Subtitle.`,
         );
       }
 
@@ -3844,6 +3930,11 @@ export default function StandaloneGenerator({
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
+    if (needsAutoSubtitleMedia && file.size > AUTO_SUBTITLE_UPLOAD_MAX_BYTES) {
+      toast.error(autoSubtitleUploadSizeMessage());
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
     setUploading(slot);
     try {
       let durationSec: number | null = null;
@@ -3865,6 +3956,10 @@ export default function StandaloneGenerator({
         durationSec = await readVideoFileDuration(file);
         if (durationSec == null) {
           toast.error("Could not read the video duration for Auto Subtitle.");
+          return;
+        }
+        if (!isAutoSubtitleDurationValid(durationSec)) {
+          toast.error(autoSubtitleDurationMessage(durationSec));
           return;
         }
       }
@@ -4072,28 +4167,12 @@ export default function StandaloneGenerator({
         onChange={(event) => void onFileSelected(event.target.files?.[0])}
       />
 
-      <MobileHeader
-        activeTool={activeTool}
-        onToolChange={onToolChange}
-        onOpenSidebar={onOpenSidebar}
-        projects={projects}
-        activeProject={activeProject}
-        showProjectPicker={Boolean(user?.id)}
-        onSelectProject={onSelectProject}
-        onCreateProject={onCreateProject}
-        onDeleteProject={onDeleteProject}
-      />
-      <DesktopTopBar
-        projects={projects}
-        activeProject={activeProject}
-        showProjectPicker={Boolean(user?.id)}
-        onSelectProject={onSelectProject}
-        onCreateProject={onCreateProject}
-        onDeleteProject={onDeleteProject}
-      />
+      <div className="fixed right-3 top-3 z-[80] md:right-4 md:top-4">
+        <UserMenu />
+      </div>
 
       <div className="ws-scroll-hide flex min-h-0 flex-1 flex-col overflow-y-auto bg-[var(--bg-app)] lg:flex-row lg:overflow-hidden">
-        <aside className="ws-scroll-hide mx-auto flex min-h-[calc(100dvh-68px)] w-full max-w-[480px] shrink-0 flex-col bg-transparent px-[12px] pb-[12px] pt-[4px] lg:mx-0 lg:h-full lg:min-h-0 lg:w-[488px] lg:max-w-none lg:pb-0 lg:pl-2 lg:pr-0 lg:pt-0">
+        <aside className="ws-scroll-hide mx-auto flex min-h-dvh w-full max-w-[480px] shrink-0 flex-col bg-transparent px-[12px] pb-[12px] pt-[4px] lg:mx-0 lg:h-full lg:min-h-0 lg:w-[488px] lg:max-w-none lg:pb-0 lg:pl-2 lg:pr-0 lg:pt-0">
           {STANDALONE_TOOL_ORDER.includes(activeTool) ? (
             activeTool === "auto_subtitle" ? (
             <AutoSubtitlePanelV2
@@ -4949,6 +5028,7 @@ function autoSubtitleStyleFromForm(form: StandaloneFormState): CaptionStyleSetti
       ...preset.background,
       enabled: form.autoSubtitleBackground,
     },
+    animation: form.autoSubtitleTransition || preset.animation,
     wordsPerLine:
       rawWordsPerLine <= 0
         ? AUTO_SUBTITLE_MAX_WORD_SPLIT
@@ -4956,6 +5036,33 @@ function autoSubtitleStyleFromForm(form: StandaloneFormState): CaptionStyleSetti
     positionV: form.autoSubtitlePosition,
     positionH: "center",
   };
+}
+
+function autoSubtitleTransitionLabel(
+  animation: CaptionAnimation,
+  language: string,
+): string {
+  if (language !== "th") return captionTransitionOptionFor(animation).label;
+  switch (animation) {
+    case "none":
+      return "ไม่มี";
+    case "fade":
+      return "ค่อยๆ จาง";
+    case "slideIn":
+    case "slideUp":
+      return "เลื่อนขึ้น";
+    case "slideDown":
+      return "เลื่อนลง";
+    case "scale":
+      return "ซูม";
+    case "pop":
+      return "เด้ง";
+    case "typewriter":
+      return "พิมพ์ทีละตัว";
+    case "wordHighlight":
+    default:
+      return captionTransitionOptionFor(animation).label;
+  }
 }
 
 function autoSubtitleAlgorithmFromForm(
@@ -5410,7 +5517,9 @@ function AutoSubtitlePanelV2({
     settingsTitle: "AI SETTINGS",
     sourceVideo: th ? "วิดีโอต้นฉบับ" : "Source video",
     uploadHint: th ? "ลาก MP4 มาวาง หรือคลิกเพื่ออัปโหลด" : "Drop an MP4 here or click to upload",
-    uploadLimit: th ? "รองรับ MP4/MOV/WEBM สูงสุด 1 GB" : "MP4/MOV/WEBM, up to 1 GB",
+    uploadLimit: th
+      ? `รองรับ MP4/MOV/WEBM สูงสุด ${AUTO_SUBTITLE_UPLOAD_MAX_LABEL} / ${AUTO_SUBTITLE_MAX_DURATION_LABEL_TH}`
+      : `MP4/MOV/WEBM, up to ${AUTO_SUBTITLE_UPLOAD_MAX_LABEL} / ${AUTO_SUBTITLE_MAX_DURATION_LABEL}`,
     aspect: th ? "สัดส่วนวิดีโอ" : "Aspect ratio",
     keepSource: th ? "ตามต้นฉบับ" : "Keep source",
     locked: th ? "เร็วๆ นี้" : "Soon",
@@ -5428,6 +5537,7 @@ function AutoSubtitlePanelV2({
     wordMode: th ? "กำหนดจำนวนคำ" : "Word split",
     wordModeHint: th ? "ตัดตามจำนวนคำที่เลือก" : "Fixed word groups",
     words: th ? "จำนวนคำต่อกลุ่ม" : "Words per group",
+    transition: th ? "ทรานซิชันข้อความ" : "Text transition",
     textColor: th ? "สีตัวอักษร" : "Text color",
     highlightColor: th ? "สีไฮไลต์" : "Highlight",
     stroke: th ? "เส้นขอบ" : "Stroke",
@@ -5478,6 +5588,14 @@ function AutoSubtitlePanelV2({
     th ? `${form.autoSubtitleWordsPerLine} คำ` : `${form.autoSubtitleWordsPerLine} words`;
   const segmentationLabel =
     form.autoSubtitleSegmentationMode === "sentence" ? copy.sentenceMode : copy.wordMode;
+  const transitionLabel = autoSubtitleTransitionLabel(
+    form.autoSubtitleTransition,
+    language,
+  );
+  const transitionOptions = CAPTION_TRANSITION_OPTIONS.map((option) => ({
+    value: option.id,
+    label: autoSubtitleTransitionLabel(option.id, language),
+  }));
   const previewSamplePhrases = useMemo(
     () =>
       autoSubtitlePreviewPhrases(
@@ -5682,6 +5800,16 @@ function AutoSubtitlePanelV2({
                       onChange({
                         autoSubtitleSegmentationMode: value as AutoSubtitleSegmentationMode,
                       })
+                    }
+                  />
+                  <VoiceTranslateSelectCard
+                    label={copy.transition}
+                    value={form.autoSubtitleTransition}
+                    displayValue={transitionLabel}
+                    icon={<Sparkles className="h-[14px] w-[14px]" />}
+                    options={transitionOptions}
+                    onChange={(value) =>
+                      onChange({ autoSubtitleTransition: value as CaptionAnimation })
                     }
                   />
                   <VoiceTranslateSelectCard
@@ -5995,39 +6123,163 @@ function AutoSubtitleAnimatedPreview({
   language?: string | null;
 }) {
   const [phraseIndex, setPhraseIndex] = useState(0);
+  const [leavingPhrase, setLeavingPhrase] = useState<{
+    key: number;
+    text: string;
+  } | null>(null);
+  const leavingTimerRef = useRef<number | null>(null);
   const safePhrases = phrases.length > 0 ? phrases : AUTO_SUBTITLE_PREVIEW_WORDS_EN;
 
   useEffect(() => {
     setPhraseIndex(0);
+    setLeavingPhrase(null);
+    if (leavingTimerRef.current) {
+      window.clearTimeout(leavingTimerRef.current);
+      leavingTimerRef.current = null;
+    }
     if (safePhrases.length <= 1) return;
     const timer = window.setInterval(() => {
-      setPhraseIndex((index) => (index + 1) % safePhrases.length);
+      setPhraseIndex((index) => {
+        const currentText = safePhrases[index % safePhrases.length] ?? "";
+        setLeavingPhrase({ key: Date.now(), text: currentText });
+        if (leavingTimerRef.current) {
+          window.clearTimeout(leavingTimerRef.current);
+        }
+        leavingTimerRef.current = window.setTimeout(() => {
+          setLeavingPhrase(null);
+          leavingTimerRef.current = null;
+        }, autoSubtitlePreviewTransitionMs(settings.animation) + 40);
+        return (index + 1) % safePhrases.length;
+      });
     }, 1350);
-    return () => window.clearInterval(timer);
-  }, [safePhrases]);
+    return () => {
+      window.clearInterval(timer);
+      if (leavingTimerRef.current) {
+        window.clearTimeout(leavingTimerRef.current);
+        leavingTimerRef.current = null;
+      }
+    };
+  }, [safePhrases, settings.animation]);
 
   const text = safePhrases[phraseIndex % safePhrases.length] ?? "";
+  const animationCss = autoSubtitlePreviewAnimationCss(settings.animation);
 
   return (
     <div className="relative flex h-[38px] w-full items-center justify-center overflow-hidden px-2">
       <style>
         {`
-          @keyframes autoSubtitlePreviewSwap {
-            0% { opacity: 0; transform: translateY(8px) scale(.96); filter: blur(2px); }
-            45% { opacity: 1; transform: translateY(0) scale(1.02); filter: blur(0); }
-            100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+          @keyframes autoSubtitlePreviewFadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+          }
+          @keyframes autoSubtitlePreviewFadeOut {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+          }
+          @keyframes autoSubtitlePreviewSlideUpIn {
+            0% { opacity: 0; transform: translateY(10px); }
+            100% { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes autoSubtitlePreviewSlideUpOut {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-8px); }
+          }
+          @keyframes autoSubtitlePreviewSlideDownIn {
+            0% { opacity: 0; transform: translateY(-10px); }
+            100% { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes autoSubtitlePreviewSlideDownOut {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(8px); }
+          }
+          @keyframes autoSubtitlePreviewScaleIn {
+            0% { opacity: 0; transform: scale(.92); }
+            100% { opacity: 1; transform: scale(1); }
+          }
+          @keyframes autoSubtitlePreviewScaleOut {
+            0% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(.95); }
+          }
+          @keyframes autoSubtitlePreviewPopIn {
+            0% { opacity: 0; transform: scale(.82); }
+            70% { opacity: 1; transform: scale(1.08); }
+            100% { opacity: 1; transform: scale(1); }
+          }
+          @keyframes autoSubtitlePreviewPopOut {
+            0% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(.9); }
           }
         `}
       </style>
+      {leavingPhrase && settings.animation !== "none" && (
+        <div
+          key={`out-${leavingPhrase.key}`}
+          className="absolute inset-x-2 flex justify-center"
+          style={{ animation: animationCss.out }}
+        >
+          <AutoSubtitlePreviewText settings={settings} text={leavingPhrase.text} language={language} />
+        </div>
+      )}
       <div
         key={`${phraseIndex}-${text}`}
-        className="flex max-w-full justify-center"
-        style={{ animation: "autoSubtitlePreviewSwap 420ms ease-out both" }}
+        className="absolute inset-x-2 flex justify-center"
+        style={{ animation: animationCss.in }}
       >
         <AutoSubtitlePreviewText settings={settings} text={text} language={language} />
       </div>
     </div>
   );
+}
+
+function autoSubtitlePreviewTransitionMs(animation: CaptionAnimation): number {
+  switch (animation) {
+    case "none":
+      return 0;
+    case "pop":
+      return 360;
+    default:
+      return 260;
+  }
+}
+
+function autoSubtitlePreviewAnimationCss(
+  animation: CaptionAnimation,
+): { in: string; out: string } {
+  const duration = autoSubtitlePreviewTransitionMs(animation);
+  if (animation === "none") {
+    return { in: "none", out: "none" };
+  }
+  switch (animation) {
+    case "slideIn":
+    case "slideUp":
+      return {
+        in: `${duration}ms autoSubtitlePreviewSlideUpIn ease-out both`,
+        out: `${Math.max(160, duration - 60)}ms autoSubtitlePreviewSlideUpOut ease-in both`,
+      };
+    case "slideDown":
+      return {
+        in: `${duration}ms autoSubtitlePreviewSlideDownIn ease-out both`,
+        out: `${Math.max(160, duration - 60)}ms autoSubtitlePreviewSlideDownOut ease-in both`,
+      };
+    case "scale":
+      return {
+        in: `${duration}ms autoSubtitlePreviewScaleIn ease-out both`,
+        out: `${Math.max(160, duration - 60)}ms autoSubtitlePreviewScaleOut ease-in both`,
+      };
+    case "pop":
+      return {
+        in: `${duration}ms autoSubtitlePreviewPopIn cubic-bezier(.2,1.35,.35,1) both`,
+        out: "180ms autoSubtitlePreviewPopOut ease-in both",
+      };
+    case "fade":
+    case "typewriter":
+    case "wordHighlight":
+    default:
+      return {
+        in: `${duration}ms autoSubtitlePreviewFadeIn ease-out both`,
+        out: `${Math.max(160, duration - 60)}ms autoSubtitlePreviewFadeOut ease-in both`,
+      };
+  }
 }
 
 function AutoSubtitlePreviewText({
@@ -6130,7 +6382,9 @@ function AutoSubtitlePanel({
       : "Upload an MP4, generate subtitles, and keep an editable project.",
     uploadTitle: th ? "วิดีโอต้นฉบับ" : "Source video",
     uploadHint: th ? "ลาก MP4 มาวาง หรือคลิกเพื่ออัปโหลด" : "Drop an MP4 here or click to upload",
-    uploadLimit: th ? "รองรับ MP4/MOV/WEBM สูงสุด 1 GB" : "MP4/MOV/WEBM, up to 1 GB",
+    uploadLimit: th
+      ? `รองรับ MP4/MOV/WEBM สูงสุด ${AUTO_SUBTITLE_UPLOAD_MAX_LABEL} / ${AUTO_SUBTITLE_MAX_DURATION_LABEL_TH}`
+      : `MP4/MOV/WEBM, up to ${AUTO_SUBTITLE_UPLOAD_MAX_LABEL} / ${AUTO_SUBTITLE_MAX_DURATION_LABEL}`,
     speechLanguage: th ? "ภาษาเสียง" : "Speech",
     preset: th ? "สไตล์ซับ" : "Style",
     font: th ? "ฟอนต์" : "Font",
@@ -8916,46 +9170,45 @@ function CreationFeed({
   onDeleteJob: (job: StandaloneJobRow) => void;
 }) {
   const [preview, setPreview] = useState<PreviewPayload | null>(null);
-  const [statusFilter, setStatusFilter] = useState<CreationStatusFilter>("all");
+  const [layoutMode, setLayoutMode] = useState<"grid" | "row">("grid");
   const { language, t } = useLanguage();
   const onStandaloneCropConfirmed = (blob: Blob, filename: string) => {
     const cleanName = filename.replace(/\.[a-z0-9]{2,5}$/i, "") || "crop";
     triggerBlobDownload(blob, buildDownloadFilename(cleanName, "png"));
     toast.success(t("workspace.stock.download_started"));
   };
-  const visibleJobs = useMemo(
-    () => jobs.filter((job) => creationStatusMatches(job, statusFilter)),
-    [jobs, statusFilter],
-  );
-  const statusFilters: Array<{ id: CreationStatusFilter; label: string }> = [
-    { id: "all", label: language === "th" ? "ทั้งหมด" : "All" },
-    { id: "completed", label: language === "th" ? "สำเร็จ" : "Done" },
-    { id: "active", label: language === "th" ? "กำลังทำ" : "Active" },
-    { id: "failed", label: language === "th" ? "ล้มเหลว" : "Failed" },
+  const viewModes: Array<{
+    id: "grid" | "row";
+    label: string;
+    icon: typeof LayoutGrid;
+  }> = [
+    { id: "grid", label: language === "th" ? "กริด" : "Grid", icon: LayoutGrid },
+    { id: "row", label: language === "th" ? "แถว" : "Row", icon: Rows3 },
   ];
 
   return (
     <>
-      <div className="mb-3 flex min-h-8 items-center justify-end gap-1.5">
-        <div className="flex items-center gap-1 rounded-full bg-white/[0.035] p-1 text-[11px] text-zinc-400">
-          <span className="grid h-6 w-6 place-items-center rounded-full text-zinc-500">
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-          </span>
-          {statusFilters.map((filter) => {
-            const active = statusFilter === filter.id;
+      <div className="mb-3 flex min-h-8 items-center justify-start">
+        <div className="inline-flex items-center gap-1 rounded-[10px] bg-[#1b1b1b]/95 p-1 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]">
+          {viewModes.map((mode) => {
+            const active = layoutMode === mode.id;
+            const Icon = mode.icon;
             return (
               <button
-                key={filter.id}
+                key={mode.id}
                 type="button"
-                onClick={() => setStatusFilter(filter.id)}
+                aria-label={mode.label}
+                aria-pressed={active}
+                title={mode.label}
+                onClick={() => setLayoutMode(mode.id)}
                 className={cn(
-                  "h-6 rounded-full px-2 text-[11px] font-semibold transition",
+                  "grid h-7 w-8 place-items-center rounded-[8px] text-zinc-400 transition",
                   active
-                    ? "bg-white text-zinc-950"
-                    : "text-zinc-400 hover:bg-white/[0.07] hover:text-white",
+                    ? "bg-white text-zinc-950 shadow-[0_8px_18px_rgba(0,0,0,0.24)]"
+                    : "hover:bg-white/[0.07] hover:text-white",
                 )}
               >
-                {filter.label}
+                <Icon className="h-4 w-4" />
               </button>
             );
           })}
@@ -8980,22 +9233,31 @@ function CreationFeed({
             </p>
           </div>
         </div>
-      ) : visibleJobs.length === 0 ? (
-        <div className="grid min-h-[360px] place-items-center p-8 text-center">
-          <div className="text-[13px] text-zinc-500">
-            {language === "th" ? "ไม่มีผลลัพธ์ในตัวกรองนี้" : "No results for this filter"}
-          </div>
-        </div>
       ) : (
-        <div className="flex flex-wrap items-start gap-2">
-          {visibleJobs.map((job) => (
-            <CreationTile
-              key={job.id}
-              job={job}
-              onPreview={setPreview}
-              onDelete={() => onDeleteJob(job)}
-            />
-          ))}
+        <div
+          className={cn(
+            layoutMode === "grid"
+              ? "flex flex-wrap items-start gap-2"
+              : "flex flex-col gap-2",
+          )}
+        >
+          {jobs.map((job) =>
+            layoutMode === "grid" ? (
+              <CreationTile
+                key={job.id}
+                job={job}
+                onPreview={setPreview}
+                onDelete={() => onDeleteJob(job)}
+              />
+            ) : (
+              <CreationRow
+                key={job.id}
+                job={job}
+                onPreview={setPreview}
+                onDelete={() => onDeleteJob(job)}
+              />
+            ),
+          )}
         </div>
       )}
       {preview && (
@@ -9007,15 +9269,6 @@ function CreationFeed({
       )}
     </>
   );
-}
-
-type CreationStatusFilter = "all" | "completed" | "active" | "failed";
-
-function creationStatusMatches(job: StandaloneJobRow, filter: CreationStatusFilter) {
-  if (filter === "all") return true;
-  if (filter === "completed") return job.status === "completed";
-  if (filter === "active") return job.status === "queued" || job.status === "running";
-  return job.status === "failed" || job.status === "permanent_failed";
 }
 
 const MODEL_FILE_RE = /\.(glb|gltf|usdz|obj|fbx)(?:[?#].*)?$/i;
@@ -9809,9 +10062,11 @@ function CreationTile({
 function CreationRow({
   job,
   onPreview,
+  onDelete,
 }: {
   job: StandaloneJobRow;
   onPreview: (preview: PreviewPayload) => void;
+  onDelete: () => void;
 }) {
   const { language, t } = useLanguage();
   const result = job.result;
@@ -9932,6 +10187,7 @@ function CreationRow({
   };
   const canOpenPreview =
     !!modelUrl || canPreviewImage || canPreviewVideo || canPreviewAudio;
+  const canDelete = !isActive;
   return (
     <article className="rounded-xl bg-[#222222] px-3 py-3">
       <div className="mb-2 flex items-start justify-between gap-3">
@@ -10112,6 +10368,21 @@ function CreationRow({
               title={t("workspace.standalone.preview_3d_model")}
             >
               <Box className="h-4 w-4" />
+            </button>
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onDelete();
+              }}
+              className="grid h-9 w-9 place-items-center rounded-lg bg-white/[0.06] text-zinc-400 transition hover:bg-red-500/15 hover:text-red-200"
+              aria-label={language === "th" ? "ลบรายการ" : "Delete result"}
+              title={language === "th" ? "ลบรายการ" : "Delete result"}
+            >
+              <Trash2 className="h-4 w-4" />
             </button>
           )}
         </div>
@@ -10485,14 +10756,14 @@ async function persistAutoSubtitleResultAsset({
 
   let insert = await supabase
     .from("user_assets")
-    .insert(payload as any)
+    .insert(payload as never)
     .select("*")
     .single();
   if (insert.error && isMissingProjectIdColumn(insert.error)) {
     const { project_id: _projectId, ...fallbackPayload } = payload;
     insert = await supabase
       .from("user_assets")
-      .insert(fallbackPayload as any)
+      .insert(fallbackPayload as never)
       .select("*")
       .single();
   }
@@ -10852,9 +11123,11 @@ function buildCurrentParams(
       fill: form.autoSubtitleFill,
       highlight_color: form.autoSubtitleHighlightColor,
       position: form.autoSubtitlePosition,
+      transition: form.autoSubtitleTransition,
       segmentation_mode: form.autoSubtitleSegmentationMode,
       words_per_line: form.autoSubtitleWordsPerLine,
-      source_duration_seconds: form.autoSubtitleVideo?.durationSec ?? 60,
+      source_duration_seconds:
+        form.autoSubtitleVideo?.durationSec ?? AUTO_SUBTITLE_MAX_DURATION_SEC,
     };
   }
   if (tool === "image_to_3d") {
@@ -11026,6 +11299,13 @@ function validateForm(
   }
   if (tool === "auto_subtitle" && !form.autoSubtitleVideo) {
     return "Upload an MP4 video before generating subtitles.";
+  }
+  if (
+    tool === "auto_subtitle" &&
+    form.autoSubtitleVideo?.durationSec &&
+    !isAutoSubtitleDurationValid(form.autoSubtitleVideo.durationSec)
+  ) {
+    return autoSubtitleDurationMessage(form.autoSubtitleVideo.durationSec);
   }
   if (tool === "image_to_3d" && threeDReferencesForForm(form).length === 0) {
     return t("workspace.standalone.validation.model_image");

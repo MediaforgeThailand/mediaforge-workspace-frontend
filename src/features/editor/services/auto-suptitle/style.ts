@@ -1,5 +1,9 @@
-import type { TextStyle } from "@/lib/openreel-core";
-import type { CaptionStyleSettings } from "../caption-presets";
+import type {
+  TextAnimation,
+  TextAnimationPreset,
+  TextStyle,
+} from "@/lib/openreel-core";
+import type { CaptionAnimation, CaptionStyleSettings } from "../caption-presets";
 import type { AutoSuptitleStyle } from "./types";
 
 export function autoSuptitleSettingsToTextStyle(
@@ -51,6 +55,63 @@ export function autoSuptitlePositionToTransform(
   if (settings.positionV === "top") y = settings.margin / refHeight;
   else if (settings.positionV === "bottom") y = 1 - settings.margin / refHeight;
   return { x, y };
+}
+
+const AUTO_SUPTITLE_TRANSITION_SECONDS = 0.22;
+const AUTO_SUPTITLE_TRANSITION_OUT_SECONDS = 0.16;
+
+function captionAnimationToTextPreset(
+  animation: CaptionAnimation,
+): TextAnimationPreset {
+  switch (animation) {
+    case "fade":
+      return "fade";
+    case "slideIn":
+    case "slideUp":
+      return "slide-down";
+    case "slideDown":
+      return "slide-up";
+    case "scale":
+      return "scale";
+    case "pop":
+      return "pop";
+    case "typewriter":
+      return "typewriter";
+    case "none":
+    case "wordHighlight":
+    default:
+      return "none";
+  }
+}
+
+export function autoSuptitleSettingsToTextAnimation(
+  settings: CaptionStyleSettings,
+): TextAnimation | undefined {
+  const preset = captionAnimationToTextPreset(settings.animation);
+  if (preset === "none") {
+    return {
+      preset: "none",
+      outPreset: "none",
+      inDuration: 0,
+      outDuration: 0,
+      params: { easing: "linear" },
+    };
+  }
+
+  return {
+    preset,
+    outPreset: preset === "typewriter" ? "fade" : preset,
+    inDuration: AUTO_SUPTITLE_TRANSITION_SECONDS,
+    outDuration: AUTO_SUPTITLE_TRANSITION_OUT_SECONDS,
+    params: {
+      fadeOpacity: { start: 0, end: 1 },
+      slideDistance: 0.035,
+      scaleFrom: preset === "pop" ? 0.82 : 0.92,
+      scaleTo: 1,
+      popOvershoot: 1.08,
+      easing: preset === "pop" ? "easeOutBack" : "ease-out",
+    },
+  };
 }
 
 export function buildAutoSuptitleStyle(

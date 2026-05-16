@@ -35,6 +35,12 @@ function getCost(
       return entry.cost;
     }
 
+    if (pricingType === "per_minute") {
+      const entry = modelEntries[0];
+      if (durationSeconds) return Math.ceil((entry.cost * durationSeconds) / 60);
+      return entry.cost;
+    }
+
     if (pricingType === "fixed") {
       const exact = modelEntries.find(
         c => c.duration_seconds === (durationSeconds ?? 5) && c.has_audio === (hasAudio ?? false)
@@ -57,6 +63,7 @@ const MOCK_COSTS: CreditCostEntry[] = [
   { feature: "generate_freepik_video", model: "kling-2-5-pro", cost: 10, pricing_type: "fixed", duration_seconds: 5, has_audio: true },
   { feature: "generate_freepik_image", model: null, cost: 3, pricing_type: "per_operation", duration_seconds: null, has_audio: false },
   { feature: "remove_background", model: null, cost: 1, pricing_type: "per_operation", duration_seconds: null, has_audio: false },
+  { feature: "auto_subtitle", model: "auto-suptitle-whisper", cost: 70, pricing_type: "per_minute", duration_seconds: null, has_audio: false },
 ];
 
 describe("getCost (credit cost calculation)", () => {
@@ -78,6 +85,10 @@ describe("getCost (credit cost calculation)", () => {
 
   it("returns per-second unit cost without duration", () => {
     expect(getCost(MOCK_COSTS, "generate_freepik_video", "kling-2-1-std")).toBe(2);
+  });
+
+  it("calculates per_minute pricing with rounded-up duration", () => {
+    expect(getCost(MOCK_COSTS, "auto_subtitle", "auto-suptitle-whisper", 125)).toBe(146);
   });
 
   it("returns fixed pricing for exact duration match", () => {

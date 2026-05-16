@@ -51,6 +51,17 @@ function normalizeWord(word: AutoSuptitleWhisperWord): AutoSuptitleWhisperWord |
   return { word: text, start: Math.max(0, word.start), end: Math.max(0, word.end) };
 }
 
+function normalizeTimingIndexWord(
+  word: AutoSuptitleWhisperWord,
+): AutoSuptitleWhisperWord | null {
+  const text = normalizeCaptionText(word.word ?? "");
+  if (!text) return null;
+  if (!Number.isFinite(word.start) || !Number.isFinite(word.end)) return null;
+  const start = Math.max(0, word.start);
+  const end = Math.max(start, word.end);
+  return { word: text, start, end };
+}
+
 function cueTextLength(words: AutoSuptitleWhisperWord[], next?: AutoSuptitleWhisperWord): number {
   const source = next ? [...words, next] : words;
   return joinCaptionUnits(source.map((w) => w.word)).length;
@@ -99,6 +110,10 @@ function normalizeCaptionText(text: string): string {
     .trim();
 }
 
+function normalizeCaptionSpacing(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
 function shouldJoinWithoutSpace(previous: string, next: string): boolean {
   if (!previous || !next) return false;
   if (/^[,.;:!?…。、！？）」』】％%]+$/.test(next)) return true;
@@ -121,11 +136,43 @@ function joinCaptionUnits(units: readonly string[]): string {
 }
 
 function captionTextLength(text: string): number {
-  return Array.from(text).length;
+  const normalized = text.normalize("NFC");
+  const Segmenter = (
+    Intl as unknown as {
+      Segmenter?: new (
+        locales?: string | string[],
+        options?: { granularity?: "grapheme" },
+      ) => { segment(input: string): Iterable<{ segment: string }> };
+    }
+  ).Segmenter;
+  if (Segmenter) {
+    return Array.from(
+      new Segmenter(undefined, { granularity: "grapheme" }).segment(normalized),
+    ).length;
+  }
+  return Array.from(normalized.replace(/\p{Mark}/gu, "")).length;
 }
 
 function unitLooksThai(unit: string): boolean {
   return /[\u0E00-\u0E7F]/.test(unit);
+}
+
+function shouldPreserveCaptionSpacing(text: string): boolean {
+  const normalized = normalizeCaptionSpacing(text);
+  if (!/\s/.test(normalized)) return false;
+  const parts = normalized.split(" ").filter(Boolean);
+  if (parts.length <= 1) return false;
+
+  const hasAsciiTerm = /[A-Za-z][A-Za-z0-9+._-]*/.test(normalized);
+  const hasMeaningfulThaiTerm = parts.some(
+    (part) => unitLooksThai(part) && captionTextLength(part) >= 3,
+  );
+  const looksLikeThaiFragments = parts.every((part) => {
+    const length = captionTextLength(part);
+    return unitLooksThai(part) && length <= 2 && !/[A-Za-z0-9]/.test(part);
+  });
+
+  return (hasAsciiTerm || hasMeaningfulThaiTerm) && !looksLikeThaiFragments;
 }
 
 const THAI_CONTEXT_JOINERS = new Set([
@@ -142,6 +189,98 @@ const THAI_CONTEXT_JOINERS = new Set([
   "เพื่อ",
 ]);
 
+const THAI_DANGLING_JOINERS = new Set(["และ", "กับ", "หรือ", "แต่", "ให้", "เพื่อ"]);
+
+const AUTO_SUPTITLE_LOCAL_RAG = {
+  standaloneCuePrefixes: ["Motion Control"],
+  protectedThaiCompounds: [
+    { text: "ภาพนิ่ง", parts: ["ภาพ", "นิ่ง"] },
+    { text: "แอ็กชั่น", parts: ["แอ็", "กชั่น"] },
+    { text: "แอคชั่น", parts: ["แอค", "ชั่น"] },
+    { text: "คาแรกเตอร์", parts: ["คา", "แรก", "เตอร์"] },
+    { text: "อากาศดีมาก", parts: ["อากาศ", "ดี", "มาก"] },
+    { text: "ออกมา", parts: ["ออก", "มา"] },
+  ],
+};
+
+function normalizeComparableAscii(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+}
+
+function isStandaloneDomainCue(text: string): boolean {
+  const normalized = normalizeComparableAscii(text);
+  return AUTO_SUPTITLE_LOCAL_RAG.standaloneCuePrefixes.some(
+    (term) => normalized === normalizeComparableAscii(term),
+  );
+}
+
+function splitDomainCueBoundary(text: string, language?: string | null): string[] {
+  const normalized = normalizeCaptionSpacing(text);
+  if (!normalized) return [];
+  const shouldApplyThaiRules =
+    textLooksSegmentPreferred(normalized) || isSegmentTextPreferredLanguage(language);
+  if (!shouldApplyThaiRules) return [normalized];
+
+  for (const term of AUTO_SUPTITLE_LOCAL_RAG.standaloneCuePrefixes) {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+    const match = normalized.match(new RegExp(`^(${escaped})\\s+(.+)$`, "i"));
+    if (!match) continue;
+    const rest = normalizeCaptionSpacing(match[2] ?? "");
+    if (!rest || !textLooksSegmentPreferred(rest)) continue;
+    return [normalizeCaptionSpacing(match[1] ?? term), rest];
+  }
+
+  return [normalized];
+}
+
+function protectedThaiTailCarryCount(
+  units: readonly string[],
+  canCarry: (count: number) => boolean,
+): number {
+  for (const compound of AUTO_SUPTITLE_LOCAL_RAG.protectedThaiCompounds) {
+    const count = compound.parts.length;
+    if (count <= 1 || units.length < count) continue;
+    const tail = units.slice(units.length - count).join("");
+    if (tail === compound.text && canCarry(count)) return count;
+  }
+  return 0;
+}
+
+function protectedThaiIncomingCarryCount(
+  units: readonly string[],
+  incomingUnit: string,
+  canCarry: (count: number) => boolean,
+): number {
+  for (const compound of AUTO_SUPTITLE_LOCAL_RAG.protectedThaiCompounds) {
+    const countBeforeIncoming = compound.parts.length - 1;
+    if (countBeforeIncoming <= 0 || units.length < countBeforeIncoming) continue;
+    if (incomingUnit !== compound.parts[compound.parts.length - 1]) continue;
+
+    const tailBeforeIncoming = units.slice(units.length - countBeforeIncoming).join("");
+    const expectedBeforeIncoming = compound.parts.slice(0, -1).join("");
+    if (tailBeforeIncoming !== expectedBeforeIncoming) continue;
+
+    const joinerIndex = units.length - countBeforeIncoming - 1;
+    const previousIndex = joinerIndex - 1;
+    if (
+      previousIndex >= 0 &&
+      THAI_CONTEXT_JOINERS.has(units[joinerIndex] ?? "") &&
+      canCarry(countBeforeIncoming + 2)
+    ) {
+      return countBeforeIncoming + 2;
+    }
+    if (
+      joinerIndex >= 0 &&
+      THAI_CONTEXT_JOINERS.has(units[joinerIndex] ?? "") &&
+      canCarry(countBeforeIncoming + 1)
+    ) {
+      return countBeforeIncoming + 1;
+    }
+    if (canCarry(countBeforeIncoming)) return countBeforeIncoming;
+  }
+  return 0;
+}
+
 function thaiOverflowCarryCount(
   units: readonly string[],
   incomingUnit: string,
@@ -150,7 +289,7 @@ function thaiOverflowCarryCount(
   if (units.length < 2) return 0;
   if (!unitLooksThai(incomingUnit) && !units.some(unitLooksThai)) return 0;
 
-  const minCommittedChars = Math.min(12, Math.max(6, Math.floor(maxChars * 0.4)));
+  const minCommittedChars = Math.min(9, Math.max(6, Math.floor(maxChars * 0.4)));
   const maxNextChars = Math.max(maxChars, Math.ceil(maxChars * 1.15));
 
   const canCarry = (count: number) => {
@@ -164,6 +303,16 @@ function thaiOverflowCarryCount(
       captionTextLength(nextText) <= maxNextChars
     );
   };
+
+  const incomingProtectedCarryCount = protectedThaiIncomingCarryCount(
+    units,
+    incomingUnit,
+    canCarry,
+  );
+  if (incomingProtectedCarryCount > 0) return incomingProtectedCarryCount;
+
+  const protectedCarryCount = protectedThaiTailCarryCount(units, canCarry);
+  if (protectedCarryCount > 0) return protectedCarryCount;
 
   const tail = units[units.length - 1] ?? "";
   if (THAI_CONTEXT_JOINERS.has(tail) && units.length >= 3 && canCarry(2)) {
@@ -230,6 +379,109 @@ function captionUnitsFromText(text: string, language?: string | null): string[] 
   return Array.from(normalized);
 }
 
+type CaptionTextUnit = { text: string; spaceBefore: boolean };
+
+function sentenceCaptionUnitsFromText(
+  text: string,
+  language?: string | null,
+): CaptionTextUnit[] {
+  const normalized = normalizeCaptionSpacing(text);
+  if (!normalized) return [];
+
+  const parts = normalized.split(" ").filter(Boolean);
+  const units: CaptionTextUnit[] = [];
+
+  for (const part of parts) {
+    const subUnits = captionUnitsFromText(part, language);
+    const effectiveUnits = subUnits.length > 0 ? subUnits : [part];
+    effectiveUnits.forEach((unit, index) => {
+      const cleanUnit = normalizeCaptionText(unit);
+      if (!cleanUnit) return;
+      units.push({
+        text: cleanUnit,
+        spaceBefore: units.length > 0 && index === 0,
+      });
+    });
+  }
+
+  return units;
+}
+
+function joinSentenceCaptionUnits(units: readonly CaptionTextUnit[]): string {
+  let output = "";
+  for (const unit of units) {
+    const text = normalizeCaptionText(unit.text);
+    if (!text) continue;
+    if (!output) {
+      output = text;
+      continue;
+    }
+    output += unit.spaceBefore || !shouldJoinWithoutSpace(output, text) ? ` ${text}` : text;
+  }
+  return output.trim();
+}
+
+function joinSentenceChunks(chunks: readonly string[]): string {
+  let output = "";
+  for (const chunk of chunks) {
+    const clean = normalizeCaptionSpacing(chunk);
+    if (!clean) continue;
+    if (!output) {
+      output = clean;
+      continue;
+    }
+    output += shouldJoinWithoutSpace(output, clean) ? clean : ` ${clean}`;
+  }
+  return output.trim();
+}
+
+function sentenceOverflowCarryCount(
+  units: readonly CaptionTextUnit[],
+  incomingUnit: CaptionTextUnit,
+  maxChars: number,
+): number {
+  if (units.length < 2) return 0;
+  if (!unitLooksThai(incomingUnit.text) && !units.some((unit) => unitLooksThai(unit.text))) {
+    return 0;
+  }
+
+  const minCommittedChars = Math.min(9, Math.max(6, Math.floor(maxChars * 0.4)));
+  const maxNextChars = Math.max(maxChars, Math.ceil(maxChars * 1.15));
+
+  const canCarry = (count: number) => {
+    const committed = units.slice(0, units.length - count);
+    const carried = units.slice(units.length - count);
+    if (committed.length === 0 || carried.length === 0) return false;
+    const committedText = joinSentenceCaptionUnits(committed);
+    const nextText = joinSentenceCaptionUnits([...carried, incomingUnit]);
+    return (
+      captionTextLength(committedText) >= minCommittedChars &&
+      captionTextLength(nextText) <= maxNextChars
+    );
+  };
+
+  const incomingProtectedCarryCount = protectedThaiIncomingCarryCount(
+    units.map((unit) => unit.text),
+    incomingUnit.text,
+    canCarry,
+  );
+  if (incomingProtectedCarryCount > 0) return incomingProtectedCarryCount;
+
+  const protectedCarryCount = protectedThaiTailCarryCount(
+    units.map((unit) => unit.text),
+    canCarry,
+  );
+  if (protectedCarryCount > 0) return protectedCarryCount;
+
+  const tail = units[units.length - 1]?.text ?? "";
+  if (THAI_CONTEXT_JOINERS.has(tail) && units.length >= 3 && canCarry(2)) {
+    return 2;
+  }
+  if (THAI_CONTEXT_JOINERS.has(tail)) return 0;
+
+  return canCarry(1) ? 1 : 0;
+}
+
 function wordsFromSegments(
   segments: AutoSuptitleWhisperSegment[],
   language?: string | null,
@@ -294,7 +546,7 @@ function estimateWordsFromTranscriptText(
 function comparableCaptionText(text: string): string {
   return normalizeCaptionText(text)
     .toLocaleLowerCase()
-    .replace(/[\s"'`.,;:!?…。，、！？()[\]{}<>|\/\\\-–—_*+=~@#$%^&]+/g, "");
+    .replace(/[\s"'`.,;:!?…。，、！？()[\]{}<>|/\\\-–—_*+=~@#$%^&]+/g, "");
 }
 
 function extractAsciiTerms(text: string): string[] {
@@ -330,7 +582,9 @@ function suggestedCuesPreserveTranscript(
 }
 
 function timingTextIndexFromWords(timingWords: AutoSuptitleWhisperWord[]) {
-  const words = timingWords.map(normalizeWord).filter(Boolean) as AutoSuptitleWhisperWord[];
+  const words = timingWords
+    .map(normalizeTimingIndexWord)
+    .filter(Boolean) as AutoSuptitleWhisperWord[];
   let text = "";
   const charToWordIndex: number[] = [];
 
@@ -344,6 +598,36 @@ function timingTextIndexFromWords(timingWords: AutoSuptitleWhisperWord[]) {
   });
 
   return { text, charToWordIndex, words };
+}
+
+function hasTimingDuration(word: AutoSuptitleWhisperWord | undefined): boolean {
+  return Boolean(word && word.end > word.start);
+}
+
+function nearestCueStartWord(
+  words: readonly AutoSuptitleWhisperWord[],
+  index: number,
+): AutoSuptitleWhisperWord {
+  for (let cursor = index; cursor < words.length; cursor += 1) {
+    if (hasTimingDuration(words[cursor])) return words[cursor];
+  }
+  for (let cursor = index; cursor >= 0; cursor -= 1) {
+    if (hasTimingDuration(words[cursor])) return words[cursor];
+  }
+  return words[index];
+}
+
+function nearestCueEndWord(
+  words: readonly AutoSuptitleWhisperWord[],
+  index: number,
+): AutoSuptitleWhisperWord {
+  for (let cursor = index; cursor >= 0; cursor -= 1) {
+    if (hasTimingDuration(words[cursor])) return words[cursor];
+  }
+  for (let cursor = index; cursor < words.length; cursor += 1) {
+    if (hasTimingDuration(words[cursor])) return words[cursor];
+  }
+  return words[index];
 }
 
 function alignSuggestedCueTextsToTimingWords(
@@ -384,8 +668,8 @@ function alignSuggestedCueTextsToTimingWords(
       matchIndex + Math.max(1, matchLength) - 1,
     );
     const endWordIndex = timingIndex.charToWordIndex[endCharIndex] ?? startWordIndex;
-    const startWord = timingIndex.words[startWordIndex];
-    const endWord = timingIndex.words[endWordIndex] ?? startWord;
+    const startWord = nearestCueStartWord(timingIndex.words, startWordIndex);
+    const endWord = nearestCueEndWord(timingIndex.words, endWordIndex) ?? startWord;
 
     aligned.push({
       word: cueText,
@@ -453,7 +737,7 @@ function estimateWordsFromSuggestedCues(
   timingWords: AutoSuptitleWhisperWord[],
   durationSec?: number | null,
 ): AutoSuptitleWhisperWord[] {
-  const cleaned = cues.map(normalizeCaptionText).filter(Boolean);
+  const cleaned = cues.map(normalizeCaptionSpacing).filter(Boolean);
   if (cleaned.length === 0) return [];
 
   const fallback = estimateSuggestedCuesByDuration(cleaned, timingWords, durationSec);
@@ -502,26 +786,26 @@ function splitCueTextBySentenceLimits(
   algorithm: AutoSuptitleAlgorithmSettings,
   language?: string | null,
 ): string[] {
-  const normalized = normalizeCaptionText(text);
+  const normalized = normalizeCaptionSpacing(text);
   if (!normalized) return [];
 
-  const units = captionUnitsFromText(normalized, language);
+  const units = sentenceCaptionUnitsFromText(normalized, language);
   if (units.length === 0) return [];
 
   const maxChars = Math.max(18, Math.floor(algorithm.maxCharsPerLine));
   const chunks: string[] = [];
-  let bucket: string[] = [];
+  let bucket: CaptionTextUnit[] = [];
 
   const flush = () => {
-    const chunk = joinCaptionUnits(bucket);
+    const chunk = joinSentenceCaptionUnits(bucket);
     if (chunk) chunks.push(chunk);
     bucket = [];
   };
 
   for (const unit of units) {
-    const nextText = joinCaptionUnits([...bucket, unit]);
+    const nextText = joinSentenceCaptionUnits([...bucket, unit]);
     if (bucket.length > 0 && captionTextLength(nextText) > maxChars) {
-      const carryCount = thaiOverflowCarryCount(bucket, unit, maxChars);
+      const carryCount = sentenceOverflowCarryCount(bucket, unit, maxChars);
       if (carryCount > 0) {
         const carried = bucket.slice(bucket.length - carryCount);
         bucket = bucket.slice(0, bucket.length - carryCount);
@@ -534,8 +818,8 @@ function splitCueTextBySentenceLimits(
 
     bucket.push(unit);
 
-    const currentText = joinCaptionUnits(bucket);
-    const endsClause = /[.!?;:…。！？]$/.test(unit);
+    const currentText = joinSentenceCaptionUnits(bucket);
+    const endsClause = /[.!?;:…。！？]$/.test(unit.text);
     if (bucket.length >= 2 && endsClause && captionTextLength(currentText) >= 10) {
       flush();
     }
@@ -543,6 +827,73 @@ function splitCueTextBySentenceLimits(
 
   flush();
   return chunks;
+}
+
+function repairProtectedThaiCompoundBoundaries(
+  chunks: readonly string[],
+  algorithm: AutoSuptitleAlgorithmSettings,
+): string[] {
+  const repaired: string[] = [];
+  const maxChars = Math.max(18, Math.floor(algorithm.maxCharsPerLine));
+
+  for (const chunk of chunks) {
+    let current = normalizeCaptionSpacing(chunk);
+    if (!current) continue;
+
+    for (const compound of AUTO_SUPTITLE_LOCAL_RAG.protectedThaiCompounds) {
+      if (compound.parts.length !== 2) continue;
+      const [head, tail] = compound.parts;
+      const previous = repaired[repaired.length - 1] ?? "";
+      if (!previous.endsWith(head) || !current.startsWith(tail)) continue;
+
+      const previousWithTail = `${previous}${tail}`;
+      if (captionTextLength(previousWithTail) <= maxChars) {
+        repaired[repaired.length - 1] = previousWithTail;
+        current = normalizeCaptionSpacing(current.slice(tail.length));
+      } else {
+        const previousWithoutHead = normalizeCaptionSpacing(previous.slice(0, -head.length));
+        if (previousWithoutHead) {
+          repaired[repaired.length - 1] = previousWithoutHead;
+        } else {
+          repaired.pop();
+        }
+        current = `${head}${current}`;
+      }
+      break;
+    }
+
+    if (current) repaired.push(current);
+  }
+
+  return repaired;
+}
+
+function repairDanglingThaiJoinerBoundaries(chunks: readonly string[]): string[] {
+  const repaired: string[] = [];
+
+  for (const chunk of chunks) {
+    let current = normalizeCaptionSpacing(chunk);
+    if (!current) continue;
+
+    const previous = repaired[repaired.length - 1] ?? "";
+    const danglingJoiner = Array.from(THAI_DANGLING_JOINERS).find(
+      (joiner) => previous.endsWith(joiner) && previous.length > joiner.length,
+    );
+
+    if (danglingJoiner) {
+      const previousWithoutJoiner = normalizeCaptionSpacing(
+        previous.slice(0, -danglingJoiner.length),
+      );
+      if (previousWithoutJoiner) {
+        repaired[repaired.length - 1] = previousWithoutJoiner;
+        current = `${danglingJoiner}${current}`;
+      }
+    }
+
+    repaired.push(current);
+  }
+
+  return repaired;
 }
 
 function shouldMergeShortSentenceChunk(
@@ -553,10 +904,11 @@ function shouldMergeShortSentenceChunk(
 ): boolean {
   if (!next) return false;
   if (/[.!?;:…。！？]$/.test(current)) return false;
+  if (isStandaloneDomainCue(current)) return false;
 
-  const currentUnits = captionUnitsFromText(current, language);
+  const currentUnits = sentenceCaptionUnitsFromText(current, language);
   const currentLength = captionTextLength(current);
-  const mergedLength = captionTextLength(joinCaptionUnits([current, next]));
+  const mergedLength = captionTextLength(joinSentenceChunks([current, next]));
   const maxChars = Math.max(18, Math.floor(algorithm.maxCharsPerLine));
   const hasAscii = /[A-Za-z]/.test(current);
 
@@ -579,23 +931,23 @@ function mergeOrphanSentenceChunks(
     const current = chunks[index];
     const next = chunks[index + 1];
     if (shouldMergeShortSentenceChunk(current, next, algorithm, language)) {
-      merged.push(joinCaptionUnits([current, next ?? ""]));
+      merged.push(joinSentenceChunks([current, next ?? ""]));
       index += 1;
       continue;
     }
 
     const previous = merged[merged.length - 1];
-    const currentUnits = captionUnitsFromText(current, language);
+    const currentUnits = sentenceCaptionUnitsFromText(current, language);
     const currentLength = captionTextLength(current);
     const canMergeBack =
       previous &&
       !/[.!?;:…。！？]$/.test(previous) &&
       currentUnits.length <= 1 &&
       currentLength <= 8 &&
-      captionTextLength(joinCaptionUnits([previous, current])) <= maxChars;
+      captionTextLength(joinSentenceChunks([previous, current])) <= maxChars;
 
     if (canMergeBack) {
-      merged[merged.length - 1] = joinCaptionUnits([previous, current]);
+      merged[merged.length - 1] = joinSentenceChunks([previous, current]);
     } else {
       merged.push(current);
     }
@@ -617,20 +969,32 @@ function buildCuesFromSuggestedCueTexts(
   const maxWordsPerCue =
     Math.max(1, Math.floor(algorithm.wordsPerLine)) *
     Math.max(1, Math.floor(algorithm.maxLinesPerCue));
-  const cleanedCueTexts = cueTexts.map(normalizeCaptionText).filter(Boolean);
+  const cleanCueText = isSentenceSegmentationMode(algorithm)
+    ? normalizeCaptionSpacing
+    : normalizeCaptionText;
+  const cleanedCueTexts = cueTexts.map(cleanCueText).filter(Boolean);
   const safeCueTexts = suggestedCuesPreserveTranscript(cleanedCueTexts, transcriptText)
     ? cleanedCueTexts
-    : [normalizeCaptionText(transcriptText ?? "")].filter(Boolean);
+    : [cleanCueText(transcriptText ?? "")].filter(Boolean);
+  const domainAwareCueTexts = isSentenceSegmentationMode(algorithm)
+    ? safeCueTexts.flatMap((cueText) => splitDomainCueBoundary(cueText, language))
+    : safeCueTexts;
   const rawCueTextChunks = isSentenceSegmentationMode(algorithm)
-    ? safeCueTexts.flatMap((cueText) =>
+    ? domainAwareCueTexts.flatMap((cueText) =>
         splitCueTextBySentenceLimits(cueText, algorithm, language),
       )
-    : safeCueTexts.flatMap((cueText) =>
+    : domainAwareCueTexts.flatMap((cueText) =>
         splitCueTextByWordLimit(cueText, maxWordsPerCue, language),
       );
-  const cueTextChunks = isSentenceSegmentationMode(algorithm)
-    ? mergeOrphanSentenceChunks(rawCueTextChunks, algorithm, language)
+  const repairedCueTextChunks = isSentenceSegmentationMode(algorithm)
+    ? repairProtectedThaiCompoundBoundaries(rawCueTextChunks, algorithm)
     : rawCueTextChunks;
+  const phraseSafeCueTextChunks = isSentenceSegmentationMode(algorithm)
+    ? repairDanglingThaiJoinerBoundaries(repairedCueTextChunks)
+    : repairedCueTextChunks;
+  const cueTextChunks = isSentenceSegmentationMode(algorithm)
+    ? mergeOrphanSentenceChunks(phraseSafeCueTextChunks, algorithm, language)
+    : phraseSafeCueTextChunks;
   const estimated = estimateWordsFromSuggestedCues(cueTextChunks, timingWords, durationSec);
   if (estimated.length === 0) return [];
 
@@ -661,6 +1025,8 @@ export function formatAutoSuptitleCueText(
   language?: string | null,
 ): string {
   void wordsPerLine;
+  const normalized = normalizeCaptionSpacing(text);
+  if (shouldPreserveCaptionSpacing(normalized)) return normalized;
   const words = captionUnitsFromText(text, language);
   if (words.length === 0) return "";
   return joinCaptionUnits(words);
@@ -681,18 +1047,16 @@ function holdCuesUntilNextSpeech(
     const speechEnd = Number.isFinite(lastWordEnd) ? lastWordEnd : cue.endTime;
     const holdLimit = speechEnd + maxHoldAfterSpeech;
     const nextStart = cues[index + 1]?.startTime;
-    const desiredEndTime =
+    const hasNextCue =
       typeof nextStart === "number" &&
       Number.isFinite(nextStart) &&
-      nextStart > cue.startTime
-        ? Math.min(holdLimit, nextStart)
-        : holdLimit;
-    const minEndTime =
-      typeof nextStart === "number" &&
-      Number.isFinite(nextStart) &&
-      nextStart > cue.startTime
-        ? Math.min(cue.startTime + minDuration, nextStart)
-        : cue.startTime + minDuration;
+      nextStart > cue.startTime;
+    const desiredEndTime = hasNextCue
+      ? Math.min(holdLimit, nextStart)
+      : holdLimit;
+    const minEndTime = hasNextCue
+      ? Math.min(cue.startTime + minDuration, nextStart)
+      : cue.startTime + minDuration;
     const endTime = Math.max(minEndTime, desiredEndTime);
 
     return {

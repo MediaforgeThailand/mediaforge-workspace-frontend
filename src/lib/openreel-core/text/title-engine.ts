@@ -212,8 +212,6 @@ export class TitleEngine {
     time: number = 0,
   ): TextRenderResult {
     let canvas: HTMLCanvasElement | OffscreenCanvas;
-    let ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
-
     if (typeof OffscreenCanvas !== "undefined") {
       canvas = new OffscreenCanvas(width, height);
     } else {
@@ -221,15 +219,15 @@ export class TitleEngine {
       canvas.width = width;
       canvas.height = height;
     }
-    ctx = canvas.getContext("2d") as
+    const ctx = canvas.getContext("2d") as
       | CanvasRenderingContext2D
       | OffscreenCanvasRenderingContext2D;
 
     ctx.clearRect(0, 0, width, height);
 
     const animatedState = textAnimationEngine.getAnimatedState(clip, time);
-    let { opacity, transform, style, visibleText, characterStates } =
-      animatedState;
+    let { opacity, transform } = animatedState;
+    const { style, visibleText, characterStates } = animatedState;
 
     if (clip.emphasisAnimation && clip.emphasisAnimation.type !== "none") {
       const emphasisState = this.applyEmphasisAnimation(
@@ -337,10 +335,10 @@ export class TitleEngine {
         charIdx++;
       }
     } else {
-      const wantsWordHighlight =
-        clip.captionMeta?.animation === "wordHighlight" &&
-        clip.words &&
-        clip.words.length > 0;
+      // Auto Suptitle presets are now static font styles. Older projects may
+      // still carry wordHighlight metadata, but this renderer should not draw
+      // karaoke-style per-word color changes anymore.
+      const wantsWordHighlight = false;
       const absoluteTime = clip.startTime + time;
       let captionWordCursor = 0;
 

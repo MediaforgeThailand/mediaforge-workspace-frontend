@@ -1,4 +1,7 @@
-import type { CaptionStyleSettings } from "@/features/editor/services/caption-presets";
+import type {
+  CaptionAnimation,
+  CaptionStyleSettings,
+} from "@/features/editor/services/caption-presets";
 import {
   formatAutoSuptitleCueText,
   normalizeAutoSuptitleCuesForDuration,
@@ -203,6 +206,12 @@ function supportedRecorderMime(): string {
   return VIDEO_MIME_CANDIDATES.find((mime) => MediaRecorder.isTypeSupported(mime)) ?? "";
 }
 
+function autoSubtitleRenderBitrate(durationSec: number): number {
+  if (durationSec >= 8 * 60) return 2_500_000;
+  if (durationSec >= 5 * 60) return 3_000_000;
+  return 6_000_000;
+}
+
 function waitForVideoMetadata(video: HTMLVideoElement): Promise<void> {
   if (video.readyState >= HTMLMediaElement.HAVE_METADATA && video.videoWidth > 0) {
     return Promise.resolve();
@@ -265,6 +274,38 @@ function wrapCaptionText(
     .filter(Boolean);
 }
 
+function captionCanvasFont(
+  settings: CaptionStyleSettings,
+  fontSize: number,
+  weight: number,
+  family: string,
+): string {
+  return `${settings.italic ? "italic " : ""}${weight} ${fontSize}px ${family}, Inter, Arial, sans-serif`;
+}
+
+function fitCaptionFontSize(
+  ctx: CanvasRenderingContext2D,
+  lines: readonly string[],
+  settings: CaptionStyleSettings,
+  baseFontSize: number,
+  weight: number,
+  family: string,
+  maxWidth: number,
+): number {
+  const minFontSize = Math.max(16, Math.floor(baseFontSize * 0.56));
+  let nextFontSize = baseFontSize;
+
+  while (nextFontSize > minFontSize) {
+    ctx.font = captionCanvasFont(settings, nextFontSize, weight, family);
+    const widest = Math.max(...lines.map((line) => ctx.measureText(line).width), 0);
+    if (widest <= maxWidth) break;
+    nextFontSize -= 1;
+  }
+
+  ctx.font = captionCanvasFont(settings, nextFontSize, weight, family);
+  return nextFontSize;
+}
+
 function drawRoundedRect(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -287,23 +328,112 @@ function drawRoundedRect(
   ctx.closePath();
 }
 
+interface CueTransitionFrame {
+  opacity: number;
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+}
+
+function clamp01(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(1, value));
+}
+
+function easeOutCubic(value: number): number {
+  const t = clamp01(value);
+  return 1 - Math.pow(1 - t, 3);
+}
+
+function easeInCubic(value: number): number {
+  const t = clamp01(value);
+  return t * t * t;
+}
+
+function cueTransitionFrame(
+  cue: AutoSuptitleCue,
+  animation: CaptionAnimation,
+  currentTime: number,
+  pixelScale: number,
+): CueTransitionFrame {
+  const duration = Math.max(0.01, cue.endTime - cue.startTime);
+  const inDuration = Math.min(0.22, duration * 0.34);
+  const outDuration = Math.min(0.16, duration * 0.28);
+  const inProgress = inDuration > 0 ? easeOutCubic((currentTime - cue.startTime) / inDuration) : 1;
+  const outProgress = outDuration > 0 ? easeInCubic((cue.endTime - currentTime) / outDuration) : 1;
+  const outAmount = 1 - outProgress;
+  const distance = 18 * pixelScale;
+
+  switch (animation) {
+    case "fade":
+      return {
+        opacity: inProgress * outProgress,
+        scale: 1,
+        offsetX: 0,
+        offsetY: 0,
+      };
+    case "slideIn":
+    case "slideUp":
+      return {
+        opacity: inProgress * outProgress,
+        scale: 1,
+        offsetX: 0,
+        offsetY: (1 - inProgress) * distance - outAmount * distance * 0.7,
+      };
+    case "slideDown":
+      return {
+        opacity: inProgress * outProgress,
+        scale: 1,
+        offsetX: 0,
+        offsetY: -(1 - inProgress) * distance + outAmount * distance * 0.7,
+      };
+    case "scale":
+      return {
+        opacity: inProgress * outProgress,
+        scale: (0.92 + inProgress * 0.08) * (1 - outAmount * 0.05),
+        offsetX: 0,
+        offsetY: 0,
+      };
+    case "pop": {
+      const overshoot = inProgress < 0.72
+        ? 0.82 + inProgress * 0.3
+        : 1 + (1 - inProgress) * 0.08;
+      return {
+        opacity: Math.min(1, inProgress * 1.4) * outProgress,
+        scale: Math.max(0.72, overshoot * (1 - outAmount * 0.1)),
+        offsetX: 0,
+        offsetY: 0,
+      };
+    }
+    case "typewriter":
+    case "wordHighlight":
+    case "none":
+    default:
+      return {
+        opacity: 1,
+        scale: 1,
+        offsetX: 0,
+        offsetY: 0,
+      };
+  }
+}
+
 function drawCue(
   ctx: CanvasRenderingContext2D,
   cue: AutoSuptitleCue | undefined,
   settings: CaptionStyleSettings,
   width: number,
   height: number,
+  currentTime: number,
 ) {
   if (!cue) return;
   const scale = Math.max(0.5, Math.min(2.5, height / 1080));
-  const fontSize = Math.max(18, Math.round(settings.size * scale));
+  const baseFontSize = Math.max(18, Math.round(settings.size * scale));
   const weight = settings.weight || 800;
   const family = settings.font || "Inter";
-  const lineHeight = fontSize * 1.18;
   const margin = Math.max(24, settings.margin * scale);
 
   ctx.save();
-  ctx.font = `${settings.italic ? "italic " : ""}${weight} ${fontSize}px ${family}, Inter, Arial, sans-serif`;
   ctx.textBaseline = "middle";
   ctx.textAlign = settings.positionH === "left" ? "left" : settings.positionH === "right" ? "right" : "center";
 
@@ -314,6 +444,17 @@ function drawCue(
     return;
   }
 
+  const maxTextWidth = Math.max(48, width - margin * 2);
+  const fontSize = fitCaptionFontSize(
+    ctx,
+    lines,
+    settings,
+    baseFontSize,
+    weight,
+    family,
+    maxTextWidth,
+  );
+  const lineHeight = fontSize * 1.18;
   const blockHeight = lines.length * lineHeight;
   const x =
     settings.positionH === "left"
@@ -328,6 +469,17 @@ function drawCue(
         ? height - margin - blockHeight / 2
         : height / 2;
   const firstY = centerY - blockHeight / 2 + lineHeight / 2;
+  const transition = cueTransitionFrame(cue, settings.animation, currentTime, scale);
+  if (transition.opacity <= 0.01 || transition.scale <= 0.01) {
+    ctx.restore();
+    return;
+  }
+
+  ctx.globalAlpha *= transition.opacity;
+  ctx.translate(transition.offsetX, transition.offsetY);
+  ctx.translate(x, centerY);
+  ctx.scale(transition.scale, transition.scale);
+  ctx.translate(-x, -centerY);
 
   if (settings.background.enabled) {
     const widest = Math.max(...lines.map((line) => ctx.measureText(line).width));
@@ -367,10 +519,10 @@ function drawCue(
       ctx.miterLimit = 2;
       ctx.lineWidth = Math.max(1, settings.stroke.width * scale);
       ctx.strokeStyle = settings.stroke.color;
-      ctx.strokeText(lines[index], x, y);
+      ctx.strokeText(lines[index], x, y, maxTextWidth);
     }
     ctx.fillStyle = settings.fill;
-    ctx.fillText(lines[index], x, y);
+    ctx.fillText(lines[index], x, y, maxTextWidth);
   }
 
   ctx.restore();
@@ -418,7 +570,7 @@ export async function renderAutoSubtitleVideo(
   const chunks: Blob[] = [];
   const recorder = new MediaRecorder(stream, {
     mimeType: mime,
-    videoBitsPerSecond: 6_000_000,
+    videoBitsPerSecond: autoSubtitleRenderBitrate(duration),
   });
 
   let animationFrame = 0;
@@ -437,7 +589,7 @@ export async function renderAutoSubtitleVideo(
       const activeCue = cues.find(
         (cue) => video.currentTime >= cue.startTime && video.currentTime < cue.endTime,
       );
-      drawCue(ctx, activeCue, options.settings, width, height);
+      drawCue(ctx, activeCue, options.settings, width, height, video.currentTime);
       options.onProgress?.(
         Math.min(96, 45 + Math.round((video.currentTime / duration) * 50)),
         "Rendering subtitle preview...",

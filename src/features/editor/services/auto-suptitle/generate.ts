@@ -97,7 +97,7 @@ export async function generateAutoSuptitle(
       language: whisperResponse.language ?? language ?? "auto",
       sourceClipId: clip.id,
       animation: settings.animation,
-      highlightColor: settings.highlightColor,
+      highlightColor: settings.fill,
     } as const;
 
     onProgress?.({
