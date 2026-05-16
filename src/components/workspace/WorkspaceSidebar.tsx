@@ -158,6 +158,7 @@ const NAV_SECTIONS: SidebarSection[] = [
           tone: "accent",
         },
       ],
+      [{ id: "spaces", labelKey: "workspace.sidebar.spaces", icon: Workflow, width: "full", tone: "accent" }],
     ],
   },
   {
@@ -166,7 +167,6 @@ const NAV_SECTIONS: SidebarSection[] = [
     rows: [
       [{ id: "library", labelKey: "workspace.sidebar.library", icon: FolderOpen }],
       [{ id: "url_asset", labelKey: "workspace.sidebar.url_asset", icon: Link }],
-      [{ id: "spaces", labelKey: "workspace.sidebar.spaces", icon: Workflow }],
       [{ id: "stock", labelKey: "workspace.sidebar.stock", icon: Images }],
     ],
   },
