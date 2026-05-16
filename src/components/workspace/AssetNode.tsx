@@ -33,6 +33,7 @@ import type { MediaContextMenuItem } from "./mediaMenuItems";
 import { useMediaContextMenu } from "./useMediaContextMenu";
 import NodeQuickActionRail from "./NodeQuickActionRail";
 import { supabase } from "@/integrations/supabase/client";
+import { useSignInModal } from "@/hooks/useSignInModal";
 import {
   isNodeMentionedAnywhere,
   isVideoFrameImageOutputHandle,
@@ -106,6 +107,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
   const { t, t: i18n } = useLanguage();
   const [isHovered, setIsHovered] = useState(false);
   const ctxMenu = useMediaContextMenu();
+  const openSignInModal = useSignInModal();
   // Re-sign the previewUrl on mount in case it was generated under
   // the old 24h TTL and has since expired. Falls back to the raw
   // URL untouched for blob:/data: URLs and non-Supabase sources.
@@ -239,7 +241,16 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
       dx("async-step-1-auth");
       const { data: authData } = await supabase.auth.getUser();
       const userId = authData.user?.id;
-      if (!userId) throw new Error("Login is required before extracting video frames");
+      if (!userId) {
+        patchNode({
+          extractingVideoFrames: false,
+          frameExtractionError: "",
+        });
+        if (hasVideoFrameOutputEdge || isMentionedAnywhere) {
+          openSignInModal();
+        }
+        return;
+      }
       dx("async-step-2-userid", { userId: userId.slice(-8) });
 
       const safeNodeId = safeStorageSegment(id);
@@ -289,6 +300,7 @@ const AssetNode = memo(({ id, data, selected }: NodeProps) => {
     id,
     isHovered,
     livePreviewUrl,
+    openSignInModal,
     selected,
     setNodes,
     shouldPrepareVideoFrames,

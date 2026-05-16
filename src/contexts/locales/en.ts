@@ -2261,6 +2261,7 @@ export const en = {
   "workspace.sidebar.threed_gen": "3D Generator",
   "workspace.sidebar.create": "Create",
   "workspace.sidebar.tools": "Tools",
+  "workspace.sidebar.editing_tools": "Editing Tools",
   "workspace.sidebar.editor_new": "New",
   "workspace.sidebar.assets": "Assets",
   "workspace.sidebar.inspire": "Inspire",

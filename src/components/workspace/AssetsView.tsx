@@ -61,6 +61,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage, getLanguageLocale, type Language } from "@/contexts/LanguageContext";
+import { useSignInModal } from "@/hooks/useSignInModal";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { getSignedUrl } from "@/hooks/useSignedUrl";
 import { cn } from "@/lib/utils";
@@ -246,6 +247,7 @@ export default function AssetsView({
   const { user } = useAuth();
   const { t, language } = useLanguage();
   const navigate = useNavigate();
+  const openSignInModal = useSignInModal();
   const projects = useWorkspaceStore((s) => s.projects);
   const projectIds = useMemo(
     () => projects.map((project) => project.id).filter(Boolean),
@@ -1028,7 +1030,7 @@ export default function AssetsView({
            * `${user.id}/...` is enforced. */
           onCropConfirmed={async (blob, filename) => {
             if (!user) {
-              toast.error(t("workspace.crop.toast_signin_required"));
+              openSignInModal();
               return;
             }
             const ext = filename.match(/\.([^.]+)$/)?.[1] ?? "png";

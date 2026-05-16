@@ -2223,6 +2223,7 @@ export const th = {
   "workspace.sidebar.threed_gen": "สร้าง 3D",
   "workspace.sidebar.create": "สร้าง",
   "workspace.sidebar.tools": "Tools",
+  "workspace.sidebar.editing_tools": "Editing Tools",
   "workspace.sidebar.editor_new": "New",
   "workspace.sidebar.assets": "ไฟล์",
   "workspace.sidebar.inspire": "แรงบันดาลใจ",

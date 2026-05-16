@@ -2099,6 +2099,7 @@ export const ja = {
   "workspace.sidebar.threed_gen": "3Dジェネレーター",
   "workspace.sidebar.create": "作成",
   "workspace.sidebar.tools": "Tools",
+  "workspace.sidebar.editing_tools": "Editing Tools",
   "workspace.sidebar.editor_new": "New",
   "workspace.sidebar.assets": "アセット",
   "workspace.sidebar.inspire": "インスピレーションを与える",

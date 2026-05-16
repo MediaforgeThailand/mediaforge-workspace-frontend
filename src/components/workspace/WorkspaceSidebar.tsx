@@ -105,7 +105,9 @@ type NavItem = {
     | "workspace.sidebar.auto_subtitle"
     | "workspace.sidebar.threed_gen"
     | "workspace.sidebar.url_asset"
+    | "workspace.sidebar.editing_tools"
     | "workspace.sidebar.editor_new";
+  badgeKey?: "workspace.sidebar.editor_new";
   icon: LucideIcon;
   width?: "full" | "half";
   tone?: "default" | "accent";
@@ -135,10 +137,10 @@ const NAV_SECTIONS: SidebarSection[] = [
       ],
       [
         { id: "voice_gen", labelKey: "workspace.sidebar.voice_gen", icon: Mic2 },
-        { id: "voice_translate", labelKey: "workspace.sidebar.voice_translate", icon: Languages },
+        { id: "voice_translate", labelKey: "workspace.sidebar.voice_translate", badgeKey: "workspace.sidebar.editor_new", icon: Languages },
       ],
       [{ id: "image_upscale", labelKey: "workspace.sidebar.image_upscale", icon: Maximize2, width: "full" }],
-      [{ id: "auto_subtitle", labelKey: "workspace.sidebar.auto_subtitle", icon: Captions, width: "full" }],
+      [{ id: "auto_subtitle", labelKey: "workspace.sidebar.auto_subtitle", badgeKey: "workspace.sidebar.editor_new", icon: Captions, width: "full" }],
       [{ id: "image_to_3d", labelKey: "workspace.sidebar.threed_gen", icon: Box, width: "full" }],
     ],
   },
@@ -146,7 +148,16 @@ const NAV_SECTIONS: SidebarSection[] = [
     labelKey: "workspace.sidebar.tools",
     variant: "tool",
     rows: [
-      [{ id: "editor", labelKey: "workspace.sidebar.editor_new", icon: Clapperboard, width: "full", tone: "accent" }],
+      [
+        {
+          id: "editor",
+          labelKey: "workspace.sidebar.editing_tools",
+          badgeKey: "workspace.sidebar.editor_new",
+          icon: Clapperboard,
+          width: "full",
+          tone: "accent",
+        },
+      ],
     ],
   },
   {
@@ -678,6 +689,7 @@ const SidebarNavSection = ({
                 compact={compactToolRow || row.length > 1}
                 variant={variant}
                 tone={item.tone}
+                badge={item.badgeKey ? translate(item.badgeKey) : undefined}
                 tooltip={variant === "tool" ? getSidebarToolTooltip(item.id, language) : undefined}
               />
             ))}
@@ -697,6 +709,7 @@ const NavLink = ({
   compact = false,
   variant = "list",
   tone = "default",
+  badge,
   tooltip,
 }: {
   label: string;
@@ -706,6 +719,7 @@ const NavLink = ({
   compact?: boolean;
   variant?: "tool" | "list";
   tone?: "default" | "accent";
+  badge?: string;
   tooltip?: string;
 }) => (
   <button
@@ -719,10 +733,11 @@ const NavLink = ({
       "group relative flex h-[32px] min-w-0 items-center gap-[10px] text-left text-[12px] font-medium transition-colors",
       tooltip && "ws-sidebar-tooltip",
       variant === "tool" && tone === "accent"
-        ? "overflow-hidden rounded-[7px] border border-cyan-300/35 bg-cyan-950/50 px-[8px] text-cyan-50 shadow-[inset_0_1px_0_rgba(255,255,255,.08),0_0_18px_-12px_rgba(34,211,238,.95)]"
+        ? "rounded-[7px] border border-cyan-300/35 bg-cyan-950/50 px-[8px] text-cyan-50 shadow-[inset_0_1px_0_rgba(255,255,255,.08),0_0_18px_-12px_rgba(34,211,238,.95)]"
         : variant === "tool"
-        ? "overflow-hidden rounded-[7px] border border-white/[0.075] bg-[#171a19] px-[8px] shadow-[inset_0_1px_0_rgba(255,255,255,.035)]"
+        ? "rounded-[7px] border border-white/[0.075] bg-[#171a19] px-[8px] shadow-[inset_0_1px_0_rgba(255,255,255,.035)]"
         : "mx-[12px] rounded-md bg-transparent px-[4px]",
+      variant === "tool" && (badge ? (compact ? "overflow-visible pr-[39px]" : "overflow-visible pr-[52px]") : "overflow-hidden"),
       variant === "tool" && !compact && "w-full",
       compact && variant === "tool" && "mx-0 flex-1 gap-[7px] px-[7px] text-[12px]",
       compact && variant === "list" && "mx-[12px]",
@@ -754,6 +769,20 @@ const NavLink = ({
     )}
     <Icon className={cn("relative shrink-0", variant === "tool" ? "h-[15px] w-[15px]" : "h-[16px] w-[16px]")} />
     <span className="relative min-w-0 truncate whitespace-nowrap">{label}</span>
+    {badge && (
+      <span
+        className={cn(
+          "pointer-events-none absolute z-20 flex items-center justify-center rounded-full border border-[#f7ff7b] bg-[linear-gradient(135deg,#fbff17_0%,#d7ff00_48%,#fff38a_100%)] font-black uppercase leading-none text-[#071004] motion-safe:animate-[sidebar-new-badge_2.6s_ease-in-out_infinite]",
+          compact
+            ? "-right-[4px] -top-[6px] h-[15px] min-w-[34px] px-[6px] text-[8px] tracking-[0.045em] shadow-[0_0_0_2px_rgba(5,10,10,.86),0_7px_14px_-7px_rgba(234,255,0,.92),inset_0_1px_0_rgba(255,255,255,.82)]"
+            : "-right-[5px] -top-[7px] h-[18px] min-w-[42px] px-[8px] text-[9px] tracking-[0.06em] shadow-[0_0_0_2px_rgba(5,10,10,.88),0_8px_18px_-7px_rgba(234,255,0,.98),inset_0_1px_0_rgba(255,255,255,.85)]",
+        )}
+      >
+        <span className={cn("absolute rounded-full bg-[#eaff00]/25", compact ? "inset-[-4px] blur-[6px]" : "inset-[-5px] blur-[7px]")} aria-hidden />
+        <span className={cn("absolute rounded-full bg-white/80", compact ? "left-[7px] top-[3px] h-[2px] w-[9px]" : "left-[8px] top-[3px] h-[2px] w-[12px]")} aria-hidden />
+        <span className="relative">{badge}</span>
+      </span>
+    )}
   </button>
 );
 

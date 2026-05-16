@@ -31,6 +31,7 @@ import { Users, Plus, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSignInModal } from "@/hooks/useSignInModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
@@ -64,6 +65,7 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
   const { setNodes } = useReactFlow();
   const { t: i18n } = useLanguage();
   const { user } = useAuth();
+  const openSignInModal = useSignInModal();
   const edges = useEdges();
   const allNodes = useNodes();
   const canvasId = useWorkspaceStore((s) => s.current?.id);
@@ -120,7 +122,7 @@ const ElementNode = memo(({ id, data, selected }: NodeProps) => {
   const onCreate = useCallback(async () => {
     if (creating || isSaved) return;
     if (!user) {
-      toast.error(i18n("workspace.elementNode.pleaseLogInToCreateElement"));
+      openSignInModal();
       return;
     }
     const name = (d.label ?? "").trim();

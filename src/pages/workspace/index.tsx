@@ -33,6 +33,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage, getLanguageLocale, type Language } from "@/contexts/LanguageContext";
+import { useSignInModal } from "@/hooks/useSignInModal";
 import type { TranslationKey } from "@/contexts/locales/en";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
 import WorkspaceErrorBoundary from "@/components/workspace/WorkspaceErrorBoundary";
@@ -568,6 +569,7 @@ const WorkspaceDashboardInner = () => {
   const educationStudentLock = useEducationStudentLock();
   const educationLockedStudent = !isOrgAdmin && educationStudentLock.locked;
   const navigate = useNavigate();
+  const openSignInModal = useSignInModal();
   const projects = useWorkspaceStore((s) => s.projects);
   const activeProjectId = useWorkspaceStore((s) => s.activeProjectId);
   const workspaces = useWorkspaceStore((s) => s.workspaces);
@@ -744,8 +746,7 @@ const WorkspaceDashboardInner = () => {
 
   const handleCreateProject = () => {
     if (!user?.id) {
-      toast.error(t("workspace.toast.sign_in_first"));
-      navigate("/auth");
+      openSignInModal();
       return;
     }
     if (educationLockedStudent) {
@@ -1461,6 +1462,7 @@ const HomeView = ({
   const navigate = useNavigate();
   const { t, t: i18n } = useLanguage();
   const { user, loading: authLoading } = useAuth();
+  const openSignInModal = useSignInModal();
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const canvases = useWorkspaceStore((s) => s.canvases);
   const graphs = useWorkspaceStore((s) => s.graphs);
@@ -1607,6 +1609,10 @@ const HomeView = ({
     if (educationLockedStudent) {
       toast.error(i18n("workspace.home.scanClassQrOrLinkTo"));
       onSection("spaces");
+      return;
+    }
+    if (!user?.id) {
+      openSignInModal();
       return;
     }
     if (!activeProjectId) {
@@ -2538,6 +2544,7 @@ const ProjectsManagerView = ({
   const navigate = useNavigate();
   const { t, t: i18n } = useLanguage();
   const { user, loading: authLoading } = useAuth();
+  const openSignInModal = useSignInModal();
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const canvases = useWorkspaceStore((s) => s.canvases);
   const graphs = useWorkspaceStore((s) => s.graphs);
@@ -2617,6 +2624,10 @@ const ProjectsManagerView = ({
     : t("workspace.home.owner.owned_by_you");
 
   const handleNewSpace = async () => {
+    if (!user?.id) {
+      openSignInModal();
+      return;
+    }
     const projectId = selectedProject?.id ?? activeProjectId;
     if (!projectId) {
       toast.error(t("workspace.toast.create_project_first_gen"));
@@ -2899,6 +2910,7 @@ const SpacesView = ({
   const navigate = useNavigate();
   const { t, t: i18n, language } = useLanguage();
   const { user, loading: authLoading } = useAuth();
+  const openSignInModal = useSignInModal();
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const canvases = useWorkspaceStore((s) => s.canvases);
   const graphs = useWorkspaceStore((s) => s.graphs);
@@ -2977,6 +2989,10 @@ const SpacesView = ({
   const handleNew = async () => {
     if (educationLockedStudent) {
       toast.error(i18n("workspace.home.scanClassQrOrOpen"));
+      return;
+    }
+    if (!user?.id) {
+      openSignInModal();
       return;
     }
     if (!activeProjectId) {

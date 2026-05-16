@@ -2104,6 +2104,7 @@ export const hi = {
   "workspace.sidebar.threed_gen": "3 डी जेनरेटर",
   "workspace.sidebar.create": "बनाएं",
   "workspace.sidebar.tools": "Tools",
+  "workspace.sidebar.editing_tools": "Editing Tools",
   "workspace.sidebar.editor_new": "New",
   "workspace.sidebar.assets": "एसेट्स",
   "workspace.sidebar.inspire": "प्रेरित करें",

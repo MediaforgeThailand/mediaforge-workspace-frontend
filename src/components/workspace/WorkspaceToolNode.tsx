@@ -31,7 +31,9 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import InsufficientCreditsDialog from "@/components/InsufficientCreditsDialog";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useSignInModal } from "@/hooks/useSignInModal";
 import { friendlyError } from "@/lib/friendlyError";
 
 import { type ParamDef } from "@/components/flow/nodes/nodeApiSchema";
@@ -1241,6 +1243,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   // Used by friendlyError() to localize jargon errors before they
   // reach the user. Raw text still lands in console.error.
   const { language, t } = useLanguage();
+  const { user } = useAuth();
+  const openSignInModal = useSignInModal();
   const currentWorkspaceId = useWorkspaceStore((s) => s.current?.workspaceId ?? null);
   const { credits } = useCredits(currentWorkspaceId);
 
@@ -1376,7 +1380,10 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     (async () => {
       const { data: authData } = await supabase.auth.getUser();
       const userId = authData.user?.id;
-      if (!userId) throw new Error("Login required before extracting video frames");
+      if (!userId) {
+        openSignInModal();
+        return;
+      }
       const basePath = `${userId}/video-frames/${safeStorageSegment(id)}/${safeStorageSegment(gen.id)}`;
       const frames = await extractAndUploadVideoFrames(gen.url!, basePath);
       setNodes((nodes) =>
@@ -1399,7 +1406,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           frameExtractionInFlightFor.current = null;
         }
       });
-  }, [allNodesForMentionScan, data, edges, id, setNodes]);
+  }, [allNodesForMentionScan, data, edges, id, openSignInModal, setNodes]);
 
   /* ── Publish preview height as `--ws-preview-h` ──
    *
@@ -1565,6 +1572,10 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     if (runInFlightRef.current || isNodeCurrentlyProcessing()) return;
     if (isViewer) {
       toast.info(t("workspace.toolNode.viewOnlyRunsDisabled"));
+      return;
+    }
+    if (!user?.id) {
+      openSignInModal();
       return;
     }
 
@@ -2579,7 +2590,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       setOptimisticRun(null);
       runInFlightRef.current = false;
     }
-  }, [getNodes, id, isNodeCurrentlyProcessing, isViewer, params, schemaKey, patchNodeDataNow, selectedModel, schema, d.params?.nodeName, language, t]);
+  }, [getNodes, id, isNodeCurrentlyProcessing, isViewer, openSignInModal, params, schemaKey, patchNodeDataNow, selectedModel, schema, d.params?.nodeName, language, t, user?.id]);
 
   useEffect(() => {
     if (!isRunning) return;

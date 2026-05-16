@@ -44,6 +44,7 @@ import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSignInModal } from "@/hooks/useSignInModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import {
@@ -750,6 +751,7 @@ const Inner = () => {
   } = useReactFlow();
   const { user } = useAuth();
   const { t, language } = useLanguage();
+  const openSignInModal = useSignInModal();
   // Viewer-mode flag — when true, the canvas renders read-only:
   // no node drags, no new connections, no marquee selection (still
   // selectable so the lightbox/preview affordances work, just no
@@ -915,7 +917,7 @@ const Inner = () => {
   const uploadAsset = useCallback(
     async (file: File, position: XYPosition) => {
       if (!user) {
-        toast.error(t("workspace.toast.login_to_upload"));
+        openSignInModal();
         return;
       }
       // 1 GB cap — covers longer creator video clips and voice-translate
@@ -1023,7 +1025,7 @@ const Inner = () => {
       });
       URL.revokeObjectURL(localPreview);
     },
-    [user, addAssetNode, updateNodeData, setNodes, t],
+    [user, addAssetNode, updateNodeData, setNodes, t, openSignInModal],
   );
 
   const onDragOver = useCallback((e: React.DragEvent) => {

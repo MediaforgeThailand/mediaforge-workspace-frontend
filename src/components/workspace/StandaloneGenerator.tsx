@@ -57,6 +57,7 @@ import {
 } from "@/lib/nodeCostCalculator";
 import { useNodeCreditCosts } from "@/hooks/useNodeCreditCosts";
 import { useCredits } from "@/hooks/useCredits";
+import { useSignInModal } from "@/hooks/useSignInModal";
 import {
   buildDownloadFilename,
   downloadFromUrl,
@@ -1753,6 +1754,7 @@ export default function StandaloneGenerator({
   const { user } = useAuth();
   const { language, t } = useLanguage();
   const navigate = useNavigate();
+  const openSignInModal = useSignInModal();
   const queryClient = useQueryClient();
   const { credits, loading: creditsLoading } = useCredits();
   const { data: creditCosts = [], isLoading: creditCostsLoading } =
@@ -2450,7 +2452,7 @@ export default function StandaloneGenerator({
 
   const openUpload = (slot: UploadSlot) => {
     if (!user?.id) {
-      toast.error(t("workspace.toast.sign_in_first"));
+      openSignInModal();
       return;
     }
     if (!activeProject?.id) {
@@ -2657,6 +2659,10 @@ export default function StandaloneGenerator({
     files: File[],
     slotOverride?: UploadSlot,
   ) => {
+    if (!user?.id) {
+      openSignInModal();
+      return;
+    }
     if (!activeProject?.id) {
       toast.error(t("workspace.toast.create_project_first_upload"));
       return;
@@ -2824,6 +2830,10 @@ export default function StandaloneGenerator({
     slot: "video-start" | "video-end",
     files: File[],
   ) => {
+    if (!user?.id) {
+      openSignInModal();
+      return;
+    }
     if (!activeProject?.id) {
       toast.error(t("workspace.toast.create_project_first_upload"));
       return;
@@ -3197,6 +3207,10 @@ export default function StandaloneGenerator({
       );
       return;
     }
+    if (!user?.id) {
+      openSignInModal();
+      return;
+    }
     if (!activeProject?.id) {
       toast.error(t("workspace.toast.create_project_first_gen"));
       return;
@@ -3277,6 +3291,10 @@ export default function StandaloneGenerator({
           ? "อัปโหลด MP4 หรือ MP3 ก่อนเริ่มแปลเสียง"
           : "Upload an MP4 or MP3 before translating.",
       );
+      return;
+    }
+    if (!user?.id) {
+      openSignInModal();
       return;
     }
     if (!activeProject?.id) {
@@ -3372,7 +3390,8 @@ export default function StandaloneGenerator({
       throw new Error("Upload an MP4 video before generating subtitles.");
     }
     if (!user?.id) {
-      throw new Error("Please sign in before generating subtitles.");
+      openSignInModal();
+      return;
     }
     if (!activeProject?.id) {
       throw new Error("Create or select a project before generating subtitles.");
@@ -3776,6 +3795,11 @@ export default function StandaloneGenerator({
 
   const onFileSelected = async (file: File | undefined) => {
     if (!file) return;
+    if (!user?.id) {
+      openSignInModal();
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
     if (!activeProject?.id) {
       toast.error(t("workspace.toast.create_project_first_upload"));
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -3873,7 +3897,7 @@ export default function StandaloneGenerator({
     setRunning(true);
     try {
       if (!user?.id) {
-        toast.error(t("workspace.toast.sign_in_first"));
+        openSignInModal();
         return;
       }
       if (!activeProject?.id) {
@@ -5462,13 +5486,13 @@ function AutoSubtitlePanelV2({
 
   return (
     <section className="standalone-create-panel standalone-translate-panel flex h-full w-full max-w-[480px] flex-col overflow-hidden rounded-[20px] border border-white/[0.02] bg-[#121314]">
-      <div className="flex h-[56px] shrink-0 items-center gap-[10px] border-b border-white/[0.035] px-[18px]">
+      <div className="flex h-[58px] shrink-0 items-center gap-[10px] border-b border-white/[0.035] px-[18px]">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-[var(--brand-primary)]/10 text-[var(--brand-soft)]">
           <Captions className="h-[16px] w-[16px]" />
         </span>
         <div className="min-w-0">
-          <h2 className="truncate text-[16px] font-semibold leading-[20px] tracking-[-0.12px] text-white">{copy.title}</h2>
-          <p className="mt-[2px] truncate text-[11px] leading-[14px] text-zinc-400">{copy.subtitle}</p>
+          <h2 className="truncate text-[18px] font-semibold leading-[22px] tracking-[-0.12px] text-white">{copy.title}</h2>
+          <p className="mt-[2px] truncate text-[12px] leading-[15px] text-zinc-400">{copy.subtitle}</p>
         </div>
       </div>
 
@@ -5547,7 +5571,7 @@ function AutoSubtitlePanelV2({
                   )}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-[13px] font-bold leading-[16px] text-white">{copy.sourceVideo}</p>
+                  <p className="text-[14px] font-bold leading-[17px] text-white">{copy.sourceVideo}</p>
                   <p className="mt-[3px] truncate text-[12px] leading-[15px] text-zinc-400">{copy.uploadHint}</p>
                   <p className="mt-[3px] text-[11px] font-semibold leading-[14px] text-[var(--brand-soft)]/80">
                     {copy.uploadLimit}
@@ -5558,7 +5582,7 @@ function AutoSubtitlePanelV2({
           </div>
 
           <div className="rounded-[16px] border border-white/[0.035] bg-[#151719] p-[10px] shadow-[inset_0_1px_0_rgba(255,255,255,.035)]">
-            <div className="mb-[10px] flex items-center gap-[8px] text-[14px] font-bold leading-[18px] tracking-[-0.08px] text-white">
+            <div className="mb-[10px] flex items-center gap-[8px] text-[15px] font-bold leading-[19px] tracking-[-0.08px] text-white">
               <Sparkles className="h-[15px] w-[15px] text-[var(--brand-soft)]" />
               {copy.settingsTitle}
             </div>
@@ -5603,183 +5627,186 @@ function AutoSubtitlePanelV2({
             </button>
 
             {showAdvanced && (
-              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <VoiceTranslateSelectCard
-                  label={copy.algorithm}
-                  value={form.autoSubtitleSegmentationMode}
-                  displayValue={segmentationLabel}
-                  icon={<SlidersHorizontal className="h-[14px] w-[14px]" />}
-                  options={[
-                    { value: "sentence", label: copy.sentenceMode },
-                    { value: "words", label: copy.wordMode },
-                  ]}
-                  onChange={(value) =>
-                    onChange({
-                      autoSubtitleSegmentationMode: value as AutoSubtitleSegmentationMode,
-                    })
-                  }
-                />
-                <VoiceTranslateSelectCard
-                  label={copy.font}
-                  value={form.autoSubtitleFont}
-                  displayValue={form.autoSubtitleFont}
-                  icon={<BookOpen className="h-4 w-4" />}
-                  options={AUTO_SUBTITLE_FONT_OPTIONS.map((font) => ({ value: font, label: font }))}
-                  onChange={(value) => onChange({ autoSubtitleFont: value })}
-                />
-                <VoiceTranslateSelectCard
-                  label={copy.position}
-                  value={form.autoSubtitlePosition}
-                  displayValue={positionLabel}
-                  icon={<SlidersHorizontal className="h-[14px] w-[14px]" />}
-                  options={[
-                    { value: "top", label: th ? "บน" : "Top" },
-                    { value: "middle", label: th ? "กลาง" : "Middle" },
-                    { value: "bottom", label: th ? "ล่าง" : "Bottom" },
-                  ]}
-                  onChange={(value) =>
-                    onChange({ autoSubtitlePosition: value as StandaloneFormState["autoSubtitlePosition"] })
-                  }
-                />
-                <VoiceTranslateSelectCard
-                  label={copy.size}
-                  value={String(form.autoSubtitleSize)}
-                  displayValue={`${form.autoSubtitleSize}px`}
-                  icon={<SlidersHorizontal className="h-[14px] w-[14px]" />}
-                  options={[36, 44, 56, 68, 80, 92].map((size) => ({
-                    value: String(size),
-                    label: `${size}px`,
-                  }))}
-                  onChange={(value) => onChange({ autoSubtitleSize: Number(value) || 56 })}
-                />
-                {form.autoSubtitleSegmentationMode === "words" && (
+              <div className="mt-[10px] space-y-[10px]">
+                <div className="grid grid-cols-1 gap-[7px] sm:grid-cols-2">
                   <VoiceTranslateSelectCard
-                    label={copy.words}
-                    value={String(form.autoSubtitleWordsPerLine)}
-                    displayValue={wordSplitLabel}
+                    label={copy.speech}
+                    value={form.autoSubtitleLanguage}
+                    displayValue={speechLabel}
+                    icon={<Languages className="h-4 w-4" />}
+                    options={CAPTIONS_LANGUAGES.map((item) => ({ value: item.code, label: item.label }))}
+                    onChange={(value) => onChange({ autoSubtitleLanguage: value })}
+                  />
+                  <VoiceTranslateSelectCard
+                    label={copy.style}
+                    value={form.autoSubtitlePresetId}
+                    displayValue={selectedPreset?.name ?? form.autoSubtitlePresetId}
+                    icon={<Captions className="h-4 w-4" />}
+                    options={BUILTIN_CAPTION_PRESETS.map((preset) => ({ value: preset.id, label: preset.name }))}
+                    onChange={applyPreset}
+                  />
+                  <VoiceTranslateSelectCard
+                    label={copy.algorithm}
+                    value={form.autoSubtitleSegmentationMode}
+                    displayValue={segmentationLabel}
                     icon={<SlidersHorizontal className="h-[14px] w-[14px]" />}
-                    options={AUTO_SUBTITLE_WORD_SPLIT_OPTIONS.map((count) => ({
-                      value: String(count),
-                      label: th ? `${count} คำ` : `${count} words`,
+                    options={[
+                      { value: "sentence", label: copy.sentenceMode },
+                      { value: "words", label: copy.wordMode },
+                    ]}
+                    onChange={(value) =>
+                      onChange({
+                        autoSubtitleSegmentationMode: value as AutoSubtitleSegmentationMode,
+                      })
+                    }
+                  />
+                  <VoiceTranslateSelectCard
+                    label={copy.font}
+                    value={form.autoSubtitleFont}
+                    displayValue={form.autoSubtitleFont}
+                    icon={<BookOpen className="h-4 w-4" />}
+                    options={AUTO_SUBTITLE_FONT_OPTIONS.map((font) => ({ value: font, label: font }))}
+                    onChange={(value) => onChange({ autoSubtitleFont: value })}
+                  />
+                  <VoiceTranslateSelectCard
+                    label={copy.position}
+                    value={form.autoSubtitlePosition}
+                    displayValue={positionLabel}
+                    icon={<SlidersHorizontal className="h-[14px] w-[14px]" />}
+                    options={[
+                      { value: "top", label: th ? "บน" : "Top" },
+                      { value: "middle", label: th ? "กลาง" : "Middle" },
+                      { value: "bottom", label: th ? "ล่าง" : "Bottom" },
+                    ]}
+                    onChange={(value) =>
+                      onChange({ autoSubtitlePosition: value as StandaloneFormState["autoSubtitlePosition"] })
+                    }
+                  />
+                  <VoiceTranslateSelectCard
+                    label={copy.size}
+                    value={String(form.autoSubtitleSize)}
+                    displayValue={`${form.autoSubtitleSize}px`}
+                    icon={<SlidersHorizontal className="h-[14px] w-[14px]" />}
+                    options={[36, 44, 56, 68, 80, 92].map((size) => ({
+                      value: String(size),
+                      label: `${size}px`,
                     }))}
-                    onChange={(value) => onChange({ autoSubtitleWordsPerLine: Number(value) || 4 })}
+                    onChange={(value) => onChange({ autoSubtitleSize: Number(value) || 56 })}
                   />
-                )}
-                <AutoSubtitleColorPicker
-                  label={copy.textColor}
-                  value={form.autoSubtitleFill}
-                  onChange={(value) => onChange({ autoSubtitleFill: value })}
-                />
-                <AutoSubtitleColorPicker
-                  label={copy.highlightColor}
-                  value={form.autoSubtitleHighlightColor}
-                  onChange={(value) => onChange({ autoSubtitleHighlightColor: value })}
-                />
-                <AutoSubtitleToggle
-                  label={copy.stroke}
-                  checked={form.autoSubtitleStroke}
-                  onChange={(checked) => onChange({ autoSubtitleStroke: checked })}
-                />
-                <AutoSubtitleToggle
-                  label={copy.background}
-                  checked={form.autoSubtitleBackground}
-                  onChange={(checked) => onChange({ autoSubtitleBackground: checked })}
-                />
-              </div>
-            )}
-
-            <AutoSubtitleSectionTitle label={copy.translation} className="mt-4" />
-            <div className="grid grid-cols-3 gap-2">
-              <AutoSubtitleChoiceButton active label={copy.noTranslation} />
-              <AutoSubtitleChoiceButton disabled label={copy.translateThai} badge={copy.locked} />
-              <AutoSubtitleChoiceButton disabled label={copy.bilingual} badge={copy.locked} />
-            </div>
-
-            <AutoSubtitleSectionTitle label={copy.algorithm} className="mt-4" />
-            <div className="grid grid-cols-2 gap-2">
-              <AutoSubtitleChoiceButton
-                active={form.autoSubtitleSegmentationMode === "sentence"}
-                label={copy.sentenceMode}
-                subLabel={copy.sentenceModeHint}
-                onClick={() => onChange({ autoSubtitleSegmentationMode: "sentence" })}
-              />
-              <AutoSubtitleChoiceButton
-                active={form.autoSubtitleSegmentationMode === "words"}
-                label={copy.wordMode}
-                subLabel={copy.wordModeHint}
-                onClick={() => onChange({ autoSubtitleSegmentationMode: "words" })}
-              />
-            </div>
-
-            {form.autoSubtitleSegmentationMode === "words" && (
-              <>
-                <AutoSubtitleSectionTitle label={copy.words} className="mt-4" />
-                <div className="grid grid-cols-6 gap-1.5">
-                  {AUTO_SUBTITLE_WORD_SPLIT_OPTIONS.map((count) => (
-                <AutoSubtitleChoiceButton
-                  key={count}
-                  active={form.autoSubtitleWordsPerLine === count}
-                  label={th ? `${count} คำ` : String(count)}
-                  onClick={() => onChange({ autoSubtitleWordsPerLine: count })}
-                />
-                  ))}
-                </div>
-              </>
-            )}
-
-            <div className="mt-3 overflow-hidden rounded-[12px] border border-white/10 bg-black">
-              <div className="relative h-[106px]">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,.12),transparent_32%),linear-gradient(180deg,rgba(34,197,94,.12),rgba(0,0,0,0))]" />
-                <div
-                  className={cn(
-                    "absolute left-3 right-3 flex justify-center",
-                    form.autoSubtitlePosition === "top" && "top-3",
-                    form.autoSubtitlePosition === "middle" && "top-1/2 -translate-y-1/2",
-                    form.autoSubtitlePosition === "bottom" && "bottom-3",
+                  {form.autoSubtitleSegmentationMode === "words" && (
+                    <VoiceTranslateSelectCard
+                      label={copy.words}
+                      value={String(form.autoSubtitleWordsPerLine)}
+                      displayValue={wordSplitLabel}
+                      icon={<SlidersHorizontal className="h-[14px] w-[14px]" />}
+                      options={AUTO_SUBTITLE_WORD_SPLIT_OPTIONS.map((count) => ({
+                        value: String(count),
+                        label: th ? `${count} คำ` : `${count} words`,
+                      }))}
+                      onChange={(value) => onChange({ autoSubtitleWordsPerLine: Number(value) || 4 })}
+                    />
                   )}
-                >
-                  <AutoSubtitleAnimatedPreview
-                    settings={selectedSettings}
-                    phrases={previewSamplePhrases}
-                    language={th ? "th" : "en"}
+                  <AutoSubtitleColorPicker
+                    label={copy.textColor}
+                    value={form.autoSubtitleFill}
+                    onChange={(value) => onChange({ autoSubtitleFill: value })}
+                  />
+                  <AutoSubtitleColorPicker
+                    label={copy.highlightColor}
+                    value={form.autoSubtitleHighlightColor}
+                    onChange={(value) => onChange({ autoSubtitleHighlightColor: value })}
+                  />
+                  <AutoSubtitleToggle
+                    label={copy.stroke}
+                    checked={form.autoSubtitleStroke}
+                    onChange={(checked) => onChange({ autoSubtitleStroke: checked })}
+                  />
+                  <AutoSubtitleToggle
+                    label={copy.background}
+                    checked={form.autoSubtitleBackground}
+                    onChange={(checked) => onChange({ autoSubtitleBackground: checked })}
                   />
                 </div>
+
+                <div>
+                  <AutoSubtitleSectionTitle label={copy.translation} />
+                  <div className="grid grid-cols-3 gap-[7px]">
+                    <AutoSubtitleChoiceButton active label={copy.noTranslation} />
+                    <AutoSubtitleChoiceButton disabled label={copy.translateThai} badge={copy.locked} />
+                    <AutoSubtitleChoiceButton disabled label={copy.bilingual} badge={copy.locked} />
+                  </div>
+                </div>
+
+                <div>
+                  <AutoSubtitleSectionTitle label={copy.algorithm} />
+                  <div className="grid grid-cols-2 gap-[7px]">
+                    <AutoSubtitleChoiceButton
+                      active={form.autoSubtitleSegmentationMode === "sentence"}
+                      label={copy.sentenceMode}
+                      subLabel={copy.sentenceModeHint}
+                      onClick={() => onChange({ autoSubtitleSegmentationMode: "sentence" })}
+                    />
+                    <AutoSubtitleChoiceButton
+                      active={form.autoSubtitleSegmentationMode === "words"}
+                      label={copy.wordMode}
+                      subLabel={copy.wordModeHint}
+                      onClick={() => onChange({ autoSubtitleSegmentationMode: "words" })}
+                    />
+                  </div>
+                </div>
+
+                {form.autoSubtitleSegmentationMode === "words" && (
+                  <div>
+                    <AutoSubtitleSectionTitle label={copy.words} />
+                    <div className="grid grid-cols-6 gap-[7px]">
+                      {AUTO_SUBTITLE_WORD_SPLIT_OPTIONS.map((count) => (
+                        <AutoSubtitleChoiceButton
+                          key={count}
+                          active={form.autoSubtitleWordsPerLine === count}
+                          label={th ? `${count} คำ` : String(count)}
+                          onClick={() => onChange({ autoSubtitleWordsPerLine: count })}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="overflow-hidden rounded-[12px] border border-white/[0.06] bg-black">
+                  <div className="relative h-[84px]">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,.10),transparent_32%),linear-gradient(180deg,rgba(244,255,0,.08),rgba(0,0,0,0))]" />
+                    <div
+                      className={cn(
+                        "absolute left-2.5 right-2.5 flex justify-center",
+                        form.autoSubtitlePosition === "top" && "top-2.5",
+                        form.autoSubtitlePosition === "middle" && "top-1/2 -translate-y-1/2",
+                        form.autoSubtitlePosition === "bottom" && "bottom-2.5",
+                      )}
+                    >
+                      <AutoSubtitleAnimatedPreview
+                        settings={selectedSettings}
+                        phrases={previewSamplePhrases}
+                        language={th ? "th" : "en"}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <VoiceTranslateSelectCard
-              label={copy.speech}
-              value={form.autoSubtitleLanguage}
-              displayValue={speechLabel}
-              icon={<Languages className="h-4 w-4" />}
-              options={CAPTIONS_LANGUAGES.map((item) => ({ value: item.code, label: item.label }))}
-              onChange={(value) => onChange({ autoSubtitleLanguage: value })}
-            />
-            <VoiceTranslateSelectCard
-              label={copy.style}
-              value={form.autoSubtitlePresetId}
-              displayValue={selectedPreset?.name ?? form.autoSubtitlePresetId}
-              icon={<Captions className="h-4 w-4" />}
-              options={BUILTIN_CAPTION_PRESETS.map((preset) => ({ value: preset.id, label: preset.name }))}
-              onChange={applyPreset}
-            />
-          </div>
-
-          <p className="rounded-[10px] border border-[var(--border-faint)] bg-black/20 px-2.5 py-2 text-[13px] font-medium leading-[18px] text-zinc-400">
+          <p className="rounded-[10px] border border-[var(--border-faint)] bg-black/20 px-2.5 py-2 text-[13px] font-medium leading-[18px] text-zinc-300">
             {copy.ready}
           </p>
 
           {progress && (
-            <div className="rounded-[10px] border border-cyan-300/15 bg-cyan-300/[0.045] px-3 py-2">
-              <div className="flex items-center justify-between gap-2 text-[12px] font-semibold text-cyan-100">
+            <div className="rounded-[10px] border border-[var(--brand-primary)]/20 bg-[var(--brand-primary)]/[0.045] px-3 py-2">
+              <div className="flex items-center justify-between gap-2 text-[12px] font-semibold text-[var(--brand-soft)]">
                 <span>{progress.message}</span>
                 <span>{Math.round(progress.progress)}%</span>
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
                 <div
-                  className="h-full rounded-full bg-cyan-200 transition-all"
+                  className="h-full rounded-full bg-[var(--brand-soft)] transition-all"
                   style={{ width: `${Math.max(4, Math.min(100, progress.progress))}%` }}
                 />
               </div>
@@ -5788,9 +5815,9 @@ function AutoSubtitlePanelV2({
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-white/[0.05] bg-[var(--bg-sidebar)] px-3 py-2.5">
-        <div className="grid grid-cols-2 gap-2.5">
-          <div className="flex h-[40px] items-center gap-2 rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-2.5 text-[13px] font-semibold text-zinc-300">
+      <div className="shrink-0 border-t border-white/[0.05] bg-[#121314] px-[12px] py-[8px]">
+        <div className="grid grid-cols-2 gap-[8px]">
+          <div className="flex h-[38px] items-center gap-2 rounded-[10px] border border-white/[0.06] bg-[#17191b] px-2.5 text-[13px] font-semibold text-zinc-300">
             <Film className="h-3.5 w-3.5 text-zinc-400" />
             <span className="truncate">{media ? "MP4" : "Media"}</span>
           </div>
@@ -5798,7 +5825,7 @@ function AutoSubtitlePanelV2({
             type="button"
             onClick={onCreate}
             disabled={running || uploading || !media}
-            className="btn-cta flex !h-10 w-full items-center justify-center gap-2 text-[13px] disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-300 disabled:shadow-none disabled:opacity-70"
+            className="btn-cta flex !h-[38px] w-full items-center justify-center gap-2 text-[13px] disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-300 disabled:shadow-none disabled:opacity-70"
           >
             {running ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -5822,7 +5849,7 @@ function AutoSubtitleSectionTitle({
   className?: string;
 }) {
   return (
-    <div className={cn("mb-2 text-[11px] font-semibold text-zinc-500", className)}>
+    <div className={cn("mb-[6px] text-[13px] font-bold leading-[16px] text-zinc-200", className)}>
       {label}
     </div>
   );
@@ -5850,17 +5877,17 @@ function AutoSubtitleChoiceButton({
       aria-pressed={Boolean(active)}
       onClick={onClick}
       className={cn(
-        "relative min-h-[38px] rounded-[8px] border px-2 py-1.5 text-center transition",
+        "relative min-h-[33px] rounded-[8px] border px-[8px] py-[5px] text-center transition",
         active
-          ? "border-white bg-white text-black"
-          : "border-white/8 bg-white/[0.04] text-zinc-300 hover:border-cyan-200/35 hover:text-white",
-        disabled && "cursor-not-allowed opacity-45 hover:border-white/8 hover:text-zinc-300",
+          ? "border-[var(--brand-primary)] bg-[var(--brand-primary)]/90 text-black shadow-[0_0_16px_rgba(244,255,0,.16)]"
+          : "border-white/[0.07] bg-white/[0.035] text-zinc-300 hover:border-[var(--brand-primary)]/45 hover:text-white",
+        disabled && "cursor-not-allowed opacity-45 hover:border-white/[0.07] hover:text-zinc-300",
       )}
     >
-      <span className="block truncate text-[12px] font-bold leading-[14px]">{label}</span>
-      {subLabel && <span className="mt-0.5 block truncate text-[9px] font-semibold opacity-60">{subLabel}</span>}
+      <span className="block truncate text-[13px] font-bold leading-[15px]">{label}</span>
+      {subLabel && <span className="mt-[2px] block truncate text-[11px] font-semibold leading-[13px] opacity-60">{subLabel}</span>}
       {badge && (
-        <span className="mt-0.5 block truncate text-[9px] font-semibold uppercase tracking-wide opacity-60">
+        <span className="mt-[2px] block truncate text-[10px] font-semibold uppercase leading-[12px] tracking-wide opacity-60">
           {badge}
         </span>
       )}
@@ -5884,18 +5911,18 @@ function AutoSubtitlePresetCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        "group overflow-hidden rounded-[10px] border bg-white/[0.04] p-1.5 text-left transition",
+        "group overflow-hidden rounded-[10px] border bg-white/[0.035] p-[5px] text-left transition",
         selected
-          ? "border-white shadow-[0_0_0_1px_rgba(255,255,255,.4)]"
-          : "border-white/8 hover:border-cyan-200/35",
+          ? "border-[var(--brand-primary)] shadow-[0_0_0_1px_rgba(244,255,0,.22)]"
+          : "border-white/[0.07] hover:border-[var(--brand-primary)]/45",
       )}
     >
-      <div className="grid h-[52px] place-items-center rounded-[7px] bg-[#1f2937] px-1">
+      <div className="grid h-[48px] place-items-center rounded-[7px] bg-[#1f2937] px-1">
         <AutoSubtitlePreviewText settings={preset.settings} text={sampleText} compact activeWord />
       </div>
       <div className="mt-1 flex min-w-0 items-center justify-between gap-1">
-        <span className="truncate text-[10px] font-semibold text-zinc-300">{preset.name}</span>
-        {selected && <Check className="h-3 w-3 shrink-0 text-cyan-200" />}
+        <span className="truncate text-[12px] font-semibold leading-[15px] text-zinc-200">{preset.name}</span>
+        {selected && <Check className="h-[13px] w-[13px] shrink-0 text-[var(--brand-soft)]" />}
       </div>
     </button>
   );
@@ -5911,8 +5938,8 @@ function AutoSubtitleColorPicker({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="standalone-setting-card rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-[9px] py-[7px]">
-      <div className="mb-2 text-[13px] font-semibold leading-[16px] text-zinc-200">{label}</div>
+    <div className="standalone-setting-card rounded-[10px] border border-white/[0.06] bg-[#16181a] px-[9px] py-[7px]">
+      <div className="mb-[6px] text-[12px] font-bold leading-[15px] text-zinc-200">{label}</div>
       <div className="flex flex-wrap gap-1.5">
         {AUTO_SUBTITLE_COLOR_OPTIONS.map((color) => (
           <button
@@ -5922,7 +5949,7 @@ function AutoSubtitleColorPicker({
             className={cn(
               "h-5 w-5 rounded-full border transition",
               value.toLowerCase() === color.toLowerCase()
-                ? "border-white ring-2 ring-cyan-200/80"
+                ? "border-black ring-2 ring-[var(--brand-primary)]/80"
                 : "border-white/20 hover:border-white/60",
             )}
             style={{ backgroundColor: color }}
@@ -5958,7 +5985,7 @@ function AutoSubtitleAnimatedPreview({
   const text = safePhrases[phraseIndex % safePhrases.length] ?? "";
 
   return (
-    <div className="relative flex h-[44px] w-full items-center justify-center overflow-hidden px-2">
+    <div className="relative flex h-[38px] w-full items-center justify-center overflow-hidden px-2">
       <style>
         {`
           @keyframes autoSubtitlePreviewSwap {
@@ -6363,14 +6390,14 @@ function AutoSubtitleToggle({
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="standalone-setting-card flex min-h-[38px] items-center justify-between gap-2 rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-[9px] py-[4px] text-left transition hover:border-cyan-300/30 hover:bg-[var(--bg-surface-2)]"
+      className="standalone-setting-card flex min-h-[34px] items-center justify-between gap-2 rounded-[10px] border border-white/[0.06] bg-[#16181a] px-[9px] py-[4px] text-left transition hover:border-[var(--brand-primary)]/35 hover:bg-white/[0.04]"
       aria-pressed={checked}
     >
-      <span className="text-[13px] font-semibold leading-[16px] text-zinc-200">{label}</span>
+      <span className="text-[12px] font-bold leading-[15px] text-zinc-200">{label}</span>
       <span
         className={cn(
           "flex h-[20px] w-[34px] items-center rounded-full p-[2px] transition",
-          checked ? "bg-cyan-200" : "bg-white/12",
+          checked ? "bg-[var(--brand-primary)]" : "bg-white/12",
         )}
       >
         <span
@@ -6403,17 +6430,17 @@ function VoiceTranslateSelectCard({
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger
         aria-label={label}
-        className="standalone-setting-card h-auto min-h-[38px] rounded-[10px] border-[var(--border-faint)] bg-[var(--bg-panel)] px-[7px] py-[3px] text-white shadow-none ring-0 transition hover:border-[var(--brand-primary)]/30 hover:bg-[var(--bg-surface-2)] focus:ring-0 focus:ring-offset-0 data-[state=open]:border-cyan-300/45 [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:text-zinc-500"
+        className="standalone-setting-card h-auto min-h-[38px] rounded-[10px] border-white/[0.06] bg-[#16181a] px-[7px] py-[3px] text-white shadow-none ring-0 transition hover:border-[var(--brand-primary)]/35 hover:bg-white/[0.04] focus:ring-0 focus:ring-offset-0 data-[state=open]:border-[var(--brand-primary)]/55 [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:text-zinc-500"
       >
         <div className="flex min-w-0 items-center gap-[6px]">
           <span className="grid h-[24px] w-[24px] shrink-0 place-items-center rounded-[7px] bg-white/[0.05] text-zinc-300">
             {icon}
           </span>
           <span className="min-w-0 text-left">
-            <span className="block text-[13px] font-medium leading-[14px] text-[var(--text-tertiary)]">
+            <span className="block text-[11px] font-semibold leading-[13px] text-zinc-500">
               {label}
             </span>
-            <span className="block truncate text-[15px] font-bold leading-[16px] text-white">
+            <span className="block truncate text-[13px] font-bold leading-[15px] text-white">
               {displayValue}
             </span>
           </span>
