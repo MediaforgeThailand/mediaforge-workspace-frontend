@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { ToastContainer } from "./components/Toast";
 import { ScriptViewDialog } from "./components/ScriptViewDialog";
-import { SearchModal } from "./components/SearchModal";
 import { useUIStore } from "./stores/ui-store";
 import { useProjectStore } from "./stores/project-store";
 import { toast } from "./stores/notification-store";
@@ -532,7 +531,6 @@ export default function EditorPage() {
           isOpen={activeModal === "scriptView"}
           onClose={closeModal}
         />
-        <SearchModal isOpen={activeModal === "search"} onClose={closeModal} />
       </div>
     </TooltipProvider>
   );

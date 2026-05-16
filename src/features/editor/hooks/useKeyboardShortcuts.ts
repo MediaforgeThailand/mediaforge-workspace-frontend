@@ -420,17 +420,6 @@ export function useKeyboardShortcuts() {
     setShowShortcutsOverlay(true);
   }, []);
 
-  // Cmd/Ctrl+K opens the search / command-palette modal. We dispatch a
-  // window event so the Toolbar's openModal("search") can react regardless
-  // of where the hook is mounted. Matches the industry standard for "find".
-  const handleOpenSearch = useCallback(() => {
-    try {
-      window.dispatchEvent(new CustomEvent("openreel:open-search"));
-    } catch {
-      // ignore
-    }
-  }, []);
-
   // Cmd/Ctrl+, opens the Settings dialog (macOS-standard preferences key).
   const handleOpenSettings = useCallback(() => {
     try {
@@ -553,7 +542,6 @@ export function useKeyboardShortcuts() {
       ["timeline.zoomOut", handleZoomOut],
       ["timeline.fitTimeline", handleFitTimeline],
       ["view.showShortcuts", handleShowShortcuts],
-      ["view.search", handleOpenSearch],
       ["view.settings", handleOpenSettings],
       ["file.save", handleSave],
       ["file.export", handleExport],
@@ -609,7 +597,6 @@ export function useKeyboardShortcuts() {
     handleZoomOut,
     handleFitTimeline,
     handleShowShortcuts,
-    handleOpenSearch,
     handleOpenSettings,
     handleSave,
     handleExport,

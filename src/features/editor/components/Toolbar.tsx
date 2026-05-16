@@ -1,31 +1,21 @@
 import React, { useCallback, useState, useEffect, useRef } from "react";
 import {
-  Search,
   Command,
   ChevronDown,
   FileVideo,
   Film,
   Music,
-  Sun,
-  Moon,
-  SunMoon,
   Loader2,
   X,
   Check,
-  FileCode,
   Settings,
   Zap,
   Circle,
   History,
-  Diamond,
-  Sparkles,
-  Play,
-  UserPlus,
   Menu as MenuIcon,
 } from "lucide-react";
 import { useProjectStore } from "../stores/project-store";
 import { useUIStore } from "../stores/ui-store";
-import { useThemeStore } from "../stores/theme-store";
 import { useNavigate } from "react-router-dom";
 import {
   getExportEngine,
@@ -39,7 +29,6 @@ import {
 } from "@/lib/openreel-core";
 import { ExportDialog } from "./ExportDialog";
 import { ScreenRecorder } from "./ScreenRecorder";
-import { HistoryPanel } from "./inspector/HistoryPanel";
 // ProjectSwitcher removed from toolbar — inline editable title now handles
 // rename, and Menu → New Project covers creating a fresh project. Recent
 // projects are still reachable from the Welcome screen.
@@ -47,7 +36,6 @@ import { SettingsDialog } from "./settings/SettingsDialog";
 import { toast } from "../stores/notification-store";
 import { useSettingsStore } from "../stores/settings-store";
 import { useAnalytics, AnalyticsEvents } from "../hooks/useAnalytics";
-import { startTour, ONBOARDING_KEY, startMoGraphTour, MOGRAPH_TOUR_KEY } from "./tour";
 import { autoSaveManager } from "../services/auto-save";
 import {
   flushCloudSave,
@@ -63,7 +51,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "@/components/openreel-ui";
-import { useI18n, useI18nStore } from "../services/i18n";
+import { useI18n } from "../services/i18n";
 // Supabase client is lazy-loaded inside the MediaForge export branch — it
 // only matters when the user actually exports to cloud. Keeping it static
 // pulled @supabase/supabase-js into the main editor bundle.
@@ -94,24 +82,14 @@ interface ExportState {
 export const Toolbar: React.FC = () => {
   const { project, renameProject, createNewProject, getFullProject } = useProjectStore();
   const {
-    openModal,
-    selectedItems,
     setExportState: setGlobalExportState,
-    keyframeEditorOpen,
-    toggleKeyframeEditor,
-    panels,
-    togglePanel,
   } = useUIStore();
-  const { mode: themeMode, toggleTheme } = useThemeStore();
   const t = useI18n();
-  const currentLocale = useI18nStore((s) => s.locale);
-  const toggleLocale = useI18nStore((s) => s.toggleLocale);
   const navigate = useNavigate();
   const { openSettings } = useSettingsStore();
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [isRecorderOpen, setIsRecorderOpen] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const { importMedia } = useProjectStore();
   const { track } = useAnalytics();
 
@@ -206,22 +184,6 @@ export const Toolbar: React.FC = () => {
     window.dispatchEvent(new CustomEvent(name));
   }, []);
 
-  const handleShare = useCallback(() => {
-    setIsExportOpen(true);
-  }, []);
-
-  const handleStartTour = useCallback(() => {
-    localStorage.removeItem(ONBOARDING_KEY);
-    startTour();
-  }, []);
-
-  const handleStartMoGraphTour = useCallback(() => {
-    localStorage.removeItem(MOGRAPH_TOUR_KEY);
-    startMoGraphTour();
-  }, []);
-
-  // Retained for future "selected-clip aware" surfaces. Touch unused-locals.
-  void selectedItems;
   const [exportState, setExportState] = useState<ExportState>({
     isExporting: false,
     progress: 0,
@@ -240,27 +202,21 @@ export const Toolbar: React.FC = () => {
     });
   }, [exportState.isExporting, exportState.progress, exportState.phase, setGlobalExportState]);
 
-  // Wire Cmd/Ctrl+S and Cmd/Ctrl+E keyboard shortcuts. The shortcut hook
-  // dispatches "openreel:save" / "openreel:export" because save and export
-  // state are local to this toolbar.
+  // Wire Cmd/Ctrl+S, Cmd/Ctrl+E, and Cmd/Ctrl+, keyboard shortcuts. The
+  // shortcut hook dispatches window events because save/export/settings state
+  // is local to this toolbar.
   useEffect(() => {
     const onExport = () => setIsExportOpen(true);
-    // Cmd/Ctrl+K → open search modal. Cmd/Ctrl+, → open settings. Both are
-    // wired here because the openModal/openSettings handles live on local
-    // UI state hooks that any-mount component cannot reach directly.
-    const onOpenSearch = () => openModal("search");
     const onOpenSettings = () => openSettings();
     window.addEventListener("openreel:save", handleSaveProject);
     window.addEventListener("openreel:export", onExport);
-    window.addEventListener("openreel:open-search", onOpenSearch);
     window.addEventListener("openreel:open-settings", onOpenSettings);
     return () => {
       window.removeEventListener("openreel:save", handleSaveProject);
       window.removeEventListener("openreel:export", onExport);
-      window.removeEventListener("openreel:open-search", onOpenSearch);
       window.removeEventListener("openreel:open-settings", onOpenSettings);
     };
-  }, [handleSaveProject, openModal, openSettings]);
+  }, [handleSaveProject, openSettings]);
 
   useEffect(() => {
     if (isExportOpen && !deviceProfile) {
@@ -301,10 +257,6 @@ export const Toolbar: React.FC = () => {
 
     setExportEstimates(estimates);
   }, [deviceProfile, project.timeline?.duration, project.settings.width, project.settings.height]);
-
-  const handleSearch = useCallback(() => {
-    openModal("search");
-  }, [openModal]);
 
   const runExport = useCallback(
     async (videoSettings: Partial<VideoExportSettings>, _ext: string, writableStream: FileSystemWritableFileStream) => {
@@ -972,22 +924,9 @@ export const Toolbar: React.FC = () => {
               <span className="ml-auto text-[10px] text-text-secondary font-mono">⌘⇧Z</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => useUIStore.getState().openModal("scriptView")} className="gap-2">
-              <FileCode size={13} />
-              <span>Project JSON</span>
-            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => openSettings()} className="gap-2">
               <Settings size={13} />
               <span>Settings</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleStartTour} className="gap-2">
-              <Play size={13} />
-              <span>Editor Tour</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleStartMoGraphTour} className="gap-2">
-              <Sparkles size={13} className="text-purple-400" />
-              <span>Animation Tour</span>
             </DropdownMenuItem>
             <DropdownMenuItem className="gap-2 text-text-muted">
               <Command size={13} />
@@ -1031,120 +970,7 @@ export const Toolbar: React.FC = () => {
         )}
       </div>
 
-      <div className="flex items-center gap-1.5 min-w-[200px] justify-end">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={toggleTheme}
-              className="p-1.5 rounded-md hover:bg-background-elevated text-text-secondary hover:text-text-primary transition-colors"
-              aria-label={`Toggle theme (current: ${themeMode})`}
-            >
-              {themeMode === "light" ? (
-                <Sun size={14} />
-              ) : themeMode === "dark" ? (
-                <Moon size={14} />
-              ) : (
-                <SunMoon size={14} />
-              )}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Theme: {themeMode}</p>
-          </TooltipContent>
-        </Tooltip>
-
-        {/* Language toggle */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={toggleLocale}
-              className="px-1.5 py-1 rounded-md hover:bg-background-elevated text-text-secondary hover:text-text-primary transition-colors text-[10px] font-bold tracking-wide"
-              aria-label="Toggle language"
-            >
-              {currentLocale === "th" ? "TH" : "EN"}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{currentLocale === "th" ? "ภาษาไทย" : "English"}</p>
-          </TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={toggleKeyframeEditor}
-              className={`p-1.5 rounded-md transition-colors ${
-                keyframeEditorOpen
-                  ? "bg-primary/20 text-primary"
-                  : "hover:bg-background-elevated text-text-secondary hover:text-text-primary"
-              }`}
-              aria-label="Keyframe editor"
-              aria-pressed={keyframeEditorOpen}
-            >
-              <Diamond size={14} />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Keyframe Editor</p>
-          </TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={() => togglePanel("audioMixer")}
-              className={`p-1.5 rounded-md transition-colors ${
-                panels.audioMixer?.visible
-                  ? "bg-primary/20 text-primary"
-                  : "hover:bg-background-elevated text-text-secondary hover:text-text-primary"
-              }`}
-              aria-label="Audio mixer"
-              aria-pressed={!!panels.audioMixer?.visible}
-            >
-              <Music size={14} />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Audio Mixer</p>
-          </TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={() => setIsHistoryOpen(!isHistoryOpen)}
-              className={`p-1.5 rounded-md transition-colors ${
-                isHistoryOpen
-                  ? "bg-primary/20 text-primary"
-                  : "hover:bg-background-elevated text-text-secondary hover:text-text-primary"
-              }`}
-              aria-label="Undo history"
-              aria-pressed={isHistoryOpen}
-            >
-              <History size={14} />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>History</p>
-          </TooltipContent>
-        </Tooltip>
-
-        {/* Command+K small icon — relocated from middle search bar */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={handleSearch}
-              data-testid="toolbar-search"
-              className="p-1.5 rounded-md hover:bg-background-elevated text-text-secondary hover:text-text-primary transition-colors"
-              aria-label="Search"
-            >
-              <Search size={14} />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Search ⌘K</p>
-          </TooltipContent>
-        </Tooltip>
+      <div className="flex items-center gap-2 min-w-[180px] justify-end">
 
         <Tooltip>
           <TooltipTrigger asChild>
@@ -1154,29 +980,11 @@ export const Toolbar: React.FC = () => {
               aria-label="Start screen recording"
             >
               <Circle size={12} className="fill-current" />
-              <span className="text-[11px] font-medium">{currentLocale === "th" ? "บันทึก" : "Record"}</span>
+              <span className="text-[11px] font-medium">Record</span>
             </button>
           </TooltipTrigger>
           <TooltipContent>
             <p>Screen Recording</p>
-          </TooltipContent>
-        </Tooltip>
-
-        {/* Share button — pill with user-plus icon, opens share modal */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={handleShare}
-              data-testid="toolbar-share"
-              className="h-8 px-3 bg-background-elevated hover:bg-background-tertiary border border-border text-text-primary rounded-md flex items-center gap-1.5 transition-colors"
-              aria-label="Share project"
-            >
-              <UserPlus size={13} />
-              <span className="text-[12px] font-medium">Share</span>
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Share / Export</p>
           </TooltipContent>
         </Tooltip>
 
@@ -1336,29 +1144,6 @@ export const Toolbar: React.FC = () => {
       />
 
       <SettingsDialog />
-
-      {isHistoryOpen && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/20 z-40"
-            onClick={() => setIsHistoryOpen(false)}
-          />
-          <div className="fixed top-12 right-0 bottom-0 w-80 bg-background-secondary border-l border-border z-50 shadow-2xl animate-in slide-in-from-right duration-200">
-            <div className="flex items-center justify-between p-3 border-b border-border">
-              <span className="text-sm font-medium text-text-primary">Action History</span>
-              <button
-                onClick={() => setIsHistoryOpen(false)}
-                className="p-1.5 rounded hover:bg-background-tertiary text-text-muted hover:text-text-primary transition-colors"
-              >
-                <X size={14} />
-              </button>
-            </div>
-            <div className="h-[calc(100%-49px)]">
-              <HistoryPanel />
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 };

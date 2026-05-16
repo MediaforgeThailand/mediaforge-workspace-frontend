@@ -297,6 +297,10 @@ export const TrackLane: React.FC<TrackLaneProps> = ({
                 const duration = typeof tx.duration === "number" && tx.duration > 0
                   ? tx.duration
                   : 1.0;
+                const params =
+                  tx.params && typeof tx.params === "object"
+                    ? tx.params
+                    : undefined;
                 try {
                   const bridge = getTransitionBridge();
                   const result = bridge.createTransition(
@@ -304,9 +308,13 @@ export const TrackLane: React.FC<TrackLaneProps> = ({
                     bestJunction.clipB as never,
                     tx.type as never,
                     duration,
+                    params as never,
                   );
                   if (result.success) {
-                    toast.success("Transition applied", `${tx.type} (${duration.toFixed(2)}s)`);
+                    toast.success(
+                      "Transition applied",
+                      `${typeof tx.name === "string" ? tx.name : tx.type} (${duration.toFixed(2)}s)`,
+                    );
                   } else {
                     toast.error("Failed to apply transition", result.error || "");
                   }

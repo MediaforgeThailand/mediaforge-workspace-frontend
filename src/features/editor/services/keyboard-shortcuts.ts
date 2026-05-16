@@ -421,16 +421,6 @@ const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
     enabled: true,
   },
   {
-    id: "view.search",
-    name: "Search",
-    description: "Open command-palette / search modal",
-    category: "view",
-    defaultKey: "cmd+k",
-    currentKey: "cmd+k",
-    action: "view.search",
-    enabled: true,
-  },
-  {
     id: "view.settings",
     name: "Settings",
     description: "Open settings dialog",

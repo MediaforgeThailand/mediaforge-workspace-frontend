@@ -28,6 +28,13 @@ import type { MediaItem } from "@/lib/openreel-core";
 import { AspectRatioMatchDialog } from "./dialogs/AspectRatioMatchDialog";
 import { saveFileHandle, saveDirectoryHandle } from "../services/media-storage";
 import {
+  EDITOR_TRANSITION_PRESETS,
+  getTransitionParamsForType,
+  toTransitionPayload,
+  type EditorTransitionPreset,
+  type TransitionPreviewKind,
+} from "../services/transition-presets";
+import {
   IconButton,
   Input,
   ScrollArea,
@@ -64,91 +71,33 @@ const formatDuration = (seconds: number): string => {
     .padStart(2, "0")}`;
 };
 
-/**
- * Transition thumbnail — mini SVG visualization showing the actual transition
- * effect with two abstract clip slabs (A = magenta, B = cyan) joined by a
- * graphical hint specific to each transition kind. We use animated SVG via
- * the `animateTransform` / `animate` elements so the card loops the effect
- * continuously when hovered (CSS group-hover triggers `data-running="true"`).
- *
- * This replaces the prior generic gradient + ArrowLeftRight icon which did
- * not communicate what each transition actually does.
- */
-type TransitionKind = "fade" | "dipBlack" | "dipWhite" | "slide" | "zoom";
-
-const TransitionThumbnail: React.FC<{ kind: TransitionKind }> = ({ kind }) => {
-  const aColor = "#A855F7"; // outgoing clip color
-  const bColor = "#06B6D4"; // incoming clip color
-
-  if (kind === "fade") {
-    // Two halves with a soft gradient between, plus a fading center band.
-    return (
-      <svg viewBox="0 0 100 60" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
-        <defs>
-          <linearGradient id="fade-grad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor={aColor} />
-            <stop offset="50%" stopColor={aColor} />
-            <stop offset="50%" stopColor={bColor} />
-            <stop offset="100%" stopColor={bColor} />
-          </linearGradient>
-          <linearGradient id="fade-blend" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="35%" stopColor={aColor} stopOpacity="1" />
-            <stop offset="50%" stopColor={aColor} stopOpacity="0" />
-            <stop offset="50%" stopColor={bColor} stopOpacity="0" />
-            <stop offset="65%" stopColor={bColor} stopOpacity="1" />
-          </linearGradient>
-        </defs>
-        <rect x="0" y="0" width="100" height="60" fill="url(#fade-grad)" />
-        <rect x="0" y="0" width="100" height="60" fill="url(#fade-blend)" />
-        <text x="50" y="35" textAnchor="middle" fontSize="10" fill="#fff" fontWeight="700" opacity="0.85">FADE</text>
-      </svg>
-    );
-  }
-
-  if (kind === "dipBlack" || kind === "dipWhite") {
-    const mid = kind === "dipBlack" ? "#000000" : "#FFFFFF";
-    const textColor = kind === "dipBlack" ? "#fff" : "#000";
-    return (
-      <svg viewBox="0 0 100 60" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
-        <rect x="0" y="0" width="40" height="60" fill={aColor} />
-        <rect x="40" y="0" width="20" height="60" fill={mid} />
-        <rect x="60" y="0" width="40" height="60" fill={bColor} />
-        <text x="50" y="35" textAnchor="middle" fontSize="8" fill={textColor} fontWeight="700">
-          DIP
-        </text>
-      </svg>
-    );
-  }
-
-  if (kind === "slide") {
-    // Show A sliding off to the left while B comes in from the right.
-    return (
-      <svg viewBox="0 0 100 60" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
-        <rect x="0" y="0" width="50" height="60" fill={aColor} />
-        <rect x="50" y="0" width="50" height="60" fill={bColor} />
-        {/* Arrow showing slide direction */}
-        <g transform="translate(50,30)">
-          <line x1="-14" y1="0" x2="14" y2="0" stroke="#F4FF00" strokeWidth="3" />
-          <polygon points="14,0 8,-6 8,6" fill="#F4FF00" />
-        </g>
-        <text x="50" y="55" textAnchor="middle" fontSize="7" fill="#fff" fontWeight="700" opacity="0.85">SLIDE</text>
-      </svg>
-    );
-  }
-
-  // zoom
-  return (
-    <svg viewBox="0 0 100 60" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
-      <rect x="0" y="0" width="100" height="60" fill={aColor} />
-      {/* Concentric "zoom" hint */}
-      <circle cx="50" cy="30" r="6" fill="none" stroke={bColor} strokeWidth="1.5" opacity="0.95" />
-      <circle cx="50" cy="30" r="13" fill="none" stroke={bColor} strokeWidth="1.5" opacity="0.7" />
-      <circle cx="50" cy="30" r="20" fill="none" stroke={bColor} strokeWidth="1.5" opacity="0.45" />
-      <circle cx="50" cy="30" r="27" fill="none" stroke={bColor} strokeWidth="1.5" opacity="0.25" />
-      <text x="50" y="55" textAnchor="middle" fontSize="7" fill="#fff" fontWeight="700" opacity="0.85">ZOOM</text>
-    </svg>
-  );
+const transitionPreviewLabel: Record<TransitionPreviewKind, string> = {
+  crossfade: "FADE",
+  dipBlack: "BLACK",
+  dipWhite: "WHITE",
+  wipe: "WIPE",
+  slide: "SLIDE",
+  push: "PUSH",
+  zoom: "ZOOM",
 };
+
+const TransitionThumbnail: React.FC<{ preset: EditorTransitionPreset }> = ({
+  preset,
+}) => (
+  <div
+    className={`editor-transition-preview editor-transition-preview--${preset.preview}`}
+    aria-hidden="true"
+  >
+    <div className="editor-transition-preview__clip editor-transition-preview__clip--a" />
+    <div className="editor-transition-preview__clip editor-transition-preview__clip--b" />
+    <div className="editor-transition-preview__dip" />
+    <div className="editor-transition-preview__wipe" />
+    <div className="editor-transition-preview__rings" />
+    <span className="editor-transition-preview__label">
+      {transitionPreviewLabel[preset.preview]}
+    </span>
+  </div>
+);
 
 /**
  * Media Item Thumbnail Component
@@ -1544,76 +1493,68 @@ export const AssetsPanel: React.FC = () => {
               {t("drag_to_clip_boundary")}
             </p>
             <div className="grid grid-cols-2 gap-2">
-              {/* V5 cleanup: trimmed to a basic set of 5 universally popular
-                  NLE transitions. Wipe & Push were the least-used outliers
-                  and went with the V5 trim — Fade / Dip Black / Dip White /
-                  Slide / Zoom cover the standard cross-clip transition needs.
-                  Each card uses a custom SVG thumbnail showing the actual
-                  effect (3 frames: before / mid / after) plus a CSS
-                  @keyframes loop on hover so the visualization animates. */}
-              {[
-                { id: "crossfade", name: "Fade", svg: "fade" as const },
-                { id: "dipToBlack", name: "Dip Black", svg: "dipBlack" as const },
-                { id: "dipToWhite", name: "Dip White", svg: "dipWhite" as const },
-                { id: "slide", name: "Slide", svg: "slide" as const },
-                { id: "zoom", name: "Zoom", svg: "zoom" as const },
-              ].map((tx) => (
-                <button
-                  key={tx.id}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData(
-                      "application/x-openreel-transition",
-                      JSON.stringify({ type: tx.id, duration: 1.0 }),
-                    );
-                    e.dataTransfer.effectAllowed = "copy";
-                  }}
-                  onClick={() => {
-                    // Best-effort apply: select the next pair of clips & apply
-                    const selectedIds = useUIStore.getState().getSelectedClipIds();
-                    const stateAll = useProjectStore.getState();
-                    if (selectedIds.length === 0) {
-                      notify.warning(t("no_clips_selected"), t("select_two_adjacent_clips"));
-                      return;
-                    }
-                    // Find selected clip & its next neighbor on same track
-                    const targetClip = stateAll.project.timeline.tracks
-                      .flatMap((tr) => tr.clips.map((c) => ({ c, trackId: tr.id })))
-                      .find((x) => x.c.id === selectedIds[0]);
-                    if (!targetClip) return;
-                    const trackClips = stateAll.project.timeline.tracks
-                      .find((tr) => tr.id === targetClip.trackId)?.clips || [];
-                    const sorted = [...trackClips].sort((a, b) => a.startTime - b.startTime);
-                    const idx = sorted.findIndex((c) => c.id === targetClip.c.id);
-                    const next = sorted[idx + 1];
-                    if (!next) {
-                      notify.warning(t("no_clips_selected"), t("select_two_adjacent_clips"));
-                      return;
-                    }
-                    const bridge = getTransitionBridge();
-                    const result = bridge.createTransition(
-                      targetClip.c as never,
-                      next as never,
-                      tx.id as never,
-                      1.0,
-                    );
-                    if (result.success) notify.success(t("applied_transition"), tx.name);
-                    else notify.error("Failed", result.error || "");
-                  }}
-                  className="group flex flex-col rounded-lg overflow-hidden border border-border hover:border-primary transition-all cursor-pointer"
-                  title={`${tx.name} — click to apply between the selected clip and its next neighbor, or drag onto a clip boundary in the timeline`}
-                  data-testid={`transition-card-${tx.id}`}
-                >
-                  <div className="aspect-video bg-background-tertiary relative overflow-hidden">
-                    <TransitionThumbnail kind={tx.svg} />
-                  </div>
-                  <div className="px-2 py-1.5 bg-background-tertiary">
-                    <div className="text-[11px] text-text-primary font-medium truncate">
-                      {tx.name}
+              {EDITOR_TRANSITION_PRESETS.map((tx) => {
+                const payload = toTransitionPayload(tx);
+                return (
+                  <button
+                    key={tx.id}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(
+                        "application/x-openreel-transition",
+                        JSON.stringify(payload),
+                      );
+                      e.dataTransfer.effectAllowed = "copy";
+                    }}
+                    onClick={() => {
+                      const selectedIds = useUIStore.getState().getSelectedClipIds();
+                      const stateAll = useProjectStore.getState();
+                      if (selectedIds.length === 0) {
+                        notify.warning(t("no_clips_selected"), t("select_two_adjacent_clips"));
+                        return;
+                      }
+                      const targetClip = stateAll.project.timeline.tracks
+                        .flatMap((tr) => tr.clips.map((c) => ({ c, trackId: tr.id })))
+                        .find((x) => x.c.id === selectedIds[0]);
+                      if (!targetClip) return;
+                      const trackClips = stateAll.project.timeline.tracks
+                        .find((tr) => tr.id === targetClip.trackId)?.clips || [];
+                      const sorted = [...trackClips].sort((a, b) => a.startTime - b.startTime);
+                      const idx = sorted.findIndex((c) => c.id === targetClip.c.id);
+                      const next = sorted[idx + 1];
+                      if (!next) {
+                        notify.warning(t("no_clips_selected"), t("select_two_adjacent_clips"));
+                        return;
+                      }
+                      const bridge = getTransitionBridge();
+                      const result = bridge.createTransition(
+                        targetClip.c as never,
+                        next as never,
+                        payload.type as never,
+                        payload.duration,
+                        getTransitionParamsForType(payload) as never,
+                      );
+                      if (result.success) notify.success(t("applied_transition"), payload.name);
+                      else notify.error("Failed", result.error || "");
+                    }}
+                    className="group flex flex-col rounded-lg overflow-hidden border border-border hover:border-primary transition-all cursor-pointer"
+                    title={`${payload.name} - click to apply between the selected clip and its next neighbor, or drag onto a clip boundary in the timeline`}
+                    data-testid={`transition-card-${tx.id}`}
+                  >
+                    <div className="aspect-video bg-background-tertiary relative overflow-hidden">
+                      <TransitionThumbnail preset={tx} />
                     </div>
-                  </div>
-                </button>
-              ))}
+                    <div className="px-2 py-1.5 bg-background-tertiary">
+                      <div className="text-[11px] text-text-primary font-medium truncate">
+                        {tx.name}
+                      </div>
+                      <div className="text-[9px] text-text-muted capitalize">
+                        {tx.category}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </ScrollArea>
