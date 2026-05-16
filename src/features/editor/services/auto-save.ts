@@ -55,9 +55,10 @@ const AUTO_SAVE_STORE = "autosaves";
 type AutoSaveEventType = "saved" | "restored" | "error" | "recoveryAvailable";
 type AutoSaveEventCallback = (data?: unknown) => void;
 
-class AutoSaveManager {
+export class AutoSaveManager {
   private config: AutoSaveConfig;
   private db: IDBDatabase | null = null;
+  private initializePromise: Promise<void> | null = null;
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private debounceTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private lastSavedHash: string = "";
@@ -65,20 +66,42 @@ class AutoSaveManager {
   private listeners: Map<AutoSaveEventType, Set<AutoSaveEventCallback>> =
     new Map();
 
+  private projectProvider: (() => Project) | null = null;
   private pendingProject: Project | null = null;
   private isDirty: boolean = false;
+  private dirtyVersion: number = 0;
+  private saveInFlight: Promise<void> | null = null;
+  private saveRequestedDuringFlight: boolean = false;
 
   constructor(config: Partial<AutoSaveConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
   async initialize(): Promise<void> {
-    try {
-      this.db = await this.openDatabase();
-    } catch (error) {
-      console.error("[AutoSave] Failed to initialize:", error);
-      this.emit("error", { error, message: "Failed to initialize auto-save" });
+    if (this.db) {
+      return;
     }
+    if (this.initializePromise) {
+      await this.initializePromise;
+      return;
+    }
+
+    this.initializePromise = this.openDatabase()
+      .then((db) => {
+        this.db = db;
+      })
+      .catch((error) => {
+        console.error("[AutoSave] Failed to initialize:", error);
+        this.emit("error", {
+          error,
+          message: "Failed to initialize auto-save",
+        });
+      })
+      .finally(() => {
+        this.initializePromise = null;
+      });
+
+    await this.initializePromise;
   }
 
   private openDatabase(): Promise<IDBDatabase> {
@@ -123,14 +146,16 @@ class AutoSaveManager {
     }
 
     this.stop(); // Stop any existing auto-save
+    this.projectProvider = getProject;
 
-    // Initial save
-    this.pendingProject = getProject();
+    // Capture the current project immediately so the first edit after mount
+    // does not save an older snapshot from a previous interval tick.
+    this.captureProject();
     this.saveIfDirty();
 
     // Set up periodic saves
     this.intervalId = setInterval(() => {
-      this.pendingProject = getProject();
+      this.captureProject();
       this.saveIfDirty();
     }, this.config.interval);
   }
@@ -146,8 +171,14 @@ class AutoSaveManager {
     }
   }
 
-  markDirty(): void {
+  markDirty(project?: Project): void {
+    if (project) {
+      this.pendingProject = project;
+    } else {
+      this.captureProject();
+    }
     this.isDirty = true;
+    this.dirtyVersion += 1;
 
     // Debounce the save
     if (this.debounceTimeoutId) {
@@ -159,29 +190,74 @@ class AutoSaveManager {
     }, this.config.debounceTime);
   }
 
+  private captureProject(): Project | null {
+    if (!this.projectProvider) {
+      return this.pendingProject;
+    }
+    try {
+      this.pendingProject = this.projectProvider();
+    } catch (error) {
+      console.warn("[AutoSave] Failed to capture project snapshot:", error);
+    }
+    return this.pendingProject;
+  }
+
   private async saveIfDirty(): Promise<void> {
+    this.captureProject();
     if (!this.pendingProject || !this.isDirty) {
       return;
     }
 
-    const project = this.pendingProject;
-    const hash = this.computeHash(project);
-
-    if (hash === this.lastSavedHash) {
-      return; // No changes
+    if (this.saveInFlight) {
+      this.saveRequestedDuringFlight = true;
+      return this.saveInFlight;
     }
 
-    try {
-      await this.save(project);
-      this.lastSavedHash = hash;
-      this.isDirty = false;
-    } catch (error) {
-      console.error("[AutoSave] Save failed:", error);
-      this.emit("error", { error, message: "Auto-save failed" });
-    }
+    const run = async () => {
+      do {
+        this.saveRequestedDuringFlight = false;
+        this.captureProject();
+
+        if (!this.pendingProject || !this.isDirty) {
+          return;
+        }
+
+        const project = this.pendingProject;
+        const dirtyVersionAtSaveStart = this.dirtyVersion;
+        const hash = this.computeHash(project);
+
+        if (hash === this.lastSavedHash) {
+          if (this.dirtyVersion === dirtyVersionAtSaveStart) {
+            this.isDirty = false;
+          }
+          continue;
+        }
+
+        try {
+          await this.save(project);
+          this.lastSavedHash = hash;
+          if (this.dirtyVersion === dirtyVersionAtSaveStart) {
+            this.isDirty = false;
+          }
+        } catch (error) {
+          console.error("[AutoSave] Save failed:", error);
+          this.emit("error", { error, message: "Auto-save failed" });
+          return;
+        }
+      } while (this.isDirty || this.saveRequestedDuringFlight);
+    };
+
+    this.saveInFlight = run().finally(() => {
+      this.saveInFlight = null;
+    });
+
+    return this.saveInFlight;
   }
 
   private async save(project: Project): Promise<void> {
+    if (!this.db) {
+      await this.initialize();
+    }
     if (!this.db) {
       throw new Error("Auto-save database not initialized");
     }
@@ -230,7 +306,21 @@ class AutoSaveManager {
       const store = tx.objectStore(AUTO_SAVE_STORE);
       const request = store.put(record);
 
-      request.onsuccess = () => resolve();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () =>
+        reject(
+          new Error(
+            `Failed to save: ${tx.error?.message ?? request.error?.message}`,
+          ),
+        );
+      tx.onabort = () =>
+        reject(
+          new Error(
+            `Save transaction aborted: ${
+              tx.error?.message ?? request.error?.message ?? "unknown error"
+            }`,
+          ),
+        );
       request.onerror = () =>
         reject(new Error(`Failed to save: ${request.error?.message}`));
     });
@@ -266,7 +356,21 @@ class AutoSaveManager {
       const store = tx.objectStore(AUTO_SAVE_STORE);
       const request = store.delete(id);
 
-      request.onsuccess = () => resolve();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () =>
+        reject(
+          new Error(
+            `Failed to delete: ${tx.error?.message ?? request.error?.message}`,
+          ),
+        );
+      tx.onabort = () =>
+        reject(
+          new Error(
+            `Delete transaction aborted: ${
+              tx.error?.message ?? request.error?.message ?? "unknown error"
+            }`,
+          ),
+        );
       request.onerror = () =>
         reject(new Error(`Failed to delete: ${request.error?.message}`));
     });
@@ -396,9 +500,21 @@ class AutoSaveManager {
       const store = tx.objectStore(AUTO_SAVE_STORE);
       const request = store.clear();
 
-      request.onsuccess = () => {
-        resolve();
-      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () =>
+        reject(
+          new Error(
+            `Failed to clear: ${tx.error?.message ?? request.error?.message}`,
+          ),
+        );
+      tx.onabort = () =>
+        reject(
+          new Error(
+            `Clear transaction aborted: ${
+              tx.error?.message ?? request.error?.message ?? "unknown error"
+            }`,
+          ),
+        );
       request.onerror = () =>
         reject(new Error(`Failed to clear: ${request.error?.message}`));
     });
@@ -409,21 +525,7 @@ class AutoSaveManager {
     // ensures that adding/removing a transition flips isDirty even when the
     // tracks/clips/media counts stay identical (V6-C1).
     const enriched = serializeBridgeState(project);
-    const transitionCount = enriched.timeline.tracks.reduce(
-      (sum, t) => sum + (t.transitions?.length ?? 0),
-      0,
-    );
-    const key = JSON.stringify({
-      id: enriched.id,
-      modifiedAt: enriched.modifiedAt,
-      trackCount: enriched.timeline.tracks.length,
-      clipCount: enriched.timeline.tracks.reduce(
-        (sum, t) => sum + t.clips.length,
-        0,
-      ),
-      mediaCount: enriched.mediaLibrary.items.length,
-      transitionCount,
-    });
+    const key = JSON.stringify(enriched);
 
     let hash = 0;
     for (let i = 0; i < key.length; i++) {
@@ -466,11 +568,30 @@ class AutoSaveManager {
   async forceSave(project: Project): Promise<void> {
     this.pendingProject = project;
     this.isDirty = true;
+    this.dirtyVersion += 1;
     await this.saveIfDirty();
+  }
+
+  async flush(): Promise<void> {
+    if (this.debounceTimeoutId) {
+      clearTimeout(this.debounceTimeoutId);
+      this.debounceTimeoutId = null;
+    }
+
+    this.captureProject();
+    await this.saveIfDirty();
+  }
+
+  hasUnsavedChanges(): boolean {
+    return this.isDirty || Boolean(this.debounceTimeoutId || this.saveInFlight);
   }
 
   destroy(): void {
     this.stop();
+    this.projectProvider = null;
+    this.pendingProject = null;
+    this.isDirty = false;
+    this.dirtyVersion = 0;
     if (this.db) {
       this.db.close();
       this.db = null;

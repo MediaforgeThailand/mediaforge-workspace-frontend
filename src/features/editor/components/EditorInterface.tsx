@@ -47,16 +47,106 @@ import {
   initializeAudioBridge,
   disposeAudioBridge,
 } from "../bridges/audio-bridge";
+import { autoSaveManager } from "../services/auto-save";
+import {
+  flushCloudSave,
+  hasPendingCloudSave,
+} from "../services/project-cloud";
+import { useSettingsStore } from "../stores/settings-store";
 
 /**
  * Auto-save initialization hook
  */
 const useAutoSave = () => {
-  const { initializeAutoSave } = useProjectStore();
+  const initializeAutoSave = useProjectStore((state) => state.initializeAutoSave);
+  const shutdownAutoSave = useProjectStore((state) => state.shutdownAutoSave);
+  const autoSave = useSettingsStore((state) => state.autoSave);
+  const autoSaveInterval = useSettingsStore((state) => state.autoSaveInterval);
+  const lifecycleIdRef = useRef(0);
 
   useEffect(() => {
+    const lifecycleId = ++lifecycleIdRef.current;
+    autoSaveManager.updateConfig({
+      enabled: autoSave,
+      interval: Math.max(1, autoSaveInterval) * 60_000,
+    });
+
+    if (!autoSave) {
+      void autoSaveManager.flush().finally(() => {
+        if (lifecycleIdRef.current === lifecycleId) {
+          shutdownAutoSave();
+        }
+      });
+      return;
+    }
+
     initializeAutoSave().catch(console.error);
-  }, [initializeAutoSave]);
+    return () => {
+      void autoSaveManager
+        .flush()
+        .catch((error) => {
+          console.warn("[EditorInterface] Auto-save cleanup flush failed:", error);
+        })
+        .finally(() => {
+          if (lifecycleIdRef.current === lifecycleId) {
+            shutdownAutoSave();
+          }
+        });
+    };
+  }, [autoSave, autoSaveInterval, initializeAutoSave, shutdownAutoSave]);
+};
+
+const useEditorLifecycleSaveGuard = () => {
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      return;
+    }
+
+    const flushAll = async () => {
+      await autoSaveManager.flush();
+      await flushCloudSave();
+    };
+
+    const flushBestEffort = () => {
+      void flushAll().catch((error) => {
+        console.warn("[EditorInterface] Final save flush failed:", error);
+      });
+    };
+
+    const hasPendingSave = () =>
+      autoSaveManager.hasUnsavedChanges() || hasPendingCloudSave();
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        flushBestEffort();
+      }
+    };
+
+    const onPageHide = () => {
+      flushBestEffort();
+    };
+
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasPendingSave()) {
+        return;
+      }
+
+      flushBestEffort();
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("beforeunload", onBeforeUnload);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      flushBestEffort();
+    };
+  }, []);
 };
 
 /**
@@ -218,6 +308,7 @@ export const EditorInterface: React.FC = () => {
   // The in-app Ctrl+V clip duplicate is still handled by `useKeyboardShortcuts`.
   useClipboardPaste();
   useAutoSave();
+  useEditorLifecycleSaveGuard();
   const t = useI18n();
 
   const {

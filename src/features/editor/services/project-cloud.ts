@@ -87,18 +87,25 @@ export async function loadMostRecentProject(): Promise<Project | null> {
 export async function loadProjectById(
   projectId: string,
 ): Promise<Project | null> {
+  const row = await loadProjectRowById(projectId);
+  return row?.data ?? null;
+}
+
+export async function loadProjectRowById(
+  projectId: string,
+): Promise<CloudProjectRow | null> {
   const sb = getSupabase();
   const { data, error } = await sb
     .from("editor_projects" as never)
-    .select("data")
+    .select("id, name, thumbnail, duration_sec, created_at, updated_at, data")
     .eq("id", projectId)
     .maybeSingle();
   if (error) {
-    console.warn("[ProjectCloud] loadProjectById failed:", error.message);
+    console.warn("[ProjectCloud] loadProjectRowById failed:", error.message);
     return null;
   }
   if (!data) return null;
-  return (data as { data: Project }).data as Project;
+  return data as unknown as CloudProjectRow;
 }
 
 function serializeForSave(project: Project): Project {
@@ -173,6 +180,8 @@ export async function deleteProject(projectId: string): Promise<boolean> {
 let pendingTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingProject: Project | null = null;
 let cloudSaveEnabled = false;
+let cloudSaveChain: Promise<void> = Promise.resolve();
+let cloudSaveInFlight: Promise<void> | null = null;
 
 export function setCloudSaveEnabled(enabled: boolean) {
   cloudSaveEnabled = enabled;
@@ -191,13 +200,17 @@ export function scheduleCloudSave(project: Project, delayMs = 2000) {
   if (!cloudSaveEnabled) return;
   pendingProject = project;
   if (pendingTimer) clearTimeout(pendingTimer);
-  pendingTimer = setTimeout(async () => {
+  pendingTimer = setTimeout(() => {
     pendingTimer = null;
     if (!pendingProject) return;
     const p = pendingProject;
     pendingProject = null;
-    await saveProject(p);
+    void enqueueCloudSave(p);
   }, delayMs);
+}
+
+export function hasPendingCloudSave(): boolean {
+  return Boolean(pendingProject || pendingTimer || cloudSaveInFlight);
 }
 
 export async function flushCloudSave(): Promise<void> {
@@ -205,9 +218,37 @@ export async function flushCloudSave(): Promise<void> {
     clearTimeout(pendingTimer);
     pendingTimer = null;
   }
+
+  let flushedProject: Promise<void> | null = null;
   if (pendingProject) {
     const p = pendingProject;
     pendingProject = null;
-    await saveProject(p);
+    flushedProject = enqueueCloudSave(p);
   }
+
+  if (flushedProject) {
+    await flushedProject;
+  } else if (cloudSaveInFlight) {
+    await cloudSaveInFlight;
+  }
+}
+
+function enqueueCloudSave(project: Project): Promise<void> {
+  const task = cloudSaveChain
+    .catch(() => undefined)
+    .then(async () => {
+      try {
+        await saveProject(project);
+      } catch (error) {
+        console.warn("[ProjectCloud] queued save failed:", error);
+      }
+    });
+  cloudSaveChain = task;
+  const trackedTask = task.finally(() => {
+    if (cloudSaveInFlight === trackedTask) {
+      cloudSaveInFlight = null;
+    }
+  });
+  cloudSaveInFlight = trackedTask;
+  return trackedTask;
 }

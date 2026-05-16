@@ -96,6 +96,22 @@ function syncSidecarClipEngines(
   }
 }
 
+function buildFullProjectSnapshot(project: Project): Project {
+  const engineState = useEngineStore.getState();
+  const titleEngine = engineState.getTitleEngine();
+  const graphicsEngine = engineState.getGraphicsEngine();
+
+  return {
+    ...project,
+    textClips: titleEngine?.getAllTextClips() || [],
+    shapeClips: graphicsEngine?.getAllShapeClips() || [],
+    svgClips: graphicsEngine?.getAllSVGClips() || [],
+    stickerClips: graphicsEngine?.getAllStickerClips() || [],
+  };
+}
+
+let autoSaveProjectUnsubscribe: (() => void) | null = null;
+
 /**
  * ProjectState - Complete state interface for project management
  *
@@ -472,6 +488,7 @@ export interface ProjectState {
 
   // Auto-save
   initializeAutoSave: () => Promise<void>;
+  shutdownAutoSave: () => void;
   checkForRecovery: () => Promise<AutoSaveMetadata[]>;
   recoverFromAutoSave: (saveId: string) => Promise<boolean>;
   forceSave: () => Promise<void>;
@@ -2891,27 +2908,25 @@ export const useProjectStore = create<ProjectState>()(
         await initializeAutoSave();
         autoSaveManager.start(() => {
           const { project } = get();
-          const titleEngine = useEngineStore.getState().getTitleEngine();
-          const graphicsEngine = useEngineStore.getState().getGraphicsEngine();
-
-          return {
-            ...project,
-            textClips: titleEngine?.getAllTextClips() || [],
-            shapeClips: graphicsEngine?.getAllShapeClips() || [],
-            svgClips: graphicsEngine?.getAllSVGClips() || [],
-            stickerClips: graphicsEngine?.getAllStickerClips() || [],
-          };
+          return buildFullProjectSnapshot(project);
         });
 
+        autoSaveProjectUnsubscribe?.();
         // Subscribe to project state changes to mark as dirty for auto-save
         // Uses Zustand's subscribeWithSelector middleware to detect changes to project object only
         // Trigger auto-save when any project field changes (timeline, media, settings, etc.)
-        useProjectStore.subscribe(
+        autoSaveProjectUnsubscribe = useProjectStore.subscribe(
           (state) => state.project,
-          () => {
-            autoSaveManager.markDirty();
+          (project) => {
+            autoSaveManager.markDirty(buildFullProjectSnapshot(project));
           },
         );
+      },
+
+      shutdownAutoSave: () => {
+        autoSaveProjectUnsubscribe?.();
+        autoSaveProjectUnsubscribe = null;
+        autoSaveManager.stop();
       },
 
       checkForRecovery: async () => {
@@ -2960,31 +2975,13 @@ export const useProjectStore = create<ProjectState>()(
 
       forceSave: async () => {
         const { project } = get();
-        const titleEngine = useEngineStore.getState().getTitleEngine();
-        const graphicsEngine = useEngineStore.getState().getGraphicsEngine();
-
-        const fullProject: Project = {
-          ...project,
-          textClips: titleEngine?.getAllTextClips() || [],
-          shapeClips: graphicsEngine?.getAllShapeClips() || [],
-          svgClips: graphicsEngine?.getAllSVGClips() || [],
-          stickerClips: graphicsEngine?.getAllStickerClips() || [],
-        };
+        const fullProject = buildFullProjectSnapshot(project);
         await autoSaveManager.forceSave(fullProject);
       },
 
       getFullProject: (): Project => {
         const { project } = get();
-        const titleEngine = useEngineStore.getState().getTitleEngine();
-        const graphicsEngine = useEngineStore.getState().getGraphicsEngine();
-
-        return {
-          ...project,
-          textClips: titleEngine?.getAllTextClips() || [],
-          shapeClips: graphicsEngine?.getAllShapeClips() || [],
-          svgClips: graphicsEngine?.getAllSVGClips() || [],
-          stickerClips: graphicsEngine?.getAllStickerClips() || [],
-        };
+        return buildFullProjectSnapshot(project);
       },
 
       // Text clip actions

@@ -21,16 +21,20 @@ import { ScriptViewDialog } from "./components/ScriptViewDialog";
 import { SearchModal } from "./components/SearchModal";
 import { useUIStore } from "./stores/ui-store";
 import { useProjectStore } from "./stores/project-store";
+import { toast } from "./stores/notification-store";
 import { createEmptyProject } from "./stores/project";
 import { restoreFontsFromIndexedDB } from "./services/font-manager";
 import {
   listUserProjects,
-  loadProjectById,
+  loadProjectRowById,
   saveProject,
   setCloudSaveEnabled,
   flushCloudSave,
   type CloudProjectSummary,
 } from "./services/project-cloud";
+import { autoSaveManager } from "./services/auto-save";
+import { loadProjectMedia, saveMediaBlob } from "./services/media-storage";
+import { restoreMediaItem } from "./utils/media-recovery";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   SOCIAL_MEDIA_PRESETS,
@@ -56,6 +60,96 @@ const LoadingSpinner: React.FC<{ message: string }> = ({ message }) => (
     <p className="text-sm text-text-secondary">{message}</p>
   </div>
 );
+
+function isRuntimeBlob(value: unknown): value is Blob {
+  return typeof Blob !== "undefined" && value instanceof Blob;
+}
+
+async function hydrateProjectMedia(project: Project): Promise<Project> {
+  const storedMedia = await loadProjectMedia(project.id).catch((error) => {
+    console.warn("[EditorPage] local media lookup failed:", error);
+    return [];
+  });
+  const blobMap = new Map(storedMedia.map((record) => [record.id, record.blob]));
+
+  const restoredItems = await Promise.all(
+    project.mediaLibrary.items.map(async (item) => {
+      const itemWithValidBlob = isRuntimeBlob(item.blob)
+        ? item
+        : { ...item, blob: null };
+      let storedBlob = blobMap.get(item.id);
+
+      if (!storedBlob && itemWithValidBlob.originalUrl) {
+        try {
+          const response = await fetch(itemWithValidBlob.originalUrl);
+          if (response.ok) {
+            storedBlob = await response.blob();
+            await saveMediaBlob(
+              project.id,
+              item.id,
+              storedBlob,
+              item.metadata,
+            ).catch((error) => {
+              console.warn("[EditorPage] local media cache failed:", error);
+            });
+          }
+        } catch (error) {
+          console.warn("[EditorPage] remote media restore failed:", error);
+        }
+      }
+
+      return restoreMediaItem(itemWithValidBlob, storedBlob);
+    }),
+  );
+
+  return {
+    ...project,
+    mediaLibrary: {
+      ...project.mediaLibrary,
+      items: restoredItems,
+    },
+  };
+}
+
+async function recoverNewerLocalProject(
+  project: Project,
+  cloudUpdatedAt?: string,
+): Promise<Project> {
+  try {
+    const localSave = await autoSaveManager.getMostRecentSave(project.id);
+    if (!localSave) {
+      return project;
+    }
+
+    const cloudSavedAt = cloudUpdatedAt
+      ? new Date(cloudUpdatedAt).getTime()
+      : NaN;
+    const baseline =
+      Number.isFinite(cloudSavedAt) && cloudSavedAt > 0
+        ? cloudSavedAt
+        : typeof project.modifiedAt === "number"
+          ? project.modifiedAt
+          : 0;
+
+    if (localSave.timestamp <= baseline + 1000) {
+      return project;
+    }
+
+    const recoveredProject = await autoSaveManager.recover(localSave.id);
+    if (!recoveredProject || recoveredProject.id !== project.id) {
+      return project;
+    }
+
+    toast.info(
+      "Recovered latest local edits",
+      "Restored the newest autosave from this device.",
+    );
+    return recoveredProject;
+  } catch (error) {
+    console.warn("[EditorPage] Local autosave recovery failed:", error);
+    return project;
+  }
+}
 
 const PRESET_DIMENSIONS: Record<string, SocialMediaCategory> = {
   "1080x1920": "tiktok",
@@ -301,7 +395,19 @@ export default function EditorPage() {
     if (!user) return;
     setCloudSaveEnabled(true);
     return () => {
-      void flushCloudSave().finally(() => setCloudSaveEnabled(false));
+      void (async () => {
+        try {
+          await autoSaveManager.flush();
+        } catch (error) {
+          console.warn("[EditorPage] Auto-save unmount flush failed:", error);
+        }
+
+        try {
+          await flushCloudSave();
+        } finally {
+          setCloudSaveEnabled(false);
+        }
+      })();
     };
   }, [user]);
 
@@ -313,9 +419,14 @@ export default function EditorPage() {
 
     void (async () => {
       if (projectId) {
-        const loaded = await loadProjectById(projectId);
+        const loaded = await loadProjectRowById(projectId);
         if (loaded) {
-          loadProject(loaded as Project);
+          const projectToLoad = await recoverNewerLocalProject(
+            loaded.data as Project,
+            loaded.updated_at,
+          );
+          const projectWithMedia = await hydrateProjectMedia(projectToLoad);
+          loadProject(projectWithMedia);
           return;
         }
         navigate("/app/editor", { replace: true });

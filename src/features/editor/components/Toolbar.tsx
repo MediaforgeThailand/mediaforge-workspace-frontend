@@ -178,6 +178,7 @@ export const Toolbar: React.FC = () => {
 
   // Menu dropdown actions
   const handleNewProject = useCallback(async () => {
+    await autoSaveManager.flush();
     await flushCloudSave();
     createNewProject();
     const nextProject = useProjectStore.getState().project;
@@ -187,7 +188,9 @@ export const Toolbar: React.FC = () => {
 
   const handleSaveProject = useCallback(async () => {
     try {
-      const ok = await saveCloudProject(getFullProject());
+      const fullProject = getFullProject();
+      await autoSaveManager.forceSave(fullProject);
+      const ok = await saveCloudProject(fullProject);
       if (ok) {
         setLastSavedAt(Date.now());
         toast.success("Project saved");
@@ -241,36 +244,23 @@ export const Toolbar: React.FC = () => {
   // dispatches "openreel:save" / "openreel:export" because save and export
   // state are local to this toolbar.
   useEffect(() => {
-    const onSave = async () => {
-      try {
-        const ok = await saveCloudProject(getFullProject());
-        if (ok) {
-          setLastSavedAt(Date.now());
-          toast.success("Project saved");
-        } else {
-          toast.error("Save failed");
-        }
-      } catch (e) {
-        toast.error("Save failed", String(e));
-      }
-    };
     const onExport = () => setIsExportOpen(true);
     // Cmd/Ctrl+K → open search modal. Cmd/Ctrl+, → open settings. Both are
     // wired here because the openModal/openSettings handles live on local
     // UI state hooks that any-mount component cannot reach directly.
     const onOpenSearch = () => openModal("search");
     const onOpenSettings = () => openSettings();
-    window.addEventListener("openreel:save", onSave);
+    window.addEventListener("openreel:save", handleSaveProject);
     window.addEventListener("openreel:export", onExport);
     window.addEventListener("openreel:open-search", onOpenSearch);
     window.addEventListener("openreel:open-settings", onOpenSettings);
     return () => {
-      window.removeEventListener("openreel:save", onSave);
+      window.removeEventListener("openreel:save", handleSaveProject);
       window.removeEventListener("openreel:export", onExport);
       window.removeEventListener("openreel:open-search", onOpenSearch);
       window.removeEventListener("openreel:open-settings", onOpenSettings);
     };
-  }, [getFullProject, openModal, openSettings]);
+  }, [handleSaveProject, openModal, openSettings]);
 
   useEffect(() => {
     if (isExportOpen && !deviceProfile) {
