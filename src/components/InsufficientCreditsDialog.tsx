@@ -2,6 +2,17 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
+  Captions,
+  CheckCircle2,
+  Coins,
+  Film,
+  Image as ImageIcon,
+  Languages,
+  LockKeyhole,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -51,6 +62,12 @@ interface CreditCostSummaryRow {
 const DEFAULT_WORKSPACE_MULTIPLIER = 1.4;
 const FREE_PLAN_CREDITS = 1_000;
 const PLAN_ORDER = ["Free", "Starter", "Creator", "Pro"] as const;
+const PLAN_COPY: Record<(typeof PLAN_ORDER)[number], string> = {
+  Free: "Utility tools for getting started. Creative generation unlocks on paid plans.",
+  Starter: "A practical entry plan for daily prompts, audio and light generation.",
+  Creator: "More monthly room for image, video, translate and subtitle workflows.",
+  Pro: "The best value pool for heavier production and faster iteration.",
+};
 
 const SYNTHETIC_FREE_PLAN: SubscriptionPlanRow = {
   id: "free-plan",
@@ -67,11 +84,6 @@ const SYNTHETIC_FREE_PLAN: SubscriptionPlanRow = {
 
 function formatNumber(value: number): string {
   return Math.max(0, Math.floor(value)).toLocaleString("en-US");
-}
-
-function displayPlanPrice(plan: SubscriptionPlanRow): string {
-  if (plan.price_thb <= 0) return "Free";
-  return `THB ${formatNumber(plan.price_thb)} / mo`;
 }
 
 function customerCostForRow(
@@ -247,11 +259,14 @@ const InsufficientCreditsDialog = ({
   return (
     <>
       <Dialog open={open && !topupOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[94vh] max-w-[1040px] overflow-visible border-0 bg-transparent p-0 text-white shadow-none [&>button]:right-2 [&>button]:top-0 [&>button]:h-10 [&>button]:w-10 [&>button]:rounded-full [&>button]:bg-black/50 [&>button]:text-white [&>button]:opacity-100 [&>button]:ring-1 [&>button]:ring-white/15 [&>button]:backdrop-blur-xl [&>button]:hover:bg-white/15">
+        <DialogContent className="max-h-[94vh] max-w-[1200px] overflow-visible border-0 bg-transparent p-0 text-white shadow-none outline-none focus:outline-none focus-visible:outline-none [&>button]:right-3 [&>button]:top-1 [&>button]:h-12 [&>button]:w-12 [&>button]:rounded-full [&>button]:bg-black/60 [&>button]:text-white [&>button]:opacity-100 [&>button]:ring-1 [&>button]:ring-white/[0.15] [&>button]:backdrop-blur-xl [&>button]:hover:bg-white/[0.15]">
           <DialogTitle className="sr-only">{title}</DialogTitle>
           <DialogDescription className="sr-only">{description}</DialogDescription>
 
-          <div className="grid max-h-[94vh] grid-cols-1 items-start gap-3 overflow-y-auto px-4 pb-4 pt-14 sm:grid-cols-2 xl:grid-cols-4 xl:gap-4 xl:px-0 xl:pb-0">
+          <div className="relative max-h-[94vh] overflow-y-auto px-4 pb-5 pt-16 xl:px-0 xl:pb-2">
+            <div className="pointer-events-none absolute -left-24 top-0 h-[420px] w-[520px] rounded-full bg-[#e5ff36]/20 blur-[90px]" />
+            <div className="pointer-events-none absolute -right-20 top-28 h-[340px] w-[420px] rounded-full bg-[#78ff9d]/10 blur-[100px]" />
+            <div className="relative grid grid-cols-1 items-start gap-5 sm:grid-cols-2 xl:grid-cols-4">
             {planCards.map((plan) => {
               const creditsPerMonth = plan.upfront_credits || (plan.name === "Free" ? FREE_PLAN_CREDITS : 0);
               const isFree = plan.name === "Free";
@@ -270,112 +285,143 @@ const InsufficientCreditsDialog = ({
                       ? "View plans"
                       : "Choose plan";
               const onCtaClick = reason === "credits" && isCurrent ? () => setTopupOpen(true) : handleGoToPricing;
+              const cardTone = isCurrent ? "current" : "dark";
+              const featureRows = [
+                {
+                  icon: Coins,
+                  label: "Monthly credits",
+                  value: formatNumber(creditsPerMonth),
+                },
+                {
+                  icon: ImageIcon,
+                  label: "Image generation",
+                  value: isFree ? "Locked" : imageCount == null ? "-" : `~${formatNumber(imageCount)} / mo`,
+                  muted: isFree,
+                },
+                {
+                  icon: Film,
+                  label: "VDO generation",
+                  value: isFree ? "Locked" : videoCount == null ? "-" : `~${formatNumber(videoCount)} / mo`,
+                  muted: isFree,
+                },
+                {
+                  icon: Languages,
+                  label: "Translate VDO",
+                  value: translateCount == null ? "-" : `~${formatNumber(translateCount)} min`,
+                },
+                {
+                  icon: Captions,
+                  label: "Auto Subtitle",
+                  value: subtitleCount == null ? "-" : `~${formatNumber(subtitleCount)} min`,
+                },
+              ];
+              const urgencyCopy =
+                reason === "feature_locked"
+                  ? `${featureName || "This feature"} needs Starter or higher.`
+                  : isEducationSpace
+                    ? "Class credit balance is too low."
+                    : shortage > 0
+                      ? `Short by ${shortageText} credits.`
+                      : null;
+              const headlineCopy =
+                urgencyCopy && isCurrent
+                  ? urgencyCopy
+                  : PLAN_COPY[plan.name as (typeof PLAN_ORDER)[number]];
+              const badgeLabel = isCurrent ? "Current plan" : isPro ? "Most popular" : "Plan";
+              const priceLabel = plan.price_thb <= 0 ? "Free" : `THB ${formatNumber(plan.price_thb)}`;
+              const creditLabel = `${formatNumber(creditsPerMonth)} credits / month`;
 
               return (
                 <div
                   key={plan.id}
                   className={cn(
-                    "relative flex flex-col rounded-[24px] border p-5 shadow-[0_22px_70px_rgba(0,0,0,0.48)] backdrop-blur-2xl transition-transform hover:-translate-y-0.5",
-                    isPro
-                      ? "border-[#f4ff3f] bg-[#f6f7ee] text-[#090b07]"
-                      : "border-white/12 bg-[#101611]/95 text-white",
+                    "group relative isolate flex min-h-[610px] overflow-hidden rounded-[34px] border bg-[#070907]/92 p-7 text-white shadow-[0_34px_120px_rgba(0,0,0,0.68)] backdrop-blur-2xl transition-transform hover:-translate-y-1",
+                    isPro ? "border-[#e5ff36]/80" : "border-white/[0.12]",
                     isCurrent &&
                       "border-[#e5ff36] shadow-[0_0_0_1px_rgba(229,255,54,0.65),0_28px_90px_rgba(229,255,54,0.18)]",
                   )}
                 >
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <div
-                      className={cn(
-                        "rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.1em]",
-                        isCurrent
-                          ? "bg-[#e5ff36] text-black"
-                          : isPro
-                            ? "bg-black text-white"
-                            : "bg-white/10 text-zinc-200",
-                      )}
-                    >
-                      {isCurrent ? "Current plan" : isPro ? "Best value" : "Plan"}
-                    </div>
-                  </div>
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-[270px] bg-[radial-gradient(circle_at_17%_14%,rgba(229,255,54,0.72),transparent_27%),linear-gradient(135deg,rgba(173,214,24,0.82)_0%,rgba(40,56,18,0.72)_34%,rgba(7,9,7,0.1)_76%)]" />
+                  <div className="pointer-events-none absolute right-[-78px] top-[-28px] h-[272px] w-[272px] rotate-[-24deg] rounded-[76px] border border-white/10 bg-black/[0.18]" />
+                  <div className="pointer-events-none absolute right-[-34px] top-[84px] h-[235px] w-[132px] rounded-full border border-white/10 bg-black/[0.22]" />
+                  <div className="pointer-events-none absolute left-8 top-8 h-1.5 w-1.5 rounded-full bg-white/[0.35]" />
+                  <div className="pointer-events-none absolute left-20 top-16 h-2 w-2 rounded-full bg-white/[0.15]" />
+                  <div className="pointer-events-none absolute right-24 top-9 h-1.5 w-1.5 rounded-full bg-white/30" />
+                  <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,rgba(7,9,7,0.16)_32%,rgba(7,9,7,0.95)_100%)]" />
 
-                  <div>
-                    <h3 className="text-[25px] font-black leading-none tracking-tight">{plan.name}</h3>
-                    <div className="mt-4 text-[27px] font-black leading-none tracking-tight">
-                      {displayPlanPrice(plan)}
-                    </div>
-                    <div className={cn("mt-2 text-[12px] font-bold", isPro ? "text-zinc-600" : "text-zinc-300")}>
-                      {formatNumber(creditsPerMonth)} credits / month
-                    </div>
-                  </div>
-
-                  {(isCurrent || (isFree && reason === "feature_locked")) && (
-                    <div
-                      className={cn(
-                        "mt-4 rounded-2xl border px-3.5 py-3",
-                        isPro
-                          ? "border-black/10 bg-black/[0.04]"
-                          : reason === "feature_locked"
-                            ? "border-[#e5ff36]/40 bg-[#e5ff36]/10"
-                            : "border-sky-300/25 bg-sky-300/10",
-                      )}
-                    >
-                      <div className={cn("text-[10px] font-black uppercase tracking-[0.1em]", isPro ? "text-zinc-500" : "text-zinc-300")}>
-                        {reason === "feature_locked" ? "Feature locked" : "Not enough credits"}
+                  <div className="relative z-10 flex min-h-[554px] w-full flex-col">
+                    <div className="flex min-h-[72px] items-start justify-between gap-4">
+                      <div className="grid h-[68px] w-[68px] place-items-center rounded-full bg-[#e5ff36] text-[20px] font-black text-black shadow-[0_18px_34px_rgba(0,0,0,0.42)] ring-1 ring-white/30">
+                        m.
                       </div>
-                      <div className="mt-1.5 text-[13px] font-black leading-5">
-                        {reason === "feature_locked"
-                          ? `${featureName || "This feature"} needs Starter or higher.`
-                          : isEducationSpace
-                            ? "Class credit balance is too low."
-                            : `Need ${requiredText || "more"} credits. Balance ${balanceText}.`}
+                      <div
+                        className={cn(
+                          "rounded-full border px-3.5 py-1.5 text-[14px] font-semibold leading-none backdrop-blur-xl",
+                          isCurrent
+                            ? "border-[#e5ff36]/70 bg-[#e5ff36] text-black"
+                            : "border-white/[0.15] bg-black/30 text-zinc-100",
+                        )}
+                      >
+                        {badgeLabel}
                       </div>
-                      {reason === "credits" && shortage > 0 && !isEducationSpace && (
-                        <div className={cn("mt-1 text-[12px] font-bold", isPro ? "text-zinc-600" : "text-zinc-300")}>
-                          Short by {shortageText} credits.
-                        </div>
+                    </div>
+
+                    <div className="mt-10">
+                      <h3 className="text-[34px] font-medium leading-none tracking-normal">{plan.name}</h3>
+                      <p className="mt-5 min-h-[84px] max-w-[240px] text-[18px] font-medium leading-7 text-zinc-300">
+                        {headlineCopy}
+                      </p>
+                      <div className="mt-8 flex items-end gap-2">
+                        <span className="text-[42px] font-light leading-none tracking-normal">{priceLabel}</span>
+                        {plan.price_thb > 0 && (
+                          <span className="pb-1 text-[18px] font-semibold text-zinc-400">
+                            /month
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-3 inline-flex rounded-full border border-white/10 bg-white/[0.08] px-3 py-1.5 text-[13px] font-semibold text-zinc-300">
+                        {creditLabel}
+                      </div>
+                    </div>
+
+                    <Button
+                      className="mt-8 h-[58px] rounded-xl bg-[#e5ff36] text-[17px] font-black text-black shadow-[0_18px_34px_rgba(0,0,0,0.34)] hover:bg-[#efff72]"
+                      onClick={onCtaClick}
+                    >
+                      {ctaLabel === "Choose plan" ? "Choose this plan" : ctaLabel}
+                    </Button>
+
+                    <div className="mt-8 flex items-center gap-3 text-zinc-500">
+                      <div className="h-px flex-1 bg-white/[0.12]" />
+                      <span className="text-[12px] font-black uppercase">MediaForge</span>
+                      <div className="h-px flex-1 bg-white/[0.12]" />
+                    </div>
+
+                    <div className="mt-6 grid gap-3.5">
+                      {featureRows.map((row) => (
+                        <PlanExampleRow
+                          key={row.label}
+                          icon={row.icon}
+                          label={row.label}
+                          value={row.value}
+                          muted={row.muted}
+                          tone={cardTone}
+                        />
+                      ))}
+                      {reason === "credits" && isCurrent && shortage > 0 && !isEducationSpace && (
+                        <PlanExampleRow
+                          icon={Sparkles}
+                          label="Credit shortage"
+                          value={shortageText}
+                          tone={cardTone}
+                        />
                       )}
                     </div>
-                  )}
-
-                  <div className="mt-4 grid gap-2.5">
-                    <PlanExampleRow
-                      label="Images"
-                      value={isFree ? "Locked" : imageCount == null ? "-" : `~${formatNumber(imageCount)} images/mo`}
-                      muted={isFree}
-                      dark={isPro}
-                    />
-                    <PlanExampleRow
-                      label="VDO 8s"
-                      value={isFree ? "Locked" : videoCount == null ? "-" : `~${formatNumber(videoCount)} videos/mo`}
-                      muted={isFree}
-                      dark={isPro}
-                    />
-                    <PlanExampleRow
-                      label="Translate 1m"
-                      value={translateCount == null ? "-" : `~${formatNumber(translateCount)} min/mo`}
-                      dark={isPro}
-                    />
-                    <PlanExampleRow
-                      label="Subtitle 1m"
-                      value={subtitleCount == null ? "-" : `~${formatNumber(subtitleCount)} min/mo`}
-                      dark={isPro}
-                    />
                   </div>
-
-                  <Button
-                    className={cn(
-                      "mt-5 h-11 rounded-2xl text-[13px] font-black",
-                      isPro
-                        ? "bg-black text-white hover:bg-zinc-800"
-                        : "bg-[#e5ff36] text-black hover:bg-[#f0ff70]",
-                    )}
-                    onClick={onCtaClick}
-                  >
-                    {ctaLabel}
-                  </Button>
                 </div>
               );
             })}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -395,38 +441,36 @@ const InsufficientCreditsDialog = ({
 };
 
 const PlanExampleRow = ({
+  icon: Icon,
   label,
   value,
   muted = false,
-  dark = false,
+  tone,
 }: {
+  icon: LucideIcon;
   label: string;
   value: string;
   muted?: boolean;
-  dark?: boolean;
+  tone: "dark" | "current";
 }) => (
-  <div
-    className={cn(
-      "flex items-center justify-between gap-3 border-b py-1.5 last:border-b-0",
-      dark ? "border-black/10" : "border-white/10",
-      muted && "opacity-60",
-    )}
-  >
-    <span className="inline-flex min-w-0 items-center gap-2">
-      <span
-        className={cn(
-          "h-1.5 w-1.5 shrink-0 rounded-full",
-          muted ? "bg-zinc-500" : dark ? "bg-black" : "bg-[#e5ff36]",
-        )}
-      />
-      <span className={cn("text-[13px] font-black leading-5", dark ? "text-zinc-900" : "text-white")}>{label}</span>
-    </span>
+  <div className={cn("flex items-center gap-3 text-zinc-300", muted && "opacity-55")}>
     <span
       className={cn(
-        "shrink-0 text-right text-[12px] font-black leading-5",
-        muted ? (dark ? "text-zinc-500" : "text-zinc-400") : dark ? "text-zinc-950" : "text-[#e5ff36]",
+        "grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/10 text-zinc-200",
+        tone === "current" && "bg-[#e5ff36]/[0.18] text-[#e5ff36]",
       )}
     >
+      {muted ? (
+        <LockKeyhole className="h-4 w-4" />
+      ) : (
+        <CheckCircle2 className="h-4 w-4" />
+      )}
+    </span>
+    <Icon className="h-4 w-4 shrink-0 text-zinc-500" />
+    <span className="min-w-0 flex-1 text-[16px] font-medium leading-6">
+      {label}
+    </span>
+    <span className="shrink-0 text-right text-[13px] font-black text-[#e5ff36]">
       {value}
     </span>
   </div>
