@@ -15,8 +15,12 @@ interface ShapeClipComponentProps {
   pixelsPerSecond: number;
   isSelected: boolean;
   onSelect: (clipId: string, addToSelection: boolean) => void;
-  onTrim: (clipId: string, edge: "left" | "right", newTime: number) => void;
-  onMoveClip: (clipId: string, newStartTime: number) => void;
+  onTrim: (
+    clipId: string,
+    edge: "left" | "right",
+    newTime: number,
+  ) => void | Promise<unknown>;
+  onMoveClip: (clipId: string, newStartTime: number) => void | Promise<unknown>;
 }
 
 export const ShapeClipComponent: React.FC<ShapeClipComponentProps> = ({
@@ -30,7 +34,12 @@ export const ShapeClipComponent: React.FC<ShapeClipComponentProps> = ({
   const clipRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
+  const [dragPreviewStartTime, setDragPreviewStartTime] = useState<number | null>(null);
   const [isTrimming, setIsTrimming] = useState<"left" | "right" | null>(null);
+  const [trimPreview, setTrimPreview] = useState<{
+    startTime: number;
+    duration: number;
+  } | null>(null);
   const { snapSettings } = useUIStore();
   const { playheadPosition } = useTimelineStore();
   const trimStartRef = useRef<{
@@ -42,9 +51,14 @@ export const ShapeClipComponent: React.FC<ShapeClipComponentProps> = ({
     startTime: shapeClip.startTime,
     duration: shapeClip.duration,
   });
+  const pendingDragTimeRef = useRef(shapeClip.startTime);
+  const pendingTrimRef = useRef<{ edge: "left" | "right"; newTime: number } | null>(null);
 
-  const left = shapeClip.startTime * pixelsPerSecond;
-  const width = shapeClip.duration * pixelsPerSecond;
+  const displayStartTime =
+    dragPreviewStartTime ?? trimPreview?.startTime ?? shapeClip.startTime;
+  const displayDuration = trimPreview?.duration ?? shapeClip.duration;
+  const left = displayStartTime * pixelsPerSecond;
+  const width = displayDuration * pixelsPerSecond;
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -56,6 +70,8 @@ export const ShapeClipComponent: React.FC<ShapeClipComponentProps> = ({
 
     const offsetX = e.clientX - rect.left;
     setDragOffset(offsetX);
+    pendingDragTimeRef.current = shapeClip.startTime;
+    setDragPreviewStartTime(shapeClip.startTime);
     setIsDragging(true);
   };
 
@@ -76,6 +92,7 @@ export const ShapeClipComponent: React.FC<ShapeClipComponentProps> = ({
       startTime: shapeClip.startTime,
       duration: shapeClip.duration,
     };
+    pendingTrimRef.current = null;
     document.body.style.cursor = "ew-resize";
     document.body.style.userSelect = "none";
   };
@@ -101,10 +118,15 @@ export const ShapeClipComponent: React.FC<ShapeClipComponentProps> = ({
         pixelsPerSecond,
         shapeClip.duration,
       );
-      onMoveClip(shapeClip.id, snapResult.time);
+      pendingDragTimeRef.current = snapResult.time;
+      setDragPreviewStartTime(snapResult.time);
     };
 
     const handleMouseUp = () => {
+      const commit = onMoveClip(shapeClip.id, pendingDragTimeRef.current);
+      Promise.resolve(commit).finally(() => {
+        setDragPreviewStartTime(null);
+      });
       setIsDragging(false);
     };
 
@@ -132,7 +154,16 @@ export const ShapeClipComponent: React.FC<ShapeClipComponentProps> = ({
         const maxStartTime =
           trimStartRef.current.startTime + trimStartRef.current.duration - 0.1;
         const clampedStartTime = Math.min(newStartTime, maxStartTime);
-        onTrim(shapeClip.id, "left", clampedStartTime);
+        pendingTrimRef.current = { edge: "left", newTime: clampedStartTime };
+        setTrimPreview({
+          startTime: clampedStartTime,
+          duration: Math.max(
+            0.1,
+            trimStartRef.current.startTime +
+              trimStartRef.current.duration -
+              clampedStartTime,
+          ),
+        });
       } else {
         const newEndTime =
           trimStartRef.current.startTime +
@@ -140,11 +171,25 @@ export const ShapeClipComponent: React.FC<ShapeClipComponentProps> = ({
           deltaTime;
         const minEndTime = trimStartRef.current.startTime + 0.1;
         const clampedEndTime = Math.max(newEndTime, minEndTime);
-        onTrim(shapeClip.id, "right", clampedEndTime);
+        pendingTrimRef.current = { edge: "right", newTime: clampedEndTime };
+        setTrimPreview({
+          startTime: trimStartRef.current.startTime,
+          duration: Math.max(0.1, clampedEndTime - trimStartRef.current.startTime),
+        });
       }
     };
 
     const handleMouseUp = () => {
+      const pending = pendingTrimRef.current;
+      if (pending) {
+        const commit = onTrim(shapeClip.id, pending.edge, pending.newTime);
+        Promise.resolve(commit).finally(() => {
+          setTrimPreview(null);
+        });
+      } else {
+        setTrimPreview(null);
+      }
+      pendingTrimRef.current = null;
       setIsTrimming(null);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";

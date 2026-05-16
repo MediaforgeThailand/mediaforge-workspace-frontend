@@ -13,8 +13,12 @@ interface TextClipComponentProps {
   pixelsPerSecond: number;
   isSelected: boolean;
   onSelect: (clipId: string, addToSelection: boolean) => void;
-  onTrim: (clipId: string, edge: "left" | "right", newTime: number) => void;
-  onMoveClip?: (clipId: string, newStartTime: number) => void;
+  onTrim: (
+    clipId: string,
+    edge: "left" | "right",
+    newTime: number,
+  ) => void | Promise<unknown>;
+  onMoveClip?: (clipId: string, newStartTime: number) => void | Promise<unknown>;
 }
 
 export const TextClipComponent: React.FC<TextClipComponentProps> = ({
@@ -29,6 +33,11 @@ export const TextClipComponent: React.FC<TextClipComponentProps> = ({
   const [isTrimming, setIsTrimming] = useState<"left" | "right" | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
+  const [dragPreviewStartTime, setDragPreviewStartTime] = useState<number | null>(null);
+  const [trimPreview, setTrimPreview] = useState<{
+    startTime: number;
+    duration: number;
+  } | null>(null);
   const { snapSettings } = useUIStore();
   const { playheadPosition } = useTimelineStore();
   const trimStartRef = useRef<{
@@ -40,9 +49,14 @@ export const TextClipComponent: React.FC<TextClipComponentProps> = ({
     startTime: textClip.startTime,
     duration: textClip.duration,
   });
+  const pendingDragTimeRef = useRef(textClip.startTime);
+  const pendingTrimRef = useRef<{ edge: "left" | "right"; newTime: number } | null>(null);
 
-  const left = textClip.startTime * pixelsPerSecond;
-  const width = textClip.duration * pixelsPerSecond;
+  const displayStartTime =
+    dragPreviewStartTime ?? trimPreview?.startTime ?? textClip.startTime;
+  const displayDuration = trimPreview?.duration ?? textClip.duration;
+  const left = displayStartTime * pixelsPerSecond;
+  const width = displayDuration * pixelsPerSecond;
 
   const handleClick = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -83,6 +97,8 @@ export const TextClipComponent: React.FC<TextClipComponentProps> = ({
     const clickX = e.clientX - rect.left;
     const clipStartX = textClip.startTime * pixelsPerSecond;
     setDragOffset(clickX - clipStartX);
+    pendingDragTimeRef.current = textClip.startTime;
+    setDragPreviewStartTime(textClip.startTime);
     setIsDragging(true);
 
     onSelect(textClip.id, e.shiftKey || e.metaKey);
@@ -108,10 +124,15 @@ export const TextClipComponent: React.FC<TextClipComponentProps> = ({
         pixelsPerSecond,
         textClip.duration,
       );
-      onMoveClip(textClip.id, snapResult.time);
+      pendingDragTimeRef.current = snapResult.time;
+      setDragPreviewStartTime(snapResult.time);
     };
 
     const handleMouseUp = () => {
+      const commit = onMoveClip(textClip.id, pendingDragTimeRef.current);
+      Promise.resolve(commit).finally(() => {
+        setDragPreviewStartTime(null);
+      });
       setIsDragging(false);
     };
 
@@ -134,6 +155,7 @@ export const TextClipComponent: React.FC<TextClipComponentProps> = ({
       startTime: textClip.startTime,
       duration: textClip.duration,
     };
+    pendingTrimRef.current = null;
     document.body.style.cursor = "ew-resize";
     document.body.style.userSelect = "none";
   };
@@ -153,7 +175,16 @@ export const TextClipComponent: React.FC<TextClipComponentProps> = ({
         const maxStartTime =
           trimStartRef.current.startTime + trimStartRef.current.duration - 0.1;
         const clampedStartTime = Math.min(newStartTime, maxStartTime);
-        onTrim(textClip.id, "left", clampedStartTime);
+        pendingTrimRef.current = { edge: "left", newTime: clampedStartTime };
+        setTrimPreview({
+          startTime: clampedStartTime,
+          duration: Math.max(
+            0.1,
+            trimStartRef.current.startTime +
+              trimStartRef.current.duration -
+              clampedStartTime,
+          ),
+        });
       } else {
         const newEndTime =
           trimStartRef.current.startTime +
@@ -161,11 +192,25 @@ export const TextClipComponent: React.FC<TextClipComponentProps> = ({
           deltaTime;
         const minEndTime = trimStartRef.current.startTime + 0.1;
         const clampedEndTime = Math.max(newEndTime, minEndTime);
-        onTrim(textClip.id, "right", clampedEndTime);
+        pendingTrimRef.current = { edge: "right", newTime: clampedEndTime };
+        setTrimPreview({
+          startTime: trimStartRef.current.startTime,
+          duration: Math.max(0.1, clampedEndTime - trimStartRef.current.startTime),
+        });
       }
     };
 
     const handleMouseUp = () => {
+      const pending = pendingTrimRef.current;
+      if (pending) {
+        const commit = onTrim(textClip.id, pending.edge, pending.newTime);
+        Promise.resolve(commit).finally(() => {
+          setTrimPreview(null);
+        });
+      } else {
+        setTrimPreview(null);
+      }
+      pendingTrimRef.current = null;
       setIsTrimming(null);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";

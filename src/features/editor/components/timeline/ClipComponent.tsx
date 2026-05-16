@@ -22,13 +22,13 @@ interface ClipComponentProps {
     clipId: string,
     newStartTime: number,
     targetTrackId?: string,
-  ) => void;
+  ) => void | Promise<unknown>;
   onSnapIndicator: (time: number | null) => void;
   onTrimClip?: (
     clipId: string,
     edge: "left" | "right",
     newTime: number,
-  ) => void;
+  ) => void | Promise<unknown>;
 }
 
 const AUTO_SCROLL_THRESHOLD = 80;
@@ -56,17 +56,28 @@ export const ClipComponent: React.FC<ClipComponentProps> = ({
   const [isPendingDrag, setIsPendingDrag] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const [dragYOffset, setDragYOffset] = useState(0);
+  const [dragPreviewStartTime, setDragPreviewStartTime] = useState<number | null>(null);
   const [isInvalidDrop, setIsInvalidDrop] = useState(false);
   const [isTrimming, setIsTrimming] = useState(false);
   const [trimEdge, setTrimEdge] = useState<"left" | "right" | null>(null);
+  const [trimPreview, setTrimPreview] = useState<{
+    startTime: number;
+    duration: number;
+    inPoint: number;
+    outPoint: number;
+  } | null>(null);
   const trimStartRef = useRef<{
     mouseX: number;
     startTime: number;
     duration: number;
+    inPoint: number;
+    outPoint: number;
   }>({
     mouseX: 0,
     startTime: clip.startTime,
     duration: clip.duration,
+    inPoint: clip.inPoint,
+    outPoint: clip.outPoint,
   });
   const dragStartRef = useRef<{ mouseY: number; clipY: number; scrollTop: number }>({
     mouseY: 0,
@@ -75,6 +86,8 @@ export const ClipComponent: React.FC<ClipComponentProps> = ({
   });
   const mousePositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const pendingDropRef = useRef<{ time: number; targetTrackId?: string }>({ time: 0 });
+  const pendingTrimRef = useRef<{ edge: "left" | "right"; newTime: number } | null>(null);
+  const lastSnapIndicatorRef = useRef<number | null>(null);
   const dragPendingRef = useRef<{ active: boolean; startX: number; startY: number }>({
     active: false,
     startX: 0,
@@ -82,8 +95,12 @@ export const ClipComponent: React.FC<ClipComponentProps> = ({
   });
   const clipRef = useRef<HTMLDivElement>(null);
 
-  const left = clip.startTime * pixelsPerSecond;
-  const width = clip.duration * pixelsPerSecond;
+  const displayStartTime =
+    dragPreviewStartTime ?? trimPreview?.startTime ?? clip.startTime;
+  const displayDuration = trimPreview?.duration ?? clip.duration;
+  const left = displayStartTime * pixelsPerSecond;
+  const width = displayDuration * pixelsPerSecond;
+  const displayClip = trimPreview ? { ...clip, ...trimPreview } : clip;
 
   const isVideo = track.type === "video";
   const isAudio = track.type === "audio";
@@ -141,7 +158,9 @@ export const ClipComponent: React.FC<ClipComponentProps> = ({
       scrollTop: timelineRef.current?.scrollTop || 0,
     };
     mousePositionRef.current = { x: e.clientX, y: e.clientY };
+    pendingDropRef.current = { time: clip.startTime };
     dragPendingRef.current = { active: true, startX: e.clientX, startY: e.clientY };
+    setDragPreviewStartTime(clip.startTime);
     setDragYOffset(0);
     setIsInvalidDrop(false);
     setIsPendingDrag(true);
@@ -158,7 +177,10 @@ export const ClipComponent: React.FC<ClipComponentProps> = ({
         mouseX: e.clientX,
         startTime: clip.startTime,
         duration: clip.duration,
+        inPoint: clip.inPoint,
+        outPoint: clip.outPoint,
       };
+      pendingTrimRef.current = null;
       document.body.style.cursor = "ew-resize";
     };
 
@@ -180,6 +202,7 @@ export const ClipComponent: React.FC<ClipComponentProps> = ({
     const handlePendingMouseUp = (e: MouseEvent) => {
       dragPendingRef.current.active = false;
       setIsPendingDrag(false);
+      setDragPreviewStartTime(null);
       onSelect(clip.id, e.shiftKey || e.metaKey);
     };
 
@@ -273,8 +296,15 @@ export const ClipComponent: React.FC<ClipComponentProps> = ({
       setIsInvalidDrop(isOverDifferentTrackType);
 
       pendingDropRef.current = { time: snapResult.time, targetTrackId };
-      onMoveClip(clip.id, snapResult.time, undefined);
-      onSnapIndicator(snapResult.snapped && snapResult.snapPoint ? snapResult.snapPoint.time : null);
+      setDragPreviewStartTime(snapResult.time);
+      const nextSnapIndicator =
+        snapResult.snapped && snapResult.snapPoint
+          ? snapResult.snapPoint.time
+          : null;
+      if (lastSnapIndicatorRef.current !== nextSnapIndicator) {
+        lastSnapIndicatorRef.current = nextSnapIndicator;
+        onSnapIndicator(nextSnapIndicator);
+      }
     };
 
     const handleMouseUp = () => {
@@ -283,13 +313,15 @@ export const ClipComponent: React.FC<ClipComponentProps> = ({
       }
 
       const { time, targetTrackId } = pendingDropRef.current;
-      if (targetTrackId) {
-        onMoveClip(clip.id, time, targetTrackId);
-      }
+      const commit = onMoveClip(clip.id, time, targetTrackId);
+      Promise.resolve(commit).finally(() => {
+        setDragPreviewStartTime(null);
+      });
 
       setIsDragging(false);
       setDragYOffset(0);
       setIsInvalidDrop(false);
+      lastSnapIndicatorRef.current = null;
       onSnapIndicator(null);
     };
 
@@ -325,28 +357,64 @@ export const ClipComponent: React.FC<ClipComponentProps> = ({
     const handleMouseMove = (e: MouseEvent) => {
       const deltaX = e.clientX - trimStartRef.current.mouseX;
       const deltaTime = deltaX / pixelsPerSecond;
+      const base = trimStartRef.current;
 
       if (trimEdge === "left") {
         const newStartTime = Math.max(
           0,
-          trimStartRef.current.startTime + deltaTime,
+          base.startTime + deltaTime,
         );
         const maxStartTime =
-          trimStartRef.current.startTime + trimStartRef.current.duration - 0.1;
+          base.startTime + base.duration - 0.1;
         const clampedStartTime = Math.min(newStartTime, maxStartTime);
-        onTrimClip(clip.id, "left", clampedStartTime);
+        const delta = clampedStartTime - base.startTime;
+        const nextInPoint = Math.max(
+          0,
+          Math.min(base.outPoint - 0.1, base.inPoint + delta),
+        );
+        const nextStartTime = base.startTime + (nextInPoint - base.inPoint);
+        pendingTrimRef.current = { edge: "left", newTime: nextStartTime };
+        setTrimPreview({
+          startTime: nextStartTime,
+          duration: Math.max(0.1, base.outPoint - nextInPoint),
+          inPoint: nextInPoint,
+          outPoint: base.outPoint,
+        });
       } else {
         const newEndTime =
-          trimStartRef.current.startTime +
-          trimStartRef.current.duration +
-          deltaTime;
-        const minEndTime = trimStartRef.current.startTime + 0.1;
+          base.startTime + base.duration + deltaTime;
+        const minEndTime = base.startTime + 0.1;
         const clampedEndTime = Math.max(newEndTime, minEndTime);
-        onTrimClip(clip.id, "right", clampedEndTime);
+        const sourceEnd =
+          mediaItem?.metadata?.duration && mediaItem.metadata.duration > 0
+            ? mediaItem.metadata.duration
+            : Math.max(base.outPoint, base.inPoint + base.duration);
+        const nextOutPoint = Math.max(
+          base.inPoint + 0.1,
+          Math.min(sourceEnd, base.inPoint + (clampedEndTime - base.startTime)),
+        );
+        const nextEndTime = base.startTime + (nextOutPoint - base.inPoint);
+        pendingTrimRef.current = { edge: "right", newTime: nextEndTime };
+        setTrimPreview({
+          startTime: base.startTime,
+          duration: Math.max(0.1, nextOutPoint - base.inPoint),
+          inPoint: base.inPoint,
+          outPoint: nextOutPoint,
+        });
       }
     };
 
     const handleMouseUp = () => {
+      const pending = pendingTrimRef.current;
+      if (pending) {
+        const commit = onTrimClip(clip.id, pending.edge, pending.newTime);
+        Promise.resolve(commit).finally(() => {
+          setTrimPreview(null);
+        });
+      } else {
+        setTrimPreview(null);
+      }
+      pendingTrimRef.current = null;
       setIsTrimming(false);
       setTrimEdge(null);
       document.body.style.cursor = "";
@@ -359,7 +427,7 @@ export const ClipComponent: React.FC<ClipComponentProps> = ({
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isTrimming, trimEdge, clip.id, pixelsPerSecond, onTrimClip]);
+  }, [isTrimming, trimEdge, clip.id, pixelsPerSecond, onTrimClip, mediaItem]);
 
   const clipName = mediaItem?.name || clip.mediaId.slice(0, 8);
 
@@ -413,7 +481,7 @@ export const ClipComponent: React.FC<ClipComponentProps> = ({
         >
       {(isVideo || isAudio) && mediaItem && measuredHeight > 0 && (
         <ClipMediaCanvas
-          clip={clip}
+          clip={displayClip}
           track={track}
           mediaItem={mediaItem}
           clipWidth={width}

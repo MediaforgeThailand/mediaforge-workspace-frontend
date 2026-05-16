@@ -24,12 +24,27 @@ const SEEK_TIMEOUT_MS = 3000;
 
 // Global pause flag. Toggled by the Preview when playback starts/stops.
 // While paused, in-flight extractions still complete (they're already running)
-// but new extraction requests resolve immediately with `[]` so the timeline
-// won't queue dozens of seek operations on the same `<video>` element that
-// playback is already trying to use. Saves significant decoder contention
-// when the user has 3+ tracks playing.
+// but new extraction requests throw a marker error so callers can retry later
+// without caching an empty frame strip as completed work. Saves significant
+// decoder contention when the user has 3+ tracks playing.
 let extractionPaused = false;
 const pausedResolvers: Array<() => void> = [];
+
+export class ThumbnailExtractionPausedError extends Error {
+  constructor() {
+    super("Thumbnail extraction is paused while playback is active");
+    this.name = "ThumbnailExtractionPausedError";
+  }
+}
+
+export function isThumbnailExtractionPausedError(
+  error: unknown,
+): error is ThumbnailExtractionPausedError {
+  return (
+    error instanceof ThumbnailExtractionPausedError ||
+    (error instanceof Error && error.name === "ThumbnailExtractionPausedError")
+  );
+}
 
 /**
  * Pause new thumbnail extraction work — called by the Preview when playback
@@ -105,8 +120,9 @@ export async function extractFrameStrip(
   // they'll retry on the next render after playback stops. This keeps
   // multi-track playback from competing with thumb seeks on the same
   // shared <video> elements.
+  // Throwing here avoids caching an empty strip as a completed thumbnail set.
   if (extractionPaused) {
-    return [];
+    throw new ThumbnailExtractionPausedError();
   }
 
   const video = document.createElement("video");

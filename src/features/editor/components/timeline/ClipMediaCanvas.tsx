@@ -6,8 +6,10 @@ import { useClipWaveformCache } from "../../stores/clip-waveform-cache";
 import {
   buildStripFromExistingThumbs,
   extractFrameStrip,
+  isThumbnailExtractionPausedError,
 } from "../../services/thumbnail-extractor";
 import {
+  chooseSourceWaveformBinCount,
   decodeWaveformPeaks,
   drawWaveform,
   rebinPeaks,
@@ -273,6 +275,12 @@ const FrameStrip: React.FC<FrameStripProps> = ({
           scheduledRef.current?.clipId === scheduledKey.clipId &&
           scheduledRef.current?.zoomBucket === scheduledKey.zoomBucket;
         if (!owned) return;
+        if (isThumbnailExtractionPausedError(err)) {
+          cache.clearClip(clip.id);
+          scheduledRef.current = null;
+          setTick((n) => n + 1);
+          return;
+        }
         // Log so failures surface during development.
         if (typeof console !== "undefined") {
           console.warn("[FrameStrip] extraction failed:", err);
@@ -419,6 +427,7 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
   const clearWaveformInFlight = useClipWaveformCache((state) => state.clearInFlight);
   const binBucketForWaveform = useClipWaveformCache((state) => state.binBucketFor);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const waveformSurfaceRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const updateClipVolume = useProjectStore((s) => s.updateClipVolume);
   // Tracks ownership of the most recent decode so only the latest commits
@@ -508,14 +517,29 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
     }, timeoutMs);
 
     const t0 = performance.now();
-    decodeWaveformPeaks(mediaItem.blob, binBucket)
-      .then((peaks) => {
+    const effectiveSourceDuration =
+      sourceDuration > 0
+        ? sourceDuration
+        : Math.max(clip.outPoint, clip.inPoint + clip.duration);
+    const sourceBinCount = chooseSourceWaveformBinCount(
+      effectiveSourceDuration,
+      binBucket,
+    );
+    decodeWaveformPeaks(mediaItem.blob, sourceBinCount)
+      .then((sourcePeaks) => {
         if (waveformOwnershipRef.current !== ownership) return;
         window.clearTimeout(timeoutHandle);
         const dt = performance.now() - t0;
         if (typeof window !== "undefined") {
           (window as unknown as { __or_lastWaveformDecodeMs?: number }).__or_lastWaveformDecodeMs = dt;
         }
+        const peaks = rebinPeaks(
+          sourcePeaks,
+          effectiveSourceDuration,
+          clip.inPoint,
+          clip.outPoint,
+          binBucket,
+        );
         setWaveformEntry(waveformCacheId, binBucket, peaks);
         forceRender((n) => n + 1);
       })
@@ -542,6 +566,7 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
     clip.id,
     clip.inPoint,
     clip.outPoint,
+    clip.duration,
     waveformCacheId,
     mediaItem,
     binBucket,
@@ -566,10 +591,13 @@ const WaveformBand: React.FC<WaveformBandProps> = ({
     const ctx = canvas.getContext("2d");
     if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const peaks = entry?.peaks ?? new Float32Array(0);
-    // Re-create a logical canvas surface to feed into drawWaveform.
-    const logical = document.createElement("canvas");
-    logical.width = width;
-    logical.height = height;
+    let logical = waveformSurfaceRef.current;
+    if (!logical) {
+      logical = document.createElement("canvas");
+      waveformSurfaceRef.current = logical;
+    }
+    logical.width = Math.max(1, Math.floor(width));
+    logical.height = Math.max(1, Math.floor(height));
     const audioTrackTopPadding = isAudioTrack
       ? Math.min(15, Math.max(8, Math.floor(height * 0.28)))
       : 0;

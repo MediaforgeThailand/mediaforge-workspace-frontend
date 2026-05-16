@@ -1043,20 +1043,44 @@ export const Timeline: React.FC = () => {
       if (!clip) return;
 
       const oldDuration = clip.duration;
-      const newDuration =
-        edge === "left"
-          ? Math.max(0.1, clip.startTime + clip.duration - newTime)
-          : Math.max(0.1, newTime - clip.startTime);
+      const mediaItem = useProjectStore.getState().getMediaItem(clip.mediaId);
+      const sourceDuration =
+        mediaItem?.metadata?.duration && mediaItem.metadata.duration > 0
+          ? mediaItem.metadata.duration
+          : Math.max(clip.outPoint, clip.inPoint + clip.duration);
 
+      let newDuration: number;
       const updates =
         edge === "left"
-          ? {
-              startTime: newTime,
-              duration: newDuration,
-            }
-          : {
-              duration: newDuration,
-            };
+          ? (() => {
+              const maxStartTime = clip.startTime + clip.duration - 0.1;
+              const nextStartTime = Math.max(0, Math.min(newTime, maxStartTime));
+              const delta = nextStartTime - clip.startTime;
+              const nextInPoint = Math.max(
+                0,
+                Math.min(clip.outPoint - 0.1, clip.inPoint + delta),
+              );
+              const adjustedStartTime =
+                clip.startTime + (nextInPoint - clip.inPoint);
+              newDuration = Math.max(0.1, clip.outPoint - nextInPoint);
+              return {
+                startTime: adjustedStartTime,
+                duration: newDuration,
+                inPoint: nextInPoint,
+              };
+            })()
+          : (() => {
+              const requestedDuration = Math.max(0.1, newTime - clip.startTime);
+              const nextOutPoint = Math.max(
+                clip.inPoint + 0.1,
+                Math.min(sourceDuration, clip.inPoint + requestedDuration),
+              );
+              newDuration = Math.max(0.1, nextOutPoint - clip.inPoint);
+              return {
+                duration: newDuration,
+                outPoint: nextOutPoint,
+              };
+            })();
 
       const adjustedKeyframes = clip.keyframes.map((kf) => {
         if (kf.id.startsWith("kf-exit-")) {

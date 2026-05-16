@@ -11,6 +11,51 @@
  *     peaks. This is heavier (~150ms for a 30s clip on a modern laptop).
  */
 
+let blobWaveformCache = new WeakMap<Blob, Map<number, Promise<Float32Array>>>();
+let waveformDecodeMissCount = 0;
+let waveformDecodeHitCount = 0;
+
+function normalizeBinCount(binCount: number): number {
+  return Math.max(1, Math.floor(binCount));
+}
+
+function roundBinBucket(binCount: number): number {
+  return Math.max(64, Math.ceil(binCount / 64) * 64);
+}
+
+/**
+ * Pick a stable full-source waveform resolution. Timeline clips re-bin this
+ * source waveform for their visible in/out range, so split clips and duplicated
+ * audio lanes don't decode the same file repeatedly.
+ */
+export function chooseSourceWaveformBinCount(
+  sourceDuration: number,
+  targetBinCount: number,
+): number {
+  const durationBins =
+    Number.isFinite(sourceDuration) && sourceDuration > 0
+      ? Math.ceil(sourceDuration * 40)
+      : targetBinCount * 2;
+  const requested = Math.max(512, targetBinCount, durationBins);
+  return Math.min(12000, roundBinBucket(requested));
+}
+
+export function getWaveformDecodeCacheStats(): {
+  hits: number;
+  misses: number;
+} {
+  return {
+    hits: waveformDecodeHitCount,
+    misses: waveformDecodeMissCount,
+  };
+}
+
+export function resetWaveformDecodeCacheForTests(): void {
+  blobWaveformCache = new WeakMap();
+  waveformDecodeMissCount = 0;
+  waveformDecodeHitCount = 0;
+}
+
 /**
  * Decode audio from a blob and return normalized [0..1] peaks.
  *
@@ -29,6 +74,34 @@
  * render the dark teal backdrop with no bars — same as a silent clip).
  */
 export async function decodeWaveformPeaks(
+  source: Blob,
+  binCount: number,
+): Promise<Float32Array> {
+  const bins = normalizeBinCount(binCount);
+  let byBin = blobWaveformCache.get(source);
+  if (!byBin) {
+    byBin = new Map();
+    blobWaveformCache.set(source, byBin);
+  }
+
+  const cached = byBin.get(bins);
+  if (cached) {
+    waveformDecodeHitCount += 1;
+    return cached;
+  }
+
+  waveformDecodeMissCount += 1;
+  const decodePromise = decodeWaveformPeaksUncached(source, bins).catch(
+    (err) => {
+      byBin?.delete(bins);
+      throw err;
+    },
+  );
+  byBin.set(bins, decodePromise);
+  return decodePromise;
+}
+
+async function decodeWaveformPeaksUncached(
   source: Blob,
   binCount: number,
 ): Promise<Float32Array> {
