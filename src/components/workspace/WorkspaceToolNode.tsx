@@ -2046,10 +2046,24 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           prompt_source?: string;
           provider_meta?: {
             model_url?: string;
+            batch_urls?: string[];
           };
         };
 
-        storeState.addGeneration(id, {
+        // SeedDream batch mode returns multiple thematically-related
+        // images in one job. `provider_meta.batch_urls` carries the
+        // full list (first entry already matches `r.url`); push one
+        // generation entry per URL so the asset library + node
+        // carousel see every output instead of just the primary.
+        // Iterate in reverse so the first URL lands at index 0 of the
+        // node's generations array (matches the primary `r.url` used
+        // for output edges and preview thumbnails).
+        const batchUrls = Array.isArray(r.provider_meta?.batch_urls)
+          ? (r.provider_meta!.batch_urls as unknown[]).filter(
+              (u): u is string => typeof u === "string" && u.length > 0,
+            )
+          : [];
+        const baseGen = {
           id: (globalThis.crypto?.randomUUID?.() ?? String(Date.now())),
           job_id: jobId,
           type: r.type,
@@ -2059,7 +2073,19 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           prompt_used: r.prompt_used,
           prompt_source: r.prompt_source,
           createdAt: Date.now(),
-        } as any);
+        };
+        if (batchUrls.length > 1) {
+          for (let i = batchUrls.length - 1; i >= 0; i--) {
+            storeState.addGeneration(id, {
+              ...baseGen,
+              id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${i}`,
+              url: batchUrls[i],
+              createdAt: Date.now() + i,
+            } as any);
+          }
+        } else {
+          storeState.addGeneration(id, baseGen as any);
+        }
 
         patchNodeDataNow(
           {

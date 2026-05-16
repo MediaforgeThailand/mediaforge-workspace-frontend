@@ -305,7 +305,7 @@ export default function AssetsView({
         return;
       }
       const next: GenerationAsset[] = (data ?? [])
-        .map((row): GenerationAsset | null => {
+        .flatMap((row): GenerationAsset[] => {
           const result = (row.result ?? {}) as {
             url?: string;
             type?: string;
@@ -342,7 +342,18 @@ export default function AssetsView({
             outputs.playback_url,
           );
           const url = modelUrl ?? mediaUrl;
-          if (!url) return null;
+          if (!url) return [];
+          // Seedream batch mode hands back N images per job. Backend
+          // mirrors all N to storage and writes the full list into
+          // `provider_meta.batch_urls` (first entry already matches
+          // `result_url`). Fan the row out to one library entry per
+          // image so users can see every batch output, not just the
+          // first.
+          const batchUrls = Array.isArray(providerMeta.batch_urls)
+            ? (providerMeta.batch_urls as unknown[]).filter(
+                (u): u is string => typeof u === "string" && u.length > 0,
+              )
+            : [];
           const kind = inferAssetKind(
             url,
             firstText(result.type, row.node_type, row.provider),
@@ -372,7 +383,7 @@ export default function AssetsView({
                 ? (params.system_prompt as string)
                 : "";
 
-          return {
+          const baseAsset: GenerationAsset = {
             source: "generation",
             id: row.id as string,
             kind,
@@ -393,10 +404,19 @@ export default function AssetsView({
                   ? Number.parseInt(params.duration as string, 10) || undefined
                   : undefined,
           };
-        })
-        .filter((x): x is GenerationAsset => x !== null);
+          if (batchUrls.length <= 1) return [baseAsset];
+          return batchUrls.map((batchUrl, idx) => ({
+            ...baseAsset,
+            id: `${baseAsset.id}__batch_${idx}`,
+            url: batchUrl,
+          }));
+        });
       setGenAssets((prev) => (offset === 0 ? next : [...prev, ...next]));
-      setGenHasMore(next.length === PAGE);
+      // Pagination tracks raw DB row count, not flat-mapped entries.
+      // Seedream batch jobs expand one row into N entries; using
+      // `next.length` after expansion would mis-flag hasMore for
+      // pages where any row fanned out.
+      setGenHasMore((data ?? []).length === PAGE);
     },
     [user, t, projectIds],
   );
@@ -727,9 +747,18 @@ export default function AssetsView({
           : deleteTarget.rowId
             ? "user_asset"
             : "upload";
+      // Seedream batch entries share one underlying job row but show
+      // as N library entries with synthetic ids `${jobId}__batch_${i}`.
+      // The backend delete handler looks up by job id, so strip the
+      // suffix to get the real row. The frontend filter below then
+      // removes every entry that points at the same source job.
+      const sourceJobIdForGeneration =
+        deleteTarget.source === "generation"
+          ? deleteTarget.id.split("__batch_")[0]
+          : null;
       const assetId =
         deleteTarget.source === "generation"
-          ? deleteTarget.id
+          ? sourceJobIdForGeneration!
           : deleteTarget.rowId ?? deleteTarget.id.replace(/^user-asset-/, "");
       const { error, data } = await supabase.functions.invoke("workspace-run-node", {
         body: {
@@ -747,7 +776,14 @@ export default function AssetsView({
       if (result.error) throw new Error(result.error);
 
       if (deleteTarget.source === "generation") {
-        setGenAssets((items) => items.filter((item) => item.id !== deleteTarget.id));
+        // Remove every fanned-out batch sibling, not just the clicked
+        // entry — they all point at the same underlying job row that
+        // the backend just deleted.
+        setGenAssets((items) =>
+          items.filter(
+            (item) => item.id.split("__batch_")[0] !== sourceJobIdForGeneration,
+          ),
+        );
       } else {
         setUploadAssets((items) => items.filter((item) => item.id !== deleteTarget.id));
       }
@@ -1006,7 +1042,18 @@ export default function AssetsView({
                 <div className="flex justify-center pt-4">
                   <button
                     type="button"
-                    onClick={() => void fetchGenPage(genAssets.length)}
+                    onClick={() => {
+                      // Pagination offset is DB-row aligned, but
+                      // genAssets may include extra entries when a
+                      // single batch job fanned out. Count unique
+                      // source-row IDs (everything before the
+                      // synthetic `__batch_N` suffix) to keep the
+                      // next page query in step with the DB.
+                      const rowsLoaded = new Set(
+                        genAssets.map((a) => a.id.split("__batch_")[0]),
+                      ).size;
+                      void fetchGenPage(rowsLoaded);
+                    }}
                     className="rounded-md bg-white/[0.06] px-4 py-2 text-xs text-zinc-300 hover:bg-white/[0.08] hover:text-zinc-100"
                   >
                     {t("workspace.assets.load_more")}
