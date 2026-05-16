@@ -2,23 +2,16 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ArrowUpCircle,
-  BookOpen,
   Captions,
-  Check,
-  Coins,
   Film,
   Image as ImageIcon,
   Languages,
   LockKeyhole,
-  Sparkles,
-  Zap,
 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -65,12 +58,6 @@ interface CreditCostSummaryRow {
 const DEFAULT_WORKSPACE_MULTIPLIER = 1.4;
 const FREE_PLAN_CREDITS = 1_000;
 const PLAN_ORDER = ["Free", "Starter", "Creator", "Pro"] as const;
-const PLAN_DESCRIPTIONS: Record<(typeof PLAN_ORDER)[number], string> = {
-  Free: "Try voice, translate, subtitle and utility tools with 1,000 credits/month.",
-  Starter: "A practical entry plan for daily prompt, audio and light generation work.",
-  Creator: "More monthly credits for consistent image, video and translate workflows.",
-  Pro: "Higher credit pool plus better runtime discount for heavier production use.",
-};
 
 const SYNTHETIC_FREE_PLAN: SubscriptionPlanRow = {
   id: "free-plan",
@@ -208,6 +195,8 @@ const InsufficientCreditsDialog = ({
     credits?.organization_type === "university";
 
   const planCards = useMemo(() => planCardsFromRows(planRows), [planRows]);
+  const currentPlanName =
+    String((profile as { plan_name?: string | null } | null)?.plan_name || "Free").trim() || "Free";
 
   const exampleCosts = useMemo(() => {
     const image = customerCostForRow(
@@ -265,165 +254,139 @@ const InsufficientCreditsDialog = ({
   return (
     <>
       <Dialog open={open && !topupOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[92vh] max-w-[980px] overflow-y-auto border-white/10 bg-[#111827] p-0 text-white shadow-2xl shadow-black/50">
-          <div className="grid gap-5 p-5 sm:p-6">
-            <DialogHeader className="space-y-2">
-              <DialogTitle className="flex items-center gap-2 text-[22px] font-black tracking-tight text-white">
-                {reason === "feature_locked" ? (
-                  <LockKeyhole className="h-5 w-5 text-amber-300" />
-                ) : (
-                  <Coins className="h-5 w-5 text-sky-400" />
-                )}
-                {title}
-              </DialogTitle>
-              <DialogDescription className="max-w-[720px] text-sm leading-6 text-zinc-300">
-                {description}
-              </DialogDescription>
-            </DialogHeader>
+        <DialogContent className="max-h-[94vh] max-w-[1180px] overflow-visible border-0 bg-transparent p-0 text-white shadow-none [&>button]:right-4 [&>button]:top-0 [&>button]:h-11 [&>button]:w-11 [&>button]:rounded-full [&>button]:bg-black/45 [&>button]:text-white [&>button]:opacity-100 [&>button]:ring-1 [&>button]:ring-white/15 [&>button]:backdrop-blur-xl [&>button]:hover:bg-white/15">
+          <DialogTitle className="sr-only">{title}</DialogTitle>
+          <DialogDescription className="sr-only">{description}</DialogDescription>
 
-            <div
-              className={cn(
-                "rounded-2xl border px-4 py-3 text-sm font-semibold",
-                reason === "feature_locked"
-                  ? "border-amber-300/25 bg-amber-300/10 text-amber-100"
-                  : "border-sky-400/20 bg-sky-500/10 text-sky-100",
-              )}
-            >
-              {reason === "feature_locked" ? (
-                <span>
-                  Current plan: {(profile as { plan_name?: string | null } | null)?.plan_name || "Free"}.{" "}
-                  Image, video and upscale tools require a paid plan.
-                </span>
-              ) : isEducationSpace ? (
-                t("insufficientCredits.classSpaceLocked")
-              ) : shortage > 0 ? (
-                t("insufficientCredits.shortBy", { shortage: shortageText })
-              ) : (
-                t("insufficientCredits.topUpOrChoosePlan")
-              )}
-            </div>
+          <div className="grid max-h-[94vh] grid-cols-1 gap-4 overflow-y-auto px-4 pb-4 pt-16 sm:grid-cols-2 xl:grid-cols-4 xl:gap-5 xl:px-0 xl:pb-0">
+            {planCards.map((plan) => {
+              const creditsPerMonth = plan.upfront_credits || (plan.name === "Free" ? FREE_PLAN_CREDITS : 0);
+              const isFree = plan.name === "Free";
+              const isPro = plan.name === "Pro";
+              const isCurrent = plan.name.toLowerCase() === currentPlanName.toLowerCase();
+              const imageCount = exampleCosts.image ? Math.floor(creditsPerMonth / exampleCosts.image) : null;
+              const videoCount = exampleCosts.video ? Math.floor(creditsPerMonth / exampleCosts.video) : null;
+              const translateCount = exampleCosts.translate ? Math.floor(creditsPerMonth / exampleCosts.translate) : null;
+              const subtitleCount = exampleCosts.subtitle ? Math.floor(creditsPerMonth / exampleCosts.subtitle) : null;
+              const ctaLabel =
+                reason === "credits" && isCurrent
+                  ? "Top up credits"
+                  : isCurrent && reason === "feature_locked"
+                    ? "Upgrade plan"
+                    : isFree
+                      ? "View plans"
+                      : "Choose plan";
+              const onCtaClick = reason === "credits" && isCurrent ? () => setTopupOpen(true) : handleGoToPricing;
 
-            {isEducationSpace ? (
-              <Button
-                className="h-11 w-full bg-emerald-500 font-semibold text-white hover:bg-emerald-400"
-                onClick={() => onOpenChange(false)}
-              >
-                <BookOpen className="mr-2 h-4 w-4" />
-                {t("insufficientCredits.backToClassSpace")}
-              </Button>
-            ) : (
-              <>
-                <div className="grid gap-3 lg:grid-cols-4">
-                  {planCards.map((plan) => {
-                    const creditsPerMonth = plan.upfront_credits || (plan.name === "Free" ? FREE_PLAN_CREDITS : 0);
-                    const isFree = plan.name === "Free";
-                    const isPro = plan.name === "Pro";
-                    const imageCount = exampleCosts.image ? Math.floor(creditsPerMonth / exampleCosts.image) : null;
-                    const videoCount = exampleCosts.video ? Math.floor(creditsPerMonth / exampleCosts.video) : null;
-                    const translateCount = exampleCosts.translate ? Math.floor(creditsPerMonth / exampleCosts.translate) : null;
-                    const subtitleCount = exampleCosts.subtitle ? Math.floor(creditsPerMonth / exampleCosts.subtitle) : null;
-                    return (
-                      <div
-                        key={plan.id}
-                        className={cn(
-                          "relative rounded-2xl border bg-white/[0.055] p-4",
-                          isPro
-                            ? "border-white bg-white text-zinc-950"
-                            : "border-white/10 text-white",
-                        )}
-                      >
-                        {isPro && (
-                          <div className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full bg-zinc-950 px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-white">
-                            Best value
-                          </div>
-                        )}
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <h3 className="text-[20px] font-black leading-6">{plan.name}</h3>
-                            <p className={cn("mt-1 min-h-[44px] text-[12px] leading-[16px]", isPro ? "text-zinc-600" : "text-zinc-300")}>
-                              {PLAN_DESCRIPTIONS[plan.name as (typeof PLAN_ORDER)[number]] ?? ""}
-                            </p>
-                          </div>
-                          <Sparkles className={cn("mt-1 h-4 w-4", isPro ? "text-zinc-950" : "text-yellow-300")} />
-                        </div>
-
-                        <div className="mt-4">
-                          <div className="text-[26px] font-black leading-none">{displayPlanPrice(plan)}</div>
-                          <div className={cn("mt-1 text-[12px] font-semibold", isPro ? "text-zinc-600" : "text-zinc-300")}>
-                            {formatNumber(creditsPerMonth)} credits / month
-                          </div>
-                        </div>
-
-                        <div className="mt-4 grid gap-2 text-[12px] font-semibold leading-[17px]">
-                          <PlanExampleRow
-                            icon={ImageIcon}
-                            label="Images"
-                            value={isFree ? "Locked" : imageCount == null ? "-" : `~${formatNumber(imageCount)} / mo`}
-                            muted={isFree}
-                            dark={isPro}
-                          />
-                          <PlanExampleRow
-                            icon={Film}
-                            label="VDO 8s"
-                            value={isFree ? "Locked" : videoCount == null ? "-" : `~${formatNumber(videoCount)} / mo`}
-                            muted={isFree}
-                            dark={isPro}
-                          />
-                          <PlanExampleRow
-                            icon={Languages}
-                            label="Translate 1m"
-                            value={translateCount == null ? "-" : `~${formatNumber(translateCount)} / mo`}
-                            dark={isPro}
-                          />
-                          <PlanExampleRow
-                            icon={Captions}
-                            label="Auto subtitle 1m"
-                            value={subtitleCount == null ? "-" : `~${formatNumber(subtitleCount)} / mo`}
-                            dark={isPro}
-                          />
-                        </div>
-
-                        <Button
-                          className={cn(
-                            "mt-4 h-10 w-full rounded-xl text-[13px] font-black",
-                            isPro
-                              ? "bg-zinc-950 text-white hover:bg-zinc-800"
-                              : "bg-white/10 text-white hover:bg-white/15",
-                          )}
-                          onClick={handleGoToPricing}
-                        >
-                          {isFree ? "View pricing" : "Choose plan"}
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {reason === "credits" && (
-                    <Button
-                      className="h-12 w-full bg-sky-500 font-black text-white hover:bg-sky-400"
-                      onClick={() => setTopupOpen(true)}
+              return (
+                <div
+                  key={plan.id}
+                  className={cn(
+                    "relative flex min-h-[620px] flex-col rounded-[30px] border p-6 shadow-[0_26px_80px_rgba(0,0,0,0.52)] backdrop-blur-2xl transition-transform hover:-translate-y-1",
+                    isPro
+                      ? "border-[#f4ff3f] bg-[#f6f7ee] text-[#090b07]"
+                      : "border-white/12 bg-[#101611]/95 text-white",
+                    isCurrent &&
+                      "border-[#e5ff36] shadow-[0_0_0_1px_rgba(229,255,54,0.65),0_28px_90px_rgba(229,255,54,0.18)]",
+                  )}
+                >
+                  <div className="mb-5 flex items-center justify-between gap-3">
+                    <div
+                      className={cn(
+                        "rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em]",
+                        isCurrent
+                          ? "bg-[#e5ff36] text-black"
+                          : isPro
+                            ? "bg-black text-white"
+                            : "bg-white/10 text-zinc-200",
+                      )}
                     >
-                      <Zap className="mr-2 h-4 w-4" />
-                      {t("insufficientCredits.quickTopUpPromptPay")}
-                    </Button>
+                      {isCurrent ? "Current plan" : isPro ? "Best value" : "Plan"}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-[30px] font-black leading-none tracking-tight">{plan.name}</h3>
+                    <div className="mt-4 text-[32px] font-black leading-none tracking-tight">
+                      {displayPlanPrice(plan)}
+                    </div>
+                    <div className={cn("mt-3 text-[15px] font-bold", isPro ? "text-zinc-600" : "text-zinc-300")}>
+                      {formatNumber(creditsPerMonth)} credits / month
+                    </div>
+                  </div>
+
+                  {(isCurrent || (isFree && reason === "feature_locked")) && (
+                    <div
+                      className={cn(
+                        "mt-5 rounded-2xl border px-4 py-3",
+                        isPro
+                          ? "border-black/10 bg-black/[0.04]"
+                          : reason === "feature_locked"
+                            ? "border-[#e5ff36]/40 bg-[#e5ff36]/10"
+                            : "border-sky-300/25 bg-sky-300/10",
+                      )}
+                    >
+                      <div className={cn("text-[12px] font-black uppercase tracking-[0.12em]", isPro ? "text-zinc-500" : "text-zinc-300")}>
+                        {reason === "feature_locked" ? "Feature locked" : "Not enough credits"}
+                      </div>
+                      <div className="mt-2 text-[16px] font-black leading-6">
+                        {reason === "feature_locked"
+                          ? `${featureName || "This feature"} needs Starter or higher.`
+                          : isEducationSpace
+                            ? "Class credit balance is too low."
+                            : `Need ${requiredText || "more"} credits. Balance ${balanceText}.`}
+                      </div>
+                      {reason === "credits" && shortage > 0 && !isEducationSpace && (
+                        <div className={cn("mt-1 text-[14px] font-bold", isPro ? "text-zinc-600" : "text-zinc-300")}>
+                          Short by {shortageText} credits.
+                        </div>
+                      )}
+                    </div>
                   )}
 
+                  <div className="mt-5 grid gap-2.5">
+                    <PlanExampleRow
+                      icon={ImageIcon}
+                      label="Images"
+                      value={isFree ? "Locked" : imageCount == null ? "-" : `~${formatNumber(imageCount)} images/mo`}
+                      muted={isFree}
+                      dark={isPro}
+                    />
+                    <PlanExampleRow
+                      icon={Film}
+                      label="VDO 8s"
+                      value={isFree ? "Locked" : videoCount == null ? "-" : `~${formatNumber(videoCount)} videos/mo`}
+                      muted={isFree}
+                      dark={isPro}
+                    />
+                    <PlanExampleRow
+                      icon={Languages}
+                      label="Translate 1m"
+                      value={translateCount == null ? "-" : `~${formatNumber(translateCount)} min/mo`}
+                      dark={isPro}
+                    />
+                    <PlanExampleRow
+                      icon={Captions}
+                      label="Subtitle 1m"
+                      value={subtitleCount == null ? "-" : `~${formatNumber(subtitleCount)} min/mo`}
+                      dark={isPro}
+                    />
+                  </div>
+
                   <Button
-                    variant="outline"
                     className={cn(
-                      "h-12 w-full border-white/15 bg-white/5 font-black text-white hover:bg-white/10",
-                      reason === "feature_locked" && "sm:col-span-2",
+                      "mt-auto h-14 rounded-2xl text-[15px] font-black",
+                      isPro
+                        ? "bg-black text-white hover:bg-zinc-800"
+                        : "bg-[#e5ff36] text-black hover:bg-[#f0ff70]",
                     )}
-                    onClick={handleGoToPricing}
+                    onClick={onCtaClick}
                   >
-                    <ArrowUpCircle className="mr-2 h-4 w-4" />
-                    {t("insufficientCredits.goToPlansPricing")}
+                    {ctaLabel}
                   </Button>
                 </div>
-              </>
-            )}
+              );
+            })}
           </div>
         </DialogContent>
       </Dialog>
@@ -455,20 +418,24 @@ const PlanExampleRow = ({
   muted?: boolean;
   dark?: boolean;
 }) => (
-  <div className={cn("flex items-center justify-between gap-2", muted && "opacity-55")}>
-    <span className="inline-flex items-center gap-2">
-      {muted ? <LockKeyhole className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
-      <span>{label}</span>
+  <div
+    className={cn(
+      "flex min-h-[52px] items-center justify-between gap-4 rounded-2xl border px-4 py-2.5",
+      dark ? "border-black/10 bg-black/[0.035]" : "border-white/10 bg-white/[0.055]",
+      muted && "opacity-60",
+    )}
+  >
+    <span className="inline-flex min-w-0 items-center gap-3">
+      {muted ? <LockKeyhole className="h-4 w-4 shrink-0" /> : <Icon className="h-4 w-4 shrink-0" />}
+      <span className={cn("text-[14px] font-black leading-5", dark ? "text-zinc-900" : "text-white")}>{label}</span>
     </span>
-    <span className={cn("text-right", dark ? "text-zinc-700" : "text-zinc-200")}>
-      {muted ? (
-        value
-      ) : (
-        <span className="inline-flex items-center gap-1">
-          <Check className="h-3 w-3 text-emerald-400" />
-          {value}
-        </span>
+    <span
+      className={cn(
+        "shrink-0 text-right text-[14px] font-black leading-5",
+        muted ? (dark ? "text-zinc-500" : "text-zinc-400") : dark ? "text-zinc-950" : "text-[#e5ff36]",
       )}
+    >
+      {value}
     </span>
   </div>
 );
