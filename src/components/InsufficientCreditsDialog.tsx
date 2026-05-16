@@ -2,13 +2,6 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Captions,
-  Film,
-  Image as ImageIcon,
-  Languages,
-  LockKeyhole,
-} from "lucide-react";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -254,11 +247,11 @@ const InsufficientCreditsDialog = ({
   return (
     <>
       <Dialog open={open && !topupOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[94vh] max-w-[1180px] overflow-visible border-0 bg-transparent p-0 text-white shadow-none [&>button]:right-4 [&>button]:top-0 [&>button]:h-11 [&>button]:w-11 [&>button]:rounded-full [&>button]:bg-black/45 [&>button]:text-white [&>button]:opacity-100 [&>button]:ring-1 [&>button]:ring-white/15 [&>button]:backdrop-blur-xl [&>button]:hover:bg-white/15">
+        <DialogContent className="max-h-[94vh] max-w-[1040px] overflow-visible border-0 bg-transparent p-0 text-white shadow-none [&>button]:right-2 [&>button]:top-0 [&>button]:h-10 [&>button]:w-10 [&>button]:rounded-full [&>button]:bg-black/50 [&>button]:text-white [&>button]:opacity-100 [&>button]:ring-1 [&>button]:ring-white/15 [&>button]:backdrop-blur-xl [&>button]:hover:bg-white/15">
           <DialogTitle className="sr-only">{title}</DialogTitle>
           <DialogDescription className="sr-only">{description}</DialogDescription>
 
-          <div className="grid max-h-[94vh] grid-cols-1 gap-4 overflow-y-auto px-4 pb-4 pt-16 sm:grid-cols-2 xl:grid-cols-4 xl:gap-5 xl:px-0 xl:pb-0">
+          <div className="grid max-h-[94vh] grid-cols-1 items-start gap-3 overflow-y-auto px-4 pb-4 pt-14 sm:grid-cols-2 xl:grid-cols-4 xl:gap-4 xl:px-0 xl:pb-0">
             {planCards.map((plan) => {
               const creditsPerMonth = plan.upfront_credits || (plan.name === "Free" ? FREE_PLAN_CREDITS : 0);
               const isFree = plan.name === "Free";
@@ -282,7 +275,7 @@ const InsufficientCreditsDialog = ({
                 <div
                   key={plan.id}
                   className={cn(
-                    "relative flex min-h-[620px] flex-col rounded-[30px] border p-6 shadow-[0_26px_80px_rgba(0,0,0,0.52)] backdrop-blur-2xl transition-transform hover:-translate-y-1",
+                    "relative flex flex-col rounded-[24px] border p-5 shadow-[0_22px_70px_rgba(0,0,0,0.48)] backdrop-blur-2xl transition-transform hover:-translate-y-0.5",
                     isPro
                       ? "border-[#f4ff3f] bg-[#f6f7ee] text-[#090b07]"
                       : "border-white/12 bg-[#101611]/95 text-white",
@@ -290,10 +283,10 @@ const InsufficientCreditsDialog = ({
                       "border-[#e5ff36] shadow-[0_0_0_1px_rgba(229,255,54,0.65),0_28px_90px_rgba(229,255,54,0.18)]",
                   )}
                 >
-                  <div className="mb-5 flex items-center justify-between gap-3">
+                  <div className="mb-4 flex items-center justify-between gap-3">
                     <div
                       className={cn(
-                        "rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em]",
+                        "rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.1em]",
                         isCurrent
                           ? "bg-[#e5ff36] text-black"
                           : isPro
@@ -306,11 +299,11 @@ const InsufficientCreditsDialog = ({
                   </div>
 
                   <div>
-                    <h3 className="text-[30px] font-black leading-none tracking-tight">{plan.name}</h3>
-                    <div className="mt-4 text-[32px] font-black leading-none tracking-tight">
+                    <h3 className="text-[25px] font-black leading-none tracking-tight">{plan.name}</h3>
+                    <div className="mt-4 text-[27px] font-black leading-none tracking-tight">
                       {displayPlanPrice(plan)}
                     </div>
-                    <div className={cn("mt-3 text-[15px] font-bold", isPro ? "text-zinc-600" : "text-zinc-300")}>
+                    <div className={cn("mt-2 text-[12px] font-bold", isPro ? "text-zinc-600" : "text-zinc-300")}>
                       {formatNumber(creditsPerMonth)} credits / month
                     </div>
                   </div>
@@ -318,7 +311,7 @@ const InsufficientCreditsDialog = ({
                   {(isCurrent || (isFree && reason === "feature_locked")) && (
                     <div
                       className={cn(
-                        "mt-5 rounded-2xl border px-4 py-3",
+                        "mt-4 rounded-2xl border px-3.5 py-3",
                         isPro
                           ? "border-black/10 bg-black/[0.04]"
                           : reason === "feature_locked"
@@ -326,10 +319,10 @@ const InsufficientCreditsDialog = ({
                             : "border-sky-300/25 bg-sky-300/10",
                       )}
                     >
-                      <div className={cn("text-[12px] font-black uppercase tracking-[0.12em]", isPro ? "text-zinc-500" : "text-zinc-300")}>
+                      <div className={cn("text-[10px] font-black uppercase tracking-[0.1em]", isPro ? "text-zinc-500" : "text-zinc-300")}>
                         {reason === "feature_locked" ? "Feature locked" : "Not enough credits"}
                       </div>
-                      <div className="mt-2 text-[16px] font-black leading-6">
+                      <div className="mt-1.5 text-[13px] font-black leading-5">
                         {reason === "feature_locked"
                           ? `${featureName || "This feature"} needs Starter or higher.`
                           : isEducationSpace
@@ -337,36 +330,32 @@ const InsufficientCreditsDialog = ({
                             : `Need ${requiredText || "more"} credits. Balance ${balanceText}.`}
                       </div>
                       {reason === "credits" && shortage > 0 && !isEducationSpace && (
-                        <div className={cn("mt-1 text-[14px] font-bold", isPro ? "text-zinc-600" : "text-zinc-300")}>
+                        <div className={cn("mt-1 text-[12px] font-bold", isPro ? "text-zinc-600" : "text-zinc-300")}>
                           Short by {shortageText} credits.
                         </div>
                       )}
                     </div>
                   )}
 
-                  <div className="mt-5 grid gap-2.5">
+                  <div className="mt-4 grid gap-2.5">
                     <PlanExampleRow
-                      icon={ImageIcon}
                       label="Images"
                       value={isFree ? "Locked" : imageCount == null ? "-" : `~${formatNumber(imageCount)} images/mo`}
                       muted={isFree}
                       dark={isPro}
                     />
                     <PlanExampleRow
-                      icon={Film}
                       label="VDO 8s"
                       value={isFree ? "Locked" : videoCount == null ? "-" : `~${formatNumber(videoCount)} videos/mo`}
                       muted={isFree}
                       dark={isPro}
                     />
                     <PlanExampleRow
-                      icon={Languages}
                       label="Translate 1m"
                       value={translateCount == null ? "-" : `~${formatNumber(translateCount)} min/mo`}
                       dark={isPro}
                     />
                     <PlanExampleRow
-                      icon={Captions}
                       label="Subtitle 1m"
                       value={subtitleCount == null ? "-" : `~${formatNumber(subtitleCount)} min/mo`}
                       dark={isPro}
@@ -375,7 +364,7 @@ const InsufficientCreditsDialog = ({
 
                   <Button
                     className={cn(
-                      "mt-auto h-14 rounded-2xl text-[15px] font-black",
+                      "mt-5 h-11 rounded-2xl text-[13px] font-black",
                       isPro
                         ? "bg-black text-white hover:bg-zinc-800"
                         : "bg-[#e5ff36] text-black hover:bg-[#f0ff70]",
@@ -406,13 +395,11 @@ const InsufficientCreditsDialog = ({
 };
 
 const PlanExampleRow = ({
-  icon: Icon,
   label,
   value,
   muted = false,
   dark = false,
 }: {
-  icon: typeof ImageIcon;
   label: string;
   value: string;
   muted?: boolean;
@@ -420,18 +407,23 @@ const PlanExampleRow = ({
 }) => (
   <div
     className={cn(
-      "flex min-h-[52px] items-center justify-between gap-4 rounded-2xl border px-4 py-2.5",
-      dark ? "border-black/10 bg-black/[0.035]" : "border-white/10 bg-white/[0.055]",
+      "flex items-center justify-between gap-3 border-b py-1.5 last:border-b-0",
+      dark ? "border-black/10" : "border-white/10",
       muted && "opacity-60",
     )}
   >
-    <span className="inline-flex min-w-0 items-center gap-3">
-      {muted ? <LockKeyhole className="h-4 w-4 shrink-0" /> : <Icon className="h-4 w-4 shrink-0" />}
-      <span className={cn("text-[14px] font-black leading-5", dark ? "text-zinc-900" : "text-white")}>{label}</span>
+    <span className="inline-flex min-w-0 items-center gap-2">
+      <span
+        className={cn(
+          "h-1.5 w-1.5 shrink-0 rounded-full",
+          muted ? "bg-zinc-500" : dark ? "bg-black" : "bg-[#e5ff36]",
+        )}
+      />
+      <span className={cn("text-[13px] font-black leading-5", dark ? "text-zinc-900" : "text-white")}>{label}</span>
     </span>
     <span
       className={cn(
-        "shrink-0 text-right text-[14px] font-black leading-5",
+        "shrink-0 text-right text-[12px] font-black leading-5",
         muted ? (dark ? "text-zinc-500" : "text-zinc-400") : dark ? "text-zinc-950" : "text-[#e5ff36]",
       )}
     >
