@@ -34,6 +34,7 @@ import { loadModelViewer } from "@/lib/loadModelViewer";
 import { ImageCropTool } from "./ImageCropTool";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { AudioPlayButton } from "./AudioPlayButton";
+import type { Generation } from "./NodeResultBar";
 
 export interface PreviewPayload {
   type: "image" | "video" | "audio" | "text" | "grid" | "model3d";
@@ -76,9 +77,25 @@ interface Props {
    *  blob and producing a new asset (e.g. WorkspaceCanvas spawns a
    *  new AssetNode, AssetsView refreshes the library list). */
   onCropConfirmed?: (blob: Blob, filename: string) => Promise<void> | void;
+  /** Optional history strip — when a node has multiple generations,
+   *  passing them here renders a filmstrip beneath the media so the
+   *  user can scrub history without leaving the prompt-panel
+   *  viewer. Clicking a thumbnail calls `onHistorySelect(i)`; the
+   *  caller is expected to update the node's `selectedGenIndex` and
+   *  re-derive the `preview` payload for the newly selected gen. */
+  historyGenerations?: Generation[];
+  historySelectedIndex?: number;
+  onHistorySelect?: (index: number) => void;
 }
 
-const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
+const NodePreviewLightbox = ({
+  preview,
+  onClose,
+  onCropConfirmed,
+  historyGenerations,
+  historySelectedIndex = 0,
+  onHistorySelect,
+}: Props) => {
   const { language, t, t: i18n } = useLanguage();
   // Crop-tool toggle. When true the lightbox renders the
   // ImageCropTool overlay on top of the preview. Esc / Cancel
@@ -319,22 +336,29 @@ const NodePreviewLightbox = ({ preview, onClose, onCropConfirmed }: Props) => {
           className="relative flex h-[min(90vh,820px)] w-[min(94vw,1580px)] overflow-hidden rounded-[18px] border border-white/12 bg-[#0f1012] shadow-[0_24px_90px_rgba(0,0,0,.72)]"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="min-w-0 flex-1 bg-black">
-            {preview.type === "image" ? (
-              <img
-                src={preview.url}
-                alt={preview.label ?? t("workspace.lightbox.alt_preview")}
-                className="h-full w-full object-contain"
-                draggable={false}
-              />
-            ) : (
-              <video
-                src={preview.url}
-                controls
-                autoPlay
-                className="h-full w-full bg-black object-contain"
-              />
-            )}
+          <div className="flex min-w-0 flex-1 flex-col bg-black">
+            <div className="min-h-0 flex-1">
+              {preview.type === "image" ? (
+                <img
+                  src={preview.url}
+                  alt={preview.label ?? t("workspace.lightbox.alt_preview")}
+                  className="h-full w-full object-contain"
+                  draggable={false}
+                />
+              ) : (
+                <video
+                  src={preview.url}
+                  controls
+                  autoPlay
+                  className="h-full w-full bg-black object-contain"
+                />
+              )}
+            </div>
+            <HistoryStrip
+              generations={historyGenerations}
+              selectedIndex={historySelectedIndex}
+              onSelect={onHistorySelect}
+            />
           </div>
 
           <aside className="flex w-[344px] shrink-0 flex-col border-l border-white/8 bg-[#101113] px-4 py-4 text-white">
@@ -781,6 +805,84 @@ function PreviewToolButton({
         </span>
       )}
     </button>
+  );
+}
+
+function HistoryStrip({
+  generations,
+  selectedIndex,
+  onSelect,
+}: {
+  generations?: Generation[];
+  selectedIndex: number;
+  onSelect?: (i: number) => void;
+}) {
+  const { t: i18n } = useLanguage();
+  if (!generations || generations.length < 2) return null;
+  const formatTime = (ts: number) => new Date(ts).toLocaleString();
+  const current = generations[selectedIndex] ?? generations[0];
+  return (
+    <div className="shrink-0 border-t border-white/8 bg-zinc-950 p-3">
+      <div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+        <span>
+          {i18n("common.history")} — {generations.length}{" "}
+          {i18n(
+            generations.length === 1
+              ? "workspace.generation.singular"
+              : "workspace.generation.plural",
+          )}
+          {" · "}
+          {selectedIndex === 0
+            ? i18n("common.latest")
+            : `#${generations.length - selectedIndex}`}
+          {" · "}
+          {formatTime(current.createdAt)}
+        </span>
+        <span>{current.type}</span>
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {generations.map((gen, i) => (
+          <button
+            key={gen.id}
+            type="button"
+            onClick={() => onSelect?.(i)}
+            title={formatTime(gen.createdAt)}
+            className={cn(
+              "relative h-16 w-16 shrink-0 overflow-hidden rounded border-2 bg-zinc-900 transition-opacity",
+              i === selectedIndex
+                ? "border-white/60"
+                : "border-zinc-700 opacity-60 hover:opacity-100",
+            )}
+          >
+            {gen.type === "image" && gen.url && (
+              <img src={gen.url} className="h-full w-full object-cover" alt="" />
+            )}
+            {gen.type === "video" && gen.url && (
+              <video
+                src={gen.url}
+                muted
+                className="h-full w-full object-cover"
+              />
+            )}
+            {gen.type === "text" && (
+              <div className="p-1 text-left text-[8px] leading-tight text-white/60">
+                {gen.text?.slice(0, 60)}
+              </div>
+            )}
+            {gen.type === "audio" && (
+              <div className="flex h-full w-full items-center justify-center bg-zinc-800 text-[18px] text-white/60">
+                ♪
+              </div>
+            )}
+            {i === 0 && (
+              <div className="absolute inset-x-0 bottom-0 bg-emerald-500/80 py-[1px] text-center text-[8px] font-semibold text-black">
+                {i18n("common.latest2")}
+              </div>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
