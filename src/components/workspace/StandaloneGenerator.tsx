@@ -4918,9 +4918,10 @@ function autoSubtitleAlgorithmFromForm(
   if (segmentationMode === "sentence") {
     return algorithmFromCaptionSettings(settings, {
       segmentationMode,
-      maxLineDuration: Math.max(settings.maxLineDuration, 4.5),
-      maxCharsPerLine: 72,
-      maxSilenceGap: 0.75,
+      maxLineDuration: Math.min(Math.max(settings.maxLineDuration, 1.5), 2.4),
+      maxCharsPerLine: 36,
+      maxSilenceGap: 0.45,
+      maxHoldAfterSpeech: 0.5,
       splitOnPunctuation: true,
     });
   }

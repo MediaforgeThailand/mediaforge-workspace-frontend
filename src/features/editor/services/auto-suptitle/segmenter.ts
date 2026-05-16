@@ -244,6 +244,38 @@ function comparableCaptionText(text: string): string {
     .replace(/[\s"'`.,;:!?…。，、！？()[\]{}<>|\/\\\-–—_*+=~@#$%^&]+/g, "");
 }
 
+function extractAsciiTerms(text: string): string[] {
+  const terms = new Set<string>();
+  const matches = text.match(/[A-Za-z][A-Za-z0-9+._-]*/g) ?? [];
+  for (const match of matches) {
+    const normalized = comparableCaptionText(match);
+    if (normalized.length >= 2) terms.add(normalized);
+  }
+  return Array.from(terms);
+}
+
+function suggestedCuesPreserveTranscript(
+  cueTexts: readonly string[],
+  transcriptText?: string | null,
+): boolean {
+  const sourceComparable = comparableCaptionText(transcriptText ?? "");
+  if (!sourceComparable) return true;
+
+  const joinedComparable = comparableCaptionText(cueTexts.join(" "));
+  if (!joinedComparable) return false;
+
+  const sourceTerms = extractAsciiTerms(transcriptText ?? "");
+  if (sourceTerms.some((term) => !joinedComparable.includes(term))) {
+    return false;
+  }
+
+  if (sourceComparable.length >= 24 && joinedComparable.length < sourceComparable.length * 0.72) {
+    return false;
+  }
+
+  return true;
+}
+
 function timingTextIndexFromWords(timingWords: AutoSuptitleWhisperWord[]) {
   const words = timingWords.map(normalizeWord).filter(Boolean) as AutoSuptitleWhisperWord[];
   let text = "";
@@ -412,8 +444,49 @@ function splitCueTextByWordLimit(
   return chunks;
 }
 
+function splitCueTextBySentenceLimits(
+  text: string,
+  algorithm: AutoSuptitleAlgorithmSettings,
+  language?: string | null,
+): string[] {
+  const normalized = normalizeCaptionText(text);
+  if (!normalized) return [];
+
+  const units = captionUnitsFromText(normalized, language);
+  if (units.length === 0) return [];
+
+  const maxChars = Math.max(18, Math.floor(algorithm.maxCharsPerLine));
+  const chunks: string[] = [];
+  let bucket: string[] = [];
+
+  const flush = () => {
+    const chunk = joinCaptionUnits(bucket);
+    if (chunk) chunks.push(chunk);
+    bucket = [];
+  };
+
+  for (const unit of units) {
+    const nextText = joinCaptionUnits([...bucket, unit]);
+    if (bucket.length > 0 && Array.from(nextText).length > maxChars) {
+      flush();
+    }
+
+    bucket.push(unit);
+
+    const currentText = joinCaptionUnits(bucket);
+    const endsClause = /[.!?;:…。！？]$/.test(unit);
+    if (bucket.length >= 2 && endsClause && Array.from(currentText).length >= 10) {
+      flush();
+    }
+  }
+
+  flush();
+  return chunks;
+}
+
 function buildCuesFromSuggestedCueTexts(
   cueTexts: readonly string[],
+  transcriptText: string | undefined | null,
   timingWords: AutoSuptitleWhisperWord[],
   clipStartTime: number,
   settings: CaptionStyleSettings,
@@ -424,9 +497,15 @@ function buildCuesFromSuggestedCueTexts(
   const maxWordsPerCue =
     Math.max(1, Math.floor(algorithm.wordsPerLine)) *
     Math.max(1, Math.floor(algorithm.maxLinesPerCue));
+  const cleanedCueTexts = cueTexts.map(normalizeCaptionText).filter(Boolean);
+  const safeCueTexts = suggestedCuesPreserveTranscript(cleanedCueTexts, transcriptText)
+    ? cleanedCueTexts
+    : [normalizeCaptionText(transcriptText ?? "")].filter(Boolean);
   const cueTextChunks = isSentenceSegmentationMode(algorithm)
-    ? cueTexts.map(normalizeCaptionText).filter(Boolean)
-    : cueTexts.flatMap((cueText) =>
+    ? safeCueTexts.flatMap((cueText) =>
+        splitCueTextBySentenceLimits(cueText, algorithm, language),
+      )
+    : safeCueTexts.flatMap((cueText) =>
         splitCueTextByWordLimit(cueText, maxWordsPerCue, language),
       );
   const estimated = estimateWordsFromSuggestedCues(cueTextChunks, timingWords, durationSec);
@@ -587,6 +666,7 @@ export function buildAutoSuptitleCuesFromResponse(
   if (shouldUseSegmentText && response.suggested_cues?.length) {
     const cues = buildCuesFromSuggestedCueTexts(
       response.suggested_cues,
+      response.text,
       response.words ?? [],
       clipStartTime,
       settings,

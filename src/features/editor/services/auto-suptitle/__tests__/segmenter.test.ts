@@ -103,6 +103,90 @@ describe("Auto Suptitle segmenter", () => {
     ]);
   });
 
+  it("sentence mode re-splits long GPT cue text into readable phrase cues", () => {
+    const cues = buildAutoSuptitleCuesFromResponse(
+      {
+        language: "thai",
+        duration: 6,
+        text: "Motion Control ช่วยสร้างวิดีโออ้างอิงจาก AI ของ MediaPod ให้ใช้งานง่ายขึ้น",
+        suggested_cues: [
+          "Motion Control ช่วยสร้างวิดีโออ้างอิงจาก AI ของ MediaPod ให้ใช้งานง่ายขึ้น",
+        ],
+        words: [
+          { word: "Motion", start: 0, end: 0.32 },
+          { word: "Control", start: 0.32, end: 0.72 },
+          { word: "ช่วย", start: 0.72, end: 1.1 },
+          { word: "สร้าง", start: 1.1, end: 1.45 },
+          { word: "วิดีโอ", start: 1.45, end: 1.95 },
+          { word: "อ้างอิง", start: 1.95, end: 2.5 },
+          { word: "จาก", start: 2.5, end: 2.75 },
+          { word: "AI", start: 2.75, end: 3.05 },
+          { word: "ของ", start: 3.05, end: 3.28 },
+          { word: "MediaPod", start: 3.28, end: 3.9 },
+          { word: "ให้", start: 3.9, end: 4.15 },
+          { word: "ใช้งาน", start: 4.15, end: 4.75 },
+          { word: "ง่ายขึ้น", start: 4.75, end: 5.5 },
+        ],
+      },
+      0,
+      DEFAULT_CAPTION_SETTINGS,
+      {
+        ...DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+        segmentationMode: "sentence",
+        maxCharsPerLine: 28,
+        maxLineDuration: 2.4,
+        maxSilenceGap: 0.45,
+      },
+      "th",
+    );
+
+    const joined = cues.map((cue) => cue.text).join(" ");
+    expect(cues.length).toBeGreaterThan(1);
+    expect(joined).toContain("MOTION");
+    expect(joined).toContain("CONTROL");
+    expect(joined).toContain("AI");
+    expect(joined).toContain("MEDIAPOD");
+    expect(Math.max(...cues.map((cue) => cue.text.length))).toBeLessThanOrEqual(34);
+  });
+
+  it("falls back to transcript text when GPT cue chunks omit English loanwords", () => {
+    const cues = buildAutoSuptitleCuesFromResponse(
+      {
+        language: "thai",
+        duration: 4,
+        text: "ใช้ AI Motion Control ใน MediaPod ได้เลย",
+        suggested_cues: ["ใช้ระบบควบคุมการเคลื่อนไหวได้เลย"],
+        words: [
+          { word: "ใช้", start: 0, end: 0.24 },
+          { word: "AI", start: 0.24, end: 0.48 },
+          { word: "Motion", start: 0.48, end: 0.86 },
+          { word: "Control", start: 0.86, end: 1.24 },
+          { word: "ใน", start: 1.24, end: 1.44 },
+          { word: "MediaPod", start: 1.44, end: 2.0 },
+          { word: "ได้", start: 2.0, end: 2.3 },
+          { word: "เลย", start: 2.3, end: 2.75 },
+        ],
+      },
+      0,
+      DEFAULT_CAPTION_SETTINGS,
+      {
+        ...DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+        segmentationMode: "sentence",
+        maxCharsPerLine: 28,
+        maxLineDuration: 2.4,
+        maxSilenceGap: 0.45,
+      },
+      "th",
+    );
+
+    const joined = cues.map((cue) => cue.text).join(" ");
+    expect(joined).toContain("AI");
+    expect(joined).toContain("MOTION");
+    expect(joined).toContain("CONTROL");
+    expect(joined).toContain("MEDIAPOD");
+    expect(joined).not.toContain("ระบบควบคุม");
+  });
+
   it("uses Thai segment text instead of broken word-level tokens", () => {
     const cues = buildAutoSuptitleCuesFromResponse(
       {
