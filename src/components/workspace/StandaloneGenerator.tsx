@@ -55,6 +55,12 @@ import {
   calculateNodeCostQuote,
   effectiveNodeDiscountPercent,
 } from "@/lib/nodeCostCalculator";
+import {
+  featureLabelForPlanLock,
+  freePlanBlockedFeatureForStandaloneTool,
+  isWorkspaceFreePlan,
+  type WorkspacePaidFeature,
+} from "@/lib/workspacePlanAccess";
 import { useNodeCreditCosts } from "@/hooks/useNodeCreditCosts";
 import { useCredits } from "@/hooks/useCredits";
 import { useSignInModal } from "@/hooks/useSignInModal";
@@ -1751,7 +1757,7 @@ export default function StandaloneGenerator({
   onCreateProject: () => void;
   onDeleteProject?: (projectId: string) => void;
 }) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { language, t } = useLanguage();
   const navigate = useNavigate();
   const openSignInModal = useSignInModal();
@@ -1794,6 +1800,10 @@ export default function StandaloneGenerator({
   const [insufficientOpen, setInsufficientOpen] = useState(false);
   const [insufficientRequiredCredits, setInsufficientRequiredCredits] =
     useState<number | undefined>();
+  const [insufficientReason, setInsufficientReason] =
+    useState<"credits" | "feature_locked">("credits");
+  const [insufficientFeature, setInsufficientFeature] =
+    useState<WorkspacePaidFeature | null>(null);
   const [deleteReferenceTarget, setDeleteReferenceTarget] =
     useState<DeletableReference | null>(null);
   const [deletingReference, setDeletingReference] = useState(false);
@@ -2391,7 +2401,6 @@ export default function StandaloneGenerator({
   const packageDiscountLabel = credits?.package_discount_label ?? null;
 
   const estimatedCostQuote = useMemo(() => {
-    if (activeTool === "voice_translate" || activeTool === "auto_subtitle") return null;
     if (creditCostsLoading) return null;
     const params = buildCurrentParams(activeTool, form);
     if (!params) return null;
@@ -3761,14 +3770,6 @@ export default function StandaloneGenerator({
             rows: 1,
             onChange: (urlAssetSource: string) => updateForm({ urlAssetSource }),
           },
-          {
-            id: "file-name",
-            label: language === "th" ? "Asset name" : "Asset name",
-            value: form.urlAssetFileName ?? "",
-            placeholder: "Optional file name",
-            rows: 1,
-            onChange: (urlAssetFileName: string) => updateForm({ urlAssetFileName }),
-          },
         ]
       : [];
   const urlAssetPanelSettings =
@@ -3914,6 +3915,16 @@ export default function StandaloneGenerator({
         toast.error(validation);
         return;
       }
+      const lockedFeature = isWorkspaceFreePlan(profile)
+        ? freePlanBlockedFeatureForStandaloneTool(activeTool)
+        : null;
+      if (lockedFeature) {
+        setInsufficientReason("feature_locked");
+        setInsufficientFeature(lockedFeature);
+        setInsufficientRequiredCredits(undefined);
+        setInsufficientOpen(true);
+        return;
+      }
       if (activeTool === "voice_translate") {
         try {
           await startVoiceTranslate();
@@ -3957,6 +3968,8 @@ export default function StandaloneGenerator({
           return;
         }
         if (Number(credits.balance ?? 0) < estimatedCost) {
+          setInsufficientReason("credits");
+          setInsufficientFeature(null);
           setInsufficientRequiredCredits(estimatedCost);
           setInsufficientOpen(true);
           return;
@@ -4023,7 +4036,16 @@ export default function StandaloneGenerator({
         await jobsQuery.refetch();
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        if (isInsufficientCreditsError(message)) {
+        const featureLocked = /FEATURE_LOCKED_FREE_PLAN|requires Starter/i.test(message);
+        if (featureLocked) {
+          const lockedFeature = freePlanBlockedFeatureForStandaloneTool(activeTool);
+          setInsufficientReason("feature_locked");
+          setInsufficientFeature(lockedFeature);
+          setInsufficientRequiredCredits(undefined);
+          setInsufficientOpen(true);
+        } else if (isInsufficientCreditsError(message)) {
+          setInsufficientReason("credits");
+          setInsufficientFeature(null);
           setInsufficientRequiredCredits(estimatedCost ?? undefined);
           setInsufficientOpen(true);
         } else {
@@ -4443,6 +4465,8 @@ export default function StandaloneGenerator({
         open={insufficientOpen}
         onOpenChange={setInsufficientOpen}
         requiredCredits={insufficientRequiredCredits}
+        reason={insufficientReason}
+        featureName={featureLabelForPlanLock(insufficientFeature)}
       />
       <Dialog
         open={!!deleteReferenceTarget}
@@ -10816,6 +10840,7 @@ function buildCurrentParams(
       source_name: form.translateVideo?.name ?? null,
       voice_cloning: true,
       disable_voice_cloning: false,
+      source_duration_seconds: form.translateVideo?.durationSec ?? 60,
     };
   }
   if (tool === "auto_subtitle") {
@@ -10829,6 +10854,7 @@ function buildCurrentParams(
       position: form.autoSubtitlePosition,
       segmentation_mode: form.autoSubtitleSegmentationMode,
       words_per_line: form.autoSubtitleWordsPerLine,
+      source_duration_seconds: form.autoSubtitleVideo?.durationSec ?? 60,
     };
   }
   if (tool === "image_to_3d") {

@@ -151,6 +151,15 @@ function modelDiscountPercent({ schemaKey, params, creditCosts }: NodeCostParams
       ]),
     );
   }
+  if (schemaKey === "autoSubtitleNode") {
+    const apiModel = modelName || "auto-suptitle-whisper";
+    return maxDiscountForRows(
+      rowsForFeatureModels(creditCosts, "auto_subtitle", [
+        apiModel,
+        "auto-suptitle-whisper",
+      ]),
+    );
+  }
   if (schemaKey === "videoToPromptNode") {
     return maxDiscountForRows(rowsForFeatureModels(creditCosts, "video_to_prompt", [modelName || "gemini-video-understanding"]));
   }
@@ -337,6 +346,26 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
     const aliases = [apiModel, "elevenlabs-dubbing-voice-clone"];
     const match = aliases
       .map((model) => creditCosts.find((r) => r.feature === "voice_translate" && r.model === model))
+      .find(Boolean);
+    if (!match) return null;
+    const seconds = Math.max(
+      1,
+      Math.ceil(Number(params.source_duration_seconds ?? params.duration_seconds ?? params.duration ?? 60) || 60),
+    );
+    if (match.pricing_type === "per_second") {
+      return Math.max(1, Math.ceil(match.cost * seconds));
+    }
+    if (match.pricing_type === "per_minute") {
+      return Math.max(1, Math.ceil((match.cost * seconds) / 60));
+    }
+    return match.cost;
+  }
+
+  if (schemaKey === "autoSubtitleNode") {
+    const apiModel = modelName || "auto-suptitle-whisper";
+    const aliases = [apiModel, "auto-suptitle-whisper"];
+    const match = aliases
+      .map((model) => creditCosts.find((r) => r.feature === "auto_subtitle" && r.model === model))
       .find(Boolean);
     if (!match) return null;
     const seconds = Math.max(

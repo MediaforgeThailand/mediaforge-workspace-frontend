@@ -83,6 +83,7 @@ type ProfilePlanFields = {
 
 // Per-plan subtitle copy (Phase 6 promo).
 const PLAN_SUBTITLE_KEYS = {
+  Free: "pricing.plan.free.subtitle",
   Starter: "pricing.plan.starter.subtitle",
   Creator: "pricing.plan.creator.subtitle",
   Pro: "pricing.plan.pro.subtitle",
@@ -95,47 +96,47 @@ type PlanName = keyof typeof PLAN_SUBTITLE_KEYS;
 const FEATURE_ROWS = [
   {
     key: "pricing.feature.allModels",
-    plans: { Starter: true, Creator: true, Pro: true, Team: true },
+    plans: { Free: false, Starter: true, Creator: true, Pro: true, Team: true },
   },
   {
     key: "pricing.feature.spacesCanvas",
-    plans: { Starter: true, Creator: true, Pro: true, Team: true },
+    plans: { Free: true, Starter: true, Creator: true, Pro: true, Team: true },
   },
   {
     key: "pricing.feature.proEditing",
-    plans: { Starter: true, Creator: true, Pro: true, Team: true },
+    plans: { Free: true, Starter: true, Creator: true, Pro: true, Team: true },
   },
   {
     key: "pricing.feature.audioGeneration",
-    plans: { Starter: true, Creator: true, Pro: true, Team: true },
+    plans: { Free: true, Starter: true, Creator: true, Pro: true, Team: true },
   },
   {
     key: "pricing.feature.commercialLicense",
-    plans: { Starter: true, Creator: true, Pro: true, Team: true },
+    plans: { Free: false, Starter: true, Creator: true, Pro: true, Team: true },
   },
   {
     key: "pricing.feature.topUpAnytime",
-    plans: { Starter: true, Creator: true, Pro: true, Team: true },
+    plans: { Free: true, Starter: true, Creator: true, Pro: true, Team: true },
   },
   {
     key: "pricing.feature.trainStyles",
-    plans: { Starter: false, Creator: true, Pro: true, Team: true },
+    plans: { Free: false, Starter: false, Creator: true, Pro: true, Team: true },
   },
   {
     key: "pricing.feature.earlyAccess",
-    plans: { Starter: false, Creator: false, Pro: true, Team: true },
+    plans: { Free: false, Starter: false, Creator: false, Pro: true, Team: true },
   },
   {
     key: "pricing.feature.fileNaming",
-    plans: { Starter: false, Creator: false, Pro: true, Team: true },
+    plans: { Free: false, Starter: false, Creator: false, Pro: true, Team: true },
   },
   {
     key: "pricing.feature.teamCreditPool",
-    plans: { Starter: false, Creator: false, Pro: false, Team: true },
+    plans: { Free: false, Starter: false, Creator: false, Pro: false, Team: true },
   },
   {
     key: "pricing.feature.centralBillingSso",
-    plans: { Starter: false, Creator: false, Pro: false, Team: true },
+    plans: { Free: false, Starter: false, Creator: false, Pro: false, Team: true },
   },
 ] as const;
 
@@ -153,6 +154,27 @@ const TEAM_PROMO_CREDITS_PER_SEAT_MONTH = 25_000;
 const TEAM_CREDITS_PER_SEAT_MONTH = TEAM_BASE_CREDITS_PER_SEAT_MONTH + TEAM_PROMO_CREDITS_PER_SEAT_MONTH;
 const TEAM_MIN_SEATS = 2;
 const TEAM_MAX_SEATS = 500;
+const FREE_PLAN_CREDITS = 1_000;
+const FREE_PLAN: SubscriptionPlan = {
+  id: "free-plan",
+  name: "Free",
+  target: "user",
+  billing_cycle: "monthly",
+  price_thb: 0,
+  upfront_credits: FREE_PLAN_CREDITS,
+  flow_quota: null,
+  sort_order: 0,
+  is_active: true,
+  stripe_price_id: null,
+  stripe_price_id_monthly: null,
+  stripe_price_id_annual: null,
+  annual_price_thb: 0,
+  annual_credits: FREE_PLAN_CREDITS * 12,
+  credit_discount_percent: 0,
+  generator_quota: 1,
+  generator_quota_label: "1 generator engine",
+  is_featured: false,
+};
 
 const Pricing = () => {
   const { t: i18n, language } = useLanguage();
@@ -218,13 +240,21 @@ const Pricing = () => {
 
   const profilePlan = profile as unknown as ProfilePlanFields | null;
   const currentPlanId = profilePlan?.subscription_plan_id || profilePlan?.current_plan_id || null;
-  const currentPlan = plans.find((p) => p.id === currentPlanId) || null;
+  const currentPlan =
+    plans.find((p) => p.id === currentPlanId) ||
+    ((profile as { subscription_status?: string | null; plan_name?: string | null } | null)?.subscription_status === "free" ||
+    (profile as { plan_name?: string | null } | null)?.plan_name === "Free"
+      ? FREE_PLAN
+      : null);
 
-  // 4-card layout. Order: Starter, Creator, Pro, Team. Filter to active rows.
-  const orderedPlans = useMemo(
-    () => [...plans].sort((a, b) => a.sort_order - b.sort_order),
-    [plans]
-  );
+  // Pricing layout. Inject Free locally as a safety net until every remote DB has
+  // the seed migration applied.
+  const orderedPlans = useMemo(() => {
+    const rows = plans.some((plan) => plan.name === "Free" && plan.target === "user")
+      ? plans
+      : [FREE_PLAN, ...plans];
+    return [...rows].sort((a, b) => a.sort_order - b.sort_order);
+  }, [plans]);
 
   const handleSubscribe = (plan: SubscriptionPlan) => {
     if (authLoading) {
@@ -237,6 +267,14 @@ const Pricing = () => {
 
     if (!session?.access_token) {
       navigate(`/auth?redirect=${encodeURIComponent("/app/pricing")}`);
+      return;
+    }
+
+    if (plan.name === "Free") {
+      toast({
+        title: "Free plan",
+        description: "Free is included automatically. Upgrade when you need image, video, or upscale.",
+      });
       return;
     }
 
@@ -291,6 +329,11 @@ const Pricing = () => {
 
   // Decide CTA copy based on the user's current plan vs the card.
   const ctaLabelFor = (plan: SubscriptionPlan): string => {
+    if (plan.name === "Free") {
+      return currentPlan?.name === "Free"
+        ? i18n("pricing.cta.currentPlan")
+        : "Included";
+    }
     if (plan.target === "team") {
       return i18n("pricing.cta.startTeam");
     }
@@ -386,7 +429,7 @@ const Pricing = () => {
               {i18n("pricing.emptyPlans")}
             </p>
           ) : (
-            <div className="grid grid-cols-1 items-start gap-[14px] pt-[26px] sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 items-start gap-[14px] pt-[26px] sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               {orderedPlans.map((plan) => (
                 <PlanCard
                   key={plan.id}
@@ -464,10 +507,13 @@ interface PlanCardProps {
 const PlanCard = ({ plan, cycle, ctaLabel, isCurrent, submitting, onSubscribe, teamSeats, onTeamSeatsChange, currency }: PlanCardProps) => {
   const { t: i18n } = useLanguage();
   const isTeam = plan.target === "team";
+  const isFree = plan.name === "Free";
   const isPro = plan.is_featured === true; // Phase 1 seeded Pro as is_featured.
   const displayPlanName = plan.name === "Team" ? i18n("pricing.plan.team.name") : plan.name;
   const subtitleKey = PLAN_SUBTITLE_KEYS[plan.name as PlanName];
-  const subtitle = subtitleKey ? i18n(subtitleKey) : "";
+  const subtitle = isFree
+    ? "1,000 credits/month. Image, video and upscale are locked."
+    : subtitleKey ? i18n(subtitleKey) : "";
 
   // Price calculation:
   //   monthly: price_thb
@@ -687,10 +733,16 @@ const PlanCard = ({ plan, cycle, ctaLabel, isCurrent, submitting, onSubscribe, t
         </div>
       )}
 
-      <div className="mt-[2px] flex flex-col gap-[2px]">
-        <ModelAvailabilityRow label="Seedance 2.0" accent={accent} />
-        <ModelAvailabilityRow label="GPT Image 2" accent={accent} />
-      </div>
+      {isFree ? (
+        <div className="mt-[2px] rounded-xl border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-[11.5px] font-semibold leading-[15px] text-amber-100">
+          Image, video and upscale require Starter or higher.
+        </div>
+      ) : (
+        <div className="mt-[2px] flex flex-col gap-[2px]">
+          <ModelAvailabilityRow label="Seedance 2.0" accent={accent} />
+          <ModelAvailabilityRow label="GPT Image 2" accent={accent} />
+        </div>
+      )}
 
       {/* Pro discount line / Team discount line */}
       {isPro && (
@@ -751,7 +803,7 @@ const PlanCard = ({ plan, cycle, ctaLabel, isCurrent, submitting, onSubscribe, t
           at the top of the file for the rationale. */}
 
       {/* 250M+ Premium assets — only Creator/Pro/Team (Starter excluded) */}
-      {plan.name !== "Starter" && (
+      {plan.name !== "Starter" && !isFree && (
         <div className="mt-auto pt-[4px]">
           <div className="flex min-h-[16px] items-center gap-[6px] text-[12px] font-semibold leading-[16px] text-zinc-100">
             <span className="flex h-[16px] w-[13px] shrink-0 items-center justify-center">

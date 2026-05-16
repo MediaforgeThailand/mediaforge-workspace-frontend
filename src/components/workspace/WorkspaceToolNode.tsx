@@ -46,6 +46,12 @@ import {
   calculateNodeCostQuote,
   effectiveNodeDiscountPercent,
 } from "@/lib/nodeCostCalculator";
+import {
+  featureLabelForPlanLock,
+  freePlanBlockedFeatureForNodeType,
+  isWorkspaceFreePlan,
+  type WorkspacePaidFeature,
+} from "@/lib/workspacePlanAccess";
 import PromptMentionTextarea from "@/components/flow/nodes/PromptMentionTextarea";
 import MultiShotBuilder, {
   type SceneBlock,
@@ -1235,6 +1241,10 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const prevHasRefVideo = useRef<boolean | undefined>(undefined);
   const runInFlightRef = useRef(false);
   const [insufficientOpen, setInsufficientOpen] = useState(false);
+  const [insufficientReason, setInsufficientReason] =
+    useState<"credits" | "feature_locked">("credits");
+  const [insufficientFeature, setInsufficientFeature] =
+    useState<WorkspacePaidFeature | null>(null);
   const [isHovered, setIsHovered] = useState(false);
   const [optimisticRun, setOptimisticRun] = useState<{
     runId: string;
@@ -1243,7 +1253,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   // Used by friendlyError() to localize jargon errors before they
   // reach the user. Raw text still lands in console.error.
   const { language, t } = useLanguage();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const openSignInModal = useSignInModal();
   const currentWorkspaceId = useWorkspaceStore((s) => s.current?.workspaceId ?? null);
   const { credits } = useCredits(currentWorkspaceId);
@@ -1576,6 +1586,15 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     }
     if (!user?.id) {
       openSignInModal();
+      return;
+    }
+    const lockedFeature = isWorkspaceFreePlan(profile)
+      ? freePlanBlockedFeatureForNodeType(schemaKey)
+      : null;
+    if (lockedFeature) {
+      setInsufficientReason("feature_locked");
+      setInsufficientFeature(lockedFeature);
+      setInsufficientOpen(true);
       return;
     }
 
@@ -2559,12 +2578,13 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       const userErrorMessage = friendlyError(errorMessage, language === "th" ? "th" : "en");
       const shouldToast = runStillActive();
       const insufficientCredits = isInsufficientCreditsError(errorMessage);
+      const featureLocked = /FEATURE_LOCKED_FREE_PLAN|requires Starter/i.test(errorMessage);
       patchNodeDataNow(
         {
           status: "error",
           runStartedAt: null,
           activeRunId: null,
-          lastRunError: insufficientCredits ? errorMessage : userErrorMessage,
+          lastRunError: insufficientCredits || featureLocked ? errorMessage : userErrorMessage,
         },
         { activeRunId: runId },
       );
@@ -2573,8 +2593,17 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         nodeId: id,
         title: `✗ ${nodeLabelForLog} · ${String(e?.message ?? e)}`,
       });
-      if (insufficientCredits) setInsufficientOpen(true);
-      if (shouldToast && !insufficientCredits) {
+      if (insufficientCredits) {
+        setInsufficientReason("credits");
+        setInsufficientFeature(null);
+        setInsufficientOpen(true);
+      }
+      if (featureLocked) {
+        setInsufficientReason("feature_locked");
+        setInsufficientFeature(freePlanBlockedFeatureForNodeType(schemaKey));
+        setInsufficientOpen(true);
+      }
+      if (shouldToast && !insufficientCredits && !featureLocked) {
         // Translate jargon errors (`PROVIDER_BILLING_ERROR`,
         // `function consume_credits_for(…) does not exist`,
         // OpenAI 401 …) to friendly Thai/EN copy. Raw error
@@ -2590,7 +2619,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       setOptimisticRun(null);
       runInFlightRef.current = false;
     }
-  }, [getNodes, id, isNodeCurrentlyProcessing, isViewer, openSignInModal, params, schemaKey, patchNodeDataNow, selectedModel, schema, d.params?.nodeName, language, t, user?.id]);
+  }, [getNodes, id, isNodeCurrentlyProcessing, isViewer, openSignInModal, params, schemaKey, patchNodeDataNow, selectedModel, schema, d.params?.nodeName, language, profile, t, user?.id]);
 
   useEffect(() => {
     if (!isRunning) return;
@@ -2656,6 +2685,15 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         return;
       }
       if (runInFlightRef.current || isNodeCurrentlyProcessing() || isViewer) return;
+      const lockedFeature = isWorkspaceFreePlan(profile)
+        ? freePlanBlockedFeatureForNodeType(schemaKey)
+        : null;
+      if (lockedFeature) {
+        setInsufficientReason("feature_locked");
+        setInsufficientFeature(lockedFeature);
+        setInsufficientOpen(true);
+        return;
+      }
 
       const sourceNode = getNodes().find((node) => node.id === id) as Node | undefined;
       if (!sourceNode) return;
@@ -2697,7 +2735,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       void runNode();
       toast.success(t("workspace.toolNode.runVariationsToast", { n }));
     },
-    [getEdges, getNodes, id, isNodeCurrentlyProcessing, isViewer, runNode, setEdges, setNodes, t],
+    [getEdges, getNodes, id, isNodeCurrentlyProcessing, isViewer, profile, runNode, schemaKey, setEdges, setNodes, t],
   );
 
   const recoveryJobs = useCanvasRecoveryJobsForNode(id);
@@ -4183,6 +4221,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           onOpenChange={setInsufficientOpen}
           requiredCredits={nodeCost ?? undefined}
           workspaceId={currentWorkspaceId}
+          reason={insufficientReason}
+          featureName={featureLabelForPlanLock(insufficientFeature)}
         />
       )}
     </>
