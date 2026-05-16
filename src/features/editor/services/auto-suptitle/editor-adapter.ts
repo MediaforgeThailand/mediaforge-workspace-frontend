@@ -65,7 +65,7 @@ export async function materializeAutoSuptitleTrack(
     const clip = useProjectStore.getState().createCaptionTextClip({
       trackId: track.id,
       startTime: cue.startTime,
-      duration: Math.max(0.05, cue.endTime - cue.startTime),
+      duration: Math.max(0.01, cue.endTime - cue.startTime),
       text: formatAutoSuptitleCueText(
         cue.text,
         settings.wordsPerLine,

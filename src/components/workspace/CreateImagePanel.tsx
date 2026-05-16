@@ -617,23 +617,12 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
           onDragOverCapture={handlePromptDragOver}
           onDropCapture={handlePromptDrop}
         >
-          <div className="flex items-center justify-between gap-[10px]">
+          <div className="flex items-center gap-[10px]">
             <span className="standalone-section-title text-[14px] font-semibold leading-[20px] text-white">{resolvedPromptLabel}</span>
-            {showReferences && (
-              <button
-                type="button"
-                onClick={openReferencePicker}
-                className="grid h-[28px] w-[28px] place-items-center rounded-[8px] border border-white/[0.08] bg-white/[0.03] text-white/70 transition hover:border-[#f4ff00]/45 hover:text-[#f4ff00]"
-                aria-label={resolvedReferenceTitle}
-                title={resolvedReferenceTitle}
-              >
-                <ImageIcon className="h-[14px] w-[14px]" />
-              </button>
-            )}
           </div>
 
           {showReferences && (
-            <div className="relative mt-[8px] overflow-hidden rounded-[10px]">
+            <div className="relative mt-[7px] overflow-hidden rounded-[10px]">
               <div
                 role="button"
                 tabIndex={0}
@@ -654,8 +643,10 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
                 }}
                 onDrop={handleReferenceDrop}
                 className={clsx(
-                  "relative flex min-h-[58px] items-center gap-[10px] rounded-[10px] border border-[#f4ff00]/80 bg-[radial-gradient(circle_at_18%_50%,rgba(244,255,0,0.18),rgba(244,255,0,0.06)_48%,rgba(0,0,0,0)_100%)] px-[10px] py-[8px] shadow-[0_0_20px_rgba(244,255,0,0.14),inset_0_0_18px_rgba(244,255,0,0.1)] transition-all outline-none focus:ring-1 focus:ring-[#f4ff00]/70",
-                  onAddReferences || onReferenceFiles || onSelectReferenceAsset ? "cursor-pointer" : "cursor-default",
+                  "relative flex min-h-[48px] items-center gap-[9px] rounded-[10px] border border-[#f4ff00]/70 bg-[radial-gradient(circle_at_16%_50%,rgba(244,255,0,0.15),rgba(244,255,0,0.045)_52%,rgba(0,0,0,0)_100%)] px-[9px] py-[6px] shadow-[inset_0_0_14px_rgba(244,255,0,0.075)] transition-all duration-150 outline-none focus:ring-1 focus:ring-[#f4ff00]/70",
+                  onAddReferences || onReferenceFiles || onSelectReferenceAsset
+                    ? "cursor-pointer hover:-translate-y-[1px] hover:border-[#f4ff00] hover:bg-[#f4ff00]/[0.075] hover:shadow-[0_0_20px_rgba(244,255,0,0.22),inset_0_0_16px_rgba(244,255,0,0.1)] active:translate-y-0"
+                    : "cursor-default",
                 )}
               >
                 <div className="flex shrink-0 -space-x-[7px]">
@@ -664,16 +655,16 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
                       reference.mime?.startsWith("video/") ? (
                         <div
                           key={reference.id}
-                          className="grid h-[34px] w-[34px] place-items-center rounded-[5px] bg-[#16181a] ring-2 ring-[#121314]"
+                          className="grid h-[30px] w-[30px] place-items-center rounded-[5px] bg-[#16181a] ring-2 ring-[#121314]"
                         >
-                          <Video className="h-[15px] w-[15px] text-white/80" />
+                          <Video className="h-[14px] w-[14px] text-white/80" />
                         </div>
                       ) : (
                         <img
                           key={reference.id}
                           src={reference.url}
                           alt=""
-                          className="h-[34px] w-[34px] rounded-[5px] object-cover ring-2 ring-[#121314]"
+                          className="h-[30px] w-[30px] rounded-[5px] object-cover ring-2 ring-[#121314]"
                         />
                       )
                     ))
@@ -683,23 +674,16 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
                         key={src}
                         src={src}
                         alt=""
-                        className="h-[34px] w-[34px] rounded-[5px] object-cover ring-2 ring-[#121314]"
+                        className="h-[30px] w-[30px] rounded-[5px] object-cover ring-2 ring-[#121314]"
                       />
                     ))
                   )}
                 </div>
-                <div className="min-w-0 flex-1 pr-[38px]">
-                  <div className="flex min-w-0 items-center gap-[6px]">
-                    <span className="standalone-reference-title truncate text-[13px] font-semibold leading-[18px] text-white">{resolvedReferenceTitle}</span>
-                    {referenceBadge && (
-                      <span className="shrink-0 rounded-full border border-white/10 bg-white/10 px-[5px] py-[1px] text-[10px] font-semibold leading-[12px] text-white/70">
-                        {referenceBadge}
-                      </span>
-                    )}
-                  </div>
-                  <p className="standalone-reference-hint mt-[2px] truncate text-[11px] leading-[15px] text-neutral-400">{resolvedReferenceHint}</p>
+                <div className="flex min-h-[34px] min-w-0 flex-1 flex-col justify-center pr-[40px]">
+                  <span className="standalone-reference-title truncate text-[13px] font-semibold leading-[16px] text-white">{resolvedReferenceTitle}</span>
+                  <p className="standalone-reference-hint mt-[1px] truncate text-[11px] leading-[14px] text-neutral-400">{resolvedReferenceHint}</p>
                 </div>
-                <span className="absolute right-[9px] top-[7px] text-[11px] font-semibold leading-[14px] text-white">
+                <span className="absolute right-[9px] top-1/2 -translate-y-1/2 text-[11px] font-semibold leading-[14px] text-white">
                   {references.length}/{maxReferences}
                 </span>
               </div>
@@ -1207,26 +1191,28 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
                     }}
                     onDrop={handleReferenceDrop}
                     className={clsx(
-                      "flex items-center gap-[12px] rounded-[8px] border border-[#f4ff00]/95 bg-[#f4ff00]/[0.08] px-[12px] py-[8px] shadow-[inset_0_-8px_24px_0_rgba(238,255,0,0.18),inset_0_2px_6px_0_rgba(238,255,0,0.18),inset_0_-4px_8px_0_rgba(238,255,0,0.3)] transition-all outline-none focus:ring-1 focus:ring-[#f4ff00]/70",
-                      onAddReferences || onReferenceFiles || onSelectReferenceAsset ? "cursor-pointer" : "cursor-default",
+                      "flex min-h-[48px] items-center gap-[9px] rounded-[9px] border border-[#f4ff00]/75 bg-[#f4ff00]/[0.055] px-[9px] py-[6px] shadow-[inset_0_0_14px_rgba(238,255,0,0.09)] transition-all duration-150 outline-none focus:ring-1 focus:ring-[#f4ff00]/70",
+                      onAddReferences || onReferenceFiles || onSelectReferenceAsset
+                        ? "cursor-pointer hover:-translate-y-[1px] hover:border-[#f4ff00] hover:bg-[#f4ff00]/[0.085] hover:shadow-[0_0_18px_rgba(238,255,0,0.2),inset_0_0_16px_rgba(238,255,0,0.1)] active:translate-y-0"
+                        : "cursor-default",
                     )}
                   >
-                    <div className="flex -space-x-[8px]">
+                    <div className="flex -space-x-[7px]">
                       {references.length > 0 ? (
                         references.slice(0, 3).map((reference) => (
                           reference.mime?.startsWith("video/") ? (
                             <div
                               key={reference.id}
-                              className="grid h-[40px] w-[40px] place-items-center rounded-[4px] bg-[#16181a] ring-2 ring-[#121314]"
+                              className="grid h-[32px] w-[32px] place-items-center rounded-[5px] bg-[#16181a] ring-2 ring-[#121314]"
                             >
-                              <Video className="h-[18px] w-[18px] text-white/80" />
+                              <Video className="h-[14px] w-[14px] text-white/80" />
                             </div>
                           ) : (
                             <img
                               key={reference.id}
                               src={reference.url}
                               alt=""
-                              className="h-[40px] w-[40px] rounded-[4px] object-cover ring-2 ring-[#121314]"
+                              className="h-[32px] w-[32px] rounded-[5px] object-cover ring-2 ring-[#121314]"
                             />
                           )
                         ))
@@ -1236,24 +1222,22 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
                             key={src}
                             src={src}
                             alt=""
-                            className="h-[40px] w-[40px] rounded-[4px] object-cover ring-2 ring-[#121314]"
+                            className="h-[32px] w-[32px] rounded-[5px] object-cover ring-2 ring-[#121314]"
                           />
                         ))
                       ) : referenceAcceptsVideo ? (
-                        <div className="grid h-[40px] w-[40px] place-items-center rounded-[4px] bg-[#16181a] ring-2 ring-[#121314]">
-                          <Video className="h-[18px] w-[18px] text-white/80" />
+                        <div className="grid h-[32px] w-[32px] place-items-center rounded-[5px] bg-[#16181a] ring-2 ring-[#121314]">
+                          <Video className="h-[14px] w-[14px] text-white/80" />
                         </div>
                       ) : (
-                        <div className="h-[40px] w-[40px] rounded-[4px] bg-white/[0.06] ring-2 ring-[#121314]" />
+                        <div className="h-[32px] w-[32px] rounded-[5px] bg-white/[0.06] ring-2 ring-[#121314]" />
                       )}
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex min-w-0 items-center gap-[8px]">
-                        <span className="standalone-reference-title truncate text-[14px] font-semibold leading-[20px] text-white">{resolvedReferenceTitle}</span>
-                      </div>
-                      <p className="standalone-reference-hint mt-[2px] truncate text-[12px] leading-[16px] text-neutral-400">{resolvedReferenceHint}</p>
+                    <div className="flex min-h-[34px] min-w-0 flex-1 flex-col justify-center">
+                      <span className="standalone-reference-title truncate text-[13px] font-semibold leading-[16px] text-white">{resolvedReferenceTitle}</span>
+                      <p className="standalone-reference-hint mt-[1px] truncate text-[11px] leading-[14px] text-neutral-400">{resolvedReferenceHint}</p>
                     </div>
-                    <span className="self-start text-[12px] leading-[16px] text-neutral-300">
+                    <span className="self-center text-[11px] font-semibold leading-[14px] text-white">
                       {references.length}/{maxReferences}
                     </span>
                   </div>
@@ -1858,6 +1842,7 @@ function VideoSwitch({ checked }: { checked: boolean }) {
 function VideoTextControlCard({ control }: { control: CreateVideoPanelTextControl }) {
   const rows = control.rows ?? 2;
   const compact = rows <= 2;
+  const singleLine = rows <= 1;
 
   return (
     <label
@@ -1867,18 +1852,27 @@ function VideoTextControlCard({ control }: { control: CreateVideoPanelTextContro
       )}
     >
       <span className="standalone-text-control-label text-[14px] font-semibold leading-[18px] text-white">{control.label}</span>
-      <textarea
-        value={control.value}
-        onChange={(event) => control.onChange(event.target.value)}
-        placeholder={control.placeholder}
-        rows={compact ? 1 : rows}
-        className={clsx(
-          "w-full resize-none rounded-[10px] border border-white/[0.06] bg-[#121314] text-white outline-none placeholder:text-neutral-500 focus:border-[#f4ff00]/50",
-          compact
-            ? "h-[40px] overflow-hidden px-[10px] py-[8px] text-[14px] leading-[20px]"
-            : "min-h-[82px] px-[10px] py-[8px] text-[14px] leading-[20px]",
-        )}
-      />
+      {singleLine ? (
+        <input
+          value={control.value}
+          onChange={(event) => control.onChange(event.target.value)}
+          placeholder={control.placeholder}
+          className="h-[40px] w-full rounded-[10px] border border-white/[0.06] bg-[#121314] px-[10px] text-[14px] leading-[40px] text-white outline-none placeholder:text-neutral-500 focus:border-[#f4ff00]/50"
+        />
+      ) : (
+        <textarea
+          value={control.value}
+          onChange={(event) => control.onChange(event.target.value)}
+          placeholder={control.placeholder}
+          rows={compact ? 1 : rows}
+          className={clsx(
+            "w-full resize-none rounded-[10px] border border-white/[0.06] bg-[#121314] text-white outline-none placeholder:text-neutral-500 focus:border-[#f4ff00]/50",
+            compact
+              ? "h-[40px] overflow-hidden px-[10px] py-[8px] text-[14px] leading-[20px]"
+              : "min-h-[82px] px-[10px] py-[8px] text-[14px] leading-[20px]",
+          )}
+        />
+      )}
     </label>
   );
 }

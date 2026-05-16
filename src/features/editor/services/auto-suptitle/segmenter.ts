@@ -120,6 +120,59 @@ function joinCaptionUnits(units: readonly string[]): string {
   return output.trim();
 }
 
+function captionTextLength(text: string): number {
+  return Array.from(text).length;
+}
+
+function unitLooksThai(unit: string): boolean {
+  return /[\u0E00-\u0E7F]/.test(unit);
+}
+
+const THAI_CONTEXT_JOINERS = new Set([
+  "และ",
+  "กับ",
+  "หรือ",
+  "แต่",
+  "ที่",
+  "ให้",
+  "ของ",
+  "ใน",
+  "จาก",
+  "โดย",
+  "เพื่อ",
+]);
+
+function thaiOverflowCarryCount(
+  units: readonly string[],
+  incomingUnit: string,
+  maxChars: number,
+): number {
+  if (units.length < 2) return 0;
+  if (!unitLooksThai(incomingUnit) && !units.some(unitLooksThai)) return 0;
+
+  const minCommittedChars = Math.min(12, Math.max(6, Math.floor(maxChars * 0.4)));
+  const maxNextChars = Math.max(maxChars, Math.ceil(maxChars * 1.15));
+
+  const canCarry = (count: number) => {
+    const committed = units.slice(0, units.length - count);
+    const carried = units.slice(units.length - count);
+    if (committed.length === 0 || carried.length === 0) return false;
+    const committedText = joinCaptionUnits(committed);
+    const nextText = joinCaptionUnits([...carried, incomingUnit]);
+    return (
+      captionTextLength(committedText) >= minCommittedChars &&
+      captionTextLength(nextText) <= maxNextChars
+    );
+  };
+
+  const tail = units[units.length - 1] ?? "";
+  if (THAI_CONTEXT_JOINERS.has(tail) && units.length >= 3 && canCarry(2)) {
+    return 2;
+  }
+
+  return canCarry(1) ? 1 : 0;
+}
+
 type IntlSegmentPart = { segment: string; isWordLike?: boolean };
 type IntlSegmenterCtor = new (
   locales?: string | string[],
@@ -467,21 +520,88 @@ function splitCueTextBySentenceLimits(
 
   for (const unit of units) {
     const nextText = joinCaptionUnits([...bucket, unit]);
-    if (bucket.length > 0 && Array.from(nextText).length > maxChars) {
-      flush();
+    if (bucket.length > 0 && captionTextLength(nextText) > maxChars) {
+      const carryCount = thaiOverflowCarryCount(bucket, unit, maxChars);
+      if (carryCount > 0) {
+        const carried = bucket.slice(bucket.length - carryCount);
+        bucket = bucket.slice(0, bucket.length - carryCount);
+        flush();
+        bucket = carried;
+      } else {
+        flush();
+      }
     }
 
     bucket.push(unit);
 
     const currentText = joinCaptionUnits(bucket);
     const endsClause = /[.!?;:…。！？]$/.test(unit);
-    if (bucket.length >= 2 && endsClause && Array.from(currentText).length >= 10) {
+    if (bucket.length >= 2 && endsClause && captionTextLength(currentText) >= 10) {
       flush();
     }
   }
 
   flush();
   return chunks;
+}
+
+function shouldMergeShortSentenceChunk(
+  current: string,
+  next: string | undefined,
+  algorithm: AutoSuptitleAlgorithmSettings,
+  language?: string | null,
+): boolean {
+  if (!next) return false;
+  if (/[.!?;:…。！？]$/.test(current)) return false;
+
+  const currentUnits = captionUnitsFromText(current, language);
+  const currentLength = captionTextLength(current);
+  const mergedLength = captionTextLength(joinCaptionUnits([current, next]));
+  const maxChars = Math.max(18, Math.floor(algorithm.maxCharsPerLine));
+  const hasAscii = /[A-Za-z]/.test(current);
+
+  return (
+    mergedLength <= maxChars &&
+    ((hasAscii && currentUnits.length <= 2 && currentLength <= 20) ||
+      (currentUnits.length <= 1 && currentLength <= 8))
+  );
+}
+
+function mergeOrphanSentenceChunks(
+  chunks: readonly string[],
+  algorithm: AutoSuptitleAlgorithmSettings,
+  language?: string | null,
+): string[] {
+  const merged: string[] = [];
+  const maxChars = Math.max(18, Math.floor(algorithm.maxCharsPerLine));
+
+  for (let index = 0; index < chunks.length; index += 1) {
+    const current = chunks[index];
+    const next = chunks[index + 1];
+    if (shouldMergeShortSentenceChunk(current, next, algorithm, language)) {
+      merged.push(joinCaptionUnits([current, next ?? ""]));
+      index += 1;
+      continue;
+    }
+
+    const previous = merged[merged.length - 1];
+    const currentUnits = captionUnitsFromText(current, language);
+    const currentLength = captionTextLength(current);
+    const canMergeBack =
+      previous &&
+      !/[.!?;:…。！？]$/.test(previous) &&
+      currentUnits.length <= 1 &&
+      currentLength <= 8 &&
+      captionTextLength(joinCaptionUnits([previous, current])) <= maxChars;
+
+    if (canMergeBack) {
+      merged[merged.length - 1] = joinCaptionUnits([previous, current]);
+    } else {
+      merged.push(current);
+    }
+  }
+
+  return merged;
 }
 
 function buildCuesFromSuggestedCueTexts(
@@ -501,13 +621,16 @@ function buildCuesFromSuggestedCueTexts(
   const safeCueTexts = suggestedCuesPreserveTranscript(cleanedCueTexts, transcriptText)
     ? cleanedCueTexts
     : [normalizeCaptionText(transcriptText ?? "")].filter(Boolean);
-  const cueTextChunks = isSentenceSegmentationMode(algorithm)
+  const rawCueTextChunks = isSentenceSegmentationMode(algorithm)
     ? safeCueTexts.flatMap((cueText) =>
         splitCueTextBySentenceLimits(cueText, algorithm, language),
       )
     : safeCueTexts.flatMap((cueText) =>
         splitCueTextByWordLimit(cueText, maxWordsPerCue, language),
       );
+  const cueTextChunks = isSentenceSegmentationMode(algorithm)
+    ? mergeOrphanSentenceChunks(rawCueTextChunks, algorithm, language)
+    : rawCueTextChunks;
   const estimated = estimateWordsFromSuggestedCues(cueTextChunks, timingWords, durationSec);
   if (estimated.length === 0) return [];
 
@@ -529,7 +652,7 @@ function buildCuesFromSuggestedCueTexts(
       ],
     };
   });
-  return holdCuesUntilNextSpeech(cues, algorithm);
+  return finalizeAutoSuptitleCues(holdCuesUntilNextSpeech(cues, algorithm));
 }
 
 export function formatAutoSuptitleCueText(
@@ -558,18 +681,54 @@ function holdCuesUntilNextSpeech(
     const speechEnd = Number.isFinite(lastWordEnd) ? lastWordEnd : cue.endTime;
     const holdLimit = speechEnd + maxHoldAfterSpeech;
     const nextStart = cues[index + 1]?.startTime;
-    const endTime =
+    const desiredEndTime =
       typeof nextStart === "number" &&
       Number.isFinite(nextStart) &&
       nextStart > cue.startTime
         ? Math.min(holdLimit, nextStart)
         : holdLimit;
+    const minEndTime =
+      typeof nextStart === "number" &&
+      Number.isFinite(nextStart) &&
+      nextStart > cue.startTime
+        ? Math.min(cue.startTime + minDuration, nextStart)
+        : cue.startTime + minDuration;
+    const endTime = Math.max(minEndTime, desiredEndTime);
 
     return {
       ...cue,
-      endTime: Math.max(cue.startTime + minDuration, endTime),
+      endTime,
     };
   });
+}
+
+function removeCueOverlaps(cues: readonly AutoSuptitleCue[]): AutoSuptitleCue[] {
+  return cues.flatMap((cue, index) => {
+    const nextStart = cues[index + 1]?.startTime;
+    const endTime =
+      typeof nextStart === "number" &&
+      Number.isFinite(nextStart) &&
+      nextStart > cue.startTime
+        ? Math.min(cue.endTime, nextStart)
+        : cue.endTime;
+
+    if (endTime <= cue.startTime + 0.01) return [];
+
+    const words = cue.words
+      .map((word) => {
+        const start = Math.max(cue.startTime, word.start);
+        const end = Math.min(endTime, word.end);
+        if (end <= start) return null;
+        return { ...word, start, end };
+      })
+      .filter(Boolean) as AutoSuptitleCue["words"];
+
+    return [{ ...cue, endTime, words }];
+  });
+}
+
+function finalizeAutoSuptitleCues(cues: AutoSuptitleCue[]): AutoSuptitleCue[] {
+  return removeCueOverlaps(cues);
 }
 
 export function buildAutoSuptitleCues(
@@ -631,7 +790,23 @@ export function buildAutoSuptitleCues(
         charLimitReached ||
         silenceLimitReached
       ) {
-        flush();
+        if ((charLimitReached || cueLineLimitReached) && !silenceLimitReached) {
+          const carryCount = thaiOverflowCarryCount(
+            bucket.map((item) => item.word),
+            word.word,
+            maxChars,
+          );
+          if (carryCount > 0) {
+            const carried = bucket.slice(bucket.length - carryCount);
+            bucket = bucket.slice(0, bucket.length - carryCount);
+            flush();
+            bucket = carried;
+          } else {
+            flush();
+          }
+        } else {
+          flush();
+        }
       }
     }
 
@@ -647,7 +822,7 @@ export function buildAutoSuptitleCues(
   }
 
   flush();
-  return holdCuesUntilNextSpeech(cues, algorithm);
+  return finalizeAutoSuptitleCues(holdCuesUntilNextSpeech(cues, algorithm));
 }
 
 export function buildAutoSuptitleCuesFromResponse(
@@ -745,7 +920,7 @@ export function normalizeAutoSuptitleCuesForDuration(
     return millisOverlap > secondsOverlap ? 0.001 : 1;
   })();
 
-  return cues.flatMap((cue) => {
+  const normalizedCues = cues.flatMap((cue) => {
     let startTime = cue.startTime * scale;
     let endTime = cue.endTime * scale;
     if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) return [];
@@ -779,4 +954,6 @@ export function normalizeAutoSuptitleCuesForDuration(
 
     return [{ ...cue, startTime, endTime, words }];
   });
+
+  return removeCueOverlaps(normalizedCues);
 }

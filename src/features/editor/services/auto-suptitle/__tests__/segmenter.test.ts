@@ -149,6 +149,66 @@ describe("Auto Suptitle segmenter", () => {
     expect(Math.max(...cues.map((cue) => cue.text.length))).toBeLessThanOrEqual(34);
   });
 
+  it("carries the previous Thai phrase unit when a long cue overflows", () => {
+    const cues = buildAutoSuptitleCuesFromResponse(
+      {
+        language: "thai",
+        duration: 3,
+        text: "วันนี้เป็นวันที่อากาศดีมาก",
+        suggested_cues: ["วันนี้เป็นวันที่อากาศดีมาก"],
+        words: [
+          { word: "วัน", start: 0, end: 0.18 },
+          { word: "นี้", start: 0.18, end: 0.32 },
+          { word: "เป็น", start: 0.32, end: 0.55 },
+          { word: "วัน", start: 0.55, end: 0.72 },
+          { word: "ที่", start: 0.72, end: 0.86 },
+          { word: "อากาศ", start: 0.86, end: 1.25 },
+          { word: "ดี", start: 1.25, end: 1.48 },
+          { word: "มาก", start: 1.48, end: 1.8 },
+        ],
+      },
+      0,
+      { ...DEFAULT_CAPTION_SETTINGS, case: "normal" },
+      {
+        ...DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+        segmentationMode: "sentence",
+        maxCharsPerLine: 21,
+        maxLineDuration: 3,
+        maxSilenceGap: 0.75,
+      },
+      "th",
+    );
+
+    expect(cues.map((cue) => cue.text)).toEqual(["วันนี้เป็นวันที่", "อากาศดีมาก"]);
+  });
+
+  it("carries the previous Thai phrase unit when word split overflows", () => {
+    const cues = buildAutoSuptitleCues(
+      [
+        { word: "วัน", start: 0, end: 0.18 },
+        { word: "นี้", start: 0.18, end: 0.32 },
+        { word: "เป็น", start: 0.32, end: 0.55 },
+        { word: "วัน", start: 0.55, end: 0.72 },
+        { word: "ที่", start: 0.72, end: 0.86 },
+        { word: "อากาศ", start: 0.86, end: 1.25 },
+        { word: "ดี", start: 1.25, end: 1.48 },
+        { word: "มาก", start: 1.48, end: 1.8 },
+      ],
+      0,
+      { ...DEFAULT_CAPTION_SETTINGS, case: "normal" },
+      {
+        ...DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+        wordsPerLine: 6,
+        maxLinesPerCue: 1,
+        maxCharsPerLine: 100,
+        maxLineDuration: 3,
+        splitOnPunctuation: false,
+      },
+    );
+
+    expect(cues.map((cue) => cue.text)).toEqual(["วันนี้เป็นวันที่", "อากาศดีมาก"]);
+  });
+
   it("falls back to transcript text when GPT cue chunks omit English loanwords", () => {
     const cues = buildAutoSuptitleCuesFromResponse(
       {
@@ -185,6 +245,65 @@ describe("Auto Suptitle segmenter", () => {
     expect(joined).toContain("CONTROL");
     expect(joined).toContain("MEDIAPOD");
     expect(joined).not.toContain("ระบบควบคุม");
+  });
+
+  it("merges a short English lead token into the next Thai phrase in sentence mode", () => {
+    const cues = buildAutoSuptitleCuesFromResponse(
+      {
+        language: "thai",
+        duration: 4,
+        text: "AI ก็จะถ่ายทอดท่าทาง จังหวะ และแอ็กชั่น",
+        suggested_cues: ["AI", "ก็จะถ่ายทอด", "ท่าทาง จังหวะ และแอ็กชั่น"],
+        words: [
+          { word: "AI", start: 0, end: 0.25 },
+          { word: "ก็", start: 0.25, end: 0.35 },
+          { word: "จะ", start: 0.35, end: 0.5 },
+          { word: "ถ่ายทอด", start: 0.5, end: 0.95 },
+          { word: "ท่าทาง", start: 0.95, end: 1.35 },
+          { word: "จังหวะ", start: 1.35, end: 1.75 },
+          { word: "และ", start: 1.75, end: 1.95 },
+          { word: "แอ็กชั่น", start: 1.95, end: 2.45 },
+        ],
+      },
+      0,
+      DEFAULT_CAPTION_SETTINGS,
+      {
+        ...DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+        segmentationMode: "sentence",
+        maxCharsPerLine: 34,
+        maxLineDuration: 2.4,
+        maxSilenceGap: 0.45,
+      },
+      "th",
+    );
+
+    expect(cues[0].text).toBe("AI ก็จะถ่ายทอด");
+    expect(cues[1].text.replace(/\s+/g, "")).toBe("ท่าทางจังหวะและแอ็กชั่น");
+    for (let index = 0; index < cues.length - 1; index += 1) {
+      expect(cues[index].endTime).toBeLessThanOrEqual(cues[index + 1].startTime);
+    }
+  });
+
+  it("never extends a subtitle cue over the next generated cue", () => {
+    const cues = buildAutoSuptitleCues(
+      [
+        { word: "AI", start: 0, end: 0.08 },
+        { word: "continues", start: 0.12, end: 0.45 },
+      ],
+      0,
+      DEFAULT_CAPTION_SETTINGS,
+      {
+        ...DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+        wordsPerLine: 1,
+        maxLinesPerCue: 1,
+        minLineDuration: 0.45,
+        maxHoldAfterSpeech: 0.5,
+      },
+    );
+
+    expect(cues).toHaveLength(2);
+    expect(cues[0].text).toBe("AI");
+    expect(cues[0].endTime).toBeLessThanOrEqual(cues[1].startTime);
   });
 
   it("uses Thai segment text instead of broken word-level tokens", () => {

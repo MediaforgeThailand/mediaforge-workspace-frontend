@@ -3644,16 +3644,16 @@ const EmptyState = ({
   hint: string;
   cta?: { label: string; onClick: () => void };
 }) => (
-  <div className="rounded-2xl bg-white/[0.02] px-5 py-12 text-center md:px-10 md:py-16">
+  <div className="rounded-[18px] bg-white/[0.02] px-5 py-10 text-center md:px-8 md:py-12">
     <div className="text-[16.5px] font-semibold text-zinc-200">{title}</div>
     <p className="mt-2 text-[15.5px] text-zinc-500">{hint}</p>
     {cta && (
       <button
         type="button"
         onClick={cta.onClick}
-        className="mt-5 inline-flex min-h-11 items-center gap-1.5 rounded-md bg-white/[0.08] px-4 text-[13.5px] font-medium text-zinc-100 transition-colors hover:bg-white/[0.12] lg:min-h-0 lg:py-1.5"
+        className="mt-4 inline-flex h-7 items-center justify-center gap-1.5 rounded-[9px] bg-white/[0.08] px-2.5 text-[12px] font-semibold leading-none text-zinc-100 transition-colors hover:bg-white/[0.12]"
       >
-        <Plus className="h-3.5 w-3.5" />
+        <Plus className="h-3 w-3 shrink-0" />
         {cta.label}
       </button>
     )}
