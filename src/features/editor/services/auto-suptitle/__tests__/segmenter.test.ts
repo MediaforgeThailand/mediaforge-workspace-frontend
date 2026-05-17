@@ -763,6 +763,99 @@ describe("Auto Suptitle segmenter", () => {
     expect(cues[0].endTime).toBeCloseTo(cues[1].startTime);
   });
 
+  it("fills spoken timing words that GPT-planned sentence cues skipped", () => {
+    const timingWords = [
+      { word: "Motion", start: 0, end: 0.28 },
+      { word: "Control", start: 0.28, end: 0.62 },
+      { word: "ช่วย", start: 0.72, end: 0.95 },
+      { word: "เปลี่ยน", start: 0.95, end: 1.18 },
+      { word: "ภาพ", start: 1.18, end: 1.38 },
+      { word: "นิ่ง", start: 1.38, end: 1.62 },
+      { word: "ให้", start: 1.62, end: 1.84 },
+      { word: "เป็น", start: 1.84, end: 2.05 },
+      { word: "วิดีโอ", start: 2.05, end: 2.46 },
+      { word: "แล้ว", start: 2.7, end: 2.92 },
+      { word: "ก็", start: 2.92, end: 3.08 },
+      { word: "ถ่ายทอด", start: 3.08, end: 3.48 },
+      { word: "ท่าทาง", start: 3.48, end: 3.86 },
+    ];
+    const cues = buildAutoSuptitleCuesFromResponse(
+      {
+        language: "thai",
+        duration: 4,
+        text: "Motion Control ช่วยเปลี่ยนภาพนิ่งให้เป็นวิดีโอแล้วก็ถ่ายทอดท่าทาง",
+        suggested_cues: [
+          "Motion Control",
+          "ช่วยเปลี่ยนภาพนิ่ง",
+          "แล้วก็ถ่ายทอดท่าทาง",
+        ],
+        words: timingWords,
+      },
+      0,
+      { ...DEFAULT_CAPTION_SETTINGS, case: "normal" },
+      {
+        ...DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+        segmentationMode: "sentence",
+        maxCharsPerLine: 36,
+        maxLineDuration: 2.6,
+        maxSilenceGap: 0.45,
+        maxHoldAfterSpeech: 0.5,
+      },
+      "th",
+    );
+
+    const joined = cues.map((cue) => cue.text).join(" ").replace(/\s+/g, "");
+    expect(joined).toContain("ให้เป็นวิดีโอ");
+    for (let index = 0; index < cues.length - 1; index += 1) {
+      const current = cues[index];
+      const next = cues[index + 1];
+      const spokenWordsInGap = timingWords.filter((word) => {
+        const midpoint = (word.start + word.end) / 2;
+        return midpoint > current.endTime + 0.01 && midpoint < next.startTime - 0.01;
+      });
+      expect(spokenWordsInGap).toHaveLength(0);
+    }
+  });
+
+  it("anchors mismatched GPT-planned sentence cues to real timing words", () => {
+    const cues = buildAutoSuptitleCuesFromResponse(
+      {
+        language: "thai",
+        duration: 15,
+        text: "new video immediately pass Mediafrost Workspace ok",
+        suggested_cues: [
+          "new video immediately",
+          "pass Mediafrost Workspace ok",
+        ],
+        words: [
+          { word: "new", start: 11.1, end: 11.5 },
+          { word: "video", start: 11.5, end: 11.9 },
+          { word: "immediately", start: 11.9, end: 12.35 },
+          { word: "pass", start: 12.94, end: 13.26 },
+          { word: "Media", start: 13.26, end: 13.58 },
+          { word: "Pods", start: 13.58, end: 14.04 },
+          { word: "Work", start: 14.04, end: 14.2 },
+          { word: "space", start: 14.2, end: 14.46 },
+          { word: "ok", start: 14.8, end: 14.9 },
+        ],
+      },
+      0,
+      { ...DEFAULT_CAPTION_SETTINGS, case: "normal" },
+      {
+        ...DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+        segmentationMode: "sentence",
+        maxCharsPerLine: 80,
+        maxLineDuration: 3,
+        maxHoldAfterSpeech: 0.5,
+      },
+      "th",
+    );
+
+    const passCue = cues.find((cue) => cue.text.includes("pass Mediafrost"));
+    expect(passCue?.startTime).toBeCloseTo(12.94);
+    expect(passCue?.endTime).toBeGreaterThan(14.4);
+  });
+
   it("does not force subtitle cues to bridge short dead air", () => {
     const cues = buildAutoSuptitleCues(
       [

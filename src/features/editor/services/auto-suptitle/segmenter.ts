@@ -630,14 +630,45 @@ function nearestCueEndWord(
   return words[index];
 }
 
+type SuggestedCueTimingMatch = AutoSuptitleWhisperWord & {
+  matchKind: "exact" | "partial";
+};
+
+function cueAnchorMinLength(text: string): number {
+  return Math.min(text.length, 4);
+}
+
+function findCueEdgeMatch(
+  comparableCue: string,
+  timingText: string,
+  cursor: number,
+  edge: "prefix" | "suffix",
+): { index: number; length: number } | null {
+  const maxLength = Math.min(24, comparableCue.length);
+  const minLength = cueAnchorMinLength(comparableCue);
+
+  for (let length = maxLength; length >= minLength; length -= 1) {
+    const fragment =
+      edge === "prefix"
+        ? comparableCue.slice(0, length)
+        : comparableCue.slice(comparableCue.length - length);
+    if (!fragment) continue;
+
+    const index = timingText.indexOf(fragment, cursor);
+    if (index >= 0) return { index, length };
+  }
+
+  return null;
+}
+
 function alignSuggestedCueTextsToTimingWords(
   cueTexts: readonly string[],
   timingWords: AutoSuptitleWhisperWord[],
-): Array<AutoSuptitleWhisperWord | null> {
+): Array<SuggestedCueTimingMatch | null> {
   const timingIndex = timingTextIndexFromWords(timingWords);
   if (!timingIndex.text || timingIndex.words.length === 0) return [];
 
-  const aligned: Array<AutoSuptitleWhisperWord | null> = [];
+  const aligned: Array<SuggestedCueTimingMatch | null> = [];
   let cursor = 0;
   let matchedCount = 0;
 
@@ -650,11 +681,35 @@ function alignSuggestedCueTextsToTimingWords(
 
     let matchIndex = timingIndex.text.indexOf(comparableCue, cursor);
     let matchLength = comparableCue.length;
+    let endCharIndex = matchIndex + Math.max(1, matchLength) - 1;
+    let matchKind: SuggestedCueTimingMatch["matchKind"] = "exact";
 
     if (matchIndex < 0 && comparableCue.length >= 8) {
       const prefix = comparableCue.slice(0, Math.min(12, comparableCue.length));
       matchIndex = timingIndex.text.indexOf(prefix, cursor);
       matchLength = prefix.length;
+      endCharIndex = matchIndex + Math.max(1, matchLength) - 1;
+      matchKind = "partial";
+    }
+
+    if (matchIndex < 0) {
+      const prefixMatch = findCueEdgeMatch(comparableCue, timingIndex.text, cursor, "prefix");
+      if (prefixMatch) {
+        matchIndex = prefixMatch.index;
+        matchLength = prefixMatch.length;
+        endCharIndex = matchIndex + Math.max(1, matchLength) - 1;
+        matchKind = "partial";
+
+        const suffixMatch = findCueEdgeMatch(
+          comparableCue,
+          timingIndex.text,
+          matchIndex + matchLength,
+          "suffix",
+        );
+        if (suffixMatch) {
+          endCharIndex = suffixMatch.index + Math.max(1, suffixMatch.length) - 1;
+        }
+      }
     }
 
     if (matchIndex < 0) {
@@ -663,11 +718,11 @@ function alignSuggestedCueTextsToTimingWords(
     }
 
     const startWordIndex = timingIndex.charToWordIndex[matchIndex];
-    const endCharIndex = Math.min(
+    const safeEndCharIndex = Math.min(
       timingIndex.charToWordIndex.length - 1,
-      matchIndex + Math.max(1, matchLength) - 1,
+      endCharIndex,
     );
-    const endWordIndex = timingIndex.charToWordIndex[endCharIndex] ?? startWordIndex;
+    const endWordIndex = timingIndex.charToWordIndex[safeEndCharIndex] ?? startWordIndex;
     const startWord = nearestCueStartWord(timingIndex.words, startWordIndex);
     const endWord = nearestCueEndWord(timingIndex.words, endWordIndex) ?? startWord;
 
@@ -675,8 +730,9 @@ function alignSuggestedCueTextsToTimingWords(
       word: cueText,
       start: startWord.start,
       end: Math.max(startWord.start + 0.05, endWord.end),
+      matchKind,
     });
-    cursor = Math.max(cursor, matchIndex + Math.max(1, matchLength));
+    cursor = Math.max(cursor, safeEndCharIndex + 1);
     matchedCount += 1;
   }
 
@@ -751,6 +807,164 @@ function estimateWordsFromSuggestedCues(
       end: index * 0.8 + 0.5,
     }),
   );
+}
+
+function absoluteNormalizedTimingWords(
+  timingWords: AutoSuptitleWhisperWord[],
+  clipStartTime: number,
+): AutoSuptitleWhisperWord[] {
+  return timingWords
+    .map(normalizeWord)
+    .filter(Boolean)
+    .map((word) => word as AutoSuptitleWhisperWord)
+    .map((word) => ({
+      word: word.word,
+      start: clipStartTime + word.start,
+      end: clipStartTime + word.end,
+    }));
+}
+
+function timingWordsInCueGap(
+  timingWords: readonly AutoSuptitleWhisperWord[],
+  gapStart: number,
+  gapEnd: number,
+): AutoSuptitleWhisperWord[] {
+  const edgePad = 0.01;
+  return timingWords.filter((word) => {
+    const midpoint = (word.start + word.end) / 2;
+    return midpoint > gapStart + edgePad && midpoint < gapEnd - edgePad;
+  });
+}
+
+function extendCueEndFromGapWords(
+  cue: AutoSuptitleCue,
+  gapWords: readonly AutoSuptitleWhisperWord[],
+  nextStart: number,
+  algorithm: AutoSuptitleAlgorithmSettings,
+): AutoSuptitleCue {
+  const lastGapWord = gapWords[gapWords.length - 1];
+  if (!lastGapWord) return cue;
+
+  const heldEnd = lastGapWord.end + Math.max(0, algorithm.maxHoldAfterSpeech);
+  const endTime = Math.min(nextStart, Math.max(cue.endTime, heldEnd));
+  const words = cue.words.map((word, index) =>
+    index === cue.words.length - 1
+      ? { ...word, end: Math.max(word.end, lastGapWord.end) }
+      : word,
+  );
+  return { ...cue, endTime, words };
+}
+
+function shiftCueStartFromGapWords(
+  cue: AutoSuptitleCue,
+  gapWords: readonly AutoSuptitleWhisperWord[],
+): AutoSuptitleCue {
+  const firstGapWord = gapWords[0];
+  if (!firstGapWord) return cue;
+
+  const startTime = Math.min(cue.startTime, firstGapWord.start);
+  const words = cue.words.map((word, index) =>
+    index === 0 ? { ...word, start: Math.min(word.start, startTime) } : word,
+  );
+  return { ...cue, startTime, words };
+}
+
+function buildGapCueFromTimingWords(
+  gapWords: readonly AutoSuptitleWhisperWord[],
+  nextStart: number,
+  settings: CaptionStyleSettings,
+  algorithm: AutoSuptitleAlgorithmSettings,
+): AutoSuptitleCue | null {
+  const firstGapWord = gapWords[0];
+  const lastGapWord = gapWords[gapWords.length - 1];
+  if (!firstGapWord || !lastGapWord) return null;
+
+  const text = normalizeCaptionSpacing(joinCaptionUnits(gapWords.map((word) => word.word)));
+  if (!text) return null;
+
+  const minDuration = Math.max(0.05, algorithm.minLineDuration);
+  const startTime = firstGapWord.start;
+  const speechEnd = Math.max(startTime + 0.05, lastGapWord.end);
+  const endTime = Math.min(
+    nextStart,
+    Math.max(startTime + minDuration, speechEnd + Math.max(0, algorithm.maxHoldAfterSpeech)),
+  );
+  if (endTime <= startTime + 0.01) return null;
+
+  return {
+    text: applyCaptionCase(text, settings.case),
+    startTime,
+    endTime,
+    words: [
+      {
+        text,
+        start: startTime,
+        end: speechEnd,
+      },
+    ],
+  };
+}
+
+function fillSpokenGapsBetweenSuggestedCues(
+  cues: AutoSuptitleCue[],
+  timingWords: AutoSuptitleWhisperWord[],
+  clipStartTime: number,
+  settings: CaptionStyleSettings,
+  algorithm: AutoSuptitleAlgorithmSettings,
+): AutoSuptitleCue[] {
+  if (cues.length < 2 || timingWords.length === 0) return cues;
+
+  const absoluteWords = absoluteNormalizedTimingWords(timingWords, clipStartTime);
+  if (absoluteWords.length === 0) return cues;
+
+  const filled: AutoSuptitleCue[] = [];
+  const working = cues.map((cue) => ({
+    ...cue,
+    words: cue.words.map((word) => ({ ...word })),
+  }));
+
+  for (let index = 0; index < working.length; index += 1) {
+    const cue = working[index];
+    const nextCue = working[index + 1];
+    filled.push(cue);
+    if (!nextCue) continue;
+
+    const cueSpeechEnd = cue.words.reduce(
+      (max, word) => Math.max(max, word.end),
+      Number.NEGATIVE_INFINITY,
+    );
+    const gapStart = Number.isFinite(cueSpeechEnd) ? cueSpeechEnd : cue.endTime;
+    const gapEnd = nextCue.startTime;
+    if (gapEnd - gapStart <= 0.06) continue;
+
+    const gapWords = timingWordsInCueGap(absoluteWords, gapStart, gapEnd);
+    if (gapWords.length === 0) continue;
+
+    const gapText = normalizeCaptionSpacing(joinCaptionUnits(gapWords.map((word) => word.word)));
+    const comparableGapText = comparableCaptionText(gapText);
+    if (!comparableGapText) continue;
+
+    const comparableCurrent = comparableCaptionText(cue.text);
+    const comparableNext = comparableCaptionText(nextCue.text);
+
+    if (comparableCurrent.includes(comparableGapText)) {
+      const extendedCue = extendCueEndFromGapWords(cue, gapWords, nextCue.startTime, algorithm);
+      filled[filled.length - 1] = extendedCue;
+      working[index] = extendedCue;
+      continue;
+    }
+
+    if (comparableNext.startsWith(comparableGapText)) {
+      const shiftedNextCue = shiftCueStartFromGapWords(nextCue, gapWords);
+      working[index + 1] = shiftedNextCue;
+      continue;
+    }
+
+    const gapCue = buildGapCueFromTimingWords(gapWords, nextCue.startTime, settings, algorithm);
+    if (gapCue) filled.push(gapCue);
+  }
+
+  return filled;
 }
 
 function splitCueTextByWordLimit(
@@ -1016,7 +1230,15 @@ function buildCuesFromSuggestedCueTexts(
       ],
     };
   });
-  return finalizeAutoSuptitleCues(holdCuesUntilNextSpeech(cues, algorithm));
+  const heldCues = holdCuesUntilNextSpeech(cues, algorithm);
+  const gapFilledCues = fillSpokenGapsBetweenSuggestedCues(
+    heldCues,
+    timingWords,
+    clipStartTime,
+    settings,
+    algorithm,
+  );
+  return finalizeAutoSuptitleCues(gapFilledCues);
 }
 
 export function formatAutoSuptitleCueText(
@@ -1038,6 +1260,7 @@ function holdCuesUntilNextSpeech(
 ): AutoSuptitleCue[] {
   const minDuration = Math.max(0.05, algorithm.minLineDuration);
   const maxHoldAfterSpeech = Math.max(0, algorithm.maxHoldAfterSpeech);
+  const bridgeTinyGap = 0.2;
 
   return cues.map((cue, index) => {
     const lastWordEnd = cue.words.reduce(
@@ -1054,10 +1277,14 @@ function holdCuesUntilNextSpeech(
     const desiredEndTime = hasNextCue
       ? Math.min(holdLimit, nextStart)
       : holdLimit;
+    const bridgedEndTime =
+      hasNextCue && nextStart - desiredEndTime <= bridgeTinyGap
+        ? nextStart
+        : desiredEndTime;
     const minEndTime = hasNextCue
       ? Math.min(cue.startTime + minDuration, nextStart)
       : cue.startTime + minDuration;
-    const endTime = Math.max(minEndTime, desiredEndTime);
+    const endTime = Math.max(minEndTime, bridgedEndTime);
 
     return {
       ...cue,
