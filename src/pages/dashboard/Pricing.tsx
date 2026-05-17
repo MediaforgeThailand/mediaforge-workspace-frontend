@@ -154,7 +154,7 @@ const TEAM_PROMO_CREDITS_PER_SEAT_MONTH = 25_000;
 const TEAM_CREDITS_PER_SEAT_MONTH = TEAM_BASE_CREDITS_PER_SEAT_MONTH + TEAM_PROMO_CREDITS_PER_SEAT_MONTH;
 const TEAM_MIN_SEATS = 2;
 const TEAM_MAX_SEATS = 500;
-const FREE_PLAN_CREDITS = 1_000;
+const FREE_PLAN_CREDITS = 500;
 const FREE_PLAN: SubscriptionPlan = {
   id: "free-plan",
   name: "Free",
@@ -512,7 +512,7 @@ const PlanCard = ({ plan, cycle, ctaLabel, isCurrent, submitting, onSubscribe, t
   const displayPlanName = plan.name === "Team" ? i18n("pricing.plan.team.name") : plan.name;
   const subtitleKey = PLAN_SUBTITLE_KEYS[plan.name as PlanName];
   const subtitle = isFree
-    ? "1,000 credits/month. Image, video and upscale are locked."
+    ? "500 starter credits/month. All workspace generators are available."
     : subtitleKey ? i18n(subtitleKey) : "";
 
   // Price calculation:
@@ -735,7 +735,7 @@ const PlanCard = ({ plan, cycle, ctaLabel, isCurrent, submitting, onSubscribe, t
 
       {isFree ? (
         <div className="mt-[2px] rounded-xl border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-[11.5px] font-semibold leading-[15px] text-amber-100">
-          Image, video and upscale require Starter or higher.
+          All workspace generators are available. Credits apply per run.
         </div>
       ) : (
         <div className="mt-[2px] flex flex-col gap-[2px]">

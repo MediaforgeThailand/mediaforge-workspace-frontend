@@ -60,11 +60,11 @@ interface CreditCostSummaryRow {
 }
 
 const DEFAULT_WORKSPACE_MULTIPLIER = 1.4;
-const FREE_PLAN_CREDITS = 1_000;
+const FREE_PLAN_CREDITS = 500;
 const PLAN_ORDER = ["Free", "Starter", "Creator", "Pro"] as const;
 const PLAN_COPY: Record<"en" | "th", Record<(typeof PLAN_ORDER)[number], string>> = {
   en: {
-    Free: "Utility tools for getting started. Creative generation unlocks on paid plans.",
+    Free: "500 starter credits for getting started. Add credits or upgrade when you need more capacity.",
     Starter: "Daily prompts, audio and light generation for a practical start.",
     Creator: "More room for image, video, translate and subtitle workflows.",
     Pro: "Best value for heavier production and faster iteration.",
