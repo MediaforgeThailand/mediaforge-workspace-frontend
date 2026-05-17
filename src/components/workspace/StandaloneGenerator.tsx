@@ -4172,7 +4172,7 @@ export default function StandaloneGenerator({
       </div>
 
       <div className="ws-scroll-hide flex min-h-0 flex-1 flex-col overflow-y-auto bg-[var(--bg-app)] lg:flex-row lg:overflow-hidden">
-        <aside className="ws-scroll-hide mx-auto flex min-h-dvh w-full max-w-[480px] shrink-0 flex-col bg-transparent px-[12px] pb-[12px] pt-[4px] lg:mx-0 lg:h-full lg:min-h-0 lg:w-[488px] lg:max-w-none lg:pb-0 lg:pl-2 lg:pr-0 lg:pt-0">
+        <aside className="ws-scroll-hide mx-auto flex min-h-dvh w-full max-w-[480px] shrink-0 flex-col bg-transparent px-[12px] pb-[12px] pt-[4px] lg:mx-0 lg:h-full lg:min-h-0 lg:w-[488px] lg:max-w-none lg:pb-0 lg:pl-2 lg:pr-0 lg:pt-4">
           {STANDALONE_TOOL_ORDER.includes(activeTool) ? (
             activeTool === "auto_subtitle" ? (
             <AutoSubtitlePanelV2
@@ -4518,7 +4518,7 @@ export default function StandaloneGenerator({
           )}
         </aside>
 
-        <main className="ws-scroll-hide min-h-0 flex-1 overflow-visible bg-[var(--bg-app)] px-3 pb-3 pt-3 md:px-4 lg:overflow-hidden lg:pb-0 lg:pl-2 lg:pr-3 lg:pt-0">
+        <main className="ws-scroll-hide min-h-0 flex-1 overflow-visible bg-[var(--bg-app)] px-3 pb-3 pt-3 md:px-4 lg:overflow-hidden lg:pb-0 lg:pl-2 lg:pr-3 lg:pt-4">
           <section className="flex min-h-[560px] flex-1 flex-col overflow-hidden rounded-[20px] bg-[var(--bg-sidebar)] shadow-[inset_0_1px_0_rgba(255,255,255,.035),0_22px_50px_-38px_rgba(238,255,0,.45)] lg:h-full lg:min-h-0">
             <div className="ws-scroll-hide min-h-0 flex-1 overflow-y-auto px-3 py-3">
               {activeTool === "auto_subtitle" ? (
@@ -9204,8 +9204,8 @@ function CreationFeed({
 
   return (
     <>
-      <div className="mb-3 flex min-h-8 items-center justify-start">
-        <div className="inline-flex items-center gap-1 rounded-[10px] bg-[#1b1b1b]/95 p-1 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]">
+      <div className="mb-2 flex min-h-0 items-center justify-start">
+        <div className="inline-flex h-6 items-center gap-[1px] rounded-[7px] bg-[#1b1b1b]/95 p-[2px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]">
           {viewModes.map((mode) => {
             const active = layoutMode === mode.id;
             const Icon = mode.icon;
@@ -9218,13 +9218,13 @@ function CreationFeed({
                 title={mode.label}
                 onClick={() => setLayoutMode(mode.id)}
                 className={cn(
-                  "grid h-7 w-8 place-items-center rounded-[8px] text-zinc-400 transition",
+                  "grid h-[18px] w-[18px] place-items-center rounded-[4px] text-zinc-400 transition",
                   active
                     ? "bg-white text-zinc-950 shadow-[0_8px_18px_rgba(0,0,0,0.24)]"
                     : "hover:bg-white/[0.07] hover:text-white",
                 )}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-[11px] w-[11px]" />
               </button>
             );
           })}
