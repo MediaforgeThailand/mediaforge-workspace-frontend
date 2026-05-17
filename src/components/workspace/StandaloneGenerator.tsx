@@ -7800,17 +7800,18 @@ function VoiceControls({
 }) {
   const { t } = useLanguage();
   return (
-    <>
+    <div className="flex flex-col gap-[7px]">
       <PromptBox
         label={t("workspace.standalone.script")}
         placeholder={t("workspace.standalone.script_placeholder")}
         value={form.script}
         onChange={(script) => onChange({ script })}
-        minRows={7}
+        minRows={5}
         maxLength={5000}
+        compact
       />
       <VoiceSettingsControls form={form} onChange={onChange} />
-    </>
+    </div>
   );
 }
 
@@ -7888,7 +7889,7 @@ function VoiceSettingsControls({
   }, [provider]);
 
   return (
-    <>
+    <div className="flex flex-col gap-[6px]">
       {provider === "elevenlabs" && (
         // ElevenLabs: live grid of the user's account voices. No
         // hardcoded preset catalog — what's in the API is what we show.
@@ -7921,7 +7922,7 @@ function VoiceSettingsControls({
             </div>
           )}
           {elevenVoices && elevenVoices.length > 0 && (
-            <div className="standalone-voice-controls ws-scroll-hide mt-[6px] grid max-h-[122px] grid-cols-2 gap-[5px] overflow-y-auto pr-0.5">
+            <div className="standalone-voice-controls ws-scroll-hide mt-[5px] grid max-h-[98px] grid-cols-3 gap-[4px] overflow-y-auto pr-0.5">
               {elevenVoices.map((voice) => {
                 const active = voice.id === form.voice;
                 return (
@@ -7930,14 +7931,14 @@ function VoiceSettingsControls({
                     type="button"
                     onClick={() => onChange({ voice: voice.id })}
                     className={cn(
-                      "standalone-voice-card flex min-h-[42px] flex-col items-start justify-between rounded-[10px] border border-dashed px-[8px] py-[5px] text-left transition",
+                      "standalone-voice-card flex min-h-[34px] flex-col items-start justify-between rounded-[9px] border border-dashed px-[6px] py-[4px] text-left transition",
                       active
                         ? "border-amber-300/50 bg-amber-300/10"
                         : "border-white/[0.12] bg-[#242424] hover:bg-[#2d2d2d]",
                     )}
                   >
                     <span
-                      className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"
+                      className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full text-[9px] font-bold text-white"
                       style={{
                         background:
                           TINT_PALETTE[voice.tint] ?? TINT_PALETTE.zinc,
@@ -7946,10 +7947,10 @@ function VoiceSettingsControls({
                       {voice.name.charAt(0)}
                     </span>
                     <span className="min-w-0 w-full">
-                      <span className="block truncate text-[12px] font-bold leading-[15px] text-white">
+                      <span className="block truncate text-[11.5px] font-bold leading-[14px] text-white">
                         {voice.name}
                       </span>
-                      <span className="block truncate text-[10.5px] leading-[13px] text-zinc-500">
+                      <span className="block truncate text-[10px] leading-[12px] text-zinc-500">
                         {voice.characteristic}
                       </span>
                     </span>
@@ -7994,9 +7995,10 @@ function VoiceSettingsControls({
               : t("workspace.standalone.voice_instructions_google_placeholder")
           }
           onChange={(voiceStyle) => onChange({ voiceStyle })}
+          compact
         />
       )}
-    </>
+    </div>
   );
 }
 
@@ -8035,7 +8037,7 @@ function GeminiVoicePicker({
         label="Voice"
         meta={`${GEMINI_TTS_VOICES.length} preset speakers`}
       />
-      <div className="standalone-voice-controls ws-scroll-hide mt-[6px] grid max-h-[122px] grid-cols-3 gap-[5px] overflow-y-auto pr-0.5">
+      <div className="standalone-voice-controls ws-scroll-hide mt-[5px] grid max-h-[98px] grid-cols-3 gap-[4px] overflow-y-auto pr-0.5">
         {GEMINI_TTS_VOICES.map((voiceName) => {
           const active = value === voiceName;
           const isPlaying = playingId === voiceName;
@@ -8046,14 +8048,14 @@ function GeminiVoicePicker({
               type="button"
               onClick={() => onChange(voiceName)}
               className={cn(
-                "standalone-voice-card relative flex min-h-[38px] flex-col items-start justify-center rounded-[10px] border border-dashed px-[8px] py-[4px] pr-[30px] text-left transition",
+                "standalone-voice-card relative flex min-h-[34px] flex-col items-start justify-center rounded-[9px] border border-dashed px-[6px] py-[3px] pr-[28px] text-left transition",
                 active
                   ? "border-amber-300/50 bg-amber-300/10"
                   : "border-white/[0.12] bg-[#242424] hover:bg-[#2d2d2d]",
               )}
             >
               <span
-                className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"
+                className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full text-[9px] font-bold text-white"
                 style={{
                   background:
                     TINT_PALETTE[pickTintFromName(voiceName)] ?? TINT_PALETTE.zinc,
@@ -8061,7 +8063,7 @@ function GeminiVoicePicker({
               >
                 {voiceName.charAt(0)}
               </span>
-              <span className="mt-[5px] block w-full truncate text-[12px] font-bold leading-[15px] text-white">
+              <span className="mt-[3px] block w-full truncate text-[11.5px] font-bold leading-[14px] text-white">
                 {voiceName}
               </span>
               {/* Preview ▶ — sits in the top-right of the card. We
@@ -8083,17 +8085,17 @@ function GeminiVoicePicker({
                   }
                 }}
                 className={cn(
-                  "absolute right-[5px] top-[6px] grid h-[24px] w-[24px] cursor-pointer place-items-center rounded-full transition",
+                  "absolute right-[5px] top-[5px] grid h-[22px] w-[22px] cursor-pointer place-items-center rounded-full transition",
                   "bg-white/[0.08] text-zinc-200 hover:bg-white/[0.16] hover:text-white",
                   isPlaying && "bg-amber-300/30 text-amber-200",
                 )}
               >
                 {isLoading ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
                 ) : isPlaying ? (
-                  <Pause className="h-3 w-3" />
+                  <Pause className="h-2.5 w-2.5" />
                 ) : (
-                  <Play className="h-3 w-3" />
+                  <Play className="h-2.5 w-2.5" />
                 )}
               </span>
             </button>
@@ -8138,11 +8140,11 @@ function GeminiAudioTagsPanel({
   };
   const prefix = composeGeminiAudioTagPrefix({ emotion, personality, speed });
   return (
-    <div className="standalone-voice-controls ws-scroll-hide max-h-[210px] overflow-y-auto rounded-[12px] bg-white/[0.04] px-[9px] py-[7px]">
-      <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+    <div className="standalone-voice-controls ws-scroll-hide max-h-[158px] overflow-y-auto rounded-[10px] bg-white/[0.04] px-[8px] py-[6px]">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
         Audio tags
       </div>
-      <p className="mt-[2px] text-[11.5px] leading-[14px] text-zinc-500">
+      <p className="mt-[1px] text-[10.5px] leading-[13px] text-zinc-500">
         เลือกอารมณ์ / บุคลิก / ความเร็ว — Gemini จะใช้ tag ในวงเล็บเพื่อปรับการอ่าน
       </p>
 
@@ -8159,11 +8161,11 @@ function GeminiAudioTagsPanel({
         onToggle={(tag) => toggle(personality, tag, onChangePersonality)}
       />
 
-      <div className="mt-[6px]">
-        <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+      <div className="mt-[5px]">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
           ความเร็ว / Speed
         </div>
-        <div className="mt-[4px] inline-flex min-h-[28px] w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[12px]">
+        <div className="mt-[3px] inline-flex min-h-[24px] w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[11px]">
           {GEMINI_SPEED_OPTIONS.map((opt) => {
             const active = speed === opt.id;
             return (
@@ -8172,7 +8174,7 @@ function GeminiAudioTagsPanel({
                 type="button"
                 onClick={() => onChangeSpeed(opt.id)}
                 className={cn(
-                  "flex-1 rounded-md px-2 py-[3px] text-center leading-[13px] transition-colors",
+                  "flex-1 rounded-md px-2 py-[2px] text-center leading-[12px] transition-colors",
                   active
                     ? "bg-white/[0.10] text-zinc-50"
                     : "text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100",
@@ -8186,11 +8188,11 @@ function GeminiAudioTagsPanel({
       </div>
 
       {prefix ? (
-        <div className="mt-[6px] rounded-md bg-black/35 px-2 py-1 font-mono text-[11px] leading-[13px] text-amber-200/90">
+        <div className="mt-[4px] rounded-md bg-black/35 px-2 py-1 font-mono text-[10.5px] leading-[12px] text-amber-200/90">
           {prefix} <span className="text-zinc-500">+ script</span>
         </div>
       ) : (
-        <div className="mt-[6px] text-[11px] leading-[14px] italic text-zinc-600">
+        <div className="mt-[4px] text-[10.5px] leading-[13px] italic text-zinc-600">
           (ยังไม่ได้เลือก audio tag — Gemini จะอ่านตาม voice ที่เลือกอย่างเดียว)
         </div>
       )}
@@ -8210,11 +8212,11 @@ function TagChipRow({
   onToggle: (tag: string) => void;
 }) {
   return (
-    <div className="mt-[6px]">
-      <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+    <div className="mt-[5px]">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
         {title}
       </div>
-      <div className="mt-[4px] flex flex-wrap gap-[4px]">
+      <div className="mt-[3px] flex flex-wrap gap-[3px]">
         {items.map((item) => {
           const active = selected.includes(item.tag);
           return (
@@ -8224,7 +8226,7 @@ function TagChipRow({
               onClick={() => onToggle(item.tag)}
               title={item.sub}
               className={cn(
-                "rounded-full px-[8px] py-[3px] text-[12px] font-medium leading-[13px] transition-colors",
+                "rounded-full px-[7px] py-[2px] text-[11px] font-medium leading-[12px] transition-colors",
                 active
                   ? "bg-amber-300/20 text-amber-200 ring-1 ring-amber-300/30"
                   : "bg-white/[0.05] text-zinc-300 hover:bg-white/[0.10] hover:text-white",
@@ -8258,11 +8260,11 @@ function ElevenLabsVoiceParams({
   ];
 
   return (
-    <div className="standalone-voice-controls rounded-[12px] bg-white/[0.04] px-[10px] py-[8px]">
-      <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+    <div className="standalone-voice-controls rounded-[10px] bg-white/[0.04] px-[8px] py-[6px]">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
         {t("workspace.standalone.voice_style")}
       </div>
-      <div className="mt-[5px] inline-flex min-h-[32px] w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[12px]">
+      <div className="mt-[4px] inline-flex min-h-[26px] w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[11.5px]">
         {presets.map((p) => {
           const active = form.voiceStylePreset === p.id;
           return (
@@ -8271,7 +8273,7 @@ function ElevenLabsVoiceParams({
               type="button"
               onClick={() => onChange({ voiceStylePreset: p.id })}
               className={cn(
-                "flex-1 rounded-md px-2 py-[5px] text-center leading-[13px] transition-colors",
+                "flex-1 rounded-md px-2 py-[3px] text-center leading-[12px] transition-colors",
                 active
                   ? "bg-white/[0.10] text-zinc-50"
                   : "text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100",
@@ -8351,8 +8353,8 @@ function RangeSlider({
   onChange: (v: number) => void;
 }) {
   return (
-    <div className="mt-[7px]">
-      <div className="flex items-center justify-between text-[11px] font-medium leading-[13px] text-zinc-300">
+    <div className="mt-[5px]">
+      <div className="flex items-center justify-between text-[10.5px] font-medium leading-[12px] text-zinc-300">
         <span>{label}</span>
         {meta && <span className="text-zinc-500">{meta}</span>}
       </div>
@@ -8363,7 +8365,7 @@ function RangeSlider({
         step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="mt-[5px] h-1 w-full cursor-pointer appearance-none rounded-full bg-white/[0.08] accent-amber-300 outline-none"
+        className="mt-[3px] h-1 w-full cursor-pointer appearance-none rounded-full bg-white/[0.08] accent-amber-300 outline-none"
       />
     </div>
   );
@@ -8575,6 +8577,7 @@ function PromptBox({
   onChange,
   minRows = 6,
   maxLength,
+  compact = false,
 }: {
   label: string;
   value: string;
@@ -8582,6 +8585,7 @@ function PromptBox({
   onChange: (value: string) => void;
   minRows?: number;
   maxLength?: number;
+  compact?: boolean;
 }) {
   return (
     <div>
@@ -8595,7 +8599,12 @@ function PromptBox({
         onChange={(event) => onChange(event.target.value)}
         rows={minRows}
         placeholder={placeholder}
-        className="mt-2 min-h-[126px] w-full resize-none rounded-2xl border border-[var(--border-faint)] bg-[var(--bg-panel)] px-3 py-3 text-[13px] leading-relaxed text-zinc-100 outline-none placeholder:text-[var(--text-tertiary)] transition focus:border-[var(--brand-primary)]/40 focus:bg-[var(--bg-surface-2)] focus:shadow-[0_0_0_1px_rgba(238,255,0,.18),0_8px_24px_-16px_rgba(238,255,0,.45)]"
+        className={cn(
+          "w-full resize-none border border-[var(--border-faint)] bg-[var(--bg-panel)] text-zinc-100 outline-none placeholder:text-[var(--text-tertiary)] transition focus:border-[var(--brand-primary)]/40 focus:bg-[var(--bg-surface-2)] focus:shadow-[0_0_0_1px_rgba(238,255,0,.18),0_8px_24px_-16px_rgba(238,255,0,.45)]",
+          compact
+            ? "mt-[6px] min-h-[92px] rounded-[14px] px-[10px] py-[8px] text-[12.5px] leading-[18px]"
+            : "mt-2 min-h-[126px] rounded-2xl px-3 py-3 text-[13px] leading-relaxed",
+        )}
       />
     </div>
   );
@@ -8639,11 +8648,13 @@ function TextInputField({
   value,
   placeholder,
   onChange,
+  compact = false,
 }: {
   label: string;
   value: string;
   placeholder: string;
   onChange: (value: string) => void;
+  compact?: boolean;
 }) {
   return (
     <label className="block">
@@ -8652,7 +8663,12 @@ function TextInputField({
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 h-10 w-full rounded-xl border border-[var(--border-faint)] bg-[var(--bg-panel)] px-3 text-[12px] text-white outline-none placeholder:text-[var(--text-tertiary)] transition focus:border-[var(--brand-primary)]/40"
+        className={cn(
+          "w-full border border-[var(--border-faint)] bg-[var(--bg-panel)] text-white outline-none placeholder:text-[var(--text-tertiary)] transition focus:border-[var(--brand-primary)]/40",
+          compact
+            ? "mt-[5px] h-8 rounded-[10px] px-[10px] text-[11.5px]"
+            : "mt-2 h-10 rounded-xl px-3 text-[12px]",
+        )}
       />
     </label>
   );

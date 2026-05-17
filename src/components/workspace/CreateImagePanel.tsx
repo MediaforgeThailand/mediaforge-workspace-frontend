@@ -549,7 +549,12 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
       )}
     >
       {/* ===== HEADER ===== */}
-      <header className="flex h-[56px] shrink-0 items-center px-[20px]">
+      <header
+        className={clsx(
+          "flex shrink-0 items-center",
+          compactVoice ? "h-[46px] px-[18px]" : "h-[56px] px-[20px]",
+        )}
+      >
         <h1 className="flex min-w-0 flex-1 items-center text-[16px] font-semibold leading-[24px] tracking-[-0.12px] text-white">
           <span className="standalone-panel-title line-clamp-1">{resolvedTitle}</span>
         </h1>
@@ -559,7 +564,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
       <div
         className={clsx(
           "flex flex-1 min-h-0 flex-col overflow-y-auto px-[12px]",
-          compactVoice ? "gap-[7px] pb-[56px]" : "gap-[12px] pb-[12px]",
+          compactVoice ? "gap-[6px] pb-[50px]" : "gap-[12px] pb-[12px]",
         )}
       >
         {/* Model Selector */}
@@ -609,7 +614,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
         <section
           className={clsx(
             "shrink-0 rounded-[16px] border border-white/[0.05] bg-[#151719] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]",
-            compactVoice ? "max-h-[154px] p-[8px]" : "p-[10px]",
+            compactVoice ? "min-h-[168px] p-[9px]" : "p-[10px]",
           )}
           onPasteCapture={handlePromptPaste}
           onDragEnterCapture={handlePromptDragOver}
@@ -702,11 +707,11 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
               onChange={updatePrompt}
               placeholder={resolvedPromptPlaceholder}
               mentionOptions={mentionOptions}
-              maxHeightPx={compactVoice ? 74 : undefined}
+              maxHeightPx={compactVoice ? 104 : undefined}
               className={clsx(
                 "mt-[8px] rounded-none border-transparent bg-transparent px-[4px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-transparent focus:ring-0",
                 compactVoice
-                  ? "min-h-[44px] max-h-[74px] py-[4px]"
+                  ? "min-h-[76px] max-h-[104px] py-[5px]"
                   : "min-h-[116px] max-h-[230px] py-[8px]",
               )}
             />
@@ -778,7 +783,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
       <div
         className={clsx(
           "relative z-10 flex w-full flex-row items-center justify-between bg-[#121314] px-[12px]",
-          compactVoice ? "gap-[10px] pb-[8px] pt-[4px]" : "gap-[16px] pb-[12px]",
+          compactVoice ? "gap-[10px] pb-[7px] pt-[3px]" : "gap-[16px] pb-[12px]",
         )}
       >
         {/* Quantity stepper */}
@@ -805,7 +810,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
             disabled={running}
             className={clsx(
               "standalone-generate-button ci-gloss-button group relative flex w-full items-center justify-center gap-[6px] overflow-hidden rounded-full border px-[8px] font-semibold transition-all active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70",
-              compactVoice ? "h-[38px] text-[13.5px] leading-[18px]" : "h-[48px] text-[15px] leading-[20px]",
+              compactVoice ? "h-[36px] text-[13px] leading-[17px]" : "h-[48px] text-[15px] leading-[20px]",
             )}
           >
             <span className="pointer-events-none absolute inset-x-4 top-0 h-[16px] rounded-b-full bg-white/30 blur-[10px]" />
