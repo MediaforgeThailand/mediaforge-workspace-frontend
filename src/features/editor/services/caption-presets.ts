@@ -98,6 +98,10 @@ export interface CaptionStyleSettings {
   positionV: CaptionPositionV;
   /** Horizontal placement. */
   positionH: CaptionPositionH;
+  /** Optional normalized X placement, 0-1. Overrides positionH when present. */
+  positionX?: number;
+  /** Optional normalized Y placement, 0-1. Overrides positionV when present. */
+  positionY?: number;
   /** Margin from the chosen edge, in px. */
   margin: number;
 }

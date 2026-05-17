@@ -574,11 +574,31 @@ function suggestedCuesPreserveTranscript(
     return false;
   }
 
+  if (textLooksSegmentPreferred(transcriptText ?? "") && sourceComparable.length >= 16) {
+    const sourceCoverage = orderedCharacterCoverageRatio(sourceComparable, joinedComparable);
+    if (sourceCoverage < 0.88) return false;
+  }
+
   if (sourceComparable.length >= 24 && joinedComparable.length < sourceComparable.length * 0.72) {
     return false;
   }
 
   return true;
+}
+
+function orderedCharacterCoverageRatio(source: string, candidate: string): number {
+  if (!source) return 1;
+  if (!candidate) return 0;
+
+  let matched = 0;
+  let cursor = 0;
+  for (const char of source) {
+    const index = candidate.indexOf(char, cursor);
+    if (index < 0) continue;
+    matched += 1;
+    cursor = index + char.length;
+  }
+  return matched / Array.from(source).length;
 }
 
 function timingTextIndexFromWords(timingWords: AutoSuptitleWhisperWord[]) {
@@ -911,6 +931,7 @@ function fillSpokenGapsBetweenSuggestedCues(
   clipStartTime: number,
   settings: CaptionStyleSettings,
   algorithm: AutoSuptitleAlgorithmSettings,
+  options: { allowUnmatchedGapCueInsertion?: boolean } = {},
 ): AutoSuptitleCue[] {
   if (cues.length < 2 || timingWords.length === 0) return cues;
 
@@ -959,6 +980,8 @@ function fillSpokenGapsBetweenSuggestedCues(
       working[index + 1] = shiftedNextCue;
       continue;
     }
+
+    if (options.allowUnmatchedGapCueInsertion === false) continue;
 
     const gapCue = buildGapCueFromTimingWords(gapWords, nextCue.startTime, settings, algorithm);
     if (gapCue) filled.push(gapCue);
@@ -1231,12 +1254,17 @@ function buildCuesFromSuggestedCueTexts(
     };
   });
   const heldCues = holdCuesUntilNextSpeech(cues, algorithm);
+  const allowUnmatchedGapCueInsertion =
+    !isSentenceSegmentationMode(algorithm) &&
+    !isSegmentTextPreferredLanguage(language) &&
+    !cueTextChunks.some((cueText) => textLooksSegmentPreferred(cueText));
   const gapFilledCues = fillSpokenGapsBetweenSuggestedCues(
     heldCues,
     timingWords,
     clipStartTime,
     settings,
     algorithm,
+    { allowUnmatchedGapCueInsertion },
   );
   return finalizeAutoSuptitleCues(gapFilledCues);
 }

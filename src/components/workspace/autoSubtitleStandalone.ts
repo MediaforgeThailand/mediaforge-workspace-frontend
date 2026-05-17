@@ -591,17 +591,24 @@ function drawCue(
   const lineHeight = fontSize * 1.18;
   const blockHeight = lines.length * lineHeight;
   const x =
-    settings.positionH === "left"
-      ? margin
-      : settings.positionH === "right"
-        ? width - margin
-        : width / 2;
+    typeof settings.positionX === "number"
+      ? Math.max(margin, Math.min(width - margin, settings.positionX * width))
+      : settings.positionH === "left"
+        ? margin
+        : settings.positionH === "right"
+          ? width - margin
+          : width / 2;
   const centerY =
-    settings.positionV === "top"
-      ? margin + blockHeight / 2
-      : settings.positionV === "bottom"
-        ? height - margin - blockHeight / 2
-        : height / 2;
+    typeof settings.positionY === "number"
+      ? Math.max(
+          margin + blockHeight / 2,
+          Math.min(height - margin - blockHeight / 2, settings.positionY * height),
+        )
+      : settings.positionV === "top"
+        ? margin + blockHeight / 2
+        : settings.positionV === "bottom"
+          ? height - margin - blockHeight / 2
+          : height / 2;
   const firstY = centerY - blockHeight / 2 + lineHeight / 2;
   const transition = cueTransitionFrame(cue, settings.animation, currentTime, scale);
   const textMotion = cueTextAnimationFrame(

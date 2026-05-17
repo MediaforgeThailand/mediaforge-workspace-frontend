@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -147,6 +147,7 @@ import {
   formatAutoSuptitleCueText,
   normalizeAutoSuptitleCuesForDuration,
   type AutoSuptitleAlgorithmSettings,
+  type AutoSuptitleCue,
   type AutoSuptitleResult,
 } from "@/features/editor/services/auto-suptitle";
 import {
@@ -163,6 +164,7 @@ import {
 } from "@/features/editor/services/caption-presets";
 import {
   createAutoSubtitleEditorProject,
+  loadAutoSubtitleHandoff,
   renderAutoSubtitleVideo,
   saveAutoSubtitleHandoff,
   type RenderAutoSubtitleVideoResult,
@@ -221,6 +223,12 @@ const AUTO_SUBTITLE_COLOR_OPTIONS = [
   "#7CFF8A",
   "#FF8FB3",
   "#FFB84D",
+];
+const AUTO_SUBTITLE_COLOR_SWATCHES = [
+  "#FFFFFF", "#8CF7FF", "#E5E7EB", "#A3A3A3", "#525252", "#111827", "#F4FF00", "#FFB84D", "#FF4747", "#D946EF",
+  "#38BDF8", "#22C55E", "#FBCFE8", "#F9A8D4", "#FB7185", "#E11D48", "#DB2777", "#F472B6", "#FCA5A5", "#FDBA74",
+  "#FDA4AF", "#FB7185", "#EF4444", "#B91C1C", "#7F1D1D", "#FECACA", "#FED7AA", "#FDBA74", "#FB923C", "#F97316",
+  "#FDE68A", "#FEF08A", "#D9F99D", "#A7F3D0", "#84CC16", "#65A30D", "#BEF264", "#86EFAC", "#22C55E", "#00FF5A",
 ];
 const AUTO_SUBTITLE_MAX_WORD_SPLIT = 6;
 const AUTO_SUBTITLE_WORD_SPLIT_OPTIONS = [1, 2, 3, 4, 5, 6];
@@ -748,6 +756,8 @@ interface StandaloneFormState {
   autoSubtitleFill: string;
   autoSubtitleHighlightColor: string;
   autoSubtitlePosition: "top" | "middle" | "bottom";
+  autoSubtitlePositionX: number;
+  autoSubtitlePositionY: number;
   autoSubtitleStroke: boolean;
   autoSubtitleStrokeWidth: number;
   autoSubtitleBackground: boolean;
@@ -817,6 +827,8 @@ const DEFAULT_AUTO_SUBTITLE_PARAMS = {
   autoSubtitleFill: "#ffffff",
   autoSubtitleHighlightColor: "#F4FF00",
   autoSubtitlePosition: "bottom" as const,
+  autoSubtitlePositionX: 0.5,
+  autoSubtitlePositionY: 0.84,
   autoSubtitleStroke: true,
   autoSubtitleStrokeWidth: 6,
   autoSubtitleBackground: false,
@@ -2301,6 +2313,7 @@ export default function StandaloneGenerator({
     language,
     refetchProjectReferences,
     translateTask?.id,
+    translateTask?.engine,
     translateTask?.jobId,
     translateTask?.outputLanguage,
     translateTask?.sourceStorageBucket,
@@ -2570,22 +2583,26 @@ export default function StandaloneGenerator({
     updateForm({ prompt: nextValue });
   };
 
-  const panelReferences =
-    activeTool === "image_gen"
-      ? form.imageRefs
-      : activeTool === "image_upscale"
-        ? [form.upscaleImage].filter(Boolean)
-      : activeTool === "video_gen"
-        ? videoPanelMode === "reference"
-          ? [form.videoRefImage, form.videoRefVideo].filter(Boolean)
-          : [form.videoStart, videoSupportsEnd ? form.videoEnd : null].filter(Boolean)
-        : activeTool === "image_to_3d"
-          ? threeDReferencesForForm(form)
-        : activeTool === "voice_translate"
-            ? [form.translateVideo].filter(Boolean)
-        : activeTool === "auto_subtitle"
-            ? [form.autoSubtitleVideo].filter(Boolean)
-          : [];
+  const panelReferences = useMemo<UploadedRef[]>(() => {
+    const compact = (items: Array<UploadedRef | null | undefined>) =>
+      items.filter((item): item is UploadedRef => Boolean(item));
+    if (activeTool === "image_gen") return form.imageRefs;
+    if (activeTool === "image_upscale") return compact([form.upscaleImage]);
+    if (activeTool === "video_gen") {
+      return videoPanelMode === "reference"
+        ? compact([form.videoRefImage, form.videoRefVideo])
+        : compact([form.videoStart, videoSupportsEnd ? form.videoEnd : null]);
+    }
+    if (activeTool === "image_to_3d") return threeDReferencesForForm(form);
+    if (activeTool === "voice_translate") return compact([form.translateVideo]);
+    if (activeTool === "auto_subtitle") return compact([form.autoSubtitleVideo]);
+    return [];
+  }, [
+    activeTool,
+    form,
+    videoPanelMode,
+    videoSupportsEnd,
+  ]);
 
   const panelMaxReferences =
     activeTool === "image_gen"
@@ -3597,6 +3614,9 @@ export default function StandaloneGenerator({
           outputName,
           outputMime,
           outputExtension: rendered.extension,
+          cues,
+          settings,
+          trackMeta: result.meta,
           cueCount: cues.length,
           transcriptText,
           handoffId,
@@ -4181,12 +4201,21 @@ export default function StandaloneGenerator({
         <Menu className="h-[18px] w-[18px]" />
       </button>
 
-      <div className="fixed right-1.5 top-1.5 z-[40] origin-top-right scale-[0.86] md:right-4 md:top-4 md:z-[80] md:scale-100">
-        <UserMenu />
-      </div>
+      {activeTool !== "auto_subtitle" && (
+        <div className="fixed right-1.5 top-1.5 z-[40] origin-top-right scale-[0.86] md:right-4 md:top-4 md:z-[80] md:scale-100">
+          <UserMenu />
+        </div>
+      )}
 
       <div className="ws-scroll-hide flex min-h-0 flex-1 flex-col overflow-y-auto bg-[var(--bg-app)] lg:flex-row lg:overflow-hidden">
-        <aside className="ws-scroll-hide mx-auto flex min-h-dvh w-full max-w-[480px] shrink-0 flex-col bg-transparent px-[12px] pb-[12px] pt-[4px] lg:mx-0 lg:h-full lg:min-h-0 lg:w-[488px] lg:max-w-none lg:pb-0 lg:pl-2 lg:pr-0 lg:pt-4">
+        <aside
+          className={cn(
+            "ws-scroll-hide mx-auto flex min-h-dvh w-full max-w-[480px] shrink-0 flex-col bg-transparent px-[12px] pb-[12px] pt-[4px] lg:mx-0 lg:h-full lg:min-h-0 lg:max-w-none lg:pb-0 lg:pl-2 lg:pr-0 lg:pt-4",
+            activeTool === "auto_subtitle"
+              ? "lg:w-[376px] xl:w-[405px] 2xl:w-[442px]"
+              : "lg:w-[488px]",
+          )}
+        >
           {STANDALONE_TOOL_ORDER.includes(activeTool) ? (
             activeTool === "auto_subtitle" ? (
             <AutoSubtitlePanelV2
@@ -4536,10 +4565,12 @@ export default function StandaloneGenerator({
           <section className="flex min-h-[560px] flex-1 flex-col overflow-hidden rounded-[20px] bg-[var(--bg-sidebar)] shadow-[inset_0_1px_0_rgba(255,255,255,.035),0_22px_50px_-38px_rgba(238,255,0,.45)] lg:h-full lg:min-h-0">
             <div className="ws-scroll-hide min-h-0 flex-1 overflow-y-auto px-3 py-3">
               {activeTool === "auto_subtitle" ? (
-                <AutoSubtitleResultFeed
+                <AutoSubtitleMiniEditorPanel
+                  form={form}
                   results={autoSubtitleResults}
                   running={running}
                   progress={autoSubtitleProgress}
+                  onChange={updateForm}
                   onEdit={openAutoSubtitleEditor}
                   onDelete={deleteAutoSubtitleResult}
                 />
@@ -5022,6 +5053,28 @@ function autoSubtitleVideoFilesFromTransfer(data: DataTransfer | null): File[] {
   return translateMediaFilesFromTransfer(data).filter(isAutoSubtitleMediaFile);
 }
 
+function clampAutoSubtitlePosition(value: number, fallback: number): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0.06, Math.min(0.94, numeric));
+}
+
+function autoSubtitleVerticalFromY(
+  y: number,
+): StandaloneFormState["autoSubtitlePosition"] {
+  if (y <= 0.34) return "top";
+  if (y >= 0.66) return "bottom";
+  return "middle";
+}
+
+function autoSubtitlePositionPercentFromVertical(
+  position: StandaloneFormState["autoSubtitlePosition"],
+): number {
+  if (position === "top") return 0.18;
+  if (position === "middle") return 0.5;
+  return 0.84;
+}
+
 function autoSubtitleStyleFromForm(form: StandaloneFormState): CaptionStyleSettings {
   const preset =
     BUILTIN_CAPTION_PRESETS.find((item) => item.id === form.autoSubtitlePresetId)?.settings ??
@@ -5051,6 +5104,11 @@ function autoSubtitleStyleFromForm(form: StandaloneFormState): CaptionStyleSetti
         : Math.max(1, Math.min(AUTO_SUBTITLE_MAX_WORD_SPLIT, rawWordsPerLine || preset.wordsPerLine)),
     positionV: form.autoSubtitlePosition,
     positionH: "center",
+    positionX: clampAutoSubtitlePosition(form.autoSubtitlePositionX, 0.5),
+    positionY: clampAutoSubtitlePosition(
+      form.autoSubtitlePositionY,
+      autoSubtitlePositionPercentFromVertical(form.autoSubtitlePosition),
+    ),
   };
 }
 
@@ -5520,7 +5578,6 @@ function AutoSubtitlePanelV2({
   onToolChange: (tool: StandaloneToolKey) => void;
 }) {
   const [showMoreStyles, setShowMoreStyles] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [subtitleDesignTab, setSubtitleDesignTab] = useState<
     "style" | "transition" | "animation"
   >("style");
@@ -5532,7 +5589,7 @@ function AutoSubtitlePanelV2({
   const selectedSettings = autoSubtitleStyleFromForm(form);
   const visiblePresets = showMoreStyles
     ? BUILTIN_CAPTION_PRESETS
-    : BUILTIN_CAPTION_PRESETS.slice(0, 4);
+    : BUILTIN_CAPTION_PRESETS.slice(0, 5);
 
   const copy = {
     title: "Auto Subtitle",
@@ -5609,12 +5666,6 @@ function AutoSubtitlePanelV2({
   const speechLabel =
     CAPTIONS_LANGUAGES.find((item) => item.code === form.autoSubtitleLanguage)?.label ??
     form.autoSubtitleLanguage;
-  const positionLabel =
-    form.autoSubtitlePosition === "top"
-      ? th ? "บน" : "Top"
-      : form.autoSubtitlePosition === "middle"
-        ? th ? "กลาง" : "Middle"
-        : th ? "ล่าง" : "Bottom";
   const aspectLabel =
     media?.width && media.height ? `${media.width}:${media.height}` : th ? "ต้นฉบับ" : "Source";
   const wordSplitLabel =
@@ -5660,6 +5711,10 @@ function AutoSubtitlePanelV2({
       autoSubtitleStrokeWidth: preset.settings.stroke.width,
       autoSubtitleBackground: preset.settings.background.enabled,
       autoSubtitlePosition: preset.settings.positionV,
+      autoSubtitlePositionX: preset.settings.positionX ?? 0.5,
+      autoSubtitlePositionY:
+        preset.settings.positionY ??
+        autoSubtitlePositionPercentFromVertical(preset.settings.positionV),
       autoSubtitleWordsPerLine: Math.max(
         1,
         Math.min(AUTO_SUBTITLE_MAX_WORD_SPLIT, preset.settings.wordsPerLine),
@@ -5668,7 +5723,7 @@ function AutoSubtitlePanelV2({
   };
 
   return (
-    <section className="standalone-create-panel standalone-translate-panel flex h-full w-full max-w-[480px] flex-col overflow-hidden rounded-[20px] border border-white/[0.02] bg-[#121314]">
+    <section className="standalone-create-panel standalone-translate-panel flex h-full w-full max-w-none flex-col overflow-hidden rounded-[20px] border border-white/[0.02] bg-[#121314]">
       <AutoSubtitlePreviewKeyframes />
       <div className="flex h-[58px] shrink-0 items-center gap-[10px] border-b border-white/[0.035] px-[18px]">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-[var(--brand-primary)]/10 text-[var(--brand-soft)]">
@@ -5804,7 +5859,7 @@ function AutoSubtitlePanelV2({
 
               {subtitleDesignTab === "style" && (
                 <>
-                  <div className="grid grid-cols-4 gap-[6px]">
+                  <div className="grid grid-cols-5 gap-[6px]">
                     {visiblePresets.map((preset) => (
                       <AutoSubtitlePresetCard
                         key={preset.id}
@@ -5815,7 +5870,7 @@ function AutoSubtitlePanelV2({
                       />
                     ))}
                   </div>
-                  {BUILTIN_CAPTION_PRESETS.length > 4 && (
+                    {BUILTIN_CAPTION_PRESETS.length > 5 && (
                     <button
                       type="button"
                       onClick={() => setShowMoreStyles((value) => !value)}
@@ -5828,7 +5883,7 @@ function AutoSubtitlePanelV2({
               )}
 
               {subtitleDesignTab === "transition" && (
-                <div className="grid grid-cols-4 gap-[6px]">
+                <div className="grid grid-cols-5 gap-[6px]">
                   {CAPTION_TRANSITION_OPTIONS.map((option) => (
                     <AutoSubtitleMotionCard
                       key={option.id}
@@ -5849,7 +5904,7 @@ function AutoSubtitlePanelV2({
               )}
 
               {subtitleDesignTab === "animation" && (
-                <div className="grid grid-cols-4 gap-[6px]">
+                <div className="grid grid-cols-5 gap-[6px]">
                   {CAPTION_TEXT_ANIMATION_OPTIONS.map((option) => (
                     <AutoSubtitleTextAnimationCard
                       key={option.id}
@@ -5868,17 +5923,11 @@ function AutoSubtitlePanelV2({
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowAdvanced((value) => !value)}
-              className="mt-[9px] flex h-[34px] w-full items-center justify-center gap-[7px] rounded-[10px] border border-dashed border-white/12 bg-black/20 text-[12px] font-bold leading-[15px] text-zinc-200 transition hover:border-[var(--brand-primary)]/45 hover:bg-[var(--brand-primary)]/[0.05]"
-            >
-              <SlidersHorizontal className="h-[14px] w-[14px]" />
-              {copy.advanced}
-            </button>
-
-            {showAdvanced && (
-              <div className="mt-[10px] space-y-[10px]">
+            <div className="mt-[10px] space-y-[10px]">
+                <div className="flex items-center gap-[7px] px-1 text-[12px] font-bold leading-[15px] text-zinc-300">
+                  <SlidersHorizontal className="h-[14px] w-[14px]" />
+                  {copy.advanced}
+                </div>
                 <div className="grid grid-cols-1 gap-[7px] sm:grid-cols-2">
                   <VoiceTranslateSelectCard
                     label={copy.speech}
@@ -5939,20 +5988,39 @@ function AutoSubtitlePanelV2({
                     options={AUTO_SUBTITLE_FONT_OPTIONS.map((font) => ({ value: font, label: font }))}
                     onChange={(value) => onChange({ autoSubtitleFont: value })}
                   />
-                  <VoiceTranslateSelectCard
-                    label={copy.position}
-                    value={form.autoSubtitlePosition}
-                    displayValue={positionLabel}
-                    icon={<SlidersHorizontal className="h-[14px] w-[14px]" />}
-                    options={[
-                      { value: "top", label: th ? "บน" : "Top" },
-                      { value: "middle", label: th ? "กลาง" : "Middle" },
-                      { value: "bottom", label: th ? "ล่าง" : "Bottom" },
-                    ]}
-                    onChange={(value) =>
-                      onChange({ autoSubtitlePosition: value as StandaloneFormState["autoSubtitlePosition"] })
-                    }
-                  />
+                  <div className="flex min-h-[52px] items-center gap-[8px] rounded-[10px] border border-white/[0.04] bg-white/[0.035] px-[9px] py-[7px]">
+                    <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-[8px] bg-white/[0.055] text-zinc-400">
+                      <SlidersHorizontal className="h-[14px] w-[14px]" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[10px] font-semibold leading-[12px] text-zinc-500">
+                        {copy.position}
+                      </div>
+                      <div className="mt-[2px] truncate text-[12px] font-bold leading-[15px] text-white">
+                        X {Math.round(clampAutoSubtitlePosition(form.autoSubtitlePositionX, 0.5) * 100)}% / Y{" "}
+                        {Math.round(
+                          clampAutoSubtitlePosition(
+                            form.autoSubtitlePositionY,
+                            autoSubtitlePositionPercentFromVertical(form.autoSubtitlePosition),
+                          ) * 100,
+                        )}
+                        %
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onChange({
+                          autoSubtitlePosition: "bottom",
+                          autoSubtitlePositionX: 0.5,
+                          autoSubtitlePositionY: 0.84,
+                        })
+                      }
+                      className="h-[28px] shrink-0 rounded-[8px] border border-white/10 px-[8px] text-[10px] font-bold text-zinc-300 transition hover:border-[var(--brand-primary)]/45 hover:text-white"
+                    >
+                      Reset
+                    </button>
+                  </div>
                   <VoiceTranslateSelectCard
                     label={copy.size}
                     value={String(form.autoSubtitleSize)}
@@ -5981,11 +6049,13 @@ function AutoSubtitlePanelV2({
                     label={copy.textColor}
                     value={form.autoSubtitleFill}
                     onChange={(value) => onChange({ autoSubtitleFill: value })}
+                    className="sm:col-span-2"
                   />
                   <AutoSubtitleColorPicker
                     label={copy.highlightColor}
                     value={form.autoSubtitleHighlightColor}
                     onChange={(value) => onChange({ autoSubtitleHighlightColor: value })}
+                    className="sm:col-span-2"
                   />
                   <AutoSubtitleToggle
                     label={copy.stroke}
@@ -6062,7 +6132,6 @@ function AutoSubtitlePanelV2({
                   </div>
                 </div>
               </div>
-            )}
           </div>
 
           <p className="rounded-[10px] border border-[var(--border-faint)] bg-black/20 px-2.5 py-2 text-[13px] font-medium leading-[18px] text-zinc-300">
@@ -6150,7 +6219,7 @@ function AutoSubtitleChoiceButton({
       className={cn(
         "relative min-h-[33px] rounded-[8px] border px-[8px] py-[5px] text-center transition",
         active
-          ? "border-[var(--brand-primary)] bg-[var(--brand-primary)]/90 text-black shadow-[0_0_16px_rgba(244,255,0,.16)]"
+          ? "border-[var(--brand-primary)] bg-[var(--brand-primary)]/[0.08] text-white shadow-[0_0_16px_rgba(244,255,0,.16)]"
           : "border-white/[0.07] bg-white/[0.035] text-zinc-300 hover:border-[var(--brand-primary)]/45 hover:text-white",
         disabled && "cursor-not-allowed opacity-45 hover:border-white/[0.07] hover:text-zinc-300",
       )}
@@ -6408,35 +6477,218 @@ function autoSubtitleAnimationCardText(animation: CaptionTextAnimation): string 
   }
 }
 
+function normalizeHexColor(value: string, fallback = "#FFFFFF"): string {
+  const clean = value.trim().replace(/^#/, "");
+  if (/^[0-9a-fA-F]{3}$/.test(clean)) {
+    return `#${clean.split("").map((char) => char + char).join("")}`.toUpperCase();
+  }
+  if (/^[0-9a-fA-F]{6}$/.test(clean)) {
+    return `#${clean}`.toUpperCase();
+  }
+  return fallback;
+}
+
+function hexToRgb(value: string): { r: number; g: number; b: number } {
+  const hex = normalizeHexColor(value).slice(1);
+  return {
+    r: Number.parseInt(hex.slice(0, 2), 16),
+    g: Number.parseInt(hex.slice(2, 4), 16),
+    b: Number.parseInt(hex.slice(4, 6), 16),
+  };
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  return `#${[r, g, b]
+    .map((channel) => Math.max(0, Math.min(255, Math.round(channel))).toString(16).padStart(2, "0"))
+    .join("")}`.toUpperCase();
+}
+
+function hexToHsv(value: string): { h: number; s: number; v: number } {
+  const { r, g, b } = hexToRgb(value);
+  const rn = r / 255;
+  const gn = g / 255;
+  const bn = b / 255;
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const delta = max - min;
+  let h = 0;
+  if (delta !== 0) {
+    if (max === rn) h = 60 * (((gn - bn) / delta) % 6);
+    else if (max === gn) h = 60 * ((bn - rn) / delta + 2);
+    else h = 60 * ((rn - gn) / delta + 4);
+  }
+  if (h < 0) h += 360;
+  return {
+    h: Math.round(h),
+    s: max === 0 ? 0 : Math.round((delta / max) * 100),
+    v: Math.round(max * 100),
+  };
+}
+
+function hsvToHex(h: number, s: number, v: number): string {
+  const hue = ((h % 360) + 360) % 360;
+  const sat = Math.max(0, Math.min(100, s)) / 100;
+  const val = Math.max(0, Math.min(100, v)) / 100;
+  const chroma = val * sat;
+  const x = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const m = val - chroma;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+
+  if (hue < 60) [r, g, b] = [chroma, x, 0];
+  else if (hue < 120) [r, g, b] = [x, chroma, 0];
+  else if (hue < 180) [r, g, b] = [0, chroma, x];
+  else if (hue < 240) [r, g, b] = [0, x, chroma];
+  else if (hue < 300) [r, g, b] = [x, 0, chroma];
+  else [r, g, b] = [chroma, 0, x];
+
+  return rgbToHex((r + m) * 255, (g + m) * 255, (b + m) * 255);
+}
+
 function AutoSubtitleColorPicker({
   label,
   value,
   onChange,
+  className,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  className?: string;
 }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const safeValue = normalizeHexColor(value);
+  const hsv = useMemo(() => hexToHsv(safeValue), [safeValue]);
+  const hueColor = hsvToHex(hsv.h, 100, 100);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleDown = (event: globalThis.MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", handleDown);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleDown);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
+  const pickFromPlane = (event: MouseEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+    const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+    const s = (x / rect.width) * 100;
+    const v = 100 - (y / rect.height) * 100;
+    onChange(hsvToHex(hsv.h, s, v));
+  };
+
+  const pickHue = (event: MouseEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+    onChange(hsvToHex((x / rect.width) * 360, hsv.s, hsv.v));
+  };
+
   return (
-    <div className="standalone-setting-card rounded-[10px] border border-white/[0.06] bg-[#16181a] px-[9px] py-[7px]">
-      <div className="mb-[6px] text-[12px] font-bold leading-[15px] text-zinc-200">{label}</div>
-      <div className="flex flex-wrap gap-1.5">
-        {AUTO_SUBTITLE_COLOR_OPTIONS.map((color) => (
+    <div ref={ref} className={cn("standalone-setting-card relative rounded-[10px] border border-white/[0.06] bg-[#16181a] px-[9px] py-[7px]", className)}>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex h-[34px] w-full items-center justify-between gap-3 rounded-[8px] px-[2px] text-left transition hover:bg-white/[0.035]"
+        aria-expanded={open}
+        aria-label={`${label} picker`}
+      >
+        <span className="text-[12px] font-bold leading-[15px] text-zinc-200">{label}</span>
+        <span className="flex h-[26px] min-w-[98px] items-center justify-between rounded-[6px] border border-white/[0.12] bg-white/[0.06] px-[4px] shadow-[inset_0_1px_0_rgba(255,255,255,.06)]">
+          <span className="h-[18px] flex-1 rounded-[3px] border border-white/30" style={{ backgroundColor: safeValue }} />
+          <ChevronDown className={cn("ml-[6px] h-3.5 w-3.5 text-zinc-300 transition", open && "rotate-180")} />
+        </span>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-[calc(100%+6px)] z-[80] w-full max-w-[360px] rounded-[12px] border border-white/[0.10] bg-[#202123] p-[10px] shadow-[0_22px_52px_-18px_rgba(0,0,0,.85),0_0_0_1px_rgba(255,255,255,.03)]">
           <button
-            key={color}
             type="button"
-            onClick={() => onChange(color)}
-            className={cn(
-              "h-5 w-5 rounded-full border transition",
-              value.toLowerCase() === color.toLowerCase()
-                ? "border-black ring-2 ring-[var(--brand-primary)]/80"
-                : "border-white/20 hover:border-white/60",
-            )}
-            style={{ backgroundColor: color }}
-            aria-label={`${label} ${color}`}
-          />
-        ))}
-      </div>
+            onMouseDown={pickFromPlane}
+            onClick={pickFromPlane}
+            className="relative h-[132px] w-full overflow-hidden rounded-[8px] border border-white/[0.08]"
+            style={{
+              background:
+                `linear-gradient(to top, #000 0%, transparent 100%), linear-gradient(to right, #fff 0%, ${hueColor} 100%)`,
+            }}
+            aria-label={`${label} color plane`}
+          >
+            <span
+              className="pointer-events-none absolute h-[14px] w-[14px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,.75)]"
+              style={{ left: `${hsv.s}%`, top: `${100 - hsv.v}%` }}
+            />
+          </button>
+
+          <div className="mt-[8px] flex items-center gap-2">
+            <button
+              type="button"
+              onMouseDown={pickHue}
+              onClick={pickHue}
+              className="relative h-[15px] flex-1 rounded-full border border-white/[0.08]"
+              style={{
+                background:
+                  "linear-gradient(90deg,#ff0000,#ffff00,#00ff00,#00ffff,#0000ff,#ff00ff,#ff0000)",
+              }}
+              aria-label={`${label} hue`}
+            >
+              <span
+                className="pointer-events-none absolute top-1/2 h-[19px] w-[8px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-black/35 shadow-[0_1px_5px_rgba(0,0,0,.7)]"
+                style={{ left: `${(hsv.h / 360) * 100}%` }}
+              />
+            </button>
+            <input
+              value={safeValue.replace("#", "")}
+              onChange={(event) => onChange(normalizeHexColor(event.target.value, safeValue))}
+              className="h-[26px] w-[96px] rounded-[6px] border border-white/[0.08] bg-black/25 px-2 text-[11px] font-semibold uppercase text-zinc-100 outline-none focus:border-[var(--brand-primary)]/55"
+              aria-label={`${label} hex`}
+            />
+          </div>
+
+          <div className="mt-[9px] rounded-[9px] border border-white/[0.06] bg-black/20 p-[7px]">
+            <div className="mb-[6px] flex items-center justify-between text-[11px] font-bold text-zinc-300">
+              <span>My colors</span>
+              <ChevronDown className="h-3 w-3" />
+            </div>
+            <div className="grid grid-cols-10 gap-[5px]">
+              <button
+                type="button"
+                onClick={() => onChange("#FFFFFF")}
+                className="grid h-[18px] w-[18px] place-items-center rounded-[4px] border border-white/15 bg-white/[0.05] text-[12px] text-zinc-300 hover:border-white/45"
+                aria-label="Add color"
+              >
+                <Plus className="h-3 w-3" />
+              </button>
+              {AUTO_SUBTITLE_COLOR_SWATCHES.map((color, index) => (
+            <button
+              key={`${color}-${index}`}
+              type="button"
+              onClick={() => onChange(color)}
+              className={cn(
+                "h-[18px] w-[18px] rounded-[4px] border transition",
+                safeValue === color
+                  ? "border-black ring-2 ring-[var(--brand-primary)]/85"
+                  : "border-white/10 hover:border-white/60",
+              )}
+              style={{ backgroundColor: color }}
+              aria-label={`${label} ${color}`}
+            />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -7080,6 +7332,12 @@ function AutoSubtitlePanel({
                   autoSubtitleStrokeWidth: preset?.settings.stroke.width ?? form.autoSubtitleStrokeWidth,
                   autoSubtitleBackground: preset?.settings.background.enabled ?? form.autoSubtitleBackground,
                   autoSubtitlePosition: preset?.settings.positionV ?? form.autoSubtitlePosition,
+                  autoSubtitlePositionX: preset?.settings.positionX ?? form.autoSubtitlePositionX,
+                  autoSubtitlePositionY:
+                    preset?.settings.positionY ??
+                    (preset
+                      ? autoSubtitlePositionPercentFromVertical(preset.settings.positionV)
+                      : form.autoSubtitlePositionY),
                   autoSubtitleWordsPerLine: Math.max(
                     1,
                     Math.min(
@@ -7108,9 +7366,13 @@ function AutoSubtitlePanel({
                 { value: "middle", label: th ? "กลาง" : "Middle" },
                 { value: "bottom", label: th ? "ล่าง" : "Bottom" },
               ]}
-              onChange={(value) =>
-                onChange({ autoSubtitlePosition: value as StandaloneFormState["autoSubtitlePosition"] })
-              }
+              onChange={(value) => {
+                const position = value as StandaloneFormState["autoSubtitlePosition"];
+                onChange({
+                  autoSubtitlePosition: position,
+                  autoSubtitlePositionY: autoSubtitlePositionPercentFromVertical(position),
+                });
+              }}
             />
             <VoiceTranslateSelectCard
               label={copy.size}
@@ -8431,7 +8693,7 @@ function VoiceSettingsControls({
   }, [provider]);
 
   return (
-    <div className="flex flex-col gap-[5px]">
+    <div className="standalone-voice-settings flex flex-col gap-[4px] rounded-[13px] bg-white/[0.03] px-[8px] py-[6px] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       {provider === "elevenlabs" && (
         // ElevenLabs: live grid of the user's account voices. No
         // hardcoded preset catalog — what's in the API is what we show.
@@ -8464,7 +8726,7 @@ function VoiceSettingsControls({
             </div>
           )}
           {elevenVoices && elevenVoices.length > 0 && (
-            <div className="standalone-voice-controls ws-scroll-hide mt-[5px] grid max-h-[122px] grid-cols-3 gap-[5px] overflow-y-auto pr-0.5">
+            <div className="standalone-voice-controls ws-scroll-hide mt-[3px] grid max-h-[172px] grid-cols-3 gap-[4px] overflow-y-auto pb-1 pr-0.5">
               {elevenVoices.map((voice) => {
                 const active = voice.id === form.voice;
                 return (
@@ -8473,10 +8735,10 @@ function VoiceSettingsControls({
                     type="button"
                     onClick={() => onChange({ voice: voice.id })}
                     className={cn(
-                      "standalone-voice-card flex min-h-[46px] flex-col items-start justify-between rounded-[10px] border px-[8px] py-[5px] text-left transition",
+                      "standalone-voice-card flex min-h-[46px] flex-col items-start justify-between rounded-[10px] border px-[7px] py-[4px] text-left transition",
                       active
-                        ? "border-[#EFFF00]/60 bg-[#EFFF00]/10"
-                        : "border-white/[0.10] bg-[#242424] hover:border-[#EFFF00]/35 hover:bg-[#2d2d2d]",
+                        ? "border-[#EFFF00]/45 bg-[#EFFF00]/10 shadow-[0_0_14px_rgba(244,255,0,0.10)]"
+                        : "border-transparent bg-white/[0.055] hover:border-[#EFFF00]/25 hover:bg-white/[0.08]",
                     )}
                   >
                     <span
@@ -8489,10 +8751,10 @@ function VoiceSettingsControls({
                       {voice.name.charAt(0)}
                     </span>
                     <span className="min-w-0 w-full">
-                      <span className="block truncate text-[12px] font-bold leading-[15px] text-white">
+                      <span className="block truncate text-[11.5px] font-bold leading-[14px] text-white">
                         {voice.name}
                       </span>
-                      <span className="block truncate text-[10.5px] leading-[12px] text-zinc-500">
+                      <span className="block truncate text-[10px] leading-[11px] text-zinc-500">
                         {voice.characteristic}
                       </span>
                     </span>
@@ -8525,19 +8787,6 @@ function VoiceSettingsControls({
             onChange({ audioTagsPersonality })
           }
           onChangeSpeed={(audioSpeed) => onChange({ audioSpeed })}
-        />
-      )}
-      {provider !== "elevenlabs" && (
-        <TextInputField
-          label={t("workspace.standalone.voice_instructions")}
-          value={form.voiceStyle}
-          placeholder={
-            provider === "gemini"
-              ? t("workspace.standalone.voice_instructions_gemini_placeholder")
-              : t("workspace.standalone.voice_instructions_google_placeholder")
-          }
-          onChange={(voiceStyle) => onChange({ voiceStyle })}
-          compact
         />
       )}
     </div>
@@ -8579,7 +8828,7 @@ function GeminiVoicePicker({
         label="Voice"
         meta={`${GEMINI_TTS_VOICES.length} preset speakers`}
       />
-      <div className="standalone-voice-controls ws-scroll-hide mt-[5px] grid max-h-[122px] grid-cols-3 gap-[5px] overflow-y-auto pr-0.5">
+      <div className="standalone-voice-controls ws-scroll-hide mt-[3px] grid max-h-[172px] grid-cols-3 gap-[4px] overflow-y-auto pb-1 pr-0.5">
         {GEMINI_TTS_VOICES.map((voiceName) => {
           const active = value === voiceName;
           const isPlaying = playingId === voiceName;
@@ -8590,14 +8839,14 @@ function GeminiVoicePicker({
               type="button"
               onClick={() => onChange(voiceName)}
               className={cn(
-                "standalone-voice-card relative flex min-h-[46px] flex-col items-start justify-center rounded-[10px] border px-[8px] py-[5px] pr-[42px] text-left transition",
+                "standalone-voice-card relative flex min-h-[50px] flex-col items-start justify-center rounded-[10px] border px-[7px] py-[4px] pr-[50px] text-left transition",
                 active
-                  ? "border-[#EFFF00]/60 bg-[#EFFF00]/10"
-                  : "border-white/[0.10] bg-[#242424] hover:border-[#EFFF00]/35 hover:bg-[#2d2d2d]",
+                  ? "border-[#EFFF00]/45 bg-[#EFFF00]/10 shadow-[0_0_14px_rgba(244,255,0,0.10)]"
+                  : "border-transparent bg-white/[0.055] hover:border-[#EFFF00]/25 hover:bg-white/[0.08]",
               )}
             >
               <span
-                className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"
+                className="grid h-[21px] w-[21px] shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"
                 style={{
                   background:
                     TINT_PALETTE[pickTintFromName(voiceName)] ?? TINT_PALETTE.zinc,
@@ -8605,7 +8854,7 @@ function GeminiVoicePicker({
               >
                 {voiceName.charAt(0)}
               </span>
-              <span className="mt-[4px] block w-full truncate text-[12px] font-bold leading-[15px] text-white">
+              <span className="mt-[2px] block w-full truncate text-[11.5px] font-bold leading-[14px] text-white">
                 {voiceName}
               </span>
               {/* Preview ▶ — sits in the top-right of the card. We
@@ -8627,17 +8876,17 @@ function GeminiVoicePicker({
                   }
                 }}
                 className={cn(
-                  "absolute right-[7px] top-1/2 grid h-[30px] w-[30px] -translate-y-1/2 cursor-pointer place-items-center rounded-full transition",
-                  "bg-white/[0.10] text-zinc-100 hover:bg-white/[0.18] hover:text-white",
+                  "absolute right-[6px] top-1/2 grid h-[42px] w-[42px] -translate-y-1/2 cursor-pointer place-items-center rounded-full transition",
+                  "bg-white/[0.12] text-zinc-100 hover:bg-white/[0.20] hover:text-white",
                   isPlaying && "bg-[#EFFF00]/25 text-[#F4FF33]",
                 )}
               >
                 {isLoading ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <Loader2 className="h-[18px] w-[18px] animate-spin" />
                 ) : isPlaying ? (
-                  <Pause className="h-3.5 w-3.5" />
+                  <Pause className="h-[18px] w-[18px]" />
                 ) : (
-                  <Play className="h-3.5 w-3.5" />
+                  <Play className="h-[18px] w-[18px]" />
                 )}
               </span>
             </button>
@@ -8682,11 +8931,11 @@ function GeminiAudioTagsPanel({
   };
   const prefix = composeGeminiAudioTagPrefix({ emotion, personality, speed });
   return (
-    <div className="standalone-voice-controls ws-scroll-hide max-h-[142px] overflow-y-auto border-t border-white/[0.06] pt-[7px]">
+    <div className="standalone-voice-controls ws-scroll-hide max-h-[114px] overflow-y-auto pt-[1px]">
       <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
         Audio tags
       </div>
-      <p className="mt-[1px] text-[10.5px] leading-[13px] text-zinc-500">
+      <p className="mt-[1px] text-[10.5px] leading-[12px] text-zinc-500">
         เลือกอารมณ์ / บุคลิก / ความเร็ว — Gemini จะใช้ tag ในวงเล็บเพื่อปรับการอ่าน
       </p>
 
@@ -8703,11 +8952,11 @@ function GeminiAudioTagsPanel({
         onToggle={(tag) => toggle(personality, tag, onChangePersonality)}
       />
 
-      <div className="mt-[5px]">
+      <div className="mt-[4px]">
         <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
           ความเร็ว / Speed
         </div>
-        <div className="mt-[3px] inline-flex min-h-[24px] w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[11px]">
+        <div className="mt-[2px] inline-flex min-h-[22px] w-full items-center gap-1 rounded-lg bg-white/[0.045] p-0.5 text-[11px]">
           {GEMINI_SPEED_OPTIONS.map((opt) => {
             const active = speed === opt.id;
             return (
@@ -8716,7 +8965,7 @@ function GeminiAudioTagsPanel({
                 type="button"
                 onClick={() => onChangeSpeed(opt.id)}
                 className={cn(
-                  "flex-1 rounded-md px-2 py-[2px] text-center leading-[12px] transition-colors",
+                  "flex-1 rounded-md px-2 py-[1px] text-center leading-[12px] transition-colors",
                   active
                     ? "bg-white/[0.10] text-zinc-50"
                     : "text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100",
@@ -8754,11 +9003,11 @@ function TagChipRow({
   onToggle: (tag: string) => void;
 }) {
   return (
-    <div className="mt-[5px]">
+    <div className="mt-[4px]">
       <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
         {title}
       </div>
-      <div className="mt-[3px] flex flex-wrap gap-[3px]">
+      <div className="mt-[2px] flex flex-wrap gap-[3px]">
         {items.map((item) => {
           const active = selected.includes(item.tag);
           return (
@@ -8768,7 +9017,7 @@ function TagChipRow({
               onClick={() => onToggle(item.tag)}
               title={item.sub}
               className={cn(
-                "rounded-full px-[7px] py-[2px] text-[11px] font-medium leading-[12px] transition-colors",
+                "rounded-full px-[7px] py-[1px] text-[11px] font-medium leading-[12px] transition-colors",
                 active
                   ? "bg-amber-300/20 text-amber-200 ring-1 ring-amber-300/30"
                   : "bg-white/[0.05] text-zinc-300 hover:bg-white/[0.10] hover:text-white",
@@ -8802,11 +9051,11 @@ function ElevenLabsVoiceParams({
   ];
 
   return (
-    <div className="standalone-voice-controls border-t border-white/[0.06] pt-[7px]">
+    <div className="standalone-voice-controls pt-[1px]">
       <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
         {t("workspace.standalone.voice_style")}
       </div>
-      <div className="mt-[4px] inline-flex min-h-[26px] w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[11.5px]">
+      <div className="mt-[3px] inline-flex min-h-[24px] w-full items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[11.5px]">
         {presets.map((p) => {
           const active = form.voiceStylePreset === p.id;
           return (
@@ -8815,7 +9064,7 @@ function ElevenLabsVoiceParams({
               type="button"
               onClick={() => onChange({ voiceStylePreset: p.id })}
               className={cn(
-                "flex-1 rounded-md px-2 py-[3px] text-center leading-[12px] transition-colors",
+                "flex-1 rounded-md px-2 py-[2px] text-center leading-[12px] transition-colors",
                 active
                   ? "bg-white/[0.10] text-zinc-50"
                   : "text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100",
@@ -8895,7 +9144,7 @@ function RangeSlider({
   onChange: (v: number) => void;
 }) {
   return (
-    <div className="mt-[5px]">
+    <div className="mt-[4px]">
       <div className="flex items-center justify-between text-[10.5px] font-medium leading-[12px] text-zinc-300">
         <span>{label}</span>
         {meta && <span className="text-zinc-500">{meta}</span>}
@@ -8907,7 +9156,7 @@ function RangeSlider({
         step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="mt-[3px] h-1 w-full cursor-pointer appearance-none rounded-full bg-white/[0.08] accent-amber-300 outline-none"
+        className="mt-[2px] h-1 w-full cursor-pointer appearance-none rounded-full bg-white/[0.08] accent-amber-300 outline-none"
       />
     </div>
   );
@@ -9208,7 +9457,7 @@ function TextInputField({
         className={cn(
           "w-full border border-[var(--border-faint)] bg-[var(--bg-panel)] text-white outline-none placeholder:text-[var(--text-tertiary)] transition focus:border-[var(--brand-primary)]/40",
           compact
-            ? "mt-[5px] h-8 rounded-[10px] px-[10px] text-[11.5px]"
+            ? "mt-[4px] h-7 rounded-[9px] px-[9px] text-[11.5px]"
             : "mt-2 h-10 rounded-xl px-3 text-[12px]",
         )}
       />
@@ -9718,6 +9967,788 @@ function AutoSubtitleResultFeed({
   );
 }
 
+function AutoSubtitleMiniEditorPanel({
+  form,
+  results,
+  running,
+  progress,
+  onChange,
+  onEdit,
+  onDelete,
+}: {
+  form: StandaloneFormState;
+  results: AutoSubtitleResultItem[];
+  running: boolean;
+  progress: AutoSubtitleProgress | null;
+  onChange: (patch: Partial<StandaloneFormState>) => void;
+  onEdit: (result: AutoSubtitleResultItem) => void;
+  onDelete: (id: string) => void;
+}) {
+  const { language, t } = useLanguage();
+  const th = language === "th";
+  const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
+  const previewFrameRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const cueDragRef = useRef<AutoSubtitleMiniCueDrag | null>(null);
+  const cueDragMovedRef = useRef(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [selectedCueId, setSelectedCueId] = useState<string | null>(null);
+  const [cueTimingEdits, setCueTimingEdits] = useState<Record<string, AutoSubtitleMiniCueTiming>>({});
+  const media = form.autoSubtitleVideo;
+
+  useEffect(() => {
+    setSelectedResultId((current) => {
+      if (results.length === 0) return null;
+      const currentResult = results.find((result) => result.id === current);
+      if (!currentResult) return results[0]?.id ?? null;
+      if (
+        media &&
+        currentResult.sourceName !== media.name &&
+        results[0]?.sourceName === media.name
+      ) {
+        return results[0].id;
+      }
+      return current;
+    });
+  }, [media, results]);
+
+  const selectedResult =
+    results.find((result) => result.id === selectedResultId) ?? results[0] ?? null;
+  const selectedResultMatchesCurrentMedia =
+    !!selectedResult &&
+    !!media &&
+    (selectedResult.sourceName === media.name || selectedResult.sourceUrl === media.url);
+  const activeResult = media
+    ? selectedResultMatchesCurrentMedia
+      ? selectedResult
+      : null
+    : selectedResult;
+  const previewSourceUrl = activeResult?.sourceUrl || media?.url || activeResult?.outputUrl || null;
+  const playbackUrl = useFreshSignedUrl(previewSourceUrl);
+  const settings = autoSubtitleStyleFromForm(form);
+  const handoff = useMemo(
+    () => (activeResult?.handoffId ? loadAutoSubtitleHandoff(activeResult.handoffId) : null),
+    [activeResult?.handoffId],
+  );
+  const positionX = clampAutoSubtitlePosition(form.autoSubtitlePositionX, 0.5);
+  const positionY = clampAutoSubtitlePosition(
+    form.autoSubtitlePositionY,
+    autoSubtitlePositionPercentFromVertical(form.autoSubtitlePosition),
+  );
+  const sourceName =
+    activeResult?.outputName ?? media?.name ?? (th ? "ยังไม่มีวิดีโอ" : "No video yet");
+  const durationSeconds = activeResult?.duration ?? media?.durationSec ?? handoff?.source.duration ?? 0;
+  const activeSourceKey = activeResult?.id ?? media?.id ?? previewSourceUrl ?? "empty";
+
+  useEffect(() => {
+    setCurrentTime(0);
+    setVideoDuration(0);
+    setIsPlaying(false);
+    setSelectedCueId(null);
+    setCueTimingEdits({});
+  }, [activeSourceKey]);
+
+  const baseCues = useMemo(
+    () =>
+      activeResult
+        ? autoSubtitleMiniCues({
+            cues: handoff?.track.cues,
+            text: activeResult.transcriptText,
+            durationSeconds: durationSeconds || videoDuration,
+            language,
+            segmentationMode: form.autoSubtitleSegmentationMode,
+            wordsPerLine: form.autoSubtitleWordsPerLine,
+          })
+        : [],
+    [
+      activeResult,
+      durationSeconds,
+      form.autoSubtitleSegmentationMode,
+      form.autoSubtitleWordsPerLine,
+      handoff?.track.cues,
+      language,
+      videoDuration,
+    ],
+  );
+  const timelineCues = useMemo(
+    () =>
+      autoSubtitleApplyCueTimingEdits(
+        baseCues,
+        cueTimingEdits,
+        Math.max(durationSeconds, videoDuration, autoSubtitleLastCueEnd(baseCues), 1),
+      ),
+    [baseCues, cueTimingEdits, durationSeconds, videoDuration],
+  );
+  const displayDuration = Math.max(durationSeconds, videoDuration, autoSubtitleLastCueEnd(timelineCues), 1);
+  const activeCue = useMemo(
+    () =>
+      autoSubtitleMiniActiveCue(
+        timelineCues,
+        currentTime,
+        selectedCueId,
+        isPlaying,
+      ),
+    [currentTime, isPlaying, selectedCueId, timelineCues],
+  );
+  const previewPhrases = useMemo(
+    () =>
+      timelineCues.length > 0
+        ? timelineCues.slice(0, 4).map((cue) => cue.text)
+        : autoSubtitlePreviewPhrases(
+            language,
+            form.autoSubtitleWordsPerLine,
+            form.autoSubtitleSegmentationMode,
+          ),
+    [
+      form.autoSubtitleSegmentationMode,
+      form.autoSubtitleWordsPerLine,
+      language,
+      timelineCues,
+    ],
+  );
+  const overlayPhrases =
+    timelineCues.length > 0
+      ? activeCue
+        ? [activeCue.text]
+        : []
+      : previewPhrases;
+  const progressPercent = Math.max(0, Math.min(100, (currentTime / displayDuration) * 100));
+  const updateSubtitlePositionFromPoint = (clientX: number, clientY: number) => {
+    const rect = previewFrameRef.current?.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return;
+    const nextX = clampAutoSubtitlePosition((clientX - rect.left) / rect.width, positionX);
+    const nextY = clampAutoSubtitlePosition((clientY - rect.top) / rect.height, positionY);
+    onChange({
+      autoSubtitlePositionX: nextX,
+      autoSubtitlePositionY: nextY,
+      autoSubtitlePosition: autoSubtitleVerticalFromY(nextY),
+    });
+  };
+
+  const handleSubtitlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    updateSubtitlePositionFromPoint(event.clientX, event.clientY);
+  };
+
+  const handleSubtitlePointerMove = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.buttons !== 1) return;
+    event.preventDefault();
+    updateSubtitlePositionFromPoint(event.clientX, event.clientY);
+  };
+
+  const handleSubtitlePointerUp = (event: PointerEvent<HTMLButtonElement>) => {
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  };
+
+  const seekTo = (seconds: number) => {
+    const video = videoRef.current;
+    const nextTime = Math.max(0, Math.min(displayDuration, seconds));
+    if (video && Number.isFinite(nextTime)) {
+      video.currentTime = nextTime;
+    }
+    setCurrentTime(nextTime);
+    const cueAtTime = autoSubtitleMiniCueAtTime(timelineCues, nextTime);
+    if (cueAtTime) setSelectedCueId(cueAtTime.id);
+  };
+
+  const togglePlayback = async () => {
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      if (video.paused) {
+        await video.play();
+      } else {
+        video.pause();
+      }
+    } catch (err) {
+      toast.error(friendlyError(err, th ? "th" : "en"));
+    }
+  };
+
+  const seekFromTimelinePoint = (clientX: number) => {
+    const rect = timelineRef.current?.getBoundingClientRect();
+    if (!rect || rect.width <= 0) return;
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    seekTo(ratio * displayDuration);
+  };
+
+  const handleTimelinePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    seekFromTimelinePoint(event.clientX);
+  };
+
+  const handleTimelinePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.buttons !== 1 || cueDragRef.current) return;
+    event.preventDefault();
+    seekFromTimelinePoint(event.clientX);
+  };
+
+  const beginCueDrag = (
+    event: PointerEvent<HTMLElement>,
+    cue: AutoSubtitleMiniCue,
+    mode: AutoSubtitleMiniCueDrag["mode"],
+  ) => {
+    const rect = timelineRef.current?.getBoundingClientRect();
+    if (!rect || rect.width <= 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    cueDragMovedRef.current = false;
+    cueDragRef.current = {
+      id: cue.id,
+      mode,
+      startX: event.clientX,
+      originalStart: cue.start,
+      originalEnd: cue.end,
+      trackWidth: rect.width,
+      duration: displayDuration,
+    };
+    setSelectedCueId(cue.id);
+    seekTo(cue.start);
+  };
+
+  const handleCueDragMove = (event: PointerEvent<HTMLElement>) => {
+    const drag = cueDragRef.current;
+    if (!drag || event.buttons !== 1) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const deltaSeconds = ((event.clientX - drag.startX) / drag.trackWidth) * drag.duration;
+    if (Math.abs(deltaSeconds) > 0.02) cueDragMovedRef.current = true;
+    let nextStart = drag.originalStart;
+    let nextEnd = drag.originalEnd;
+    if (drag.mode === "move") {
+      nextStart += deltaSeconds;
+      nextEnd += deltaSeconds;
+    } else if (drag.mode === "start") {
+      nextStart += deltaSeconds;
+    } else {
+      nextEnd += deltaSeconds;
+    }
+    const nextTiming = autoSubtitleClampCueTiming(
+      timelineCues,
+      drag.id,
+      nextStart,
+      nextEnd,
+      displayDuration,
+    );
+    setCueTimingEdits((current) => ({ ...current, [drag.id]: nextTiming }));
+    setCurrentTime(nextTiming.start);
+  };
+
+  const handleCueDragEnd = (event: PointerEvent<HTMLElement>) => {
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    cueDragRef.current = null;
+  };
+
+  const handleCueClick = (cue: AutoSubtitleMiniCue) => {
+    if (cueDragMovedRef.current) {
+      cueDragMovedRef.current = false;
+      return;
+    }
+    setSelectedCueId(cue.id);
+    seekTo(cue.start);
+  };
+
+  const downloadResult = async (result: AutoSubtitleResultItem) => {
+    try {
+      const response = await fetch(result.outputUrl);
+      if (!response.ok) throw new Error("Could not read the generated subtitle video.");
+      const blob = await response.blob();
+      triggerBlobDownload(blob, result.outputName);
+      toast.success(t("workspace.stock.download_started"));
+    } catch (err) {
+      toast.error(friendlyError(err, th ? "th" : "en"));
+    }
+  };
+
+  return (
+    <div className="flex h-full min-h-[620px] overflow-hidden rounded-[18px] border border-white/[0.035] bg-[#101112]">
+      <AutoSubtitlePreviewKeyframes />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex h-[46px] shrink-0 items-center justify-between gap-3 border-b border-white/[0.055] bg-[#18191a] px-3 pr-[74px] 2xl:pr-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="grid h-[24px] w-[24px] place-items-center rounded-[7px] bg-[var(--brand-primary)]/10 text-[var(--brand-soft)]">
+              <Captions className="h-[13px] w-[13px]" />
+            </span>
+            <div className="min-w-0">
+              <span className="block truncate text-[12px] font-bold text-white">
+                {th ? "Mini subtitle editor" : "Mini subtitle editor"}
+              </span>
+              <span className="block truncate text-[10px] font-semibold text-zinc-500">
+                {previewSourceUrl
+                  ? th
+                    ? "ลากซับบนวิดีโอเพื่อกำหนดตำแหน่ง"
+                    : "Drag subtitle text on the video to set position"
+                  : th
+                    ? "อัปโหลดวิดีโอเพื่อเริ่ม preview"
+                    : "Upload a video to start previewing"}
+              </span>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="hidden h-7 items-center rounded-[7px] bg-white/[0.055] px-2 text-[11px] font-semibold text-zinc-300 md:inline-flex">
+              X {Math.round(positionX * 100)} / Y {Math.round(positionY * 100)}
+            </span>
+            {activeResult && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void downloadResult(activeResult)}
+                  className="grid h-7 w-7 place-items-center rounded-[7px] bg-white/[0.065] text-zinc-200 transition hover:bg-white/[0.1] hover:text-white"
+                  aria-label={th ? "ดาวน์โหลด" : "Download"}
+                  title={th ? "ดาวน์โหลด" : "Download"}
+                >
+                  <Download className="h-[14px] w-[14px]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onEdit(activeResult)}
+                  className="grid h-7 w-7 place-items-center rounded-[7px] bg-cyan-200 text-black transition hover:bg-cyan-100"
+                  aria-label={th ? "เปิด editor เต็ม" : "Open full editor"}
+                  title={th ? "เปิด editor เต็ม" : "Open full editor"}
+                >
+                  <ExternalLink className="h-[14px] w-[14px]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(activeResult.id)}
+                  className="grid h-7 w-7 place-items-center rounded-[7px] text-zinc-400 transition hover:bg-red-500/15 hover:text-red-200"
+                  aria-label={th ? "ลบผลลัพธ์" : "Delete result"}
+                  title={th ? "ลบผลลัพธ์" : "Delete result"}
+                >
+                  <Trash2 className="h-[14px] w-[14px]" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div ref={previewFrameRef} className="relative min-h-0 flex-1 overflow-hidden bg-[#080808]">
+          {playbackUrl ? (
+            <video
+              ref={videoRef}
+              src={playbackUrl}
+              controls
+              playsInline
+              preload="metadata"
+              className="h-full w-full object-contain"
+              onLoadedMetadata={(event) => {
+                const duration = Number(event.currentTarget.duration);
+                if (Number.isFinite(duration) && duration > 0) {
+                  setVideoDuration(duration);
+                }
+              }}
+              onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onEnded={() => setIsPlaying(false)}
+            />
+          ) : (
+            <div className="h-full bg-black" aria-label={th ? "ยังไม่มีวิดีโอ" : "No video loaded"}>
+              <div className="flex h-full items-center justify-center text-[12px] font-semibold text-zinc-700">
+                {th ? "ยังไม่มีวิดีโอ" : "No video yet"}
+              </div>
+            </div>
+          )}
+
+          {previewSourceUrl && overlayPhrases.length > 0 && (
+            <button
+              type="button"
+              onPointerDown={handleSubtitlePointerDown}
+              onPointerMove={handleSubtitlePointerMove}
+              onPointerUp={handleSubtitlePointerUp}
+              style={{
+                left: `${positionX * 100}%`,
+                top: `${positionY * 100}%`,
+                transform: "translate(-50%, -50%)",
+              }}
+              className="group absolute z-20 flex min-w-[180px] cursor-grab touch-none items-center justify-center rounded-[12px] px-2 py-1 outline-none transition hover:bg-black/20 active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-cyan-200/80"
+              title={th ? "ลากเพื่อปรับตำแหน่ง subtitle" : "Drag to move subtitle"}
+            >
+              <span className="pointer-events-none">
+                <AutoSubtitleAnimatedPreview
+                  settings={settings}
+                  phrases={overlayPhrases}
+                  language={th ? "th" : "en"}
+                />
+              </span>
+              <span className="absolute -right-2 -top-2 grid h-5 w-5 place-items-center rounded-full border border-white/15 bg-black/75 text-zinc-200 opacity-0 shadow transition group-hover:opacity-100">
+                <GripVertical className="h-3 w-3" />
+              </span>
+            </button>
+          )}
+
+          {(running || progress) && (
+            <div className="absolute inset-0 grid place-items-center bg-black/42 backdrop-blur-[1px]">
+              <div className="min-w-[240px] rounded-[16px] border border-cyan-200/15 bg-black/75 p-4 text-center shadow-[0_18px_48px_-28px_rgba(103,232,249,.55)]">
+                <Loader2 className="mx-auto h-6 w-6 animate-spin text-cyan-100" />
+                <p className="mt-3 text-[13px] font-bold text-white">
+                  {progress?.message ?? (th ? "กำลังสร้างซับ" : "Generating subtitles")}
+                </p>
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-cyan-200 transition-all"
+                    style={{ width: `${Math.max(4, Math.min(100, progress?.progress ?? 12))}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="shrink-0 border-t border-white/[0.055] bg-[#151617] p-2.5">
+          <div className="mb-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="min-w-0 rounded-[10px] border border-white/[0.06] bg-black/20 px-3 py-2">
+              <div className="truncate text-[12px] font-bold text-white">
+                {activeResult
+                  ? activeResult.outputName
+                  : media
+                    ? media.name
+                    : th
+                      ? "ยังไม่มี result"
+                      : "No result yet"}
+              </div>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {activeResult ? (
+                  <>
+                    <MiniMeta label={`${activeResult.cueCount} cues`} />
+                    <MiniMeta label={activeResult.outputExtension.toUpperCase()} />
+                    <MiniMeta label={`${Math.max(1, Math.round(activeResult.duration))}s`} />
+                  </>
+                ) : media ? (
+                  <>
+                    <MiniMeta label={th ? "Preview source" : "Preview source"} />
+                    <MiniMeta label={media.mime?.split("/").pop()?.toUpperCase() ?? "VIDEO"} />
+                    <MiniMeta label={media.durationSec ? `${Math.round(media.durationSec)}s` : "Draft"} />
+                  </>
+                ) : (
+                  <MiniMeta label={th ? "ว่าง" : "Empty"} />
+                )}
+              </div>
+            </div>
+            {activeResult && (
+              <div className="grid grid-cols-2 gap-2 md:w-[240px]">
+                <button
+                  type="button"
+                  onClick={() => void downloadResult(activeResult)}
+                  className="flex h-10 items-center justify-center gap-2 rounded-[10px] border border-white/10 bg-white/[0.045] text-[12px] font-bold text-zinc-100 transition hover:bg-white/[0.08]"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {th ? "ดาวน์โหลด" : "Download"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onEdit(activeResult)}
+                  className="flex h-10 items-center justify-center gap-2 rounded-[10px] bg-cyan-200 text-[12px] font-bold text-black transition hover:bg-cyan-100"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  {th ? "แก้ไข" : "Edit"}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {results.length > 1 && (
+            <div className="mb-2 flex gap-1.5 overflow-x-auto pb-1">
+              {results.slice(0, 8).map((result) => (
+                <button
+                  key={result.id}
+                  type="button"
+                  onClick={() => setSelectedResultId(result.id)}
+                  className={cn(
+                    "h-7 max-w-[180px] shrink-0 truncate rounded-[7px] border px-2 text-left text-[11px] font-semibold transition",
+                    selectedResult?.id === result.id
+                      ? "border-[var(--brand-primary)] bg-[var(--brand-primary)] text-black"
+                      : "border-white/[0.07] bg-white/[0.04] text-zinc-300 hover:border-white/20",
+                  )}
+                >
+                  {result.outputName}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="mb-2 flex items-center justify-between gap-2 text-[11px] font-semibold text-zinc-400">
+            <span>{autoSubtitleMiniDuration(currentTime)}</span>
+            <button
+              type="button"
+              onClick={() => void togglePlayback()}
+              disabled={!playbackUrl}
+              className="grid h-7 w-7 place-items-center rounded-full bg-white/[0.06] text-zinc-100 transition hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-35"
+              aria-label={isPlaying ? "Pause preview" : "Play preview"}
+            >
+              {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+            </button>
+            <span>{autoSubtitleMiniDuration(displayDuration)}</span>
+          </div>
+
+          <div
+            ref={timelineRef}
+            onPointerDown={handleTimelinePointerDown}
+            onPointerMove={handleTimelinePointerMove}
+            className="relative grid grid-cols-[92px_minmax(0,1fr)] gap-y-1.5 text-[11px]"
+          >
+            <div
+              className="pointer-events-none absolute bottom-0 top-0 z-20 w-px bg-[var(--brand-primary)]/90 shadow-[0_0_10px_rgba(244,255,0,.75)]"
+              style={{ left: `calc(92px + (100% - 92px) * ${progressPercent / 100})` }}
+            />
+            <div className="flex h-8 items-center rounded-l-[8px] bg-[#1b151f] px-2 font-bold text-purple-200">
+              {th ? "Subtitle" : "Subtitle"}
+            </div>
+            <div className="relative h-8 min-w-0 overflow-hidden rounded-r-[8px] bg-[#120f16] px-1.5">
+              {timelineCues.length > 0 ? (
+                timelineCues.map((cue) => {
+                  const left = Math.max(0, Math.min(100, (cue.start / displayDuration) * 100));
+                  const width = Math.max(2.8, Math.min(100 - left, ((cue.end - cue.start) / displayDuration) * 100));
+                  const active = activeCue?.id === cue.id || selectedCueId === cue.id;
+                  return (
+                    <button
+                      key={cue.id}
+                      type="button"
+                      onClick={() => handleCueClick(cue)}
+                      onPointerDown={(event) => beginCueDrag(event, cue, "move")}
+                      onPointerMove={handleCueDragMove}
+                      onPointerUp={handleCueDragEnd}
+                      onPointerCancel={handleCueDragEnd}
+                      className={cn(
+                        "absolute top-1 flex h-6 min-w-[34px] cursor-grab touch-none items-center justify-center truncate rounded-[7px] border px-2 text-[10px] font-bold transition active:cursor-grabbing",
+                        active
+                          ? "border-purple-200 bg-purple-500/75 text-white shadow-[0_0_14px_rgba(216,180,254,.34)]"
+                          : "border-purple-300/20 bg-purple-700/45 text-purple-50 hover:border-purple-200/55",
+                      )}
+                      style={{ left: `${left}%`, width: `${width}%` }}
+                      title={th ? "ลากเพื่อย้ายเวลา จับขอบเพื่อยืด/หดช่วง subtitle" : "Drag to move timing. Drag edges to resize."}
+                    >
+                      <span
+                        role="presentation"
+                        onPointerDown={(event) => beginCueDrag(event, cue, "start")}
+                        className="absolute inset-y-0 left-0 w-2 cursor-ew-resize rounded-l-[7px] bg-white/0 hover:bg-white/20"
+                      />
+                      <span className="truncate">{cue.text}</span>
+                      <span
+                        role="presentation"
+                        onPointerDown={(event) => beginCueDrag(event, cue, "end")}
+                        className="absolute inset-y-0 right-0 w-2 cursor-ew-resize rounded-r-[7px] bg-white/0 hover:bg-white/20"
+                      />
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="flex h-full items-center px-2 text-[10px] font-semibold text-zinc-600">
+                  {th ? "ยังไม่มี subtitle track" : "No subtitle track yet"}
+                </div>
+              )}
+            </div>
+            <div className="flex h-7 items-center rounded-l-[8px] bg-[#101826] px-2 font-bold text-sky-200">
+              {th ? "Media" : "Media"}
+            </div>
+            <div
+              className="relative h-7 min-w-0 overflow-hidden rounded-r-[8px] bg-sky-500/25"
+              onClick={() => seekTo(0)}
+            >
+              <div className="absolute inset-y-1 left-1 right-1 rounded-[6px] border border-sky-200/25 bg-sky-500/35" />
+              <span className="absolute inset-y-0 left-3 flex max-w-[75%] items-center truncate text-[10px] font-semibold text-sky-50">
+                {sourceName}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface AutoSubtitleMiniCue {
+  id: string;
+  text: string;
+  start: number;
+  end: number;
+}
+
+interface AutoSubtitleMiniCueTiming {
+  start: number;
+  end: number;
+}
+
+interface AutoSubtitleMiniCueDrag {
+  id: string;
+  mode: "move" | "start" | "end";
+  startX: number;
+  originalStart: number;
+  originalEnd: number;
+  trackWidth: number;
+  duration: number;
+}
+
+function autoSubtitleMiniCues({
+  cues,
+  text,
+  language,
+  segmentationMode,
+  wordsPerLine,
+  durationSeconds,
+}: {
+  cues?: AutoSuptitleCue[] | null;
+  text?: string | null;
+  language: ReturnType<typeof useLanguage>["language"];
+  segmentationMode: AutoSubtitleSegmentationMode;
+  wordsPerLine: number;
+  durationSeconds: number;
+}): AutoSubtitleMiniCue[] {
+  if (Array.isArray(cues) && cues.length > 0) {
+    return cues
+      .map((cue, index) => {
+        const start = Math.max(0, Number(cue.startTime) || 0);
+        const end = Math.max(start + 0.12, Number(cue.endTime) || start + 0.8);
+        const textValue = String(cue.text ?? "").replace(/\s+/g, " ").trim();
+        if (!textValue) return null;
+        return {
+          id: `cue-${index}-${start.toFixed(2)}`,
+          text: textValue,
+          start,
+          end,
+        } satisfies AutoSubtitleMiniCue;
+      })
+      .filter((cue): cue is AutoSubtitleMiniCue => Boolean(cue))
+      .sort((a, b) => a.start - b.start)
+      .slice(0, 80);
+  }
+
+  const clean = (text ?? "").replace(/\s+/g, " ").trim();
+  if (!clean) return [];
+  const sentenceParts = clean
+    .split(/(?<=[.!?。！？])\s+|[|]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  let parts: string[];
+  if (segmentationMode === "sentence" && sentenceParts.length > 1) {
+    parts = sentenceParts.slice(0, 24);
+  } else {
+    const tokens = clean.match(/[A-Za-z0-9]+(?:['-][A-Za-z0-9]+)?|[\u0E00-\u0E7F]+|[^\s]/g) ?? [];
+    const groupSize = segmentationMode === "words"
+      ? Math.max(1, Math.min(AUTO_SUBTITLE_MAX_WORD_SPLIT, wordsPerLine || 4))
+      : 4;
+    parts = [];
+    for (let index = 0; index < tokens.length; index += groupSize) {
+      parts.push(tokens.slice(index, index + groupSize).join(" "));
+    }
+  }
+  const duration = Math.max(1, durationSeconds || parts.length * 1.25);
+  const slot = duration / Math.max(1, parts.length);
+  return parts.slice(0, 80).map((part, index) => ({
+    id: `fallback-${index}`,
+    text: part,
+    start: index * slot,
+    end: Math.min(duration, Math.max(index * slot + 0.6, (index + 1) * slot - 0.04)),
+  }));
+}
+
+function autoSubtitleLastCueEnd(cues: readonly AutoSubtitleMiniCue[]): number {
+  return cues.reduce((end, cue) => Math.max(end, cue.end), 0);
+}
+
+function autoSubtitleApplyCueTimingEdits(
+  cues: readonly AutoSubtitleMiniCue[],
+  edits: Record<string, AutoSubtitleMiniCueTiming>,
+  duration: number,
+): AutoSubtitleMiniCue[] {
+  const safeDuration = Math.max(0.2, duration);
+  const sorted = [...cues].sort((a, b) => a.start - b.start);
+  const applied: AutoSubtitleMiniCue[] = [];
+  for (let index = 0; index < sorted.length; index += 1) {
+    const cue = sorted[index];
+    const edit = edits[cue.id];
+    const minDuration = 0.16;
+    const previousEnd = applied[applied.length - 1]?.end ?? 0;
+    const nextStart = sorted[index + 1]?.start ?? safeDuration;
+    const requestedStart = edit?.start ?? cue.start;
+    const requestedEnd = edit?.end ?? cue.end;
+    const start = Math.max(
+      previousEnd,
+      Math.min(requestedStart, Math.max(previousEnd, nextStart - minDuration)),
+    );
+    const end = Math.max(
+      start + minDuration,
+      Math.min(requestedEnd, safeDuration, nextStart),
+    );
+    applied.push({
+      ...cue,
+      start: Number(start.toFixed(3)),
+      end: Number(Math.min(safeDuration, end).toFixed(3)),
+    });
+  }
+  return applied;
+}
+
+function autoSubtitleClampCueTiming(
+  cues: readonly AutoSubtitleMiniCue[],
+  cueId: string,
+  start: number,
+  end: number,
+  duration: number,
+): AutoSubtitleMiniCueTiming {
+  const sorted = [...cues].sort((a, b) => a.start - b.start);
+  const index = sorted.findIndex((cue) => cue.id === cueId);
+  const minDuration = 0.16;
+  const prevEnd = index > 0 ? sorted[index - 1].end : 0;
+  const nextStart = index >= 0 && index < sorted.length - 1 ? sorted[index + 1].start : duration;
+  const originalLength = Math.max(minDuration, end - start);
+  let nextStartValue = Math.max(prevEnd, Math.min(start, duration - minDuration));
+  let nextEndValue = Math.max(nextStartValue + minDuration, Math.min(end, duration));
+
+  if (nextEndValue > nextStart) {
+    nextEndValue = Math.max(prevEnd + minDuration, nextStart);
+    if (nextStartValue + minDuration > nextEndValue) {
+      nextStartValue = Math.max(prevEnd, nextEndValue - minDuration);
+    }
+  }
+  if (nextStartValue < prevEnd) {
+    nextStartValue = prevEnd;
+    nextEndValue = Math.min(duration, nextStartValue + originalLength);
+  }
+  if (nextEndValue - nextStartValue < minDuration) {
+    nextEndValue = Math.min(duration, nextStartValue + minDuration);
+  }
+  return {
+    start: Number(nextStartValue.toFixed(3)),
+    end: Number(nextEndValue.toFixed(3)),
+  };
+}
+
+function autoSubtitleMiniCueAtTime(
+  cues: readonly AutoSubtitleMiniCue[],
+  time: number,
+): AutoSubtitleMiniCue | null {
+  return cues.find((cue) => time >= cue.start - 0.04 && time < cue.end) ?? null;
+}
+
+function autoSubtitleMiniActiveCue(
+  cues: readonly AutoSubtitleMiniCue[],
+  currentTime: number,
+  selectedCueId: string | null,
+  isPlaying: boolean,
+): AutoSubtitleMiniCue | null {
+  const currentCue = autoSubtitleMiniCueAtTime(cues, currentTime);
+  if (currentCue) return currentCue;
+  if (!isPlaying && selectedCueId) {
+    return cues.find((cue) => cue.id === selectedCueId) ?? null;
+  }
+  return null;
+}
+
+function autoSubtitleMiniDuration(seconds: number | null | undefined): string {
+  const safeSeconds = Math.max(0, Math.round(Number(seconds) || 0));
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainder = safeSeconds % 60;
+  return `00:${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
+}
+
 function CreationFeed({
   jobs,
   loading,
@@ -9851,6 +10882,70 @@ const firstFiniteNumber = (...values: Array<unknown>): number | undefined => {
   }
   return undefined;
 };
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function storageBucketFromUnknown(value: unknown): "ai-media" | "user_assets" | undefined {
+  const bucket = firstText(value);
+  return bucket === "ai-media" || bucket === "user_assets" ? bucket : undefined;
+}
+
+function storedCaptionSettings(value: unknown): CaptionStyleSettings | null {
+  if (!isPlainRecord(value)) return null;
+  const stroke = isPlainRecord(value.stroke) ? value.stroke : {};
+  const shadow = isPlainRecord(value.shadow) ? value.shadow : {};
+  const background = isPlainRecord(value.background) ? value.background : {};
+  return {
+    ...DEFAULT_CAPTION_SETTINGS,
+    ...value,
+    stroke: {
+      ...DEFAULT_CAPTION_SETTINGS.stroke,
+      ...stroke,
+    },
+    shadow: {
+      ...DEFAULT_CAPTION_SETTINGS.shadow,
+      ...shadow,
+    },
+    background: {
+      ...DEFAULT_CAPTION_SETTINGS.background,
+      ...background,
+    },
+  } as CaptionStyleSettings;
+}
+
+function storedAutoSubtitleCues(value: unknown): AutoSuptitleCue[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((rawCue) => {
+      if (!isPlainRecord(rawCue)) return null;
+      const startTime = firstFiniteNumber(rawCue.startTime, rawCue.start_time, rawCue.start);
+      const endTime = firstFiniteNumber(rawCue.endTime, rawCue.end_time, rawCue.end);
+      const text = firstText(rawCue.text, rawCue.word);
+      if (startTime == null || endTime == null || !text || endTime <= startTime) {
+        return null;
+      }
+      const rawWords = Array.isArray(rawCue.words) ? rawCue.words : [];
+      const words = rawWords
+        .map((rawWord) => {
+          if (!isPlainRecord(rawWord)) return null;
+          const wordText = firstText(rawWord.text, rawWord.word);
+          const start = firstFiniteNumber(rawWord.start);
+          const end = firstFiniteNumber(rawWord.end);
+          if (!wordText || start == null || end == null || end < start) return null;
+          return { text: wordText, start, end };
+        })
+        .filter((word): word is AutoSuptitleCue["words"][number] => Boolean(word));
+      return {
+        text,
+        startTime,
+        endTime,
+        words: words.length > 0 ? words : [{ text, start: startTime, end: endTime }],
+      } satisfies AutoSuptitleCue;
+    })
+    .filter((cue): cue is AutoSuptitleCue => Boolean(cue));
+}
 
 function cleanReferenceFileName(value: string | undefined): string | undefined {
   if (!value) return undefined;
@@ -11207,12 +12302,63 @@ async function autoSubtitleResultFromUserAsset(
   const rawMime = firstText(metadata.output_mime, row.file_type, metadata.mime_type);
   const outputMime = storageSafeAutoSubtitleMime(rawMime, extension);
   const parsedCreatedAt = Date.parse(firstText(row.created_at) ?? "");
+  const createdAt =
+    firstFiniteNumber(metadata.created_at_ms) ??
+    (Number.isFinite(parsedCreatedAt) ? parsedCreatedAt : Date.now());
+  const duration = firstFiniteNumber(metadata.duration) ?? 0;
+  const sourceStorageBucket = storageBucketFromUnknown(metadata.source_storage_bucket);
+  const sourceStoragePath = firstText(metadata.source_storage_path);
+  let sourceUrl = firstText(metadata.source_url) ?? "";
+  if (sourceStorageBucket && sourceStoragePath) {
+    try {
+      sourceUrl = await createStorageSignedUrl(sourceStorageBucket, sourceStoragePath);
+    } catch (err) {
+      console.warn("[AutoSubtitle] could not refresh saved source URL:", err);
+    }
+  }
+  const storedCues = storedAutoSubtitleCues(metadata.subtitle_cues);
+  const storedStyle = storedCaptionSettings(metadata.subtitle_style);
+  const rawMeta = isPlainRecord(metadata.subtitle_meta) ? metadata.subtitle_meta : {};
+  const handoffIdFromMetadata = firstText(metadata.handoff_id);
+  let handoffId = handoffIdFromMetadata ?? "";
+  const hasLocalHandoff = handoffId ? Boolean(loadAutoSubtitleHandoff(handoffId)) : false;
+  if ((!handoffId || !hasLocalHandoff) && storedCues.length > 0 && storedStyle && sourceUrl) {
+    handoffId = saveAutoSubtitleHandoff({
+      version: 1,
+      feature: "auto-suptitle",
+      source: {
+        url: sourceUrl,
+        fileName: firstText(metadata.source_name, metadata.source_file_name) ?? "Source video",
+        mime: firstText(metadata.source_mime) ?? "video/mp4",
+        duration,
+      },
+      track: {
+        name: AUTO_SUPTITLE_TRACK_NAME,
+        cues: storedCues,
+        meta: {
+          groupId:
+            firstText(rawMeta.groupId, rawMeta.group_id) ??
+            `${AUTO_SUPTITLE_GROUP_PREFIX}-${createdAt}`,
+          generatedAt: firstFiniteNumber(rawMeta.generatedAt, rawMeta.generated_at) ?? createdAt,
+          language: firstText(rawMeta.language, metadata.language) ?? "auto",
+          sourceClipId: firstText(rawMeta.sourceClipId, rawMeta.source_clip_id, metadata.source_clip_id),
+          animation: firstText(rawMeta.animation, metadata.animation) as CaptionAnimation | undefined,
+          highlightColor:
+            firstText(rawMeta.highlightColor, rawMeta.highlight_color, metadata.highlight_color) ??
+            storedStyle.highlightColor,
+        },
+      },
+      style: storedStyle,
+      transcriptText: firstText(metadata.transcript_text) ?? storedCues.map((cue) => cue.text).join(" "),
+      createdAt,
+    });
+  }
 
   return {
     id: String(row.id ?? outputStoragePath ?? rawUrl),
     assetId: row.id != null ? String(row.id) : undefined,
     sourceName: firstText(metadata.source_name, metadata.source_file_name) ?? "Source video",
-    sourceUrl: firstText(metadata.source_url) ?? "",
+    sourceUrl,
     outputUrl,
     outputName,
     outputMime,
@@ -11221,11 +12367,11 @@ async function autoSubtitleResultFromUserAsset(
     outputStoragePath,
     cueCount: firstFiniteNumber(metadata.cue_count) ?? 0,
     transcriptText: firstText(metadata.transcript_text) ?? "",
-    handoffId: firstText(metadata.handoff_id) ?? "",
+    handoffId,
     editorProjectId: firstText(metadata.editor_project_id),
     editorProjectError: firstText(metadata.editor_project_error),
-    createdAt: firstFiniteNumber(metadata.created_at_ms) ?? (Number.isFinite(parsedCreatedAt) ? parsedCreatedAt : Date.now()),
-    duration: firstFiniteNumber(metadata.duration) ?? 0,
+    createdAt,
+    duration,
   };
 }
 
@@ -11237,6 +12383,9 @@ async function persistAutoSubtitleResultAsset({
   outputName,
   outputMime,
   outputExtension,
+  cues,
+  settings,
+  trackMeta,
   cueCount,
   transcriptText,
   handoffId,
@@ -11252,6 +12401,9 @@ async function persistAutoSubtitleResultAsset({
   outputName: string;
   outputMime: string;
   outputExtension: "mp4" | "webm";
+  cues: AutoSuptitleCue[];
+  settings: CaptionStyleSettings;
+  trackMeta: AutoSuptitleResult["meta"];
   cueCount: number;
   transcriptText: string;
   handoffId: string;
@@ -11291,8 +12443,13 @@ async function persistAutoSubtitleResultAsset({
     output_extension: outputExtension,
     source_name: source.name,
     source_url: source.url,
+    source_storage_bucket: source.storageBucket,
+    source_storage_path: source.storagePath,
     source_mime: source.mime,
     source_duration: source.durationSec,
+    subtitle_cues: cues,
+    subtitle_style: settings,
+    subtitle_meta: trackMeta,
     cue_count: cueCount,
     transcript_text: transcriptText,
     handoff_id: handoffId,
@@ -11681,6 +12838,11 @@ function buildCurrentParams(
       fill: form.autoSubtitleFill,
       highlight_color: form.autoSubtitleHighlightColor,
       position: form.autoSubtitlePosition,
+      position_x: clampAutoSubtitlePosition(form.autoSubtitlePositionX, 0.5),
+      position_y: clampAutoSubtitlePosition(
+        form.autoSubtitlePositionY,
+        autoSubtitlePositionPercentFromVertical(form.autoSubtitlePosition),
+      ),
       transition: form.autoSubtitleTransition,
       text_animation: form.autoSubtitleTextAnimation,
       segmentation_mode: form.autoSubtitleSegmentationMode,

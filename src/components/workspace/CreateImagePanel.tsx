@@ -294,9 +294,6 @@ function CostDiscountLine({ quote }: { quote?: CreatePanelCostQuote | null }) {
           {packageLabel} -{quote.packageDiscountPercent}%
         </span>
       )}
-      {quote.totalDiscountPercent > 0 && (
-        <span className="text-neutral-500">Total -{quote.totalDiscountPercent}%</span>
-      )}
     </div>
   );
 }
@@ -564,7 +561,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
       <div
         className={clsx(
           "flex flex-1 min-h-0 flex-col overflow-y-auto px-[12px]",
-          compactVoice ? "gap-[6px] pb-[50px]" : "gap-[12px] pb-[12px]",
+          compactVoice ? "gap-[3px] pb-[46px]" : "gap-[12px] pb-[12px]",
         )}
       >
         {/* Model Selector */}
@@ -613,8 +610,8 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
         {(showPromptInput || showReferences) && (
         <section
           className={clsx(
-            "shrink-0 rounded-[16px] border border-white/[0.05] bg-[#151719] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]",
-            compactVoice ? "min-h-[168px] p-[9px]" : "p-[10px]",
+            "shrink-0 rounded-[16px] bg-[#151719] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]",
+            compactVoice ? "min-h-[92px] border border-transparent p-[8px]" : "border border-white/[0.05] p-[10px]",
           )}
           onPasteCapture={handlePromptPaste}
           onDragEnterCapture={handlePromptDragOver}
@@ -707,11 +704,11 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
               onChange={updatePrompt}
               placeholder={resolvedPromptPlaceholder}
               mentionOptions={mentionOptions}
-              maxHeightPx={compactVoice ? 104 : undefined}
+              maxHeightPx={compactVoice ? 48 : undefined}
               className={clsx(
                 "mt-[8px] rounded-none border-transparent bg-transparent px-[4px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-transparent focus:ring-0",
                 compactVoice
-                  ? "min-h-[76px] max-h-[104px] py-[5px]"
+                  ? "min-h-[34px] max-h-[48px] py-[1px]"
                   : "min-h-[116px] max-h-[230px] py-[8px]",
               )}
             />
@@ -771,7 +768,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
           <div
             className={clsx(
               "flex shrink-0 flex-col",
-              compactVoice ? "gap-[6px]" : "gap-[10px]",
+              compactVoice ? "gap-[5px]" : "gap-[10px]",
             )}
           >
             {extraControls}

@@ -817,6 +817,37 @@ describe("Auto Suptitle segmenter", () => {
     }
   });
 
+  it("does not create Thai sentence cues from unmatched Whisper timing noise", () => {
+    const cues = buildAutoSuptitleCuesFromResponse(
+      {
+        language: "thai",
+        duration: 4,
+        text: "ถูกต้องแล้วไปต่อ",
+        suggested_cues: ["ถูกต้อง", "แล้วไปต่อ"],
+        words: [
+          { word: "ถูก", start: 0, end: 0.22 },
+          { word: "ววดคปคุมชุบับได้", start: 0.72, end: 1.2 },
+          { word: "ต่อ", start: 1.5, end: 1.78 },
+        ],
+      },
+      0,
+      { ...DEFAULT_CAPTION_SETTINGS, case: "normal" },
+      {
+        ...DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+        segmentationMode: "sentence",
+        maxCharsPerLine: 40,
+        maxLineDuration: 3,
+        maxHoldAfterSpeech: 0.5,
+      },
+      "th",
+    );
+
+    const joined = cues.map((cue) => cue.text).join(" ");
+    expect(joined).toContain("ถูกต้อง");
+    expect(joined).toContain("แล้วไปต่อ");
+    expect(joined).not.toContain("ววดคปคุม");
+  });
+
   it("anchors mismatched GPT-planned sentence cues to real timing words", () => {
     const cues = buildAutoSuptitleCuesFromResponse(
       {

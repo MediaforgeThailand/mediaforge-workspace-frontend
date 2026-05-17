@@ -53,12 +53,18 @@ export function autoSuptitlePositionToTransform(
   refHeight = 1080,
   refWidth = 1920,
 ): { x: number; y: number } {
-  let x = 0.5;
-  let y = 0.5;
-  if (settings.positionH === "left") x = settings.margin / refWidth;
-  else if (settings.positionH === "right") x = 1 - settings.margin / refWidth;
-  if (settings.positionV === "top") y = settings.margin / refHeight;
-  else if (settings.positionV === "bottom") y = 1 - settings.margin / refHeight;
+  let x = typeof settings.positionX === "number" ? settings.positionX : 0.5;
+  let y = typeof settings.positionY === "number" ? settings.positionY : 0.5;
+  if (typeof settings.positionX !== "number") {
+    if (settings.positionH === "left") x = settings.margin / refWidth;
+    else if (settings.positionH === "right") x = 1 - settings.margin / refWidth;
+  }
+  if (typeof settings.positionY !== "number") {
+    if (settings.positionV === "top") y = settings.margin / refHeight;
+    else if (settings.positionV === "bottom") y = 1 - settings.margin / refHeight;
+  }
+  x = Math.max(0.02, Math.min(0.98, x));
+  y = Math.max(0.02, Math.min(0.98, y));
   return { x, y };
 }
 

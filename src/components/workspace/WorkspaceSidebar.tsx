@@ -217,6 +217,7 @@ export interface WorkspaceSidebarProps {
   projects?: ProjectMeta[];
   activeProjectId?: string | null;
   onSelectProject?: (id: string | null) => void;
+  collapsed?: boolean;
 }
 
 export default function WorkspaceSidebar({
@@ -226,6 +227,7 @@ export default function WorkspaceSidebar({
   projects = [],
   activeProjectId = null,
   onSelectProject,
+  collapsed = false,
 }: WorkspaceSidebarProps) {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
@@ -272,9 +274,17 @@ export default function WorkspaceSidebar({
   //     panel from the main content (different elevation).
   //   • Width tightened 198 → 192 keeps the visual rhythm.
   return (
-    <div className="ws-scroll-hide h-full shrink-0 bg-[#070808] py-2 pl-0">
+    <div
+      className={cn(
+        "ws-scroll-hide h-full shrink-0 bg-[#070808] py-2 pl-0 transition-[width] duration-200",
+        collapsed ? "w-[66px]" : "w-[230px]",
+      )}
+    >
       <aside
-        className="mf-readable ws-scroll-hide flex h-full w-[230px] flex-col gap-[4px] overflow-y-auto rounded-[18px] border border-white/[0.10] px-[6px] py-[12px] text-[#b0b4ba]"
+        className={cn(
+          "mf-readable ws-scroll-hide flex h-full flex-col gap-[4px] overflow-y-auto rounded-[18px] border border-white/[0.10] py-[12px] text-[#b0b4ba] transition-[width,padding] duration-200",
+          collapsed ? "w-[60px] px-[5px]" : "w-[230px] px-[6px]",
+        )}
         style={{
           background:
             "radial-gradient(95% 70% at 50% -10%, rgba(234,255,0,.04), transparent 50%), linear-gradient(180deg, #171a19 0%, #111313 46%, #0c0d0d 100%)",
@@ -287,11 +297,15 @@ export default function WorkspaceSidebar({
        *  Digital Media wordmark there; the full lockup is wide
        *  so we use object-contain to fit the 34px square slot
        *  without distorting the trefoil + wordmark proportions. */}
-      <div className="flex shrink-0 items-center px-[12px] pb-[12px] pt-[4px]">
+      <div className={cn("flex shrink-0 items-center pb-[12px] pt-[4px]", collapsed ? "justify-center px-0" : "px-[12px]")}>
         <button
           type="button"
           onClick={() => navigate("/app/workspace")}
-          className="flex min-w-0 items-center gap-[8px] text-[18px] font-bold text-white transition-colors hover:text-white"
+          title={brandName}
+          className={cn(
+            "flex min-w-0 items-center text-[18px] font-bold text-white transition-colors hover:text-white",
+            collapsed ? "justify-center gap-0" : "gap-[8px]",
+          )}
         >
           {/* Brand logo — defaults to the MediaForge mark, swapped
            *  to the tenant org logo when the user is on a claimed
@@ -301,17 +315,19 @@ export default function WorkspaceSidebar({
             alt={brandName}
             className={cn(
               "shrink-0 select-none object-contain",
-              usingDefaultBrand
+              collapsed
+                ? "h-[28px] w-[34px]"
+                : usingDefaultBrand
                 ? "h-[28px] w-[42px]"
                 : "h-[26px] w-[26px] rounded-full bg-white",
             )}
             draggable={false}
           />
-          <span className="truncate leading-tight">{brandName}</span>
+          {!collapsed && <span className="truncate leading-tight">{brandName}</span>}
         </button>
       </div>
 
-      {(onSelectProject || onCreate) && (
+      {!collapsed && (onSelectProject || onCreate) && (
         <SidebarProjectPicker
           projects={projectOptions}
           activeProject={selectedProject}
@@ -333,6 +349,8 @@ export default function WorkspaceSidebar({
             active={active === it.id}
             onClick={() => handleClick(it.id)}
             variant="list"
+            iconOnly={collapsed}
+            tooltip={collapsed ? t(it.labelKey) : undefined}
           />
         ))}
       </nav>
@@ -349,6 +367,7 @@ export default function WorkspaceSidebar({
           onSelect={handleClick}
           translate={t}
           language={language}
+          collapsed={collapsed}
         />
       ))}
 
@@ -360,21 +379,21 @@ export default function WorkspaceSidebar({
 
       {/* Active class switcher — only renders when student is in 2+
        *  classes; consumers/single-class students see nothing. */}
-      <div className="mt-auto px-[8px] pt-[10px]">
+      {!collapsed && <div className="mt-auto px-[8px] pt-[10px]">
         <ActiveClassPicker variant="compact" className="w-full" />
-      </div>
+      </div>}
 
       {/* Org credit badge — visible to org members so they can see
        *  their balance at a glance. Returns null for consumer/guests. */}
-      <div className="px-[8px] py-[6px]">
+      {!collapsed && <div className="px-[8px] py-[6px]">
         <OrgCreditBadge variant="card" />
-      </div>
+      </div>}
 
       {/* Org admin / class teacher entry to the management surface. */}
-      <OrgAdminLink />
+      {!collapsed && <OrgAdminLink />}
 
       {/* ── Bottom utility row ─────────────────────────────────── */}
-      <div className="flex items-center gap-[4px] px-[8px] pb-[2px] pt-[8px]">
+      <div className={cn("flex items-center gap-[4px] pb-[2px] pt-[8px]", collapsed ? "mt-auto justify-center px-0" : "px-[8px]")}>
         <UtilityBtn icon={SettingsIcon} title={t("workspace.sidebar.settings")} onClick={() => navigate("/app/settings")} />
       </div>
       <AllAssetsDialog open={libraryOpen} onClose={() => setLibraryOpen(false)} />
@@ -647,6 +666,7 @@ const SidebarNavSection = ({
   onSelect,
   translate,
   language,
+  collapsed = false,
 }: {
   label: string;
   rows: NavItem[][];
@@ -655,28 +675,30 @@ const SidebarNavSection = ({
   onSelect: (s: SectionKey) => void;
   translate: (key: NavItem["labelKey"]) => string;
   language: Language;
+  collapsed?: boolean;
 }) => (
-  <div className={cn("pt-[16px]", variant === "tool" && "pt-[18px]")}>
+  <div className={cn(collapsed ? "pt-[8px]" : "pt-[16px]", variant === "tool" && (collapsed ? "pt-[10px]" : "pt-[18px]"))}>
     <div
       className={cn(
         "px-[16px] pb-[6px] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#555b61]",
         variant === "tool" && "px-[18px] pb-[7px] text-[#4e5559]",
+        collapsed && "sr-only",
       )}
     >
       {label}
     </div>
-    <div className={cn("flex flex-col gap-[4px]", variant === "tool" && "gap-[5px] px-[10px]")}>
+    <div className={cn("flex flex-col gap-[4px]", variant === "tool" && (collapsed ? "gap-[5px] px-0" : "gap-[5px] px-[10px]"))}>
       {rows.map((row, rowIndex) => {
         const splitToolRow =
           variant === "tool" && row.some((item) => item.width === "half");
-        const compactToolRow = variant === "tool" && (row.length > 1 || splitToolRow);
+        const compactToolRow = collapsed || (variant === "tool" && (row.length > 1 || splitToolRow));
 
         return (
           <div
             key={`${label}-${rowIndex}`}
             className={cn(
-              variant === "tool" && "flex gap-[5px]",
-              variant !== "tool" && (row.length > 1 || splitToolRow) && "flex gap-[4px] px-[4px]",
+              collapsed ? "flex flex-col items-center gap-[5px]" : variant === "tool" && "flex gap-[5px]",
+              !collapsed && variant !== "tool" && (row.length > 1 || splitToolRow) && "flex gap-[4px] px-[4px]",
             )}
           >
             {row.map((item) => (
@@ -690,10 +712,15 @@ const SidebarNavSection = ({
                 variant={variant}
                 tone={item.tone}
                 badge={item.badgeKey ? translate(item.badgeKey) : undefined}
-                tooltip={variant === "tool" ? getSidebarToolTooltip(item.id, language) : undefined}
+                iconOnly={collapsed}
+                tooltip={
+                  collapsed
+                    ? getSidebarNavLabel(item.id, translate(item.labelKey))
+                    : variant === "tool" ? getSidebarToolTooltip(item.id, language) : undefined
+                }
               />
             ))}
-            {splitToolRow && row.length === 1 && <span className="flex-1" aria-hidden />}
+            {!collapsed && splitToolRow && row.length === 1 && <span className="flex-1" aria-hidden />}
           </div>
         );
       })}
@@ -711,6 +738,7 @@ const NavLink = ({
   tone = "default",
   badge,
   tooltip,
+  iconOnly = false,
 }: {
   label: string;
   icon: LucideIcon;
@@ -721,6 +749,7 @@ const NavLink = ({
   tone?: "default" | "accent";
   badge?: string;
   tooltip?: string;
+  iconOnly?: boolean;
 }) => (
   <button
     type="button"
@@ -732,6 +761,7 @@ const NavLink = ({
        *  is enough now that the sidebar is a Layer-1 panel. */
       "group relative flex h-[32px] min-w-0 items-center gap-[10px] text-left text-[12px] font-medium transition-colors",
       tooltip && "ws-sidebar-tooltip",
+      iconOnly && "mx-auto h-[36px] w-[36px] flex-none justify-center gap-0 rounded-[10px] px-0",
       variant === "tool" && tone === "accent"
         ? "rounded-[7px] border border-cyan-300/35 bg-cyan-950/50 px-[8px] text-cyan-50 shadow-[inset_0_1px_0_rgba(255,255,255,.08),0_0_18px_-12px_rgba(34,211,238,.95)]"
         : variant === "tool"
@@ -741,6 +771,7 @@ const NavLink = ({
       variant === "tool" && !compact && "w-full",
       compact && variant === "tool" && "mx-0 flex-1 gap-[7px] px-[7px] text-[12px]",
       compact && variant === "list" && "mx-[12px]",
+      iconOnly && "mx-auto flex-none px-0",
       active && variant === "tool" && tone === "accent"
         ? "border-cyan-200/80 bg-cyan-500/20 text-white shadow-[0_0_18px_-8px_rgba(34,211,238,.95),inset_0_0_0_1px_rgba(255,255,255,.08)]"
         : active && variant === "tool"
@@ -767,9 +798,9 @@ const NavLink = ({
     {variant === "tool" && active && (
       <span className="pointer-events-none absolute inset-[-1px] rounded-[8px] shadow-[inset_0_-3px_8px_0_rgba(234,255,0,.30),inset_0_1px_8px_0_rgba(255,255,255,.16),0_0_12px_rgba(234,255,0,.32)]" />
     )}
-    <Icon className={cn("relative shrink-0", variant === "tool" ? "h-[15px] w-[15px]" : "h-[16px] w-[16px]")} />
-    <span className="relative min-w-0 truncate whitespace-nowrap">{label}</span>
-    {badge && (
+    <Icon className={cn("relative shrink-0", iconOnly ? "h-[17px] w-[17px]" : variant === "tool" ? "h-[15px] w-[15px]" : "h-[16px] w-[16px]")} />
+    {!iconOnly && <span className="relative min-w-0 truncate whitespace-nowrap">{label}</span>}
+    {badge && !iconOnly && (
       <span
         className={cn(
           "pointer-events-none absolute z-20 flex items-center justify-center rounded-full border border-[#f7ff7b] bg-[linear-gradient(135deg,#fbff17_0%,#d7ff00_48%,#fff38a_100%)] font-black uppercase leading-none text-[#071004] motion-safe:animate-[sidebar-new-badge_2.6s_ease-in-out_infinite]",
@@ -800,6 +831,8 @@ function getSidebarNavLabel(id: SectionKey, fallback: string): string {
       return "3D Gen";
     case "url_asset":
       return "URL Asset";
+    case "auto_subtitle":
+      return "Auto Subtitle";
     default:
       return fallback;
   }

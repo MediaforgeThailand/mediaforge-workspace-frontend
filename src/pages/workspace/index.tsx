@@ -831,6 +831,7 @@ const WorkspaceDashboardInner = () => {
           projects={visibleProjects}
           activeProjectId={visibleActiveProjectId}
           onSelectProject={isSignedIn ? setActiveProject : undefined}
+          collapsed={section === "auto_subtitle"}
         />
       </div>
 
