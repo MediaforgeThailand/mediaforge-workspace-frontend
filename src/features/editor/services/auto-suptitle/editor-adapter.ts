@@ -2,6 +2,7 @@ import type { Track } from "@/lib/openreel-core";
 import { useProjectStore } from "../../stores/project-store";
 import { AUTO_SUPTITLE_TRACK_NAME, type AutoSuptitleMaterializeArgs, type AutoSuptitleMaterializeResult } from "./types";
 import {
+  autoSuptitleSettingsToTextEmphasisAnimation,
   autoSuptitleSettingsToTextAnimation,
   buildAutoSuptitleStyle,
 } from "./style";
@@ -58,6 +59,7 @@ export async function materializeAutoSuptitleTrack(
     project.settings.width || 1920,
   );
   const animation = autoSuptitleSettingsToTextAnimation(settings);
+  const emphasisAnimation = autoSuptitleSettingsToTextEmphasisAnimation(settings);
 
   const cues = normalizeAutoSuptitleCuesForDuration(
     result.cues,
@@ -81,7 +83,12 @@ export async function materializeAutoSuptitleTrack(
       words: cue.words,
       captionMeta: result.meta,
     });
-    if (clip) created.push(clip);
+    if (clip) {
+      useProjectStore
+        .getState()
+        .updateClipEmphasisAnimation(clip.id, emphasisAnimation);
+      created.push(clip);
+    }
   }
 
   return { trackId: track.id, clips: created };

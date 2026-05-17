@@ -262,9 +262,9 @@ const EditorProjectsHome: React.FC<{
               type="button"
               onClick={handleCreate}
               disabled={creating}
-              className="group flex h-[132px] w-full items-center justify-center gap-4 rounded-lg bg-[linear-gradient(135deg,#77e7ea,#04b9d6_54%,#13b89f)] text-[#031213] shadow-[0_22px_80px_-42px_rgba(0,229,255,.78)] transition-transform hover:scale-[1.002] disabled:cursor-wait disabled:opacity-75"
+              className="ci-gloss-button group flex h-[132px] w-full items-center justify-center gap-4 rounded-lg border transition-transform hover:-translate-y-px disabled:cursor-wait disabled:opacity-75"
             >
-              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[#031213] text-cyan-200 transition-transform group-hover:scale-105">
+              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[#070707] text-[color:var(--brand-primary)] transition-transform group-hover:scale-105">
                 {creating ? (
                   <Loader2 size={17} className="animate-spin" />
                 ) : (

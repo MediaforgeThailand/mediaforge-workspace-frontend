@@ -26,6 +26,7 @@ import {
   Rows2,
   Crosshair,
   Link2,
+  ArrowLeftRight,
   AlignVerticalSpaceAround,
   MousePointer2,
   SkipBack,
@@ -58,6 +59,7 @@ import {
   formatTimecode,
   getTrackInfo,
 } from "./timeline/index";
+import { ClipTransitionSection } from "./inspector";
 
 export const Timeline: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -167,6 +169,31 @@ export const Timeline: React.FC = () => {
     },
     [allShapeClips],
   );
+  const [showTransitionPanel, setShowTransitionPanel] = useState(false);
+  const selectedTransitionClipId = useMemo(() => {
+    if (selectedClipIds.length !== 1) {
+      return null;
+    }
+
+    const clipId = selectedClipIds[0];
+    const isRegularVisualClip = tracks.some(
+      (track) =>
+        track.type !== "audio" && track.clips.some((clip) => clip.id === clipId),
+    );
+    if (isRegularVisualClip) {
+      return clipId;
+    }
+
+    const isTextClip = allTextClips.some((clip) => clip.id === clipId);
+    const isGraphicClip = allShapeClips.some((clip) => clip.id === clipId);
+    return isTextClip || isGraphicClip ? clipId : null;
+  }, [selectedClipIds, tracks, allTextClips, allShapeClips]);
+
+  useEffect(() => {
+    if (!selectedTransitionClipId) {
+      setShowTransitionPanel(false);
+    }
+  }, [selectedTransitionClipId]);
   const [isBoxSelecting, setIsBoxSelecting] = React.useState(false);
   const [selectionBox, setSelectionBox] = React.useState<{
     startX: number;
@@ -1357,6 +1384,46 @@ export const Timeline: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {selectedTransitionClipId && (
+            <Popover
+              open={showTransitionPanel}
+              onOpenChange={setShowTransitionPanel}
+            >
+              <PopoverTrigger asChild>
+                <button
+                  data-testid="timeline-transition-menu"
+                  title="Entry / Exit transitions"
+                  className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-colors ${
+                    showTransitionPanel
+                      ? "bg-primary/20 text-primary border-primary/40"
+                      : "bg-background-tertiary border-border text-text-secondary hover:text-text-primary hover:bg-background-elevated"
+                  }`}
+                >
+                  <ArrowLeftRight size={14} />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                side="top"
+                align="end"
+                sideOffset={8}
+                className="w-[360px] p-3 bg-background-secondary border-border shadow-xl"
+              >
+                <div className="mb-3">
+                  <p className="text-xs font-semibold text-text-primary">
+                    Entry / Exit
+                  </p>
+                  <p className="text-[10px] text-text-muted">
+                    Edit the selected clip transition.
+                  </p>
+                </div>
+                <ClipTransitionSection
+                  clipId={selectedTransitionClipId}
+                  compact
+                />
+              </PopoverContent>
+            </Popover>
+          )}
+
           {/* CapCut-parity timeline toggle row: Magnet (P) / Snapping (N) / Linkage (Shift+L) / Preview Axis (Alt+P) */}
           <div
             data-testid="timeline-toggle-row"

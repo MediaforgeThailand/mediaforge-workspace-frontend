@@ -45,14 +45,17 @@ import {
 } from "../../services/captions-generator";
 import {
   AUTO_SUPTITLE_TRACK_NAME,
+  autoSuptitleSettingsToTextEmphasisAnimation,
   autoSuptitleSettingsToTextAnimation,
   materializeAutoSuptitleTrack,
 } from "../../services/auto-suptitle";
 import { CAPTIONS_LANGUAGES } from "../../services/captions-client";
 import {
   BUILTIN_CAPTION_PRESETS,
+  CAPTION_TEXT_ANIMATION_OPTIONS,
   CAPTION_TRANSITION_OPTIONS,
   applyCaptionCase,
+  captionTextAnimationOptionFor,
   captionTransitionOptionFor,
   deleteUserPreset,
   listAllPresets,
@@ -172,6 +175,7 @@ export const CaptionsPanel: React.FC = () => {
   const updateTextStyle = useProjectStore((s) => s.updateTextStyle);
   const updateTextTransform = useProjectStore((s) => s.updateTextTransform);
   const updateTextAnimation = useProjectStore((s) => s.updateTextAnimation);
+  const updateClipEmphasisAnimation = useProjectStore((s) => s.updateClipEmphasisAnimation);
   const seekTo = useTimelineStore((s) => s.seekTo);
 
   const [savedFonts, setSavedFonts] = useState<Array<{ name: string; fileName: string }>>([]);
@@ -436,12 +440,14 @@ export const CaptionsPanel: React.FC = () => {
     const transformPos = captionPositionToTransform(settings, refHeight, refWidth);
     const baseStyle = captionSettingsToTextStyle(settings);
     const animation = autoSuptitleSettingsToTextAnimation(settings);
+    const emphasisAnimation = autoSuptitleSettingsToTextEmphasisAnimation(settings);
     for (const clip of activeGroup.clips) {
       updateTextStyle(clip.id, baseStyle);
       updateTextTransform(clip.id, { position: transformPos });
       if (animation) {
         updateTextAnimation(clip.id, animation);
       }
+      updateClipEmphasisAnimation(clip.id, emphasisAnimation);
     }
     toast.success(`Restyled ${activeGroup.clips.length} caption clips`);
   };
@@ -803,6 +809,24 @@ export const CaptionsPanel: React.FC = () => {
             </div>
             <p className="text-[10px] leading-relaxed text-text-muted">
               {captionTransitionOptionFor(settings.animation).description}
+            </p>
+          </Section>
+
+          <Section title="Text animation">
+            <div className="grid grid-cols-2 gap-1">
+              {CAPTION_TEXT_ANIMATION_OPTIONS.map((option) => (
+                <Toggle
+                  key={option.id}
+                  active={(settings.textAnimation ?? "none") === option.id}
+                  onClick={() => updateSettings({ textAnimation: option.id })}
+                  title={option.description}
+                >
+                  {option.label}
+                </Toggle>
+              ))}
+            </div>
+            <p className="text-[10px] leading-relaxed text-text-muted">
+              {captionTextAnimationOptionFor(settings.textAnimation).description}
             </p>
           </Section>
 

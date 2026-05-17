@@ -1,9 +1,14 @@
 import type {
+  EmphasisAnimation,
   TextAnimation,
   TextAnimationPreset,
   TextStyle,
 } from "@/lib/openreel-core";
-import type { CaptionAnimation, CaptionStyleSettings } from "../caption-presets";
+import type {
+  CaptionAnimation,
+  CaptionStyleSettings,
+  CaptionTextAnimation,
+} from "../caption-presets";
 import type { AutoSuptitleStyle } from "./types";
 
 export function autoSuptitleSettingsToTextStyle(
@@ -84,6 +89,65 @@ function captionAnimationToTextPreset(
   }
 }
 
+function captionTextAnimationToEmphasisType(
+  animation: CaptionTextAnimation | undefined,
+): EmphasisAnimation["type"] {
+  switch (animation) {
+    case "loud-emphasis":
+    case "big-echoes":
+      return "pulse";
+    case "bounce-left":
+    case "leap-in":
+      return "bounce";
+    case "bubble-sprite":
+    case "ode-to-joy":
+      return "float";
+    case "spatter-stroke":
+      return "shake";
+    case "wavy-roll":
+      return "wave";
+    case "in-scanner":
+    case "hope-horizon":
+      return "glow";
+    case "text-sprout":
+    case "sequence-reveal":
+      return "zoom-pulse";
+    case "typing-cursor":
+      return "flash";
+    case "rebound-in":
+    case "tension-release":
+      return "rubber-band";
+    case "pop-snow":
+      return "tada";
+    case "blaze-shot":
+      return "tilt";
+    case "love-emphasis":
+      return "heartbeat";
+    case "quirky-spelling":
+      return "wobble";
+    case "none":
+    default:
+      return "none";
+  }
+}
+
+function isEntryLikeTextAnimation(
+  animation: CaptionTextAnimation | undefined,
+): boolean {
+  return (
+    animation === "typing-cursor" ||
+    animation === "bounce-left" ||
+    animation === "in-scanner" ||
+    animation === "text-sprout" ||
+    animation === "leap-in" ||
+    animation === "rebound-in" ||
+    animation === "hope-horizon" ||
+    animation === "sequence-reveal" ||
+    animation === "wavy-roll" ||
+    animation === "quirky-spelling"
+  );
+}
+
 export function autoSuptitleSettingsToTextAnimation(
   settings: CaptionStyleSettings,
 ): TextAnimation | undefined {
@@ -111,6 +175,42 @@ export function autoSuptitleSettingsToTextAnimation(
       popOvershoot: 1.08,
       easing: preset === "pop" ? "easeOutBack" : "ease-out",
     },
+  };
+}
+
+export function autoSuptitleSettingsToTextEmphasisAnimation(
+  settings: CaptionStyleSettings,
+): EmphasisAnimation {
+  const type = captionTextAnimationToEmphasisType(settings.textAnimation);
+  if (type === "none") {
+    return {
+      type: "none",
+      speed: 1,
+      intensity: 1,
+      loop: true,
+    };
+  }
+
+  return {
+    type,
+    speed:
+      type === "shake" || type === "flash" || type === "tada"
+        ? 1.35
+        : isEntryLikeTextAnimation(settings.textAnimation)
+          ? 1.65
+          : 0.9,
+    intensity:
+      type === "glow"
+        ? 0.7
+        : type === "shake"
+          ? 0.35
+          : type === "rubber-band" || type === "wobble"
+            ? 0.55
+            : 0.45,
+    loop: !isEntryLikeTextAnimation(settings.textAnimation),
+    animationDuration: isEntryLikeTextAnimation(settings.textAnimation)
+      ? 0.72
+      : undefined,
   };
 }
 

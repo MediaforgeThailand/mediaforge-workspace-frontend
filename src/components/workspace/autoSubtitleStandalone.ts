@@ -1,5 +1,6 @@
 import type {
   CaptionAnimation,
+  CaptionTextAnimation,
   CaptionStyleSettings,
 } from "@/features/editor/services/caption-presets";
 import {
@@ -350,6 +351,13 @@ function easeInCubic(value: number): number {
   return t * t * t;
 }
 
+function easeOutBack(value: number): number {
+  const t = clamp01(value) - 1;
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * t * t * t + c1 * t * t;
+}
+
 function cueTransitionFrame(
   cue: AutoSuptitleCue,
   animation: CaptionAnimation,
@@ -418,6 +426,132 @@ function cueTransitionFrame(
   }
 }
 
+function cueTextAnimationFrame(
+  cue: AutoSuptitleCue,
+  animation: CaptionTextAnimation | undefined,
+  currentTime: number,
+  pixelScale: number,
+): CueTransitionFrame {
+  const duration = Math.max(0.01, cue.endTime - cue.startTime);
+  const elapsed = Math.max(0, currentTime - cue.startTime);
+  const progress = clamp01((currentTime - cue.startTime) / duration);
+  const entryDuration = Math.min(0.72, Math.max(0.28, duration * 0.42));
+  const entry = clamp01(elapsed / entryDuration);
+  const easedEntry = easeOutCubic(entry);
+  const backEntry = easeOutBack(entry);
+  const wave = Math.sin(progress * Math.PI * 2);
+  const fastWave = Math.sin(progress * Math.PI * 8);
+  const distance = 14 * pixelScale;
+
+  switch (animation) {
+    case "typing-cursor":
+      return {
+        opacity: entry < 0.18 ? 0.35 : 1,
+        scale: 1,
+        offsetX: (1 - easedEntry) * -distance * 0.5,
+        offsetY: 0,
+      };
+    case "bounce-left":
+      return {
+        opacity: Math.min(1, entry * 1.4),
+        scale: Math.max(0.82, backEntry),
+        offsetX: (1 - easedEntry) * -distance * 1.4,
+        offsetY: Math.sin(entry * Math.PI) * -distance * 0.18,
+      };
+    case "in-scanner":
+      return {
+        opacity: Math.min(1, entry * 1.6),
+        scale: 1,
+        offsetX: (1 - easedEntry) * distance * 0.35,
+        offsetY: 0,
+      };
+    case "text-sprout":
+      return {
+        opacity: Math.min(1, entry * 1.5),
+        scale: Math.max(0.45, backEntry),
+        offsetX: 0,
+        offsetY: (1 - easedEntry) * distance,
+      };
+    case "leap-in":
+      return {
+        opacity: Math.min(1, entry * 1.5),
+        scale: Math.max(0.78, backEntry),
+        offsetX: 0,
+        offsetY: (1 - easedEntry) * distance * 1.25,
+      };
+    case "rebound-in":
+    case "tension-release":
+      return {
+        opacity: Math.min(1, entry * 1.35),
+        scale: Math.max(0.75, backEntry),
+        offsetX: 0,
+        offsetY: 0,
+      };
+    case "loud-emphasis":
+    case "big-echoes":
+      return {
+        opacity: 1,
+        scale: 1 + Math.max(0, wave) * 0.065,
+        offsetX: 0,
+        offsetY: 0,
+      };
+    case "spatter-stroke":
+    case "quirky-spelling":
+      return {
+        opacity: 1,
+        scale: 1,
+        offsetX: fastWave * distance * 0.28,
+        offsetY: Math.cos(progress * Math.PI * 8) * distance * 0.12,
+      };
+    case "ode-to-joy":
+    case "bubble-sprite":
+      return {
+        opacity: 1,
+        scale: 1,
+        offsetX: 0,
+        offsetY: wave * distance * 0.45,
+      };
+    case "pop-snow":
+    case "love-emphasis":
+      return {
+        opacity: 1,
+        scale: 1 + Math.max(0, wave) * 0.045,
+        offsetX: 0,
+        offsetY: 0,
+      };
+    case "hope-horizon":
+    case "sequence-reveal":
+      return {
+        opacity: Math.min(1, entry * 1.5),
+        scale: 1,
+        offsetX: (1 - easedEntry) * -distance * 0.45,
+        offsetY: 0,
+      };
+    case "wavy-roll":
+      return {
+        opacity: Math.min(1, entry * 1.4),
+        scale: 1,
+        offsetX: 0,
+        offsetY: wave * distance * 0.35,
+      };
+    case "blaze-shot":
+      return {
+        opacity: Math.min(1, entry * 1.5),
+        scale: 1,
+        offsetX: (1 - easedEntry) * -distance,
+        offsetY: 0,
+      };
+    case "none":
+    default:
+      return {
+        opacity: 1,
+        scale: 1,
+        offsetX: 0,
+        offsetY: 0,
+      };
+  }
+}
+
 function drawCue(
   ctx: CanvasRenderingContext2D,
   cue: AutoSuptitleCue | undefined,
@@ -470,15 +604,27 @@ function drawCue(
         : height / 2;
   const firstY = centerY - blockHeight / 2 + lineHeight / 2;
   const transition = cueTransitionFrame(cue, settings.animation, currentTime, scale);
+  const textMotion = cueTextAnimationFrame(
+    cue,
+    settings.textAnimation,
+    currentTime,
+    scale,
+  );
   if (transition.opacity <= 0.01 || transition.scale <= 0.01) {
     ctx.restore();
     return;
   }
 
-  ctx.globalAlpha *= transition.opacity;
-  ctx.translate(transition.offsetX, transition.offsetY);
+  ctx.globalAlpha *= transition.opacity * textMotion.opacity;
+  ctx.translate(
+    transition.offsetX + textMotion.offsetX,
+    transition.offsetY + textMotion.offsetY,
+  );
   ctx.translate(x, centerY);
-  ctx.scale(transition.scale, transition.scale);
+  ctx.scale(
+    transition.scale * textMotion.scale,
+    transition.scale * textMotion.scale,
+  );
   ctx.translate(-x, -centerY);
 
   if (settings.background.enabled) {
@@ -505,11 +651,21 @@ function drawCue(
     ctx.fill();
   }
 
-  if (settings.shadow.enabled) {
-    ctx.shadowColor = settings.shadow.color;
-    ctx.shadowBlur = settings.shadow.blur * scale;
-    ctx.shadowOffsetX = settings.shadow.offsetX * scale;
-    ctx.shadowOffsetY = settings.shadow.offsetY * scale;
+  const textGlowEnabled =
+    settings.textAnimation === "hope-horizon" ||
+    settings.textAnimation === "love-emphasis" ||
+    settings.textAnimation === "big-echoes";
+  if (settings.shadow.enabled || textGlowEnabled) {
+    ctx.shadowColor =
+      textGlowEnabled
+        ? settings.highlightColor || settings.fill
+        : settings.shadow.color;
+    ctx.shadowBlur =
+      textGlowEnabled
+        ? Math.max(10, settings.shadow.blur * scale)
+        : settings.shadow.blur * scale;
+    ctx.shadowOffsetX = settings.shadow.enabled ? settings.shadow.offsetX * scale : 0;
+    ctx.shadowOffsetY = settings.shadow.enabled ? settings.shadow.offsetY * scale : 0;
   }
 
   for (let index = 0; index < lines.length; index += 1) {

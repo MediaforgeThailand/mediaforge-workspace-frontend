@@ -24,7 +24,6 @@ import {
   ShapeSection,
   SVGSection,
   BlendingSection,
-  ClipTransitionSection,
   CropSection,
   SpeedSection,
   ClipTabs,
@@ -376,9 +375,9 @@ export const InspectorPanel: React.FC = () => {
   }, [selectedClip, project.timeline.tracks, project.mediaLibrary.items]);
 
   /**
-   * Determine which sections to show based on clip type. After V6 trim only
-   * Crop, Blending and Entry/Exit Transitions remain for video/image clips —
-   * shape/svg keep their dedicated property editors.
+   * Determine which sections to show based on clip type. Entry/Exit
+   * transitions now live in the timeline toolbar so they stay close to the
+   * selected clip instead of being buried in the inspector.
    */
   const showShapeSection = clipType === "shape";
   const showSVGSection = clipType === "svg";
@@ -526,27 +525,6 @@ export const InspectorPanel: React.FC = () => {
                 activeTab={activeMainTab}
               >
                 <BlendingSection clipId={clipId} />
-              </Section>
-            )}
-
-            {/* Entry/Exit Transitions - For all visual clips. Trimmed to a
-                basic set (None / Fade / Slide L/R/Up/Down / Zoom in/out) — the
-                deeper presets (blur, iris-*, rotate) live in the V5-removed
-                feature pack. */}
-            {(clipType === "video" ||
-              clipType === "image" ||
-              clipType === "text" ||
-              clipType === "shape" ||
-              clipType === "svg" ||
-              clipType === "sticker") && (
-              <Section
-                title="Entry/Exit Transitions"
-                sectionId="transitions"
-                defaultOpen={false}
-                tabGroup="video"
-                activeTab={activeMainTab}
-              >
-                <ClipTransitionSection clipId={clipId} />
               </Section>
             )}
 

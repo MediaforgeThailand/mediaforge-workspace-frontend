@@ -16,6 +16,28 @@ export type CaptionAnimation =
   | "scale"
   | "pop";
 
+export type CaptionTextAnimation =
+  | "none"
+  | "typing-cursor"
+  | "bounce-left"
+  | "in-scanner"
+  | "text-sprout"
+  | "leap-in"
+  | "rebound-in"
+  | "loud-emphasis"
+  | "spatter-stroke"
+  | "ode-to-joy"
+  | "pop-snow"
+  | "hope-horizon"
+  | "big-echoes"
+  | "tension-release"
+  | "sequence-reveal"
+  | "bubble-sprite"
+  | "blaze-shot"
+  | "love-emphasis"
+  | "wavy-roll"
+  | "quirky-spelling";
+
 export type CaptionCase = "normal" | "upper" | "lower" | "title";
 export type CaptionPositionV = "top" | "middle" | "bottom";
 export type CaptionPositionH = "left" | "center" | "right";
@@ -64,6 +86,8 @@ export interface CaptionStyleSettings {
   highlightColor: string;
   /** Animation style. */
   animation: CaptionAnimation;
+  /** Continuous text motion, separate from cue entry/exit transitions. */
+  textAnimation: CaptionTextAnimation;
 
   // Layout
   /** Maximum words per caption line. */
@@ -91,6 +115,12 @@ export interface CaptionPreset {
 
 export interface CaptionTransitionOption {
   id: CaptionAnimation;
+  label: string;
+  description: string;
+}
+
+export interface CaptionTextAnimationOption {
+  id: CaptionTextAnimation;
   label: string;
   description: string;
 }
@@ -128,12 +158,124 @@ export const CAPTION_TRANSITION_OPTIONS: CaptionTransitionOption[] = [
   },
 ];
 
+export const CAPTION_TEXT_ANIMATION_OPTIONS: CaptionTextAnimationOption[] = [
+  {
+    id: "none",
+    label: "None",
+    description: "Static text with no text animation.",
+  },
+  {
+    id: "typing-cursor",
+    label: "Typing Cursor",
+    description: "Characters type in with a cursor-like finish.",
+  },
+  {
+    id: "bounce-left",
+    label: "Bounce Left",
+    description: "Text bounces in from the left.",
+  },
+  {
+    id: "in-scanner",
+    label: "In Scanner",
+    description: "Text appears through a fast scanning sweep.",
+  },
+  {
+    id: "text-sprout",
+    label: "Text Sprout",
+    description: "Letters grow upward into place.",
+  },
+  {
+    id: "leap-in",
+    label: "Leap In",
+    description: "Text leaps upward with a soft landing.",
+  },
+  {
+    id: "rebound-in",
+    label: "Rebound In",
+    description: "Text stretches and rebounds into place.",
+  },
+  {
+    id: "loud-emphasis",
+    label: "Loud Emphasis",
+    description: "A strong pop for punchy spoken words.",
+  },
+  {
+    id: "spatter-stroke",
+    label: "Spatter Stroke",
+    description: "A quick rough impact around the text.",
+  },
+  {
+    id: "ode-to-joy",
+    label: "Ode To Joy",
+    description: "A light celebratory sway.",
+  },
+  {
+    id: "pop-snow",
+    label: "Pop Snow",
+    description: "Text pops with tiny particle accents.",
+  },
+  {
+    id: "hope-horizon",
+    label: "Hope Horizon",
+    description: "A soft horizontal glow reveal.",
+  },
+  {
+    id: "big-echoes",
+    label: "Big Echoes",
+    description: "Text lands with an echo-like shadow trail.",
+  },
+  {
+    id: "tension-release",
+    label: "Tension Release",
+    description: "Text compresses then releases smoothly.",
+  },
+  {
+    id: "sequence-reveal",
+    label: "Sequence Reveal",
+    description: "Letters reveal in sequence.",
+  },
+  {
+    id: "bubble-sprite",
+    label: "Bubble Sprite",
+    description: "Small bubble accents float around the text.",
+  },
+  {
+    id: "blaze-shot",
+    label: "Blaze Shot",
+    description: "A fast diagonal streak shoots through the text.",
+  },
+  {
+    id: "love-emphasis",
+    label: "Love Emphasis",
+    description: "A soft warm pulse for gentle emphasis.",
+  },
+  {
+    id: "wavy-roll",
+    label: "Wavy Roll",
+    description: "Text rolls with a wave-like entrance.",
+  },
+  {
+    id: "quirky-spelling",
+    label: "Quirky Spelling",
+    description: "Letters snap in with playful uneven timing.",
+  },
+];
+
 export function captionTransitionOptionFor(
   animation: CaptionAnimation,
 ): CaptionTransitionOption {
   return (
     CAPTION_TRANSITION_OPTIONS.find((option) => option.id === animation) ??
     CAPTION_TRANSITION_OPTIONS[0]
+  );
+}
+
+export function captionTextAnimationOptionFor(
+  animation: CaptionTextAnimation | undefined,
+): CaptionTextAnimationOption {
+  return (
+    CAPTION_TEXT_ANIMATION_OPTIONS.find((option) => option.id === animation) ??
+    CAPTION_TEXT_ANIMATION_OPTIONS[0]
   );
 }
 
@@ -150,6 +292,7 @@ export const DEFAULT_CAPTION_SETTINGS: CaptionStyleSettings = {
   background: { enabled: false, color: "rgba(0,0,0,0.6)", padding: 12, cornerRadius: 8 },
   highlightColor: "#F4FF00",
   animation: "none",
+  textAnimation: "none",
   wordsPerLine: 3,
   maxLineDuration: 2.5,
   positionV: "middle",

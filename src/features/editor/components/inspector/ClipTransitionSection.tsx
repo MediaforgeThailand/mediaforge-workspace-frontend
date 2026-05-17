@@ -13,6 +13,8 @@ import type {
   EasingType,
   Transform,
   GraphicClip,
+  TextAnimation,
+  TextAnimationPreset,
 } from "@/lib/openreel-core";
 import { useProjectStore } from "../../stores/project-store";
 import { useEngineStore } from "../../stores/engine-store";
@@ -70,8 +72,57 @@ const EASINGS: { id: EasingType; label: string }[] = [
   { id: "ease-in-out", label: "Ease In Out" },
 ];
 
+function mapTextAnimationPreset(
+  preset: TextAnimationPreset | undefined,
+): TransitionPreset {
+  switch (preset) {
+    case "fade":
+      return "fade";
+    case "slide-left":
+      return "slide-left";
+    case "slide-right":
+      return "slide-right";
+    case "slide-up":
+      return "slide-up";
+    case "slide-down":
+      return "slide-down";
+    case "scale":
+    case "pop":
+      return "zoom-in";
+    default:
+      return "none";
+  }
+}
+
+function getAnimationEasing(animation: TextAnimation): EasingType {
+  return animation.params?.easing || "ease-out";
+}
+
+function toTransitionSignature(entry: TransitionConfig, exit: TransitionConfig) {
+  return [
+    entry.preset,
+    entry.duration,
+    entry.easing,
+    exit.preset,
+    exit.duration,
+    exit.easing,
+  ].join("|");
+}
+
+function clampTransitionDuration(
+  duration: number | undefined,
+  clipDuration: number,
+) {
+  const fallback = 0.5;
+  const safeDuration =
+    Number.isFinite(duration) && duration ? duration : fallback;
+  const maxDuration = Math.max(0.1, clipDuration / 2);
+  return Math.min(Math.max(0.1, safeDuration), maxDuration);
+}
+
 interface ClipTransitionSectionProps {
   clipId: string;
+  compact?: boolean;
 }
 
 interface ClipLike {
@@ -79,6 +130,7 @@ interface ClipLike {
   duration: number;
   transform: Transform;
   keyframes?: Keyframe[];
+  animation?: TextAnimation;
 }
 
 type ClipType = "regular" | "text";
@@ -579,11 +631,36 @@ function detectCurrentTransitions(clip: ClipLike): {
     if (firstKf) exit.easing = firstKf.easing;
   }
 
+  if (clip.animation) {
+    const animationEasing = getAnimationEasing(clip.animation);
+
+    if (entryKfs.length === 0) {
+      entry.preset = mapTextAnimationPreset(clip.animation.preset);
+      entry.duration = clampTransitionDuration(
+        clip.animation.inDuration,
+        clip.duration,
+      );
+      entry.easing = animationEasing;
+    }
+
+    if (exitKfs.length === 0) {
+      exit.preset = mapTextAnimationPreset(
+        clip.animation.outPreset ?? clip.animation.preset,
+      );
+      exit.duration = clampTransitionDuration(
+        clip.animation.outDuration,
+        clip.duration,
+      );
+      exit.easing = animationEasing === "ease-out" ? "ease-in" : animationEasing;
+    }
+  }
+
   return { entry, exit };
 }
 
 export const ClipTransitionSection: React.FC<ClipTransitionSectionProps> = ({
   clipId,
+  compact = false,
 }) => {
   const {
     project,
@@ -661,6 +738,47 @@ export const ClipTransitionSection: React.FC<ClipTransitionSectionProps> = ({
   const [exitEasing, setExitEasing] = useState<EasingType>(
     detected.exit.easing,
   );
+
+  const detectedSignature = toTransitionSignature(detected.entry, detected.exit);
+  const stateSignature = useMemo(
+    () =>
+      toTransitionSignature(
+        {
+          preset: entryPreset,
+          duration: entryDuration,
+          easing: entryEasing,
+        },
+        { preset: exitPreset, duration: exitDuration, easing: exitEasing },
+      ),
+    [
+      entryPreset,
+      entryDuration,
+      entryEasing,
+      exitPreset,
+      exitDuration,
+      exitEasing,
+    ],
+  );
+  const isSyncingDetectedRef = useRef(false);
+
+  useEffect(() => {
+    isSyncingDetectedRef.current = true;
+    setEntryPreset(detected.entry.preset);
+    setEntryDuration(detected.entry.duration);
+    setEntryEasing(detected.entry.easing);
+    setExitPreset(detected.exit.preset);
+    setExitDuration(detected.exit.duration);
+    setExitEasing(detected.exit.easing);
+  }, [
+    clipId,
+    detectedSignature,
+    detected.entry.preset,
+    detected.entry.duration,
+    detected.entry.easing,
+    detected.exit.preset,
+    detected.exit.duration,
+    detected.exit.easing,
+  ]);
 
   /**
    * Persist the current entry/exit picks onto the clip's keyframes.
@@ -756,29 +874,33 @@ export const ClipTransitionSection: React.FC<ClipTransitionSectionProps> = ({
   useEffect(() => {
     if (!didMountRef.current) {
       didMountRef.current = true;
+      isSyncingDetectedRef.current = false;
+      return;
+    }
+    if (isSyncingDetectedRef.current) {
+      isSyncingDetectedRef.current = false;
+      return;
+    }
+    if (stateSignature === detectedSignature) {
       return;
     }
     applyTransitions(true);
-  }, [
-    entryPreset,
-    entryDuration,
-    entryEasing,
-    exitPreset,
-    exitDuration,
-    exitEasing,
-    applyTransitions,
-  ]);
+  }, [stateSignature, detectedSignature, applyTransitions]);
 
   if (!clip) return null;
 
+  const presetGridClass = compact
+    ? "grid grid-cols-4 gap-1"
+    : "grid grid-cols-3 gap-1";
+
   return (
-    <div className="space-y-4">
+    <div className={compact ? "space-y-3" : "space-y-4"}>
       {/* Entry Transition */}
       <div className="space-y-2">
         <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wider">
           Entry Animation
         </span>
-        <div className="grid grid-cols-3 gap-1">
+        <div className={presetGridClass}>
           {PRESETS.map((preset) => (
             <button
               key={`entry-${preset.id}`}
@@ -834,7 +956,7 @@ export const ClipTransitionSection: React.FC<ClipTransitionSectionProps> = ({
         <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wider">
           Exit Animation
         </span>
-        <div className="grid grid-cols-3 gap-1">
+        <div className={presetGridClass}>
           {PRESETS.map((preset) => (
             <button
               key={`exit-${preset.id}`}

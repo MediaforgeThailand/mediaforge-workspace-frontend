@@ -152,11 +152,14 @@ import {
 import {
   applyCaptionCase,
   BUILTIN_CAPTION_PRESETS,
+  CAPTION_TEXT_ANIMATION_OPTIONS,
   CAPTION_TRANSITION_OPTIONS,
+  captionTextAnimationOptionFor,
   captionTransitionOptionFor,
   DEFAULT_CAPTION_SETTINGS,
   type CaptionAnimation,
   type CaptionStyleSettings,
+  type CaptionTextAnimation,
 } from "@/features/editor/services/caption-presets";
 import {
   createAutoSubtitleEditorProject,
@@ -749,6 +752,7 @@ interface StandaloneFormState {
   autoSubtitleStrokeWidth: number;
   autoSubtitleBackground: boolean;
   autoSubtitleTransition: CaptionAnimation;
+  autoSubtitleTextAnimation: CaptionTextAnimation;
   autoSubtitleSegmentationMode: AutoSubtitleSegmentationMode;
   autoSubtitleWordsPerLine: number;
   upscaleImage: UploadedRef | null;
@@ -817,6 +821,7 @@ const DEFAULT_AUTO_SUBTITLE_PARAMS = {
   autoSubtitleStrokeWidth: 6,
   autoSubtitleBackground: false,
   autoSubtitleTransition: "fade" as const,
+  autoSubtitleTextAnimation: "none" as const,
   autoSubtitleSegmentationMode: "sentence" as const,
   autoSubtitleWordsPerLine: 4,
 };
@@ -4167,7 +4172,16 @@ export default function StandaloneGenerator({
         onChange={(event) => void onFileSelected(event.target.files?.[0])}
       />
 
-      <div className="fixed right-3 top-3 z-[80] md:right-4 md:top-4">
+      <button
+        type="button"
+        onClick={onOpenSidebar}
+        className="fixed left-2 top-2 z-[40] grid h-9 w-9 place-items-center rounded-[10px] border border-white/[0.08] bg-black/75 text-zinc-100 shadow-[0_12px_28px_-22px_rgba(0,0,0,.95)] backdrop-blur-md transition hover:border-[#eaff00]/45 hover:text-[#eaff00] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#eaff00]/70 md:hidden"
+        aria-label={t("workspace.standalone.menu")}
+      >
+        <Menu className="h-[18px] w-[18px]" />
+      </button>
+
+      <div className="fixed right-1.5 top-1.5 z-[40] origin-top-right scale-[0.86] md:right-4 md:top-4 md:z-[80] md:scale-100">
         <UserMenu />
       </div>
 
@@ -5029,6 +5043,8 @@ function autoSubtitleStyleFromForm(form: StandaloneFormState): CaptionStyleSetti
       enabled: form.autoSubtitleBackground,
     },
     animation: form.autoSubtitleTransition || preset.animation,
+    textAnimation:
+      form.autoSubtitleTextAnimation || preset.textAnimation || "none",
     wordsPerLine:
       rawWordsPerLine <= 0
         ? AUTO_SUBTITLE_MAX_WORD_SPLIT
@@ -5063,6 +5079,14 @@ function autoSubtitleTransitionLabel(
     default:
       return captionTransitionOptionFor(animation).label;
   }
+}
+
+function autoSubtitleTextAnimationLabel(
+  animation: CaptionTextAnimation,
+  language: string,
+): string {
+  void language;
+  return captionTextAnimationOptionFor(animation).label;
 }
 
 function autoSubtitleAlgorithmFromForm(
@@ -5497,6 +5521,9 @@ function AutoSubtitlePanelV2({
 }) {
   const [showMoreStyles, setShowMoreStyles] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [subtitleDesignTab, setSubtitleDesignTab] = useState<
+    "style" | "transition" | "animation"
+  >("style");
   const th = language === "th";
   const media = form.autoSubtitleVideo;
   const selectedPreset =
@@ -5524,6 +5551,9 @@ function AutoSubtitlePanelV2({
     keepSource: th ? "ตามต้นฉบับ" : "Keep source",
     locked: th ? "เร็วๆ นี้" : "Soon",
     style: th ? "สไตล์ซับไตเติล" : "Subtitle style",
+    styleTab: th ? "สไตล์" : "Style",
+    transitionTab: th ? "ทรานซิชัน" : "Transition",
+    animationTab: th ? "อนิเมชัน" : "Animation",
     moreStyles: th ? "แสดงสไตล์ทั้งหมด" : "Show all styles",
     fewerStyles: th ? "แสดงน้อยลง" : "Show less",
     advanced: th ? "ปรับตำแหน่ง ฟอนต์ และสีซับไตเติล" : "Adjust position, font, and subtitle colors",
@@ -5538,6 +5568,7 @@ function AutoSubtitlePanelV2({
     wordModeHint: th ? "ตัดตามจำนวนคำที่เลือก" : "Fixed word groups",
     words: th ? "จำนวนคำต่อกลุ่ม" : "Words per group",
     transition: th ? "ทรานซิชันข้อความ" : "Text transition",
+    textAnimation: th ? "อนิเมชันตัวอักษร" : "Text animation",
     textColor: th ? "สีตัวอักษร" : "Text color",
     highlightColor: th ? "สีไฮไลต์" : "Highlight",
     stroke: th ? "เส้นขอบ" : "Stroke",
@@ -5547,6 +5578,8 @@ function AutoSubtitlePanelV2({
     translateThai: th ? "แปลภาษาไทย" : "Translate Thai",
     bilingual: "Bilingual",
     previewText: th ? "ตัวอย่างซับไตเติล" : "Sample subtitle",
+    previewCardText: th ? "ตัวอย่าง" : "Sample",
+    previewNextText: th ? "ต่อไป" : "Next",
     ready: th
       ? "ผลลัพธ์จะแสดงด้านขวา พร้อมโปรเจกต์ editor และ track subtitle สำหรับแก้ต่อ"
       : "Results appear on the right with an editable editor project.",
@@ -5592,9 +5625,17 @@ function AutoSubtitlePanelV2({
     form.autoSubtitleTransition,
     language,
   );
+  const textAnimationLabel = autoSubtitleTextAnimationLabel(
+    form.autoSubtitleTextAnimation,
+    language,
+  );
   const transitionOptions = CAPTION_TRANSITION_OPTIONS.map((option) => ({
     value: option.id,
     label: autoSubtitleTransitionLabel(option.id, language),
+  }));
+  const textAnimationOptions = CAPTION_TEXT_ANIMATION_OPTIONS.map((option) => ({
+    value: option.id,
+    label: autoSubtitleTextAnimationLabel(option.id, language),
   }));
   const previewSamplePhrases = useMemo(
     () =>
@@ -5628,6 +5669,7 @@ function AutoSubtitlePanelV2({
 
   return (
     <section className="standalone-create-panel standalone-translate-panel flex h-full w-full max-w-[480px] flex-col overflow-hidden rounded-[20px] border border-white/[0.02] bg-[#121314]">
+      <AutoSubtitlePreviewKeyframes />
       <div className="flex h-[58px] shrink-0 items-center gap-[10px] border-b border-white/[0.035] px-[18px]">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-[var(--brand-primary)]/10 text-[var(--brand-soft)]">
           <Captions className="h-[16px] w-[16px]" />
@@ -5737,27 +5779,94 @@ function AutoSubtitlePanelV2({
               ))}
             </div>
 
-            <AutoSubtitleSectionTitle label={copy.style} className="mt-[12px]" />
-            <div className="grid grid-cols-2 gap-[7px]">
-              {visiblePresets.map((preset) => (
-                <AutoSubtitlePresetCard
-                  key={preset.id}
-                  preset={preset}
-                  selected={preset.id === form.autoSubtitlePresetId}
-                  sampleText={copy.previewText}
-                  onSelect={() => applyPreset(preset.id)}
-                />
-              ))}
+            <div className="mt-[12px] rounded-[12px] border border-white/[0.05] bg-black/20 p-[7px]">
+              <div className="mb-[7px] grid grid-cols-3 gap-[5px] border-b border-white/[0.06] pb-[6px]">
+                {([
+                  ["style", copy.styleTab],
+                  ["transition", copy.transitionTab],
+                  ["animation", copy.animationTab],
+                ] as const).map(([tab, label]) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setSubtitleDesignTab(tab)}
+                    className={cn(
+                      "h-[28px] rounded-[8px] px-[6px] text-[11px] font-bold leading-[13px] transition",
+                      subtitleDesignTab === tab
+                        ? "bg-white text-black"
+                        : "bg-white/[0.04] text-zinc-400 hover:bg-white/[0.07] hover:text-white",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {subtitleDesignTab === "style" && (
+                <>
+                  <div className="grid grid-cols-4 gap-[6px]">
+                    {visiblePresets.map((preset) => (
+                      <AutoSubtitlePresetCard
+                        key={preset.id}
+                        preset={preset}
+                        selected={preset.id === form.autoSubtitlePresetId}
+                        sampleText={copy.previewCardText}
+                        onSelect={() => applyPreset(preset.id)}
+                      />
+                    ))}
+                  </div>
+                  {BUILTIN_CAPTION_PRESETS.length > 4 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowMoreStyles((value) => !value)}
+                      className="mt-[7px] h-[28px] w-full rounded-[8px] border border-white/10 bg-white/[0.03] text-[11px] font-semibold leading-[13px] text-zinc-300 transition hover:border-[var(--brand-primary)]/45 hover:text-white"
+                    >
+                      {showMoreStyles ? copy.fewerStyles : copy.moreStyles}
+                    </button>
+                  )}
+                </>
+              )}
+
+              {subtitleDesignTab === "transition" && (
+                <div className="grid grid-cols-4 gap-[6px]">
+                  {CAPTION_TRANSITION_OPTIONS.map((option) => (
+                    <AutoSubtitleMotionCard
+                      key={option.id}
+                      label={autoSubtitleTransitionLabel(option.id, language)}
+                      description={option.description}
+                      selected={form.autoSubtitleTransition === option.id}
+                      settings={{
+                        ...selectedSettings,
+                        animation: option.id,
+                        textAnimation: "none",
+                      }}
+                      phrases={[copy.previewCardText, copy.previewNextText]}
+                      language={language}
+                      onSelect={() => onChange({ autoSubtitleTransition: option.id })}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {subtitleDesignTab === "animation" && (
+                <div className="grid grid-cols-4 gap-[6px]">
+                  {CAPTION_TEXT_ANIMATION_OPTIONS.map((option) => (
+                    <AutoSubtitleTextAnimationCard
+                      key={option.id}
+                      label={autoSubtitleTextAnimationLabel(option.id, language)}
+                      description={option.description}
+                      selected={form.autoSubtitleTextAnimation === option.id}
+                      settings={{
+                        ...selectedSettings,
+                        textAnimation: option.id,
+                      }}
+                      animation={option.id}
+                      onSelect={() => onChange({ autoSubtitleTextAnimation: option.id })}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-            {BUILTIN_CAPTION_PRESETS.length > 4 && (
-              <button
-                type="button"
-                onClick={() => setShowMoreStyles((value) => !value)}
-                className="mt-[8px] h-[32px] w-full rounded-[8px] border border-white/10 bg-white/[0.03] text-[12px] font-semibold leading-[15px] text-zinc-300 transition hover:border-[var(--brand-primary)]/45 hover:text-white"
-              >
-                {showMoreStyles ? copy.fewerStyles : copy.moreStyles}
-              </button>
-            )}
 
             <button
               type="button"
@@ -5810,6 +5919,16 @@ function AutoSubtitlePanelV2({
                     options={transitionOptions}
                     onChange={(value) =>
                       onChange({ autoSubtitleTransition: value as CaptionAnimation })
+                    }
+                  />
+                  <VoiceTranslateSelectCard
+                    label={copy.textAnimation}
+                    value={form.autoSubtitleTextAnimation}
+                    displayValue={textAnimationLabel}
+                    icon={<Sparkles className="h-[14px] w-[14px]" />}
+                    options={textAnimationOptions}
+                    onChange={(value) =>
+                      onChange({ autoSubtitleTextAnimation: value as CaptionTextAnimation })
                     }
                   />
                   <VoiceTranslateSelectCard
@@ -6063,21 +6182,230 @@ function AutoSubtitlePresetCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        "group overflow-hidden rounded-[10px] border bg-white/[0.035] p-[5px] text-left transition",
+        "group overflow-hidden rounded-[8px] border bg-white/[0.035] p-[4px] text-left transition",
         selected
           ? "border-[var(--brand-primary)] shadow-[0_0_0_1px_rgba(244,255,0,.22)]"
           : "border-white/[0.07] hover:border-[var(--brand-primary)]/45",
       )}
     >
-      <div className="grid h-[48px] place-items-center rounded-[7px] bg-[#1f2937] px-1">
+      <div className="grid h-[36px] place-items-center rounded-[6px] bg-[#1f2937] px-1">
         <AutoSubtitlePreviewText settings={preset.settings} text={sampleText} compact activeWord />
       </div>
-      <div className="mt-1 flex min-w-0 items-center justify-between gap-1">
-        <span className="truncate text-[12px] font-semibold leading-[15px] text-zinc-200">{preset.name}</span>
+      <div className="mt-[4px] flex min-w-0 items-center justify-between gap-1">
+        <span className="truncate text-[10px] font-semibold leading-[12px] text-zinc-200">{preset.name}</span>
         {selected && <Check className="h-[13px] w-[13px] shrink-0 text-[var(--brand-soft)]" />}
       </div>
     </button>
   );
+}
+
+function AutoSubtitleMotionCard({
+  label,
+  description,
+  selected,
+  settings,
+  phrases,
+  language,
+  onSelect,
+}: {
+  label: string;
+  description: string;
+  selected: boolean;
+  settings: CaptionStyleSettings;
+  phrases: readonly string[];
+  language: string;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      title={description}
+      className={cn(
+        "group overflow-hidden rounded-[8px] border bg-white/[0.035] p-[4px] text-left transition",
+        selected
+          ? "border-[var(--brand-primary)] shadow-[0_0_0_1px_rgba(244,255,0,.22)]"
+          : "border-white/[0.07] hover:border-[var(--brand-primary)]/45",
+      )}
+    >
+      <div className="grid h-[36px] place-items-center overflow-hidden rounded-[6px] bg-[#1f2937] px-1">
+        <AutoSubtitleAnimatedPreview
+          settings={settings}
+          phrases={phrases}
+          language={language}
+          compact
+        />
+      </div>
+      <div className="mt-[4px] flex min-w-0 items-center justify-between gap-1">
+        <span className="truncate text-[10px] font-semibold leading-[12px] text-zinc-200">
+          {label}
+        </span>
+        {selected && <Check className="h-[13px] w-[13px] shrink-0 text-[var(--brand-soft)]" />}
+      </div>
+    </button>
+  );
+}
+
+function AutoSubtitleTextAnimationCard({
+  label,
+  description,
+  selected,
+  settings,
+  animation,
+  onSelect,
+}: {
+  label: string;
+  description: string;
+  selected: boolean;
+  settings: CaptionStyleSettings;
+  animation: CaptionTextAnimation;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      title={description}
+      className={cn(
+        "group overflow-hidden rounded-[8px] border bg-white/[0.035] p-[4px] text-left transition",
+        selected
+          ? "border-[var(--brand-primary)] shadow-[0_0_0_1px_rgba(244,255,0,.22)]"
+          : "border-white/[0.07] hover:border-[var(--brand-primary)]/45",
+      )}
+    >
+      <div className="grid h-[36px] place-items-center overflow-hidden rounded-[6px] bg-[#232b36] px-1">
+        <AutoSubtitleCapcutAnimationPreview settings={settings} animation={animation} />
+      </div>
+      <div className="mt-[4px] flex min-w-0 items-center justify-between gap-1">
+        <span className="truncate text-[10px] font-semibold leading-[12px] text-zinc-200">
+          {label}
+        </span>
+        {selected && <Check className="h-[13px] w-[13px] shrink-0 text-[var(--brand-soft)]" />}
+      </div>
+    </button>
+  );
+}
+
+function AutoSubtitleCapcutAnimationPreview({
+  settings,
+  animation,
+}: {
+  settings: CaptionStyleSettings;
+  animation: CaptionTextAnimation;
+}) {
+  const sample = autoSubtitleAnimationCardText(animation);
+  const renderChars =
+    animation === "typing-cursor" ||
+    animation === "text-sprout" ||
+    animation === "sequence-reveal" ||
+    animation === "quirky-spelling";
+  const showParticles =
+    animation === "spatter-stroke" ||
+    animation === "pop-snow" ||
+    animation === "bubble-sprite" ||
+    animation === "blaze-shot" ||
+    animation === "love-emphasis";
+  const textStyle: React.CSSProperties = {
+    fontFamily: `"${settings.font}", Inter, sans-serif`,
+    fontWeight: settings.weight,
+    color: settings.fill,
+    WebkitTextStroke: settings.stroke.enabled
+      ? `${Math.min(1.1, Math.max(0.45, settings.stroke.width / 7))}px ${settings.stroke.color}`
+      : undefined,
+    paintOrder: "stroke fill",
+    textShadow: settings.shadow.enabled
+      ? `${settings.shadow.offsetX}px ${settings.shadow.offsetY}px ${Math.max(2, settings.shadow.blur)}px ${settings.shadow.color}`
+      : "0 1px 8px rgba(0,0,0,.55)",
+    backgroundColor: settings.background.enabled ? settings.background.color : undefined,
+    borderRadius: settings.background.enabled ? Math.max(4, settings.background.cornerRadius / 2) : undefined,
+    padding: settings.background.enabled ? "2px 5px" : undefined,
+  };
+
+  return (
+    <div className="relative grid h-full w-full place-items-center overflow-hidden">
+      {animation === "in-scanner" && (
+        <span className="autoSubtitleCapcutScanner absolute inset-y-0 w-[18px] rounded-full bg-white/35 blur-[2px]" />
+      )}
+      {animation === "hope-horizon" && (
+        <span className="autoSubtitleCapcutHorizon absolute h-[4px] w-[76%] rounded-full bg-cyan-200/70 blur-[5px]" />
+      )}
+      {animation === "big-echoes" && (
+        <>
+          <span className="autoSubtitleCapcutEcho autoSubtitleCapcutEchoA absolute text-[13px] font-black tracking-[.02em] text-white/18">
+            {sample}
+          </span>
+          <span className="autoSubtitleCapcutEcho autoSubtitleCapcutEchoB absolute text-[13px] font-black tracking-[.02em] text-white/12">
+            {sample}
+          </span>
+        </>
+      )}
+      {animation === "blaze-shot" && (
+        <span className="autoSubtitleCapcutBlaze absolute h-[44px] w-[8px] rotate-45 bg-yellow-200/70 blur-[3px]" />
+      )}
+      {showParticles && (
+        <span className="pointer-events-none absolute inset-0">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <span
+              key={`particle-${index}`}
+              className={cn(
+                "autoSubtitleCapcutParticle absolute h-[3px] w-[3px] rounded-full",
+                animation === "love-emphasis"
+                  ? "bg-pink-300"
+                  : animation === "bubble-sprite"
+                    ? "border border-cyan-200/80 bg-transparent"
+                    : "bg-[var(--brand-soft)]",
+              )}
+              style={{
+                left: `${18 + index * 15}%`,
+                top: `${22 + (index % 2) * 34}%`,
+                animationDelay: `${index * 110}ms`,
+              }}
+            />
+          ))}
+        </span>
+      )}
+      <span
+        className={cn(
+          "autoSubtitleCapcutText relative z-[1] max-w-full whitespace-nowrap text-center text-[13px] font-black uppercase tracking-[.02em]",
+          `autoSubtitleCapcut-${animation}`,
+        )}
+        style={textStyle}
+      >
+        {renderChars
+          ? Array.from(sample).map((char, index) => (
+              <span
+                key={`${char}-${index}`}
+                className="autoSubtitleCapcutChar inline-block"
+                style={{ animationDelay: `${index * 58}ms` }}
+              >
+                {char}
+              </span>
+            ))
+          : sample}
+        {animation === "typing-cursor" && (
+          <span className="autoSubtitleCapcutCursor ml-[2px] inline-block h-[13px] w-[1px] translate-y-[2px] bg-current" />
+        )}
+      </span>
+    </div>
+  );
+}
+
+function autoSubtitleAnimationCardText(animation: CaptionTextAnimation): string {
+  switch (animation) {
+    case "typing-cursor":
+    case "in-scanner":
+    case "text-sprout":
+    case "sequence-reveal":
+      return "ABC";
+    case "big-echoes":
+    case "loud-emphasis":
+    case "quirky-spelling":
+      return "ABC123";
+    case "none":
+      return "ABC";
+    default:
+      return "NEXT";
+  }
 }
 
 function AutoSubtitleColorPicker({
@@ -6113,14 +6441,210 @@ function AutoSubtitleColorPicker({
   );
 }
 
+function AutoSubtitlePreviewKeyframes() {
+  return (
+    <style>
+      {`
+        @keyframes autoSubtitlePreviewFadeIn {
+          0% { opacity: 0; }
+          100% { opacity: 1; }
+        }
+        @keyframes autoSubtitlePreviewFadeOut {
+          0% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+        @keyframes autoSubtitlePreviewSlideUpIn {
+          0% { opacity: 0; transform: translateY(10px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes autoSubtitlePreviewSlideUpOut {
+          0% { opacity: 1; transform: translateY(0); }
+          100% { opacity: 0; transform: translateY(-8px); }
+        }
+        @keyframes autoSubtitlePreviewSlideDownIn {
+          0% { opacity: 0; transform: translateY(-10px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes autoSubtitlePreviewSlideDownOut {
+          0% { opacity: 1; transform: translateY(0); }
+          100% { opacity: 0; transform: translateY(8px); }
+        }
+        @keyframes autoSubtitlePreviewScaleIn {
+          0% { opacity: 0; transform: scale(.92); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes autoSubtitlePreviewScaleOut {
+          0% { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(.95); }
+        }
+        @keyframes autoSubtitlePreviewPopIn {
+          0% { opacity: 0; transform: scale(.82); }
+          70% { opacity: 1; transform: scale(1.08); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes autoSubtitlePreviewPopOut {
+          0% { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(.9); }
+        }
+        @keyframes autoSubtitleCapcutTyping {
+          0% { clip-path: inset(0 100% 0 0); opacity: .3; }
+          72% { clip-path: inset(0 0 0 0); opacity: 1; }
+          100% { clip-path: inset(0 0 0 0); opacity: 1; }
+        }
+        @keyframes autoSubtitleCapcutCursorBlink {
+          0%, 42% { opacity: 1; }
+          43%, 100% { opacity: 0; }
+        }
+        @keyframes autoSubtitleCapcutBounceLeft {
+          0% { opacity: 0; transform: translateX(-18px) scale(.86); }
+          58% { opacity: 1; transform: translateX(4px) scale(1.06); }
+          100% { opacity: 1; transform: translateX(0) scale(1); }
+        }
+        @keyframes autoSubtitleCapcutScanner {
+          0% { left: -24px; opacity: 0; }
+          20% { opacity: 1; }
+          100% { left: calc(100% + 24px); opacity: 0; }
+        }
+        @keyframes autoSubtitleCapcutScanText {
+          0% { opacity: .2; filter: blur(1.4px) brightness(1.7); }
+          45% { opacity: 1; filter: blur(0) brightness(1.25); }
+          100% { opacity: 1; filter: blur(0) brightness(1); }
+        }
+        @keyframes autoSubtitleCapcutSprout {
+          0% { opacity: 0; transform: translateY(9px) scaleY(.35); }
+          64% { opacity: 1; transform: translateY(-2px) scaleY(1.12); }
+          100% { opacity: 1; transform: translateY(0) scaleY(1); }
+        }
+        @keyframes autoSubtitleCapcutLeap {
+          0% { opacity: 0; transform: translateY(15px) scale(.82); }
+          56% { opacity: 1; transform: translateY(-5px) scale(1.05); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes autoSubtitleCapcutRebound {
+          0% { opacity: 0; transform: scaleX(1.45) scaleY(.55); }
+          52% { opacity: 1; transform: scaleX(.86) scaleY(1.16); }
+          100% { opacity: 1; transform: scaleX(1) scaleY(1); }
+        }
+        @keyframes autoSubtitleCapcutLoud {
+          0%, 100% { transform: scale(1); filter: brightness(1); }
+          35% { transform: scale(1.14); filter: brightness(1.35); }
+          62% { transform: scale(.98); }
+        }
+        @keyframes autoSubtitleCapcutSpatter {
+          0%, 100% { transform: translate(0, 0) rotate(0deg); }
+          20% { transform: translate(-2px, 1px) rotate(-2deg); }
+          42% { transform: translate(2px, -1px) rotate(2deg); }
+          66% { transform: translate(-1px, -1px) rotate(-1deg); }
+        }
+        @keyframes autoSubtitleCapcutOde {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          30% { transform: translateY(-4px) rotate(-2deg); }
+          68% { transform: translateY(2px) rotate(2deg); }
+        }
+        @keyframes autoSubtitleCapcutParticle {
+          0% { opacity: 0; transform: translateY(5px) scale(.5); }
+          40% { opacity: 1; }
+          100% { opacity: 0; transform: translateY(-12px) scale(1.15); }
+        }
+        @keyframes autoSubtitleCapcutPopSnow {
+          0% { opacity: 0; transform: scale(.72); }
+          52% { opacity: 1; transform: scale(1.1); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes autoSubtitleCapcutHorizon {
+          0% { opacity: 0; transform: translateX(-36%) scaleX(.2); }
+          42% { opacity: 1; transform: translateX(0) scaleX(1); }
+          100% { opacity: .3; transform: translateX(28%) scaleX(.4); }
+        }
+        @keyframes autoSubtitleCapcutHope {
+          0% { opacity: 0; filter: blur(2px) drop-shadow(0 0 0 rgba(125, 236, 255, 0)); }
+          48% { opacity: 1; filter: blur(0) drop-shadow(0 0 8px rgba(125, 236, 255, .85)); }
+          100% { opacity: 1; filter: blur(0) drop-shadow(0 0 2px rgba(125, 236, 255, .35)); }
+        }
+        @keyframes autoSubtitleCapcutEcho {
+          0% { opacity: .75; transform: translate(0, 0) scale(1.02); }
+          100% { opacity: 0; transform: translate(7px, 5px) scale(1.22); }
+        }
+        @keyframes autoSubtitleCapcutTension {
+          0% { transform: scaleX(1.38) scaleY(.72); }
+          48% { transform: scaleX(.88) scaleY(1.16); }
+          100% { transform: scaleX(1) scaleY(1); }
+        }
+        @keyframes autoSubtitleCapcutSequence {
+          0% { opacity: 0; transform: translateY(6px) scale(.88); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes autoSubtitleCapcutBubble {
+          0%, 100% { transform: translateY(1px) scale(1); }
+          50% { transform: translateY(-4px) scale(1.03); }
+        }
+        @keyframes autoSubtitleCapcutBlaze {
+          0% { left: -18px; opacity: 0; }
+          20% { opacity: 1; }
+          100% { left: calc(100% + 18px); opacity: 0; }
+        }
+        @keyframes autoSubtitleCapcutBlazeText {
+          0% { opacity: 0; transform: translateX(-10px); filter: brightness(1); }
+          45% { opacity: 1; transform: translateX(2px); filter: brightness(1.55); }
+          100% { opacity: 1; transform: translateX(0); filter: brightness(1); }
+        }
+        @keyframes autoSubtitleCapcutLove {
+          0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(255, 118, 188, .25)); }
+          42% { transform: scale(1.08); filter: drop-shadow(0 0 9px rgba(255, 118, 188, .7)); }
+        }
+        @keyframes autoSubtitleCapcutWavyRoll {
+          0% { opacity: 0; transform: translateY(8px) rotate(-7deg); }
+          52% { opacity: 1; transform: translateY(-2px) rotate(4deg); }
+          100% { opacity: 1; transform: translateY(0) rotate(0deg); }
+        }
+        @keyframes autoSubtitleCapcutQuirky {
+          0% { opacity: 0; transform: translateY(-5px) rotate(-5deg) scale(.9); }
+          70% { opacity: 1; transform: translateY(1px) rotate(3deg) scale(1.06); }
+          100% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
+        }
+        .autoSubtitleCapcut-none { animation: none; }
+        .autoSubtitleCapcut-typing-cursor { display: inline-flex; overflow: hidden; animation: 1100ms autoSubtitleCapcutTyping steps(4, end) infinite; }
+        .autoSubtitleCapcutCursor { animation: 560ms autoSubtitleCapcutCursorBlink steps(1, end) infinite; }
+        .autoSubtitleCapcut-bounce-left { animation: 920ms autoSubtitleCapcutBounceLeft cubic-bezier(.2,1.45,.28,1) infinite; }
+        .autoSubtitleCapcutScanner { animation: 1050ms autoSubtitleCapcutScanner ease-in-out infinite; }
+        .autoSubtitleCapcut-in-scanner { animation: 1050ms autoSubtitleCapcutScanText ease-in-out infinite; }
+        .autoSubtitleCapcut-text-sprout .autoSubtitleCapcutChar { transform-origin: bottom center; animation: 780ms autoSubtitleCapcutSprout cubic-bezier(.18,1.25,.3,1) infinite; }
+        .autoSubtitleCapcut-leap-in { animation: 900ms autoSubtitleCapcutLeap cubic-bezier(.2,1.3,.3,1) infinite; }
+        .autoSubtitleCapcut-rebound-in { animation: 950ms autoSubtitleCapcutRebound cubic-bezier(.2,1.18,.3,1) infinite; }
+        .autoSubtitleCapcut-loud-emphasis { animation: 820ms autoSubtitleCapcutLoud ease-in-out infinite; }
+        .autoSubtitleCapcut-spatter-stroke { animation: 680ms autoSubtitleCapcutSpatter steps(2, end) infinite; }
+        .autoSubtitleCapcut-ode-to-joy { animation: 1050ms autoSubtitleCapcutOde ease-in-out infinite; }
+        .autoSubtitleCapcutParticle { animation: 900ms autoSubtitleCapcutParticle ease-out infinite; }
+        .autoSubtitleCapcut-pop-snow { animation: 900ms autoSubtitleCapcutPopSnow cubic-bezier(.2,1.25,.32,1) infinite; }
+        .autoSubtitleCapcutHorizon { animation: 1150ms autoSubtitleCapcutHorizon ease-in-out infinite; }
+        .autoSubtitleCapcut-hope-horizon { animation: 1150ms autoSubtitleCapcutHope ease-in-out infinite; }
+        .autoSubtitleCapcutEcho { animation: 980ms autoSubtitleCapcutEcho ease-out infinite; }
+        .autoSubtitleCapcutEchoA { transform: translate(3px, 2px); }
+        .autoSubtitleCapcutEchoB { transform: translate(6px, 5px); animation-delay: 120ms; }
+        .autoSubtitleCapcut-big-echoes { animation: 980ms autoSubtitleCapcutLoud ease-out infinite; }
+        .autoSubtitleCapcut-tension-release { transform-origin: center; animation: 900ms autoSubtitleCapcutTension cubic-bezier(.18,1.2,.25,1) infinite; }
+        .autoSubtitleCapcut-sequence-reveal .autoSubtitleCapcutChar { opacity: 0; animation: 760ms autoSubtitleCapcutSequence ease-out infinite; }
+        .autoSubtitleCapcut-bubble-sprite { animation: 1200ms autoSubtitleCapcutBubble ease-in-out infinite; }
+        .autoSubtitleCapcutBlaze { animation: 900ms autoSubtitleCapcutBlaze ease-in-out infinite; }
+        .autoSubtitleCapcut-blaze-shot { animation: 900ms autoSubtitleCapcutBlazeText ease-out infinite; }
+        .autoSubtitleCapcut-love-emphasis { animation: 980ms autoSubtitleCapcutLove ease-in-out infinite; }
+        .autoSubtitleCapcut-wavy-roll { animation: 980ms autoSubtitleCapcutWavyRoll ease-in-out infinite; }
+        .autoSubtitleCapcut-quirky-spelling .autoSubtitleCapcutChar { animation: 760ms autoSubtitleCapcutQuirky cubic-bezier(.2,1.25,.32,1) infinite; }
+      `}
+    </style>
+  );
+}
+
 function AutoSubtitleAnimatedPreview({
   settings,
   phrases,
   language,
+  compact,
 }: {
   settings: CaptionStyleSettings;
   phrases: readonly string[];
   language?: string | null;
+  compact?: boolean;
 }) {
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [leavingPhrase, setLeavingPhrase] = useState<{
@@ -6163,61 +6687,23 @@ function AutoSubtitleAnimatedPreview({
 
   const text = safePhrases[phraseIndex % safePhrases.length] ?? "";
   const animationCss = autoSubtitlePreviewAnimationCss(settings.animation);
+  const textMotionCss = autoSubtitlePreviewTextMotionCss(settings.textAnimation);
 
   return (
-    <div className="relative flex h-[38px] w-full items-center justify-center overflow-hidden px-2">
-      <style>
-        {`
-          @keyframes autoSubtitlePreviewFadeIn {
-            0% { opacity: 0; }
-            100% { opacity: 1; }
-          }
-          @keyframes autoSubtitlePreviewFadeOut {
-            0% { opacity: 1; }
-            100% { opacity: 0; }
-          }
-          @keyframes autoSubtitlePreviewSlideUpIn {
-            0% { opacity: 0; transform: translateY(10px); }
-            100% { opacity: 1; transform: translateY(0); }
-          }
-          @keyframes autoSubtitlePreviewSlideUpOut {
-            0% { opacity: 1; transform: translateY(0); }
-            100% { opacity: 0; transform: translateY(-8px); }
-          }
-          @keyframes autoSubtitlePreviewSlideDownIn {
-            0% { opacity: 0; transform: translateY(-10px); }
-            100% { opacity: 1; transform: translateY(0); }
-          }
-          @keyframes autoSubtitlePreviewSlideDownOut {
-            0% { opacity: 1; transform: translateY(0); }
-            100% { opacity: 0; transform: translateY(8px); }
-          }
-          @keyframes autoSubtitlePreviewScaleIn {
-            0% { opacity: 0; transform: scale(.92); }
-            100% { opacity: 1; transform: scale(1); }
-          }
-          @keyframes autoSubtitlePreviewScaleOut {
-            0% { opacity: 1; transform: scale(1); }
-            100% { opacity: 0; transform: scale(.95); }
-          }
-          @keyframes autoSubtitlePreviewPopIn {
-            0% { opacity: 0; transform: scale(.82); }
-            70% { opacity: 1; transform: scale(1.08); }
-            100% { opacity: 1; transform: scale(1); }
-          }
-          @keyframes autoSubtitlePreviewPopOut {
-            0% { opacity: 1; transform: scale(1); }
-            100% { opacity: 0; transform: scale(.9); }
-          }
-        `}
-      </style>
+    <div className={cn("relative flex w-full items-center justify-center overflow-hidden px-2", compact ? "h-[30px]" : "h-[38px]")}>
       {leavingPhrase && settings.animation !== "none" && (
         <div
           key={`out-${leavingPhrase.key}`}
           className="absolute inset-x-2 flex justify-center"
           style={{ animation: animationCss.out }}
         >
-          <AutoSubtitlePreviewText settings={settings} text={leavingPhrase.text} language={language} />
+          <AutoSubtitlePreviewText
+            settings={settings}
+            text={leavingPhrase.text}
+            language={language}
+            compact={compact}
+            motionStyle={textMotionCss}
+          />
         </div>
       )}
       <div
@@ -6225,7 +6711,13 @@ function AutoSubtitleAnimatedPreview({
         className="absolute inset-x-2 flex justify-center"
         style={{ animation: animationCss.in }}
       >
-        <AutoSubtitlePreviewText settings={settings} text={text} language={language} />
+        <AutoSubtitlePreviewText
+          settings={settings}
+          text={text}
+          language={language}
+          compact={compact}
+          motionStyle={textMotionCss}
+        />
       </div>
     </div>
   );
@@ -6282,6 +6774,54 @@ function autoSubtitlePreviewAnimationCss(
   }
 }
 
+function autoSubtitlePreviewTextMotionCss(
+  animation: CaptionTextAnimation | undefined,
+): React.CSSProperties | undefined {
+  switch (animation) {
+    case "typing-cursor":
+      return { animation: "1100ms autoSubtitleCapcutTyping steps(4, end) infinite" };
+    case "bounce-left":
+      return { animation: "920ms autoSubtitleCapcutBounceLeft cubic-bezier(.2,1.45,.28,1) infinite" };
+    case "in-scanner":
+      return { animation: "1050ms autoSubtitleCapcutScanText ease-in-out infinite" };
+    case "text-sprout":
+      return { animation: "780ms autoSubtitleCapcutSprout cubic-bezier(.18,1.25,.3,1) infinite" };
+    case "leap-in":
+      return { animation: "900ms autoSubtitleCapcutLeap cubic-bezier(.2,1.3,.3,1) infinite" };
+    case "rebound-in":
+      return { animation: "950ms autoSubtitleCapcutRebound cubic-bezier(.2,1.18,.3,1) infinite" };
+    case "loud-emphasis":
+      return { animation: "820ms autoSubtitleCapcutLoud ease-in-out infinite" };
+    case "spatter-stroke":
+      return { animation: "680ms autoSubtitleCapcutSpatter steps(2, jump-none) infinite" };
+    case "ode-to-joy":
+      return { animation: "1050ms autoSubtitleCapcutOde ease-in-out infinite" };
+    case "pop-snow":
+      return { animation: "900ms autoSubtitleCapcutPopSnow cubic-bezier(.2,1.25,.32,1) infinite" };
+    case "hope-horizon":
+      return { animation: "1150ms autoSubtitleCapcutHope ease-in-out infinite" };
+    case "big-echoes":
+      return { animation: "980ms autoSubtitleCapcutLoud ease-out infinite" };
+    case "tension-release":
+      return { animation: "900ms autoSubtitleCapcutTension cubic-bezier(.18,1.2,.25,1) infinite" };
+    case "sequence-reveal":
+      return { animation: "760ms autoSubtitleCapcutSequence ease-out infinite" };
+    case "bubble-sprite":
+      return { animation: "1200ms autoSubtitleCapcutBubble ease-in-out infinite" };
+    case "blaze-shot":
+      return { animation: "900ms autoSubtitleCapcutBlazeText ease-out infinite" };
+    case "love-emphasis":
+      return { animation: "980ms autoSubtitleCapcutLove ease-in-out infinite" };
+    case "wavy-roll":
+      return { animation: "980ms autoSubtitleCapcutWavyRoll ease-in-out infinite" };
+    case "quirky-spelling":
+      return { animation: "760ms autoSubtitleCapcutQuirky cubic-bezier(.2,1.25,.32,1) infinite" };
+    case "none":
+    default:
+      return undefined;
+  }
+}
+
 function AutoSubtitlePreviewText({
   settings,
   text,
@@ -6289,6 +6829,7 @@ function AutoSubtitlePreviewText({
   activeWord,
   wordsPerLine,
   language,
+  motionStyle,
 }: {
   settings: CaptionStyleSettings;
   text: string;
@@ -6296,6 +6837,7 @@ function AutoSubtitlePreviewText({
   activeWord?: boolean;
   wordsPerLine?: number;
   language?: string | null;
+  motionStyle?: React.CSSProperties;
 }) {
   const transformed = applyCaptionCase(text, settings.case);
   const displayText = wordsPerLine
@@ -6334,7 +6876,7 @@ function AutoSubtitlePreviewText({
         compact ? "truncate" : "overflow-hidden text-ellipsis whitespace-nowrap",
         compact ? "px-1" : "px-2",
       )}
-      style={previewStyle}
+      style={{ ...previewStyle, ...motionStyle }}
     >
       {activeWord && settings.animation === "wordHighlight" && restText.trim().length > 0 ? (
         <span className="inline-flex max-w-full items-baseline overflow-hidden whitespace-nowrap">
@@ -7889,7 +8431,7 @@ function VoiceSettingsControls({
   }, [provider]);
 
   return (
-    <div className="flex flex-col gap-[6px]">
+    <div className="flex flex-col gap-[5px]">
       {provider === "elevenlabs" && (
         // ElevenLabs: live grid of the user's account voices. No
         // hardcoded preset catalog — what's in the API is what we show.
@@ -7922,7 +8464,7 @@ function VoiceSettingsControls({
             </div>
           )}
           {elevenVoices && elevenVoices.length > 0 && (
-            <div className="standalone-voice-controls ws-scroll-hide mt-[5px] grid max-h-[98px] grid-cols-3 gap-[4px] overflow-y-auto pr-0.5">
+            <div className="standalone-voice-controls ws-scroll-hide mt-[5px] grid max-h-[122px] grid-cols-3 gap-[5px] overflow-y-auto pr-0.5">
               {elevenVoices.map((voice) => {
                 const active = voice.id === form.voice;
                 return (
@@ -7931,14 +8473,14 @@ function VoiceSettingsControls({
                     type="button"
                     onClick={() => onChange({ voice: voice.id })}
                     className={cn(
-                      "standalone-voice-card flex min-h-[34px] flex-col items-start justify-between rounded-[9px] border border-dashed px-[6px] py-[4px] text-left transition",
+                      "standalone-voice-card flex min-h-[46px] flex-col items-start justify-between rounded-[10px] border px-[8px] py-[5px] text-left transition",
                       active
-                        ? "border-amber-300/50 bg-amber-300/10"
-                        : "border-white/[0.12] bg-[#242424] hover:bg-[#2d2d2d]",
+                        ? "border-[#EFFF00]/60 bg-[#EFFF00]/10"
+                        : "border-white/[0.10] bg-[#242424] hover:border-[#EFFF00]/35 hover:bg-[#2d2d2d]",
                     )}
                   >
                     <span
-                      className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full text-[9px] font-bold text-white"
+                      className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"
                       style={{
                         background:
                           TINT_PALETTE[voice.tint] ?? TINT_PALETTE.zinc,
@@ -7947,10 +8489,10 @@ function VoiceSettingsControls({
                       {voice.name.charAt(0)}
                     </span>
                     <span className="min-w-0 w-full">
-                      <span className="block truncate text-[11.5px] font-bold leading-[14px] text-white">
+                      <span className="block truncate text-[12px] font-bold leading-[15px] text-white">
                         {voice.name}
                       </span>
-                      <span className="block truncate text-[10px] leading-[12px] text-zinc-500">
+                      <span className="block truncate text-[10.5px] leading-[12px] text-zinc-500">
                         {voice.characteristic}
                       </span>
                     </span>
@@ -8037,7 +8579,7 @@ function GeminiVoicePicker({
         label="Voice"
         meta={`${GEMINI_TTS_VOICES.length} preset speakers`}
       />
-      <div className="standalone-voice-controls ws-scroll-hide mt-[5px] grid max-h-[98px] grid-cols-3 gap-[4px] overflow-y-auto pr-0.5">
+      <div className="standalone-voice-controls ws-scroll-hide mt-[5px] grid max-h-[122px] grid-cols-3 gap-[5px] overflow-y-auto pr-0.5">
         {GEMINI_TTS_VOICES.map((voiceName) => {
           const active = value === voiceName;
           const isPlaying = playingId === voiceName;
@@ -8048,14 +8590,14 @@ function GeminiVoicePicker({
               type="button"
               onClick={() => onChange(voiceName)}
               className={cn(
-                "standalone-voice-card relative flex min-h-[34px] flex-col items-start justify-center rounded-[9px] border border-dashed px-[6px] py-[3px] pr-[28px] text-left transition",
+                "standalone-voice-card relative flex min-h-[46px] flex-col items-start justify-center rounded-[10px] border px-[8px] py-[5px] pr-[42px] text-left transition",
                 active
-                  ? "border-amber-300/50 bg-amber-300/10"
-                  : "border-white/[0.12] bg-[#242424] hover:bg-[#2d2d2d]",
+                  ? "border-[#EFFF00]/60 bg-[#EFFF00]/10"
+                  : "border-white/[0.10] bg-[#242424] hover:border-[#EFFF00]/35 hover:bg-[#2d2d2d]",
               )}
             >
               <span
-                className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full text-[9px] font-bold text-white"
+                className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"
                 style={{
                   background:
                     TINT_PALETTE[pickTintFromName(voiceName)] ?? TINT_PALETTE.zinc,
@@ -8063,7 +8605,7 @@ function GeminiVoicePicker({
               >
                 {voiceName.charAt(0)}
               </span>
-              <span className="mt-[3px] block w-full truncate text-[11.5px] font-bold leading-[14px] text-white">
+              <span className="mt-[4px] block w-full truncate text-[12px] font-bold leading-[15px] text-white">
                 {voiceName}
               </span>
               {/* Preview ▶ — sits in the top-right of the card. We
@@ -8085,17 +8627,17 @@ function GeminiVoicePicker({
                   }
                 }}
                 className={cn(
-                  "absolute right-[5px] top-[5px] grid h-[22px] w-[22px] cursor-pointer place-items-center rounded-full transition",
-                  "bg-white/[0.08] text-zinc-200 hover:bg-white/[0.16] hover:text-white",
-                  isPlaying && "bg-amber-300/30 text-amber-200",
+                  "absolute right-[7px] top-1/2 grid h-[30px] w-[30px] -translate-y-1/2 cursor-pointer place-items-center rounded-full transition",
+                  "bg-white/[0.10] text-zinc-100 hover:bg-white/[0.18] hover:text-white",
+                  isPlaying && "bg-[#EFFF00]/25 text-[#F4FF33]",
                 )}
               >
                 {isLoading ? (
-                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : isPlaying ? (
-                  <Pause className="h-2.5 w-2.5" />
+                  <Pause className="h-3.5 w-3.5" />
                 ) : (
-                  <Play className="h-2.5 w-2.5" />
+                  <Play className="h-3.5 w-3.5" />
                 )}
               </span>
             </button>
@@ -8140,7 +8682,7 @@ function GeminiAudioTagsPanel({
   };
   const prefix = composeGeminiAudioTagPrefix({ emotion, personality, speed });
   return (
-    <div className="standalone-voice-controls ws-scroll-hide max-h-[158px] overflow-y-auto rounded-[10px] bg-white/[0.04] px-[8px] py-[6px]">
+    <div className="standalone-voice-controls ws-scroll-hide max-h-[142px] overflow-y-auto border-t border-white/[0.06] pt-[7px]">
       <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
         Audio tags
       </div>
@@ -8260,7 +8802,7 @@ function ElevenLabsVoiceParams({
   ];
 
   return (
-    <div className="standalone-voice-controls rounded-[10px] bg-white/[0.04] px-[8px] py-[6px]">
+    <div className="standalone-voice-controls border-t border-white/[0.06] pt-[7px]">
       <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
         {t("workspace.standalone.voice_style")}
       </div>
@@ -11140,6 +11682,7 @@ function buildCurrentParams(
       highlight_color: form.autoSubtitleHighlightColor,
       position: form.autoSubtitlePosition,
       transition: form.autoSubtitleTransition,
+      text_animation: form.autoSubtitleTextAnimation,
       segmentation_mode: form.autoSubtitleSegmentationMode,
       words_per_line: form.autoSubtitleWordsPerLine,
       source_duration_seconds:
