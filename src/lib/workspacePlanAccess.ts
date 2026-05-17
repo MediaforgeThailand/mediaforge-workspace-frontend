@@ -7,19 +7,9 @@ export type WorkspacePlanProfile = {
   subscription_plan_id?: string | null;
 } | null | undefined;
 
-const FREE_BLOCKED_STANDALONE_TOOLS = new Set([
-  "image_gen",
-  "video_gen",
-  "image_upscale",
-]);
+const FREE_BLOCKED_STANDALONE_TOOLS = new Set<string>();
 
-const FREE_BLOCKED_NODE_TYPES = new Set([
-  "bananaProNode",
-  "imageGenNode",
-  "klingVideoNode",
-  "videoGenNode",
-  "upscaleImageNode",
-]);
+const FREE_BLOCKED_NODE_TYPES = new Set<string>();
 
 export function isWorkspaceFreePlan(profile: WorkspacePlanProfile): boolean {
   const planName = String(profile?.plan_name ?? "").trim().toLowerCase();
