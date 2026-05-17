@@ -183,6 +183,7 @@ export interface SubtitleStyle {
   readonly color: string;
   readonly backgroundColor: string;
   readonly position: "top" | "center" | "bottom";
+  readonly accentColor?: string;
   readonly highlightColor?: string;
   readonly upcomingColor?: string;
 }

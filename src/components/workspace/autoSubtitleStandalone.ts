@@ -1,7 +1,8 @@
-import type {
-  CaptionAnimation,
-  CaptionTextAnimation,
-  CaptionStyleSettings,
+import {
+  captionAccentColor,
+  type CaptionAnimation,
+  type CaptionTextAnimation,
+  type CaptionStyleSettings,
 } from "@/features/editor/services/caption-presets";
 import {
   formatAutoSuptitleCueText,
@@ -665,7 +666,7 @@ function drawCue(
   if (settings.shadow.enabled || textGlowEnabled) {
     ctx.shadowColor =
       textGlowEnabled
-        ? settings.highlightColor || settings.fill
+        ? captionAccentColor(settings)
         : settings.shadow.color;
     ctx.shadowBlur =
       textGlowEnabled

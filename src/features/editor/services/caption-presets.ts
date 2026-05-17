@@ -7,6 +7,7 @@
 
 export type CaptionAnimation =
   | "none"
+  /** Legacy only. Kept so older caption projects can still render. */
   | "wordHighlight"
   | "typewriter"
   | "slideIn"
@@ -82,8 +83,10 @@ export interface CaptionStyleSettings {
   shadow: CaptionShadowStyle;
   /** Highlight rectangle behind text. */
   background: CaptionBackgroundStyle;
+  /** Accent/effect color used by glow or emphasis animations. */
+  accentColor?: string;
   /** Legacy highlight color field kept for older saved presets. */
-  highlightColor: string;
+  highlightColor?: string;
   /** Animation style. */
   animation: CaptionAnimation;
   /** Continuous text motion, separate from cue entry/exit transitions. */
@@ -283,6 +286,19 @@ export function captionTextAnimationOptionFor(
   );
 }
 
+export function captionAccentColor(settings: Pick<CaptionStyleSettings, "accentColor" | "highlightColor" | "fill">): string {
+  return settings.accentColor || settings.highlightColor || settings.fill;
+}
+
+export function normalizeCaptionSettings(settings: CaptionStyleSettings): CaptionStyleSettings {
+  const accentColor = captionAccentColor(settings);
+  return {
+    ...settings,
+    accentColor,
+    highlightColor: settings.highlightColor || accentColor,
+  };
+}
+
 /** Default settings — used when the panel first opens and no preset is selected. */
 export const DEFAULT_CAPTION_SETTINGS: CaptionStyleSettings = {
   font: "Inter",
@@ -294,6 +310,7 @@ export const DEFAULT_CAPTION_SETTINGS: CaptionStyleSettings = {
   stroke: { enabled: true, color: "#000000", width: 6 },
   shadow: { enabled: false, offsetX: 2, offsetY: 2, blur: 4, color: "rgba(0,0,0,0.5)" },
   background: { enabled: false, color: "rgba(0,0,0,0.6)", padding: 12, cornerRadius: 8 },
+  accentColor: "#F4FF00",
   highlightColor: "#F4FF00",
   animation: "none",
   textAnimation: "none",
@@ -318,6 +335,7 @@ export const BUILTIN_CAPTION_PRESETS: CaptionPreset[] = [
       stroke: { enabled: true, color: "#000000", width: 6 },
       shadow: { enabled: false, offsetX: 2, offsetY: 2, blur: 4, color: "rgba(0,0,0,0.5)" },
       background: { enabled: false, color: "rgba(0,0,0,0.6)", padding: 12, cornerRadius: 8 },
+      accentColor: "#F4FF00",
       highlightColor: "#F4FF00",
       animation: "none",
       case: "upper",
@@ -341,6 +359,7 @@ export const BUILTIN_CAPTION_PRESETS: CaptionPreset[] = [
       stroke: { enabled: true, color: "#000000", width: 3 },
       shadow: { enabled: false, offsetX: 0, offsetY: 0, blur: 0, color: "rgba(0,0,0,0.5)" },
       background: { enabled: true, color: "rgba(0,0,0,0.6)", padding: 8, cornerRadius: 4 },
+      accentColor: "#F4FF00",
       highlightColor: "#F4FF00",
       animation: "none",
       case: "normal",
@@ -364,6 +383,7 @@ export const BUILTIN_CAPTION_PRESETS: CaptionPreset[] = [
       stroke: { enabled: false, color: "#000000", width: 0 },
       shadow: { enabled: true, offsetX: 0, offsetY: 1, blur: 4, color: "rgba(0,0,0,0.55)" },
       background: { enabled: false, color: "rgba(0,0,0,0)", padding: 0, cornerRadius: 0 },
+      accentColor: "#F4FF00",
       highlightColor: "#F4FF00",
       animation: "fade",
       case: "normal",
@@ -387,6 +407,7 @@ export const BUILTIN_CAPTION_PRESETS: CaptionPreset[] = [
       stroke: { enabled: true, color: "#000000", width: 8 },
       shadow: { enabled: false, offsetX: 2, offsetY: 2, blur: 4, color: "rgba(0,0,0,0.5)" },
       background: { enabled: false, color: "rgba(0,0,0,0.6)", padding: 12, cornerRadius: 8 },
+      accentColor: "#ffffff",
       highlightColor: "#ffffff",
       animation: "none",
       case: "upper",
@@ -410,6 +431,7 @@ export const BUILTIN_CAPTION_PRESETS: CaptionPreset[] = [
       stroke: { enabled: false, color: "#000000", width: 0 },
       shadow: { enabled: true, offsetX: 0, offsetY: 2, blur: 10, color: "rgba(0,0,0,0.72)" },
       background: { enabled: false, color: "rgba(0,0,0,0)", padding: 0, cornerRadius: 0 },
+      accentColor: "#ffffff",
       highlightColor: "#ffffff",
       animation: "fade",
       case: "normal",
@@ -433,6 +455,7 @@ export const BUILTIN_CAPTION_PRESETS: CaptionPreset[] = [
       stroke: { enabled: true, color: "#000000", width: 7 },
       shadow: { enabled: false, offsetX: 0, offsetY: 0, blur: 0, color: "rgba(0,0,0,0.5)" },
       background: { enabled: false, color: "rgba(0,0,0,0)", padding: 0, cornerRadius: 0 },
+      accentColor: "#F4FF00",
       highlightColor: "#F4FF00",
       animation: "none",
       case: "upper",
@@ -456,6 +479,7 @@ export const BUILTIN_CAPTION_PRESETS: CaptionPreset[] = [
       stroke: { enabled: true, color: "#06220a", width: 4 },
       shadow: { enabled: true, offsetX: 0, offsetY: 0, blur: 14, color: "rgba(124,255,138,0.45)" },
       background: { enabled: false, color: "rgba(0,0,0,0)", padding: 0, cornerRadius: 0 },
+      accentColor: "#7CFF8A",
       highlightColor: "#7CFF8A",
       animation: "none",
       case: "upper",
@@ -479,6 +503,7 @@ export const BUILTIN_CAPTION_PRESETS: CaptionPreset[] = [
       stroke: { enabled: true, color: "#1b1020", width: 5 },
       shadow: { enabled: false, offsetX: 0, offsetY: 0, blur: 0, color: "rgba(0,0,0,0.5)" },
       background: { enabled: true, color: "rgba(255,72,154,0.82)", padding: 10, cornerRadius: 10 },
+      accentColor: "#ffffff",
       highlightColor: "#ffffff",
       animation: "none",
       case: "upper",
@@ -502,6 +527,7 @@ export const BUILTIN_CAPTION_PRESETS: CaptionPreset[] = [
       stroke: { enabled: false, color: "#000000", width: 0 },
       shadow: { enabled: false, offsetX: 0, offsetY: 0, blur: 0, color: "rgba(0,0,0,0.5)" },
       background: { enabled: true, color: "rgba(0,0,0,0.72)", padding: 12, cornerRadius: 8 },
+      accentColor: "#F4FF00",
       highlightColor: "#F4FF00",
       animation: "none",
       case: "normal",
@@ -525,6 +551,7 @@ export const BUILTIN_CAPTION_PRESETS: CaptionPreset[] = [
       stroke: { enabled: true, color: "#001114", width: 4 },
       shadow: { enabled: true, offsetX: 0, offsetY: 0, blur: 14, color: "rgba(140,247,255,0.5)" },
       background: { enabled: false, color: "rgba(0,0,0,0)", padding: 0, cornerRadius: 0 },
+      accentColor: "#8CF7FF",
       highlightColor: "#8CF7FF",
       animation: "none",
       case: "upper",
@@ -550,7 +577,11 @@ export function loadUserPresets(): CaptionPreset[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw) as PersistedPresetFile;
     if (parsed?.version !== 1 || !Array.isArray(parsed.presets)) return [];
-    return parsed.presets.map((p) => ({ ...p, builtin: false }));
+    return parsed.presets.map((p) => ({
+      ...p,
+      builtin: false,
+      settings: normalizeCaptionSettings(p.settings),
+    }));
   } catch {
     return [];
   }
@@ -558,10 +589,14 @@ export function loadUserPresets(): CaptionPreset[] {
 
 export function saveUserPreset(preset: CaptionPreset): void {
   const existing = loadUserPresets();
+  const normalizedPreset = {
+    ...preset,
+    settings: normalizeCaptionSettings(preset.settings),
+  };
   // Replace any existing preset with the same id, otherwise append.
   const next = existing.some((p) => p.id === preset.id)
-    ? existing.map((p) => (p.id === preset.id ? preset : p))
-    : [...existing, preset];
+    ? existing.map((p) => (p.id === preset.id ? normalizedPreset : p))
+    : [...existing, normalizedPreset];
   const file: PersistedPresetFile = { version: 1, presets: next };
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(file)); } catch { /* ignore quota */ }
 }
@@ -575,7 +610,13 @@ export function deleteUserPreset(id: string): void {
 
 /** Combined list of built-in + user presets. */
 export function listAllPresets(): CaptionPreset[] {
-  return [...BUILTIN_CAPTION_PRESETS, ...loadUserPresets()];
+  return [
+    ...BUILTIN_CAPTION_PRESETS.map((preset) => ({
+      ...preset,
+      settings: normalizeCaptionSettings(preset.settings),
+    })),
+    ...loadUserPresets(),
+  ];
 }
 
 /**

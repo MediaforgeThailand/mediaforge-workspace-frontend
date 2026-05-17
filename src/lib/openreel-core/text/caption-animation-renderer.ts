@@ -57,7 +57,7 @@ function renderWordHighlight(
     return renderNone(subtitle);
   }
 
-  const highlightColor = subtitle.style?.highlightColor || "#ffff00";
+  const highlightColor = subtitle.style?.accentColor || subtitle.style?.highlightColor || "#ffff00";
   const upcomingColor = subtitle.style?.upcomingColor;
 
   const segments: WordSegment[] = subtitle.words.map((word) => {
@@ -139,7 +139,7 @@ function renderKaraoke(
     return renderNone(subtitle);
   }
 
-  const highlightColor = subtitle.style?.highlightColor || "#ffff00";
+  const highlightColor = subtitle.style?.accentColor || subtitle.style?.highlightColor || "#ffff00";
   const upcomingColor =
     subtitle.style?.upcomingColor || "rgba(255, 255, 255, 0.5)";
 

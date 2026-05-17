@@ -374,7 +374,9 @@ export class TitleEngine {
             const isActive = !!(
               word && absoluteTime >= word.start && absoluteTime < word.end
             );
-            const color = isActive ? clip.captionMeta!.highlightColor : style.color;
+            const color = isActive
+              ? (clip.captionMeta!.accentColor || clip.captionMeta!.highlightColor)
+              : style.color;
 
             if (style.strokeColor && style.strokeWidth) {
               ctx.strokeStyle = style.strokeColor;

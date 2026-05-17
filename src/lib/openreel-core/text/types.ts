@@ -15,8 +15,8 @@ export interface TextClip {
   readonly blendOpacity?: number;
   readonly emphasisAnimation?: EmphasisAnimation;
   /**
-   * Word-level timing for caption-style text. When present, the renderer
-   * uses these to highlight the currently-spoken word in `captionMeta.highlightColor`.
+   * Word-level timing for caption-style text. Older projects may use these
+   * with legacy word-highlight metadata.
    * Times are in absolute timeline seconds (NOT clip-relative).
    */
   readonly words?: ReadonlyArray<{
@@ -51,7 +51,9 @@ export interface CaptionClipMeta {
     | "slideDown"
     | "scale"
     | "pop";
-  /** Word-highlight color (used when animation = wordHighlight). */
+  /** Accent/effect color for glow or emphasis animations. */
+  readonly accentColor?: string;
+  /** Legacy word-highlight color field kept for older saved projects. */
   readonly highlightColor: string;
 }
 

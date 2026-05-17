@@ -767,8 +767,8 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
         {extraControls && (
           <div
             className={clsx(
-              "flex shrink-0 flex-col",
-              compactVoice ? "gap-[5px]" : "gap-[10px]",
+              "flex flex-col",
+              compactVoice ? "min-h-0 flex-1 gap-[5px]" : "shrink-0 gap-[10px]",
             )}
           >
             {extraControls}

@@ -155,9 +155,11 @@ import {
   BUILTIN_CAPTION_PRESETS,
   CAPTION_TEXT_ANIMATION_OPTIONS,
   CAPTION_TRANSITION_OPTIONS,
+  captionAccentColor,
   captionTextAnimationOptionFor,
   captionTransitionOptionFor,
   DEFAULT_CAPTION_SETTINGS,
+  normalizeCaptionSettings,
   type CaptionAnimation,
   type CaptionStyleSettings,
   type CaptionTextAnimation,
@@ -754,7 +756,7 @@ interface StandaloneFormState {
   autoSubtitleFont: string;
   autoSubtitleSize: number;
   autoSubtitleFill: string;
-  autoSubtitleHighlightColor: string;
+  autoSubtitleAccentColor: string;
   autoSubtitlePosition: "top" | "middle" | "bottom";
   autoSubtitlePositionX: number;
   autoSubtitlePositionY: number;
@@ -825,7 +827,7 @@ const DEFAULT_AUTO_SUBTITLE_PARAMS = {
   autoSubtitleFont: "Inter",
   autoSubtitleSize: 56,
   autoSubtitleFill: "#ffffff",
-  autoSubtitleHighlightColor: "#F4FF00",
+  autoSubtitleAccentColor: "#F4FF00",
   autoSubtitlePosition: "bottom" as const,
   autoSubtitlePositionX: 0.5,
   autoSubtitlePositionY: 0.84,
@@ -3566,7 +3568,8 @@ export default function StandaloneGenerator({
           language: whisperResponse.language ?? form.autoSubtitleLanguage ?? "auto",
           sourceClipId: source.id,
           animation: settings.animation,
-          highlightColor: settings.highlightColor,
+          accentColor: captionAccentColor(settings),
+          highlightColor: captionAccentColor(settings),
         },
       };
       const outputName = autoSubtitleOutputName(source.name, rendered.extension);
@@ -5075,6 +5078,19 @@ function autoSubtitlePositionPercentFromVertical(
   return 0.84;
 }
 
+const AUTO_SUBTITLE_ACCENT_TEXT_ANIMATIONS = new Set<CaptionTextAnimation>([
+  "hope-horizon",
+  "big-echoes",
+  "love-emphasis",
+]);
+
+function autoSubtitleUsesAccentColor(settings: CaptionStyleSettings): boolean {
+  return (
+    settings.animation === "wordHighlight" ||
+    AUTO_SUBTITLE_ACCENT_TEXT_ANIMATIONS.has(settings.textAnimation)
+  );
+}
+
 function autoSubtitleStyleFromForm(form: StandaloneFormState): CaptionStyleSettings {
   const preset =
     BUILTIN_CAPTION_PRESETS.find((item) => item.id === form.autoSubtitlePresetId)?.settings ??
@@ -5085,7 +5101,8 @@ function autoSubtitleStyleFromForm(form: StandaloneFormState): CaptionStyleSetti
     font: form.autoSubtitleFont,
     size: Math.max(24, Math.min(96, Number(form.autoSubtitleSize) || preset.size)),
     fill: form.autoSubtitleFill || preset.fill,
-    highlightColor: form.autoSubtitleHighlightColor || preset.highlightColor,
+    accentColor: form.autoSubtitleAccentColor || captionAccentColor(preset),
+    highlightColor: form.autoSubtitleAccentColor || captionAccentColor(preset),
     stroke: {
       ...preset.stroke,
       enabled: form.autoSubtitleStroke,
@@ -5627,7 +5644,7 @@ function AutoSubtitlePanelV2({
     transition: th ? "ทรานซิชันข้อความ" : "Text transition",
     textAnimation: th ? "อนิเมชันตัวอักษร" : "Text animation",
     textColor: th ? "สีตัวอักษร" : "Text color",
-    highlightColor: th ? "สีไฮไลต์" : "Highlight",
+    accentColor: th ? "สีเอฟเฟกต์" : "Accent color",
     stroke: th ? "เส้นขอบ" : "Stroke",
     background: th ? "พื้นหลัง" : "Background",
     translation: th ? "การแปลภาษา" : "Translation",
@@ -5706,7 +5723,7 @@ function AutoSubtitlePanelV2({
       autoSubtitleFont: preset.settings.font,
       autoSubtitleSize: preset.settings.size,
       autoSubtitleFill: preset.settings.fill,
-      autoSubtitleHighlightColor: preset.settings.highlightColor,
+      autoSubtitleAccentColor: captionAccentColor(preset.settings),
       autoSubtitleStroke: preset.settings.stroke.enabled,
       autoSubtitleStrokeWidth: preset.settings.stroke.width,
       autoSubtitleBackground: preset.settings.background.enabled,
@@ -6051,12 +6068,14 @@ function AutoSubtitlePanelV2({
                     onChange={(value) => onChange({ autoSubtitleFill: value })}
                     className="sm:col-span-2"
                   />
-                  <AutoSubtitleColorPicker
-                    label={copy.highlightColor}
-                    value={form.autoSubtitleHighlightColor}
-                    onChange={(value) => onChange({ autoSubtitleHighlightColor: value })}
-                    className="sm:col-span-2"
-                  />
+                  {autoSubtitleUsesAccentColor(selectedSettings) && (
+                    <AutoSubtitleColorPicker
+                      label={copy.accentColor}
+                      value={form.autoSubtitleAccentColor}
+                      onChange={(value) => onChange({ autoSubtitleAccentColor: value })}
+                      className="sm:col-span-2"
+                    />
+                  )}
                   <AutoSubtitleToggle
                     label={copy.stroke}
                     checked={form.autoSubtitleStroke}
@@ -7132,7 +7151,7 @@ function AutoSubtitlePreviewText({
     >
       {activeWord && settings.animation === "wordHighlight" && restText.trim().length > 0 ? (
         <span className="inline-flex max-w-full items-baseline overflow-hidden whitespace-nowrap">
-          <span style={{ color: settings.highlightColor }}>{highlightedWord}</span>
+          <span style={{ color: captionAccentColor(settings) }}>{highlightedWord}</span>
           <span>{restText}</span>
         </span>
       ) : (
@@ -8604,7 +8623,7 @@ function VoiceControls({
 }) {
   const { t } = useLanguage();
   return (
-    <div className="flex flex-col gap-[7px]">
+    <div className="flex min-h-0 flex-1 flex-col gap-[7px]">
       <PromptBox
         label={t("workspace.standalone.script")}
         placeholder={t("workspace.standalone.script_placeholder")}
@@ -8693,7 +8712,7 @@ function VoiceSettingsControls({
   }, [provider]);
 
   return (
-    <div className="standalone-voice-settings flex flex-col gap-[4px] rounded-[13px] bg-white/[0.03] px-[8px] py-[6px] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+    <div className="standalone-voice-settings flex min-h-0 flex-1 flex-col gap-[4px] rounded-[13px] bg-white/[0.03] px-[8px] py-[6px] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       {provider === "elevenlabs" && (
         // ElevenLabs: live grid of the user's account voices. No
         // hardcoded preset catalog — what's in the API is what we show.
@@ -9990,6 +10009,7 @@ function AutoSubtitleMiniEditorPanel({
   const previewFrameRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
+  const timelineTrackRef = useRef<HTMLDivElement>(null);
   const cueDragRef = useRef<AutoSubtitleMiniCueDrag | null>(null);
   const cueDragMovedRef = useRef(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -10026,7 +10046,7 @@ function AutoSubtitleMiniEditorPanel({
       ? selectedResult
       : null
     : selectedResult;
-  const previewSourceUrl = activeResult?.sourceUrl || media?.url || activeResult?.outputUrl || null;
+  const previewSourceUrl = media?.url ?? activeResult?.sourceUrl ?? activeResult?.outputUrl ?? null;
   const playbackUrl = useFreshSignedUrl(previewSourceUrl);
   const settings = autoSubtitleStyleFromForm(form);
   const handoff = useMemo(
@@ -10039,7 +10059,7 @@ function AutoSubtitleMiniEditorPanel({
     autoSubtitlePositionPercentFromVertical(form.autoSubtitlePosition),
   );
   const sourceName =
-    activeResult?.outputName ?? media?.name ?? (th ? "ยังไม่มีวิดีโอ" : "No video yet");
+    media?.name ?? activeResult?.outputName ?? (th ? "ยังไม่มีวิดีโอ" : "No video yet");
   const durationSeconds = activeResult?.duration ?? media?.durationSec ?? handoff?.source.duration ?? 0;
   const activeSourceKey = activeResult?.id ?? media?.id ?? previewSourceUrl ?? "empty";
 
@@ -10115,6 +10135,10 @@ function AutoSubtitleMiniEditorPanel({
         ? [activeCue.text]
         : []
       : previewPhrases;
+  const timelineTicks = useMemo(
+    () => autoSubtitleMiniTimelineTicks(displayDuration),
+    [displayDuration],
+  );
   const progressPercent = Math.max(0, Math.min(100, (currentTime / displayDuration) * 100));
   const updateSubtitlePositionFromPoint = (clientX: number, clientY: number) => {
     const rect = previewFrameRef.current?.getBoundingClientRect();
@@ -10171,7 +10195,7 @@ function AutoSubtitleMiniEditorPanel({
   };
 
   const seekFromTimelinePoint = (clientX: number) => {
-    const rect = timelineRef.current?.getBoundingClientRect();
+    const rect = timelineTrackRef.current?.getBoundingClientRect();
     if (!rect || rect.width <= 0) return;
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     seekTo(ratio * displayDuration);
@@ -10194,7 +10218,7 @@ function AutoSubtitleMiniEditorPanel({
     cue: AutoSubtitleMiniCue,
     mode: AutoSubtitleMiniCueDrag["mode"],
   ) => {
-    const rect = timelineRef.current?.getBoundingClientRect();
+    const rect = timelineTrackRef.current?.getBoundingClientRect();
     if (!rect || rect.width <= 0) return;
     event.preventDefault();
     event.stopPropagation();
@@ -10403,101 +10427,115 @@ function AutoSubtitleMiniEditorPanel({
         </div>
 
         <div className="shrink-0 border-t border-white/[0.055] bg-[#151617] p-2.5">
-          <div className="mb-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
-            <div className="min-w-0 rounded-[10px] border border-white/[0.06] bg-black/20 px-3 py-2">
-              <div className="truncate text-[12px] font-bold text-white">
-                {activeResult
-                  ? activeResult.outputName
-                  : media
-                    ? media.name
-                    : th
-                      ? "ยังไม่มี result"
-                      : "No result yet"}
+          {results.length > 0 && (
+            <div className="mb-2">
+              <div className="mb-1.5 flex items-center justify-between gap-2 px-0.5">
+                <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-500">
+                  {th ? "ผลลัพธ์ล่าสุด" : "Recent results"}
+                </span>
+                <span className="text-[10px] font-semibold text-zinc-600">
+                  {results.length}
+                </span>
               </div>
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                {activeResult ? (
-                  <>
-                    <MiniMeta label={`${activeResult.cueCount} cues`} />
-                    <MiniMeta label={activeResult.outputExtension.toUpperCase()} />
-                    <MiniMeta label={`${Math.max(1, Math.round(activeResult.duration))}s`} />
-                  </>
-                ) : media ? (
-                  <>
-                    <MiniMeta label={th ? "Preview source" : "Preview source"} />
-                    <MiniMeta label={media.mime?.split("/").pop()?.toUpperCase() ?? "VIDEO"} />
-                    <MiniMeta label={media.durationSec ? `${Math.round(media.durationSec)}s` : "Draft"} />
-                  </>
-                ) : (
-                  <MiniMeta label={th ? "ว่าง" : "Empty"} />
-                )}
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {results.slice(0, 10).map((result) => {
+                  const belongsToCurrentMedia =
+                    !media || result.sourceUrl === media.url || result.sourceName === media.name;
+                  const selected = selectedResult?.id === result.id && belongsToCurrentMedia;
+                  return (
+                    <button
+                      key={result.id}
+                      type="button"
+                      onClick={() => setSelectedResultId(result.id)}
+                      className={cn(
+                        "grid w-[86px] shrink-0 gap-1 rounded-[9px] border p-1 text-left transition",
+                        selected
+                          ? "border-[var(--brand-primary)] bg-[var(--brand-primary)]/12"
+                          : "border-white/[0.065] bg-white/[0.035] hover:border-white/18 hover:bg-white/[0.055]",
+                      )}
+                      title={result.outputName}
+                      aria-label={result.outputName}
+                    >
+                      <span className="relative h-[44px] overflow-hidden rounded-[7px] bg-black">
+                        <video
+                          src={result.outputUrl}
+                          muted
+                          playsInline
+                          preload="metadata"
+                          className="h-full w-full object-cover opacity-90"
+                        />
+                        <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 text-[8px] font-bold text-white">
+                          {result.outputExtension.toUpperCase()}
+                        </span>
+                      </span>
+                      <span className={cn(
+                        "block truncate text-[10px] font-bold",
+                        selected ? "text-[var(--brand-primary)]" : "text-zinc-300",
+                      )}>
+                        {autoSubtitleShortFileName(result.outputName)}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-            </div>
-            {activeResult && (
-              <div className="grid grid-cols-2 gap-2 md:w-[240px]">
-                <button
-                  type="button"
-                  onClick={() => void downloadResult(activeResult)}
-                  className="flex h-10 items-center justify-center gap-2 rounded-[10px] border border-white/10 bg-white/[0.045] text-[12px] font-bold text-zinc-100 transition hover:bg-white/[0.08]"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  {th ? "ดาวน์โหลด" : "Download"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onEdit(activeResult)}
-                  className="flex h-10 items-center justify-center gap-2 rounded-[10px] bg-cyan-200 text-[12px] font-bold text-black transition hover:bg-cyan-100"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  {th ? "แก้ไข" : "Edit"}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {results.length > 1 && (
-            <div className="mb-2 flex gap-1.5 overflow-x-auto pb-1">
-              {results.slice(0, 8).map((result) => (
-                <button
-                  key={result.id}
-                  type="button"
-                  onClick={() => setSelectedResultId(result.id)}
-                  className={cn(
-                    "h-7 max-w-[180px] shrink-0 truncate rounded-[7px] border px-2 text-left text-[11px] font-semibold transition",
-                    selectedResult?.id === result.id
-                      ? "border-[var(--brand-primary)] bg-[var(--brand-primary)] text-black"
-                      : "border-white/[0.07] bg-white/[0.04] text-zinc-300 hover:border-white/20",
-                  )}
-                >
-                  {result.outputName}
-                </button>
-              ))}
             </div>
           )}
-
-          <div className="mb-2 flex items-center justify-between gap-2 text-[11px] font-semibold text-zinc-400">
-            <span>{autoSubtitleMiniDuration(currentTime)}</span>
-            <button
-              type="button"
-              onClick={() => void togglePlayback()}
-              disabled={!playbackUrl}
-              className="grid h-7 w-7 place-items-center rounded-full bg-white/[0.06] text-zinc-100 transition hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-35"
-              aria-label={isPlaying ? "Pause preview" : "Play preview"}
-            >
-              {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-            </button>
-            <span>{autoSubtitleMiniDuration(displayDuration)}</span>
-          </div>
 
           <div
             ref={timelineRef}
             onPointerDown={handleTimelinePointerDown}
             onPointerMove={handleTimelinePointerMove}
-            className="relative grid grid-cols-[92px_minmax(0,1fr)] gap-y-1.5 text-[11px]"
+            className="relative grid grid-cols-[132px_minmax(0,1fr)] gap-y-1.5 text-[11px]"
           >
             <div
-              className="pointer-events-none absolute bottom-0 top-0 z-20 w-px bg-[var(--brand-primary)]/90 shadow-[0_0_10px_rgba(244,255,0,.75)]"
-              style={{ left: `calc(92px + (100% - 92px) * ${progressPercent / 100})` }}
-            />
+              className="pointer-events-none absolute bottom-0 top-0 z-30 w-px bg-[var(--brand-primary)]/95 shadow-[0_0_12px_rgba(244,255,0,.8)]"
+              style={{ left: `calc(132px + (100% - 132px) * ${progressPercent / 100})` }}
+            >
+              <span className="absolute -top-1 left-1/2 h-3 w-3 -translate-x-1/2 rounded-[3px] bg-[var(--brand-primary)] shadow-[0_0_12px_rgba(244,255,0,.9)]" />
+            </div>
+            <div className="flex h-7 items-center gap-1.5 rounded-l-[8px] bg-[#121314] px-2 font-mono text-[10px] font-bold text-zinc-300">
+              <button
+                type="button"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void togglePlayback();
+                }}
+                disabled={!playbackUrl}
+                className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/[0.08] text-zinc-100 transition hover:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-35"
+                aria-label={isPlaying ? "Pause preview" : "Play preview"}
+              >
+                {isPlaying ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+              </button>
+              <span className="min-w-[72px] shrink-0">{autoSubtitleMiniDuration(currentTime)}</span>
+            </div>
+            <div
+              ref={timelineTrackRef}
+              className="relative h-7 min-w-0 overflow-hidden rounded-r-[8px] border border-white/[0.055] bg-[#111214]"
+            >
+              {timelineTicks.map((tick) => {
+                const left = Math.max(0, Math.min(100, (tick / displayDuration) * 100));
+                const isFirst = tick <= 0.01;
+                const isLast = Math.abs(tick - displayDuration) <= 0.01;
+                return (
+                  <span
+                    key={`tick-${tick.toFixed(2)}`}
+                    className="pointer-events-none absolute inset-y-0 flex items-start border-l border-white/[0.08] pt-1 font-mono text-[9px] font-bold text-zinc-500"
+                    style={{
+                      left: `${left}%`,
+                      transform: isFirst ? "translateX(0)" : isLast ? "translateX(-100%)" : "translateX(-50%)",
+                    }}
+                  >
+                    <span className={cn(
+                      "whitespace-nowrap px-1",
+                      isFirst ? "pl-0" : isLast ? "pr-0" : "",
+                    )}>
+                      {autoSubtitleMiniDuration(tick)}
+                    </span>
+                  </span>
+                );
+              })}
+            </div>
             <div className="flex h-8 items-center rounded-l-[8px] bg-[#1b151f] px-2 font-bold text-purple-200">
               {th ? "Subtitle" : "Subtitle"}
             </div>
@@ -10742,6 +10780,36 @@ function autoSubtitleMiniActiveCue(
   return null;
 }
 
+function autoSubtitleMiniTimelineTicks(durationSeconds: number): number[] {
+  const duration = Math.max(1, Number(durationSeconds) || 1);
+  const niceIntervals = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
+  const rawInterval = duration / 5;
+  const interval =
+    niceIntervals.find((candidate) => candidate >= rawInterval) ??
+    niceIntervals[niceIntervals.length - 1];
+  const ticks: number[] = [0];
+  for (let tick = interval; tick < duration; tick += interval) {
+    ticks.push(tick);
+  }
+  const last = ticks[ticks.length - 1] ?? 0;
+  if (duration - last < interval * 0.35 && ticks.length > 1) {
+    ticks[ticks.length - 1] = duration;
+  } else if (Math.abs(duration - last) > 0.25) {
+    ticks.push(duration);
+  }
+  return ticks;
+}
+
+function autoSubtitleShortFileName(name: string, maxLength = 24): string {
+  const clean = name.replace(/[?#].*$/, "").split(/[\\/]/).pop()?.trim() || name;
+  if (clean.length <= maxLength) return clean;
+  const extensionMatch = clean.match(/(\.[a-z0-9]{2,5})$/i);
+  const extension = extensionMatch?.[1] ?? "";
+  const base = extension ? clean.slice(0, -extension.length) : clean;
+  const keep = Math.max(8, maxLength - extension.length - 3);
+  return `${base.slice(0, keep)}...${extension}`;
+}
+
 function autoSubtitleMiniDuration(seconds: number | null | undefined): string {
   const safeSeconds = Math.max(0, Math.round(Number(seconds) || 0));
   const minutes = Math.floor(safeSeconds / 60);
@@ -10897,7 +10965,7 @@ function storedCaptionSettings(value: unknown): CaptionStyleSettings | null {
   const stroke = isPlainRecord(value.stroke) ? value.stroke : {};
   const shadow = isPlainRecord(value.shadow) ? value.shadow : {};
   const background = isPlainRecord(value.background) ? value.background : {};
-  return {
+  return normalizeCaptionSettings({
     ...DEFAULT_CAPTION_SETTINGS,
     ...value,
     stroke: {
@@ -10912,7 +10980,7 @@ function storedCaptionSettings(value: unknown): CaptionStyleSettings | null {
       ...DEFAULT_CAPTION_SETTINGS.background,
       ...background,
     },
-  } as CaptionStyleSettings;
+  } as CaptionStyleSettings);
 }
 
 function storedAutoSubtitleCues(value: unknown): AutoSuptitleCue[] {
@@ -12343,9 +12411,24 @@ async function autoSubtitleResultFromUserAsset(
           language: firstText(rawMeta.language, metadata.language) ?? "auto",
           sourceClipId: firstText(rawMeta.sourceClipId, rawMeta.source_clip_id, metadata.source_clip_id),
           animation: firstText(rawMeta.animation, metadata.animation) as CaptionAnimation | undefined,
+          accentColor:
+            firstText(
+              rawMeta.accentColor,
+              rawMeta.accent_color,
+              metadata.accent_color,
+              rawMeta.highlightColor,
+              rawMeta.highlight_color,
+              metadata.highlight_color,
+            ) ?? captionAccentColor(storedStyle),
           highlightColor:
-            firstText(rawMeta.highlightColor, rawMeta.highlight_color, metadata.highlight_color) ??
-            storedStyle.highlightColor,
+            firstText(
+              rawMeta.highlightColor,
+              rawMeta.highlight_color,
+              metadata.highlight_color,
+              rawMeta.accentColor,
+              rawMeta.accent_color,
+              metadata.accent_color,
+            ) ?? captionAccentColor(storedStyle),
         },
       },
       style: storedStyle,
@@ -12836,7 +12919,8 @@ function buildCurrentParams(
       preset: form.autoSubtitlePresetId,
       font: form.autoSubtitleFont,
       fill: form.autoSubtitleFill,
-      highlight_color: form.autoSubtitleHighlightColor,
+      accent_color: form.autoSubtitleAccentColor,
+      highlight_color: form.autoSubtitleAccentColor,
       position: form.autoSubtitlePosition,
       position_x: clampAutoSubtitlePosition(form.autoSubtitlePositionX, 0.5),
       position_y: clampAutoSubtitlePosition(

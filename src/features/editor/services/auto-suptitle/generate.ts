@@ -11,6 +11,7 @@ import {
   type AutoSuptitleGenerateArgs,
   type AutoSuptitleResult,
 } from "./types";
+import { captionAccentColor } from "../caption-presets";
 
 const WHISPER_MAX_BYTES = 24 * 1024 * 1024;
 
@@ -97,7 +98,8 @@ export async function generateAutoSuptitle(
       language: whisperResponse.language ?? language ?? "auto",
       sourceClipId: clip.id,
       animation: settings.animation,
-      highlightColor: settings.fill,
+      accentColor: captionAccentColor(settings),
+      highlightColor: captionAccentColor(settings),
     } as const;
 
     onProgress?.({
