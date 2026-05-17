@@ -5,6 +5,9 @@ export type WorkspacePlanProfile = {
   subscription_status?: string | null;
   current_plan_id?: string | null;
   subscription_plan_id?: string | null;
+  /** Staff/owner accounts (admin row in `user_roles`) bypass the Free
+   *  plan paywall regardless of `plan_name`. Set by AuthContext. */
+  is_admin?: boolean | null;
 } | null | undefined;
 
 const FREE_BLOCKED_STANDALONE_TOOLS = new Set([
@@ -22,6 +25,7 @@ const FREE_BLOCKED_NODE_TYPES = new Set([
 ]);
 
 export function isWorkspaceFreePlan(profile: WorkspacePlanProfile): boolean {
+  if (profile?.is_admin) return false;
   const planName = String(profile?.plan_name ?? "").trim().toLowerCase();
   const status = String(profile?.subscription_status ?? "").trim().toLowerCase();
   if (planName) return planName === "free";

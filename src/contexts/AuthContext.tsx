@@ -32,6 +32,9 @@ interface Profile {
   organization_id: string | null;
   /** @deprecated Use `organization_id`. Kept as alias during migration. */
   org_id: string | null;
+  /** True when the user has an `admin` row in `public.user_roles`. Staff
+   *  accounts often live on the Free plan but must bypass paywall gates. */
+  is_admin: boolean;
 }
 
 interface AuthContextType {
@@ -112,11 +115,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const fetchProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, user_id, display_name, avatar_url, company, role, subscription_status, created_at, updated_at, billing_interval, current_period_end, current_plan_id, subscription_plan_id, organization_id, account_type, subscription_plans(name)")
-        .eq("user_id", userId)
-        .maybeSingle();
+      const [{ data, error }, rolesResult] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("id, user_id, display_name, avatar_url, company, role, subscription_status, created_at, updated_at, billing_interval, current_period_end, current_plan_id, subscription_plan_id, organization_id, account_type, subscription_plans(name)")
+          .eq("user_id", userId)
+          .maybeSingle(),
+        supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userId),
+      ]);
 
       if (error) {
         console.error("Error fetching profile:", error);
@@ -125,6 +134,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (!data) return null;
       // Resolve plan name from the joined subscription_plans
       const planRow = (data as any).subscription_plans as { name: string } | null;
+      const isAdmin = !rolesResult.error
+        && (rolesResult.data ?? []).some((r) => r.role === "admin");
       const profile: Profile = {
         ...(data as any),
         plan_name: planRow?.name ?? null,
@@ -132,6 +143,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         // both keys so older UI references keep working until rewritten.
         organization_id: (data as any).organization_id ?? null,
         org_id: (data as any).organization_id ?? null,
+        is_admin: isAdmin,
       };
       delete (profile as any).subscription_plans;
       return profile;
@@ -349,5 +361,6 @@ function createDemoProfile(): Profile {
     account_type: "consumer",
     organization_id: null,
     org_id: null,
+    is_admin: false,
   };
 }
