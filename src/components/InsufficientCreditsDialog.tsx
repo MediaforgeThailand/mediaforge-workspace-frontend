@@ -280,12 +280,16 @@ const InsufficientCreditsDialog = ({
   return (
     <>
       <Dialog open={open && !topupOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[96vh] max-w-[1120px] overflow-visible border-0 bg-transparent p-0 text-white shadow-none outline-none focus:outline-none focus-visible:outline-none [&>button]:right-2 [&>button]:top-1 [&>button]:h-10 [&>button]:w-10 [&>button]:rounded-full [&>button]:bg-black/60 [&>button]:text-white [&>button]:opacity-100 [&>button]:ring-1 [&>button]:ring-white/[0.15] [&>button]:backdrop-blur-xl [&>button]:hover:bg-white/[0.15]">
+        <DialogContent className="!fixed !inset-0 !left-0 !top-0 !z-[1000] !h-[100dvh] !w-screen !max-w-none !translate-x-0 !translate-y-0 overflow-hidden border-0 bg-black p-0 text-white shadow-none outline-none focus:outline-none focus-visible:outline-none [&>button]:right-4 [&>button]:top-4 [&>button]:z-30 [&>button]:h-12 [&>button]:w-12 [&>button]:rounded-full [&>button]:border [&>button]:border-white/[0.12] [&>button]:bg-black/30 [&>button]:text-white [&>button]:opacity-100 [&>button]:backdrop-blur-xl [&>button]:hover:bg-white/[0.1] md:[&>button]:right-5 md:[&>button]:top-4 md:[&>button]:h-[52px] md:[&>button]:w-[52px] xl:[&>button]:right-4 xl:[&>button]:top-3">
           <DialogTitle className="sr-only">{title}</DialogTitle>
           <DialogDescription className="sr-only">{description}</DialogDescription>
 
-          <div className="relative max-h-[96vh] overflow-y-auto px-3 pb-3 pt-12 xl:px-0 xl:pb-1 xl:pt-11">
-            <div className="relative grid grid-cols-1 items-start gap-3 sm:grid-cols-2 xl:grid-cols-4 xl:gap-4">
+          <div className="relative h-[100dvh] overflow-y-auto bg-[#020302]">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_3%_0%,rgba(229,255,54,0.7),transparent_12%),radial-gradient(circle_at_18%_15%,rgba(181,219,26,0.42),transparent_24%),linear-gradient(104deg,rgba(178,219,25,0.2)_0%,rgba(34,48,13,0.72)_24%,rgba(6,7,6,0.98)_58%,#000_100%)]" />
+            <div className="pointer-events-none absolute inset-0 opacity-90 [background-image:radial-gradient(circle_at_2%_11%,rgba(255,255,255,.42)_0_2px,transparent_3px),radial-gradient(circle_at_8%_24%,rgba(255,255,255,.22)_0_2px,transparent_3px),radial-gradient(circle_at_15%_8%,rgba(255,255,255,.28)_0_2px,transparent_3px),radial-gradient(circle_at_25%_2%,rgba(255,255,255,.14)_0_4px,transparent_5px),radial-gradient(circle_at_32%_17%,rgba(229,255,54,.12)_0_6px,transparent_7px)]" />
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-full bg-[linear-gradient(90deg,rgba(229,255,54,0.18),transparent_36%)]" />
+            <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-[1480px] items-center justify-center px-5 py-8 sm:px-7 xl:px-10 xl:py-7">
+              <div className="grid w-full grid-cols-1 items-center gap-5 sm:grid-cols-2 xl:grid-cols-4 xl:gap-5">
             {planCards.map((plan) => {
               const creditsPerMonth = plan.upfront_credits || (plan.name === "Free" ? FREE_PLAN_CREDITS : 0);
               const isFree = plan.name === "Free";
@@ -304,7 +308,6 @@ const InsufficientCreditsDialog = ({
                       ? isThai ? "ดูแพ็กเกจ" : "View plans"
                       : isThai ? "เลือกแพ็กเกจ" : "Choose plan";
               const onCtaClick = reason === "credits" && isCurrent ? () => setTopupOpen(true) : handleGoToPricing;
-              const cardTone = isCurrent ? "current" : "dark";
               const featureRows = [
                 {
                   icon: ImageIcon,
@@ -361,24 +364,29 @@ const InsufficientCreditsDialog = ({
                 <div
                   key={plan.id}
                   className={cn(
-                    "group relative isolate flex overflow-hidden rounded-[24px] border bg-[#070907]/94 p-4 text-white shadow-[0_22px_70px_rgba(0,0,0,0.58)] backdrop-blur-2xl transition-transform hover:-translate-y-0.5 sm:p-4",
-                    isPro ? "border-[#e5ff36]/80" : "border-white/[0.12]",
+                    "group relative isolate flex h-auto min-h-[730px] overflow-hidden rounded-[32px] border bg-[#080908]/95 px-8 pb-7 pt-9 text-white shadow-[0_48px_120px_rgba(0,0,0,0.72)] backdrop-blur-2xl transition-transform hover:-translate-y-1 sm:px-9 xl:h-[min(712px,calc(100dvh-56px))] xl:min-h-0 xl:px-7 xl:pb-5 xl:pt-7",
+                    isPro ? "border-[#e5ff36]/85" : "border-white/[0.12]",
                     isCurrent &&
-                      "border-[#e5ff36] shadow-[0_0_0_1px_rgba(229,255,54,0.55),0_22px_70px_rgba(229,255,54,0.14)]",
+                      "border-[#e5ff36] shadow-[0_0_0_1px_rgba(229,255,54,0.65),0_36px_120px_rgba(229,255,54,0.16)]",
                   )}
                 >
-                  <div className="pointer-events-none absolute inset-x-0 top-0 h-[148px] bg-[radial-gradient(circle_at_12%_7%,rgba(229,255,54,0.72),transparent_24%),linear-gradient(135deg,rgba(165,204,22,0.58)_0%,rgba(27,38,13,0.62)_38%,rgba(7,9,7,0.08)_78%)]" />
-                  <div className="pointer-events-none absolute right-[-70px] top-[-62px] h-[170px] w-[170px] rotate-[-24deg] rounded-[48px] border border-white/10 bg-black/[0.14]" />
-                  <div className="pointer-events-none absolute right-[-36px] top-[52px] h-[150px] w-[86px] rounded-full border border-white/10 bg-black/[0.18]" />
-                  <div className="pointer-events-none absolute left-7 top-8 h-1.5 w-1.5 rounded-full bg-white/[0.3]" />
-                  <div className="pointer-events-none absolute right-24 top-8 h-1.5 w-1.5 rounded-full bg-white/25" />
-                  <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,rgba(7,9,7,0.16)_32%,rgba(7,9,7,0.95)_100%)]" />
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-[260px] bg-[radial-gradient(circle_at_14%_14%,rgba(229,255,54,0.82),transparent_18%),linear-gradient(134deg,rgba(191,232,28,0.52)_0%,rgba(50,66,20,0.62)_32%,rgba(8,9,8,0.04)_75%)] xl:h-[230px]" />
+                  <div className="pointer-events-none absolute right-[-94px] top-[-48px] h-[286px] w-[286px] rotate-[-24deg] rounded-[76px] border border-white/[0.09] bg-black/[0.25] xl:h-[240px] xl:w-[240px]" />
+                  <div className="pointer-events-none absolute right-[-46px] top-[126px] h-[238px] w-[132px] rounded-full border border-white/[0.09] bg-black/[0.24] xl:top-[108px] xl:h-[200px] xl:w-[112px]" />
+                  <div className="pointer-events-none absolute left-[17%] top-[86px] h-2 w-2 rounded-full bg-white/35" />
+                  <div className="pointer-events-none absolute right-[38%] top-[83px] h-2.5 w-2.5 rounded-full bg-white/20" />
+                  <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,rgba(8,9,8,0.1)_29%,rgba(8,9,8,0.98)_100%)]" />
 
-                  <div className="relative z-10 flex min-h-[430px] w-full flex-col">
-                    <div className="flex min-h-[30px] justify-end">
+                  <div className="relative z-10 flex h-full w-full flex-col">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="relative grid h-[74px] w-[74px] shrink-0 place-items-center overflow-hidden rounded-full bg-[#e5ff36] shadow-[0_26px_38px_rgba(0,0,0,0.46)] ring-1 ring-white/30 xl:h-[58px] xl:w-[58px]">
+                        <span className="absolute -left-4 top-2 h-10 w-14 rotate-[-28deg] rounded-full bg-black/20" />
+                        <span className="absolute -right-3 bottom-2 h-11 w-14 rotate-[24deg] rounded-full bg-white/24" />
+                        <Sparkles className="relative h-8 w-8 text-black xl:h-6 xl:w-6" strokeWidth={2.35} />
+                      </div>
                       <div
                         className={cn(
-                          "rounded-full border px-2.5 py-1 text-[10px] font-bold leading-none backdrop-blur-xl",
+                          "rounded-full border px-4 py-2.5 text-[12px] font-semibold leading-none backdrop-blur-xl xl:px-3 xl:py-1.5 xl:text-[9px]",
                           isCurrent
                             ? "border-[#e5ff36]/70 bg-[#e5ff36] text-black"
                             : "border-white/[0.15] bg-black/30 text-zinc-100",
@@ -388,32 +396,38 @@ const InsufficientCreditsDialog = ({
                       </div>
                     </div>
 
-                    <div className="mt-6">
-                      <h3 className="text-[23px] font-semibold leading-none tracking-normal">{plan.name}</h3>
-                      <p className="mt-3 min-h-[50px] max-w-[230px] text-[12px] font-medium leading-[1.65] text-zinc-300">
+                    <div className="mt-14 xl:mt-7">
+                      <h3 className="text-[38px] font-light leading-none tracking-normal xl:text-[27px]">{plan.name}</h3>
+                      <p className="mt-5 min-h-[76px] max-w-[310px] text-[18px] font-medium leading-[1.5] text-zinc-300 xl:mt-4 xl:min-h-[50px] xl:text-[11.5px] xl:leading-[1.45]">
                         {headlineCopy}
                       </p>
-                      <div className="mt-4 flex items-end gap-1.5">
-                        <span className="text-[27px] font-semibold leading-none tracking-normal">{priceLabel}</span>
+                      <div className="mt-7 flex items-end gap-2 xl:mt-4">
+                        <span className="text-[48px] font-light leading-none tracking-normal xl:text-[30px]">{priceLabel}</span>
                         {plan.price_thb > 0 && (
-                          <span className="pb-0.5 text-[12px] font-semibold text-zinc-400">
+                          <span className="pb-1.5 text-[18px] font-semibold text-zinc-400 xl:text-[10px]">
                             {isThai ? "/เดือน" : "/month"}
                           </span>
                         )}
                       </div>
-                      <div className="mt-2 inline-flex rounded-full border border-white/10 bg-white/[0.08] px-2.5 py-1 text-[10px] font-semibold text-zinc-300">
+                      <div className="mt-4 inline-flex rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-[13px] font-semibold text-zinc-300 xl:mt-2.5 xl:px-3 xl:py-1.5 xl:text-[9px]">
                         {creditLabel}
                       </div>
                     </div>
 
                     <Button
-                      className="mt-4 h-10 rounded-xl bg-[#e5ff36] text-[12px] font-black text-black shadow-[0_14px_26px_rgba(0,0,0,0.3)] hover:bg-[#efff72]"
+                      className="mt-9 h-[62px] rounded-xl bg-[#e5ff36] text-[18px] font-black text-black shadow-[0_24px_44px_rgba(0,0,0,0.38)] hover:bg-[#efff72] xl:mt-5 xl:h-12 xl:text-[12px]"
                       onClick={onCtaClick}
                     >
                       {ctaLabel === "Choose plan" ? "Choose this plan" : ctaLabel}
                     </Button>
 
-                    <div className="mt-4 grid gap-1.5">
+                    <div className="mt-8 flex items-center gap-4 text-zinc-500 xl:mt-4">
+                      <div className="h-px flex-1 bg-white/[0.12]" />
+                      <span className="text-[12px] font-black uppercase tracking-normal xl:text-[9px]">MediaForge +</span>
+                      <div className="h-px flex-1 bg-white/[0.12]" />
+                    </div>
+
+                    <div className="mt-6 grid gap-4 xl:mt-3 xl:gap-2.5">
                       {featureRows.map((row) => (
                         <PlanExampleRow
                           key={row.label}
@@ -421,7 +435,7 @@ const InsufficientCreditsDialog = ({
                           label={row.label}
                           value={row.value}
                           muted={row.muted}
-                          tone={cardTone}
+                          current={isCurrent}
                         />
                       ))}
                       {reason === "credits" && isCurrent && shortage > 0 && !isEducationSpace && (
@@ -429,7 +443,7 @@ const InsufficientCreditsDialog = ({
                           icon={Sparkles}
                           label={isThai ? "เครดิตที่ขาด" : "Credit shortage"}
                           value={shortageText}
-                          tone={cardTone}
+                          current={isCurrent}
                         />
                       )}
                     </div>
@@ -437,6 +451,7 @@ const InsufficientCreditsDialog = ({
                 </div>
               );
             })}
+              </div>
             </div>
           </div>
         </DialogContent>
@@ -461,32 +476,32 @@ const PlanExampleRow = ({
   label,
   value,
   muted = false,
-  tone,
+  current,
 }: {
   icon: LucideIcon;
   label: string;
   value: string;
   muted?: boolean;
-  tone: "dark" | "current";
+  current: boolean;
 }) => (
-  <div className={cn("flex min-w-0 items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.045] px-2.5 py-1.5 text-zinc-300", muted && "opacity-60")}>
+  <div className={cn("flex min-w-0 items-center gap-4 text-zinc-300 xl:gap-2.5", muted && "opacity-58")}>
     <span
       className={cn(
-        "grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/10 text-zinc-200",
-        tone === "current" && "bg-[#e5ff36]/[0.18] text-[#e5ff36]",
+        "grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/10 text-zinc-200 xl:h-7 xl:w-7",
+        current && "bg-[#e5ff36]/[0.2] text-[#e5ff36]",
       )}
     >
       {muted ? (
-        <LockKeyhole className="h-3 w-3" />
+        <LockKeyhole className="h-5 w-5 xl:h-3.5 xl:w-3.5" />
       ) : (
-        <CheckCircle2 className="h-3 w-3" />
+        <CheckCircle2 className="h-5 w-5 xl:h-3.5 xl:w-3.5" />
       )}
     </span>
-    <Icon className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-    <span className="min-w-0 flex-1 truncate text-[11px] font-medium leading-4">
+    <Icon className="h-6 w-6 shrink-0 text-zinc-500 xl:h-[18px] xl:w-[18px]" />
+    <span className="min-w-0 flex-1 truncate text-[18px] font-medium leading-7 xl:text-[11.5px] xl:leading-4">
       {label}
     </span>
-    <span className="shrink-0 whitespace-nowrap text-[10.5px] font-black leading-4 text-[#e5ff36]">
+    <span className="shrink-0 whitespace-nowrap text-[16px] font-semibold leading-7 text-[#e5ff36] xl:text-[10.5px] xl:leading-4">
       {value}
     </span>
   </div>
