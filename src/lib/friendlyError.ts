@@ -142,6 +142,31 @@ const MAPPINGS: ErrorMapping[] = [
     hi: "फ़ाइल बहुत बड़ी है (अधिकतम 1 GB)।",
   },
 
+  {
+    match: /not riggable|cannot be rigged|can't be rigged|pre-?rig check says this model is not riggable/i,
+    th: "โมเดลนี้ยัง Rig ไม่ได้ ลองเลือกโมเดล 3D อื่นหรือเจนใหม่ให้รูปทรงชัดขึ้น",
+    en: "This model is not riggable yet. Try another 3D model or regenerate with a clearer body shape.",
+    ja: "This model is not riggable yet. Try another 3D model or regenerate with a clearer body shape.",
+    es: "This model is not riggable yet. Try another 3D model or regenerate with a clearer body shape.",
+    hi: "This model is not riggable yet. Try another 3D model or regenerate with a clearer body shape.",
+  },
+  {
+    match: /Tripo rigging needs a Tripo-generated 3D model|missing a Tripo task ID|original_model_task_id/i,
+    th: "Auto Rig ต้องใช้โมเดล 3D ที่เจนจาก Tripo ในโปรเจกต์นี้ก่อน",
+    en: "Auto Rig needs a Tripo-generated 3D model from this project first.",
+    ja: "Auto Rig needs a Tripo-generated 3D model from this project first.",
+    es: "Auto Rig needs a Tripo-generated 3D model from this project first.",
+    hi: "Auto Rig needs a Tripo-generated 3D model from this project first.",
+  },
+  {
+    match: /Tripo3D .*rig|animate_rig|animate_prerigcheck|pre-?rig|prerig/i,
+    th: "Tripo Rig ปฏิเสธงานนี้ ลองใช้ Rig Check หรือเลือกประเภท rig ให้ตรงกับโมเดล",
+    en: "Tripo rejected this rigging task. Run Rig Check or choose the rig type that matches the model.",
+    ja: "Tripo rejected this rigging task. Run Rig Check or choose the rig type that matches the model.",
+    es: "Tripo rejected this rigging task. Run Rig Check or choose the rig type that matches the model.",
+    hi: "Tripo rejected this rigging task. Run Rig Check or choose the rig type that matches the model.",
+  },
+
   // ── Provider auth / config ──────────────────────────────────
   {
     match: /OpenAI 401|api[\s_-]*key|unauthorized|401[\s_]/i,

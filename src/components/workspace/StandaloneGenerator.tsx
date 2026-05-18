@@ -441,12 +441,14 @@ type UploadSlot =
   | "translate-video"
   | "auto-subtitle-video"
   | "upscale-image"
-  | "model-image";
+  | "model-image"
+  | "model-3d";
 
 type StandaloneThreeDMode = "image_to_3d" | "auto_rig" | "animate";
 
 const THREE_D_STANDALONE_NODE_TYPES = new Set<string>([
   "imageTo3dNode",
+  "tripoImportModelNode",
   "tripoPreRigCheckNode",
   "tripoRigNode",
   "tripoAnimateNode",
@@ -462,6 +464,11 @@ const TRIPO_RIG_TYPES = [
   "serpentine",
   "aquatic",
 ];
+
+const TRIPO_RIG_TYPE_SET = new Set(TRIPO_RIG_TYPES);
+const TRIPO_AUTO_RIG_TYPE = "auto";
+const MODEL_3D_UPLOAD_ACCEPT = ".glb,.obj,.fbx,.stl,model/gltf-binary,model/obj,model/fbx,model/stl,application/octet-stream";
+const MODEL_3D_IMPORT_MAX_BYTES = 20 * 1024 * 1024;
 
 const TRIPO_ANIMATION_PRESETS = [
   "preset:idle",
@@ -625,6 +632,14 @@ type PanelReferenceAsset = {
   storageBucket?: "ai-media" | "user_assets";
   storagePath?: string;
   durationSec?: number;
+  modelUrl?: string;
+  previewUrl?: string;
+  taskId?: string;
+  tripoModelTaskId?: string;
+  originalModelTaskId?: string;
+  providerTaskId?: string;
+  providerMeta?: Record<string, unknown>;
+  nodeType?: string;
 };
 
 type DeletableReference = {
@@ -683,6 +698,71 @@ interface StandaloneResult {
     [key: string]: unknown;
   };
   credits_spent?: number;
+}
+
+const STANDALONE_JOB_TERMINAL_STATUSES = new Set<StandaloneJobRow["status"]>([
+  "completed",
+  "failed",
+  "permanent_failed",
+]);
+
+function waitMs(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function normalizePreRigBoolean(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+  if (typeof value !== "string") return null;
+  const text = value.trim().toLowerCase();
+  if (!text) return null;
+  if (/not\s+riggable|cannot\s+be\s+rigged|can't\s+be\s+rigged|unsupported/.test(text)) {
+    return false;
+  }
+  if (/riggable|passed|pass|true|yes/.test(text)) return true;
+  if (/false|no|failed|fail/.test(text)) return false;
+  return null;
+}
+
+function normalizeTripoRigType(value: unknown): string {
+  const text = firstText(value)?.trim().toLowerCase();
+  return text && TRIPO_RIG_TYPE_SET.has(text) ? text : "";
+}
+
+function tripoPreRigInfoFromJob(job: StandaloneJobRow): {
+  riggable: boolean | null;
+  rigType: string;
+} {
+  const result = job.result;
+  const outputs = result?.outputs ?? {};
+  const providerMeta = result?.provider_meta ?? {};
+  const text = firstText(result?.text, outputs.text, outputs.message);
+  const textRigType = text?.match(/\(([^)]+)\)/)?.[1];
+  return {
+    riggable: normalizePreRigBoolean(
+      providerMeta.riggable ?? outputs.riggable ?? text,
+    ),
+    rigType: normalizeTripoRigType(
+      providerMeta.rig_type ?? outputs.rig_type ?? textRigType,
+    ),
+  };
+}
+
+function standaloneJobFailureMessage(
+  job: Pick<StandaloneJobRow, "error" | "last_error" | "result">,
+  fallback: string,
+): string {
+  return (
+    firstText(
+      job.error,
+      job.last_error,
+      job.result?.text,
+      job.result?.provider_meta?.message,
+    ) ?? fallback
+  );
 }
 
 interface VoiceTranslateTask {
@@ -820,6 +900,7 @@ interface StandaloneFormState {
   autoSubtitleStrokeWidth: number;
   autoSubtitleBackground: boolean;
   autoSubtitleTransition: CaptionAnimation;
+  autoSubtitleOutTransition: CaptionAnimation;
   autoSubtitleTextAnimation: CaptionTextAnimation;
   autoSubtitleSegmentationMode: AutoSubtitleSegmentationMode;
   autoSubtitleWordsPerLine: number;
@@ -902,6 +983,7 @@ const DEFAULT_AUTO_SUBTITLE_PARAMS = {
   autoSubtitleStrokeWidth: 6,
   autoSubtitleBackground: false,
   autoSubtitleTransition: "fade" as const,
+  autoSubtitleOutTransition: "fade" as const,
   autoSubtitleTextAnimation: "none" as const,
   autoSubtitleSegmentationMode: "sentence" as const,
   autoSubtitleWordsPerLine: 4,
@@ -1382,7 +1464,7 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     pbr: true,
     threeDMode: "image_to_3d",
     model3dSource: null,
-    rigType: "biped",
+    rigType: TRIPO_AUTO_RIG_TYPE,
     rigSpec: "tripo",
     rigOutFormat: "glb",
     animationPreset: "preset:walk",
@@ -2045,10 +2127,14 @@ export default function StandaloneGenerator({
   const threeDModelSourceOptions = useMemo(() => {
     if (activeTool !== "image_to_3d") return [];
     return mergeReferenceOptions(
-      (jobsQuery.data ?? []).map(referenceFromGenerationJob),
+      [
+        ...(jobsQuery.data ?? []).map(referenceFromGenerationJob),
+        ...(projectReferencesQuery.data ?? []),
+        form.model3dSource,
+      ],
       80,
-    ).filter((ref) => isStandaloneModel3dReference(ref) && !!tripoModelTaskIdFromReference(ref));
-  }, [activeTool, jobsQuery.data]);
+    ).filter((ref) => isStandaloneModel3dReference(ref));
+  }, [activeTool, form.model3dSource, jobsQuery.data, projectReferencesQuery.data]);
   // Per-tool active-job count drives the Generate button's disabled
   // state. The previous gating only used the local `running` flag,
   // which we cleared as soon as the enqueue API returned (~1-2s)
@@ -2609,45 +2695,84 @@ export default function StandaloneGenerator({
     if (creditCostsLoading) return null;
     const params = buildCurrentParams(activeTool, form);
     if (!params) return null;
-    const quote = calculateNodeCostQuote({
-      schemaKey: activeStandaloneNodeType,
-      params,
-      creditCosts,
-    });
-    if (!quote) return null;
     const runCount =
       activeTool === "image_gen"
         ? Math.min(4, Math.max(1, Number(form.imageCount) || 1))
         : activeTool === "video_gen"
           ? Math.min(4, Math.max(1, Number(form.videoCount) || 1))
         : 1;
-    if (quote.baseCost <= 0) {
+
+    const quoteForNode = (
+      schemaKey: string,
+      quoteParams: Record<string, unknown>,
+      quantity: number,
+    ): CreatePanelCostQuote | null => {
+      const quote = calculateNodeCostQuote({
+        schemaKey,
+        params: quoteParams,
+        creditCosts,
+      });
+      if (!quote) return null;
+      if (quote.baseCost <= 0) {
+        return {
+          fullCost: 0,
+          modelCost: 0,
+          finalCost: 0,
+          modelDiscountPercent: 0,
+          packageDiscountPercent,
+          packageDiscountLabel,
+          totalDiscountPercent: 0,
+        };
+      }
+      const multiplier = workspaceCostMultiplierForTool(
+        activeTool,
+        String(quoteParams.model_name ?? form.model),
+        workspaceCreditMultiplier,
+      );
+      const fullRunCost = Math.max(1, Math.ceil(quote.baseCost * multiplier));
+      const modelRunCost = applyNodeCostDiscount(fullRunCost, quote.discountPercent);
+      const finalRunCost = applyPackageCostDiscount(modelRunCost, packageDiscountPercent);
+      const fullCost = fullRunCost * quantity;
+      const modelCost = modelRunCost * quantity;
+      const finalCost = finalRunCost * quantity;
       return {
-        fullCost: 0,
-        modelCost: 0,
-        finalCost: 0,
-        modelDiscountPercent: 0,
+        fullCost,
+        modelCost,
+        finalCost,
+        modelDiscountPercent: quote.discountPercent,
         packageDiscountPercent,
         packageDiscountLabel,
-        totalDiscountPercent: 0,
+        totalDiscountPercent: effectiveNodeDiscountPercent(fullCost, finalCost),
       };
+    };
+
+    const mainQuote = quoteForNode(activeStandaloneNodeType, params, runCount);
+    if (!mainQuote) return null;
+    if (activeTool !== "image_to_3d" || standaloneThreeDMode(form) !== "auto_rig") {
+      return mainQuote;
     }
-    const multiplier = workspaceCostMultiplierForTool(
-      activeTool,
-      form.model,
-      workspaceCreditMultiplier,
+    const importQuote =
+      form.model3dSource && !tripoModelTaskIdFromReference(form.model3dSource)
+        ? quoteForNode(
+            "tripoImportModelNode",
+            { model_name: "tripo3d-import" },
+            1,
+          )
+        : null;
+    const preflightQuote = quoteForNode(
+      "tripoPreRigCheckNode",
+      { model_name: "tripo3d-prerigcheck" },
+      1,
     );
-    const fullRunCost = Math.max(1, Math.ceil(quote.baseCost * multiplier));
-    const modelRunCost = applyNodeCostDiscount(fullRunCost, quote.discountPercent);
-    const finalRunCost = applyPackageCostDiscount(modelRunCost, packageDiscountPercent);
-    const fullCost = fullRunCost * runCount;
-    const modelCost = modelRunCost * runCount;
-    const finalCost = finalRunCost * runCount;
+    if (!preflightQuote) return mainQuote;
+    const fullCost = mainQuote.fullCost + preflightQuote.fullCost + (importQuote?.fullCost ?? 0);
+    const modelCost = mainQuote.modelCost + preflightQuote.modelCost + (importQuote?.modelCost ?? 0);
+    const finalCost = mainQuote.finalCost + preflightQuote.finalCost + (importQuote?.finalCost ?? 0);
     return {
       fullCost,
       modelCost,
       finalCost,
-      modelDiscountPercent: quote.discountPercent,
+      modelDiscountPercent: effectiveNodeDiscountPercent(fullCost, modelCost),
       packageDiscountPercent,
       packageDiscountLabel,
       totalDiscountPercent: effectiveNodeDiscountPercent(fullCost, finalCost),
@@ -2785,7 +2910,7 @@ export default function StandaloneGenerator({
       return "image-ref";
     }
     if (activeTool === "image_to_3d") {
-      return activeThreeDMode === "image_to_3d" ? "model-image" : null;
+      return activeThreeDMode === "image_to_3d" ? "model-image" : "model-3d";
     }
     if (activeTool === "image_upscale") {
       return "upscale-image";
@@ -2860,6 +2985,12 @@ export default function StandaloneGenerator({
         patch.autoSubtitleVideo = uploaded;
       } else if (slot === "upscale-image") {
         patch.upscaleImage = uploaded;
+      } else if (slot === "model-3d") {
+        patch.model3dSource = {
+          ...uploaded,
+          modelUrl: uploaded.modelUrl ?? uploaded.url,
+          mime: uploaded.mime || inferModelMime(uploaded.url),
+        };
       } else if (slot === "model-image") {
         const maxRefs = max3dRefsForModel(current.model);
         const existingRefs = threeDReferencesForForm(current);
@@ -2894,7 +3025,9 @@ export default function StandaloneGenerator({
     const slot = slotOverride ?? getPanelReferenceSlot();
     if (!slot) return;
     const candidates =
-      activeTool === "image_gen" || activeTool === "image_to_3d"
+      slot === "model-3d"
+        ? files.slice(0, 1)
+      : activeTool === "image_gen" || activeTool === "image_to_3d"
         ? files.slice(0, Math.max(0, panelMaxReferences - panelReferences.length))
         : files.slice(0, 1);
     if (candidates.length === 0) return;
@@ -2906,12 +3039,15 @@ export default function StandaloneGenerator({
         const needsTranslateMedia = slot === "translate-video";
         const needsAutoSubtitleMedia = slot === "auto-subtitle-video";
         const needsUpscaleMedia = slot === "upscale-image";
+        const needsModel3d = slot === "model-3d";
         const isValidType = needsTranslateMedia
           ? isTranslateMediaFile(file)
           : needsAutoSubtitleMedia
             ? isAutoSubtitleMediaFile(file)
           : needsUpscaleMedia
             ? file.type.startsWith("image/")
+          : needsModel3d
+            ? isModel3dUploadFile(file)
           : needsVideo
             ? file.type.startsWith("video/")
             : file.type.startsWith("image/");
@@ -2927,10 +3063,16 @@ export default function StandaloneGenerator({
                 ? language === "th"
                   ? "เลือกไฟล์ภาพสำหรับ Upscale Mediaforge"
                   : "Choose an image for Upscale Mediaforge."
+              : needsModel3d
+                ? "Choose a GLB, OBJ, FBX, or STL model file."
               : needsVideo
                 ? t("workspace.toast.upload_video_ref")
                 : t("workspace.toast.upload_image_ref"),
           );
+          continue;
+        }
+        if (needsModel3d && file.size > MODEL_3D_IMPORT_MAX_BYTES) {
+          toast.error("Tripo OpenAPI model import supports GLB, OBJ, FBX, or STL files up to 20MB.");
           continue;
         }
         if (isTranslateVideoOverUploadLimit(slot, file)) {
@@ -2992,6 +3134,7 @@ export default function StandaloneGenerator({
     const expectsTranslateMedia = slot === "translate-video";
     const expectsAutoSubtitleMedia = slot === "auto-subtitle-video";
     const expectsUpscaleMedia = slot === "upscale-image";
+    const expectsModel3d = slot === "model-3d";
     if (expectsAutoSubtitleMedia && !referenceMime.startsWith("video/")) {
       toast.error("Choose an MP4 video for Auto Subtitle.");
       return;
@@ -3019,11 +3162,16 @@ export default function StandaloneGenerator({
       toast.error(t("workspace.toast.upload_video_ref"));
       return;
     }
+    if (expectsModel3d && !isStandaloneModel3dReference(reference)) {
+      toast.error("Choose a GLB, OBJ, FBX, or STL model file.");
+      return;
+    }
     if (
       !expectsVideo &&
       !expectsTranslateMedia &&
       !expectsAutoSubtitleMedia &&
       !expectsUpscaleMedia &&
+      !expectsModel3d &&
       (referenceMime.startsWith("video/") || referenceMime.startsWith("audio/"))
     ) {
       toast.error(t("workspace.toast.upload_image_ref"));
@@ -3066,6 +3214,14 @@ export default function StandaloneGenerator({
       storageBucket: reference.storageBucket,
       storagePath: reference.storagePath,
       durationSec,
+      modelUrl: reference.modelUrl,
+      previewUrl: reference.previewUrl,
+      taskId: reference.taskId,
+      tripoModelTaskId: reference.tripoModelTaskId,
+      originalModelTaskId: reference.originalModelTaskId,
+      providerTaskId: reference.providerTaskId,
+      providerMeta: reference.providerMeta,
+      nodeType: reference.nodeType,
     });
   };
 
@@ -3279,7 +3435,9 @@ export default function StandaloneGenerator({
     activeTool === "image_upscale"
       ? language === "th" ? "ไฟล์ต้นฉบับ" : "Source media"
       : activeTool === "image_to_3d"
-      ? t("workspace.standalone.reference_image")
+      ? activeThreeDMode === "image_to_3d"
+        ? t("workspace.standalone.reference_image")
+        : "Source 3D model"
       : activeTool === "video_gen"
         ? t("workspace.standalone.reference_image")
         : t("workspace.standalone.references");
@@ -3295,6 +3453,8 @@ export default function StandaloneGenerator({
         videoPanelMode === "reference" &&
         videoSupportsReferenceVideo(form.model) &&
         (!videoSupportsReferenceImage(form.model) || !!form.videoRefImage));
+    const wantsModelAssets =
+      activeTool === "image_to_3d" && activeThreeDMode !== "image_to_3d";
     return mergeReferenceOptions([
       ...(jobsQuery.data ?? []).map(referenceFromGenerationJob),
       ...(projectReferencesQuery.data ?? []),
@@ -3305,6 +3465,9 @@ export default function StandaloneGenerator({
         }
         if (activeTool === "image_upscale") {
           return ref.mime.startsWith("image/");
+        }
+        if (wantsModelAssets) {
+          return isStandaloneModel3dReference(ref);
         }
         return wantsVideoAssets
           ? ref.mime.startsWith("video/") || ref.mime.startsWith("audio/")
@@ -3317,6 +3480,7 @@ export default function StandaloneGenerator({
     form.videoRefImage,
     jobsQuery.data,
     projectReferencesQuery.data,
+    activeThreeDMode,
     videoPanelMode,
   ]);
 
@@ -4081,12 +4245,15 @@ export default function StandaloneGenerator({
     const needsTranslateMedia = slot === "translate-video";
     const needsAutoSubtitleMedia = slot === "auto-subtitle-video";
     const needsUpscaleMedia = slot === "upscale-image";
+    const needsModel3d = slot === "model-3d";
     const isValidType = needsTranslateMedia
       ? isTranslateMediaFile(file)
       : needsAutoSubtitleMedia
         ? isAutoSubtitleMediaFile(file)
       : needsUpscaleMedia
         ? file.type.startsWith("image/")
+      : needsModel3d
+        ? isModel3dUploadFile(file)
       : needsVideo
         ? file.type.startsWith("video/")
         : file.type.startsWith("image/");
@@ -4102,6 +4269,8 @@ export default function StandaloneGenerator({
             ? language === "th"
               ? "เลือกไฟล์ภาพสำหรับ Upscale Mediaforge"
               : "Choose an image for Upscale Mediaforge."
+          : needsModel3d
+            ? "Choose a GLB, OBJ, FBX, or STL model file."
           : needsVideo
             ? t("workspace.toast.upload_video_ref")
             : t("workspace.toast.upload_image_ref"),
@@ -4116,6 +4285,11 @@ export default function StandaloneGenerator({
     }
     if (needsAutoSubtitleMedia && file.size > AUTO_SUBTITLE_UPLOAD_MAX_BYTES) {
       toast.error(autoSubtitleUploadSizeMessage());
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    if (needsModel3d && file.size > MODEL_3D_IMPORT_MAX_BYTES) {
+      toast.error("Tripo OpenAPI model import supports GLB, OBJ, FBX, or STL files up to 20MB.");
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
@@ -4276,19 +4450,20 @@ export default function StandaloneGenerator({
             ? Math.min(4, Math.max(1, Number(form.videoCount) || 1))
           : 1;
       try {
-        for (let index = 0; index < runCount; index += 1) {
-          const batchParams =
-            runCount > 1
-              ? { ...params, batch_index: index + 1, batch_count: runCount }
-              : params;
+        const enqueueStandaloneJob = async (
+          nodeType: string,
+          jobParams: Record<string, unknown>,
+          jobInputs: Record<string, unknown>,
+          index: number | string,
+        ): Promise<string> => {
           const { data, error } = await supabase.functions.invoke(
             RUN_EDGE_FUNCTION,
             {
               body: {
                 action: "enqueue_workspace_job",
-                node_type: activeStandaloneNodeType,
-                params: batchParams,
-                inputs,
+                node_type: nodeType,
+                params: jobParams,
+                inputs: jobInputs,
                 mentioned_assets: mentionedAssets,
                 project_id: activeProject.id,
                 workspace_id: null,
@@ -4306,6 +4481,123 @@ export default function StandaloneGenerator({
                 t("workspace.standalone.error_failed_queue"),
             );
           }
+          return resp.job_id;
+        };
+
+        const waitForStandaloneJob = async (
+          jobId: string,
+          timeoutMs = 5 * 60 * 1000,
+        ): Promise<StandaloneJobRow> => {
+          const startedAt = Date.now();
+          let lastWarning = "";
+          while (Date.now() - startedAt < timeoutMs) {
+            const { data, error } = await supabase.functions.invoke(
+              RUN_EDGE_FUNCTION,
+              {
+                body: { action: "poll_workspace_job", job_id: jobId },
+              },
+            );
+            if (error) throw new Error(await functionErrorMessage(error));
+            const resp = data as {
+              job?: StandaloneJobRow | null;
+              error?: string;
+              warning?: string;
+            } | null;
+            if (resp?.error) throw new Error(resp.error);
+            if (resp?.warning) lastWarning = resp.warning;
+            if (resp?.job && STANDALONE_JOB_TERMINAL_STATUSES.has(resp.job.status)) {
+              return resp.job;
+            }
+            await refetchJobs();
+            await waitMs(4000);
+          }
+          throw new Error(
+            lastWarning ||
+              "Rig Check is taking too long. Please try Auto Rig again in a moment.",
+          );
+        };
+
+        let preparedParams = params;
+        let preparedInputs = inputs;
+        if (activeTool === "image_to_3d" && activeThreeDMode === "auto_rig") {
+          if (form.model3dSource && !tripoModelTaskIdFromReference(form.model3dSource)) {
+            const importPayload = externalModel3dInputFromReference(form.model3dSource);
+            if (!importPayload) {
+              throw new Error("Upload a GLB, OBJ, FBX, or STL model before Auto Rig.");
+            }
+            const importJobId = await enqueueStandaloneJob(
+              "tripoImportModelNode",
+              { model_name: "tripo3d-import" },
+              { model3d: importPayload },
+              "import-model",
+            );
+            toast.success(
+              language === "th"
+                ? "กำลัง import โมเดลเข้า Tripo ก่อน Auto Rig"
+                : "Importing the model into Tripo before Auto Rig.",
+            );
+            const importJob = await waitForStandaloneJob(importJobId);
+            if (importJob.status !== "completed") {
+              throw new Error(
+                standaloneJobFailureMessage(importJob, "Tripo import failed before Auto Rig."),
+              );
+            }
+            const importedSource = referenceFromGenerationJob(importJob);
+            const importedPayload = model3dInputFromReference(importedSource);
+            if (!importedSource || !importedPayload) {
+              throw new Error("Tripo import completed but did not return a riggable model task ID.");
+            }
+            preparedInputs = { model3d: importedPayload };
+            updateForm({ model3dSource: importedSource });
+            toast.success("Import complete. Running Rig Check.");
+          }
+          const preflightJobId = await enqueueStandaloneJob(
+            "tripoPreRigCheckNode",
+            { model_name: "tripo3d-prerigcheck" },
+            preparedInputs,
+            "rig-check",
+          );
+          toast.success(
+            language === "th"
+              ? "กำลังตรวจ Rig Check ก่อน Auto Rig"
+              : "Running Rig Check before Auto Rig.",
+          );
+          const preflightJob = await waitForStandaloneJob(preflightJobId);
+          if (preflightJob.status !== "completed") {
+            throw new Error(
+              standaloneJobFailureMessage(preflightJob, "Rig Check failed before Auto Rig."),
+            );
+          }
+          const preflight = tripoPreRigInfoFromJob(preflightJob);
+          if (preflight.riggable === false) {
+            throw new Error(
+              "Tripo pre-rig check says this model is not riggable yet. Try another 3D model or generate a clearer body shape.",
+            );
+          }
+          if (preflight.rigType) {
+            preparedParams = { ...preparedParams, rig_type: preflight.rigType };
+            if (preflight.rigType !== form.rigType) {
+              updateForm({ rigType: preflight.rigType });
+            }
+          }
+          toast.success(
+            preflight.rigType
+              ? `Rig Check passed (${preflight.rigType}). Starting Auto Rig.`
+              : "Rig Check passed. Starting Auto Rig.",
+          );
+        }
+
+        for (let index = 0; index < runCount; index += 1) {
+          const batchParams =
+            runCount > 1
+              ? { ...preparedParams, batch_index: index + 1, batch_count: runCount }
+              : preparedParams;
+          await enqueueStandaloneJob(
+            activeStandaloneNodeType,
+            batchParams,
+            preparedInputs,
+            index,
+          );
         }
         toast.success(t("workspace.toast.gen_queued"));
         // Await — `setRunning(false)` in finally below would otherwise
@@ -4405,14 +4697,14 @@ export default function StandaloneGenerator({
               }))}
               sourceOptions={threeDModelSourceOptions}
               referenceAssets={panelReferenceAssets}
-              uploading={uploading === "model-image"}
+              uploading={uploading === (activeThreeDMode === "image_to_3d" ? "model-image" : "model-3d")}
               running={running}
               activeJobCount={activeJobsForCurrentTool}
               createLabel={standaloneCreateButtonLabelForForm(activeTool, form, language, estimatedCost)}
               costQuote={estimatedCostQuote}
               onChange={updateForm}
               onModelChange={setToolModel}
-              onUploadClick={() => openUpload("model-image")}
+              onUploadClick={() => openUpload(activeThreeDMode === "image_to_3d" ? "model-image" : "model-3d")}
               onReferenceFiles={uploadPanelReferenceFiles}
               onSelectReferenceAsset={selectPanelReferenceAsset}
               onRemoveReference={removePanelReference}
@@ -5276,6 +5568,7 @@ const AUTO_SUBTITLE_ACCENT_TEXT_ANIMATIONS = new Set<CaptionTextAnimation>([
 function autoSubtitleUsesAccentColor(settings: CaptionStyleSettings): boolean {
   return (
     settings.animation === "wordHighlight" ||
+    settings.outAnimation === "wordHighlight" ||
     AUTO_SUBTITLE_ACCENT_TEXT_ANIMATIONS.has(settings.textAnimation)
   );
 }
@@ -5302,6 +5595,8 @@ function autoSubtitleStyleFromForm(form: StandaloneFormState): CaptionStyleSetti
       enabled: form.autoSubtitleBackground,
     },
     animation: form.autoSubtitleTransition || preset.animation,
+    outAnimation:
+      form.autoSubtitleOutTransition || preset.outAnimation || preset.animation,
     textAnimation:
       form.autoSubtitleTextAnimation || preset.textAnimation || "none",
     wordsPerLine:
@@ -5782,7 +6077,7 @@ function AutoSubtitlePanelV2({
 }) {
   const [showMoreStyles, setShowMoreStyles] = useState(false);
   const [subtitleDesignTab, setSubtitleDesignTab] = useState<
-    "style" | "transition" | "animation"
+    "style" | "in" | "out" | "loop"
   >("style");
   const th = language === "th";
   const { t } = useLanguage();
@@ -5812,8 +6107,9 @@ function AutoSubtitlePanelV2({
     locked: t("workspace.standalone.auto_subtitle.locked"),
     style: t("workspace.standalone.auto_subtitle.style"),
     styleTab: t("workspace.standalone.auto_subtitle.style_tab"),
-    transitionTab: t("workspace.standalone.auto_subtitle.transition_tab"),
-    animationTab: t("workspace.standalone.auto_subtitle.animation_tab"),
+    inTab: "In",
+    outTab: "Out",
+    loopTab: "Loop",
     moreStyles: t("workspace.standalone.auto_subtitle.more_styles"),
     fewerStyles: t("workspace.standalone.auto_subtitle.fewer_styles"),
     advanced: t("workspace.standalone.auto_subtitle.advanced"),
@@ -5827,8 +6123,9 @@ function AutoSubtitlePanelV2({
     wordMode: t("workspace.standalone.auto_subtitle.word_mode"),
     wordModeHint: t("workspace.standalone.auto_subtitle.word_mode_hint"),
     words: t("workspace.standalone.auto_subtitle.words"),
-    transition: t("workspace.standalone.auto_subtitle.transition"),
-    textAnimation: t("workspace.standalone.auto_subtitle.text_animation"),
+    inAnimation: "In animation",
+    outAnimation: "Out animation",
+    loopAnimation: "Loop animation",
     textColor: t("workspace.standalone.auto_subtitle.text_color"),
     accentColor: t("workspace.standalone.auto_subtitle.accent_color"),
     stroke: t("workspace.standalone.auto_subtitle.stroke"),
@@ -5873,6 +6170,10 @@ function AutoSubtitlePanelV2({
     form.autoSubtitleSegmentationMode === "sentence" ? copy.sentenceMode : copy.wordMode;
   const transitionLabel = autoSubtitleTransitionLabel(
     form.autoSubtitleTransition,
+    language,
+  );
+  const outTransitionLabel = autoSubtitleTransitionLabel(
+    form.autoSubtitleOutTransition || form.autoSubtitleTransition,
     language,
   );
   const textAnimationLabel = autoSubtitleTextAnimationLabel(
@@ -6034,11 +6335,12 @@ function AutoSubtitlePanelV2({
             </div>
 
             <div className="mt-[12px] rounded-[12px] border border-white/[0.05] bg-black/20 p-[7px]">
-              <div className="mb-[7px] grid grid-cols-3 gap-[5px] border-b border-white/[0.06] pb-[6px]">
+              <div className="mb-[7px] grid grid-cols-4 gap-[5px] border-b border-white/[0.06] pb-[6px]">
                 {([
                   ["style", copy.styleTab],
-                  ["transition", copy.transitionTab],
-                  ["animation", copy.animationTab],
+                  ["in", copy.inTab],
+                  ["out", copy.outTab],
+                  ["loop", copy.loopTab],
                 ] as const).map(([tab, label]) => (
                   <button
                     key={tab}
@@ -6081,7 +6383,7 @@ function AutoSubtitlePanelV2({
                 </>
               )}
 
-              {subtitleDesignTab === "transition" && (
+              {subtitleDesignTab === "in" && (
                 <div className="grid grid-cols-5 gap-[6px]">
                   {CAPTION_TRANSITION_OPTIONS.map((option) => (
                     <AutoSubtitleMotionCard
@@ -6092,6 +6394,7 @@ function AutoSubtitlePanelV2({
                       settings={{
                         ...selectedSettings,
                         animation: option.id,
+                        outAnimation: form.autoSubtitleOutTransition || form.autoSubtitleTransition,
                         textAnimation: "none",
                       }}
                       phrases={[copy.previewCardText, copy.previewNextText]}
@@ -6102,7 +6405,28 @@ function AutoSubtitlePanelV2({
                 </div>
               )}
 
-              {subtitleDesignTab === "animation" && (
+              {subtitleDesignTab === "out" && (
+                <div className="grid grid-cols-5 gap-[6px]">
+                  {CAPTION_TRANSITION_OPTIONS.map((option) => (
+                    <AutoSubtitleMotionCard
+                      key={option.id}
+                      label={autoSubtitleTransitionLabel(option.id, language)}
+                      description={option.description}
+                      selected={(form.autoSubtitleOutTransition || form.autoSubtitleTransition) === option.id}
+                      settings={{
+                        ...selectedSettings,
+                        outAnimation: option.id,
+                        textAnimation: "none",
+                      }}
+                      phrases={[copy.previewCardText, copy.previewNextText]}
+                      language={language}
+                      onSelect={() => onChange({ autoSubtitleOutTransition: option.id })}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {subtitleDesignTab === "loop" && (
                 <div className="grid grid-cols-5 gap-[6px]">
                   {CAPTION_TEXT_ANIMATION_OPTIONS.map((option) => (
                     <AutoSubtitleTextAnimationCard
@@ -6160,7 +6484,7 @@ function AutoSubtitlePanelV2({
                     }
                   />
                   <VoiceTranslateSelectCard
-                    label={copy.transition}
+                    label={copy.inAnimation}
                     value={form.autoSubtitleTransition}
                     displayValue={transitionLabel}
                     icon={<Sparkles className="h-[14px] w-[14px]" />}
@@ -6170,7 +6494,17 @@ function AutoSubtitlePanelV2({
                     }
                   />
                   <VoiceTranslateSelectCard
-                    label={copy.textAnimation}
+                    label={copy.outAnimation}
+                    value={form.autoSubtitleOutTransition || form.autoSubtitleTransition}
+                    displayValue={outTransitionLabel}
+                    icon={<Sparkles className="h-[14px] w-[14px]" />}
+                    options={transitionOptions}
+                    onChange={(value) =>
+                      onChange({ autoSubtitleOutTransition: value as CaptionAnimation })
+                    }
+                  />
+                  <VoiceTranslateSelectCard
+                    label={copy.loopAnimation}
                     value={form.autoSubtitleTextAnimation}
                     displayValue={textAnimationLabel}
                     icon={<Sparkles className="h-[14px] w-[14px]" />}
@@ -7127,7 +7461,7 @@ function AutoSubtitleAnimatedPreview({
         leavingTimerRef.current = window.setTimeout(() => {
           setLeavingPhrase(null);
           leavingTimerRef.current = null;
-        }, autoSubtitlePreviewTransitionMs(settings.animation) + 40);
+        }, autoSubtitlePreviewTransitionMs(settings.outAnimation ?? settings.animation) + 40);
         return (index + 1) % safePhrases.length;
       });
     }, 1350);
@@ -7138,19 +7472,20 @@ function AutoSubtitleAnimatedPreview({
         leavingTimerRef.current = null;
       }
     };
-  }, [safePhrases, settings.animation]);
+  }, [safePhrases, settings.animation, settings.outAnimation]);
 
   const text = safePhrases[phraseIndex % safePhrases.length] ?? "";
-  const animationCss = autoSubtitlePreviewAnimationCss(settings.animation);
+  const inAnimationCss = autoSubtitlePreviewAnimationCss(settings.animation);
+  const outAnimationCss = autoSubtitlePreviewAnimationCss(settings.outAnimation ?? settings.animation);
   const textMotionCss = autoSubtitlePreviewTextMotionCss(settings.textAnimation);
 
   return (
     <div className={cn("relative flex w-full items-center justify-center overflow-hidden px-2", compact ? "h-[30px]" : "h-[38px]")}>
-      {leavingPhrase && settings.animation !== "none" && (
+      {leavingPhrase && (settings.outAnimation ?? settings.animation) !== "none" && (
         <div
           key={`out-${leavingPhrase.key}`}
           className="absolute inset-x-2 flex justify-center"
-          style={{ animation: animationCss.out }}
+          style={{ animation: outAnimationCss.out }}
         >
           <AutoSubtitlePreviewText
             settings={settings}
@@ -7164,7 +7499,7 @@ function AutoSubtitleAnimatedPreview({
       <div
         key={`${phraseIndex}-${text}`}
         className="absolute inset-x-2 flex justify-center"
-        style={{ animation: animationCss.in }}
+        style={{ animation: inAnimationCss.in }}
       >
         <AutoSubtitlePreviewText
           settings={settings}
@@ -9687,7 +10022,7 @@ function ThreeDWorkshop({
     event.preventDefault();
     const files = Array.from(event.dataTransfer.files ?? []);
     if (files.length > 0) {
-      void onReferenceFiles(files, "model-image");
+      void onReferenceFiles(files, mode === "image_to_3d" ? "model-image" : "model-3d");
     }
   };
 
@@ -9789,7 +10124,7 @@ function ThreeDWorkshop({
                 <p className="mt-1 text-[11px] leading-[15px] text-zinc-400">{modeMeta.caption}</p>
                 {mode === "auto_rig" && (
                   <div className="mt-2 inline-flex max-w-full items-center rounded-full border border-emerald-300/15 bg-emerald-300/[0.055] px-2 py-0.5 text-[10px] font-semibold text-emerald-100/85">
-                    Rig Check preflight / Tripo free
+                    Rig Check first / credits
                   </div>
                 )}
               </div>
@@ -9878,6 +10213,7 @@ function ThreeDWorkshop({
                   mode={mode}
                   sourceOptions={visibleSourceOptions}
                   selectedSource={selectedSource}
+                  onUpload={onUploadClick}
                   onSelect={(model3dSource) => onChange({ model3dSource })}
                 />
 
@@ -9885,8 +10221,8 @@ function ThreeDWorkshop({
                   <div className="grid grid-cols-3 gap-2">
                     <SelectField
                       label="Rig type"
-                      value={form.rigType ?? "biped"}
-                      options={TRIPO_RIG_TYPES}
+                      value={form.rigType ?? TRIPO_AUTO_RIG_TYPE}
+                      options={[TRIPO_AUTO_RIG_TYPE, ...TRIPO_RIG_TYPES]}
                       onChange={(rigType) => onChange({ rigType })}
                     />
                     <SelectField
@@ -10107,13 +10443,19 @@ function ThreeDWorkshop({
             >
               <span>
                 <UploadCloud className="mx-auto h-6 w-6 text-[#f4ff00]" />
-                <span className="mt-2 block text-[12px] font-bold text-white">Upload reference</span>
-                <span className="mt-2 block text-[10px] text-zinc-400">PNG, JPG, WEBP</span>
+                <span className="mt-2 block text-[12px] font-bold text-white">
+                  {mode === "image_to_3d" ? "Upload reference" : "Upload 3D model"}
+                </span>
+                <span className="mt-2 block text-[10px] text-zinc-400">
+                  {mode === "image_to_3d" ? "PNG, JPG, WEBP" : "GLB, OBJ, FBX, STL"}
+                </span>
               </span>
             </button>
 
             <div className="mt-4 flex items-center justify-between">
-              <div className="text-[11px] font-black uppercase tracking-[0.08em] text-zinc-300">Image assets</div>
+              <div className="text-[11px] font-black uppercase tracking-[0.08em] text-zinc-300">
+                {mode === "image_to_3d" ? "Image assets" : "Model assets"}
+              </div>
               <div className="text-[11px] font-semibold text-zinc-600">{referenceAssets.length}</div>
             </div>
             <div className="mt-2 grid grid-cols-3 gap-2">
@@ -10121,17 +10463,23 @@ function ThreeDWorkshop({
                 <button
                   key={asset.id}
                   type="button"
-                  onClick={() => void onSelectReferenceAsset(asset, "model-image")}
+                  onClick={() => void onSelectReferenceAsset(asset, mode === "image_to_3d" ? "model-image" : "model-3d")}
                   className="aspect-square overflow-hidden rounded-[9px] border border-white/[0.05] bg-black transition hover:border-[#f4ff00]/60"
                   title={asset.name ?? "asset"}
                 >
-                  <img src={asset.url} alt="" className="h-full w-full object-cover" />
+                  {isStandaloneModel3dReference(asset) ? (
+                    <span className="grid h-full w-full place-items-center">
+                      <Box className="h-6 w-6 text-[#f4ff00]" />
+                    </span>
+                  ) : (
+                    <img src={asset.url} alt="" className="h-full w-full object-cover" />
+                  )}
                 </button>
               ))}
             </div>
 
             <div className="mt-5 flex items-center justify-between">
-              <div className="text-[11px] font-black uppercase tracking-[0.08em] text-zinc-300">Generated models</div>
+              <div className="text-[11px] font-black uppercase tracking-[0.08em] text-zinc-300">Source models</div>
               <div className="text-[11px] font-semibold text-zinc-600">{completedModels.length}</div>
             </div>
             <div className="mt-2 space-y-2">
@@ -10145,7 +10493,9 @@ function ThreeDWorkshop({
                   <ThreeDReferenceThumb reference={model} />
                   <span className="min-w-0">
                     <span className="block truncate text-[11px] font-bold text-white">{model.name}</span>
-                    <span className="block truncate text-[10px] text-zinc-500">{tripoModelTaskIdFromReference(model).slice(0, 8)}</span>
+                    <span className="block truncate text-[10px] text-zinc-500">
+                      {tripoModelTaskIdFromReference(model).slice(0, 8) || "import needed"}
+                    </span>
                   </span>
                 </button>
               ))}
@@ -10181,24 +10531,48 @@ function ThreeDSourcePicker({
   mode,
   sourceOptions,
   selectedSource,
+  onUpload,
   onSelect,
 }: {
   mode: StandaloneThreeDMode;
   sourceOptions: UploadedRef[];
   selectedSource: UploadedRef | null;
+  onUpload: () => void;
   onSelect: (source: UploadedRef) => void;
 }) {
   return (
     <div>
-      <FieldLabel label="Source model" meta={sourceOptions.length ? `${sourceOptions.length} ready` : "Tripo only"} />
+      <FieldLabel label="Source model" meta={sourceOptions.length ? `${sourceOptions.length} ready` : "Upload or Tripo"} />
       {sourceOptions.length === 0 ? (
-        <div className="mt-2 rounded-[12px] border border-dashed border-white/[0.10] bg-black/20 px-3 py-4 text-[11px] leading-5 text-zinc-400">
-          {mode === "animate"
-            ? "Run Auto Rig first. Animate preset expects a rigged Tripo model."
-            : "Create an Image to 3D result first. Rigging needs a completed Tripo model."}
+        <div className="mt-2 rounded-[12px] border border-dashed border-white/[0.10] bg-black/20 p-3 text-[11px] leading-5 text-zinc-400">
+          <p>
+            {mode === "animate"
+              ? "Run Auto Rig first. Animate preset expects a rigged Tripo model."
+              : "Upload a GLB/OBJ/FBX/STL model or create an Image to 3D result first."}
+          </p>
+          {mode === "auto_rig" && (
+            <button
+              type="button"
+              onClick={onUpload}
+              className="mt-3 inline-flex h-8 items-center gap-2 rounded-[9px] bg-[#f4ff00] px-3 text-[11px] font-black text-zinc-950 transition hover:bg-[#fbff69]"
+            >
+              <UploadCloud className="h-3.5 w-3.5" />
+              Upload 3D model
+            </button>
+          )}
         </div>
       ) : (
         <div className="mt-2 space-y-2">
+          {mode === "auto_rig" && (
+            <button
+              type="button"
+              onClick={onUpload}
+              className="flex h-9 w-full items-center justify-center gap-2 rounded-[10px] border border-dashed border-[#f4ff00]/35 bg-[#f4ff00]/[0.04] text-[11px] font-black text-[#f4ff00] transition hover:bg-[#f4ff00]/[0.08]"
+            >
+              <UploadCloud className="h-3.5 w-3.5" />
+              Upload external 3D
+            </button>
+          )}
           {sourceOptions.slice(0, 5).map((source) => {
             const active = selectedSource?.id === source.id;
             return (
@@ -10217,7 +10591,7 @@ function ThreeDSourcePicker({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[11px] font-bold text-white">{source.name}</span>
                   <span className="mt-1 block truncate text-[10px] font-semibold text-zinc-500">
-                    {tripoModelTaskIdFromReference(source).slice(0, 12)}
+                    {tripoModelTaskIdFromReference(source).slice(0, 12) || "Needs Tripo import"}
                   </span>
                 </span>
                 {active && <Check className="h-4 w-4 shrink-0 text-[#f4ff00]" />}
@@ -10355,7 +10729,7 @@ function SelectField({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 h-10 w-full rounded-xl border border-[var(--border-faint)] bg-[var(--bg-panel)] px-3 text-[12px] font-semibold text-white outline-none transition hover:bg-[var(--bg-surface-2)] focus:border-[var(--brand-primary)]/40 disabled:cursor-not-allowed"
+        className="mt-2 h-10 w-full rounded-xl border border-[var(--border-faint)] bg-[var(--bg-panel)] px-1 text-[10px] font-semibold text-white outline-none transition hover:bg-[var(--bg-surface-2)] focus:border-[var(--brand-primary)]/40 disabled:cursor-not-allowed"
       >
         {options.map((option) => (
           <option key={option} value={option} className="bg-zinc-950">
@@ -12110,6 +12484,12 @@ function inferModelMime(url: string | undefined): string {
   return "model/gltf-binary";
 }
 
+function isModel3dUploadFile(file: File): boolean {
+  const name = file.name.toLowerCase();
+  if (/\.(glb|obj|fbx|stl)$/i.test(name)) return true;
+  return /^(model\/|application\/octet-stream$)/i.test(file.type) && /\.(glb|obj|fbx|stl)$/i.test(name);
+}
+
 function isStandaloneModel3dReference(
   reference: Pick<UploadedRef, "mime" | "url" | "modelUrl"> | null | undefined,
 ): boolean {
@@ -12190,13 +12570,36 @@ function model3dInputFromReference(
   };
 }
 
+function externalModel3dInputFromReference(
+  reference: UploadedRef | null | undefined,
+): Record<string, unknown> | null {
+  if (!reference) return null;
+  const modelUrl = firstText(reference.modelUrl, MODEL_FILE_RE.test(reference.url) ? reference.url : "");
+  if (!modelUrl) return null;
+  const name = reference.name || "model.glb";
+  const extension = name.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase()
+    ?? modelUrl.split(/[?#]/)[0].match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase()
+    ?? "";
+  return {
+    url: modelUrl,
+    model_url: modelUrl,
+    source_model_url: modelUrl,
+    file_name: name,
+    format: extension,
+    preview_url: firstText(reference.previewUrl, !MODEL_FILE_RE.test(reference.url) ? reference.url : ""),
+    provider_meta: reference.providerMeta ?? {},
+  };
+}
+
 function inferReferenceMime(url: string | undefined, fallback?: unknown): string {
   const value = typeof fallback === "string" ? fallback.toLowerCase() : "";
   if (value.startsWith("image/") || value.startsWith("video/") || value.startsWith("audio/")) return value;
+  if (value.startsWith("model/")) return value;
   if (value.includes("video")) return "video/mp4";
   if (value.includes("audio")) return "audio/mpeg";
   if (value.includes("image")) return "image/jpeg";
   const cleanUrl = (url ?? "").split(/[?#]/)[0].toLowerCase();
+  if (MODEL_FILE_RE.test(cleanUrl)) return inferModelMime(cleanUrl);
   if (/\.(mp4|mov|webm|m4v)$/i.test(cleanUrl)) return "video/mp4";
   if (/\.(mp3|m4a|aac)$/i.test(cleanUrl)) return "audio/mpeg";
   if (/\.(wav)$/i.test(cleanUrl)) return "audio/wav";
@@ -12207,6 +12610,7 @@ function inferReferenceMime(url: string | undefined, fallback?: unknown): string
 }
 
 function referenceFromGenerationJob(job: StandaloneJobRow): UploadedRef | null {
+  if (job.node_type === "tripoPreRigCheckNode") return null;
   if (job.status !== "completed") return null;
   const result = job.result;
   if (!result) return null;
@@ -12426,14 +12830,21 @@ async function referenceFromUserAsset(
     metadata.url,
     metadata.storage_path,
   );
-  if (!rawUrl || MODEL_FILE_RE.test(rawUrl)) return null;
+  if (!rawUrl) return null;
   const storagePointer = storagePointerFromReferenceUrl(rawUrl);
   const mime = inferReferenceMime(
     rawUrl,
     firstText(row.file_type, row.mime_type, row.type, metadata.mime_type, metadata.content_type),
   );
-  if (!mime.startsWith("image/") && !mime.startsWith("video/") && !mime.startsWith("audio/")) return null;
+  const isModel = mime.startsWith("model/") || MODEL_FILE_RE.test(rawUrl);
+  if (!mime.startsWith("image/") && !mime.startsWith("video/") && !mime.startsWith("audio/") && !isModel) return null;
   const signedUrl = await getSignedUrl(rawUrl);
+  const taskId = firstText(
+    metadata.tripo_model_task_id,
+    metadata.original_model_task_id,
+    metadata.provider_task_id,
+    metadata.task_id,
+  );
   return {
     id: `user-asset-${String(row.id ?? rawUrl)}`,
     source: "user_asset",
@@ -12453,6 +12864,13 @@ async function referenceFromUserAsset(
     ),
     url: signedUrl,
     mime,
+    modelUrl: isModel ? signedUrl : undefined,
+    tripoModelTaskId: taskId,
+    originalModelTaskId: taskId,
+    providerTaskId: taskId,
+    providerMeta: metadata.provider_meta && typeof metadata.provider_meta === "object"
+      ? (metadata.provider_meta as Record<string, unknown>)
+      : {},
   };
 }
 
@@ -13240,6 +13658,7 @@ function uploadAcceptForSlot(slot: UploadSlot, model?: string): string {
   if (slot === "upscale-image") {
     return "image/*";
   }
+  if (slot === "model-3d") return MODEL_3D_UPLOAD_ACCEPT;
   return slot === "video-ref-video" ? "video/*" : "image/*";
 }
 
@@ -13373,9 +13792,10 @@ async function uploadReference(
     !file.type.startsWith("image/") &&
     !file.type.startsWith("video/") &&
     !file.type.startsWith("audio/") &&
+    !isModel3dUploadFile(file) &&
     !isTranslateMediaFile(file)
   ) {
-    throw new Error("Only image, video, or audio references are supported on this surface.");
+    throw new Error("Only image, video, audio, or 3D model references are supported on this surface.");
   }
   const uploadFile = await normalizeImageReferenceUpload(file);
   const imageDimensions = await readImageFileDimensions(uploadFile);
@@ -13414,6 +13834,7 @@ async function uploadReference(
     name: file.name,
     url: data.signedUrl,
     mime: contentType,
+    modelUrl: MODEL_FILE_RE.test(uploadFile.name) ? data.signedUrl : undefined,
     width: imageDimensions?.width,
     height: imageDimensions?.height,
   };
@@ -14029,6 +14450,7 @@ function buildCurrentParams(
         autoSubtitlePositionPercentFromVertical(form.autoSubtitlePosition),
       ),
       transition: form.autoSubtitleTransition,
+      out_transition: form.autoSubtitleOutTransition,
       text_animation: form.autoSubtitleTextAnimation,
       segmentation_mode: form.autoSubtitleSegmentationMode,
       words_per_line: form.autoSubtitleWordsPerLine,
@@ -14041,7 +14463,7 @@ function buildCurrentParams(
     if (mode === "auto_rig") {
       return {
         model_name: "tripo3d-rig",
-        rig_type: form.rigType ?? "biped",
+        rig_type: form.rigType && form.rigType !== TRIPO_AUTO_RIG_TYPE ? form.rigType : "biped",
         spec: form.rigSpec ?? "tripo",
         out_format: form.rigOutFormat ?? "glb",
       };
@@ -14130,7 +14552,9 @@ function buildCurrentInputs(
   if (tool === "image_to_3d") {
     const mode = standaloneThreeDMode(form);
     if (mode !== "image_to_3d") {
-      const payload = model3dInputFromReference(form.model3dSource);
+      const payload =
+        model3dInputFromReference(form.model3dSource) ??
+        externalModel3dInputFromReference(form.model3dSource);
       return payload ? { model3d: payload } : {};
     }
     const refs = threeDReferencesForForm(form).slice(0, max3dRefsForModel(form.model));
@@ -14247,10 +14671,12 @@ function validateForm(
       if (!form.model3dSource) {
         return "Select a completed Tripo 3D model first.";
       }
-      if (!tripoModelTaskIdFromReference(form.model3dSource)) {
+      const hasTripoTaskId = !!tripoModelTaskIdFromReference(form.model3dSource);
+      const canImportExternalModel = mode === "auto_rig" && isStandaloneModel3dReference(form.model3dSource);
+      if (!hasTripoTaskId && !canImportExternalModel) {
         return "This model is missing a Tripo task ID. Use a model generated by Tripo in this project.";
       }
-      if (mode === "animate" && !isRiggedTripoSourceReference(form.model3dSource)) {
+      if (mode === "animate" && (!hasTripoTaskId || !isRiggedTripoSourceReference(form.model3dSource))) {
         return "Run Auto Rig first, then choose the rigged result for animation.";
       }
     }

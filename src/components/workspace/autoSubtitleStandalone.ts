@@ -473,6 +473,7 @@ function easeOutBack(value: number): number {
 function cueTransitionFrame(
   cue: AutoSuptitleCue,
   animation: CaptionAnimation,
+  outAnimation: CaptionAnimation | undefined,
   currentTime: number,
   pixelScale: number,
 ): CueTransitionFrame {
@@ -483,11 +484,26 @@ function cueTransitionFrame(
   const outProgress = outDuration > 0 ? easeInCubic((cue.endTime - currentTime) / outDuration) : 1;
   const outAmount = 1 - outProgress;
   const distance = 18 * pixelScale;
+  const inFrame = cueTransitionInFrame(animation, inProgress, distance);
+  const outFrame = cueTransitionOutFrame(outAnimation ?? animation, outAmount, distance);
 
+  return {
+    opacity: inFrame.opacity * outFrame.opacity,
+    scale: inFrame.scale * outFrame.scale,
+    offsetX: inFrame.offsetX + outFrame.offsetX,
+    offsetY: inFrame.offsetY + outFrame.offsetY,
+  };
+}
+
+function cueTransitionInFrame(
+  animation: CaptionAnimation,
+  progress: number,
+  distance: number,
+): CueTransitionFrame {
   switch (animation) {
     case "fade":
       return {
-        opacity: inProgress * outProgress,
+        opacity: progress,
         scale: 1,
         offsetX: 0,
         offsetY: 0,
@@ -495,36 +511,91 @@ function cueTransitionFrame(
     case "slideIn":
     case "slideUp":
       return {
-        opacity: inProgress * outProgress,
+        opacity: progress,
         scale: 1,
         offsetX: 0,
-        offsetY: (1 - inProgress) * distance - outAmount * distance * 0.7,
+        offsetY: (1 - progress) * distance,
       };
     case "slideDown":
       return {
-        opacity: inProgress * outProgress,
+        opacity: progress,
         scale: 1,
         offsetX: 0,
-        offsetY: -(1 - inProgress) * distance + outAmount * distance * 0.7,
+        offsetY: -(1 - progress) * distance,
       };
     case "scale":
       return {
-        opacity: inProgress * outProgress,
-        scale: (0.92 + inProgress * 0.08) * (1 - outAmount * 0.05),
+        opacity: progress,
+        scale: 0.92 + progress * 0.08,
         offsetX: 0,
         offsetY: 0,
       };
     case "pop": {
-      const overshoot = inProgress < 0.72
-        ? 0.82 + inProgress * 0.3
-        : 1 + (1 - inProgress) * 0.08;
+      const overshoot = progress < 0.72
+        ? 0.82 + progress * 0.3
+        : 1 + (1 - progress) * 0.08;
       return {
-        opacity: Math.min(1, inProgress * 1.4) * outProgress,
-        scale: Math.max(0.72, overshoot * (1 - outAmount * 0.1)),
+        opacity: Math.min(1, progress * 1.4),
+        scale: Math.max(0.72, overshoot),
         offsetX: 0,
         offsetY: 0,
       };
     }
+    case "typewriter":
+    case "wordHighlight":
+    case "none":
+    default:
+      return {
+        opacity: 1,
+        scale: 1,
+        offsetX: 0,
+        offsetY: 0,
+      };
+  }
+}
+
+function cueTransitionOutFrame(
+  animation: CaptionAnimation,
+  amount: number,
+  distance: number,
+): CueTransitionFrame {
+  switch (animation) {
+    case "fade":
+      return {
+        opacity: 1 - amount,
+        scale: 1,
+        offsetX: 0,
+        offsetY: 0,
+      };
+    case "slideIn":
+    case "slideUp":
+      return {
+        opacity: 1 - amount,
+        scale: 1,
+        offsetX: 0,
+        offsetY: -amount * distance * 0.7,
+      };
+    case "slideDown":
+      return {
+        opacity: 1 - amount,
+        scale: 1,
+        offsetX: 0,
+        offsetY: amount * distance * 0.7,
+      };
+    case "scale":
+      return {
+        opacity: 1 - amount,
+        scale: 1 - amount * 0.05,
+        offsetX: 0,
+        offsetY: 0,
+      };
+    case "pop":
+      return {
+        opacity: 1 - amount,
+        scale: 1 - amount * 0.1,
+        offsetX: 0,
+        offsetY: 0,
+      };
     case "typewriter":
     case "wordHighlight":
     case "none":
@@ -723,7 +794,13 @@ function drawCue(
           ? height - margin - blockHeight / 2
           : height / 2;
   const firstY = centerY - blockHeight / 2 + lineHeight / 2;
-  const transition = cueTransitionFrame(cue, settings.animation, currentTime, scale);
+  const transition = cueTransitionFrame(
+    cue,
+    settings.animation,
+    settings.outAnimation,
+    currentTime,
+    scale,
+  );
   const textMotion = cueTextAnimationFrame(
     cue,
     settings.textAnimation,

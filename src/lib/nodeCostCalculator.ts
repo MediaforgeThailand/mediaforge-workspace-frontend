@@ -165,6 +165,7 @@ function modelDiscountPercent({ schemaKey, params, creditCosts }: NodeCostParams
   }
   if (
     schemaKey === "imageTo3dNode" ||
+    schemaKey === "tripoImportModelNode" ||
     schemaKey === "tripoPreRigCheckNode" ||
     schemaKey === "tripoRigNode" ||
     schemaKey === "tripoAnimateNode" ||
@@ -397,6 +398,7 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
 
   if (
     schemaKey === "imageTo3dNode" ||
+    schemaKey === "tripoImportModelNode" ||
     schemaKey === "tripoPreRigCheckNode" ||
     schemaKey === "tripoRigNode" ||
     schemaKey === "tripoAnimateNode" ||

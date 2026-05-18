@@ -1491,6 +1491,29 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     ],
   },
 
+  tripoImportModelNode: {
+    displayName: "Tripo Import Model",
+    category: "AI PROCESS",
+    accentColor: "amber",
+    supportedModels: ["tripo3d-import"],
+    defaultModel: "tripo3d-import",
+    inputs: [
+      { id: "model3d", label: "3D", color: "amber", required: true },
+    ],
+    outputs: [{ id: "model3d", label: "Tripo 3D", color: "amber" }],
+    params: [
+      {
+        key: "model_name",
+        label: "Model",
+        type: "select",
+        options: ["tripo3d-import"],
+        optionLabels: { "tripo3d-import": "Tripo Import Model" },
+        default: "tripo3d-import",
+        required: true,
+      },
+    ],
+  },
+
   tripoRigNode: {
     displayName: "Tripo Auto Rig",
     category: "AI PROCESS",
