@@ -936,7 +936,7 @@ function voiceTranslateEngineOptions(th: boolean): VoiceTranslateEngineOption[] 
   return [
     {
       id: "elevenlabs_dubbing_clone",
-      title: "Translate",
+      title: th ? "แปลเสียง" : "Translate",
       provider: "ElevenLabs",
       badge: th ? "Voice clone" : "Voice clone",
       description: th
@@ -5279,7 +5279,7 @@ function VoiceTranslatePanel({
 }) {
   const th = language === "th";
   const copy = {
-    title: "Translate",
+    title: th ? "แปลเสียง" : "Translate",
     subtitle: th
       ? "แปลเสียงจาก MP4/MP3 โดยคงโทนเสียงผู้พูดให้ใกล้ต้นฉบับ"
       : "Translate MP4/MP3 speech with ElevenLabs voice-clone dubbing.",
@@ -5298,7 +5298,7 @@ function VoiceTranslatePanel({
     consent: th
       ? "ฉันมีสิทธิ์ใช้ไฟล์นี้และได้รับอนุญาตให้แปล/โคลนเสียงของผู้พูด"
       : "I have permission to translate this file's speech.",
-    action: "Translate",
+    action: th ? "เริ่มแปลเสียง" : "Translate",
     processing: th ? "กำลังแปล" : "Translating",
     ready: th ? "ผลลัพธ์จะแสดงทางขวาเมื่อพร้อม" : "Results appear on the right when ready.",
     remove: th ? "ลบไฟล์" : "Remove file",
@@ -5479,10 +5479,10 @@ function VoiceTranslatePanel({
               </span>
               <span className="min-w-0 text-left">
                 <span className="block text-[13px] font-medium leading-[14px] text-[var(--text-tertiary)]">
-                  Format
+                  {th ? "รูปแบบไฟล์" : "Format"}
                 </span>
                 <span className="block truncate text-[15px] font-bold leading-[16px] text-white">
-                  {media ? translateOutputFormatLabel(media) : "Auto"}
+                  {media ? translateOutputFormatLabel(media) : th ? "อัตโนมัติ" : "Auto"}
                 </span>
               </span>
             </div>
