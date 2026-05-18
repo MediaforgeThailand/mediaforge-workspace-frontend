@@ -381,10 +381,10 @@ function wrapCaptionText(
   text: string,
   maxWidth: number,
 ): string[] {
-  return text
-    .split("\n")
-    .flatMap((line) => wrapCaptionLineByWidth(ctx, line, maxWidth))
-    .filter(Boolean);
+  void ctx;
+  void maxWidth;
+  const singleLine = text.replace(/\s+/g, " ").trim();
+  return singleLine ? [singleLine] : [];
 }
 
 function captionCanvasFont(

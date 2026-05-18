@@ -1417,12 +1417,8 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         supportedModels: [...SINGLE_IMAGE_3D_MODELS],
       },
     ],
-    // No output ports — a generated 3D model isn't wireable into any
-    // other node in the workspace (image / video tools can't consume
-    // a GLB). The result lives in the node's preview + the user's
-    // asset library; downstream needs would be served by a future
-    // node type that takes 3d as input.
-    outputs: [],
+    // 3D results can feed Tripo rig / animate / export nodes.
+    outputs: [{ id: "model3d", label: "3D", color: "amber" }],
     params: [
       {
         key: "model_name",
@@ -1468,6 +1464,158 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         options: ["false", "true"],
         optionLabels: { "false": "Off", "true": "On" },
         default: "true",
+      },
+    ],
+  },
+
+  tripoPreRigCheckNode: {
+    displayName: "Tripo Rig Check",
+    category: "AI PROCESS",
+    accentColor: "amber",
+    supportedModels: ["tripo3d-prerigcheck"],
+    defaultModel: "tripo3d-prerigcheck",
+    inputs: [
+      { id: "model3d", label: "3D", color: "amber", required: true },
+    ],
+    outputs: [{ id: "model3d", label: "ready 3D", color: "amber" }],
+    params: [
+      {
+        key: "model_name",
+        label: "Model",
+        type: "select",
+        options: ["tripo3d-prerigcheck"],
+        optionLabels: { "tripo3d-prerigcheck": "Tripo Pre-Rig Check" },
+        default: "tripo3d-prerigcheck",
+        required: true,
+      },
+    ],
+  },
+
+  tripoRigNode: {
+    displayName: "Tripo Auto Rig",
+    category: "AI PROCESS",
+    accentColor: "amber",
+    supportedModels: ["tripo3d-rig"],
+    defaultModel: "tripo3d-rig",
+    inputs: [
+      { id: "model3d", label: "3D", color: "amber", required: true },
+    ],
+    outputs: [{ id: "model3d", label: "rigged 3D", color: "amber" }],
+    params: [
+      {
+        key: "model_name",
+        label: "Model",
+        type: "select",
+        options: ["tripo3d-rig"],
+        optionLabels: { "tripo3d-rig": "Tripo Auto Rig" },
+        default: "tripo3d-rig",
+        required: true,
+      },
+      {
+        key: "rig_type",
+        label: "Rig Type",
+        type: "select",
+        options: ["biped", "quadruped", "hexapod", "octopod", "avian", "serpentine", "aquatic"],
+        optionLabels: {
+          biped: "Biped",
+          quadruped: "Quadruped",
+          hexapod: "Hexapod",
+          octopod: "Octopod",
+          avian: "Avian",
+          serpentine: "Serpentine",
+          aquatic: "Aquatic",
+        },
+        default: "biped",
+      },
+      {
+        key: "out_format",
+        label: "Output",
+        type: "select",
+        options: ["glb", "fbx"],
+        optionLabels: { glb: "GLB", fbx: "FBX" },
+        default: "glb",
+      },
+    ],
+  },
+
+  tripoAnimateNode: {
+    displayName: "Tripo Animate",
+    category: "AI PROCESS",
+    accentColor: "amber",
+    supportedModels: ["tripo3d-retarget"],
+    defaultModel: "tripo3d-retarget",
+    inputs: [
+      { id: "model3d", label: "rigged 3D", color: "amber", required: true },
+    ],
+    outputs: [{ id: "model3d", label: "animated 3D", color: "amber" }],
+    params: [
+      {
+        key: "model_name",
+        label: "Model",
+        type: "select",
+        options: ["tripo3d-retarget"],
+        optionLabels: { "tripo3d-retarget": "Tripo Animate" },
+        default: "tripo3d-retarget",
+        required: true,
+      },
+      {
+        key: "animation",
+        label: "Animation",
+        type: "select",
+        options: [
+          "preset:idle",
+          "preset:walk",
+          "preset:run",
+          "preset:jump",
+          "preset:quadruped:walk",
+        ],
+        optionLabels: {
+          "preset:idle": "Idle",
+          "preset:walk": "Walk",
+          "preset:run": "Run",
+          "preset:jump": "Jump",
+          "preset:quadruped:walk": "Quadruped Walk",
+        },
+        default: "preset:walk",
+      },
+      {
+        key: "out_format",
+        label: "Output",
+        type: "select",
+        options: ["glb", "fbx"],
+        optionLabels: { glb: "GLB", fbx: "FBX" },
+        default: "glb",
+      },
+    ],
+  },
+
+  tripoExportNode: {
+    displayName: "Tripo Export",
+    category: "AI PROCESS",
+    accentColor: "amber",
+    supportedModels: ["tripo3d-conversion"],
+    defaultModel: "tripo3d-conversion",
+    inputs: [
+      { id: "model3d", label: "3D", color: "amber", required: true },
+    ],
+    outputs: [{ id: "model3d", label: "export", color: "amber" }],
+    params: [
+      {
+        key: "model_name",
+        label: "Model",
+        type: "select",
+        options: ["tripo3d-conversion"],
+        optionLabels: { "tripo3d-conversion": "Tripo Export" },
+        default: "tripo3d-conversion",
+        required: true,
+      },
+      {
+        key: "format",
+        label: "Format",
+        type: "select",
+        options: ["glb", "fbx", "obj", "stl", "usdz"],
+        optionLabels: { glb: "GLB", fbx: "FBX", obj: "OBJ", stl: "STL", usdz: "USDZ" },
+        default: "glb",
       },
     ],
   },

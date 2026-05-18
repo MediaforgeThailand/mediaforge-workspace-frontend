@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import { createServer } from "node:http";
-import { createReadStream, existsSync } from "node:fs";
+import { createReadStream, createWriteStream, existsSync } from "node:fs";
 import { copyFile, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { basename, extname, join, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 
 const PORT = Number(process.env.SMART_FRAMES_WORKER_PORT || 8787);
 const HOST = process.env.SMART_FRAMES_WORKER_HOST || "127.0.0.1";
@@ -22,8 +23,9 @@ const json = (res, status, payload) => {
   res.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "access-control-allow-origin": "*",
-    "access-control-allow-methods": "GET,POST,OPTIONS",
-    "access-control-allow-headers": "content-type",
+    "access-control-allow-methods": "GET,HEAD,POST,DELETE,OPTIONS",
+    "access-control-allow-headers": "content-type,range",
+    "access-control-expose-headers": "content-length,content-range,accept-ranges",
   });
   res.end(JSON.stringify(payload));
 };
@@ -451,11 +453,15 @@ async function renderJob({ file, plan, presetLabel }) {
   if (typeof file.size === "number" && file.size > MAX_UPLOAD_BYTES) {
     throw new Error("Video is larger than the 1 GB local render limit.");
   }
-  const inputBuffer = Buffer.from(await file.arrayBuffer());
-  if (inputBuffer.byteLength > MAX_UPLOAD_BYTES) {
+  if (typeof file.stream === "function") {
+    await pipeline(Readable.fromWeb(file.stream()), createWriteStream(inputPath));
+  } else {
+    await writeFile(inputPath, Buffer.from(await file.arrayBuffer()));
+  }
+  const inputStat = await stat(inputPath);
+  if (inputStat.size > MAX_UPLOAD_BYTES) {
     throw new Error("Video is larger than the 1 GB local render limit.");
   }
-  await writeFile(inputPath, inputBuffer);
 
   const inputInfo = await ffprobe(inputPath);
   if (inputInfo.duration > MAX_RENDER_DURATION_SECONDS) {
@@ -547,22 +553,22 @@ async function handleRender(req, res) {
     json(res, 413, { ok: false, error: "Video is larger than the 1 GB local render limit." });
     return;
   }
-  const request = new Request(`http://${HOST}:${PORT}${req.url}`, {
-    method: req.method,
-    headers: req.headers,
-    body: Readable.toWeb(req),
-    duplex: "half",
-  });
-  const form = await request.formData();
-  const file = form.get("file");
-  if (!file || typeof file.arrayBuffer !== "function") {
-    json(res, 400, { ok: false, error: "Missing video file." });
-    return;
-  }
-  const plan = String(form.get("plan") || "");
-  const presetLabel = String(form.get("presetLabel") || "Smart Frames");
   activeRenderCount += 1;
   try {
+    const request = new Request(`http://${HOST}:${PORT}${req.url}`, {
+      method: req.method,
+      headers: req.headers,
+      body: Readable.toWeb(req),
+      duplex: "half",
+    });
+    const form = await request.formData();
+    const file = form.get("file");
+    if (!file || typeof file.arrayBuffer !== "function") {
+      json(res, 400, { ok: false, error: "Missing video file." });
+      return;
+    }
+    const plan = String(form.get("plan") || "");
+    const presetLabel = String(form.get("presetLabel") || "Smart Frames");
     const result = await renderJob({ file, plan, presetLabel });
     json(res, 200, { ok: true, ...result });
   } finally {
@@ -574,6 +580,10 @@ async function handleOutput(req, res) {
   const url = new URL(req.url, BASE_URL);
   const [, , jobId, ...fileParts] = url.pathname.split("/");
   const fileName = decodeURIComponent(fileParts.join("/"));
+  if (!jobId || !fileName) {
+    json(res, 404, { ok: false, error: "File not found." });
+    return;
+  }
   const outputRoot = resolve(OUTPUT_ROOT);
   const filePath = resolve(OUTPUT_ROOT, jobId || "", fileName || "");
   if (
@@ -583,11 +593,20 @@ async function handleOutput(req, res) {
     json(res, 404, { ok: false, error: "File not found." });
     return;
   }
-  const fileStat = await stat(filePath);
+  const fileStat = await stat(filePath).catch(() => null);
+  if (!fileStat) {
+    json(res, 404, { ok: false, error: "File not found." });
+    return;
+  }
+  if (!fileStat.isFile()) {
+    json(res, 404, { ok: false, error: "File not found." });
+    return;
+  }
   const type = extname(filePath).toLowerCase() === ".mp4" ? "video/mp4" : "application/octet-stream";
   const baseHeaders = {
     "content-type": type,
     "access-control-allow-origin": "*",
+    "access-control-expose-headers": "content-length,content-range,accept-ranges",
     "accept-ranges": "bytes",
     "cache-control": "no-store",
   };
@@ -599,8 +618,14 @@ async function handleOutput(req, res) {
       res.end();
       return;
     }
-    const requestedStart = match[1] ? Number(match[1]) : 0;
-    const requestedEnd = match[2] ? Number(match[2]) : fileStat.size - 1;
+    const isSuffixRange = !match[1] && Boolean(match[2]);
+    const suffixLength = isSuffixRange ? Number(match[2]) : 0;
+    const requestedStart = isSuffixRange
+      ? Math.max(0, fileStat.size - suffixLength)
+      : match[1]
+        ? Number(match[1])
+        : 0;
+    const requestedEnd = isSuffixRange || !match[2] ? fileStat.size - 1 : Number(match[2]);
     const start = Math.max(0, requestedStart);
     const end = Math.min(fileStat.size - 1, requestedEnd);
     if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= fileStat.size) {
@@ -638,8 +663,9 @@ const server = createServer(async (req, res) => {
     if (req.method === "OPTIONS") {
       res.writeHead(204, {
         "access-control-allow-origin": "*",
-        "access-control-allow-methods": "GET,POST,OPTIONS",
-        "access-control-allow-headers": "content-type",
+        "access-control-allow-methods": "GET,HEAD,POST,DELETE,OPTIONS",
+        "access-control-allow-headers": "content-type,range",
+        "access-control-expose-headers": "content-length,content-range,accept-ranges",
       });
       res.end();
       return;

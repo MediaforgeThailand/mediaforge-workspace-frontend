@@ -20,6 +20,18 @@ interface DownloadRequest {
   };
 }
 
+interface SocialDownloadRequest {
+  method?: string;
+  headers: Record<string, string | string[] | undefined>;
+  body?: unknown;
+}
+
+interface SocialDownloadResponse {
+  statusCode: number;
+  setHeader(name: string, value: string): void;
+  end(body?: string): void;
+}
+
 const SOCIAL_HOST_PATTERNS = [
   /(^|\.)youtube\.com$/i,
   /(^|\.)youtu\.be$/i,
@@ -34,19 +46,24 @@ const FORMAT_META: Record<OutputFormat, { extension: string; contentType: string
   png: { extension: "png", contentType: "image/png", maxBytes: 32 * 1024 * 1024 },
 };
 
+const SOCIAL_MP4_MAX_HEIGHT = Math.max(
+  720,
+  Math.min(2160, Number.parseInt(process.env.SOCIAL_DOWNLOADER_MAX_MP4_HEIGHT || "1080", 10) || 1080),
+);
+
 const execFileAsync = promisify(execFile);
 const CHROME_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36";
 const FACEBOOK_CRAWLER_USER_AGENT =
   "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)";
 
-function sendJson(res: any, status: number, body: Record<string, unknown>) {
+function sendJson(res: SocialDownloadResponse, status: number, body: Record<string, unknown>) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.end(JSON.stringify(body));
 }
 
-function parseBody(req: any): DownloadRequest {
+function parseBody(req: SocialDownloadRequest): DownloadRequest {
   if (!req.body) return {};
   if (typeof req.body === "string") return JSON.parse(req.body || "{}");
   return req.body as DownloadRequest;
@@ -137,10 +154,20 @@ function ytdlpFlags(format: OutputFormat, outputTemplate: string): Record<string
   };
 
   if (format === "mp4") {
+    const heightCap = SOCIAL_MP4_MAX_HEIGHT;
     return {
       ...base,
-      format: "bv*[ext=mp4][height<=720]+ba[ext=m4a]/b[ext=mp4]/best[height<=720]/best",
+      format: [
+        `bv*[ext=mp4][height<=${heightCap}]+ba[ext=m4a]`,
+        `bv*[ext=mp4][height<=${heightCap}]+ba`,
+        `b[ext=mp4][height<=${heightCap}]`,
+        `best[height<=${heightCap}]`,
+        "bv*[ext=mp4]+ba[ext=m4a]",
+        "b[ext=mp4]",
+        "best",
+      ].join("/"),
       mergeOutputFormat: "mp4",
+      formatSort: `res:${heightCap},ext:mp4:m4a`,
     };
   }
 
@@ -618,16 +645,16 @@ async function downloadSocialPageImageAsPng(args: {
 }
 
 async function uploadToSignedUrl(signedUrl: string, filePath: string, contentType: string): Promise<void> {
-  const init: RequestInit & { duplex?: "half" } = {
+  const init = {
     method: "PUT",
     headers: {
       "Content-Type": contentType,
       "Cache-Control": "max-age=31536000",
       "x-upsert": "false",
     },
-    body: createReadStream(filePath) as any,
+    body: createReadStream(filePath),
     duplex: "half",
-  };
+  } as unknown as RequestInit & { duplex: "half" };
   const upload = await fetch(signedUrl, init);
 
   if (!upload.ok) {
@@ -682,7 +709,7 @@ function humanizeDownloaderError(error: unknown): string {
   return raw || "This social link could not be downloaded. Try again or upload the file directly.";
 }
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: SocialDownloadRequest, res: SocialDownloadResponse) {
   if (req.method !== "POST") {
     sendJson(res, 405, { error: "Method not allowed" });
     return;
