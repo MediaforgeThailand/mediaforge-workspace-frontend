@@ -5179,9 +5179,9 @@ function autoSubtitleAlgorithmFromForm(
     return algorithmFromCaptionSettings(settings, {
       segmentationMode,
       maxLineDuration: Math.min(Math.max(settings.maxLineDuration, 1.5), 2.4),
-      maxCharsPerLine: 36,
-      maxSilenceGap: 0.45,
-      maxHoldAfterSpeech: 0.5,
+      maxCharsPerLine: 28,
+      maxSilenceGap: 0.6,
+      maxHoldAfterSpeech: 0.9,
       splitOnPunctuation: true,
     });
   }
@@ -12910,6 +12910,7 @@ function buildCurrentParams(
       preset: form.autoSubtitlePresetId,
       font: form.autoSubtitleFont,
       fill: form.autoSubtitleFill,
+      highlight_enabled: false,
       accent_color: form.autoSubtitleAccentColor,
       highlight_color: form.autoSubtitleAccentColor,
       position: form.autoSubtitlePosition,

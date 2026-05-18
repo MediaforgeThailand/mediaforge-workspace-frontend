@@ -167,6 +167,47 @@ describe("Auto Suptitle segmenter", () => {
     expect(Math.max(...cues.map((cue) => visualTextLength(cue.text)))).toBeLessThanOrEqual(34);
   });
 
+  it("keeps Thai sentence captions readable and holds brief spoken gaps", () => {
+    const transcript = "ช่วยเปลี่ยนภาพนี้ให้เคลื่อนไหวตามสไตล์ต้นฉบับได้";
+    const cues = buildAutoSuptitleCuesFromResponse(
+      {
+        language: "thai",
+        duration: 5,
+        text: transcript,
+        suggested_cues: [transcript],
+        words: [
+          { word: "ช่วย", start: 0, end: 0.24 },
+          { word: "เปลี่ยน", start: 0.24, end: 0.58 },
+          { word: "ภาพนี้", start: 0.58, end: 0.94 },
+          { word: "ให้เคลื่อนไหว", start: 1.7, end: 2.12 },
+          { word: "ตามสไตล์", start: 2.12, end: 2.58 },
+          { word: "ต้นฉบับ", start: 3.35, end: 3.82 },
+          { word: "ได้", start: 3.82, end: 4.05 },
+        ],
+      },
+      0,
+      { ...DEFAULT_CAPTION_SETTINGS, case: "normal" },
+      {
+        ...DEFAULT_AUTO_SUPTITLE_ALGORITHM,
+        segmentationMode: "sentence",
+        maxCharsPerLine: 28,
+        maxLineDuration: 2.4,
+        maxSilenceGap: 0.6,
+        maxHoldAfterSpeech: 0.9,
+      },
+      "th",
+    );
+
+    expect(cues.length).toBeGreaterThan(1);
+    expect(cues.map((cue) => cue.text).join("")).toBe(transcript);
+    expect(cues.every((cue) => visualTextLength(cue.text) <= 28)).toBe(true);
+    const largestGap = cues.reduce((maxGap, cue, index) => {
+      const nextCue = cues[index + 1];
+      return nextCue ? Math.max(maxGap, nextCue.startTime - cue.endTime) : maxGap;
+    }, 0);
+    expect(largestGap).toBeLessThanOrEqual(0.08);
+  });
+
   it("carries the previous Thai phrase unit when a long cue overflows", () => {
     const cues = buildAutoSuptitleCuesFromResponse(
       {
