@@ -422,7 +422,7 @@ const Pricing = () => {
             </label>
             <button
               type="button"
-              onClick={() => navigate("/app/affiliate")}
+                onClick={() => navigate("/app/settings?tab=affiliate")}
               className="h-[42px] rounded-full border border-white/10 bg-white/[0.04] px-4 text-[12px] font-bold text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white"
             >
               Creator signup
