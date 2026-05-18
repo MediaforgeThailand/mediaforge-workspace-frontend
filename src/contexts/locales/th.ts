@@ -2245,6 +2245,19 @@ export const th = {
     "จัดการคลาส นักเรียน และเครดิตของมหาวิทยาลัย",
   "workspace.sidebar.branding_tip": "โลโก้และชื่อย่อ",
   "workspace.sidebar.settings_tip": "ตั้งค่า",
+  "workspace.sidebar.image_gen_tip": "สร้างภาพจากพรอมป์และภาพอ้างอิง",
+  "workspace.sidebar.video_gen_tip":
+    "สร้างวิดีโอจากพรอมป์ เฟรมเริ่มต้น/สิ้นสุด หรือภาพอ้างอิง",
+  "workspace.sidebar.voice_gen_tip": "สร้างเสียงพูดจากสคริปต์",
+  "workspace.sidebar.voice_translate_tip":
+    "แปลเสียงพูดจากไฟล์เสียงหรือวิดีโอ โดยคงโทนเสียงเดิม",
+  "workspace.sidebar.image_upscale_tip": "เพิ่มความละเอียดและความคมชัดของภาพ",
+  "workspace.sidebar.url_asset_tip": "นำไฟล์จาก URL เข้าคลังแอสเซ็ต",
+  "workspace.sidebar.auto_subtitle_tip": "สร้างซับไตเติลอัตโนมัติจากวิดีโอ",
+  "workspace.sidebar.threed_gen_tip": "สร้างโมเดล 3D จากภาพอ้างอิง",
+  "workspace.sidebar.editor_tip": "ตัดต่อวิดีโอและจัดการโปรเจกต์ไทม์ไลน์",
+  "workspace.sidebar.spaces_tip":
+    "สร้างเวิร์กโฟลว์ AI บนพื้นที่ว่างด้วยเครื่องมือ แอสเซ็ต และโหนด",
 
   // User menu
   "workspace.usermenu.account": "เมนูบัญชี",

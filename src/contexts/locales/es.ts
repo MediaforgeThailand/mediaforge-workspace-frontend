@@ -2358,6 +2358,26 @@ export const es = {
     "Gestionar clases, estudiantes y créditos universitarios.",
   "workspace.sidebar.branding_tip": "Logotipo y nombre corto",
   "workspace.sidebar.settings_tip": "Configuración",
+  "workspace.sidebar.image_gen_tip":
+    "Crea imágenes a partir de prompts y referencias visuales.",
+  "workspace.sidebar.video_gen_tip":
+    "Crea videos a partir de prompts, fotogramas de inicio/fin o referencias.",
+  "workspace.sidebar.voice_gen_tip":
+    "Genera audio hablado a partir de un guion.",
+  "workspace.sidebar.voice_translate_tip":
+    "Traduce voz desde audio o video conservando el tono original.",
+  "workspace.sidebar.image_upscale_tip":
+    "Aumenta la resolución y nitidez de las imágenes.",
+  "workspace.sidebar.url_asset_tip":
+    "Importa archivos desde una URL directa a tu biblioteca de recursos.",
+  "workspace.sidebar.auto_subtitle_tip":
+    "Genera subtítulos automáticamente a partir de videos.",
+  "workspace.sidebar.threed_gen_tip":
+    "Crea modelos 3D a partir de referencias de imagen.",
+  "workspace.sidebar.editor_tip":
+    "Edita videos y gestiona proyectos de línea de tiempo.",
+  "workspace.sidebar.spaces_tip":
+    "Crea flujos de trabajo de IA en un lienzo en blanco con herramientas, recursos y nodos.",
 
   // User menu
   "workspace.usermenu.account": "Menú de cuenta",

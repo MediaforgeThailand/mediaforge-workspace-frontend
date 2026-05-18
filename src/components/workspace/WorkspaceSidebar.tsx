@@ -50,7 +50,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { useLanguage, type Language } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import type { TranslationKey } from "@/contexts/locales/en";
 import { useIsClassTeacher, useIsOrgAdmin } from "@/hooks/useIsOrgUser";
 import { useOrgBranding } from "@/hooks/useOrgBranding";
 import { useCredits } from "@/hooks/useCredits";
@@ -58,6 +59,7 @@ import { supabase } from "@/integrations/supabase/client";
 import OrgCreditBadge from "@/components/OrgCreditBadge";
 import ActiveClassPicker from "@/components/ActiveClassPicker";
 import AllAssetsDialog from "@/components/workspace/AllAssetsDialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DEFAULT_BRAND_LOGO, DEFAULT_BRAND_NAME } from "@/components/workspace/brandAssets";
 import { getProjectAvatar } from "@/components/workspace/projectAvatars";
 import type { ProjectMeta } from "@/store/useWorkspaceStore";
@@ -230,7 +232,7 @@ export default function WorkspaceSidebar({
   collapsed = false,
 }: WorkspaceSidebarProps) {
   const navigate = useNavigate();
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const [libraryOpen, setLibraryOpen] = useState(false);
   // Tenant branding override (e.g. dmd.mediaforge.co → DMD logo +
   // "DMD" short name). Returns null on the bare workspace.mediaforge.co
@@ -366,7 +368,6 @@ export default function WorkspaceSidebar({
           active={active}
           onSelect={handleClick}
           translate={t}
-          language={language}
           collapsed={collapsed}
         />
       ))}
@@ -665,7 +666,6 @@ const SidebarNavSection = ({
   active,
   onSelect,
   translate,
-  language,
   collapsed = false,
 }: {
   label: string;
@@ -673,8 +673,7 @@ const SidebarNavSection = ({
   variant: "tool" | "list";
   active?: SectionKey;
   onSelect: (s: SectionKey) => void;
-  translate: (key: NavItem["labelKey"]) => string;
-  language: Language;
+  translate: (key: TranslationKey) => string;
   collapsed?: boolean;
 }) => (
   <div className={cn(collapsed ? "pt-[8px]" : "pt-[16px]", variant === "tool" && (collapsed ? "pt-[10px]" : "pt-[18px]"))}>
@@ -716,7 +715,7 @@ const SidebarNavSection = ({
                 tooltip={
                   collapsed
                     ? translate(item.labelKey)
-                    : variant === "tool" ? getSidebarToolTooltip(item.id, language) : undefined
+                    : variant === "tool" ? getSidebarToolTooltip(item.id, translate) : undefined
                 }
               />
             ))}
@@ -750,17 +749,14 @@ const NavLink = ({
   badge?: string;
   tooltip?: string;
   iconOnly?: boolean;
-}) => (
+}) => {
+  const button = (
   <button
     type="button"
     onClick={onClick}
-    data-sidebar-tooltip={tooltip || undefined}
     aria-label={tooltip ? `${label}: ${tooltip}` : label}
     className={cn(
-      /* 2026-05: drop the inset 1px stroke on active — bg lift alone
-       *  is enough now that the sidebar is a Layer-1 panel. */
       "group relative flex h-[32px] min-w-0 items-center gap-[10px] text-left text-[12px] font-medium transition-colors",
-      tooltip && "ws-sidebar-tooltip",
       iconOnly && "mx-auto h-[36px] w-[36px] flex-none justify-center gap-0 rounded-[10px] px-0",
       variant === "tool" && tone === "accent"
         ? "rounded-[7px] border border-cyan-300/35 bg-cyan-950/50 px-[8px] text-cyan-50 shadow-[inset_0_1px_0_rgba(255,255,255,.08),0_0_18px_-12px_rgba(34,211,238,.95)]"
@@ -815,30 +811,49 @@ const NavLink = ({
       </span>
     )}
   </button>
-);
+  );
 
-function getSidebarToolTooltip(id: SectionKey, language: Language): string | undefined {
-  const th = language === "th";
+  if (!tooltip) return button;
 
+  return (
+    <Tooltip delayDuration={150}>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipContent
+        side="right"
+        sideOffset={10}
+        className="pointer-events-none max-w-[230px] whitespace-normal border-white/[0.12] bg-black px-[9px] py-[6px] text-[11px] font-semibold leading-[1.35] text-white shadow-[0_18px_48px_-24px_rgba(0,0,0,.95),0_0_24px_-18px_rgba(234,255,0,.75)]"
+      >
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
+  );
+};
+
+function getSidebarToolTooltip(
+  id: SectionKey,
+  t: (key: TranslationKey) => string,
+): string | undefined {
   switch (id) {
     case "image_gen":
-      return th ? "สร้างภาพจาก prompt และภาพอ้างอิง" : "Create images from prompts and visual references.";
+      return t("workspace.sidebar.image_gen_tip");
     case "video_gen":
-      return th ? "สร้างวิดีโอจาก prompt, start/end frame หรือ reference" : "Create video from prompts, frames, or references.";
+      return t("workspace.sidebar.video_gen_tip");
     case "voice_gen":
-      return th ? "สร้างเสียงพูดจากสคริปต์" : "Generate spoken audio from a script.";
+      return t("workspace.sidebar.voice_gen_tip");
     case "voice_translate":
-      return th ? "แปลหรือพากย์เสียงจากไฟล์วิดีโอ/เสียง" : "Translate or dub speech from audio or video.";
+      return t("workspace.sidebar.voice_translate_tip");
     case "image_upscale":
-      return th ? "เพิ่มความละเอียดและความคมชัดของภาพ" : "Upscale and sharpen an image.";
+      return t("workspace.sidebar.image_upscale_tip");
     case "url_asset":
-      return th ? "นำไฟล์จาก URL เข้าคลัง asset" : "Import a direct file URL into your assets.";
+      return t("workspace.sidebar.url_asset_tip");
     case "auto_subtitle":
-      return th ? "สร้างคำบรรยายอัตโนมัติจากวิดีโอ" : "Generate subtitles automatically from video.";
+      return t("workspace.sidebar.auto_subtitle_tip");
     case "image_to_3d":
-      return th ? "สร้างโมเดล 3D จากรูปอ้างอิง" : "Create a 3D model from an image reference.";
+      return t("workspace.sidebar.threed_gen_tip");
     case "editor":
-      return th ? "ตัดต่อวิดีโอและจัดการ timeline" : "Edit video and timeline projects.";
+      return t("workspace.sidebar.editor_tip");
+    case "spaces":
+      return t("workspace.sidebar.spaces_tip");
     default:
       return undefined;
   }

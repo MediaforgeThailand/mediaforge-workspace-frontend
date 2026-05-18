@@ -2128,6 +2128,24 @@ export const hi = {
     "कक्षाएं, छात्र और विश्वविद्यालय क्रेडिट प्रबंधित करें",
   "workspace.sidebar.branding_tip": "लोगो और संक्षिप्त नाम",
   "workspace.sidebar.settings_tip": "सेटिंग्स",
+  "workspace.sidebar.image_gen_tip":
+    "प्रॉम्प्ट और विज़ुअल रेफ़रेंस से इमेज बनाएँ।",
+  "workspace.sidebar.video_gen_tip":
+    "प्रॉम्प्ट, स्टार्ट/एंड फ़्रेम या रेफ़रेंस से वीडियो बनाएँ।",
+  "workspace.sidebar.voice_gen_tip": "स्क्रिप्ट से वॉइस ऑडियो जनरेट करें।",
+  "workspace.sidebar.voice_translate_tip":
+    "ऑडियो या वीडियो की आवाज़ को मूल टोन बनाए रखते हुए अनुवाद करें।",
+  "workspace.sidebar.image_upscale_tip":
+    "इमेज की रिज़ॉल्यूशन और शार्पनेस बढ़ाएँ।",
+  "workspace.sidebar.url_asset_tip":
+    "डायरेक्ट URL से फ़ाइलों को अपनी एसेट लाइब्रेरी में इम्पोर्ट करें।",
+  "workspace.sidebar.auto_subtitle_tip":
+    "वीडियो से सबटाइटल अपने-आप जनरेट करें।",
+  "workspace.sidebar.threed_gen_tip": "इमेज रेफ़रेंस से 3D मॉडल बनाएँ।",
+  "workspace.sidebar.editor_tip":
+    "वीडियो एडिट करें और टाइमलाइन प्रोजेक्ट मैनेज करें।",
+  "workspace.sidebar.spaces_tip":
+    "खाली कैनवास पर टूल्स, एसेट्स और नोड्स के साथ AI वर्कफ़्लो बनाएँ।",
   "workspace.usermenu.account": "खाता मेनू",
   "workspace.usermenu.member_fallback": "सदस्य",
   "workspace.usermenu.upgrade": "अपग्रेड",
