@@ -8592,7 +8592,7 @@ function UpscaleGuide({
 }) {
   const th = language === "th";
   const mediaLabel = th ? "ภาพเท่านั้น" : "image only";
-  const title = th ? "ตั้งค่า Upscale Mediaforge" : "Upscale Mediaforge settings";
+  const title = th ? "การตั้งค่าเพิ่มความละเอียดภาพ" : "Upscale Mediaforge settings";
   const summary = th
     ? "เลือกขนาด 1K, 2K, หรือ 4K และระดับคุณภาพสำหรับการเพิ่มความคมชัดของภาพ"
     : "Choose 1K, 2K, or 4K output and quality for image enhancement.";

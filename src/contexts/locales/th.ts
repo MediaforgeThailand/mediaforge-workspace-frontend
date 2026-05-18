@@ -2525,7 +2525,7 @@ export const th = {
   "workspace.standalone.tool.image_gen.nav": "รูปภาพ",
   "workspace.standalone.tool.image_gen.title": "สร้างรูปภาพ",
   "workspace.standalone.tool.image_upscale.nav": "เพิ่มความละเอียด",
-  "workspace.standalone.tool.image_upscale.title": "Upscale Mediaforge",
+  "workspace.standalone.tool.image_upscale.title": "เพิ่มความละเอียดภาพ",
   "workspace.standalone.tool.url_asset.nav": "URL",
   "workspace.standalone.tool.url_asset.title": "URL to Asset",
   "workspace.standalone.tool.auto_subtitle.nav": "ซับอัตโนมัติ",
