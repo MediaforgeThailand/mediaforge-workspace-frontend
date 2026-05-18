@@ -1473,12 +1473,12 @@ function standaloneCreateActionTitle(
 ) {
   const labels: Record<StandaloneToolKey, { en: string; th: string }> = {
     image_gen: { en: "Create Image", th: "สร้างรูปภาพ" },
-    image_upscale: { en: "Upscale Mediaforge", th: "ขยายภาพ Mediaforge" },
+    image_upscale: { en: "Upscale Mediaforge", th: "Upscale Mediaforge" },
     video_gen: { en: "Create Video", th: "สร้างวิดีโอ" },
     voice_gen: { en: "Create Audio", th: "สร้างเสียง" },
     voice_translate: { en: "Translate Voice", th: "แปลเสียงวิดีโอ" },
     image_to_3d: { en: "Create 3D", th: "สร้าง 3D" },
-    auto_subtitle: { en: "Auto Subtitle", th: "Auto Subtitle" },
+    auto_subtitle: { en: "Auto Subtitle", th: "ซับอัตโนมัติ" },
     url_asset: { en: "URL to Asset", th: "URL to Asset" },
   };
   return labels[tool][language];
@@ -1506,7 +1506,7 @@ function standaloneCreateButtonLabel(
     return language === "th" ? "เริ่มแปลเสียง" : "Translate Voice";
   }
   if (tool === "image_upscale") {
-    return language === "th" ? "ขยายสื่อ" : "Upscale";
+    return language === "th" ? "เพิ่มความละเอียด" : "Upscale";
   }
   if (tool === "url_asset") {
     return "Import";
@@ -5543,7 +5543,7 @@ function VoiceTranslatePanel({
         <div className="grid grid-cols-2 gap-2.5">
           <div className="flex h-[40px] items-center gap-2 rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-2.5 text-[13px] font-semibold text-zinc-300">
             <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-400" />
-            <span className="truncate">{media ? translateOutputShortLabel(media) : "Media"}</span>
+            <span className="truncate">{media ? translateOutputShortLabel(media) : th ? "สื่อ" : "Media"}</span>
           </div>
           <button
             type="button"
@@ -5609,7 +5609,7 @@ function AutoSubtitlePanelV2({
     : BUILTIN_CAPTION_PRESETS.slice(0, 5);
 
   const copy = {
-    title: "Auto Subtitle",
+    title: th ? "ซับอัตโนมัติ" : "Auto Subtitle",
     subtitle: th
       ? "อัปโหลด MP4 เพื่อสร้างซับอัตโนมัติและเก็บโปรเจกต์ไว้แก้ต่อ"
       : "Upload an MP4, generate subtitles, and keep an editable project.",
@@ -5657,7 +5657,7 @@ function AutoSubtitlePanelV2({
     ready: th
       ? "ผลลัพธ์จะแสดงด้านขวา พร้อมโปรเจกต์ editor และ track subtitle สำหรับแก้ต่อ"
       : "Results appear on the right with an editable editor project.",
-    action: "Auto Subtitle",
+    action: th ? "ซับอัตโนมัติ" : "Auto Subtitle",
     processing: th ? "กำลังสร้างซับ" : "Generating",
     remove: th ? "ลบวิดีโอ" : "Remove video",
   };
@@ -6178,7 +6178,7 @@ function AutoSubtitlePanelV2({
         <div className="grid grid-cols-2 gap-[8px]">
           <div className="flex h-[38px] items-center gap-2 rounded-[10px] border border-white/[0.06] bg-[#17191b] px-2.5 text-[13px] font-semibold text-zinc-300">
             <Film className="h-3.5 w-3.5 text-zinc-400" />
-            <span className="truncate">{media ? "MP4" : "Media"}</span>
+            <span className="truncate">{media ? "MP4" : th ? "สื่อ" : "Media"}</span>
           </div>
           <button
             type="button"
@@ -7189,7 +7189,7 @@ function AutoSubtitlePanel({
   const th = language === "th";
   const media = form.autoSubtitleVideo;
   const copy = {
-    title: "Auto Subtitle",
+    title: th ? "ซับอัตโนมัติ" : "Auto Subtitle",
     subtitle: th
       ? "อัปโหลด MP4 เพื่อสร้างซับอัตโนมัติและโปรเจกต์แก้ไขได้"
       : "Upload an MP4, generate subtitles, and keep an editable project.",
@@ -7209,7 +7209,7 @@ function AutoSubtitlePanel({
     ready: th
       ? "ผลลัพธ์จะแสดงด้านขวา และจะสร้างโปรเจกต์ editor พร้อม track subtitle ให้แก้ต่อได้"
       : "Results appear on the right with an editable editor project.",
-    action: th ? "Auto Subtitle" : "Auto Subtitle",
+    action: th ? "ซับอัตโนมัติ" : "Auto Subtitle",
     processing: th ? "กำลังสร้างซับ" : "Generating",
     remove: th ? "ลบวิดีโอ" : "Remove video",
   };
@@ -7452,7 +7452,7 @@ function AutoSubtitlePanel({
         <div className="grid grid-cols-2 gap-2.5">
           <div className="flex h-[40px] items-center gap-2 rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-2.5 text-[13px] font-semibold text-zinc-300">
             <Film className="h-3.5 w-3.5 text-zinc-400" />
-            <span className="truncate">{media ? "MP4" : "Media"}</span>
+            <span className="truncate">{media ? "MP4" : th ? "สื่อ" : "Media"}</span>
           </div>
           <button
             type="button"
