@@ -5160,8 +5160,13 @@ function autoSubtitleTextAnimationLabel(
   animation: CaptionTextAnimation,
   language: string,
 ): string {
-  void language;
+  if (language === "th" && animation === "none") return "ไม่มี";
   return captionTextAnimationOptionFor(animation).label;
+}
+
+function captionLanguageLabel(code: string, th: boolean): string {
+  if (code === "auto" && th) return "ตรวจจับอัตโนมัติ";
+  return CAPTIONS_LANGUAGES.find((item) => item.code === code)?.label ?? code;
 }
 
 function autoSubtitleAlgorithmFromForm(
@@ -5279,7 +5284,7 @@ function VoiceTranslatePanel({
 }) {
   const th = language === "th";
   const copy = {
-    title: th ? "แปลเสียง" : "Translate",
+    title: th ? "แปลเสียงพูด" : "Translate",
     subtitle: th
       ? "แปลเสียงจาก MP4/MP3 โดยคงโทนเสียงผู้พูดให้ใกล้ต้นฉบับ"
       : "Translate MP4/MP3 speech with ElevenLabs voice-clone dubbing.",
@@ -5680,9 +5685,7 @@ function AutoSubtitlePanelV2({
     addFiles(files);
   };
 
-  const speechLabel =
-    CAPTIONS_LANGUAGES.find((item) => item.code === form.autoSubtitleLanguage)?.label ??
-    form.autoSubtitleLanguage;
+  const speechLabel = captionLanguageLabel(form.autoSubtitleLanguage, th);
   const aspectLabel =
     media?.width && media.height ? `${media.width}:${media.height}` : th ? "ต้นฉบับ" : "Source";
   const wordSplitLabel =
@@ -5951,7 +5954,7 @@ function AutoSubtitlePanelV2({
                     value={form.autoSubtitleLanguage}
                     displayValue={speechLabel}
                     icon={<Languages className="h-4 w-4" />}
-                    options={CAPTIONS_LANGUAGES.map((item) => ({ value: item.code, label: item.label }))}
+                    options={CAPTIONS_LANGUAGES.map((item) => ({ value: item.code, label: captionLanguageLabel(item.code, th) }))}
                     onChange={(value) => onChange({ autoSubtitleLanguage: value })}
                   />
                   <VoiceTranslateSelectCard
@@ -7235,9 +7238,7 @@ function AutoSubtitlePanel({
   const selectedPreset =
     BUILTIN_CAPTION_PRESETS.find((preset) => preset.id === form.autoSubtitlePresetId)?.name ??
     form.autoSubtitlePresetId;
-  const speechLabel =
-    CAPTIONS_LANGUAGES.find((item) => item.code === form.autoSubtitleLanguage)?.label ??
-    form.autoSubtitleLanguage;
+  const speechLabel = captionLanguageLabel(form.autoSubtitleLanguage, th);
   const positionLabel =
     form.autoSubtitlePosition === "top"
       ? th ? "บน" : "Top"
@@ -7332,7 +7333,7 @@ function AutoSubtitlePanel({
               value={form.autoSubtitleLanguage}
               displayValue={speechLabel}
               icon={<Languages className="h-4 w-4" />}
-              options={CAPTIONS_LANGUAGES.map((item) => ({ value: item.code, label: item.label }))}
+              options={CAPTIONS_LANGUAGES.map((item) => ({ value: item.code, label: captionLanguageLabel(item.code, th) }))}
               onChange={(value) => onChange({ autoSubtitleLanguage: value })}
             />
             <VoiceTranslateSelectCard
