@@ -32,6 +32,7 @@ interface EmbeddedCheckoutModalProps {
   billingInterval?: "monthly" | "annual";
   teamSeats?: number;
   currency?: SupportedWorkspaceCurrency;
+  affiliateCode?: string;
 }
 
 // Singleton — load once per app lifetime
@@ -157,6 +158,7 @@ const EmbeddedCheckoutModal = ({
   billingInterval = "monthly",
   teamSeats,
   currency = "thb",
+  affiliateCode = "",
 }: EmbeddedCheckoutModalProps) => {
   const { t } = useLanguage();
   const normalizedCurrency = normalizeWorkspaceCurrency(currency);
@@ -221,7 +223,7 @@ const EmbeddedCheckoutModal = ({
             ? { packageId, intent: usePaymentIntent, paymentMethod, currency: normalizedCurrency }
             : mode === "team_seats"
               ? { checkoutType: "team_seats", teamSeats, billingInterval, intent: usePaymentIntent, paymentMethod, currency: normalizedCurrency }
-              : { packageId, billingInterval, intent: usePaymentIntent, paymentMethod, currency: normalizedCurrency };
+              : { packageId, billingInterval, intent: usePaymentIntent, paymentMethod, currency: normalizedCurrency, affiliateCode };
 
         const { data, error: invokeErr } = await supabase.functions.invoke(fnName, { body });
         if (useHostedCardCheckout) {
@@ -254,7 +256,7 @@ const EmbeddedCheckoutModal = ({
     };
 
     void init();
-  }, [open, mode, packageId, billingInterval, teamSeats, paymentMethod, normalizedCurrency, isThaiCheckout, t]);
+  }, [open, mode, packageId, billingInterval, teamSeats, paymentMethod, normalizedCurrency, isThaiCheckout, affiliateCode, t]);
 
   const stripeInstance = useMemo(
     () => (publishableKey ? getStripe(publishableKey) : null),
