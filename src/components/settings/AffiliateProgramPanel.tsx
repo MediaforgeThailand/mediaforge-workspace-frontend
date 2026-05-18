@@ -154,6 +154,7 @@ export default function AffiliateProgramPanel({ className }: { className?: strin
             <p className="mt-[5px] max-w-[640px] text-[13px] leading-[20px] text-zinc-400">
               Your account is approved. You earn {commissionRate}% commission from confirmed subscription sales,
               and renewals keep using the first paid amount as the commission base.
+              Each customer is attributed to the first creator they reach — first referral link clicked or code used at checkout wins.
             </p>
           </div>
           <Badge className="h-[26px] w-fit border-emerald-400/25 bg-emerald-400/10 px-[10px] text-emerald-200">
@@ -241,6 +242,7 @@ export default function AffiliateProgramPanel({ className }: { className?: strin
           <h2 className="mt-[6px] text-[22px] font-semibold leading-[28px] text-zinc-50">Apply as a creator affiliate</h2>
           <p className="mt-[5px] max-w-[640px] text-[13px] leading-[20px] text-zinc-400">
             Submit a simple creator profile for manual review. Approved creators earn 30% commission from confirmed subscription sales.
+            Each customer is attributed to one creator only — first referral link clicked or code used at checkout wins.
           </p>
         </div>
         <Badge variant="outline" className="h-[26px] w-fit border-white/15 bg-white/[0.04] px-[10px] capitalize text-zinc-300">
