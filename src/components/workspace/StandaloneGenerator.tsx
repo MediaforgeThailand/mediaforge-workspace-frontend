@@ -936,7 +936,7 @@ function voiceTranslateEngineOptions(th: boolean): VoiceTranslateEngineOption[] 
   return [
     {
       id: "elevenlabs_dubbing_clone",
-      title: th ? "แปลเสียง" : "Translate",
+      title: th ? "แปลเสียง" : "Voice Translate",
       provider: "ElevenLabs",
       badge: th ? "Voice clone" : "Voice clone",
       description: th
@@ -1469,7 +1469,7 @@ function standaloneToolNav(tool: StandaloneToolKey, t: TranslationFn) {
 
 function standaloneCreateActionTitle(
   tool: StandaloneToolKey,
-  language: "en" | "th",
+  language: ReturnType<typeof useLanguage>["language"],
 ) {
   const labels: Record<StandaloneToolKey, { en: string; th: string }> = {
     image_gen: { en: "Create Image", th: "สร้างรูปภาพ" },
@@ -1481,7 +1481,8 @@ function standaloneCreateActionTitle(
     auto_subtitle: { en: "Auto Subtitle", th: "ซับอัตโนมัติ" },
     url_asset: { en: "URL to Asset", th: "URL to Asset" },
   };
-  return labels[tool][language];
+  const lang = language === "th" ? "th" : "en";
+  return labels[tool][lang];
 }
 
 function standaloneCreateButtonLabel(
@@ -5158,14 +5159,14 @@ function autoSubtitleTransitionLabel(
 
 function autoSubtitleTextAnimationLabel(
   animation: CaptionTextAnimation,
-  language: string,
+  t: ReturnType<typeof useLanguage>["t"],
 ): string {
-  if (language === "th" && animation === "none") return "ไม่มี";
+  if (animation === "none") return t("workspace.standalone.panel.text_animation_none");
   return captionTextAnimationOptionFor(animation).label;
 }
 
-function captionLanguageLabel(code: string, th: boolean): string {
-  if (code === "auto" && th) return "ตรวจจับอัตโนมัติ";
+function captionLanguageLabel(code: string, t: ReturnType<typeof useLanguage>["t"]): string {
+  if (code === "auto") return t("workspace.standalone.panel.language_auto_detect");
   return CAPTIONS_LANGUAGES.find((item) => item.code === code)?.label ?? code;
 }
 
@@ -5283,8 +5284,9 @@ function VoiceTranslatePanel({
   onToolChange: (tool: StandaloneToolKey) => void;
 }) {
   const th = language === "th";
+  const { t } = useLanguage();
   const copy = {
-    title: th ? "แปลเสียงพูด" : "Translate",
+    title: t("workspace.standalone.panel.voice_translate.title"),
     subtitle: th
       ? "แปลเสียงจาก MP4/MP3 โดยคงโทนเสียงผู้พูดให้ใกล้ต้นฉบับ"
       : "Translate MP4/MP3 speech with ElevenLabs voice-clone dubbing.",
@@ -5303,7 +5305,7 @@ function VoiceTranslatePanel({
     consent: th
       ? "ฉันมีสิทธิ์ใช้ไฟล์นี้และได้รับอนุญาตให้แปล/โคลนเสียงของผู้พูด"
       : "I have permission to translate this file's speech.",
-    action: th ? "เริ่มแปลเสียง" : "Translate",
+    action: t("workspace.standalone.panel.voice_translate.action"),
     processing: th ? "กำลังแปล" : "Translating",
     ready: th ? "ผลลัพธ์จะแสดงทางขวาเมื่อพร้อม" : "Results appear on the right when ready.",
     remove: th ? "ลบไฟล์" : "Remove file",
@@ -5484,10 +5486,10 @@ function VoiceTranslatePanel({
               </span>
               <span className="min-w-0 text-left">
                 <span className="block text-[13px] font-medium leading-[14px] text-[var(--text-tertiary)]">
-                  {th ? "รูปแบบไฟล์" : "Format"}
+                  {t("workspace.standalone.panel.format")}
                 </span>
                 <span className="block truncate text-[15px] font-bold leading-[16px] text-white">
-                  {media ? translateOutputFormatLabel(media) : th ? "อัตโนมัติ" : "Auto"}
+                  {media ? translateOutputFormatLabel(media) : t("workspace.standalone.panel.format_auto")}
                 </span>
               </span>
             </div>
@@ -5548,7 +5550,7 @@ function VoiceTranslatePanel({
         <div className="grid grid-cols-2 gap-2.5">
           <div className="flex h-[40px] items-center gap-2 rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-2.5 text-[13px] font-semibold text-zinc-300">
             <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-400" />
-            <span className="truncate">{media ? translateOutputShortLabel(media) : th ? "สื่อ" : "Media"}</span>
+            <span className="truncate">{media ? translateOutputShortLabel(media) : t("workspace.standalone.panel.media")}</span>
           </div>
           <button
             type="button"
@@ -5604,6 +5606,7 @@ function AutoSubtitlePanelV2({
     "style" | "transition" | "animation"
   >("style");
   const th = language === "th";
+  const { t } = useLanguage();
   const media = form.autoSubtitleVideo;
   const selectedPreset =
     BUILTIN_CAPTION_PRESETS.find((preset) => preset.id === form.autoSubtitlePresetId) ??
@@ -5614,7 +5617,7 @@ function AutoSubtitlePanelV2({
     : BUILTIN_CAPTION_PRESETS.slice(0, 5);
 
   const copy = {
-    title: th ? "ซับอัตโนมัติ" : "Auto Subtitle",
+    title: t("workspace.standalone.panel.auto_subtitle.title"),
     subtitle: th
       ? "อัปโหลด MP4 เพื่อสร้างซับอัตโนมัติและเก็บโปรเจกต์ไว้แก้ต่อ"
       : "Upload an MP4, generate subtitles, and keep an editable project.",
@@ -5662,7 +5665,7 @@ function AutoSubtitlePanelV2({
     ready: th
       ? "ผลลัพธ์จะแสดงด้านขวา พร้อมโปรเจกต์ editor และ track subtitle สำหรับแก้ต่อ"
       : "Results appear on the right with an editable editor project.",
-    action: th ? "ซับอัตโนมัติ" : "Auto Subtitle",
+    action: t("workspace.standalone.panel.auto_subtitle.action"),
     processing: th ? "กำลังสร้างซับ" : "Generating",
     remove: th ? "ลบวิดีโอ" : "Remove video",
   };
@@ -5685,7 +5688,7 @@ function AutoSubtitlePanelV2({
     addFiles(files);
   };
 
-  const speechLabel = captionLanguageLabel(form.autoSubtitleLanguage, th);
+  const speechLabel = captionLanguageLabel(form.autoSubtitleLanguage, t);
   const aspectLabel =
     media?.width && media.height ? `${media.width}:${media.height}` : th ? "ต้นฉบับ" : "Source";
   const wordSplitLabel =
@@ -5698,7 +5701,7 @@ function AutoSubtitlePanelV2({
   );
   const textAnimationLabel = autoSubtitleTextAnimationLabel(
     form.autoSubtitleTextAnimation,
-    language,
+    t,
   );
   const transitionOptions = CAPTION_TRANSITION_OPTIONS.map((option) => ({
     value: option.id,
@@ -5706,7 +5709,7 @@ function AutoSubtitlePanelV2({
   }));
   const textAnimationOptions = CAPTION_TEXT_ANIMATION_OPTIONS.map((option) => ({
     value: option.id,
-    label: autoSubtitleTextAnimationLabel(option.id, language),
+    label: autoSubtitleTextAnimationLabel(option.id, t),
   }));
   const previewSamplePhrases = useMemo(
     () =>
@@ -5928,7 +5931,7 @@ function AutoSubtitlePanelV2({
                   {CAPTION_TEXT_ANIMATION_OPTIONS.map((option) => (
                     <AutoSubtitleTextAnimationCard
                       key={option.id}
-                      label={autoSubtitleTextAnimationLabel(option.id, language)}
+                      label={autoSubtitleTextAnimationLabel(option.id, t)}
                       description={option.description}
                       selected={form.autoSubtitleTextAnimation === option.id}
                       settings={{
@@ -5954,7 +5957,7 @@ function AutoSubtitlePanelV2({
                     value={form.autoSubtitleLanguage}
                     displayValue={speechLabel}
                     icon={<Languages className="h-4 w-4" />}
-                    options={CAPTIONS_LANGUAGES.map((item) => ({ value: item.code, label: captionLanguageLabel(item.code, th) }))}
+                    options={CAPTIONS_LANGUAGES.map((item) => ({ value: item.code, label: captionLanguageLabel(item.code, t) }))}
                     onChange={(value) => onChange({ autoSubtitleLanguage: value })}
                   />
                   <VoiceTranslateSelectCard
@@ -6181,7 +6184,7 @@ function AutoSubtitlePanelV2({
         <div className="grid grid-cols-2 gap-[8px]">
           <div className="flex h-[38px] items-center gap-2 rounded-[10px] border border-white/[0.06] bg-[#17191b] px-2.5 text-[13px] font-semibold text-zinc-300">
             <Film className="h-3.5 w-3.5 text-zinc-400" />
-            <span className="truncate">{media ? "MP4" : th ? "สื่อ" : "Media"}</span>
+            <span className="truncate">{media ? "MP4" : t("workspace.standalone.panel.media")}</span>
           </div>
           <button
             type="button"
@@ -7190,9 +7193,10 @@ function AutoSubtitlePanel({
   onToolChange: (tool: StandaloneToolKey) => void;
 }) {
   const th = language === "th";
+  const { t } = useLanguage();
   const media = form.autoSubtitleVideo;
   const copy = {
-    title: th ? "ซับอัตโนมัติ" : "Auto Subtitle",
+    title: t("workspace.standalone.panel.auto_subtitle.title"),
     subtitle: th
       ? "อัปโหลด MP4 เพื่อสร้างซับอัตโนมัติและโปรเจกต์แก้ไขได้"
       : "Upload an MP4, generate subtitles, and keep an editable project.",
@@ -7212,7 +7216,7 @@ function AutoSubtitlePanel({
     ready: th
       ? "ผลลัพธ์จะแสดงด้านขวา และจะสร้างโปรเจกต์ editor พร้อม track subtitle ให้แก้ต่อได้"
       : "Results appear on the right with an editable editor project.",
-    action: th ? "ซับอัตโนมัติ" : "Auto Subtitle",
+    action: t("workspace.standalone.panel.auto_subtitle.action"),
     processing: th ? "กำลังสร้างซับ" : "Generating",
     remove: th ? "ลบวิดีโอ" : "Remove video",
   };
@@ -7238,7 +7242,7 @@ function AutoSubtitlePanel({
   const selectedPreset =
     BUILTIN_CAPTION_PRESETS.find((preset) => preset.id === form.autoSubtitlePresetId)?.name ??
     form.autoSubtitlePresetId;
-  const speechLabel = captionLanguageLabel(form.autoSubtitleLanguage, th);
+  const speechLabel = captionLanguageLabel(form.autoSubtitleLanguage, t);
   const positionLabel =
     form.autoSubtitlePosition === "top"
       ? th ? "บน" : "Top"
@@ -7333,7 +7337,7 @@ function AutoSubtitlePanel({
               value={form.autoSubtitleLanguage}
               displayValue={speechLabel}
               icon={<Languages className="h-4 w-4" />}
-              options={CAPTIONS_LANGUAGES.map((item) => ({ value: item.code, label: captionLanguageLabel(item.code, th) }))}
+              options={CAPTIONS_LANGUAGES.map((item) => ({ value: item.code, label: captionLanguageLabel(item.code, t) }))}
               onChange={(value) => onChange({ autoSubtitleLanguage: value })}
             />
             <VoiceTranslateSelectCard
@@ -7453,7 +7457,7 @@ function AutoSubtitlePanel({
         <div className="grid grid-cols-2 gap-2.5">
           <div className="flex h-[40px] items-center gap-2 rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-2.5 text-[13px] font-semibold text-zinc-300">
             <Film className="h-3.5 w-3.5 text-zinc-400" />
-            <span className="truncate">{media ? "MP4" : th ? "สื่อ" : "Media"}</span>
+            <span className="truncate">{media ? "MP4" : t("workspace.standalone.panel.media")}</span>
           </div>
           <button
             type="button"
@@ -8588,11 +8592,12 @@ function UpscaleGuide({
   language,
 }: {
   form: StandaloneFormState;
-  language: "en" | "th";
+  language: ReturnType<typeof useLanguage>["language"];
 }) {
   const th = language === "th";
+  const { t } = useLanguage();
   const mediaLabel = th ? "ภาพเท่านั้น" : "image only";
-  const title = th ? "การตั้งค่าเพิ่มความละเอียดภาพ" : "Upscale Mediaforge settings";
+  const title = t("workspace.standalone.panel.upscale.settings_title");
   const summary = th
     ? "เลือกขนาด 1K, 2K, หรือ 4K และระดับคุณภาพสำหรับการเพิ่มความคมชัดของภาพ"
     : "Choose 1K, 2K, or 4K output and quality for image enhancement.";
