@@ -111,6 +111,7 @@ const Settings = lazyWithRetry(() => import("./pages/dashboard/Settings"));
 const Transactions = lazyWithRetry(() => import("./pages/dashboard/Transactions"));
 const Pricing = lazyWithRetry(() => import("./pages/dashboard/Pricing"));
 const TeamRegister = lazyWithRetry(() => import("./pages/dashboard/TeamRegister"));
+const AffiliatePortal = lazyWithRetry(() => import("./pages/dashboard/AffiliatePortal"));
 
 // ── Org/workspace surfaces ────────────────────────────────────
 // TeacherCenter — Variant A "Command Center" for teachers + org_admins.
@@ -216,6 +217,17 @@ const App = () => (
                       <ProtectedRoute>
                         <WorkspacePageShell hideSidebarBelowLg>
                           <TeamRegister />
+                        </WorkspacePageShell>
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/app/affiliate"
+                    element={
+                      <ProtectedRoute>
+                        <WorkspacePageShell hideSidebarBelowLg>
+                          <AffiliatePortal />
                         </WorkspacePageShell>
                       </ProtectedRoute>
                     }

@@ -42,6 +42,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import SettingsLayout, { type SettingsSectionKey } from "@/components/settings/SettingsLayout";
 import PlanBilling from "@/components/settings/PlanBilling";
+import AffiliateProgramPanel from "@/components/settings/AffiliateProgramPanel";
 import { DeleteAccountDialog } from "@/components/settings/DeleteAccountDialog";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
 import { updateSchoolProfile } from "@/lib/orgAdminApi";
@@ -93,6 +94,8 @@ const Settings = () => {
       ? "organization.my-team"
       : tabParam === "preferences"
       ? "account.profile"
+      : tabParam === "affiliate"
+      ? "account.affiliate-program"
       : "account.profile";
 
   const [activeKey, setActiveKey] = useState<SettingsSectionKey>(initialKey);
@@ -455,6 +458,8 @@ const Settings = () => {
         return renderCompactPlaceholder(Bookmark, t("workspace.settings.stock_collections"), t("workspace.settings.stock_collections_desc"));
       case "account.following":
         return renderCompactPlaceholder(UserPlus, t("workspace.settings.following"), t("workspace.settings.following_desc"));
+      case "account.affiliate-program":
+        return <AffiliateProgramPanel />;
       case "organization.my-team":
         return renderTeamSettings();
       case "organization.people":
