@@ -25,6 +25,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { getSignedUrl } from "@/hooks/useSignedUrl";
 
 type AssetSource = "generated" | "uploaded" | "element";
 type AssetType = "image" | "video" | "audio" | "model3d";
@@ -51,14 +54,81 @@ interface Props {
   onClose: () => void;
 }
 
-function genFieldType(
-  gen: { type?: string; url?: string; model_url?: string },
-): AssetType | null {
-  if (gen.model_url) return "model3d";
-  const t = (gen.type ?? "").toLowerCase();
+function firstString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (trimmed) return trimmed;
+  }
+  return undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function cleanAssetName(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const cleaned = value
+    .split(/[?#]/)[0]
+    .split(/[\\/]/)
+    .filter(Boolean)
+    .pop()
+    ?.replace(/^[0-9]{10,}[-_]/, "")
+    .trim();
+  return cleaned || undefined;
+}
+
+function dateMs(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+function genFieldType(gen: Record<string, unknown>): AssetType | null {
+  const modelUrl = firstString(
+    gen.model_url,
+    gen.modelUrl,
+    gen.glb_url,
+    gen.gltf_url,
+    gen.mesh_url,
+  );
+  if (modelUrl) return "model3d";
+  const t = firstString(
+    gen.type,
+    gen.kind,
+    gen.mediaType,
+    gen.mimeType,
+    gen.contentType,
+  )?.toLowerCase() ?? "";
   if (t === "image" || t === "video" || t === "audio") return t;
-  if (t === "model3d" || t === "model_3d") return "model3d";
-  const url = gen.url ?? "";
+  if (t.includes("video")) return "video";
+  if (t.includes("audio")) return "audio";
+  if (t.includes("image")) return "image";
+  if (t.includes("3d") || t.includes("model")) return "model3d";
+  const url = firstString(
+    gen.url,
+    gen.output_url,
+    gen.outputUrl,
+    gen.asset_url,
+    gen.media_url,
+    gen.mediaUrl,
+    gen.image_url,
+    gen.imageUrl,
+    gen.video_url,
+    gen.videoUrl,
+    gen.audio_url,
+    gen.audioUrl,
+    gen.file_url,
+    gen.fileUrl,
+    gen.download_url,
+    gen.downloadUrl,
+  ) ?? "";
   if (/\.(glb|gltf|usdz|obj|fbx)(\?|#|$)/i.test(url)) return "model3d";
   if (/\.(png|jpe?g|webp|gif|avif)(\?|#|$)/i.test(url)) return "image";
   if (/\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(url)) return "video";
@@ -66,8 +136,75 @@ function genFieldType(
   return null;
 }
 
+function collectStringArray(value: unknown): string[] {
+  if (typeof value === "string" && value.trim()) return [value.trim()];
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (typeof item === "string" && item.trim()) return [item.trim()];
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    return firstString(
+      record.url,
+      record.output_url,
+      record.outputUrl,
+      record.asset_url,
+      record.media_url,
+      record.mediaUrl,
+      record.image_url,
+      record.imageUrl,
+      record.video_url,
+      record.videoUrl,
+      record.audio_url,
+      record.audioUrl,
+      record.file_url,
+      record.fileUrl,
+      record.download_url,
+      record.downloadUrl,
+    ) ?? [];
+  });
+}
+
+function outputUrlsFromRecord(record: Record<string, unknown>): string[] {
+  const urls = [
+    ...collectStringArray(record.url),
+    ...collectStringArray(record.output_url),
+    ...collectStringArray(record.outputUrl),
+    ...collectStringArray(record.asset_url),
+    ...collectStringArray(record.media_url),
+    ...collectStringArray(record.mediaUrl),
+    ...collectStringArray(record.image_url),
+    ...collectStringArray(record.imageUrl),
+    ...collectStringArray(record.video_url),
+    ...collectStringArray(record.videoUrl),
+    ...collectStringArray(record.audio_url),
+    ...collectStringArray(record.audioUrl),
+    ...collectStringArray(record.file_url),
+    ...collectStringArray(record.fileUrl),
+    ...collectStringArray(record.download_url),
+    ...collectStringArray(record.downloadUrl),
+    ...collectStringArray(record.urls),
+    ...collectStringArray(record.images),
+    ...collectStringArray(record.videos),
+    ...collectStringArray(record.audios),
+    ...collectStringArray(record.files),
+    ...collectStringArray(record.output),
+  ];
+  return [...new Set(urls.filter(Boolean))];
+}
+
+async function resolveAssetUrl(rawUrl: string): Promise<string> {
+  const normalized = rawUrl.trim();
+  if (!normalized) return rawUrl;
+  if (/^(data:|blob:)/i.test(normalized)) return normalized;
+  if (/^https?:\/\//i.test(normalized)) return getSignedUrl(normalized);
+  const path = normalized.replace(/^\/+/, "");
+  if (/^(ai-media|user_assets)\//i.test(path)) return getSignedUrl(`/${path}`);
+  return getSignedUrl(path);
+}
+
 const AllAssetsDialog = ({ open, onClose }: Props) => {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const allGraphs = useWorkspaceStore((s) => s.graphs);
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const canvases = useWorkspaceStore((s) => s.canvases);
@@ -80,6 +217,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [draggingExternal, setDraggingExternal] = useState(false);
+  const [remoteAssets, setRemoteAssets] = useState<DialogAsset[]>([]);
   const searchRef = useRef<HTMLInputElement | null>(null);
 
   /* Project selector state. Each Space (`workspace`) belongs to a
@@ -123,7 +261,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
   const activeProjectName =
     projectOptions.find((p) => p.id === effectiveProjectId)?.name ?? "All projects";
 
-  const assets = useMemo<DialogAsset[]>(() => {
+  const graphAssets = useMemo<DialogAsset[]>(() => {
     const out: DialogAsset[] = [];
     const seenUrls = new Set<string>();
 
@@ -183,9 +321,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
 
         for (let i = 0; i < generations.length; i += 1) {
           const g = generations[i] ?? {};
-          const fieldType = genFieldType(
-            g as { type?: string; url?: string; model_url?: string },
-          );
+          const fieldType = genFieldType(g);
           if (!fieldType) continue;
 
           const assetUrl =
@@ -234,6 +370,362 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
       return a.label.localeCompare(b.label);
     });
   }, [allGraphs, canvasMetaById, workspaceProjectById]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!open || !user) {
+      setRemoteAssets([]);
+      return;
+    }
+
+    const loadProjectAssets = async () => {
+      const next: DialogAsset[] = [];
+      const seen = new Set<string>();
+      const addAsset = (asset: DialogAsset) => {
+        const key = `${asset.fieldType}:${asset.url.split("?")[0]}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        next.push(asset);
+      };
+
+      const jobSelect =
+        "id, status, node_type, provider, model, request, result, created_at, project_id, workspace_id, canvas_id, node_id";
+      let jobsQuery = supabase
+        .from("workspace_generation_jobs")
+        .select(jobSelect)
+        .eq("status", "completed")
+        .order("created_at", { ascending: false })
+        .limit(500);
+      jobsQuery = effectiveProjectId
+        ? jobsQuery.eq("project_id", effectiveProjectId)
+        : jobsQuery.eq("user_id", user.id);
+
+      const { data: jobs, error: jobsError } = await jobsQuery;
+      if (jobsError) {
+        console.warn("[AllAssetsDialog] workspace_generation_jobs load failed:", jobsError.message);
+      }
+
+      for (const row of jobs ?? []) {
+        const result = asRecord(row.result);
+        const outputs = asRecord(result.outputs);
+        const providerMeta = asRecord(result.provider_meta);
+        const modelUrl = firstString(
+          result.model_url,
+          result.modelUrl,
+          providerMeta.model_url,
+          outputs.model_url,
+          outputs.glb_url,
+          outputs.gltf_url,
+          outputs.mesh_url,
+          outputs.model,
+        );
+        const mediaUrls = modelUrl ? [modelUrl] : outputUrlsFromRecord(result).concat(outputUrlsFromRecord(outputs));
+        const modelLabel =
+          firstString(row.model, row.node_type, row.provider) ?? "Generation";
+        const request = asRecord(row.request);
+        const params = asRecord(request.params);
+        const prompt = firstString(params.prompt, params.system_prompt, result.prompt);
+        const createdAt = dateMs(row.created_at) ?? Date.now();
+        const rowProjectId = typeof row.project_id === "string" ? row.project_id : null;
+        const rowWorkspaceId = typeof row.workspace_id === "string" ? row.workspace_id : null;
+        const rowCanvasId =
+          typeof row.canvas_id === "string"
+            ? row.canvas_id
+            : `standalone:${rowProjectId ?? effectiveProjectId ?? user.id}`;
+        const rowNodeId = typeof row.node_id === "string" ? row.node_id : String(row.id);
+
+        for (let index = 0; index < mediaUrls.length; index += 1) {
+          const rawUrl = mediaUrls[index];
+          if (!rawUrl) continue;
+          const fieldType = modelUrl
+            ? "model3d"
+            : genFieldType({
+                ...result,
+                ...outputs,
+                url: rawUrl,
+                type: firstString(result.type, row.node_type, row.provider),
+              });
+          if (!fieldType) continue;
+          const url = await resolveAssetUrl(rawUrl);
+          const posterUrl =
+            fieldType === "model3d"
+              ? firstString(
+                  providerMeta.rendered_image,
+                  result.rendered_image,
+                  result.preview_image,
+                  outputs.rendered_image,
+                  outputs.preview_image,
+                  outputs.thumbnail_url,
+                  outputs.poster,
+                  outputs.output_image,
+                )
+              : firstString(
+                  result.thumbnail_url,
+                  result.thumbnailUrl,
+                  result.poster,
+                  outputs.thumbnail_url,
+                  outputs.poster,
+                );
+          addAsset({
+            id: `job_${row.id}_${index}`,
+            source: "generated",
+            fieldType,
+            url,
+            posterUrl: posterUrl ? await resolveAssetUrl(posterUrl) : undefined,
+            label: prompt || modelLabel,
+            fileName: cleanAssetName(rawUrl) ?? modelLabel,
+            fromNodeId: rowNodeId,
+            fromNodeLabel: modelLabel,
+            projectId: rowProjectId ?? effectiveProjectId,
+            workspaceId: rowWorkspaceId,
+            canvasId: rowCanvasId,
+            createdAt,
+          });
+        }
+      }
+
+      const { data: uploads, error: uploadsError } = await (supabase as any)
+        .from("user_assets")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (uploadsError) {
+        console.warn("[AllAssetsDialog] user_assets load failed:", uploadsError.message);
+      }
+
+      for (const row of (uploads ?? []) as Array<Record<string, unknown>>) {
+        const metadata = asRecord(row.metadata);
+        const projectId = firstString(row.project_id, metadata.project_id) ?? effectiveProjectId;
+        if (effectiveProjectId && projectId && projectId !== effectiveProjectId) continue;
+        const rawUrl = firstString(
+          row.file_url,
+          row.url,
+          row.public_url,
+          row.thumbnail_url,
+          metadata.file_url,
+          metadata.url,
+          metadata.storage_path,
+        );
+        if (!rawUrl) continue;
+        const url = await resolveAssetUrl(rawUrl);
+        const fieldType = genFieldType({
+          url,
+          type: firstString(row.file_type, row.mime_type, row.type, metadata.mime_type, metadata.content_type),
+        });
+        if (!fieldType) continue;
+        addAsset({
+          id: `upload_${String(row.id ?? rawUrl)}`,
+          source: "uploaded",
+          fieldType,
+          url,
+          posterUrl:
+            fieldType === "video" || fieldType === "model3d"
+              ? await resolveAssetUrl(
+                  firstString(row.thumbnail_url, metadata.thumbnail_url, metadata.poster_url) ?? rawUrl,
+                )
+              : undefined,
+          label:
+            cleanAssetName(
+              firstString(row.name, row.file_name, row.filename, metadata.name, metadata.file_name),
+            ) ??
+            cleanAssetName(rawUrl) ??
+            "asset",
+          fileName:
+            cleanAssetName(
+              firstString(row.file_name, row.filename, metadata.file_name, metadata.filename),
+            ) ?? cleanAssetName(rawUrl),
+          fromNodeId: String(row.id ?? rawUrl),
+          fromNodeLabel: "Upload",
+          projectId,
+          workspaceId: null,
+          canvasId: `upload:${projectId ?? user.id}`,
+          createdAt: dateMs(row.created_at) ?? Date.now(),
+        });
+      }
+
+      const { data: editorProjects, error: editorProjectsError } = await (supabase as any)
+        .from("editor_projects")
+        .select("id, name, thumbnail, created_at, updated_at, data")
+        .order("updated_at", { ascending: false })
+        .limit(100);
+      if (editorProjectsError) {
+        console.warn(
+          "[AllAssetsDialog] editor_projects load failed:",
+          editorProjectsError.message,
+        );
+      }
+
+      for (const row of (editorProjects ?? []) as Array<Record<string, unknown>>) {
+        const projectData = asRecord(row.data);
+        const mediaLibrary = asRecord(projectData.mediaLibrary);
+        const mediaItems = Array.isArray(mediaLibrary.items)
+          ? (mediaLibrary.items as Array<Record<string, unknown>>)
+          : [];
+        const editorProjectId = firstString(row.id, projectData.id) ?? "editor-project";
+        const editorProjectName =
+          firstString(row.name, projectData.name) ?? "Editing project";
+        const rowCreatedAt =
+          dateMs(row.updated_at) ?? dateMs(row.created_at) ?? dateMs(projectData.modifiedAt);
+
+        for (let index = 0; index < mediaItems.length; index += 1) {
+          const item = asRecord(mediaItems[index]);
+          const metadata = asRecord(item.metadata);
+          const filmstrip = Array.isArray(item.filmstripThumbnails)
+            ? (item.filmstripThumbnails as Array<Record<string, unknown>>)
+            : [];
+          const firstFilmstrip = filmstrip[0] ? asRecord(filmstrip[0]) : {};
+          const rawUrl = firstString(
+            item.originalUrl,
+            item.url,
+            item.publicUrl,
+            item.src,
+            item.file_url,
+            item.fileUrl,
+            item.storage_path,
+            item.storagePath,
+            item.thumbnailUrl,
+            firstFilmstrip.url,
+          );
+          if (!rawUrl || /^blob:/i.test(rawUrl)) continue;
+          const fieldType =
+            genFieldType({
+              url: rawUrl,
+              type: firstString(
+                item.type,
+                metadata.mimeType,
+                metadata.mime_type,
+                metadata.contentType,
+                metadata.content_type,
+              ),
+            }) ??
+            (firstString(item.type) === "video"
+              ? "video"
+              : firstString(item.type) === "audio"
+                ? "audio"
+                : firstString(item.type) === "image"
+                  ? "image"
+                  : null);
+          if (!fieldType) continue;
+
+          const posterRaw = firstString(
+            item.thumbnailUrl,
+            firstFilmstrip.url,
+            row.thumbnail,
+          );
+          const itemId = firstString(item.id) ?? `${editorProjectId}_${index}`;
+          const displayName =
+            cleanAssetName(firstString(item.name, item.fileName, item.filename)) ??
+            cleanAssetName(rawUrl) ??
+            `${editorProjectName} asset`;
+          addAsset({
+            id: `editor_${editorProjectId}_${itemId}`,
+            source: "uploaded",
+            fieldType,
+            url: await resolveAssetUrl(rawUrl),
+            posterUrl:
+              posterRaw && posterRaw !== rawUrl
+                ? await resolveAssetUrl(posterRaw)
+                : undefined,
+            label: displayName,
+            fileName: displayName,
+            fromNodeId: itemId,
+            fromNodeLabel: editorProjectName,
+            projectId: effectiveProjectId,
+            workspaceId: null,
+            canvasId: `editor:${editorProjectId}`,
+            createdAt:
+              dateMs(item.createdAt) ??
+              dateMs(item.updatedAt) ??
+              dateMs(item.modifiedAt) ??
+              rowCreatedAt ??
+              Date.now(),
+          });
+        }
+      }
+
+      const collectStorageBucket = async (
+        bucket: "ai-media" | "user_assets",
+        prefix: string,
+        depth = 0,
+      ): Promise<void> => {
+        const { data, error } = await supabase.storage.from(bucket).list(prefix, {
+          limit: 200,
+          sortBy: { column: "created_at", order: "desc" },
+        });
+        if (error) {
+          console.warn(`[AllAssetsDialog] ${bucket} list failed:`, error.message);
+          return;
+        }
+
+        for (const obj of data ?? []) {
+          const path = `${prefix}/${obj.name}`;
+          if (!obj.id) {
+            if (depth < 3) await collectStorageBucket(bucket, path, depth + 1);
+            continue;
+          }
+          const fieldType = genFieldType({
+            url: path,
+            type: typeof obj.metadata?.mimetype === "string" ? obj.metadata.mimetype : undefined,
+          });
+          if (!fieldType) continue;
+          const displayName = cleanAssetName(obj.name) ?? obj.name;
+          addAsset({
+            id: `storage_${bucket}_${path}`,
+            source: "uploaded",
+            fieldType,
+            url: await resolveAssetUrl(`${bucket}/${path}`),
+            label: displayName,
+            fileName: displayName,
+            fromNodeId: path,
+            fromNodeLabel: bucket === "user_assets" ? "Editor upload" : "Upload",
+            projectId: effectiveProjectId,
+            workspaceId: null,
+            canvasId: `storage:${bucket}`,
+            createdAt: dateMs(obj.created_at) ?? Date.now(),
+          });
+        }
+      };
+
+      await Promise.all([
+        collectStorageBucket("ai-media", user.id),
+        collectStorageBucket("user_assets", user.id),
+      ]);
+
+      if (!cancelled) {
+        setRemoteAssets(
+          next.sort((a, b) => {
+            if (a.createdAt && b.createdAt) return b.createdAt - a.createdAt;
+            if (a.createdAt) return -1;
+            if (b.createdAt) return 1;
+            return a.label.localeCompare(b.label);
+          }),
+        );
+      }
+    };
+
+    void loadProjectAssets();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveProjectId, open, user]);
+
+  const assets = useMemo<DialogAsset[]>(() => {
+    const out: DialogAsset[] = [];
+    const seen = new Set<string>();
+    for (const asset of [...remoteAssets, ...graphAssets]) {
+      const key = `${asset.fieldType}:${asset.url.split("?")[0]}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(asset);
+    }
+    return out.sort((a, b) => {
+      if (a.createdAt && b.createdAt) return b.createdAt - a.createdAt;
+      if (a.createdAt) return -1;
+      if (b.createdAt) return 1;
+      return a.label.localeCompare(b.label);
+    });
+  }, [graphAssets, remoteAssets]);
 
   const projectAssets = useMemo(() => {
     if (!effectiveProjectId) return assets;
