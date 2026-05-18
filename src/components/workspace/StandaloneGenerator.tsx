@@ -936,7 +936,7 @@ function voiceTranslateEngineOptions(th: boolean): VoiceTranslateEngineOption[] 
   return [
     {
       id: "elevenlabs_dubbing_clone",
-      title: "Translate",
+      title: th ? "แปลเสียง" : "Voice Translate",
       provider: "ElevenLabs",
       badge: th ? "Voice clone" : "Voice clone",
       description: th
@@ -1469,19 +1469,20 @@ function standaloneToolNav(tool: StandaloneToolKey, t: TranslationFn) {
 
 function standaloneCreateActionTitle(
   tool: StandaloneToolKey,
-  language: "en" | "th",
+  language: ReturnType<typeof useLanguage>["language"],
 ) {
   const labels: Record<StandaloneToolKey, { en: string; th: string }> = {
     image_gen: { en: "Create Image", th: "สร้างรูปภาพ" },
-    image_upscale: { en: "Upscale Mediaforge", th: "ขยายภาพ Mediaforge" },
+    image_upscale: { en: "Upscale Mediaforge", th: "Upscale Mediaforge" },
     video_gen: { en: "Create Video", th: "สร้างวิดีโอ" },
     voice_gen: { en: "Create Audio", th: "สร้างเสียง" },
     voice_translate: { en: "Translate Voice", th: "แปลเสียงวิดีโอ" },
     image_to_3d: { en: "Create 3D", th: "สร้าง 3D" },
-    auto_subtitle: { en: "Auto Subtitle", th: "Auto Subtitle" },
+    auto_subtitle: { en: "Auto Subtitle", th: "ซับอัตโนมัติ" },
     url_asset: { en: "URL to Asset", th: "URL to Asset" },
   };
-  return labels[tool][language];
+  const lang = language === "th" ? "th" : "en";
+  return labels[tool][lang];
 }
 
 function standaloneCreateButtonLabel(
@@ -1506,7 +1507,7 @@ function standaloneCreateButtonLabel(
     return language === "th" ? "เริ่มแปลเสียง" : "Translate Voice";
   }
   if (tool === "image_upscale") {
-    return language === "th" ? "ขยายสื่อ" : "Upscale";
+    return language === "th" ? "เพิ่มความละเอียด" : "Upscale";
   }
   if (tool === "url_asset") {
     return "Import";
@@ -4373,18 +4374,18 @@ export default function StandaloneGenerator({
               referenceBadge={
                 activeTool === "image_upscale"
                   ? undefined
-                  : language === "th" ? "ไม่บังคับ" : "Optional"
+                  : t("workspace.standalone.optional")
               }
               referenceHint={
                 activeTool === "video_gen"
-                  ? "JPEG/PNG/WEBP/MP4, 20 MB max"
+                  ? t("workspace.standalone.hint.video_visual_reference")
                   : activeTool === "image_upscale"
-                    ? "JPEG/PNG/WEBP, 20 MB max"
+                    ? t("workspace.standalone.hint.model_image_reference")
                   : activeTool === "image_to_3d"
                     ? panelMaxReferences > 1
-                      ? "Front first, then left/back/right. JPEG/PNG/WEBP, 20 MB max"
-                      : "JPEG/PNG/WEBP, 20 MB max"
-                    : "JPEG/PNG/WEBP/GIF, 20 MB max"
+                      ? t("workspace.standalone.hint.model_multiview_reference")
+                      : t("workspace.standalone.hint.model_image_reference")
+                    : t("workspace.standalone.hint.image_reference")
               }
               referenceAccept={
                 activeTool === "image_upscale"
@@ -5158,10 +5159,15 @@ function autoSubtitleTransitionLabel(
 
 function autoSubtitleTextAnimationLabel(
   animation: CaptionTextAnimation,
-  language: string,
+  t: ReturnType<typeof useLanguage>["t"],
 ): string {
-  void language;
+  if (animation === "none") return t("workspace.standalone.panel.text_animation_none");
   return captionTextAnimationOptionFor(animation).label;
+}
+
+function captionLanguageLabel(code: string, t: ReturnType<typeof useLanguage>["t"]): string {
+  if (code === "auto") return t("workspace.standalone.panel.language_auto_detect");
+  return CAPTIONS_LANGUAGES.find((item) => item.code === code)?.label ?? code;
 }
 
 function autoSubtitleAlgorithmFromForm(
@@ -5277,31 +5283,23 @@ function VoiceTranslatePanel({
   onCreate: () => void;
   onToolChange: (tool: StandaloneToolKey) => void;
 }) {
-  const th = language === "th";
+  const { t } = useLanguage();
   const copy = {
-    title: "Translate",
-    subtitle: th
-      ? "แปลเสียงจาก MP4/MP3 โดยคงโทนเสียงผู้พูดให้ใกล้ต้นฉบับ"
-      : "Translate MP4/MP3 speech with ElevenLabs voice-clone dubbing.",
-    uploadTitle: th ? "ไฟล์ต้นฉบับ" : "Source file",
-    uploadHint: th ? "ลาก MP4/MP3 มาวาง หรือคลิกเพื่ออัปโหลด" : "Drop an MP4/MP3 here or click to upload",
-    uploadLimit: th
-      ? `รองรับ MP4/MP3 สูงสุด ${TRANSLATE_VIDEO_UPLOAD_MAX_LABEL}`
-      : `MP4/MP3, up to ${TRANSLATE_VIDEO_UPLOAD_MAX_LABEL}`,
-    source: th ? "ต้นฉบับ" : "Source",
-    sourceAuto: th ? "ตรวจจับอัตโนมัติ" : "Auto detect",
-    sourceHint: th
-      ? "เลือกภาษาต้นฉบับให้ตรงเพื่อลดการเดาผิดและลดสำเนียงเพี้ยน"
-      : "Pick the actual source language to reduce transcription mistakes before generating the new voice.",
-    target: th ? "เป้าหมาย" : "Target",
-    speakers: th ? "ผู้พูด" : "Speakers",
-    consent: th
-      ? "ฉันมีสิทธิ์ใช้ไฟล์นี้และได้รับอนุญาตให้แปล/โคลนเสียงของผู้พูด"
-      : "I have permission to translate this file's speech.",
-    action: "Translate",
-    processing: th ? "กำลังแปล" : "Translating",
-    ready: th ? "ผลลัพธ์จะแสดงทางขวาเมื่อพร้อม" : "Results appear on the right when ready.",
-    remove: th ? "ลบไฟล์" : "Remove file",
+    title: t("workspace.standalone.panel.voice_translate.title"),
+    subtitle: t("workspace.standalone.voice_translate.subtitle"),
+    uploadTitle: t("workspace.standalone.voice_translate.upload_title"),
+    uploadHint: t("workspace.standalone.voice_translate.upload_hint"),
+    uploadLimit: t("workspace.standalone.voice_translate.upload_limit", { max: TRANSLATE_VIDEO_UPLOAD_MAX_LABEL }),
+    source: t("workspace.standalone.voice_translate.source"),
+    sourceAuto: t("workspace.standalone.voice_translate.source_auto"),
+    sourceHint: t("workspace.standalone.voice_translate.source_hint"),
+    target: t("workspace.standalone.voice_translate.target"),
+    speakers: t("workspace.standalone.voice_translate.speakers"),
+    consent: t("workspace.standalone.voice_translate.consent"),
+    action: t("workspace.standalone.panel.voice_translate.action"),
+    processing: t("workspace.standalone.voice_translate.processing"),
+    ready: t("workspace.standalone.voice_translate.ready"),
+    remove: t("workspace.standalone.voice_translate.remove"),
   };
   const media = form.translateVideo;
   const isAudio = translateOutputTypeForMedia(media) === "audio";
@@ -5479,10 +5477,10 @@ function VoiceTranslatePanel({
               </span>
               <span className="min-w-0 text-left">
                 <span className="block text-[13px] font-medium leading-[14px] text-[var(--text-tertiary)]">
-                  Format
+                  {t("workspace.standalone.panel.format")}
                 </span>
                 <span className="block truncate text-[15px] font-bold leading-[16px] text-white">
-                  {media ? translateOutputFormatLabel(media) : "Auto"}
+                  {media ? translateOutputFormatLabel(media) : t("workspace.standalone.panel.format_auto")}
                 </span>
               </span>
             </div>
@@ -5543,7 +5541,7 @@ function VoiceTranslatePanel({
         <div className="grid grid-cols-2 gap-2.5">
           <div className="flex h-[40px] items-center gap-2 rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-2.5 text-[13px] font-semibold text-zinc-300">
             <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-400" />
-            <span className="truncate">{media ? translateOutputShortLabel(media) : "Media"}</span>
+            <span className="truncate">{media ? translateOutputShortLabel(media) : t("workspace.standalone.panel.media")}</span>
           </div>
           <button
             type="button"
@@ -5599,6 +5597,7 @@ function AutoSubtitlePanelV2({
     "style" | "transition" | "animation"
   >("style");
   const th = language === "th";
+  const { t } = useLanguage();
   const media = form.autoSubtitleVideo;
   const selectedPreset =
     BUILTIN_CAPTION_PRESETS.find((preset) => preset.id === form.autoSubtitlePresetId) ??
@@ -5609,57 +5608,54 @@ function AutoSubtitlePanelV2({
     : BUILTIN_CAPTION_PRESETS.slice(0, 5);
 
   const copy = {
-    title: "Auto Subtitle",
-    subtitle: th
-      ? "อัปโหลด MP4 เพื่อสร้างซับอัตโนมัติและเก็บโปรเจกต์ไว้แก้ต่อ"
-      : "Upload an MP4, generate subtitles, and keep an editable project.",
+    title: t("workspace.standalone.panel.auto_subtitle.title"),
+    subtitle: t("workspace.standalone.auto_subtitle.subtitle"),
     tabSubtitle: "AI Subtitle",
     tabRepurpose: "AI Repurposing Video",
     settingsTitle: "AI SETTINGS",
-    sourceVideo: th ? "วิดีโอต้นฉบับ" : "Source video",
-    uploadHint: th ? "ลาก MP4 มาวาง หรือคลิกเพื่ออัปโหลด" : "Drop an MP4 here or click to upload",
-    uploadLimit: th
-      ? `รองรับ MP4/MOV/WEBM สูงสุด ${AUTO_SUBTITLE_UPLOAD_MAX_LABEL} / ${AUTO_SUBTITLE_MAX_DURATION_LABEL_TH}`
-      : `MP4/MOV/WEBM, up to ${AUTO_SUBTITLE_UPLOAD_MAX_LABEL} / ${AUTO_SUBTITLE_MAX_DURATION_LABEL}`,
-    aspect: th ? "สัดส่วนวิดีโอ" : "Aspect ratio",
-    keepSource: th ? "ตามต้นฉบับ" : "Keep source",
-    locked: th ? "เร็วๆ นี้" : "Soon",
-    style: th ? "สไตล์ซับไตเติล" : "Subtitle style",
-    styleTab: th ? "สไตล์" : "Style",
-    transitionTab: th ? "ทรานซิชัน" : "Transition",
-    animationTab: th ? "อนิเมชัน" : "Animation",
-    moreStyles: th ? "แสดงสไตล์ทั้งหมด" : "Show all styles",
-    fewerStyles: th ? "แสดงน้อยลง" : "Show less",
-    advanced: th ? "ปรับตำแหน่ง ฟอนต์ และสีซับไตเติล" : "Adjust position, font, and subtitle colors",
-    speech: th ? "ภาษาพูด" : "Speech",
-    font: th ? "ฟอนต์" : "Font",
-    position: th ? "ตำแหน่ง" : "Position",
-    size: th ? "ขนาด" : "Size",
-    algorithm: th ? "วิธีแบ่งซับ" : "Algorithm",
-    sentenceMode: th ? "ตามประโยค" : "Sentence",
-    sentenceModeHint: th ? "อิงจังหวะพูดและช่วงเว้น" : "Uses speech pauses",
-    wordMode: th ? "กำหนดจำนวนคำ" : "Word split",
-    wordModeHint: th ? "ตัดตามจำนวนคำที่เลือก" : "Fixed word groups",
-    words: th ? "จำนวนคำต่อกลุ่ม" : "Words per group",
-    transition: th ? "ทรานซิชันข้อความ" : "Text transition",
-    textAnimation: th ? "อนิเมชันตัวอักษร" : "Text animation",
-    textColor: th ? "สีตัวอักษร" : "Text color",
-    accentColor: th ? "สีเอฟเฟกต์" : "Accent color",
-    stroke: th ? "เส้นขอบ" : "Stroke",
-    background: th ? "พื้นหลัง" : "Background",
-    translation: th ? "การแปลภาษา" : "Translation",
-    noTranslation: th ? "ไม่แปลภาษา" : "No translation",
-    translateThai: th ? "แปลภาษาไทย" : "Translate Thai",
+    sourceVideo: t("workspace.standalone.auto_subtitle.upload_title"),
+    uploadHint: t("workspace.standalone.auto_subtitle.upload_hint"),
+    uploadLimit: t("workspace.standalone.auto_subtitle.upload_limit", {
+      max: AUTO_SUBTITLE_UPLOAD_MAX_LABEL,
+      duration: th ? AUTO_SUBTITLE_MAX_DURATION_LABEL_TH : AUTO_SUBTITLE_MAX_DURATION_LABEL,
+    }),
+    aspect: t("workspace.standalone.auto_subtitle.aspect"),
+    keepSource: t("workspace.standalone.auto_subtitle.keep_source"),
+    locked: t("workspace.standalone.auto_subtitle.locked"),
+    style: t("workspace.standalone.auto_subtitle.style"),
+    styleTab: t("workspace.standalone.auto_subtitle.style_tab"),
+    transitionTab: t("workspace.standalone.auto_subtitle.transition_tab"),
+    animationTab: t("workspace.standalone.auto_subtitle.animation_tab"),
+    moreStyles: t("workspace.standalone.auto_subtitle.more_styles"),
+    fewerStyles: t("workspace.standalone.auto_subtitle.fewer_styles"),
+    advanced: t("workspace.standalone.auto_subtitle.advanced"),
+    speech: t("workspace.standalone.auto_subtitle.speech"),
+    font: t("workspace.standalone.auto_subtitle.font"),
+    position: t("workspace.standalone.auto_subtitle.position"),
+    size: t("workspace.standalone.auto_subtitle.size"),
+    algorithm: t("workspace.standalone.auto_subtitle.algorithm"),
+    sentenceMode: t("workspace.standalone.auto_subtitle.sentence_mode"),
+    sentenceModeHint: t("workspace.standalone.auto_subtitle.sentence_mode_hint"),
+    wordMode: t("workspace.standalone.auto_subtitle.word_mode"),
+    wordModeHint: t("workspace.standalone.auto_subtitle.word_mode_hint"),
+    words: t("workspace.standalone.auto_subtitle.words"),
+    transition: t("workspace.standalone.auto_subtitle.transition"),
+    textAnimation: t("workspace.standalone.auto_subtitle.text_animation"),
+    textColor: t("workspace.standalone.auto_subtitle.text_color"),
+    accentColor: t("workspace.standalone.auto_subtitle.accent_color"),
+    stroke: t("workspace.standalone.auto_subtitle.stroke"),
+    background: t("workspace.standalone.auto_subtitle.background"),
+    translation: t("workspace.standalone.auto_subtitle.translation"),
+    noTranslation: t("workspace.standalone.auto_subtitle.no_translation"),
+    translateThai: t("workspace.standalone.auto_subtitle.translate_thai"),
     bilingual: "Bilingual",
-    previewText: th ? "ตัวอย่างซับไตเติล" : "Sample subtitle",
-    previewCardText: th ? "ตัวอย่าง" : "Sample",
-    previewNextText: th ? "ต่อไป" : "Next",
-    ready: th
-      ? "ผลลัพธ์จะแสดงด้านขวา พร้อมโปรเจกต์ editor และ track subtitle สำหรับแก้ต่อ"
-      : "Results appear on the right with an editable editor project.",
-    action: "Auto Subtitle",
-    processing: th ? "กำลังสร้างซับ" : "Generating",
-    remove: th ? "ลบวิดีโอ" : "Remove video",
+    previewText: t("workspace.standalone.auto_subtitle.preview_text"),
+    previewCardText: t("workspace.standalone.auto_subtitle.preview_card"),
+    previewNextText: t("workspace.standalone.auto_subtitle.preview_next"),
+    ready: t("workspace.standalone.auto_subtitle.ready"),
+    action: t("workspace.standalone.panel.auto_subtitle.action"),
+    processing: t("workspace.standalone.auto_subtitle.processing"),
+    remove: t("workspace.standalone.auto_subtitle.remove"),
   };
 
   const addFiles = (files: File[]) => {
@@ -5680,9 +5676,7 @@ function AutoSubtitlePanelV2({
     addFiles(files);
   };
 
-  const speechLabel =
-    CAPTIONS_LANGUAGES.find((item) => item.code === form.autoSubtitleLanguage)?.label ??
-    form.autoSubtitleLanguage;
+  const speechLabel = captionLanguageLabel(form.autoSubtitleLanguage, t);
   const aspectLabel =
     media?.width && media.height ? `${media.width}:${media.height}` : th ? "ต้นฉบับ" : "Source";
   const wordSplitLabel =
@@ -5695,7 +5689,7 @@ function AutoSubtitlePanelV2({
   );
   const textAnimationLabel = autoSubtitleTextAnimationLabel(
     form.autoSubtitleTextAnimation,
-    language,
+    t,
   );
   const transitionOptions = CAPTION_TRANSITION_OPTIONS.map((option) => ({
     value: option.id,
@@ -5703,7 +5697,7 @@ function AutoSubtitlePanelV2({
   }));
   const textAnimationOptions = CAPTION_TEXT_ANIMATION_OPTIONS.map((option) => ({
     value: option.id,
-    label: autoSubtitleTextAnimationLabel(option.id, language),
+    label: autoSubtitleTextAnimationLabel(option.id, t),
   }));
   const previewSamplePhrases = useMemo(
     () =>
@@ -5925,7 +5919,7 @@ function AutoSubtitlePanelV2({
                   {CAPTION_TEXT_ANIMATION_OPTIONS.map((option) => (
                     <AutoSubtitleTextAnimationCard
                       key={option.id}
-                      label={autoSubtitleTextAnimationLabel(option.id, language)}
+                      label={autoSubtitleTextAnimationLabel(option.id, t)}
                       description={option.description}
                       selected={form.autoSubtitleTextAnimation === option.id}
                       settings={{
@@ -5951,7 +5945,7 @@ function AutoSubtitlePanelV2({
                     value={form.autoSubtitleLanguage}
                     displayValue={speechLabel}
                     icon={<Languages className="h-4 w-4" />}
-                    options={CAPTIONS_LANGUAGES.map((item) => ({ value: item.code, label: item.label }))}
+                    options={CAPTIONS_LANGUAGES.map((item) => ({ value: item.code, label: captionLanguageLabel(item.code, t) }))}
                     onChange={(value) => onChange({ autoSubtitleLanguage: value })}
                   />
                   <VoiceTranslateSelectCard
@@ -6178,7 +6172,7 @@ function AutoSubtitlePanelV2({
         <div className="grid grid-cols-2 gap-[8px]">
           <div className="flex h-[38px] items-center gap-2 rounded-[10px] border border-white/[0.06] bg-[#17191b] px-2.5 text-[13px] font-semibold text-zinc-300">
             <Film className="h-3.5 w-3.5 text-zinc-400" />
-            <span className="truncate">{media ? "MP4" : "Media"}</span>
+            <span className="truncate">{media ? "MP4" : t("workspace.standalone.panel.media")}</span>
           </div>
           <button
             type="button"
@@ -7187,31 +7181,29 @@ function AutoSubtitlePanel({
   onToolChange: (tool: StandaloneToolKey) => void;
 }) {
   const th = language === "th";
+  const { t } = useLanguage();
   const media = form.autoSubtitleVideo;
   const copy = {
-    title: "Auto Subtitle",
-    subtitle: th
-      ? "อัปโหลด MP4 เพื่อสร้างซับอัตโนมัติและโปรเจกต์แก้ไขได้"
-      : "Upload an MP4, generate subtitles, and keep an editable project.",
-    uploadTitle: th ? "วิดีโอต้นฉบับ" : "Source video",
-    uploadHint: th ? "ลาก MP4 มาวาง หรือคลิกเพื่ออัปโหลด" : "Drop an MP4 here or click to upload",
-    uploadLimit: th
-      ? `รองรับ MP4/MOV/WEBM สูงสุด ${AUTO_SUBTITLE_UPLOAD_MAX_LABEL} / ${AUTO_SUBTITLE_MAX_DURATION_LABEL_TH}`
-      : `MP4/MOV/WEBM, up to ${AUTO_SUBTITLE_UPLOAD_MAX_LABEL} / ${AUTO_SUBTITLE_MAX_DURATION_LABEL}`,
-    speechLanguage: th ? "ภาษาเสียง" : "Speech",
-    preset: th ? "สไตล์ซับ" : "Style",
-    font: th ? "ฟอนต์" : "Font",
-    position: th ? "ตำแหน่ง" : "Position",
-    size: th ? "ขนาด" : "Size",
-    words: th ? "คำต่อบรรทัด" : "Words / line",
-    stroke: th ? "เส้นขอบ" : "Stroke",
-    background: th ? "พื้นหลัง" : "Background",
-    ready: th
-      ? "ผลลัพธ์จะแสดงด้านขวา และจะสร้างโปรเจกต์ editor พร้อม track subtitle ให้แก้ต่อได้"
-      : "Results appear on the right with an editable editor project.",
-    action: th ? "Auto Subtitle" : "Auto Subtitle",
-    processing: th ? "กำลังสร้างซับ" : "Generating",
-    remove: th ? "ลบวิดีโอ" : "Remove video",
+    title: t("workspace.standalone.panel.auto_subtitle.title"),
+    subtitle: t("workspace.standalone.auto_subtitle.subtitle"),
+    uploadTitle: t("workspace.standalone.auto_subtitle.upload_title"),
+    uploadHint: t("workspace.standalone.auto_subtitle.upload_hint"),
+    uploadLimit: t("workspace.standalone.auto_subtitle.upload_limit", {
+      max: AUTO_SUBTITLE_UPLOAD_MAX_LABEL,
+      duration: th ? AUTO_SUBTITLE_MAX_DURATION_LABEL_TH : AUTO_SUBTITLE_MAX_DURATION_LABEL,
+    }),
+    speechLanguage: t("workspace.standalone.auto_subtitle.speech"),
+    preset: t("workspace.standalone.auto_subtitle.preset"),
+    font: t("workspace.standalone.auto_subtitle.font"),
+    position: t("workspace.standalone.auto_subtitle.position"),
+    size: t("workspace.standalone.auto_subtitle.size"),
+    words: t("workspace.standalone.auto_subtitle.words_per_line"),
+    stroke: t("workspace.standalone.auto_subtitle.stroke"),
+    background: t("workspace.standalone.auto_subtitle.background"),
+    ready: t("workspace.standalone.auto_subtitle.ready"),
+    action: t("workspace.standalone.panel.auto_subtitle.action"),
+    processing: t("workspace.standalone.auto_subtitle.processing"),
+    remove: t("workspace.standalone.auto_subtitle.remove"),
   };
 
   const addFiles = (files: File[]) => {
@@ -7235,15 +7227,13 @@ function AutoSubtitlePanel({
   const selectedPreset =
     BUILTIN_CAPTION_PRESETS.find((preset) => preset.id === form.autoSubtitlePresetId)?.name ??
     form.autoSubtitlePresetId;
-  const speechLabel =
-    CAPTIONS_LANGUAGES.find((item) => item.code === form.autoSubtitleLanguage)?.label ??
-    form.autoSubtitleLanguage;
+  const speechLabel = captionLanguageLabel(form.autoSubtitleLanguage, t);
   const positionLabel =
     form.autoSubtitlePosition === "top"
-      ? th ? "บน" : "Top"
+      ? t("workspace.standalone.auto_subtitle.position_top")
       : form.autoSubtitlePosition === "middle"
-        ? th ? "กลาง" : "Middle"
-        : th ? "ล่าง" : "Bottom";
+        ? t("workspace.standalone.auto_subtitle.position_middle")
+        : t("workspace.standalone.auto_subtitle.position_bottom");
 
   return (
     <section className="standalone-translate-panel flex min-h-0 flex-1 flex-col overflow-hidden rounded-[18px] border border-[var(--border-overlay)] bg-[var(--bg-sidebar)] shadow-[inset_0_1px_0_rgba(255,255,255,.05)]">
@@ -7332,7 +7322,7 @@ function AutoSubtitlePanel({
               value={form.autoSubtitleLanguage}
               displayValue={speechLabel}
               icon={<Languages className="h-4 w-4" />}
-              options={CAPTIONS_LANGUAGES.map((item) => ({ value: item.code, label: item.label }))}
+              options={CAPTIONS_LANGUAGES.map((item) => ({ value: item.code, label: captionLanguageLabel(item.code, t) }))}
               onChange={(value) => onChange({ autoSubtitleLanguage: value })}
             />
             <VoiceTranslateSelectCard
@@ -7381,9 +7371,9 @@ function AutoSubtitlePanel({
               displayValue={positionLabel}
               icon={<SlidersHorizontal className="h-[14px] w-[14px]" />}
               options={[
-                { value: "top", label: th ? "บน" : "Top" },
-                { value: "middle", label: th ? "กลาง" : "Middle" },
-                { value: "bottom", label: th ? "ล่าง" : "Bottom" },
+                { value: "top", label: t("workspace.standalone.auto_subtitle.position_top") },
+                { value: "middle", label: t("workspace.standalone.auto_subtitle.position_middle") },
+                { value: "bottom", label: t("workspace.standalone.auto_subtitle.position_bottom") },
               ]}
               onChange={(value) => {
                 const position = value as StandaloneFormState["autoSubtitlePosition"];
@@ -7452,7 +7442,7 @@ function AutoSubtitlePanel({
         <div className="grid grid-cols-2 gap-2.5">
           <div className="flex h-[40px] items-center gap-2 rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-2.5 text-[13px] font-semibold text-zinc-300">
             <Film className="h-3.5 w-3.5 text-zinc-400" />
-            <span className="truncate">{media ? "MP4" : "Media"}</span>
+            <span className="truncate">{media ? "MP4" : t("workspace.standalone.panel.media")}</span>
           </div>
           <button
             type="button"
@@ -8587,11 +8577,12 @@ function UpscaleGuide({
   language,
 }: {
   form: StandaloneFormState;
-  language: "en" | "th";
+  language: ReturnType<typeof useLanguage>["language"];
 }) {
   const th = language === "th";
+  const { t } = useLanguage();
   const mediaLabel = th ? "ภาพเท่านั้น" : "image only";
-  const title = th ? "ตั้งค่า Upscale Mediaforge" : "Upscale Mediaforge settings";
+  const title = t("workspace.standalone.panel.upscale.settings_title");
   const summary = th
     ? "เลือกขนาด 1K, 2K, หรือ 4K และระดับคุณภาพสำหรับการเพิ่มความคมชัดของภาพ"
     : "Choose 1K, 2K, or 4K output and quality for image enhancement.";

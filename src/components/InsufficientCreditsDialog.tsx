@@ -258,7 +258,7 @@ const InsufficientCreditsDialog = ({
       ? featureName
           .replace(/Image generation/i, "สร้างภาพ")
           .replace(/Video generation|VDO generation/i, "สร้างวิดีโอ")
-          .replace(/Upscale/i, "ขยายภาพ")
+          .replace(/Upscale/i, "เพิ่มความละเอียดภาพ")
           .replace(/Translate/i, "แปลวิดีโอ")
           .replace(/Auto Subtitle/i, "ซับอัตโนมัติ")
       : featureName;
