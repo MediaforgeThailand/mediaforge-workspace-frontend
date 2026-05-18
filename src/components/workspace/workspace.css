@@ -2093,6 +2093,99 @@ body.ws-resizing * {
   background: hsl(0 0% 100% / 0.3);
 }
 
+.standalone-voice-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(66 100% 52% / 0.72) hsl(0 0% 100% / 0.06);
+}
+.standalone-voice-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.standalone-voice-scroll::-webkit-scrollbar-track {
+  background: hsl(0 0% 100% / 0.06);
+  border-radius: 999px;
+}
+.standalone-voice-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, hsl(64 100% 52% / 0.9), hsl(183 100% 79% / 0.5));
+  border: 1px solid hsl(0 0% 0% / 0.35);
+  border-radius: 999px;
+}
+.standalone-voice-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, hsl(64 100% 56% / 1), hsl(183 100% 80% / 0.66));
+}
+
+.standalone-voice-list-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(66 100% 52% / 0.82) hsl(0 0% 100% / 0.07);
+  scrollbar-gutter: stable;
+}
+.standalone-voice-list-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.standalone-voice-list-scroll::-webkit-scrollbar-track {
+  background: hsl(0 0% 100% / 0.07);
+  border-radius: 999px;
+}
+.standalone-voice-list-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, hsl(64 100% 52% / 0.92), hsl(183 100% 79% / 0.58));
+  border: 1px solid hsl(0 0% 0% / 0.35);
+  border-radius: 999px;
+}
+.standalone-voice-list-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, hsl(64 100% 56% / 1), hsl(183 100% 80% / 0.72));
+}
+
+.standalone-create-panel-voice .standalone-voice-settings {
+  min-height: 0;
+}
+
+.standalone-create-panel-voice .standalone-voice-list-scroll {
+  overscroll-behavior: contain;
+  scrollbar-color: hsl(66 100% 52% / 1) hsl(0 0% 100% / 0.14);
+  scrollbar-gutter: stable;
+}
+
+.standalone-create-panel-voice .standalone-voice-list-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.standalone-create-panel-voice .standalone-voice-list-scroll::-webkit-scrollbar-track {
+  background: hsl(0 0% 100% / 0.13);
+  border-radius: 999px;
+  margin: 2px 0;
+}
+
+.standalone-create-panel-voice .standalone-voice-list-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, hsl(64 100% 52%), hsl(183 100% 79% / 0.78));
+  border: 1px solid hsl(0 0% 0% / 0.45);
+  border-radius: 999px;
+  box-shadow: 0 0 10px hsl(64 100% 52% / 0.3);
+}
+
+.standalone-create-panel-voice .standalone-voice-list-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, hsl(64 100% 58%), hsl(183 100% 82% / 0.88));
+}
+
+.standalone-audio-tags-panel {
+  max-height: clamp(112px, 16vh, 150px);
+}
+
+.standalone-create-panel-voice .standalone-audio-tags-panel {
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: clamp(112px, 16vh, 150px);
+  overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .standalone-audio-tags-panel {
+    max-height: clamp(102px, 15vh, 132px);
+  }
+
+  .standalone-create-panel-voice .standalone-audio-tags-panel {
+    max-height: clamp(102px, 15vh, 132px);
+  }
+}
+
 /* ── Tab bar — slim horizontal scroll for many tabs ───────── */
 .ws-tabs-scroll::-webkit-scrollbar {
   height: 4px;
