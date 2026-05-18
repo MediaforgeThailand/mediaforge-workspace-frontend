@@ -2185,6 +2185,7 @@ export const ja = {
   "workspace.settings.stock_downloads": "ストックのダウンロード",
   "workspace.settings.stock_collections": "ストックコレクション",
   "workspace.settings.following": "フォロー中",
+  "workspace.settings.affiliate_program": "アフィリエイトプログラム",
   "workspace.settings.my_team": "私のチーム",
   "workspace.settings.people": "人々",
   "workspace.settings.security_sso": "セキュリティ SSO",
