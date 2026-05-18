@@ -46,6 +46,7 @@ export type SettingsSectionLabelKey =
   | "workspace.settings.stock_downloads"
   | "workspace.settings.stock_collections"
   | "workspace.settings.following"
+  | "workspace.settings.affiliate_program"
   | "workspace.settings.my_team"
   | "workspace.settings.people"
   | "workspace.settings.security_sso"
@@ -54,8 +55,7 @@ export type SettingsSectionLabelKey =
 export interface SettingsSection {
   key: SettingsSectionKey;
   /** Translation key for the visible label. */
-  labelKey?: SettingsSectionLabelKey;
-  label?: string;
+  labelKey: SettingsSectionLabelKey;
   icon: LucideIcon;
 }
 
@@ -64,7 +64,7 @@ export const ACCOUNT_SECTIONS: SettingsSection[] = [
   { key: "account.stock-downloads", labelKey: "workspace.settings.stock_downloads", icon: Download },
   { key: "account.stock-collections", labelKey: "workspace.settings.stock_collections", icon: Bookmark },
   { key: "account.following", labelKey: "workspace.settings.following", icon: UserPlus },
-  { key: "account.affiliate-program", label: "Affiliate Program", icon: Link2 },
+  { key: "account.affiliate-program", labelKey: "workspace.settings.affiliate_program", icon: Link2 },
 ];
 
 export const ORG_SECTIONS: SettingsSection[] = [
@@ -95,7 +95,7 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
             key={item.key}
             type="button"
             onClick={() => onChange(item.key)}
-            title={item.label ?? t(item.labelKey!)}
+            title={t(item.labelKey)}
             className={cn(
               "group flex h-[32px] w-full items-center gap-[8px] rounded-md px-[10px] text-[12.5px] font-semibold leading-none transition-colors",
               active
@@ -104,7 +104,7 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
             )}
           >
             <item.icon className="h-[13px] w-[13px] flex-shrink-0" />
-            <span className="min-w-0 flex-1 truncate text-left">{item.label ?? t(item.labelKey!)}</span>
+            <span className="min-w-0 flex-1 truncate text-left">{t(item.labelKey)}</span>
           </button>
         );
       })}
@@ -115,7 +115,7 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
   const allSections = [...ACCOUNT_SECTIONS, ...ORG_SECTIONS];
   const currentSection = allSections.find((s) => s.key === activeKey);
   const currentLabel = currentSection
-    ? currentSection.label ?? t(currentSection.labelKey!)
+    ? t(currentSection.labelKey)
     : t("workspace.settings.fallback_title");
 
   return (
@@ -139,7 +139,7 @@ const SettingsLayout = ({ activeKey, onChange, children }: SettingsLayoutProps) 
                 )}
               >
                 <s.icon className="h-[16px] w-[16px]" />
-                {s.label ?? t(s.labelKey!)}
+                {t(s.labelKey)}
               </button>
             );
           })}

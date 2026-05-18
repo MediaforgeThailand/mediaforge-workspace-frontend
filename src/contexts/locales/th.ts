@@ -2299,6 +2299,7 @@ export const th = {
   "workspace.settings.stock_downloads": "สื่อสต็อกที่ดาวน์โหลด",
   "workspace.settings.stock_collections": "คอลเลกชันสื่อสต็อก",
   "workspace.settings.following": "กำลังติดตาม",
+  "workspace.settings.affiliate_program": "โปรแกรมพันธมิตร",
   "workspace.settings.my_team": "ทีมของฉัน",
   "workspace.settings.people": "สมาชิก",
   "workspace.settings.security_sso": "ความปลอดภัย SSO",

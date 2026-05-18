@@ -2175,6 +2175,7 @@ export const hi = {
   "workspace.settings.stock_downloads": "स्टॉक डाउनलोड",
   "workspace.settings.stock_collections": "स्टॉक संग्रह",
   "workspace.settings.following": "अनुसरण कर रहा हूँ",
+  "workspace.settings.affiliate_program": "एफिलिएट प्रोग्राम",
   "workspace.settings.my_team": "मेरी टीम",
   "workspace.settings.people": "लोग",
   "workspace.settings.security_sso": "सरक्षा SSO",

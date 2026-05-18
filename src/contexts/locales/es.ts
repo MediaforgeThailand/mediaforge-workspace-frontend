@@ -2413,6 +2413,7 @@ export const es = {
   "workspace.settings.stock_downloads": "Descargas de stock",
   "workspace.settings.stock_collections": "Colecciones de recursos de stock",
   "workspace.settings.following": "Siguiendo",
+  "workspace.settings.affiliate_program": "Programa de afiliados",
   "workspace.settings.my_team": "Mi equipo",
   "workspace.settings.people": "gente",
   "workspace.settings.security_sso": "Seguridad SSO",

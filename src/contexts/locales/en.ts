@@ -2337,6 +2337,7 @@ export const en = {
   "workspace.settings.stock_downloads": "Stock downloads",
   "workspace.settings.stock_collections": "Stock collections",
   "workspace.settings.following": "Following",
+  "workspace.settings.affiliate_program": "Affiliate Program",
   "workspace.settings.my_team": "My Team",
   "workspace.settings.people": "People",
   "workspace.settings.security_sso": "Security SSO",
