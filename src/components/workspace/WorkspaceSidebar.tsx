@@ -58,6 +58,7 @@ import { supabase } from "@/integrations/supabase/client";
 import OrgCreditBadge from "@/components/OrgCreditBadge";
 import ActiveClassPicker from "@/components/ActiveClassPicker";
 import AllAssetsDialog from "@/components/workspace/AllAssetsDialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DEFAULT_BRAND_LOGO, DEFAULT_BRAND_NAME } from "@/components/workspace/brandAssets";
 import { getProjectAvatar } from "@/components/workspace/projectAvatars";
 import type { ProjectMeta } from "@/store/useWorkspaceStore";
@@ -750,17 +751,14 @@ const NavLink = ({
   badge?: string;
   tooltip?: string;
   iconOnly?: boolean;
-}) => (
+}) => {
+  const button = (
   <button
     type="button"
     onClick={onClick}
-    data-sidebar-tooltip={tooltip || undefined}
     aria-label={tooltip ? `${label}: ${tooltip}` : label}
     className={cn(
-      /* 2026-05: drop the inset 1px stroke on active — bg lift alone
-       *  is enough now that the sidebar is a Layer-1 panel. */
       "group relative flex h-[32px] min-w-0 items-center gap-[10px] text-left text-[12px] font-medium transition-colors",
-      tooltip && "ws-sidebar-tooltip",
       iconOnly && "mx-auto h-[36px] w-[36px] flex-none justify-center gap-0 rounded-[10px] px-0",
       variant === "tool" && tone === "accent"
         ? "rounded-[7px] border border-cyan-300/35 bg-cyan-950/50 px-[8px] text-cyan-50 shadow-[inset_0_1px_0_rgba(255,255,255,.08),0_0_18px_-12px_rgba(34,211,238,.95)]"
@@ -815,7 +813,23 @@ const NavLink = ({
       </span>
     )}
   </button>
-);
+  );
+
+  if (!tooltip) return button;
+
+  return (
+    <Tooltip delayDuration={150}>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipContent
+        side="right"
+        sideOffset={10}
+        className="pointer-events-none max-w-[230px] whitespace-normal border-white/[0.12] bg-black px-[9px] py-[6px] text-[11px] font-semibold leading-[1.35] text-white shadow-[0_18px_48px_-24px_rgba(0,0,0,.95),0_0_24px_-18px_rgba(234,255,0,.75)]"
+      >
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
+  );
+};
 
 function getSidebarNavLabel(id: SectionKey, fallback: string): string {
   switch (id) {
