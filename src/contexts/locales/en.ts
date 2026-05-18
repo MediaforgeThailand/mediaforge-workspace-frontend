@@ -2283,6 +2283,22 @@ export const en = {
     "Manage classes, students, and university credits",
   "workspace.sidebar.branding_tip": "Logo and short name",
   "workspace.sidebar.settings_tip": "Settings",
+  "workspace.sidebar.image_gen_tip":
+    "Create images from prompts and visual references.",
+  "workspace.sidebar.video_gen_tip":
+    "Create videos from prompts, start/end frames, or references.",
+  "workspace.sidebar.voice_gen_tip": "Generate spoken audio from a script.",
+  "workspace.sidebar.voice_translate_tip":
+    "Translate speech from audio or video while preserving the original voice tone.",
+  "workspace.sidebar.image_upscale_tip": "Upscale and sharpen images.",
+  "workspace.sidebar.url_asset_tip":
+    "Import files from a direct URL into your asset library.",
+  "workspace.sidebar.auto_subtitle_tip":
+    "Generate subtitles automatically from video.",
+  "workspace.sidebar.threed_gen_tip": "Create 3D models from image references.",
+  "workspace.sidebar.editor_tip": "Edit videos and manage timeline projects.",
+  "workspace.sidebar.spaces_tip":
+    "Build AI workflows on a blank canvas with tools, assets, and nodes.",
 
   // User menu
   "workspace.usermenu.account": "Account menu",

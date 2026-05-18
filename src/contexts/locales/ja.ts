@@ -2122,6 +2122,21 @@ export const ja = {
     "クラス、学生、大学のクレジットを管理する",
   "workspace.sidebar.branding_tip": "ロゴと略称",
   "workspace.sidebar.settings_tip": "設定",
+  "workspace.sidebar.image_gen_tip": "プロンプトと参考画像から画像を生成します。",
+  "workspace.sidebar.video_gen_tip":
+    "プロンプト、開始/終了フレーム、参考素材から動画を生成します。",
+  "workspace.sidebar.voice_gen_tip": "スクリプトから音声を生成します。",
+  "workspace.sidebar.voice_translate_tip":
+    "音声または動画の話し声を、元の声のトーンを保ったまま翻訳します。",
+  "workspace.sidebar.image_upscale_tip": "画像の解像度とシャープさを高めます。",
+  "workspace.sidebar.url_asset_tip":
+    "直接URLからファイルをアセットライブラリに取り込みます。",
+  "workspace.sidebar.auto_subtitle_tip": "動画から字幕を自動生成します。",
+  "workspace.sidebar.threed_gen_tip": "参考画像から3Dモデルを生成します。",
+  "workspace.sidebar.editor_tip":
+    "動画を編集し、タイムラインプロジェクトを管理します。",
+  "workspace.sidebar.spaces_tip":
+    "空のキャンバス上で、ツール・アセット・ノードを使ってAIワークフローを構築します。",
   "workspace.usermenu.account": "アカウントメニュー",
   "workspace.usermenu.member_fallback": "メンバー",
   "workspace.usermenu.upgrade": "アップグレード",
