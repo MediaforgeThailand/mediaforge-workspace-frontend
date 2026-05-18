@@ -54,6 +54,19 @@ const emptyStatus: AffiliateStatus = {
   },
 };
 
+function normalizePhone(raw: string): { value: string; valid: boolean } {
+  const trimmed = raw.replace(/[\s-]/g, "");
+  // Thai local format "0XXXXXXXXX" → "+66XXXXXXXXX"
+  if (/^0\d{8,9}$/.test(trimmed)) {
+    return { value: `+66${trimmed.slice(1)}`, valid: true };
+  }
+  // E.164: leading + then 7-15 digits, first digit 1-9
+  if (/^\+[1-9]\d{7,14}$/.test(trimmed)) {
+    return { value: trimmed, valid: true };
+  }
+  return { value: trimmed, valid: false };
+}
+
 function money(value: number) {
   return new Intl.NumberFormat("th-TH", {
     style: "currency",
@@ -103,10 +116,15 @@ export default function AffiliateProgramPanel({ className }: { className?: strin
 
   const submitMutation = useMutation({
     mutationFn: async () => {
+      const phone = normalizePhone(form.phone);
+      if (!phone.valid) {
+        throw new Error("Use international phone format like +66812345678, or Thai local 0812345678.");
+      }
       const { data, error } = await supabase.functions.invoke("affiliate-portal", {
         body: {
           action: "submit_affiliate_application",
           ...form,
+          phone: phone.value,
           follower_count: Number(form.follower_count || 0),
         },
       });
@@ -268,7 +286,7 @@ export default function AffiliateProgramPanel({ className }: { className?: strin
         <h3 className="text-[15px] font-semibold leading-[20px] text-zinc-100">Creator and payout details</h3>
         <div className="mt-[14px] grid gap-[12px] sm:grid-cols-2">
           <Field label="Full name" value={form.full_name} onChange={(v) => updateField("full_name", v)} />
-          <Field label="Phone" value={form.phone} onChange={(v) => updateField("phone", v)} required />
+          <Field label="Phone" value={form.phone} onChange={(v) => updateField("phone", v)} placeholder="+66812345678 or 0812345678" required />
           <Field label="Social profile URL" value={form.social_profile_url} onChange={(v) => updateField("social_profile_url", v)} required />
           <Field label="Platform" value={form.social_platform} onChange={(v) => updateField("social_platform", v)} placeholder="YouTube, TikTok, Instagram" />
           <Field label="Follower count" value={form.follower_count} onChange={(v) => updateField("follower_count", v)} placeholder="Optional" />
