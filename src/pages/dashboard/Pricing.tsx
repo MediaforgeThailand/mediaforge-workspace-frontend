@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
 import { UserMenu } from "@/components/workspace/UserMenu";
+import { getStoredCode } from "@/lib/tracking/referralCapture";
 import {
   // `WORKSPACE_CURRENCIES` previously fed the now-removed
   // currency-picker dropdown. Auto-detection happens via
@@ -204,6 +205,9 @@ const Pricing = () => {
   const [checkoutPlan, setCheckoutPlan] = useState<SubscriptionPlan | null>(null);
   const [teamSeats, setTeamSeats] = useState(TEAM_MIN_SEATS);
   const [teamCheckoutOpen, setTeamCheckoutOpen] = useState(false);
+  const [affiliateCode, setAffiliateCode] = useState(() =>
+    (searchParams.get("code") || searchParams.get("creator") || getStoredCode() || "").toUpperCase(),
+  );
 
   useEffect(() => {
     Promise.all([
@@ -407,6 +411,22 @@ const Pricing = () => {
                 </span>
               </button>
             </div>
+            <label className="flex h-[42px] min-w-[240px] items-center gap-2 rounded-full border border-white/10 bg-[#252525] px-4 text-left text-[12px] text-zinc-400 shadow-[0_8px_20px_rgba(0,0,0,0.18)]">
+              <span className="whitespace-nowrap font-semibold text-zinc-300">Creator code</span>
+              <input
+                value={affiliateCode}
+                onChange={(event) => setAffiliateCode(event.target.value.toUpperCase())}
+                placeholder="Optional"
+                className="h-full min-w-0 flex-1 bg-transparent text-[12.5px] font-bold tracking-[0.08em] text-white outline-none placeholder:font-medium placeholder:tracking-normal placeholder:text-zinc-600"
+              />
+            </label>
+            <button
+              type="button"
+                onClick={() => navigate("/app/settings?tab=affiliate")}
+              className="h-[42px] rounded-full border border-white/10 bg-white/[0.04] px-4 text-[12px] font-bold text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white"
+            >
+              Creator signup
+            </button>
               {/* Currency selector intentionally removed — user
                *  asked for the currency to be auto-detected from
                *  the visitor's country (see `detectWorkspaceCurrency`
@@ -465,6 +485,7 @@ const Pricing = () => {
         packageId={checkoutPlan?.id ?? ""}
         billingInterval={cycle}
         currency={currency}
+        affiliateCode={affiliateCode.trim()}
         onSuccess={() => {
           void refetch();
           void refreshProfile();
