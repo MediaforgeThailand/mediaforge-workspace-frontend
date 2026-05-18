@@ -704,7 +704,7 @@ const SidebarNavSection = ({
             {row.map((item) => (
               <NavLink
                 key={item.id}
-                label={getSidebarNavLabel(item.id, translate(item.labelKey))}
+                label={translate(item.labelKey)}
                 icon={item.icon}
                 active={active === item.id}
                 onClick={() => onSelect(item.id)}
@@ -715,7 +715,7 @@ const SidebarNavSection = ({
                 iconOnly={collapsed}
                 tooltip={
                   collapsed
-                    ? getSidebarNavLabel(item.id, translate(item.labelKey))
+                    ? translate(item.labelKey)
                     : variant === "tool" ? getSidebarToolTooltip(item.id, language) : undefined
                 }
               />
@@ -816,27 +816,6 @@ const NavLink = ({
     )}
   </button>
 );
-
-function getSidebarNavLabel(id: SectionKey, fallback: string): string {
-  switch (id) {
-    case "image_gen":
-      return "Image Gen";
-    case "video_gen":
-      return "Video Gen";
-    case "voice_gen":
-      return "Voice Gen";
-    case "voice_translate":
-      return "Translate";
-    case "image_to_3d":
-      return "3D Gen";
-    case "url_asset":
-      return "URL Asset";
-    case "auto_subtitle":
-      return "Auto Subtitle";
-    default:
-      return fallback;
-  }
-}
 
 function getSidebarToolTooltip(id: SectionKey, language: Language): string | undefined {
   const th = language === "th";
