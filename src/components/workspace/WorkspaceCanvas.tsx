@@ -65,6 +65,7 @@ import NodePreviewLightbox, {
   getNodeDownloadable,
   type PreviewPayload,
 } from "./NodePreviewLightbox";
+import type { Generation } from "./NodeResultBar";
 // ImageCropTool stays eager: NodePreviewLightbox imports it eagerly,
 // so a lazy() here would still land in the main canvas chunk.
 // Follow-up: lazy inside NPL too, then flip this to lazy.
@@ -142,6 +143,39 @@ type AssetNodeData = {
 function nodeModelName(node: Node | undefined, fallback: string): string {
   const data = node?.data as NodeDataWithParams | undefined;
   return data?.params?.model_name ?? fallback;
+}
+
+/* Build the optional history-strip props for NodePreviewLightbox.
+ *
+ * Returns `{}` (no strip) when there's no source node, when the
+ * node has no `generations`, or when it has only one gen — the
+ * strip only earns its space at 2+ generations. */
+function buildLightboxHistoryProps(
+  previewNodeId: string | null,
+  nodes: ReadonlyArray<Node>,
+  onSelect: (i: number) => void,
+): {
+  historyGenerations?: Generation[];
+  historySelectedIndex?: number;
+  onHistorySelect?: (i: number) => void;
+} {
+  if (!previewNodeId) return {};
+  const node = nodes.find((n) => n.id === previewNodeId);
+  if (!node) return {};
+  const data = (node.data ?? {}) as Record<string, unknown>;
+  const gens = Array.isArray(data.generations)
+    ? (data.generations as Generation[])
+    : [];
+  if (gens.length < 2) return {};
+  const selectedIndex =
+    typeof data.selectedGenIndex === "number"
+      ? (data.selectedGenIndex as number)
+      : 0;
+  return {
+    historyGenerations: gens,
+    historySelectedIndex: selectedIndex,
+    onHistorySelect: onSelect,
+  };
 }
 
 function assetFieldType(node: Node | undefined): string | undefined {
@@ -1234,6 +1268,12 @@ const Inner = () => {
   } | null>(null);
   const [picker, setPicker] = useState<CanvasNodePickerState | null>(null);
   const [preview, setPreview] = useState<PreviewPayload | null>(null);
+  // When the preview originates from a tool node with multiple
+  // generations, we track that node's id so the lightbox can render
+  // a history filmstrip beneath the media and selecting a thumbnail
+  // can mutate the node's `selectedGenIndex` in the store. `null`
+  // for non-node previews (asset panel, all-assets dialog).
+  const [previewNodeId, setPreviewNodeId] = useState<string | null>(null);
   const [quickCrop, setQuickCrop] = useState<{
     src: string;
     label: string;
@@ -1388,6 +1428,7 @@ const Inner = () => {
       return;
     }
     setPreview(p);
+    setPreviewNodeId(fresh.id);
   }, [t]);
 
   useEffect(() => {
@@ -1398,7 +1439,10 @@ const Inner = () => {
       const node = all.find((n) => n.id === nodeId);
       if (!node) return;
       const p = getNodePreview(node, all);
-      if (p) setPreview(p);
+      if (p) {
+        setPreview(p);
+        setPreviewNodeId(node.id);
+      }
     };
     window.addEventListener("workspace-open-node-preview", handler);
     return () => window.removeEventListener("workspace-open-node-preview", handler);
@@ -1811,7 +1855,10 @@ const Inner = () => {
       const sel = all.find((n) => n.selected);
       if (!sel) return;
       const p = getNodePreview(sel, all);
-      if (p) setPreview(p);
+      if (p) {
+        setPreview(p);
+        setPreviewNodeId(sel.id);
+      }
     },
   });
 
@@ -1849,7 +1896,10 @@ const Inner = () => {
       e.stopPropagation();
       const all = useWorkspaceStore.getState().current?.nodes ?? [];
       const p = getNodePreview(node, all);
-      if (p) setPreview(p);
+      if (p) {
+        setPreview(p);
+        setPreviewNodeId(node.id);
+      }
     },
     [],
   );
@@ -1874,6 +1924,11 @@ const Inner = () => {
         | undefined;
       if (!detail?.url) return;
       const ft = detail.fieldType ?? "image";
+      // Asset-panel previews are not bound to a canvas node, so any
+      // pre-existing history binding from a prior preview must be
+      // cleared — otherwise the strip would persist showing the
+      // wrong node's gens.
+      setPreviewNodeId(null);
       if (ft === "model3d") {
         setPreview({
           type: "model3d",
@@ -2762,7 +2817,37 @@ const Inner = () => {
       {preview && (
         <NodePreviewLightbox
           preview={preview}
-          onClose={() => setPreview(null)}
+          onClose={() => {
+            setPreview(null);
+            setPreviewNodeId(null);
+          }}
+          {...buildLightboxHistoryProps(previewNodeId, nodes, (i) => {
+            // Update the source node's selected-gen index AND
+            // re-derive the preview payload from the freshly-
+            // selected generation. Both writes are synchronous so
+            // the lightbox swaps images on the same frame the user
+            // clicks the thumbnail.
+            if (!previewNodeId) return;
+            setNodes((ns) =>
+              ns.map((n) =>
+                n.id === previewNodeId
+                  ? {
+                      ...n,
+                      data: { ...(n.data ?? {}), selectedGenIndex: i },
+                    }
+                  : n,
+              ),
+            );
+            const all = useWorkspaceStore.getState().current?.nodes ?? [];
+            const fresh = all.find((n) => n.id === previewNodeId);
+            if (!fresh) return;
+            const updated = {
+              ...fresh,
+              data: { ...(fresh.data ?? {}), selectedGenIndex: i },
+            };
+            const p = getNodePreview(updated, all);
+            if (p) setPreview(p);
+          })}
           /* Crop confirm — turn the cropped Blob into a File and
            * route it through the existing uploadAsset path. The new
            * AssetNode spawns at the centre of the current viewport
