@@ -87,8 +87,10 @@ export interface CaptionStyleSettings {
   accentColor?: string;
   /** Legacy highlight color field kept for older saved presets. */
   highlightColor?: string;
-  /** Animation style. */
+  /** In animation style. */
   animation: CaptionAnimation;
+  /** Optional Out animation style. Falls back to `animation` for older presets. */
+  outAnimation?: CaptionAnimation;
   /** Continuous text motion, separate from cue entry/exit transitions. */
   textAnimation: CaptionTextAnimation;
 
@@ -296,6 +298,7 @@ export function normalizeCaptionSettings(settings: CaptionStyleSettings): Captio
     ...settings,
     accentColor,
     highlightColor: settings.highlightColor || accentColor,
+    outAnimation: settings.outAnimation ?? settings.animation,
   };
 }
 

@@ -38,6 +38,7 @@ import {
   Maximize2,
   Video,
   Mic2,
+  Sparkles,
   Settings as SettingsIcon,
   Palette,
   Plus,
@@ -80,6 +81,7 @@ export type SectionKey =
   | "voice_gen"
   | "voice_translate"
   | "auto_subtitle"
+  | "smart_frames"
   | "image_to_3d"
   | "url_asset"
   | "editor"
@@ -105,6 +107,7 @@ type NavItem = {
     | "workspace.sidebar.voice_gen"
     | "workspace.sidebar.voice_translate"
     | "workspace.sidebar.auto_subtitle"
+    | "workspace.sidebar.smart_frames"
     | "workspace.sidebar.threed_gen"
     | "workspace.sidebar.url_asset"
     | "workspace.sidebar.editing_tools"
@@ -143,6 +146,7 @@ const NAV_SECTIONS: SidebarSection[] = [
       ],
       [{ id: "image_upscale", labelKey: "workspace.sidebar.image_upscale", icon: Maximize2, width: "full" }],
       [{ id: "auto_subtitle", labelKey: "workspace.sidebar.auto_subtitle", badgeKey: "workspace.sidebar.editor_new", icon: Captions, width: "full" }],
+      [{ id: "smart_frames", labelKey: "workspace.sidebar.smart_frames", badgeKey: "workspace.sidebar.editor_new", icon: Sparkles, width: "full", tone: "accent" }],
       [{ id: "image_to_3d", labelKey: "workspace.sidebar.threed_gen", icon: Box, width: "full" }],
     ],
   },
@@ -848,6 +852,8 @@ function getSidebarToolTooltip(
       return t("workspace.sidebar.url_asset_tip");
     case "auto_subtitle":
       return t("workspace.sidebar.auto_subtitle_tip");
+    case "smart_frames":
+      return t("workspace.sidebar.smart_frames_tip");
     case "image_to_3d":
       return t("workspace.sidebar.threed_gen_tip");
     case "editor":

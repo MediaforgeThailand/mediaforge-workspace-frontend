@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent, type PointerEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -47,6 +47,7 @@ import {
   CreateImagePanel,
   CreateVideoPanel,
   StandalonePromptMentionTextarea,
+  type CreatePanelCostQuote,
   type CreateVideoPanelSetting,
 } from "@/components/workspace/CreateImagePanel";
 import { normalizeUrlAssetSource, validateUrlAssetSource } from "@/components/workspace/urlAssetValidation";
@@ -86,7 +87,9 @@ import {
 } from "@/components/ui/select";
 import NodePreviewLightbox, { type PreviewPayload } from "./NodePreviewLightbox";
 import { useFreshSignedUrl } from "./useFreshSignedUrl";
+import { useMirroredTripoUrl } from "./useMirroredTripoUrl";
 import { getSignedUrl } from "@/hooks/useSignedUrl";
+import { loadModelViewer } from "@/lib/loadModelViewer";
 import { AudioPlayButton } from "./AudioPlayButton";
 import GenerateIcon from "@/components/GenerateIcon";
 import {
@@ -440,7 +443,53 @@ type UploadSlot =
   | "translate-video"
   | "auto-subtitle-video"
   | "upscale-image"
-  | "model-image";
+  | "model-image"
+  | "model-3d";
+
+type StandaloneThreeDMode = "image_to_3d" | "auto_rig" | "animate";
+
+const THREE_D_STANDALONE_NODE_TYPES = new Set<string>([
+  "imageTo3dNode",
+  "tripoImportModelNode",
+  "tripoPreRigCheckNode",
+  "tripoRigNode",
+  "tripoAnimateNode",
+  "tripoExportNode",
+]);
+
+const TRIPO_RIG_TYPES = [
+  "biped",
+  "quadruped",
+  "hexapod",
+  "octopod",
+  "avian",
+  "serpentine",
+  "aquatic",
+];
+
+const TRIPO_RIG_TYPE_SET = new Set(TRIPO_RIG_TYPES);
+const TRIPO_AUTO_RIG_TYPE = "auto";
+const MODEL_3D_UPLOAD_ACCEPT = ".glb,.obj,.fbx,.stl,model/gltf-binary,model/obj,model/fbx,model/stl,application/octet-stream";
+const MODEL_3D_IMPORT_MAX_BYTES = 20 * 1024 * 1024;
+
+const TRIPO_ANIMATION_PRESETS = [
+  "preset:idle",
+  "preset:walk",
+  "preset:run",
+  "preset:dive",
+  "preset:climb",
+  "preset:jump",
+  "preset:slash",
+  "preset:shoot",
+  "preset:hurt",
+  "preset:fall",
+  "preset:turn",
+  "preset:quadruped:walk",
+  "preset:hexapod:walk",
+  "preset:octopod:walk",
+  "preset:serpentine:march",
+  "preset:aquatic:march",
+];
 
 /** Optional reference role.
  *
@@ -465,6 +514,14 @@ interface UploadedRef {
   durationSec?: number;
   width?: number;
   height?: number;
+  modelUrl?: string;
+  previewUrl?: string;
+  taskId?: string;
+  tripoModelTaskId?: string;
+  originalModelTaskId?: string;
+  providerTaskId?: string;
+  providerMeta?: Record<string, unknown>;
+  nodeType?: string;
 }
 
 const TRANSLATE_VIDEO_EXTENSION_RE = /\.(mp4|mov|webm|m4v)(?:[?#].*)?$/i;
@@ -577,6 +634,14 @@ type PanelReferenceAsset = {
   storageBucket?: "ai-media" | "user_assets";
   storagePath?: string;
   durationSec?: number;
+  modelUrl?: string;
+  previewUrl?: string;
+  taskId?: string;
+  tripoModelTaskId?: string;
+  originalModelTaskId?: string;
+  providerTaskId?: string;
+  providerMeta?: Record<string, unknown>;
+  nodeType?: string;
 };
 
 type DeletableReference = {
@@ -637,6 +702,159 @@ interface StandaloneResult {
   credits_spent?: number;
 }
 
+const STANDALONE_JOB_TERMINAL_STATUSES = new Set<StandaloneJobRow["status"]>([
+  "completed",
+  "failed",
+  "permanent_failed",
+]);
+
+function waitMs(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function normalizePreRigBoolean(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+  if (typeof value !== "string") return null;
+  const text = value.trim().toLowerCase();
+  if (!text) return null;
+  if (/not\s+riggable|cannot\s+be\s+rigged|can't\s+be\s+rigged|unsupported/.test(text)) {
+    return false;
+  }
+  if (/riggable|passed|pass|true|yes/.test(text)) return true;
+  if (/false|no|failed|fail/.test(text)) return false;
+  return null;
+}
+
+function normalizeTripoRigType(value: unknown): string {
+  const text = firstText(value)?.trim().toLowerCase();
+  return text && TRIPO_RIG_TYPE_SET.has(text) ? text : "";
+}
+
+function tripoPreRigInfoFromJob(job: StandaloneJobRow): {
+  riggable: boolean | null;
+  rigType: string;
+} {
+  const result = job.result;
+  const outputs = result?.outputs ?? {};
+  const providerMeta = result?.provider_meta ?? {};
+  const text = firstText(result?.text, outputs.text, outputs.message);
+  const textRigType = text?.match(/\(([^)]+)\)/)?.[1];
+  return {
+    riggable: normalizePreRigBoolean(
+      providerMeta.riggable ?? outputs.riggable ?? text,
+    ),
+    rigType: normalizeTripoRigType(
+      providerMeta.rig_type ?? outputs.rig_type ?? textRigType,
+    ),
+  };
+}
+
+function standaloneJobFailureMessage(
+  job: Pick<StandaloneJobRow, "error" | "last_error" | "result">,
+  fallback: string,
+): string {
+  return (
+    firstText(
+      job.error,
+      job.last_error,
+      job.result?.text,
+      job.result?.provider_meta?.message,
+    ) ?? fallback
+  );
+}
+
+function threeDJobTypeLabel(job: Pick<StandaloneJobRow, "node_type">): string {
+  switch (job.node_type) {
+    case "tripoPreRigCheckNode":
+      return "Rig Check";
+    case "tripoRigNode":
+      return "Auto Rig";
+    case "tripoAnimateNode":
+      return "Animate Preset";
+    case "tripoImportModelNode":
+      return "Import 3D";
+    case "tripoExportNode":
+      return "Export 3D";
+    case "imageTo3dNode":
+    default:
+      return "Image to 3D";
+  }
+}
+
+function threeDJobStatusLabel(status: StandaloneJobRow["status"]): string {
+  switch (status) {
+    case "queued":
+      return "Queued";
+    case "running":
+      return "Running";
+    case "completed":
+      return "Ready";
+    case "failed":
+    case "permanent_failed":
+      return "Failed";
+    default:
+      return status;
+  }
+}
+
+function cleanThreeDJobFailureMessage(message: string): string {
+  return message
+    .replace(/^error:\s*/i, "")
+    .replace(/\bpermanent_failed\b/gi, "failed")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function threeDJobFailureHint(job: StandaloneJobRow): string {
+  const raw = cleanThreeDJobFailureMessage(standaloneJobFailureMessage(job, ""));
+  if (raw && !/^failed$/i.test(raw)) return raw;
+  switch (job.node_type) {
+    case "tripoPreRigCheckNode":
+      return "Tripo could not confirm that this model is riggable. Try a clearer body shape, less occlusion, or a T/A-pose style model.";
+    case "tripoRigNode":
+      return "Tripo rejected rigging. Run Rig Check first, then match the rig type to the model: biped for humanoid, quadruped for four-legged characters.";
+    case "tripoAnimateNode":
+      return "Animation preset needs a rigged model first. Run Auto Rig successfully before animation.";
+    case "tripoImportModelNode":
+      return "The uploaded model could not be imported. Try GLB/OBJ/FBX/STL with a clean mesh and supported file size.";
+    case "imageTo3dNode":
+    default:
+      return "Generation failed. Try a clearer front reference image or fewer/cleaner reference views.";
+  }
+}
+
+function threeDJobTimelineSummary(job: StandaloneJobRow): string {
+  if (job.status === "failed" || job.status === "permanent_failed") {
+    return `Why: ${threeDJobFailureHint(job)}`;
+  }
+  if (job.status === "queued") return "Waiting for the worker to start this run.";
+  if (job.status === "running") return "Processing with Tripo. The output will appear here when ready.";
+  switch (job.node_type) {
+    case "tripoPreRigCheckNode": {
+      const info = tripoPreRigInfoFromJob(job);
+      if (info.riggable === false) return "Rig Check finished: Tripo says this model is not riggable yet.";
+      return info.rigType
+        ? `Rig Check passed. Suggested rig type: ${info.rigType}.`
+        : "Rig Check passed. You can continue to Auto Rig.";
+    }
+    case "tripoRigNode":
+      return "Rigged model is ready. Use it for animation presets or export.";
+    case "tripoAnimateNode":
+      return "Animated model is ready. Export GLB/FBX when you are happy with it.";
+    case "tripoImportModelNode":
+      return "External 3D model is imported and ready for Rig Check or Auto Rig.";
+    case "tripoExportNode":
+      return "Export package is ready to download.";
+    case "imageTo3dNode":
+    default:
+      return "3D model is ready. Use it for Auto Rig, animation, or export.";
+  }
+}
+
 interface VoiceTranslateTask {
   id: string;
   jobId?: string;
@@ -672,6 +890,14 @@ interface AutoSubtitleResultItem {
   editorProjectError?: string;
   createdAt: number;
   duration: number;
+}
+
+function autoSubtitleResultMatchesMedia(
+  result: AutoSubtitleResultItem,
+  media: UploadedRef | null | undefined,
+): boolean {
+  if (!media) return false;
+  return result.sourceUrl === media.url || result.sourceName === media.name;
 }
 
 interface AutoSubtitleProgress {
@@ -764,6 +990,7 @@ interface StandaloneFormState {
   autoSubtitleStrokeWidth: number;
   autoSubtitleBackground: boolean;
   autoSubtitleTransition: CaptionAnimation;
+  autoSubtitleOutTransition: CaptionAnimation;
   autoSubtitleTextAnimation: CaptionTextAnimation;
   autoSubtitleSegmentationMode: AutoSubtitleSegmentationMode;
   autoSubtitleWordsPerLine: number;
@@ -781,6 +1008,17 @@ interface StandaloneFormState {
   modelImages: UploadedRef[];
   texture: boolean;
   pbr: boolean;
+  threeDMode?: StandaloneThreeDMode;
+  model3dSource?: UploadedRef | null;
+  rigType?: string;
+  rigSpec?: "tripo" | "mixamo";
+  rigOutFormat?: "glb" | "fbx";
+  animationPreset?: string;
+  animationBatch?: string;
+  animationOutFormat?: "glb" | "fbx";
+  animationBake?: boolean;
+  animationWithGeometry?: boolean;
+  animationInPlace?: boolean;
   urlAssetSource?: string;
   urlAssetFileName?: string;
 }
@@ -835,6 +1073,7 @@ const DEFAULT_AUTO_SUBTITLE_PARAMS = {
   autoSubtitleStrokeWidth: 6,
   autoSubtitleBackground: false,
   autoSubtitleTransition: "fade" as const,
+  autoSubtitleOutTransition: "fade" as const,
   autoSubtitleTextAnimation: "none" as const,
   autoSubtitleSegmentationMode: "sentence" as const,
   autoSubtitleWordsPerLine: 4,
@@ -1313,6 +1552,17 @@ const INITIAL_FORMS: Record<StandaloneToolKey, StandaloneFormState> = {
     modelImages: [],
     texture: true,
     pbr: true,
+    threeDMode: "image_to_3d",
+    model3dSource: null,
+    rigType: TRIPO_AUTO_RIG_TYPE,
+    rigSpec: "tripo",
+    rigOutFormat: "glb",
+    animationPreset: "preset:walk",
+    animationBatch: "",
+    animationOutFormat: "glb",
+    animationBake: true,
+    animationWithGeometry: true,
+    animationInPlace: false,
   },
   url_asset: {
     model: STANDALONE_TOOLS.url_asset.defaultModel,
@@ -1515,6 +1765,61 @@ function standaloneCreateButtonLabel(
   return language === "th" ? "สร้าง" : "Generate";
 }
 
+function standaloneThreeDMode(form: StandaloneFormState): StandaloneThreeDMode {
+  return form.threeDMode ?? "image_to_3d";
+}
+
+function standaloneNodeTypeForTool(
+  tool: StandaloneToolKey,
+  form: StandaloneFormState,
+): string {
+  if (tool !== "image_to_3d") return STANDALONE_TOOLS[tool].nodeType;
+  switch (standaloneThreeDMode(form)) {
+    case "auto_rig":
+      return "tripoRigNode";
+    case "animate":
+      return "tripoAnimateNode";
+    case "image_to_3d":
+    default:
+      return "imageTo3dNode";
+  }
+}
+
+function standaloneCreateButtonLabelForForm(
+  tool: StandaloneToolKey,
+  form: StandaloneFormState,
+  language: "en" | "th",
+  estimatedCost?: number | null,
+) {
+  if (tool !== "image_to_3d") {
+    return standaloneCreateButtonLabel(tool, language, estimatedCost);
+  }
+  if (
+    estimatedCost != null &&
+    Number.isFinite(estimatedCost) &&
+    estimatedCost > 0
+  ) {
+    const action =
+      standaloneThreeDMode(form) === "auto_rig"
+        ? "Auto Rig"
+        : standaloneThreeDMode(form) === "animate"
+          ? "Animate"
+          : "Generate";
+    return `${action} ${new Intl.NumberFormat("en-US", {
+      maximumFractionDigits: 0,
+    }).format(Math.ceil(estimatedCost))}`;
+  }
+  switch (standaloneThreeDMode(form)) {
+    case "auto_rig":
+      return "Auto Rig";
+    case "animate":
+      return "Animate 3D";
+    case "image_to_3d":
+    default:
+      return "Create 3D";
+  }
+}
+
 function workspaceCostMultiplierForTool(
   tool: StandaloneToolKey,
   model: string,
@@ -1712,7 +2017,7 @@ function isUpscaleStandaloneJob(job: Pick<StandaloneJobRow, "node_type">) {
 
 function standaloneJobModelLabel(
   job: Pick<StandaloneJobRow, "node_type" | "model">,
-  params: Record<string, unknown>,
+  params: Record<string, unknown> = {},
 ) {
   if (isUpscaleStandaloneJob(job)) return UPSCALE_MEDIAFORGE_LABEL;
   if (job.node_type === "voiceTranslateNode") return "Translate";
@@ -1873,6 +2178,8 @@ export default function StandaloneGenerator({
 
   const activeDef = STANDALONE_TOOLS[activeTool];
   const form = forms[activeTool];
+  const activeThreeDMode = standaloneThreeDMode(form);
+  const activeStandaloneNodeType = standaloneNodeTypeForTool(activeTool, form);
   const selectedModel =
     activeDef.models.find((model) => model.id === form.model) ??
     activeDef.models[0] ??
@@ -1907,6 +2214,17 @@ export default function StandaloneGenerator({
     [jobsQuery.data],
   );
   const activeJobIdsKey = activeJobs.map((job) => job.id).join("|");
+  const threeDModelSourceOptions = useMemo(() => {
+    if (activeTool !== "image_to_3d") return [];
+    return mergeReferenceOptions(
+      [
+        form.model3dSource,
+        ...(jobsQuery.data ?? []).map(referenceFromGenerationJob),
+        ...(projectReferencesQuery.data ?? []),
+      ],
+      80,
+    ).filter((ref) => isStandaloneModel3dReference(ref));
+  }, [activeTool, form.model3dSource, jobsQuery.data, projectReferencesQuery.data]);
   // Per-tool active-job count drives the Generate button's disabled
   // state. The previous gating only used the local `running` flag,
   // which we cleared as soon as the enqueue API returned (~1-2s)
@@ -1917,15 +2235,18 @@ export default function StandaloneGenerator({
   // running in the background doesn't lock the image button (and
   // vice versa).
   const activeJobsForCurrentTool = useMemo(() => {
-    const nodeType = STANDALONE_TOOLS[activeTool]?.nodeType;
+    const nodeType = activeStandaloneNodeType;
     if (!nodeType) return 0;
     return activeJobs.filter((job) => {
       if (activeTool === "voice_translate") {
         return isVoiceTranslateStandaloneJob(job);
       }
+      if (activeTool === "image_to_3d") {
+        return THREE_D_STANDALONE_NODE_TYPES.has(job.node_type);
+      }
       return job.node_type === nodeType;
     }).length;
-  }, [activeJobs, activeTool]);
+  }, [activeJobs, activeStandaloneNodeType, activeTool]);
 
   useEffect(() => {
     if (!hasActiveJobs) return;
@@ -2446,7 +2767,7 @@ export default function StandaloneGenerator({
         nextPatch.videoMultiPrompt = "";
       }
     }
-    if (activeTool === "image_to_3d") {
+    if (activeTool === "image_to_3d" && activeThreeDMode === "image_to_3d") {
       const nextRefs = threeDReferencesForForm(form).slice(0, max3dRefsForModel(model));
       nextPatch.modelImages = nextRefs;
       nextPatch.modelImage = nextRefs[0] ?? null;
@@ -2464,51 +2785,90 @@ export default function StandaloneGenerator({
     if (creditCostsLoading) return null;
     const params = buildCurrentParams(activeTool, form);
     if (!params) return null;
-    const quote = calculateNodeCostQuote({
-      schemaKey: activeDef.nodeType,
-      params,
-      creditCosts,
-    });
-    if (!quote) return null;
     const runCount =
       activeTool === "image_gen"
         ? Math.min(4, Math.max(1, Number(form.imageCount) || 1))
         : activeTool === "video_gen"
           ? Math.min(4, Math.max(1, Number(form.videoCount) || 1))
         : 1;
-    if (quote.baseCost <= 0) {
+
+    const quoteForNode = (
+      schemaKey: string,
+      quoteParams: Record<string, unknown>,
+      quantity: number,
+    ): CreatePanelCostQuote | null => {
+      const quote = calculateNodeCostQuote({
+        schemaKey,
+        params: quoteParams,
+        creditCosts,
+      });
+      if (!quote) return null;
+      if (quote.baseCost <= 0) {
+        return {
+          fullCost: 0,
+          modelCost: 0,
+          finalCost: 0,
+          modelDiscountPercent: 0,
+          packageDiscountPercent,
+          packageDiscountLabel,
+          totalDiscountPercent: 0,
+        };
+      }
+      const multiplier = workspaceCostMultiplierForTool(
+        activeTool,
+        String(quoteParams.model_name ?? form.model),
+        workspaceCreditMultiplier,
+      );
+      const fullRunCost = Math.max(1, Math.ceil(quote.baseCost * multiplier));
+      const modelRunCost = applyNodeCostDiscount(fullRunCost, quote.discountPercent);
+      const finalRunCost = applyPackageCostDiscount(modelRunCost, packageDiscountPercent);
+      const fullCost = fullRunCost * quantity;
+      const modelCost = modelRunCost * quantity;
+      const finalCost = finalRunCost * quantity;
       return {
-        fullCost: 0,
-        modelCost: 0,
-        finalCost: 0,
-        modelDiscountPercent: 0,
+        fullCost,
+        modelCost,
+        finalCost,
+        modelDiscountPercent: quote.discountPercent,
         packageDiscountPercent,
         packageDiscountLabel,
-        totalDiscountPercent: 0,
+        totalDiscountPercent: effectiveNodeDiscountPercent(fullCost, finalCost),
       };
+    };
+
+    const mainQuote = quoteForNode(activeStandaloneNodeType, params, runCount);
+    if (!mainQuote) return null;
+    if (activeTool !== "image_to_3d" || standaloneThreeDMode(form) !== "auto_rig") {
+      return mainQuote;
     }
-    const multiplier = workspaceCostMultiplierForTool(
-      activeTool,
-      form.model,
-      workspaceCreditMultiplier,
+    const importQuote =
+      form.model3dSource && !tripoModelTaskIdFromReference(form.model3dSource)
+        ? quoteForNode(
+            "tripoImportModelNode",
+            { model_name: "tripo3d-import" },
+            1,
+          )
+        : null;
+    const preflightQuote = quoteForNode(
+      "tripoPreRigCheckNode",
+      { model_name: "tripo3d-prerigcheck" },
+      1,
     );
-    const fullRunCost = Math.max(1, Math.ceil(quote.baseCost * multiplier));
-    const modelRunCost = applyNodeCostDiscount(fullRunCost, quote.discountPercent);
-    const finalRunCost = applyPackageCostDiscount(modelRunCost, packageDiscountPercent);
-    const fullCost = fullRunCost * runCount;
-    const modelCost = modelRunCost * runCount;
-    const finalCost = finalRunCost * runCount;
+    if (!preflightQuote) return mainQuote;
+    const fullCost = mainQuote.fullCost + preflightQuote.fullCost + (importQuote?.fullCost ?? 0);
+    const modelCost = mainQuote.modelCost + preflightQuote.modelCost + (importQuote?.modelCost ?? 0);
+    const finalCost = mainQuote.finalCost + preflightQuote.finalCost + (importQuote?.finalCost ?? 0);
     return {
       fullCost,
       modelCost,
       finalCost,
-      modelDiscountPercent: quote.discountPercent,
+      modelDiscountPercent: effectiveNodeDiscountPercent(fullCost, modelCost),
       packageDiscountPercent,
       packageDiscountLabel,
       totalDiscountPercent: effectiveNodeDiscountPercent(fullCost, finalCost),
     };
   }, [
-    activeDef.nodeType,
+    activeStandaloneNodeType,
     activeTool,
     creditCosts,
     creditCostsLoading,
@@ -2533,6 +2893,14 @@ export default function StandaloneGenerator({
     setUploadAccept(accept);
     if (fileInputRef.current) fileInputRef.current.accept = accept;
     fileInputRef.current?.click();
+  };
+
+  const rememberUploadedReference = (reference: UploadedRef) => {
+    if (!user?.id || !activeProject?.id) return;
+    queryClient.setQueryData<UploadedRef[]>(
+      ["standalone-project-reference-assets", user.id, activeProject.id],
+      (items) => mergeReferenceOptions([reference, ...(items ?? [])], 120),
+    );
   };
 
   const panelBottom =
@@ -2596,7 +2964,11 @@ export default function StandaloneGenerator({
         ? compact([form.videoRefImage, form.videoRefVideo])
         : compact([form.videoStart, videoSupportsEnd ? form.videoEnd : null]);
     }
-    if (activeTool === "image_to_3d") return threeDReferencesForForm(form);
+    if (activeTool === "image_to_3d") {
+      return activeThreeDMode === "image_to_3d"
+        ? threeDReferencesForForm(form)
+        : compact([form.model3dSource ?? null]);
+    }
     if (activeTool === "voice_translate") return compact([form.translateVideo]);
     if (activeTool === "auto_subtitle") return compact([form.autoSubtitleVideo]);
     return [];
@@ -2622,7 +2994,9 @@ export default function StandaloneGenerator({
               ? 1
               : 0
         : activeTool === "image_to_3d"
-          ? max3dRefsForModel(form.model)
+          ? activeThreeDMode === "image_to_3d"
+            ? max3dRefsForModel(form.model)
+            : 1
         : activeTool === "voice_translate"
             ? 1
         : activeTool === "auto_subtitle"
@@ -2634,7 +3008,7 @@ export default function StandaloneGenerator({
       return "image-ref";
     }
     if (activeTool === "image_to_3d") {
-      return "model-image";
+      return activeThreeDMode === "image_to_3d" ? "model-image" : "model-3d";
     }
     if (activeTool === "image_upscale") {
       return "upscale-image";
@@ -2709,6 +3083,12 @@ export default function StandaloneGenerator({
         patch.autoSubtitleVideo = uploaded;
       } else if (slot === "upscale-image") {
         patch.upscaleImage = uploaded;
+      } else if (slot === "model-3d") {
+        patch.model3dSource = {
+          ...uploaded,
+          modelUrl: uploaded.modelUrl ?? uploaded.url,
+          mime: uploaded.mime || inferModelMime(uploaded.url),
+        };
       } else if (slot === "model-image") {
         const maxRefs = max3dRefsForModel(current.model);
         const existingRefs = threeDReferencesForForm(current);
@@ -2743,7 +3123,9 @@ export default function StandaloneGenerator({
     const slot = slotOverride ?? getPanelReferenceSlot();
     if (!slot) return;
     const candidates =
-      activeTool === "image_gen" || activeTool === "image_to_3d"
+      slot === "model-3d"
+        ? files.slice(0, 1)
+      : activeTool === "image_gen" || activeTool === "image_to_3d"
         ? files.slice(0, Math.max(0, panelMaxReferences - panelReferences.length))
         : files.slice(0, 1);
     if (candidates.length === 0) return;
@@ -2755,12 +3137,15 @@ export default function StandaloneGenerator({
         const needsTranslateMedia = slot === "translate-video";
         const needsAutoSubtitleMedia = slot === "auto-subtitle-video";
         const needsUpscaleMedia = slot === "upscale-image";
+        const needsModel3d = slot === "model-3d";
         const isValidType = needsTranslateMedia
           ? isTranslateMediaFile(file)
           : needsAutoSubtitleMedia
             ? isAutoSubtitleMediaFile(file)
           : needsUpscaleMedia
             ? file.type.startsWith("image/")
+          : needsModel3d
+            ? isModel3dUploadFile(file)
           : needsVideo
             ? file.type.startsWith("video/")
             : file.type.startsWith("image/");
@@ -2776,10 +3161,16 @@ export default function StandaloneGenerator({
                 ? language === "th"
                   ? "เลือกไฟล์ภาพสำหรับ Upscale Mediaforge"
                   : "Choose an image for Upscale Mediaforge."
+              : needsModel3d
+                ? "Choose a GLB, OBJ, FBX, or STL model file."
               : needsVideo
                 ? t("workspace.toast.upload_video_ref")
                 : t("workspace.toast.upload_image_ref"),
           );
+          continue;
+        }
+        if (needsModel3d && file.size > MODEL_3D_IMPORT_MAX_BYTES) {
+          toast.error("Tripo OpenAPI model import supports GLB, OBJ, FBX, or STL files up to 20MB.");
           continue;
         }
         if (isTranslateVideoOverUploadLimit(slot, file)) {
@@ -2817,10 +3208,12 @@ export default function StandaloneGenerator({
           }
         }
         const uploaded = await uploadReference(file, user?.id, activeProject.id);
-        applyUploadedReference(slot, {
+        const uploadedReference = {
           ...uploaded,
           durationSec: durationSec ?? uploaded.durationSec,
-        });
+        };
+        rememberUploadedReference(uploadedReference);
+        applyUploadedReference(slot, uploadedReference);
       }
       toast.success(t("workspace.toast.reference_uploaded"));
     } catch (err) {
@@ -2841,6 +3234,7 @@ export default function StandaloneGenerator({
     const expectsTranslateMedia = slot === "translate-video";
     const expectsAutoSubtitleMedia = slot === "auto-subtitle-video";
     const expectsUpscaleMedia = slot === "upscale-image";
+    const expectsModel3d = slot === "model-3d";
     if (expectsAutoSubtitleMedia && !referenceMime.startsWith("video/")) {
       toast.error("Choose an MP4 video for Auto Subtitle.");
       return;
@@ -2868,11 +3262,16 @@ export default function StandaloneGenerator({
       toast.error(t("workspace.toast.upload_video_ref"));
       return;
     }
+    if (expectsModel3d && !isStandaloneModel3dReference(reference)) {
+      toast.error("Choose a GLB, OBJ, FBX, or STL model file.");
+      return;
+    }
     if (
       !expectsVideo &&
       !expectsTranslateMedia &&
       !expectsAutoSubtitleMedia &&
       !expectsUpscaleMedia &&
+      !expectsModel3d &&
       (referenceMime.startsWith("video/") || referenceMime.startsWith("audio/"))
     ) {
       toast.error(t("workspace.toast.upload_image_ref"));
@@ -2915,6 +3314,14 @@ export default function StandaloneGenerator({
       storageBucket: reference.storageBucket,
       storagePath: reference.storagePath,
       durationSec,
+      modelUrl: reference.modelUrl,
+      previewUrl: reference.previewUrl,
+      taskId: reference.taskId,
+      tripoModelTaskId: reference.tripoModelTaskId,
+      originalModelTaskId: reference.originalModelTaskId,
+      providerTaskId: reference.providerTaskId,
+      providerMeta: reference.providerMeta,
+      nodeType: reference.nodeType,
     });
   };
 
@@ -2939,6 +3346,7 @@ export default function StandaloneGenerator({
     setUploading(slot);
     try {
       const uploaded = await uploadReference(file, user?.id, activeProject.id);
+      rememberUploadedReference(uploaded);
       applyUploadedReference(slot, uploaded);
       toast.success(t("workspace.toast.reference_uploaded"));
     } catch (err) {
@@ -2990,9 +3398,13 @@ export default function StandaloneGenerator({
         if (current.videoRefImage?.id === id) patch.videoRefImage = null;
         if (current.videoRefVideo?.id === id) patch.videoRefVideo = null;
       } else if (activeTool === "image_to_3d") {
-        const nextRefs = threeDReferencesForForm(current).filter((ref) => ref.id !== id);
-        patch.modelImages = nextRefs;
-        patch.modelImage = nextRefs[0] ?? null;
+        if (standaloneThreeDMode(current) === "image_to_3d") {
+          const nextRefs = threeDReferencesForForm(current).filter((ref) => ref.id !== id);
+          patch.modelImages = nextRefs;
+          patch.modelImage = nextRefs[0] ?? null;
+        } else if (current.model3dSource?.id === id) {
+          patch.model3dSource = null;
+        }
       } else if (activeTool === "voice_translate" && current.translateVideo?.id === id) {
         patch.translateVideo = null;
       } else if (activeTool === "auto_subtitle" && current.autoSubtitleVideo?.id === id) {
@@ -3124,7 +3536,9 @@ export default function StandaloneGenerator({
     activeTool === "image_upscale"
       ? language === "th" ? "ไฟล์ต้นฉบับ" : "Source media"
       : activeTool === "image_to_3d"
-      ? t("workspace.standalone.reference_image")
+      ? activeThreeDMode === "image_to_3d"
+        ? t("workspace.standalone.reference_image")
+        : "Source 3D model"
       : activeTool === "video_gen"
         ? t("workspace.standalone.reference_image")
         : t("workspace.standalone.references");
@@ -3140,7 +3554,10 @@ export default function StandaloneGenerator({
         videoPanelMode === "reference" &&
         videoSupportsReferenceVideo(form.model) &&
         (!videoSupportsReferenceImage(form.model) || !!form.videoRefImage));
+    const wantsModelAssets =
+      activeTool === "image_to_3d" && activeThreeDMode !== "image_to_3d";
     return mergeReferenceOptions([
+      ...(wantsModelAssets ? [form.model3dSource] : []),
       ...(jobsQuery.data ?? []).map(referenceFromGenerationJob),
       ...(projectReferencesQuery.data ?? []),
     ])
@@ -3150,6 +3567,9 @@ export default function StandaloneGenerator({
         }
         if (activeTool === "image_upscale") {
           return ref.mime.startsWith("image/");
+        }
+        if (wantsModelAssets) {
+          return isStandaloneModel3dReference(ref);
         }
         return wantsVideoAssets
           ? ref.mime.startsWith("video/") || ref.mime.startsWith("audio/")
@@ -3162,6 +3582,8 @@ export default function StandaloneGenerator({
     form.videoRefImage,
     jobsQuery.data,
     projectReferencesQuery.data,
+    activeThreeDMode,
+    form.model3dSource,
     videoPanelMode,
   ]);
 
@@ -3926,12 +4348,15 @@ export default function StandaloneGenerator({
     const needsTranslateMedia = slot === "translate-video";
     const needsAutoSubtitleMedia = slot === "auto-subtitle-video";
     const needsUpscaleMedia = slot === "upscale-image";
+    const needsModel3d = slot === "model-3d";
     const isValidType = needsTranslateMedia
       ? isTranslateMediaFile(file)
       : needsAutoSubtitleMedia
         ? isAutoSubtitleMediaFile(file)
       : needsUpscaleMedia
         ? file.type.startsWith("image/")
+      : needsModel3d
+        ? isModel3dUploadFile(file)
       : needsVideo
         ? file.type.startsWith("video/")
         : file.type.startsWith("image/");
@@ -3947,6 +4372,8 @@ export default function StandaloneGenerator({
             ? language === "th"
               ? "เลือกไฟล์ภาพสำหรับ Upscale Mediaforge"
               : "Choose an image for Upscale Mediaforge."
+          : needsModel3d
+            ? "Choose a GLB, OBJ, FBX, or STL model file."
           : needsVideo
             ? t("workspace.toast.upload_video_ref")
             : t("workspace.toast.upload_image_ref"),
@@ -3961,6 +4388,11 @@ export default function StandaloneGenerator({
     }
     if (needsAutoSubtitleMedia && file.size > AUTO_SUBTITLE_UPLOAD_MAX_BYTES) {
       toast.error(autoSubtitleUploadSizeMessage());
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    if (needsModel3d && file.size > MODEL_3D_IMPORT_MAX_BYTES) {
+      toast.error("Tripo OpenAPI model import supports GLB, OBJ, FBX, or STL files up to 20MB.");
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
@@ -3993,10 +4425,12 @@ export default function StandaloneGenerator({
         }
       }
       const uploaded = await uploadReference(file, user?.id, activeProject.id);
-      applyUploadedReference(slot, {
+      const uploadedReference = {
         ...uploaded,
         durationSec: durationSec ?? uploaded.durationSec,
-      });
+      };
+      rememberUploadedReference(uploadedReference);
+      applyUploadedReference(slot, uploadedReference);
       toast.success(t("workspace.toast.reference_uploaded"));
     } catch (err) {
       toast.error(friendlyError(err, language === "th" ? "th" : "en"));
@@ -4121,19 +4555,20 @@ export default function StandaloneGenerator({
             ? Math.min(4, Math.max(1, Number(form.videoCount) || 1))
           : 1;
       try {
-        for (let index = 0; index < runCount; index += 1) {
-          const batchParams =
-            runCount > 1
-              ? { ...params, batch_index: index + 1, batch_count: runCount }
-              : params;
+        const enqueueStandaloneJob = async (
+          nodeType: string,
+          jobParams: Record<string, unknown>,
+          jobInputs: Record<string, unknown>,
+          index: number | string,
+        ): Promise<string> => {
           const { data, error } = await supabase.functions.invoke(
             RUN_EDGE_FUNCTION,
             {
               body: {
                 action: "enqueue_workspace_job",
-                node_type: activeDef.nodeType,
-                params: batchParams,
-                inputs,
+                node_type: nodeType,
+                params: jobParams,
+                inputs: jobInputs,
                 mentioned_assets: mentionedAssets,
                 project_id: activeProject.id,
                 workspace_id: null,
@@ -4151,6 +4586,123 @@ export default function StandaloneGenerator({
                 t("workspace.standalone.error_failed_queue"),
             );
           }
+          return resp.job_id;
+        };
+
+        const waitForStandaloneJob = async (
+          jobId: string,
+          timeoutMs = 5 * 60 * 1000,
+        ): Promise<StandaloneJobRow> => {
+          const startedAt = Date.now();
+          let lastWarning = "";
+          while (Date.now() - startedAt < timeoutMs) {
+            const { data, error } = await supabase.functions.invoke(
+              RUN_EDGE_FUNCTION,
+              {
+                body: { action: "poll_workspace_job", job_id: jobId },
+              },
+            );
+            if (error) throw new Error(await functionErrorMessage(error));
+            const resp = data as {
+              job?: StandaloneJobRow | null;
+              error?: string;
+              warning?: string;
+            } | null;
+            if (resp?.error) throw new Error(resp.error);
+            if (resp?.warning) lastWarning = resp.warning;
+            if (resp?.job && STANDALONE_JOB_TERMINAL_STATUSES.has(resp.job.status)) {
+              return resp.job;
+            }
+            await refetchJobs();
+            await waitMs(4000);
+          }
+          throw new Error(
+            lastWarning ||
+              "Rig Check is taking too long. Please try Auto Rig again in a moment.",
+          );
+        };
+
+        let preparedParams = params;
+        let preparedInputs = inputs;
+        if (activeTool === "image_to_3d" && activeThreeDMode === "auto_rig") {
+          if (form.model3dSource && !tripoModelTaskIdFromReference(form.model3dSource)) {
+            const importPayload = externalModel3dInputFromReference(form.model3dSource);
+            if (!importPayload) {
+              throw new Error("Upload a GLB, OBJ, FBX, or STL model before Auto Rig.");
+            }
+            const importJobId = await enqueueStandaloneJob(
+              "tripoImportModelNode",
+              { model_name: "tripo3d-import" },
+              { model3d: importPayload },
+              "import-model",
+            );
+            toast.success(
+              language === "th"
+                ? "กำลัง import โมเดลเข้า Tripo ก่อน Auto Rig"
+                : "Importing the model into Tripo before Auto Rig.",
+            );
+            const importJob = await waitForStandaloneJob(importJobId);
+            if (importJob.status !== "completed") {
+              throw new Error(
+                standaloneJobFailureMessage(importJob, "Tripo import failed before Auto Rig."),
+              );
+            }
+            const importedSource = referenceFromGenerationJob(importJob);
+            const importedPayload = model3dInputFromReference(importedSource);
+            if (!importedSource || !importedPayload) {
+              throw new Error("Tripo import completed but did not return a riggable model task ID.");
+            }
+            preparedInputs = { model3d: importedPayload };
+            updateForm({ model3dSource: importedSource });
+            toast.success("Import complete. Running Rig Check.");
+          }
+          const preflightJobId = await enqueueStandaloneJob(
+            "tripoPreRigCheckNode",
+            { model_name: "tripo3d-prerigcheck" },
+            preparedInputs,
+            "rig-check",
+          );
+          toast.success(
+            language === "th"
+              ? "กำลังตรวจ Rig Check ก่อน Auto Rig"
+              : "Running Rig Check before Auto Rig.",
+          );
+          const preflightJob = await waitForStandaloneJob(preflightJobId);
+          if (preflightJob.status !== "completed") {
+            throw new Error(
+              standaloneJobFailureMessage(preflightJob, "Rig Check failed before Auto Rig."),
+            );
+          }
+          const preflight = tripoPreRigInfoFromJob(preflightJob);
+          if (preflight.riggable === false) {
+            throw new Error(
+              "Tripo pre-rig check says this model is not riggable yet. Try another 3D model or generate a clearer body shape.",
+            );
+          }
+          if (preflight.rigType) {
+            preparedParams = { ...preparedParams, rig_type: preflight.rigType };
+            if (preflight.rigType !== form.rigType) {
+              updateForm({ rigType: preflight.rigType });
+            }
+          }
+          toast.success(
+            preflight.rigType
+              ? `Rig Check passed (${preflight.rigType}). Starting Auto Rig.`
+              : "Rig Check passed. Starting Auto Rig.",
+          );
+        }
+
+        for (let index = 0; index < runCount; index += 1) {
+          const batchParams =
+            runCount > 1
+              ? { ...preparedParams, batch_index: index + 1, batch_count: runCount }
+              : preparedParams;
+          await enqueueStandaloneJob(
+            activeStandaloneNodeType,
+            batchParams,
+            preparedInputs,
+            index,
+          );
         }
         toast.success(t("workspace.toast.gen_queued"));
         // Await — `setRunning(false)` in finally below would otherwise
@@ -4205,7 +4757,7 @@ export default function StandaloneGenerator({
         <Menu className="h-[18px] w-[18px]" />
       </button>
 
-      {activeTool !== "auto_subtitle" && (
+      {activeTool !== "auto_subtitle" && activeTool !== "image_to_3d" && (
         <div className="fixed right-1.5 top-1.5 z-[40] origin-top-right scale-[0.86] md:right-4 md:top-4 md:z-[80] md:scale-100">
           <UserMenu />
         </div>
@@ -4215,9 +4767,11 @@ export default function StandaloneGenerator({
         <aside
           className={cn(
             "ws-scroll-hide mx-auto flex min-h-dvh w-full max-w-[480px] shrink-0 flex-col bg-transparent px-[12px] pb-[12px] pt-[4px] lg:mx-0 lg:h-full lg:min-h-0 lg:max-w-none lg:pb-0 lg:pl-2 lg:pr-0 lg:pt-4",
-            activeTool === "auto_subtitle"
-              ? "lg:w-[376px] xl:w-[405px] 2xl:w-[442px]"
-              : "lg:w-[488px]",
+            activeTool === "image_to_3d"
+              ? "lg:flex-1 lg:w-auto lg:max-w-none lg:p-0"
+              : activeTool === "auto_subtitle"
+                ? "lg:w-[376px] xl:w-[405px] 2xl:w-[442px]"
+                : "lg:w-[488px]",
           )}
         >
           {STANDALONE_TOOL_ORDER.includes(activeTool) ? (
@@ -4234,6 +4788,35 @@ export default function StandaloneGenerator({
               onRemoveVideo={() => updateForm({ autoSubtitleVideo: null })}
               onCreate={() => void run()}
               onToolChange={onToolChange}
+            />
+            ) : activeTool === "image_to_3d" ? (
+            <ThreeDWorkshop
+              mode={activeThreeDMode}
+              form={form}
+              jobs={filterJobsForTool(jobsQuery.data ?? [], activeTool)}
+              jobsLoading={jobsQuery.isLoading}
+              modelOptions={activeDef.models.filter((model) => model.id !== "google-tts-studio").map((model) => ({
+                id: model.id,
+                label: model.label,
+                provider: model.provider,
+              }))}
+              sourceOptions={threeDModelSourceOptions}
+              referenceAssets={panelReferenceAssets}
+              uploading={uploading === (activeThreeDMode === "image_to_3d" ? "model-image" : "model-3d")}
+              running={running}
+              activeJobCount={activeJobsForCurrentTool}
+              createLabel={standaloneCreateButtonLabelForForm(activeTool, form, language, estimatedCost)}
+              costQuote={estimatedCostQuote}
+              onChange={updateForm}
+              onModelChange={setToolModel}
+              onUploadClick={() => openUpload(activeThreeDMode === "image_to_3d" ? "model-image" : "model-3d")}
+              onReferenceFiles={uploadPanelReferenceFiles}
+              onSelectReferenceAsset={selectPanelReferenceAsset}
+              onRemoveReference={removePanelReference}
+              onCreate={() => void run()}
+              onDeleteJob={deleteStandaloneResult}
+              onToolChange={onToolChange}
+              onOpenSidebar={onOpenSidebar}
             />
             ) : activeTool === "voice_translate" ? (
             <VoiceTranslatePanel
@@ -4565,6 +5148,7 @@ export default function StandaloneGenerator({
           )}
         </aside>
 
+        {activeTool !== "image_to_3d" && (
         <main className="ws-scroll-hide min-h-0 flex-1 overflow-visible bg-[var(--bg-app)] px-3 pb-3 pt-3 md:px-4 lg:overflow-hidden lg:pb-0 lg:pl-2 lg:pr-3 lg:pt-4">
           <section className="flex min-h-[560px] flex-1 flex-col overflow-hidden rounded-[20px] bg-[var(--bg-sidebar)] shadow-[inset_0_1px_0_rgba(255,255,255,.035),0_22px_50px_-38px_rgba(238,255,0,.45)] lg:h-full lg:min-h-0">
             <div className="ws-scroll-hide min-h-0 flex-1 overflow-y-auto px-3 py-3">
@@ -4588,6 +5172,7 @@ export default function StandaloneGenerator({
             </div>
           </section>
         </main>
+        )}
       </div>
       <InsufficientCreditsDialog
         open={insufficientOpen}
@@ -5088,6 +5673,7 @@ const AUTO_SUBTITLE_ACCENT_TEXT_ANIMATIONS = new Set<CaptionTextAnimation>([
 function autoSubtitleUsesAccentColor(settings: CaptionStyleSettings): boolean {
   return (
     settings.animation === "wordHighlight" ||
+    settings.outAnimation === "wordHighlight" ||
     AUTO_SUBTITLE_ACCENT_TEXT_ANIMATIONS.has(settings.textAnimation)
   );
 }
@@ -5114,6 +5700,8 @@ function autoSubtitleStyleFromForm(form: StandaloneFormState): CaptionStyleSetti
       enabled: form.autoSubtitleBackground,
     },
     animation: form.autoSubtitleTransition || preset.animation,
+    outAnimation:
+      form.autoSubtitleOutTransition || preset.outAnimation || preset.animation,
     textAnimation:
       form.autoSubtitleTextAnimation || preset.textAnimation || "none",
     wordsPerLine:
@@ -5179,8 +5767,8 @@ function autoSubtitleAlgorithmFromForm(
     return algorithmFromCaptionSettings(settings, {
       segmentationMode,
       maxLineDuration: Math.min(Math.max(settings.maxLineDuration, 1.5), 2.4),
-      maxCharsPerLine: 36,
-      maxSilenceGap: 0.45,
+      maxCharsPerLine: 28,
+      maxSilenceGap: 0.6,
       maxHoldAfterSpeech: 0.5,
       splitOnPunctuation: true,
     });
@@ -5594,7 +6182,7 @@ function AutoSubtitlePanelV2({
 }) {
   const [showMoreStyles, setShowMoreStyles] = useState(false);
   const [subtitleDesignTab, setSubtitleDesignTab] = useState<
-    "style" | "transition" | "animation"
+    "style" | "in" | "out" | "loop"
   >("style");
   const th = language === "th";
   const { t } = useLanguage();
@@ -5624,8 +6212,9 @@ function AutoSubtitlePanelV2({
     locked: t("workspace.standalone.auto_subtitle.locked"),
     style: t("workspace.standalone.auto_subtitle.style"),
     styleTab: t("workspace.standalone.auto_subtitle.style_tab"),
-    transitionTab: t("workspace.standalone.auto_subtitle.transition_tab"),
-    animationTab: t("workspace.standalone.auto_subtitle.animation_tab"),
+    inTab: "In",
+    outTab: "Out",
+    loopTab: "Loop",
     moreStyles: t("workspace.standalone.auto_subtitle.more_styles"),
     fewerStyles: t("workspace.standalone.auto_subtitle.fewer_styles"),
     advanced: t("workspace.standalone.auto_subtitle.advanced"),
@@ -5639,8 +6228,9 @@ function AutoSubtitlePanelV2({
     wordMode: t("workspace.standalone.auto_subtitle.word_mode"),
     wordModeHint: t("workspace.standalone.auto_subtitle.word_mode_hint"),
     words: t("workspace.standalone.auto_subtitle.words"),
-    transition: t("workspace.standalone.auto_subtitle.transition"),
-    textAnimation: t("workspace.standalone.auto_subtitle.text_animation"),
+    inAnimation: "In animation",
+    outAnimation: "Out animation",
+    loopAnimation: "Loop animation",
     textColor: t("workspace.standalone.auto_subtitle.text_color"),
     accentColor: t("workspace.standalone.auto_subtitle.accent_color"),
     stroke: t("workspace.standalone.auto_subtitle.stroke"),
@@ -5685,6 +6275,10 @@ function AutoSubtitlePanelV2({
     form.autoSubtitleSegmentationMode === "sentence" ? copy.sentenceMode : copy.wordMode;
   const transitionLabel = autoSubtitleTransitionLabel(
     form.autoSubtitleTransition,
+    language,
+  );
+  const outTransitionLabel = autoSubtitleTransitionLabel(
+    form.autoSubtitleOutTransition || form.autoSubtitleTransition,
     language,
   );
   const textAnimationLabel = autoSubtitleTextAnimationLabel(
@@ -5846,11 +6440,12 @@ function AutoSubtitlePanelV2({
             </div>
 
             <div className="mt-[12px] rounded-[12px] border border-white/[0.05] bg-black/20 p-[7px]">
-              <div className="mb-[7px] grid grid-cols-3 gap-[5px] border-b border-white/[0.06] pb-[6px]">
+              <div className="mb-[7px] grid grid-cols-4 gap-[5px] border-b border-white/[0.06] pb-[6px]">
                 {([
                   ["style", copy.styleTab],
-                  ["transition", copy.transitionTab],
-                  ["animation", copy.animationTab],
+                  ["in", copy.inTab],
+                  ["out", copy.outTab],
+                  ["loop", copy.loopTab],
                 ] as const).map(([tab, label]) => (
                   <button
                     key={tab}
@@ -5870,7 +6465,7 @@ function AutoSubtitlePanelV2({
 
               {subtitleDesignTab === "style" && (
                 <>
-                  <div className="grid grid-cols-5 gap-[6px]">
+                  <div className="grid grid-cols-2 gap-[8px] sm:grid-cols-3">
                     {visiblePresets.map((preset) => (
                       <AutoSubtitlePresetCard
                         key={preset.id}
@@ -5893,8 +6488,8 @@ function AutoSubtitlePanelV2({
                 </>
               )}
 
-              {subtitleDesignTab === "transition" && (
-                <div className="grid grid-cols-5 gap-[6px]">
+              {subtitleDesignTab === "in" && (
+                <div className="grid grid-cols-2 gap-[8px] sm:grid-cols-3">
                   {CAPTION_TRANSITION_OPTIONS.map((option) => (
                     <AutoSubtitleMotionCard
                       key={option.id}
@@ -5904,6 +6499,7 @@ function AutoSubtitlePanelV2({
                       settings={{
                         ...selectedSettings,
                         animation: option.id,
+                        outAnimation: form.autoSubtitleOutTransition || form.autoSubtitleTransition,
                         textAnimation: "none",
                       }}
                       phrases={[copy.previewCardText, copy.previewNextText]}
@@ -5914,8 +6510,29 @@ function AutoSubtitlePanelV2({
                 </div>
               )}
 
-              {subtitleDesignTab === "animation" && (
-                <div className="grid grid-cols-5 gap-[6px]">
+              {subtitleDesignTab === "out" && (
+                <div className="grid grid-cols-2 gap-[8px] sm:grid-cols-3">
+                  {CAPTION_TRANSITION_OPTIONS.map((option) => (
+                    <AutoSubtitleMotionCard
+                      key={option.id}
+                      label={autoSubtitleTransitionLabel(option.id, language)}
+                      description={option.description}
+                      selected={(form.autoSubtitleOutTransition || form.autoSubtitleTransition) === option.id}
+                      settings={{
+                        ...selectedSettings,
+                        outAnimation: option.id,
+                        textAnimation: "none",
+                      }}
+                      phrases={[copy.previewCardText, copy.previewNextText]}
+                      language={language}
+                      onSelect={() => onChange({ autoSubtitleOutTransition: option.id })}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {subtitleDesignTab === "loop" && (
+                <div className="grid grid-cols-2 gap-[8px] sm:grid-cols-3">
                   {CAPTION_TEXT_ANIMATION_OPTIONS.map((option) => (
                     <AutoSubtitleTextAnimationCard
                       key={option.id}
@@ -5972,7 +6589,7 @@ function AutoSubtitlePanelV2({
                     }
                   />
                   <VoiceTranslateSelectCard
-                    label={copy.transition}
+                    label={copy.inAnimation}
                     value={form.autoSubtitleTransition}
                     displayValue={transitionLabel}
                     icon={<Sparkles className="h-[14px] w-[14px]" />}
@@ -5982,7 +6599,17 @@ function AutoSubtitlePanelV2({
                     }
                   />
                   <VoiceTranslateSelectCard
-                    label={copy.textAnimation}
+                    label={copy.outAnimation}
+                    value={form.autoSubtitleOutTransition || form.autoSubtitleTransition}
+                    displayValue={outTransitionLabel}
+                    icon={<Sparkles className="h-[14px] w-[14px]" />}
+                    options={transitionOptions}
+                    onChange={(value) =>
+                      onChange({ autoSubtitleOutTransition: value as CaptionAnimation })
+                    }
+                  />
+                  <VoiceTranslateSelectCard
+                    label={copy.loopAnimation}
                     value={form.autoSubtitleTextAnimation}
                     displayValue={textAnimationLabel}
                     icon={<Sparkles className="h-[14px] w-[14px]" />}
@@ -6259,6 +6886,7 @@ function AutoSubtitlePresetCard({
   sampleText: string;
   onSelect: () => void;
 }) {
+  const previewText = autoSubtitlePreviewCardText(sampleText);
   return (
     <button
       type="button"
@@ -6270,11 +6898,14 @@ function AutoSubtitlePresetCard({
           : "border-white/[0.07] hover:border-[var(--brand-primary)]/45",
       )}
     >
-      <div className="grid h-[36px] place-items-center rounded-[6px] bg-[#1f2937] px-1">
-        <AutoSubtitlePreviewText settings={preset.settings} text={sampleText} compact activeWord />
+      <div className="relative grid h-[66px] place-items-center overflow-hidden rounded-[7px] bg-[#1f2937] px-[10px] pt-[16px]">
+        <AutoSubtitleTextPreviewBadge />
+        <AutoSubtitlePreviewText settings={preset.settings} text={previewText} compact activeWord />
       </div>
-      <div className="mt-[4px] flex min-w-0 items-center justify-between gap-1">
-        <span className="truncate text-[10px] font-semibold leading-[12px] text-zinc-200">{preset.name}</span>
+      <div className="mt-[5px] flex min-w-0 items-center justify-between gap-1">
+        <span className="block min-h-[22px] min-w-0 overflow-hidden text-[10px] font-semibold leading-[11px] text-zinc-200" title={preset.name}>
+          {preset.name}
+        </span>
         {selected && <Check className="h-[13px] w-[13px] shrink-0 text-[var(--brand-soft)]" />}
       </div>
     </button>
@@ -6310,7 +6941,8 @@ function AutoSubtitleMotionCard({
           : "border-white/[0.07] hover:border-[var(--brand-primary)]/45",
       )}
     >
-      <div className="grid h-[36px] place-items-center overflow-hidden rounded-[6px] bg-[#1f2937] px-1">
+      <div className="relative grid h-[66px] place-items-center overflow-hidden rounded-[7px] bg-[#1f2937] px-[10px] pt-[16px]">
+        <AutoSubtitleTextPreviewBadge />
         <AutoSubtitleAnimatedPreview
           settings={settings}
           phrases={phrases}
@@ -6318,8 +6950,8 @@ function AutoSubtitleMotionCard({
           compact
         />
       </div>
-      <div className="mt-[4px] flex min-w-0 items-center justify-between gap-1">
-        <span className="truncate text-[10px] font-semibold leading-[12px] text-zinc-200">
+      <div className="mt-[5px] flex min-w-0 items-center justify-between gap-1">
+        <span className="block min-h-[22px] min-w-0 overflow-hidden text-[10px] font-semibold leading-[11px] text-zinc-200" title={label}>
           {label}
         </span>
         {selected && <Check className="h-[13px] w-[13px] shrink-0 text-[var(--brand-soft)]" />}
@@ -6355,17 +6987,32 @@ function AutoSubtitleTextAnimationCard({
           : "border-white/[0.07] hover:border-[var(--brand-primary)]/45",
       )}
     >
-      <div className="grid h-[36px] place-items-center overflow-hidden rounded-[6px] bg-[#232b36] px-1">
+      <div className="relative grid h-[66px] place-items-center overflow-hidden rounded-[7px] bg-[#232b36] px-[10px] pt-[16px]">
+        <AutoSubtitleTextPreviewBadge />
         <AutoSubtitleCapcutAnimationPreview settings={settings} animation={animation} />
       </div>
-      <div className="mt-[4px] flex min-w-0 items-center justify-between gap-1">
-        <span className="truncate text-[10px] font-semibold leading-[12px] text-zinc-200">
+      <div className="mt-[5px] flex min-w-0 items-center justify-between gap-1">
+        <span className="block min-h-[22px] min-w-0 overflow-hidden text-[10px] font-semibold leading-[11px] text-zinc-200" title={label}>
           {label}
         </span>
         {selected && <Check className="h-[13px] w-[13px] shrink-0 text-[var(--brand-soft)]" />}
       </div>
     </button>
   );
+}
+
+function AutoSubtitleTextPreviewBadge() {
+  return (
+    <span className="pointer-events-none absolute right-[6px] top-[5px] z-[2] rounded-full bg-black/55 px-[5px] py-[2px] text-[8px] font-bold uppercase leading-none tracking-[.06em] text-white/75">
+      Text preview
+    </span>
+  );
+}
+
+function autoSubtitlePreviewCardText(sampleText: string): string {
+  const clean = sampleText.trim();
+  if (clean.split(/\s+/).filter(Boolean).length >= 3) return clean;
+  return "Text preview sample";
 }
 
 function AutoSubtitleCapcutAnimationPreview({
@@ -6413,10 +7060,10 @@ function AutoSubtitleCapcutAnimationPreview({
       )}
       {animation === "big-echoes" && (
         <>
-          <span className="autoSubtitleCapcutEcho autoSubtitleCapcutEchoA absolute text-[13px] font-black tracking-[.02em] text-white/18">
+          <span className="autoSubtitleCapcutEcho autoSubtitleCapcutEchoA absolute max-w-[92%] text-center text-[9px] font-black leading-[10px] tracking-[.01em] text-white/18">
             {sample}
           </span>
-          <span className="autoSubtitleCapcutEcho autoSubtitleCapcutEchoB absolute text-[13px] font-black tracking-[.02em] text-white/12">
+          <span className="autoSubtitleCapcutEcho autoSubtitleCapcutEchoB absolute max-w-[92%] text-center text-[9px] font-black leading-[10px] tracking-[.01em] text-white/12">
             {sample}
           </span>
         </>
@@ -6448,10 +7095,10 @@ function AutoSubtitleCapcutAnimationPreview({
       )}
       <span
         className={cn(
-          "autoSubtitleCapcutText relative z-[1] max-w-full whitespace-nowrap text-center text-[13px] font-black uppercase tracking-[.02em]",
+          "autoSubtitleCapcutText relative z-[1] max-w-[94%] text-center text-[9px] font-black leading-[10px] tracking-[.01em]",
           `autoSubtitleCapcut-${animation}`,
         )}
-        style={textStyle}
+        style={{ ...textStyle, whiteSpace: "normal" }}
       >
         {renderChars
           ? Array.from(sample).map((char, index) => (
@@ -6465,7 +7112,7 @@ function AutoSubtitleCapcutAnimationPreview({
             ))
           : sample}
         {animation === "typing-cursor" && (
-          <span className="autoSubtitleCapcutCursor ml-[2px] inline-block h-[13px] w-[1px] translate-y-[2px] bg-current" />
+          <span className="autoSubtitleCapcutCursor ml-[2px] inline-block h-[11px] w-[1px] translate-y-[2px] bg-current" />
         )}
       </span>
     </div>
@@ -6478,15 +7125,15 @@ function autoSubtitleAnimationCardText(animation: CaptionTextAnimation): string 
     case "in-scanner":
     case "text-sprout":
     case "sequence-reveal":
-      return "ABC";
+      return "Text preview sample";
     case "big-echoes":
     case "loud-emphasis":
     case "quirky-spelling":
-      return "ABC123";
+      return "Text preview sample";
     case "none":
-      return "ABC";
+      return "Text preview sample";
     default:
-      return "NEXT";
+      return "Text preview sample";
   }
 }
 
@@ -6937,7 +7584,7 @@ function AutoSubtitleAnimatedPreview({
         leavingTimerRef.current = window.setTimeout(() => {
           setLeavingPhrase(null);
           leavingTimerRef.current = null;
-        }, autoSubtitlePreviewTransitionMs(settings.animation) + 40);
+        }, autoSubtitlePreviewTransitionMs(settings.outAnimation ?? settings.animation) + 40);
         return (index + 1) % safePhrases.length;
       });
     }, 1350);
@@ -6948,19 +7595,20 @@ function AutoSubtitleAnimatedPreview({
         leavingTimerRef.current = null;
       }
     };
-  }, [safePhrases, settings.animation]);
+  }, [safePhrases, settings.animation, settings.outAnimation]);
 
   const text = safePhrases[phraseIndex % safePhrases.length] ?? "";
-  const animationCss = autoSubtitlePreviewAnimationCss(settings.animation);
+  const inAnimationCss = autoSubtitlePreviewAnimationCss(settings.animation);
+  const outAnimationCss = autoSubtitlePreviewAnimationCss(settings.outAnimation ?? settings.animation);
   const textMotionCss = autoSubtitlePreviewTextMotionCss(settings.textAnimation);
 
   return (
-    <div className={cn("relative flex w-full items-center justify-center overflow-hidden px-2", compact ? "h-[30px]" : "h-[38px]")}>
-      {leavingPhrase && settings.animation !== "none" && (
+    <div className={cn("relative flex w-full items-center justify-center overflow-hidden px-2", compact ? "h-[40px]" : "h-[38px]")}>
+      {leavingPhrase && (settings.outAnimation ?? settings.animation) !== "none" && (
         <div
           key={`out-${leavingPhrase.key}`}
           className="absolute inset-x-2 flex justify-center"
-          style={{ animation: animationCss.out }}
+          style={{ animation: outAnimationCss.out }}
         >
           <AutoSubtitlePreviewText
             settings={settings}
@@ -6974,7 +7622,7 @@ function AutoSubtitleAnimatedPreview({
       <div
         key={`${phraseIndex}-${text}`}
         className="absolute inset-x-2 flex justify-center"
-        style={{ animation: animationCss.in }}
+        style={{ animation: inAnimationCss.in }}
       >
         <AutoSubtitlePreviewText
           settings={settings}
@@ -7131,20 +7779,28 @@ function AutoSubtitlePreviewText({
     padding: settings.background.enabled ? (compact ? "2px 5px" : "4px 9px") : undefined,
     lineHeight: compact ? "12px" : "22px",
     letterSpacing: 0,
-    whiteSpace: "nowrap",
+    whiteSpace: compact ? "normal" : "nowrap",
   };
+  const compactClampStyle: React.CSSProperties | undefined = compact
+    ? {
+        display: "-webkit-box",
+        WebkitBoxOrient: "vertical",
+        WebkitLineClamp: 2,
+        overflow: "hidden",
+      }
+    : undefined;
 
   return (
     <div
       className={cn(
-        "max-w-full text-center uppercase",
-        compact ? "truncate" : "overflow-hidden text-ellipsis whitespace-nowrap",
+        "max-w-full text-center",
+        compact ? "overflow-hidden" : "overflow-hidden text-ellipsis whitespace-nowrap uppercase",
         compact ? "px-1" : "px-2",
       )}
-      style={{ ...previewStyle, ...motionStyle }}
+      style={{ ...previewStyle, ...compactClampStyle, ...motionStyle }}
     >
       {activeWord && settings.animation === "wordHighlight" && restText.trim().length > 0 ? (
-        <span className="inline-flex max-w-full items-baseline overflow-hidden whitespace-nowrap">
+        <span className={cn(compact ? "inline" : "inline-flex max-w-full items-baseline overflow-hidden whitespace-nowrap")}>
           <span style={{ color: captionAccentColor(settings) }}>{highlightedWord}</span>
           <span>{restText}</span>
         </span>
@@ -9371,6 +10027,1119 @@ function ThreeDControls({
   );
 }
 
+const THREE_D_MODE_ITEMS: Array<{
+  id: StandaloneThreeDMode;
+  title: string;
+  shortTitle: string;
+  caption: string;
+  icon: typeof Box;
+}> = [
+  {
+    id: "image_to_3d",
+    title: "Image to 3D",
+    shortTitle: "Model",
+    caption: "Generate a textured GLB from image references.",
+    icon: ImagePlus,
+  },
+  {
+    id: "auto_rig",
+    title: "Auto Rig 3D",
+    shortTitle: "Rig",
+    caption: "Run rig preflight, then prepare the model for motion.",
+    icon: SlidersHorizontal,
+  },
+  {
+    id: "animate",
+    title: "Animate 3D preset",
+    shortTitle: "Animate",
+    caption: "Apply Tripo preset motion to a rigged model.",
+    icon: Play,
+  },
+];
+
+function threeDModeMeta(mode: StandaloneThreeDMode) {
+  return THREE_D_MODE_ITEMS.find((item) => item.id === mode) ?? THREE_D_MODE_ITEMS[0];
+}
+
+function ThreeDWorkshop({
+  mode,
+  form,
+  jobs,
+  jobsLoading,
+  modelOptions,
+  sourceOptions,
+  referenceAssets,
+  uploading,
+  running,
+  activeJobCount,
+  createLabel,
+  costQuote,
+  onChange,
+  onModelChange,
+  onUploadClick,
+  onReferenceFiles,
+  onSelectReferenceAsset,
+  onRemoveReference,
+  onCreate,
+  onDeleteJob,
+  onToolChange,
+  onOpenSidebar,
+}: {
+  mode: StandaloneThreeDMode;
+  form: StandaloneFormState;
+  jobs: StandaloneJobRow[];
+  jobsLoading: boolean;
+  modelOptions: Array<{ id: string; label: string; provider?: string }>;
+  sourceOptions: UploadedRef[];
+  referenceAssets: PanelReferenceAsset[];
+  uploading: boolean;
+  running: boolean;
+  activeJobCount: number;
+  createLabel: string;
+  costQuote: CreatePanelCostQuote | null;
+  onChange: (patch: Partial<StandaloneFormState>) => void;
+  onModelChange: (model: string) => void;
+  onUploadClick: () => void;
+  onReferenceFiles: (files: File[], slotOverride?: UploadSlot) => Promise<void>;
+  onSelectReferenceAsset: (reference: PanelReferenceAsset, slotOverride?: UploadSlot) => Promise<void>;
+  onRemoveReference: (id: string) => void;
+  onCreate: () => void;
+  onDeleteJob: (job: StandaloneJobRow) => void;
+  onToolChange: (tool: StandaloneToolKey) => void;
+  onOpenSidebar: () => void;
+}) {
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [sideTab, setSideTab] = useState<"assets" | "properties">("assets");
+  const imageRefs = threeDReferencesForForm(form);
+  const modeMeta = threeDModeMeta(mode);
+  const sourceOptionsWithCurrent = mergeReferenceOptions(
+    [form.model3dSource, ...sourceOptions],
+    120,
+  );
+  const visibleSourceOptions =
+    mode === "animate" ? sourceOptionsWithCurrent.filter(isRiggedTripoSourceReference) : sourceOptionsWithCurrent;
+  const selectedSource =
+    form.model3dSource &&
+    (mode !== "animate" || visibleSourceOptions.some((source) => source.id === form.model3dSource?.id))
+      ? form.model3dSource
+      : null;
+  const activeJob = jobs.find((job) => job.status === "queued" || job.status === "running") ?? null;
+  const selectedJob =
+    jobs.find((job) => job.id === selectedJobId) ?? activeJob ?? jobs[0] ?? null;
+  const selectedResult = selectedJob?.result ?? null;
+  const selectedModelUrl = getStandaloneModelUrl(selectedResult);
+  const selectedPosterUrl = getStandalonePosterUrl(selectedResult, selectedModelUrl);
+  const selectedSourceModelUrl = modelUrlFromReference(selectedSource);
+  const selectedSourcePosterUrl = selectedSource
+    ? posterUrlFromReference(selectedSource)
+    : undefined;
+  const mainPreviewModelUrl =
+    mode !== "image_to_3d" && selectedSourceModelUrl
+      ? selectedSourceModelUrl
+      : selectedModelUrl;
+  const mainPreviewPosterUrl =
+    mode !== "image_to_3d" && selectedSourceModelUrl
+      ? selectedSourcePosterUrl
+      : selectedPosterUrl;
+  const mainPreviewTitle =
+    mode !== "image_to_3d" && selectedSource
+      ? selectedSource.name
+      : selectedJob
+        ? standaloneJobModelLabel(selectedJob)
+        : "3D model";
+  const mainPreviewSubtitle =
+    mode !== "image_to_3d" && selectedSource
+      ? tripoModelTaskIdFromReference(selectedSource).slice(0, 12) || "External model"
+      : selectedJob
+        ? `${selectedJob.status} / ${formatDate(selectedJob.created_at, "en")}`
+        : "";
+  const hasMainPreview = Boolean(mainPreviewModelUrl || selectedPosterUrl);
+  const disabled = running || uploading || activeJobCount > 0;
+  const ModeIcon = modeMeta.icon;
+  const compactModeCaption =
+    mode === "image_to_3d"
+      ? "Textured GLB from images."
+      : mode === "auto_rig"
+        ? "Preflight, rig, then prepare motion."
+        : "Apply motion presets to rigged models.";
+
+  useEffect(() => {
+    if (selectedJobId && jobs.some((job) => job.id === selectedJobId)) return;
+    setSelectedJobId(jobs[0]?.id ?? null);
+  }, [jobs, selectedJobId]);
+
+  useEffect(() => {
+    if (mode === "image_to_3d" || selectedSource || !visibleSourceOptions[0]) return;
+    onChange({ model3dSource: visibleSourceOptions[0] });
+  }, [mode, onChange, selectedSource, visibleSourceOptions]);
+
+  const selectMode = (nextMode: StandaloneThreeDMode) => {
+    const nextSourceOptions =
+      nextMode === "animate" ? sourceOptions.filter(isRiggedTripoSourceReference) : sourceOptions;
+    onChange({
+      threeDMode: nextMode,
+      ...(nextMode !== "image_to_3d" && !form.model3dSource && nextSourceOptions[0]
+        ? { model3dSource: nextSourceOptions[0] }
+        : {}),
+    });
+  };
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const files = Array.from(event.dataTransfer.files ?? []);
+    if (files.length > 0) {
+      void onReferenceFiles(files, mode === "image_to_3d" ? "model-image" : "model-3d");
+    }
+  };
+
+  const completedModels = visibleSourceOptions.slice(0, 18);
+
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#191a1c] text-white lg:flex-row">
+      <button
+        type="button"
+        onClick={onOpenSidebar}
+        className="fixed left-2 top-2 z-[60] grid h-9 w-9 place-items-center rounded-[10px] border border-white/[0.08] bg-black/75 text-zinc-100 shadow-[0_12px_28px_-22px_rgba(0,0,0,.95)] backdrop-blur-md transition hover:border-[#eaff00]/45 hover:text-[#eaff00] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#eaff00]/70 md:hidden"
+        aria-label="Open workspace menu"
+      >
+        <Menu className="h-[18px] w-[18px]" />
+      </button>
+
+      <aside className="flex min-h-0 shrink-0 overflow-hidden border-b border-white/[0.06] bg-[#232527] lg:h-full lg:w-[360px] lg:border-b-0 lg:border-r">
+        <div className="hidden w-[56px] shrink-0 flex-col items-center gap-2 border-r border-black/25 bg-[#141516] py-2.5 lg:flex">
+          {THREE_D_MODE_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const active = item.id === mode;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => selectMode(item.id)}
+                aria-label={item.title}
+                title={item.title}
+                className={cn(
+                  "grid h-[46px] w-[46px] place-items-center rounded-[11px] text-[10px] font-bold transition",
+                  active
+                    ? "bg-[#f4ff00] text-zinc-950 shadow-[0_10px_24px_-18px_rgba(244,255,0,.8)]"
+                    : "text-zinc-400 hover:bg-white/[0.06] hover:text-white",
+                )}
+              >
+                <span className="grid place-items-center gap-0.5">
+                  <Icon className="h-4 w-4" />
+                  <span className="leading-none">{item.shortTitle}</span>
+                </span>
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => onToolChange("image_gen")}
+            className="mt-auto grid h-9 w-9 place-items-center rounded-[10px] text-zinc-500 transition hover:bg-white/[0.06] hover:text-white"
+            aria-label="Back to image generator"
+            title="Back to image generator"
+          >
+            <ChevronDown className="h-4 w-4 rotate-90" />
+          </button>
+        </div>
+
+        <div className="flex min-w-0 min-h-0 flex-1 flex-col px-[12px] py-[12px]">
+          <div className="mb-[12px] flex items-center justify-between gap-[8px]">
+            <div className="min-w-0">
+              <h1 className="[font-size:16px] font-bold [line-height:20px] text-white">3D Workshop</h1>
+              <p className="[font-size:11px] font-medium [line-height:14px] text-zinc-500">
+                Tripo model, rig, animate, export
+              </p>
+            </div>
+            <div className="lg:hidden">
+              <UserMenu />
+            </div>
+          </div>
+
+          <div className="mb-3 grid grid-cols-3 gap-1.5 lg:hidden">
+            {THREE_D_MODE_ITEMS.map((item) => {
+              const active = item.id === mode;
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => selectMode(item.id)}
+                  aria-pressed={active}
+                  className={cn(
+                    "min-h-[58px] rounded-[10px] border px-2 py-1.5 text-left transition",
+                    active
+                      ? "border-[#f4ff00]/55 bg-[#f4ff00]/10"
+                      : "border-white/[0.06] bg-white/[0.035] hover:bg-white/[0.06]",
+                  )}
+                >
+                  <Icon className={cn("h-3.5 w-3.5", active ? "text-[#f4ff00]" : "text-zinc-400")} />
+                  <span className="mt-1 block text-[11px] font-bold leading-[12px]">{item.shortTitle}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="ws-scroll-hide min-h-0 flex-1 overflow-y-auto">
+            <div className="rounded-[14px] border border-white/[0.055] bg-[#1d1f21] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,.035)]">
+            <div className="flex items-start gap-2">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-white/[0.06] text-[#f4ff00]">
+                <ModeIcon className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-[14px] font-bold leading-tight text-white">{modeMeta.title}</h2>
+                <p className="mt-1 truncate text-[11px] leading-[15px] text-zinc-400">{compactModeCaption}</p>
+                {mode === "auto_rig" && (
+                  <div className="mt-2 inline-flex max-w-full items-center rounded-full border border-emerald-300/15 bg-emerald-300/[0.055] px-2 py-0.5 text-[10px] font-semibold text-emerald-100/85">
+                    Rig Check first / credits
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {mode === "image_to_3d" ? (
+              <div className="mt-2 space-y-2">
+                <label className="block">
+                  <FieldLabel label="Model" meta="Tripo" />
+                  <select
+                    value={form.model}
+                    onChange={(event) => onModelChange(event.target.value)}
+                    className="mt-1 h-8 w-full rounded-[9px] border border-white/[0.08] bg-[#101112] px-3 text-[12px] font-semibold text-white outline-none transition focus:border-[#f4ff00]/50"
+                  >
+                    {modelOptions.map((model) => (
+                      <option key={model.id} value={model.id} className="bg-zinc-950">
+                        {model.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={handleDrop}
+                  className="rounded-[12px] border border-dashed border-[#f4ff00]/35 bg-[#f4ff00]/[0.035] p-1.5"
+                >
+                  <button
+                    type="button"
+                    onClick={onUploadClick}
+                    disabled={uploading}
+                    className="grid min-h-[82px] w-full place-items-center rounded-[10px] bg-[linear-gradient(135deg,rgba(255,255,255,.055),rgba(255,255,255,.014))] text-center transition hover:bg-white/[0.065] disabled:opacity-60"
+                  >
+                    <span>
+                      {uploading ? (
+                        <Loader2 className="mx-auto h-6 w-6 animate-spin text-[#f4ff00]" />
+                      ) : (
+                        <UploadCloud className="mx-auto h-5 w-5 text-[#f4ff00]" />
+                      )}
+                      <span className="mt-1.5 block text-[12px] font-bold text-white">
+                        Upload image references
+                      </span>
+                      <span className="mt-1 block text-[11px] text-zinc-500">
+                        Front first. Up to {max3dRefsForModel(form.model)} views.
+                      </span>
+                    </span>
+                  </button>
+                  {imageRefs.length > 0 && (
+                    <div className="mt-2 grid grid-cols-4 gap-2">
+                      {imageRefs.map((ref, index) => (
+                        <div key={ref.id} className="group relative aspect-square overflow-hidden rounded-[9px] bg-black">
+                          <img src={ref.url} alt="" className="h-full w-full object-cover" />
+                          <span className="absolute left-1 top-1 rounded bg-black/65 px-1 text-[9px] font-bold text-white">
+                            {index + 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onRemoveReference(ref.id)}
+                            className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/70 text-white opacity-0 transition group-hover:opacity-100"
+                            aria-label="Remove reference"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <ThreeDCompactToggle
+                    label="Texture"
+                    checked={form.texture}
+                    onChange={(texture) => onChange({ texture })}
+                  />
+                  <ThreeDCompactToggle
+                    label="PBR"
+                    checked={form.pbr}
+                    onChange={(pbr) => onChange({ pbr })}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="mt-2 space-y-2">
+                <ThreeDSourcePicker
+                  mode={mode}
+                  sourceOptions={visibleSourceOptions}
+                  selectedSource={selectedSource}
+                  onUpload={onUploadClick}
+                  onSelect={(model3dSource) => onChange({ model3dSource })}
+                />
+
+                {mode === "auto_rig" ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="col-span-2">
+                      <SelectField
+                        label="Rig type"
+                        value={form.rigType ?? TRIPO_AUTO_RIG_TYPE}
+                        options={[TRIPO_AUTO_RIG_TYPE, ...TRIPO_RIG_TYPES]}
+                        onChange={(rigType) => onChange({ rigType })}
+                      />
+                    </div>
+                    <SelectField
+                      label="Spec"
+                      value={form.rigSpec ?? "tripo"}
+                      options={["tripo", "mixamo"]}
+                      onChange={(rigSpec) => onChange({ rigSpec: rigSpec === "mixamo" ? "mixamo" : "tripo" })}
+                    />
+                    <SelectField
+                      label="Output"
+                      value={form.rigOutFormat ?? "glb"}
+                      options={["glb", "fbx"]}
+                      onChange={(rigOutFormat) => onChange({ rigOutFormat: rigOutFormat === "fbx" ? "fbx" : "glb" })}
+                    />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    <SelectField
+                      label="Preset"
+                      value={form.animationPreset ?? "preset:walk"}
+                      options={TRIPO_ANIMATION_PRESETS}
+                      onChange={(animationPreset) => onChange({ animationPreset, animationBatch: "" })}
+                    />
+                    <SelectField
+                      label="Output"
+                      value={form.animationOutFormat ?? "glb"}
+                      options={["glb", "fbx"]}
+                      onChange={(animationOutFormat) => onChange({ animationOutFormat: animationOutFormat === "fbx" ? "fbx" : "glb" })}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+            </div>
+          </div>
+
+          <div className="mt-3 shrink-0 rounded-[14px] border border-white/[0.055] bg-[#1d1f21] p-3 shadow-[0_18px_48px_-38px_rgba(0,0,0,.95)]">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-zinc-500">Run</div>
+              <span className="rounded-full bg-white/[0.05] px-2 py-0.5 text-[10px] font-semibold text-zinc-300">
+                {costQuote?.finalCost != null ? `${costQuote.finalCost.toLocaleString()} credits` : "Cost loading"}
+              </span>
+            </div>
+            {costQuote && costQuote.fullCost > costQuote.finalCost && (
+              <div className="mb-2 text-right text-[10px] font-medium text-emerald-200">
+                {costQuote.fullCost.toLocaleString()} to {costQuote.finalCost.toLocaleString()} credits
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={onCreate}
+              disabled={disabled}
+              className="btn-cta flex h-11 w-full items-center justify-center gap-2 rounded-[12px] text-[13px] disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-300 disabled:shadow-none disabled:opacity-70"
+            >
+              {disabled ? <Loader2 className="h-4 w-4 animate-spin" /> : <GenerateIcon className="h-4 w-4" />}
+              {createLabel}
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <main className="flex min-h-0 flex-1 flex-col bg-[#202123]">
+        <div className="hidden h-[44px] shrink-0 items-center justify-between border-b border-white/[0.055] bg-[#151617] px-[16px] lg:flex">
+          <div className="flex min-w-0 items-center gap-[8px]">
+            <span className="truncate [font-size:13px] font-bold [line-height:16px] text-white">3D Workspace</span>
+            <span className="rounded-full bg-white/[0.06] px-[8px] py-[2px] [font-size:10px] font-bold [line-height:12px] text-[#f4ff00]">
+              Tripo v3.1
+            </span>
+            <span className="truncate [font-size:11px] font-semibold [line-height:14px] text-zinc-500">
+              {modeMeta.title}
+            </span>
+          </div>
+        </div>
+
+        <div className="relative min-h-0 flex-1 overflow-hidden bg-[#252729] bg-[linear-gradient(rgba(255,255,255,.028)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.028)_1px,transparent_1px)] bg-[size:48px_48px]">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_78%,rgba(244,255,0,.065),transparent_32%)]" />
+          <div className="absolute right-8 top-8 hidden gap-2 lg:flex">
+            {["Z", "X", "Y"].map((axis, index) => (
+              <span
+                key={axis}
+                className={cn(
+                  "grid h-8 w-8 place-items-center rounded-full text-[11px] font-black text-black",
+                  index === 0 ? "bg-sky-400" : index === 1 ? "bg-rose-400" : "bg-lime-300",
+                )}
+              >
+                {axis}
+              </span>
+            ))}
+          </div>
+
+          <div className="relative grid h-full place-items-center p-6">
+            {hasMainPreview ? (
+              <div className="w-full max-w-[720px]">
+                <div className="mb-3 flex max-w-[300px] items-center gap-3 rounded-[12px] border border-white/[0.07] bg-[#18191b] p-3 shadow-[0_18px_48px_-36px_rgba(0,0,0,.9)]">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-[#f4ff00] text-zinc-950">
+                    <Box className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-[12px] font-bold text-white">
+                      {mainPreviewTitle}
+                    </div>
+                    {mainPreviewSubtitle && (
+                      <div className="mt-1 truncate text-[11px] font-semibold text-zinc-400">
+                        {mainPreviewSubtitle}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="grid aspect-[1.55] place-items-center overflow-hidden rounded-[16px] border border-white/[0.055] bg-[#151617] shadow-[0_36px_80px_-72px_rgba(244,255,0,.75)]">
+                  {mainPreviewModelUrl ? (
+                    <ThreeDModelPreviewFrame
+                      modelUrl={mainPreviewModelUrl}
+                      posterUrl={mainPreviewPosterUrl}
+                      label={mainPreviewTitle}
+                      variant="main"
+                      interactive
+                    />
+                  ) : selectedPosterUrl ? (
+                    <img src={selectedPosterUrl} alt="" className="max-h-full max-w-full object-contain" />
+                  ) : (
+                    <div className="rounded-full bg-red-500/20 px-5 py-3 text-[13px] font-bold text-red-100">
+                      {selectedJob?.status === "completed" ? "No preview available" : selectedJob?.status}
+                    </div>
+                  )}
+                </div>
+                {mainPreviewModelUrl && (
+                  <div className="mt-5 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => downloadFromUrl(mainPreviewModelUrl, buildDownloadFilename(mainPreviewTitle || "mediaforge-3d-model", modelFileExtension(mainPreviewModelUrl, mainPreviewTitle)))}
+                      className="btn-cta flex h-11 items-center justify-center gap-2 rounded-[12px] px-5 text-[13px]"
+                    >
+                      <Download className="h-4 w-4" />
+                      Export 3D
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="max-w-[520px] text-center opacity-90">
+                <div className="mx-auto grid h-16 w-16 place-items-center rounded-[16px] text-[#f4ff00]">
+                  <Box className="h-10 w-10" />
+                </div>
+                <h2 className="mt-4 text-[20px] font-black text-zinc-300">
+                  {mode === "image_to_3d" ? "Generate Topo-Ready Mesh in Seconds!" : "Prepare a Clean 3D Model"}
+                </h2>
+                <p className="mt-2 text-[12px] font-semibold leading-5 text-zinc-500">
+                  {mode === "image_to_3d"
+                    ? "Realtime Mesh Editing - Coming Soon"
+                    : "Select or upload a model to rig, animate, and export."}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="h-[156px] shrink-0 border-t border-white/[0.06] bg-[#111213] px-[18px] py-[10px]">
+          <div className="mb-[8px] flex items-end justify-between gap-4">
+            <div>
+              <div className="[font-size:12px] font-black uppercase tracking-[0.08em] [line-height:14px] text-zinc-200">
+                Timeline
+              </div>
+              <div className="mt-[2px] [font-size:11px] font-medium [line-height:13px] text-zinc-500">
+                Job history, output status, and the reason a run failed.
+              </div>
+            </div>
+            <div className="shrink-0 rounded-full bg-white/[0.05] px-[9px] py-[3px] [font-size:11px] font-semibold [line-height:13px] text-zinc-400">
+              {jobs.length} results
+            </div>
+          </div>
+          <div className="ws-scroll-hide flex gap-[10px] overflow-x-auto pb-[2px]">
+            {jobsLoading ? (
+              <div className="grid h-[104px] w-[252px] shrink-0 place-items-center rounded-[12px] border border-white/[0.06] bg-white/[0.03]">
+                <Loader2 className="h-4 w-4 animate-spin text-[#f4ff00]" />
+              </div>
+            ) : jobs.length === 0 ? (
+              <div className="grid h-[104px] flex-1 place-items-center rounded-[12px] border border-dashed border-white/[0.08] text-[12px] font-semibold text-zinc-600">
+                No 3D output yet
+              </div>
+            ) : (
+              jobs.map((job) => (
+                <ThreeDJobTile
+                  key={job.id}
+                  job={job}
+                  active={job.id === selectedJob?.id}
+                  onSelect={() => setSelectedJobId(job.id)}
+                  onDelete={() => onDeleteJob(job)}
+                />
+              ))
+            )}
+          </div>
+        </div>
+      </main>
+
+      <aside className="hidden min-h-0 w-[252px] shrink-0 border-l border-white/[0.06] bg-[#151617] lg:flex lg:flex-col">
+        <div className="hidden h-[44px] shrink-0 items-center justify-end border-b border-white/[0.055] bg-[#151617] px-[12px] lg:flex">
+          <UserMenu />
+        </div>
+        <div className="grid h-10 shrink-0 grid-cols-2 border-b border-white/[0.06]">
+          <button
+            type="button"
+            onClick={() => setSideTab("assets")}
+            className={cn(
+              "flex items-center justify-center gap-2 text-[12px] font-bold transition",
+              sideTab === "assets" ? "bg-white text-black" : "text-zinc-400 hover:text-white",
+            )}
+          >
+            <LayoutGrid className="h-4 w-4" />
+            Assets
+          </button>
+          <button
+            type="button"
+            onClick={() => setSideTab("properties")}
+            className={cn(
+              "flex items-center justify-center gap-2 text-[12px] font-bold transition",
+              sideTab === "properties" ? "bg-white text-black" : "text-zinc-400 hover:text-white",
+            )}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Property
+          </button>
+        </div>
+
+        {sideTab === "assets" ? (
+          <div className="ws-scroll-hide min-h-0 flex-1 overflow-y-auto p-3">
+            <button
+              type="button"
+              onClick={onUploadClick}
+              className="grid h-[104px] w-full place-items-center rounded-[12px] border border-dashed border-white/[0.11] bg-white/[0.025] text-center transition hover:border-[#f4ff00]/45 hover:bg-[#f4ff00]/[0.04]"
+            >
+              <span>
+                <UploadCloud className="mx-auto h-6 w-6 text-[#f4ff00]" />
+                <span className="mt-2 block text-[12px] font-bold text-white">
+                  {mode === "image_to_3d" ? "Upload reference" : "Upload 3D model"}
+                </span>
+                <span className="mt-2 block text-[10px] text-zinc-400">
+                  {mode === "image_to_3d" ? "PNG, JPG, WEBP" : "GLB, OBJ, FBX, STL"}
+                </span>
+              </span>
+            </button>
+
+            <div className="mt-4 flex items-center justify-between">
+              <div className="text-[11px] font-black uppercase tracking-[0.08em] text-zinc-300">
+                {mode === "image_to_3d" ? "Image assets" : "Model assets"}
+              </div>
+              <div className="text-[11px] font-semibold text-zinc-600">{referenceAssets.length}</div>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {referenceAssets.slice(0, 30).map((asset) => (
+                <button
+                  key={asset.id}
+                  type="button"
+                  onClick={() => void onSelectReferenceAsset(asset, mode === "image_to_3d" ? "model-image" : "model-3d")}
+                  className="aspect-square overflow-hidden rounded-[9px] border border-white/[0.05] bg-black transition hover:border-[#f4ff00]/60"
+                  title={asset.name ?? "asset"}
+                >
+                  {isStandaloneModel3dReference(asset) ? (
+                    <ThreeDReferenceThumb reference={asset} compact />
+                  ) : (
+                    <ThreeDImageAssetThumb src={asset.url} />
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-5 flex items-center justify-between">
+              <div className="text-[11px] font-black uppercase tracking-[0.08em] text-zinc-300">Source models</div>
+              <div className="text-[11px] font-semibold text-zinc-600">{completedModels.length}</div>
+            </div>
+            <div className="mt-2 space-y-2">
+              {completedModels.slice(0, 8).map((model) => (
+                <button
+                  key={model.id}
+                  type="button"
+                  onClick={() => onChange({ model3dSource: model })}
+                  className="flex w-full items-center gap-2 rounded-[10px] border border-white/[0.06] bg-white/[0.025] p-2 text-left transition hover:border-[#f4ff00]/45"
+                >
+                  <ThreeDReferenceThumb reference={model} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-[11px] font-bold text-white">{model.name}</span>
+                    <span className="block truncate text-[10px] text-zinc-500">
+                      {tripoModelTaskIdFromReference(model).slice(0, 8) || "import needed"}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3 p-3">
+            <PropertyRow label="Mode" value={modeMeta.title} />
+            <PropertyRow label="Cost" value={costQuote?.finalCost != null ? `${costQuote.finalCost.toLocaleString()} credits` : "..."} />
+            <PropertyRow label="Model" value={form.model} />
+            <PropertyRow label="Source" value={selectedSource?.name ?? "None"} />
+          </div>
+        )}
+      </aside>
+    </div>
+  );
+}
+
+function ThreeDReferenceThumb({
+  reference,
+  compact = false,
+}: {
+  reference: UploadedRef;
+  compact?: boolean;
+}) {
+  const modelUrl = modelUrlFromReference(reference);
+  const posterUrl = posterUrlFromReference(reference);
+  const modelKey = modelUrl ? modelPreviewCacheKey(modelUrl) : "";
+  const [capturedPoster, setCapturedPoster] = useState<string | undefined>(() =>
+    modelKey ? MODEL_PREVIEW_THUMB_CACHE.get(modelKey) : undefined,
+  );
+
+  useEffect(() => {
+    if (!modelKey) {
+      setCapturedPoster(undefined);
+      return;
+    }
+    setCapturedPoster(MODEL_PREVIEW_THUMB_CACHE.get(modelKey));
+    const onThumbReady = (event: Event) => {
+      const detail = (event as CustomEvent<ModelPreviewThumbEventDetail>).detail;
+      if (detail?.key === modelKey) setCapturedPoster(detail.dataUrl);
+    };
+    window.addEventListener(MODEL_PREVIEW_THUMB_EVENT, onThumbReady);
+    return () => window.removeEventListener(MODEL_PREVIEW_THUMB_EVENT, onThumbReady);
+  }, [modelKey]);
+
+  const src = capturedPoster ?? posterUrl ?? (!modelUrl && !MODEL_FILE_RE.test(reference.url) ? reference.url : "");
+  return (
+    <span className={cn(
+      "grid shrink-0 place-items-center overflow-hidden rounded-[9px] bg-black",
+      compact ? "h-full w-full" : "h-11 w-11",
+    )}>
+      {src ? (
+        <span className="relative block h-full w-full">
+          <ThreeDImageAssetThumb src={src} modelFallback={Boolean(modelUrl)} />
+          {modelUrl && (
+            <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/70 px-1 text-[8px] font-black text-[#f4ff00]">
+              3D
+            </span>
+          )}
+        </span>
+      ) : modelUrl ? (
+        <ThreeDStaticModelThumb modelUrl={modelUrl} label={reference.name} compact={compact} />
+      ) : (
+        <Box className="h-5 w-5 text-[#f4ff00]" />
+      )}
+    </span>
+  );
+}
+
+function ThreeDImageAssetThumb({
+  src,
+  modelFallback = false,
+}: {
+  src?: string;
+  modelFallback?: boolean;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    const Icon = modelFallback ? Box : ImagePlus;
+    return (
+      <span className="grid h-full w-full place-items-center bg-[radial-gradient(circle_at_35%_25%,rgba(244,255,0,.18),transparent_30%),linear-gradient(145deg,#070809,#141618)] text-[#f4ff00]">
+        <Icon className={cn(modelFallback ? "h-6 w-6" : "h-5 w-5")} />
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt=""
+      className="h-full w-full object-cover"
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+function ThreeDStaticModelThumb({
+  modelUrl,
+  label,
+  compact,
+}: {
+  modelUrl: string;
+  label?: string;
+  compact: boolean;
+}) {
+  return (
+    <span className="relative grid h-full w-full place-items-center overflow-hidden bg-[radial-gradient(circle_at_35%_25%,rgba(244,255,0,.22),transparent_32%),linear-gradient(145deg,#090a0b,#17191c)] text-[#f4ff00]">
+      <Box className={cn(compact ? "h-6 w-6" : "h-5 w-5")} />
+      {!compact && (
+        <span className="pointer-events-none absolute bottom-1 rounded bg-black/65 px-1 text-[7px] font-black uppercase leading-[10px] text-white/80">
+          {modelFileExtension(modelUrl, label)}
+        </span>
+      )}
+      <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/70 px-1 text-[8px] font-black text-[#f4ff00]">
+        3D
+      </span>
+    </span>
+  );
+}
+
+function ThreeDModelPreviewFrame({
+  modelUrl,
+  posterUrl,
+  label,
+  variant,
+  interactive = false,
+}: {
+  modelUrl: string;
+  posterUrl?: string;
+  label?: string;
+  variant: "main" | "thumb";
+  interactive?: boolean;
+}) {
+  const viewerUrl = useMirroredTripoUrl(modelUrl);
+  const viewerRef = useRef<ModelViewerElement | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const canRenderModel = canInlineModelViewer(modelUrl);
+  const isMain = variant === "main";
+
+  useEffect(() => {
+    setLoaded(false);
+    if (!canRenderModel) return;
+    void loadModelViewer().catch((err) => {
+      console.warn("[3DWorkshop] failed to load model-viewer:", err);
+    });
+  }, [canRenderModel, modelUrl]);
+
+  useEffect(() => {
+    if (!canRenderModel) return;
+    const el = viewerRef.current;
+    if (!el) return;
+    const onLoad = () => setLoaded(true);
+    el.addEventListener("load", onLoad);
+    const fallback = window.setTimeout(() => setLoaded(true), isMain ? 15_000 : 8_000);
+    return () => {
+      el.removeEventListener("load", onLoad);
+      window.clearTimeout(fallback);
+    };
+  }, [canRenderModel, isMain, modelUrl, viewerUrl]);
+
+  useEffect(() => {
+    if (!isMain || !loaded || !canRenderModel) return;
+    const el = viewerRef.current;
+    if (!el?.toDataURL) return;
+    const key = modelPreviewCacheKey(modelUrl);
+    if (MODEL_PREVIEW_THUMB_CACHE.has(key)) return;
+    const capture = window.setTimeout(() => {
+      try {
+        const dataUrl = el.toDataURL?.("image/webp", 0.72);
+        if (!dataUrl?.startsWith("data:image/")) return;
+        MODEL_PREVIEW_THUMB_CACHE.set(key, dataUrl);
+        window.dispatchEvent(
+          new CustomEvent<ModelPreviewThumbEventDetail>(MODEL_PREVIEW_THUMB_EVENT, {
+            detail: { key, dataUrl },
+          }),
+        );
+      } catch (err) {
+        console.info("[3DWorkshop] thumbnail capture skipped:", err);
+      }
+    }, 650);
+    return () => window.clearTimeout(capture);
+  }, [canRenderModel, isMain, loaded, modelUrl, viewerUrl]);
+
+  if (!canRenderModel) {
+    return (
+      <span className={cn(
+        "relative grid h-full w-full place-items-center overflow-hidden bg-black text-[#f4ff00]",
+        isMain ? "min-h-[260px]" : "",
+      )}>
+        {posterUrl ? (
+          <img src={posterUrl} alt="" className="h-full w-full object-contain" />
+        ) : (
+          <span className="grid place-items-center gap-2 text-center">
+            <Box className={cn(isMain ? "h-14 w-14" : "h-6 w-6")} />
+            {isMain && (
+              <span className="text-[12px] font-semibold text-zinc-400">
+                {modelFileExtension(modelUrl, label).toUpperCase()} preview after import
+              </span>
+            )}
+          </span>
+        )}
+      </span>
+    );
+  }
+
+  return (
+    <span className="relative block h-full w-full overflow-hidden bg-[#08090a]">
+      <model-viewer
+        ref={(el) => {
+          viewerRef.current = el as ModelViewerElement | null;
+        }}
+        src={viewerUrl ?? modelUrl}
+        poster={posterUrl}
+        alt={label ?? "3D model"}
+        {...(isMain ? { "auto-rotate": "" } : {})}
+        {...(interactive ? { "camera-controls": "" } : { "disable-zoom": "" })}
+        shadow-intensity={isMain ? "0.85" : "0"}
+        shadow-softness={isMain ? "0.9" : "1"}
+        exposure={isMain ? "1" : "0.9"}
+        loading={isMain ? "eager" : "lazy"}
+        interaction-prompt={interactive ? "auto" : "none"}
+        style={{
+          width: "100%",
+          height: "100%",
+          background: "transparent",
+          cursor: interactive ? "grab" : "default",
+          pointerEvents: interactive ? "auto" : "none",
+        }}
+      />
+      {!loaded && (
+        <span className="pointer-events-none absolute inset-0 grid place-items-center bg-black/55">
+          <Loader2 className={cn("animate-spin text-[#f4ff00]", isMain ? "h-6 w-6" : "h-4 w-4")} />
+        </span>
+      )}
+      {!isMain && (
+        <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/70 px-1 text-[8px] font-black text-[#f4ff00]">
+          3D
+        </span>
+      )}
+    </span>
+  );
+}
+
+function ThreeDCompactToggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  const displayLabel = label === "Texture" ? "Tex" : label;
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="flex h-9 min-w-0 items-center justify-between gap-1 rounded-[10px] border border-white/[0.055] bg-[#151617] px-1.5 text-left transition hover:border-[#f4ff00]/35 hover:bg-white/[0.035]"
+      aria-pressed={checked}
+      title={label}
+    >
+      <span className="min-w-0 truncate text-[10px] font-semibold text-zinc-200">{displayLabel}</span>
+      <span
+        className={cn(
+          "relative h-4 w-7 shrink-0 rounded-full transition",
+          checked ? "bg-[#f4ff00] shadow-[0_0_18px_-8px_rgba(244,255,0,.9)]" : "bg-zinc-700",
+        )}
+      >
+        <span
+          className={cn(
+            "absolute top-[3px] h-2.5 w-2.5 rounded-full bg-white transition",
+            checked ? "left-[15px]" : "left-[3px]",
+          )}
+        />
+      </span>
+    </button>
+  );
+}
+
+function ThreeDSourcePicker({
+  mode,
+  sourceOptions,
+  selectedSource,
+  onUpload,
+  onSelect,
+}: {
+  mode: StandaloneThreeDMode;
+  sourceOptions: UploadedRef[];
+  selectedSource: UploadedRef | null;
+  onUpload: () => void;
+  onSelect: (source: UploadedRef) => void;
+}) {
+  const pickerSourceOptions = mergeReferenceOptions([selectedSource, ...sourceOptions], 8);
+  return (
+    <div>
+      <FieldLabel label="Source model" meta={pickerSourceOptions.length ? `${pickerSourceOptions.length} ready` : "Upload or Tripo"} />
+      {pickerSourceOptions.length === 0 ? (
+        <div className="mt-2 rounded-[12px] border border-dashed border-white/[0.10] bg-black/20 p-3 text-[11px] leading-5 text-zinc-400">
+          <p>
+            {mode === "animate"
+              ? "Run Auto Rig first. Animate preset expects a rigged Tripo model."
+              : "Upload a GLB/OBJ/FBX/STL model or create an Image to 3D result first."}
+          </p>
+          {mode === "auto_rig" && (
+            <button
+              type="button"
+              onClick={onUpload}
+              className="mt-3 inline-flex h-8 items-center gap-2 rounded-[9px] bg-[#f4ff00] px-3 text-[11px] font-black text-zinc-950 transition hover:bg-[#fbff69]"
+            >
+              <UploadCloud className="h-3.5 w-3.5" />
+              Upload 3D model
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="mt-2 space-y-2">
+          {mode === "auto_rig" && (
+            <button
+              type="button"
+              onClick={onUpload}
+              className="flex h-9 w-full items-center justify-center gap-2 rounded-[10px] border border-dashed border-[#f4ff00]/35 bg-[#f4ff00]/[0.04] text-[11px] font-black text-[#f4ff00] transition hover:bg-[#f4ff00]/[0.08]"
+            >
+              <UploadCloud className="h-3.5 w-3.5" />
+              Upload external 3D
+            </button>
+          )}
+          {pickerSourceOptions.slice(0, 5).map((source) => {
+            const active = selectedSource?.id === source.id;
+            return (
+              <button
+                key={source.id}
+                type="button"
+                onClick={() => onSelect(source)}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-[12px] border p-2 text-left transition",
+                  active
+                    ? "border-[#f4ff00]/60 bg-[#f4ff00]/10"
+                    : "border-white/[0.07] bg-white/[0.025] hover:border-white/[0.16]",
+                )}
+              >
+                <ThreeDReferenceThumb reference={source} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[11px] font-bold text-white">{source.name}</span>
+                  <span className="mt-1 block truncate text-[10px] font-semibold text-zinc-500">
+                    {tripoModelTaskIdFromReference(source).slice(0, 12) || "Needs Tripo import"}
+                  </span>
+                </span>
+                {active && <Check className="h-4 w-4 shrink-0 text-[#f4ff00]" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ThreeDJobTile({
+  job,
+  active,
+  onSelect,
+  onDelete,
+}: {
+  job: StandaloneJobRow;
+  active: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  const result = job.result;
+  const params = job.request?.params ?? {};
+  const modelUrl = getStandaloneModelUrl(result);
+  const posterUrl = getStandalonePosterUrl(result, modelUrl);
+  const failed = job.status === "failed" || job.status === "permanent_failed";
+  const running = job.status === "queued" || job.status === "running";
+  const typeLabel = threeDJobTypeLabel(job);
+  const statusLabel = threeDJobStatusLabel(job.status);
+  const modelLabel = standaloneJobModelLabel(job, params);
+  const summary = threeDJobTimelineSummary(job);
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "group relative flex h-[104px] w-[252px] shrink-0 items-stretch gap-[10px] overflow-hidden rounded-[12px] border bg-[#171819] p-[10px] text-left transition",
+        active ? "border-[#f4ff00]/80 bg-[#20220f]" : "border-white/[0.07] hover:border-white/[0.18] hover:bg-[#1d1f21]",
+      )}
+    >
+      <span className="relative grid h-[82px] w-[74px] shrink-0 place-items-center overflow-hidden rounded-[10px] bg-black">
+        {posterUrl ? (
+          <img src={posterUrl} alt="" className="h-full w-full object-cover opacity-90" />
+        ) : (
+          <Box className="h-8 w-8 text-zinc-700" />
+        )}
+        <span className="absolute left-[5px] top-[5px] rounded bg-black/75 px-[5px] py-[2px] [font-size:8px] font-black [line-height:10px] text-[#f4ff00]">
+          3D
+        </span>
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-start justify-between gap-2">
+          <span className="min-w-0">
+            <span className="block truncate [font-size:12px] font-black [line-height:14px] text-white">
+              {typeLabel}
+            </span>
+            <span className="mt-[3px] block truncate [font-size:10px] font-semibold [line-height:12px] text-zinc-400">
+              {modelLabel}
+            </span>
+          </span>
+          <span
+            className={cn(
+              "shrink-0 rounded-full px-[7px] py-[2px] [font-size:9px] font-black uppercase [line-height:11px]",
+              failed
+                ? "bg-red-500/15 text-red-200 ring-1 ring-red-300/20"
+                : running
+                  ? "bg-sky-400/15 text-sky-200 ring-1 ring-sky-300/20"
+                  : "bg-emerald-300/12 text-emerald-100 ring-1 ring-emerald-200/20",
+            )}
+          >
+            {statusLabel}
+          </span>
+        </span>
+        <span
+          className={cn(
+            "mt-[8px] line-clamp-2 block [font-size:10px] font-semibold [line-height:13px]",
+            failed ? "text-red-100/85" : "text-zinc-500",
+          )}
+          title={summary}
+        >
+          {summary}
+        </span>
+      </span>
+      <span
+        role="button"
+        tabIndex={0}
+        onClick={(event) => {
+          event.stopPropagation();
+          onDelete();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            event.stopPropagation();
+            onDelete();
+          }
+        }}
+        className="absolute right-1 top-1 z-20 grid h-5 w-5 place-items-center rounded-full bg-black/70 text-white opacity-0 transition group-hover:opacity-100"
+        aria-label="Delete 3D job"
+      >
+        <Trash2 className="h-2.5 w-2.5" />
+      </span>
+    </button>
+  );
+}
+
+function PropertyRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[10px] border border-white/[0.06] bg-white/[0.025] px-3 py-2">
+      <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-500">{label}</div>
+      <div className="mt-1 truncate text-[12px] font-semibold text-white">{value}</div>
+    </div>
+  );
+}
+
 function PromptBox({
   label,
   value,
@@ -9432,7 +11201,7 @@ function SelectField({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 h-10 w-full rounded-xl border border-[var(--border-faint)] bg-[var(--bg-panel)] px-3 text-[12px] font-semibold text-white outline-none transition hover:bg-[var(--bg-surface-2)] focus:border-[var(--brand-primary)]/40 disabled:cursor-not-allowed"
+        className="mt-2 h-10 w-full rounded-xl border border-[var(--border-faint)] bg-[var(--bg-panel)] px-1 text-[10px] font-semibold text-white outline-none transition hover:bg-[var(--bg-surface-2)] focus:border-[var(--brand-primary)]/40 disabled:cursor-not-allowed"
       >
         {options.map((option) => (
           <option key={option} value={option} className="bg-zinc-950">
@@ -9997,47 +11766,69 @@ function AutoSubtitleMiniEditorPanel({
   const { language, t } = useLanguage();
   const th = language === "th";
   const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
+  const [previewMode, setPreviewMode] = useState<"source" | "result">("source");
   const previewFrameRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const timelineTrackRef = useRef<HTMLDivElement>(null);
   const cueDragRef = useRef<AutoSubtitleMiniCueDrag | null>(null);
   const cueDragMovedRef = useRef(false);
+  const pendingGeneratedResultPreviewRef = useRef(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
   const [selectedCueId, setSelectedCueId] = useState<string | null>(null);
   const [cueTimingEdits, setCueTimingEdits] = useState<Record<string, AutoSubtitleMiniCueTiming>>({});
   const media = form.autoSubtitleVideo;
+  const mediaIdentity = media ? `${media.id ?? ""}|${media.name}|${media.url}` : "empty";
+
+  useEffect(() => {
+    setPreviewMode("source");
+    setSelectedResultId(null);
+    setSelectedCueId(null);
+    setCueTimingEdits({});
+  }, [mediaIdentity]);
+
+  useEffect(() => {
+    if (running || progress) {
+      pendingGeneratedResultPreviewRef.current = true;
+    }
+  }, [progress, running]);
 
   useEffect(() => {
     setSelectedResultId((current) => {
       if (results.length === 0) return null;
-      const currentResult = results.find((result) => result.id === current);
-      if (!currentResult) return results[0]?.id ?? null;
-      if (
-        media &&
-        currentResult.sourceName !== media.name &&
-        results[0]?.sourceName === media.name
-      ) {
-        return results[0].id;
-      }
-      return current;
+      return current && results.some((result) => result.id === current)
+        ? current
+        : results[0]?.id ?? null;
     });
-  }, [media, results]);
+  }, [results]);
+
+  useEffect(() => {
+    if (!pendingGeneratedResultPreviewRef.current || running || progress || results.length === 0) {
+      return;
+    }
+    const generatedResult = media
+      ? results.find((result) => autoSubtitleResultMatchesMedia(result, media))
+      : results[0] ?? null;
+    if (!generatedResult) return;
+    setSelectedResultId(generatedResult.id);
+    setPreviewMode("result");
+    pendingGeneratedResultPreviewRef.current = false;
+  }, [media, progress, results, running]);
 
   const selectedResult =
-    results.find((result) => result.id === selectedResultId) ?? results[0] ?? null;
-  const selectedResultMatchesCurrentMedia =
-    !!selectedResult &&
-    !!media &&
-    (selectedResult.sourceName === media.name || selectedResult.sourceUrl === media.url);
-  const activeResult = media
-    ? selectedResultMatchesCurrentMedia
-      ? selectedResult
-      : null
-    : selectedResult;
-  const previewSourceUrl = media?.url ?? activeResult?.sourceUrl ?? activeResult?.outputUrl ?? null;
+    results.find((result) => result.id === selectedResultId) ?? null;
+  const fallbackResult = results[0] ?? null;
+  const activeResult = !media
+    ? selectedResult ?? fallbackResult
+    : previewMode === "result"
+      ? selectedResult ?? fallbackResult
+      : null;
+  const isRenderedResultPreview = !!activeResult && (!media || previewMode === "result");
+  const previewSourceUrl = isRenderedResultPreview
+    ? activeResult.outputUrl
+    : media?.url ?? null;
   const playbackUrl = useFreshSignedUrl(previewSourceUrl);
   const settings = autoSubtitleStyleFromForm(form);
   const handoff = useMemo(
@@ -10050,9 +11841,13 @@ function AutoSubtitleMiniEditorPanel({
     autoSubtitlePositionPercentFromVertical(form.autoSubtitlePosition),
   );
   const sourceName =
-    media?.name ?? activeResult?.outputName ?? (th ? "ยังไม่มีวิดีโอ" : "No video yet");
+    isRenderedResultPreview
+      ? activeResult?.outputName ?? (th ? "ยังไม่มีวิดีโอ" : "No video yet")
+      : media?.name ?? (th ? "ยังไม่มีวิดีโอ" : "No video yet");
   const durationSeconds = activeResult?.duration ?? media?.durationSec ?? handoff?.source.duration ?? 0;
-  const activeSourceKey = activeResult?.id ?? media?.id ?? previewSourceUrl ?? "empty";
+  const activeSourceKey = isRenderedResultPreview
+    ? activeResult?.id ?? previewSourceUrl ?? "empty"
+    : media?.id ?? previewSourceUrl ?? "empty";
 
   useEffect(() => {
     setCurrentTime(0);
@@ -10120,8 +11915,9 @@ function AutoSubtitleMiniEditorPanel({
       timelineCues,
     ],
   );
-  const overlayPhrases =
-    timelineCues.length > 0
+  const overlayPhrases = isRenderedResultPreview
+    ? []
+    : timelineCues.length > 0
       ? activeCue
         ? [activeCue.text]
         : []
@@ -10281,6 +12077,42 @@ function AutoSubtitleMiniEditorPanel({
       toast.error(friendlyError(err, th ? "th" : "en"));
     }
   };
+  const resultWithMiniEditorHandoff = (result: AutoSubtitleResultItem): AutoSubtitleResultItem => {
+    if (!handoff || result.id !== activeResult?.id || timelineCues.length === 0) return result;
+    const editedCues = timelineCues.map((cue, index) => {
+      const original = handoff.track.cues[index];
+      const words = (original?.words ?? [])
+        .map((word) => ({
+          ...word,
+          start: Math.max(cue.start, Math.min(cue.end, word.start)),
+          end: Math.max(cue.start, Math.min(cue.end, word.end)),
+        }))
+        .filter((word) => word.end > word.start);
+      return {
+        ...(original ?? { words: [] }),
+        text: cue.text,
+        startTime: cue.start,
+        endTime: cue.end,
+        words,
+      };
+    });
+    const handoffId = saveAutoSubtitleHandoff({
+      ...handoff,
+      style: settings,
+      track: {
+        ...handoff.track,
+        cues: editedCues,
+        meta: {
+          ...handoff.track.meta,
+          animation: settings.animation,
+          accentColor: captionAccentColor(settings),
+          highlightColor: captionAccentColor(settings),
+        },
+      },
+      createdAt: Date.now(),
+    });
+    return { ...result, handoffId };
+  };
 
   return (
     <div className="flex h-full min-h-[620px] overflow-hidden rounded-[18px] border border-white/[0.035] bg-[#101112]">
@@ -10323,7 +12155,7 @@ function AutoSubtitleMiniEditorPanel({
                 </button>
                 <button
                   type="button"
-                  onClick={() => onEdit(activeResult)}
+                  onClick={() => onEdit(resultWithMiniEditorHandoff(activeResult))}
                   className="grid h-7 w-7 place-items-center rounded-[7px] bg-cyan-200 text-black transition hover:bg-cyan-100"
                   aria-label={th ? "เปิด editor เต็ม" : "Open full editor"}
                   title={th ? "เปิด editor เต็ม" : "Open full editor"}
@@ -10430,14 +12262,15 @@ function AutoSubtitleMiniEditorPanel({
               </div>
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {results.slice(0, 10).map((result) => {
-                  const belongsToCurrentMedia =
-                    !media || result.sourceUrl === media.url || result.sourceName === media.name;
-                  const selected = selectedResult?.id === result.id && belongsToCurrentMedia;
+                  const selected = isRenderedResultPreview && activeResult?.id === result.id;
                   return (
                     <button
                       key={result.id}
                       type="button"
-                      onClick={() => setSelectedResultId(result.id)}
+                      onClick={() => {
+                        setSelectedResultId(result.id);
+                        setPreviewMode("result");
+                      }}
                       className={cn(
                         "grid w-[86px] shrink-0 gap-1 rounded-[9px] border p-1 text-left transition",
                         selected
@@ -10919,8 +12752,20 @@ function CreationFeed({
   );
 }
 
-const MODEL_FILE_RE = /\.(glb|gltf|usdz|obj|fbx)(?:[?#].*)?$/i;
-const REFERENCE_MEDIA_FILE_RE = /\.(png|jpe?g|webp|gif|mp4|mov|webm|m4v|mp3|wav|m4a|aac)(?:[?#].*)?$/i;
+const MODEL_FILE_RE = /\.(glb|gltf|usdz|obj|fbx|stl|3mf)(?:[?#].*)?$/i;
+const MODEL_VIEWER_FILE_RE = /\.(glb|gltf|usdz)(?:[?#].*)?$/i;
+const REFERENCE_MEDIA_FILE_RE = /\.(png|jpe?g|webp|gif|mp4|mov|webm|m4v|mp3|wav|m4a|aac|glb|gltf|usdz|obj|fbx|stl|3mf)(?:[?#].*)?$/i;
+const MODEL_PREVIEW_THUMB_EVENT = "mediaforge:3d-model-thumb-ready";
+const MODEL_PREVIEW_THUMB_CACHE = new Map<string, string>();
+
+type ModelPreviewThumbEventDetail = {
+  key: string;
+  dataUrl: string;
+};
+
+type ModelViewerElement = HTMLElement & {
+  toDataURL?: (type?: string, encoderOptions?: number) => string;
+};
 
 const firstText = (...values: Array<unknown>): string | undefined => {
   for (const value of values) {
@@ -10928,6 +12773,41 @@ const firstText = (...values: Array<unknown>): string | undefined => {
   }
   return undefined;
 };
+
+function modelUrlFromReference(
+  reference: Pick<UploadedRef, "modelUrl" | "url"> | null | undefined,
+): string | undefined {
+  if (!reference) return undefined;
+  return firstText(reference.modelUrl, MODEL_FILE_RE.test(reference.url) ? reference.url : "");
+}
+
+function posterUrlFromReference(
+  reference: Pick<UploadedRef, "previewUrl" | "url" | "modelUrl"> | null | undefined,
+): string | undefined {
+  if (!reference) return undefined;
+  return firstText(reference.previewUrl, !MODEL_FILE_RE.test(reference.url) ? reference.url : "");
+}
+
+function canInlineModelViewer(url: string | undefined): boolean {
+  return MODEL_VIEWER_FILE_RE.test(url ?? "");
+}
+
+function modelFileExtension(url: string | undefined, name?: string): string {
+  const source = firstText(name, url) ?? "";
+  const match = source.split(/[?#]/)[0].match(/\.([a-z0-9]+)$/i);
+  return (match?.[1]?.toLowerCase() || "glb").replace(/[^a-z0-9]/g, "") || "glb";
+}
+
+function modelPreviewCacheKey(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.toString();
+  } catch {
+    return url.split(/[?#]/)[0] || url;
+  }
+}
 
 const firstFiniteNumber = (...values: Array<unknown>): number | undefined => {
   for (const value of values) {
@@ -11112,13 +12992,141 @@ function normalizeStandaloneResultType(
   return "";
 }
 
+function inferModelMime(url: string | undefined): string {
+  const cleanUrl = (url ?? "").split(/[?#]/)[0].toLowerCase();
+  if (cleanUrl.endsWith(".gltf")) return "model/gltf+json";
+  if (cleanUrl.endsWith(".usdz")) return "model/vnd.usdz+zip";
+  if (cleanUrl.endsWith(".obj")) return "model/obj";
+  if (cleanUrl.endsWith(".fbx")) return "model/fbx";
+  if (cleanUrl.endsWith(".stl")) return "model/stl";
+  if (cleanUrl.endsWith(".3mf")) return "model/3mf";
+  return "model/gltf-binary";
+}
+
+function referenceCategoryForUpload(contentType: string, isModelFile: boolean): string {
+  if (isModelFile) return "model_3d";
+  if (contentType.startsWith("video/")) return "video";
+  if (contentType.startsWith("audio/")) return "audio";
+  if (contentType.startsWith("image/")) return "image";
+  return "reference";
+}
+
+function isModel3dUploadFile(file: File): boolean {
+  const name = file.name.toLowerCase();
+  if (/\.(glb|obj|fbx|stl)$/i.test(name)) return true;
+  return /^(model\/|application\/octet-stream$)/i.test(file.type) && /\.(glb|obj|fbx|stl)$/i.test(name);
+}
+
+function isStandaloneModel3dReference(
+  reference: Pick<UploadedRef, "mime" | "url" | "modelUrl"> | null | undefined,
+): boolean {
+  if (!reference) return false;
+  const mime = reference.mime?.toLowerCase() ?? "";
+  if (mime.startsWith("model/")) return true;
+  return MODEL_FILE_RE.test(reference.modelUrl ?? reference.url);
+}
+
+function firstUuidFromText(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  return value.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0];
+}
+
+function tripoModelTaskIdFromResult(result: StandaloneResult | null | undefined): string {
+  if (!result) return "";
+  const meta = result.provider_meta ?? {};
+  const outputs = result.outputs ?? {};
+  const modelUrl = getStandaloneModelUrl(result);
+  return firstText(
+    meta.tripo_model_task_id,
+    meta.original_model_task_id,
+    meta.source_model_task_id,
+    meta.provider_task_id,
+    meta.task_id,
+    result.task_id,
+    firstUuidFromText(modelUrl),
+    firstUuidFromText(outputs.model_url),
+  );
+}
+
+function tripoModelTaskIdFromReference(
+  reference: Pick<UploadedRef, "tripoModelTaskId" | "originalModelTaskId" | "providerTaskId" | "taskId" | "providerMeta" | "modelUrl"> | null | undefined,
+): string {
+  if (!reference) return "";
+  const meta = reference.providerMeta ?? {};
+  return firstText(
+    reference.tripoModelTaskId,
+    reference.originalModelTaskId,
+    reference.providerTaskId,
+    reference.taskId,
+    meta.tripo_model_task_id,
+    meta.original_model_task_id,
+    meta.source_model_task_id,
+    meta.provider_task_id,
+    meta.task_id,
+    firstUuidFromText(reference.modelUrl),
+  );
+}
+
+function isRiggedTripoSourceReference(reference: UploadedRef | null | undefined): boolean {
+  if (!reference) return false;
+  return (
+    reference.nodeType === "tripoRigNode" ||
+    reference.nodeType === "tripoAnimateNode" ||
+    reference.providerMeta?.task_type === "animate_rig" ||
+    reference.providerMeta?.task_type === "animate_retarget"
+  );
+}
+
+function model3dInputFromReference(
+  reference: UploadedRef | null | undefined,
+): Record<string, unknown> | null {
+  if (!reference) return null;
+  const modelUrl = firstText(reference.modelUrl, MODEL_FILE_RE.test(reference.url) ? reference.url : "");
+  const taskId = tripoModelTaskIdFromReference(reference);
+  if (!taskId) return null;
+  return {
+    url: modelUrl || reference.url,
+    model_url: modelUrl,
+    source_model_url: modelUrl,
+    preview_url: firstText(reference.previewUrl, !MODEL_FILE_RE.test(reference.url) ? reference.url : ""),
+    task_id: taskId,
+    tripo_model_task_id: taskId,
+    original_model_task_id: taskId,
+    provider_task_id: firstText(reference.providerTaskId, reference.taskId, taskId),
+    provider_meta: reference.providerMeta ?? {},
+  };
+}
+
+function externalModel3dInputFromReference(
+  reference: UploadedRef | null | undefined,
+): Record<string, unknown> | null {
+  if (!reference) return null;
+  const modelUrl = firstText(reference.modelUrl, MODEL_FILE_RE.test(reference.url) ? reference.url : "");
+  if (!modelUrl) return null;
+  const name = reference.name || "model.glb";
+  const extension = name.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase()
+    ?? modelUrl.split(/[?#]/)[0].match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase()
+    ?? "";
+  return {
+    url: modelUrl,
+    model_url: modelUrl,
+    source_model_url: modelUrl,
+    file_name: name,
+    format: extension,
+    preview_url: firstText(reference.previewUrl, !MODEL_FILE_RE.test(reference.url) ? reference.url : ""),
+    provider_meta: reference.providerMeta ?? {},
+  };
+}
+
 function inferReferenceMime(url: string | undefined, fallback?: unknown): string {
   const value = typeof fallback === "string" ? fallback.toLowerCase() : "";
   if (value.startsWith("image/") || value.startsWith("video/") || value.startsWith("audio/")) return value;
+  if (value.startsWith("model/")) return value;
   if (value.includes("video")) return "video/mp4";
   if (value.includes("audio")) return "audio/mpeg";
   if (value.includes("image")) return "image/jpeg";
   const cleanUrl = (url ?? "").split(/[?#]/)[0].toLowerCase();
+  if (MODEL_FILE_RE.test(cleanUrl)) return inferModelMime(cleanUrl);
   if (/\.(mp4|mov|webm|m4v)$/i.test(cleanUrl)) return "video/mp4";
   if (/\.(mp3|m4a|aac)$/i.test(cleanUrl)) return "audio/mpeg";
   if (/\.(wav)$/i.test(cleanUrl)) return "audio/wav";
@@ -11129,12 +13137,43 @@ function inferReferenceMime(url: string | undefined, fallback?: unknown): string
 }
 
 function referenceFromGenerationJob(job: StandaloneJobRow): UploadedRef | null {
+  if (job.node_type === "tripoPreRigCheckNode") return null;
   if (job.status !== "completed") return null;
   const result = job.result;
   if (!result) return null;
   const modelUrl = getStandaloneModelUrl(result);
+  const posterUrl = getStandalonePosterUrl(result, modelUrl);
   const outputs = result.outputs ?? {};
   const type = String(result.type ?? "");
+  if (modelUrl) {
+    const params = job.request?.params ?? {};
+    const providerMeta = result.provider_meta ?? {};
+    const taskId = tripoModelTaskIdFromResult(result);
+    return {
+      id: `job-${job.id}`,
+      source: "generation",
+      assetId: job.id,
+      name: uploadedReferenceName(
+        firstText(outputs.file_name, outputs.filename, modelUrl),
+        modelUrl,
+        String(params.nodeName ?? params.model_name ?? job.model ?? "3d-model"),
+      ),
+      url: posterUrl ?? modelUrl,
+      modelUrl,
+      previewUrl: posterUrl,
+      mime: inferModelMime(modelUrl),
+      taskId: firstText(result.task_id, providerMeta.task_id),
+      tripoModelTaskId: taskId,
+      originalModelTaskId: firstText(
+        providerMeta.original_model_task_id,
+        providerMeta.source_model_task_id,
+        taskId,
+      ),
+      providerTaskId: firstText(providerMeta.provider_task_id, result.task_id),
+      providerMeta,
+      nodeType: job.node_type,
+    };
+  }
   const videoUrl = firstText(
     type === "video" ? result.url : undefined,
     outputs.video_url,
@@ -11152,7 +13191,7 @@ function referenceFromGenerationJob(job: StandaloneJobRow): UploadedRef | null {
     outputs.output_image,
     outputs.rendered_image,
     outputs.preview_image,
-    getStandalonePosterUrl(result, modelUrl),
+    posterUrl,
   );
   const url = videoUrl ?? audioUrl ?? imageUrl;
   if (!url || MODEL_FILE_RE.test(url)) return null;
@@ -11318,14 +13357,21 @@ async function referenceFromUserAsset(
     metadata.url,
     metadata.storage_path,
   );
-  if (!rawUrl || MODEL_FILE_RE.test(rawUrl)) return null;
+  if (!rawUrl) return null;
   const storagePointer = storagePointerFromReferenceUrl(rawUrl);
   const mime = inferReferenceMime(
     rawUrl,
     firstText(row.file_type, row.mime_type, row.type, metadata.mime_type, metadata.content_type),
   );
-  if (!mime.startsWith("image/") && !mime.startsWith("video/") && !mime.startsWith("audio/")) return null;
+  const isModel = mime.startsWith("model/") || MODEL_FILE_RE.test(rawUrl);
+  if (!mime.startsWith("image/") && !mime.startsWith("video/") && !mime.startsWith("audio/") && !isModel) return null;
   const signedUrl = await getSignedUrl(rawUrl);
+  const taskId = firstText(
+    metadata.tripo_model_task_id,
+    metadata.original_model_task_id,
+    metadata.provider_task_id,
+    metadata.task_id,
+  );
   return {
     id: `user-asset-${String(row.id ?? rawUrl)}`,
     source: "user_asset",
@@ -11345,6 +13391,13 @@ async function referenceFromUserAsset(
     ),
     url: signedUrl,
     mime,
+    modelUrl: isModel ? signedUrl : undefined,
+    tripoModelTaskId: taskId,
+    originalModelTaskId: taskId,
+    providerTaskId: taskId,
+    providerMeta: metadata.provider_meta && typeof metadata.provider_meta === "object"
+      ? (metadata.provider_meta as Record<string, unknown>)
+      : {},
   };
 }
 
@@ -12132,6 +14185,7 @@ function uploadAcceptForSlot(slot: UploadSlot, model?: string): string {
   if (slot === "upscale-image") {
     return "image/*";
   }
+  if (slot === "model-3d") return MODEL_3D_UPLOAD_ACCEPT;
   return slot === "video-ref-video" ? "video/*" : "image/*";
 }
 
@@ -12261,17 +14315,22 @@ async function uploadReference(
   if (!userId) throw new Error("Please sign in before uploading references.");
   if (!projectId) throw new Error("Create or select a project before uploading references.");
   const inferredMime = inferReferenceMime(file.name, file.type);
+  const isModelFile = isModel3dUploadFile(file) || MODEL_FILE_RE.test(file.name);
   if (
     !file.type.startsWith("image/") &&
     !file.type.startsWith("video/") &&
     !file.type.startsWith("audio/") &&
+    !isModelFile &&
     !isTranslateMediaFile(file)
   ) {
-    throw new Error("Only image, video, or audio references are supported on this surface.");
+    throw new Error("Only image, video, audio, or 3D model references are supported on this surface.");
   }
   const uploadFile = await normalizeImageReferenceUpload(file);
   const imageDimensions = await readImageFileDimensions(uploadFile);
-  const contentType = uploadFile.type || inferredMime || "application/octet-stream";
+  const uploadIsModelFile = isModelFile || MODEL_FILE_RE.test(uploadFile.name);
+  const contentType = uploadIsModelFile
+    ? inferModelMime(uploadFile.name || file.name)
+    : uploadFile.type || inferredMime || "application/octet-stream";
   const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 80);
   // Storage RLS on `ai-media` requires the FIRST folder segment to
   // equal `auth.uid()`:
@@ -12298,16 +14357,83 @@ async function uploadReference(
   if (signError || !data?.signedUrl) {
     throw new Error(`Could not create signed URL: ${signError?.message ?? ""}`);
   }
-  return {
-    id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`,
+  const storageUrl = storageObjectUrl(STORAGE_BUCKET, storagePath);
+  const modelFormat =
+    uploadIsModelFile
+      ? (uploadFile.name.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? undefined)
+      : undefined;
+  const metadata = {
+    source: "standalone_reference_upload",
+    storage_bucket: STORAGE_BUCKET,
+    storage_path: storagePath,
+    file_name: file.name,
+    original_file_name: file.name,
+    mime_type: contentType,
+    content_type: contentType,
+    project_id: projectId,
+    ...(imageDimensions ? imageDimensions : {}),
+    ...(uploadIsModelFile
+      ? {
+          model_url: storageUrl,
+          source_model_url: storageUrl,
+          model_format: modelFormat,
+        }
+      : {}),
+  };
+  const assetPayload: Record<string, unknown> = {
+    user_id: userId,
+    project_id: projectId,
+    name: file.name,
+    file_url: storageUrl,
+    file_type: contentType,
     source: "upload",
+    category: referenceCategoryForUpload(contentType, uploadIsModelFile),
+    metadata,
+  };
+  let assetId: string | undefined;
+  try {
+    let insert = await supabase
+      .from("user_assets")
+      .insert(assetPayload as never)
+      .select("*")
+      .single();
+    if (insert.error && isMissingProjectIdColumn(insert.error)) {
+      const { project_id: _projectId, ...fallbackPayload } = assetPayload;
+      insert = await supabase
+        .from("user_assets")
+        .insert(fallbackPayload as never)
+        .select("*")
+        .single();
+    }
+    if (insert.error) {
+      console.warn("[StandaloneGenerator] user_assets insert failed:", insert.error.message);
+    } else if (insert.data) {
+      const row = insert.data as ProjectReferenceAssetRow;
+      assetId = row.id != null ? String(row.id) : undefined;
+    }
+  } catch (err) {
+    console.warn("[StandaloneGenerator] user_assets insert failed:", err);
+  }
+  return {
+    id: assetId ? `user-asset-${assetId}` : (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`),
+    source: assetId ? "user_asset" : "upload",
+    assetId,
     storageBucket: STORAGE_BUCKET,
     storagePath,
     name: file.name,
     url: data.signedUrl,
     mime: contentType,
+    modelUrl: uploadIsModelFile ? data.signedUrl : undefined,
     width: imageDimensions?.width,
     height: imageDimensions?.height,
+    providerMeta: uploadIsModelFile
+      ? {
+          source: "external_upload",
+          storage_bucket: STORAGE_BUCKET,
+          storage_path: storagePath,
+          model_format: modelFormat,
+        }
+      : undefined,
   };
 }
 
@@ -12595,6 +14721,7 @@ const STANDALONE_MENTION_REGEX = /@\[([^\]]+)\]\(([^)]+)\)/g;
 function fieldTypeForReference(
   reference: Pick<UploadedRef, "mime">,
 ): StandaloneMentionedAsset["fieldType"] {
+  if (reference.mime?.startsWith("model/")) return null;
   if (reference.mime?.startsWith("video/")) return "video";
   if (reference.mime?.startsWith("audio/")) return "audio";
   return "image";
@@ -12910,6 +15037,7 @@ function buildCurrentParams(
       preset: form.autoSubtitlePresetId,
       font: form.autoSubtitleFont,
       fill: form.autoSubtitleFill,
+      highlight_enabled: false,
       accent_color: form.autoSubtitleAccentColor,
       highlight_color: form.autoSubtitleAccentColor,
       position: form.autoSubtitlePosition,
@@ -12919,6 +15047,7 @@ function buildCurrentParams(
         autoSubtitlePositionPercentFromVertical(form.autoSubtitlePosition),
       ),
       transition: form.autoSubtitleTransition,
+      out_transition: form.autoSubtitleOutTransition,
       text_animation: form.autoSubtitleTextAnimation,
       segmentation_mode: form.autoSubtitleSegmentationMode,
       words_per_line: form.autoSubtitleWordsPerLine,
@@ -12927,6 +15056,26 @@ function buildCurrentParams(
     };
   }
   if (tool === "image_to_3d") {
+    const mode = standaloneThreeDMode(form);
+    if (mode === "auto_rig") {
+      return {
+        model_name: "tripo3d-rig",
+        rig_type: form.rigType && form.rigType !== TRIPO_AUTO_RIG_TYPE ? form.rigType : "biped",
+        spec: form.rigSpec ?? "tripo",
+        out_format: form.rigOutFormat ?? "glb",
+      };
+    }
+    if (mode === "animate") {
+      const batch = String(form.animationBatch ?? "").trim();
+      return {
+        model_name: "tripo3d-retarget",
+        ...(batch ? { animations: batch } : { animation: form.animationPreset ?? "preset:walk" }),
+        out_format: form.animationOutFormat ?? "glb",
+        bake_animation: String(form.animationBake ?? true),
+        export_with_geometry: String(form.animationWithGeometry ?? true),
+        animate_in_place: String(form.animationInPlace ?? false),
+      };
+    }
     return build3dParams({
       model: form.model,
       texture: form.texture,
@@ -12998,6 +15147,13 @@ function buildCurrentInputs(
     };
   }
   if (tool === "image_to_3d") {
+    const mode = standaloneThreeDMode(form);
+    if (mode !== "image_to_3d") {
+      const payload =
+        model3dInputFromReference(form.model3dSource) ??
+        externalModel3dInputFromReference(form.model3dSource);
+      return payload ? { model3d: payload } : {};
+    }
     const refs = threeDReferencesForForm(form).slice(0, max3dRefsForModel(form.model));
     if (refs.length === 0) return {};
     const imageUrls = refs.map((ref) => ref.url);
@@ -13103,8 +15259,24 @@ function validateForm(
   ) {
     return autoSubtitleDurationMessage(form.autoSubtitleVideo.durationSec);
   }
-  if (tool === "image_to_3d" && threeDReferencesForForm(form).length === 0) {
-    return t("workspace.standalone.validation.model_image");
+  if (tool === "image_to_3d") {
+    const mode = standaloneThreeDMode(form);
+    if (mode === "image_to_3d" && threeDReferencesForForm(form).length === 0) {
+      return t("workspace.standalone.validation.model_image");
+    }
+    if (mode !== "image_to_3d") {
+      if (!form.model3dSource) {
+        return "Select a completed Tripo 3D model first.";
+      }
+      const hasTripoTaskId = !!tripoModelTaskIdFromReference(form.model3dSource);
+      const canImportExternalModel = mode === "auto_rig" && isStandaloneModel3dReference(form.model3dSource);
+      if (!hasTripoTaskId && !canImportExternalModel) {
+        return "This model is missing a Tripo task ID. Use a model generated by Tripo in this project.";
+      }
+      if (mode === "animate" && (!hasTripoTaskId || !isRiggedTripoSourceReference(form.model3dSource))) {
+        return "Run Auto Rig first, then choose the rigged result for animation.";
+      }
+    }
   }
   if (tool === "url_asset") {
     const rawUrl = (form.urlAssetSource ?? "").trim();
@@ -13681,6 +15853,9 @@ function filterJobsForTool(
   const nodeType = STANDALONE_TOOLS[tool].nodeType;
   if (tool === "voice_translate") {
     return jobs.filter((job) => isVoiceTranslateStandaloneJob(job));
+  }
+  if (tool === "image_to_3d") {
+    return jobs.filter((job) => THREE_D_STANDALONE_NODE_TYPES.has(job.node_type));
   }
   return jobs.filter((job) => job.node_type === nodeType);
 }

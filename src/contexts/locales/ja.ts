@@ -2092,6 +2092,7 @@ export const ja = {
   "workspace.sidebar.image_gen": "画像生成",
   "workspace.sidebar.image_upscale": "高解像度化",
   "workspace.sidebar.url_asset": "URLアセット",
+  "workspace.sidebar.smart_frames": "Smart Frames",
   "workspace.sidebar.auto_subtitle": "自動字幕",
   "workspace.sidebar.video_gen": "動画生成",
   "workspace.sidebar.voice_gen": "音声ジェネレーター",
@@ -2132,6 +2133,7 @@ export const ja = {
   "workspace.sidebar.url_asset_tip":
     "直接URLからファイルをアセットライブラリに取り込みます。",
   "workspace.sidebar.auto_subtitle_tip": "動画から字幕を自動生成します。",
+  "workspace.sidebar.smart_frames_tip": "Use OpenAI to plan HyperFrames video edits and create an editable draft.",
   "workspace.sidebar.threed_gen_tip": "参考画像から3Dモデルを生成します。",
   "workspace.sidebar.editor_tip":
     "動画を編集し、タイムラインプロジェクトを管理します。",
@@ -2185,6 +2187,7 @@ export const ja = {
   "workspace.settings.stock_downloads": "ストックのダウンロード",
   "workspace.settings.stock_collections": "ストックコレクション",
   "workspace.settings.following": "フォロー中",
+  "workspace.settings.affiliate_program": "アフィリエイトプログラム",
   "workspace.settings.my_team": "私のチーム",
   "workspace.settings.people": "人々",
   "workspace.settings.security_sso": "セキュリティ SSO",

@@ -81,7 +81,11 @@ export async function materializeAutoSuptitleTrack(
       transform,
       animation,
       words: cue.words,
-      captionMeta: result.meta,
+      captionMeta: {
+        ...result.meta,
+        role: "subtitle",
+        relativePosition: { x: 0, y: 0 },
+      },
     });
     if (clip) {
       useProjectStore

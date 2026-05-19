@@ -2327,6 +2327,7 @@ export const es = {
   "workspace.sidebar.image_gen": "Crear imagen",
   "workspace.sidebar.image_upscale": "Mejorar resolución",
   "workspace.sidebar.url_asset": "URL a recurso",
+  "workspace.sidebar.smart_frames": "Smart Frames",
   "workspace.sidebar.auto_subtitle": "Subtítulos automáticos",
   "workspace.sidebar.video_gen": "Generador de vídeos",
   "workspace.sidebar.voice_gen": "Generador de voz",
@@ -2372,6 +2373,7 @@ export const es = {
     "Importa archivos desde una URL directa a tu biblioteca de recursos.",
   "workspace.sidebar.auto_subtitle_tip":
     "Genera subtítulos automáticamente a partir de videos.",
+  "workspace.sidebar.smart_frames_tip": "Use OpenAI to plan HyperFrames video edits and create an editable draft.",
   "workspace.sidebar.threed_gen_tip":
     "Crea modelos 3D a partir de referencias de imagen.",
   "workspace.sidebar.editor_tip":
@@ -2433,6 +2435,7 @@ export const es = {
   "workspace.settings.stock_downloads": "Descargas de stock",
   "workspace.settings.stock_collections": "Colecciones de recursos de stock",
   "workspace.settings.following": "Siguiendo",
+  "workspace.settings.affiliate_program": "Programa de afiliados",
   "workspace.settings.my_team": "Mi equipo",
   "workspace.settings.people": "gente",
   "workspace.settings.security_sso": "Seguridad SSO",

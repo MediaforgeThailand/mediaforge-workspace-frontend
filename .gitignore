@@ -37,6 +37,7 @@ SUPABASE_CREDENTIALS.md
 .mcp.json
 
 screenshots
+tmp/
 
 # Playwright artifacts
 test-results

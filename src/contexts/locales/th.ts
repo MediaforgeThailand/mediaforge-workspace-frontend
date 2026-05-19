@@ -2216,6 +2216,7 @@ export const th = {
   "workspace.sidebar.image_gen": "สร้างภาพ",
   "workspace.sidebar.image_upscale": "เพิ่มความละเอียดภาพ",
   "workspace.sidebar.url_asset": "URL แอสเซ็ต",
+  "workspace.sidebar.smart_frames": "Smart Frames",
   "workspace.sidebar.auto_subtitle": "ซับอัตโนมัติ",
   "workspace.sidebar.video_gen": "สร้างวิดีโอ",
   "workspace.sidebar.voice_gen": "สร้างเสียง",
@@ -2254,6 +2255,7 @@ export const th = {
   "workspace.sidebar.image_upscale_tip": "เพิ่มความละเอียดและความคมชัดของภาพ",
   "workspace.sidebar.url_asset_tip": "นำไฟล์จาก URL เข้าคลังแอสเซ็ต",
   "workspace.sidebar.auto_subtitle_tip": "สร้างซับไตเติลอัตโนมัติจากวิดีโอ",
+  "workspace.sidebar.smart_frames_tip": "Use OpenAI to plan HyperFrames video edits and create an editable draft.",
   "workspace.sidebar.threed_gen_tip": "สร้างโมเดล 3D จากภาพอ้างอิง",
   "workspace.sidebar.editor_tip": "ตัดต่อวิดีโอและจัดการโปรเจกต์ไทม์ไลน์",
   "workspace.sidebar.spaces_tip":
@@ -2312,6 +2314,7 @@ export const th = {
   "workspace.settings.stock_downloads": "สื่อสต็อกที่ดาวน์โหลด",
   "workspace.settings.stock_collections": "คอลเลกชันสื่อสต็อก",
   "workspace.settings.following": "กำลังติดตาม",
+  "workspace.settings.affiliate_program": "โปรแกรมพันธมิตร",
   "workspace.settings.my_team": "ทีมของฉัน",
   "workspace.settings.people": "สมาชิก",
   "workspace.settings.security_sso": "ความปลอดภัย SSO",

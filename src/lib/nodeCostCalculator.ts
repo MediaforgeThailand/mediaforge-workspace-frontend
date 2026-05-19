@@ -163,7 +163,14 @@ function modelDiscountPercent({ schemaKey, params, creditCosts }: NodeCostParams
   if (schemaKey === "videoToPromptNode") {
     return maxDiscountForRows(rowsForFeatureModels(creditCosts, "video_to_prompt", [modelName || "gemini-video-understanding"]));
   }
-  if (schemaKey === "imageTo3dNode") {
+  if (
+    schemaKey === "imageTo3dNode" ||
+    schemaKey === "tripoImportModelNode" ||
+    schemaKey === "tripoPreRigCheckNode" ||
+    schemaKey === "tripoRigNode" ||
+    schemaKey === "tripoAnimateNode" ||
+    schemaKey === "tripoExportNode"
+  ) {
     return maxDiscountForRows(rowsForFeatureModels(creditCosts, "model_3d", [modelName || "tripo3d-v3.1"]));
   }
   if (schemaKey === "klingVideoNode" || schemaKey === "videoGenNode") {
@@ -389,7 +396,14 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
     return match?.cost ?? null;
   }
 
-  if (schemaKey === "imageTo3dNode") {
+  if (
+    schemaKey === "imageTo3dNode" ||
+    schemaKey === "tripoImportModelNode" ||
+    schemaKey === "tripoPreRigCheckNode" ||
+    schemaKey === "tripoRigNode" ||
+    schemaKey === "tripoAnimateNode" ||
+    schemaKey === "tripoExportNode"
+  ) {
     const apiModel = modelName || "tripo3d-v3.1";
     const match = creditCosts.find(
       (r) => r.feature === "model_3d" && r.model === apiModel,

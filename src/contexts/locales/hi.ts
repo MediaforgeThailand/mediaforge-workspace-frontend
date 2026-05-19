@@ -2097,6 +2097,7 @@ export const hi = {
   "workspace.sidebar.image_gen": "इमेज बनाएं",
   "workspace.sidebar.image_upscale": "रिज़ॉल्यूशन बढ़ाएं",
   "workspace.sidebar.url_asset": "URL एसेट",
+  "workspace.sidebar.smart_frames": "Smart Frames",
   "workspace.sidebar.auto_subtitle": "स्वचालित उपशीर्षक",
   "workspace.sidebar.video_gen": "वीडियो जनरेशन",
   "workspace.sidebar.voice_gen": "आवाज जनरेटर",
@@ -2141,6 +2142,7 @@ export const hi = {
     "डायरेक्ट URL से फ़ाइलों को अपनी एसेट लाइब्रेरी में इम्पोर्ट करें।",
   "workspace.sidebar.auto_subtitle_tip":
     "वीडियो से सबटाइटल अपने-आप जनरेट करें।",
+  "workspace.sidebar.smart_frames_tip": "Use OpenAI to plan HyperFrames video edits and create an editable draft.",
   "workspace.sidebar.threed_gen_tip": "इमेज रेफ़रेंस से 3D मॉडल बनाएँ।",
   "workspace.sidebar.editor_tip":
     "वीडियो एडिट करें और टाइमलाइन प्रोजेक्ट मैनेज करें।",
@@ -2193,6 +2195,7 @@ export const hi = {
   "workspace.settings.stock_downloads": "स्टॉक डाउनलोड",
   "workspace.settings.stock_collections": "स्टॉक संग्रह",
   "workspace.settings.following": "अनुसरण कर रहा हूँ",
+  "workspace.settings.affiliate_program": "एफिलिएट प्रोग्राम",
   "workspace.settings.my_team": "मेरी टीम",
   "workspace.settings.people": "लोग",
   "workspace.settings.security_sso": "सरक्षा SSO",

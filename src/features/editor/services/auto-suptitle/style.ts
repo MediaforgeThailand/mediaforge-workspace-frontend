@@ -158,7 +158,10 @@ export function autoSuptitleSettingsToTextAnimation(
   settings: CaptionStyleSettings,
 ): TextAnimation | undefined {
   const preset = captionAnimationToTextPreset(settings.animation);
-  if (preset === "none") {
+  const outPreset = captionAnimationToTextPreset(
+    settings.outAnimation ?? settings.animation,
+  );
+  if (preset === "none" && outPreset === "none") {
     return {
       preset: "none",
       outPreset: "none",
@@ -170,9 +173,10 @@ export function autoSuptitleSettingsToTextAnimation(
 
   return {
     preset,
-    outPreset: preset === "typewriter" ? "fade" : preset,
-    inDuration: AUTO_SUPTITLE_TRANSITION_SECONDS,
-    outDuration: AUTO_SUPTITLE_TRANSITION_OUT_SECONDS,
+    outPreset: outPreset === "typewriter" ? "fade" : outPreset,
+    inDuration: preset === "none" ? 0 : AUTO_SUPTITLE_TRANSITION_SECONDS,
+    outDuration:
+      outPreset === "none" ? 0 : AUTO_SUPTITLE_TRANSITION_OUT_SECONDS,
     params: {
       fadeOpacity: { start: 0, end: 1 },
       slideDistance: 0.035,

@@ -64,10 +64,19 @@ import {
   WalletCards,
   ChevronDown,
   ChevronRight,
+  Clapperboard,
+  Code2,
   ArrowRight,
+  Boxes,
+  Download,
+  FileVideo,
   List,
+  Loader2,
   SlidersHorizontal,
+  Sparkles,
+  UploadCloud,
   UserCircle2,
+  WandSparkles,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -498,6 +507,7 @@ const VALID_SECTIONS: Section[] = [
   "voice_gen",
   "voice_translate",
   "auto_subtitle",
+  "smart_frames",
   "image_to_3d",
   "url_asset",
 ];
@@ -831,7 +841,7 @@ const WorkspaceDashboardInner = () => {
           projects={visibleProjects}
           activeProjectId={visibleActiveProjectId}
           onSelectProject={isSignedIn ? setActiveProject : undefined}
-          collapsed={section === "auto_subtitle"}
+          collapsed={section === "auto_subtitle" || section === "image_to_3d"}
         />
       </div>
 
@@ -914,6 +924,13 @@ const WorkspaceDashboardInner = () => {
         {section === "stock" && (
           <StockView onOpenSidebar={() => setMobileSidebarOpen(true)} />
         )}
+        {section === "smart_frames" && (
+          <HyperFramesSmartView
+            projects={standaloneProjects}
+            activeProjectId={visibleActiveProjectId}
+            onOpenSidebar={() => setMobileSidebarOpen(true)}
+          />
+        )}
         {isStandaloneSection(section) && (
           educationLockedStudent ? (
             <EducationLockedToolView onOpenSpaces={() => setSection("spaces")} onOpenSidebar={() => setMobileSidebarOpen(true)} />
@@ -936,6 +953,7 @@ const WorkspaceDashboardInner = () => {
           section !== "history" &&
           section !== "assets" &&
           section !== "stock" &&
+          section !== "smart_frames" &&
           !isStandaloneSection(section) && (
             <Placeholder
               section={section}
@@ -1744,6 +1762,1276 @@ const EducationLockedToolView = ({
       </div>
     </div>
   </>
+  );
+};
+
+const HYPERFRAMES_SMART_PRESETS = [
+  {
+    id: "cleancut",
+    label: "Clean Cut",
+    description: "Remove dead air and keep natural speech rhythm.",
+  },
+] as const;
+
+type HyperFramesSmartPresetId = (typeof HYPERFRAMES_SMART_PRESETS)[number]["id"];
+
+const HYPERFRAMES_SMART_STORAGE_VERSION = 2;
+const HYPERFRAMES_SMART_STORAGE_PREFIX = "mediaforge:smart-frames:v1";
+const HYPERFRAMES_SMART_DB_NAME = "mediaforge-smart-frames";
+const HYPERFRAMES_SMART_DB_STORE = "sources";
+
+const HYPERFRAMES_SMART_VISUALS: Record<
+  HyperFramesSmartPresetId,
+  { title: string; accent: string; glow: string; beats: string[] }
+> = {
+  cleancut: {
+    title: "CLEAN CUT",
+    accent: "#eaff00",
+    glow: "rgba(234,255,0,.34)",
+    beats: ["Detect silence", "Trim dead air", "Preserve speech", "Editable timeline"],
+  },
+};
+
+function smartFramesStorageKey(userId: string | undefined, projectId: string | null): string {
+  return `${HYPERFRAMES_SMART_STORAGE_PREFIX}:${userId ?? "anonymous"}:${projectId ?? "default"}`;
+}
+
+function smartFramesSourceBlobKey(userId: string | undefined, projectId: string | null): string {
+  return `${userId ?? "anonymous"}:${projectId ?? "default"}:latest-source`;
+}
+
+function openSmartFramesDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      reject(new Error("Browser storage is not available."));
+      return;
+    }
+    const request = indexedDB.open(HYPERFRAMES_SMART_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(HYPERFRAMES_SMART_DB_STORE)) {
+        db.createObjectStore(HYPERFRAMES_SMART_DB_STORE);
+      }
+    };
+    request.onerror = () => reject(request.error ?? new Error("Could not open browser storage."));
+    request.onsuccess = () => resolve(request.result);
+  });
+}
+
+async function writeSmartFramesSourceBlob(key: string, file: File): Promise<void> {
+  const db = await openSmartFramesDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(HYPERFRAMES_SMART_DB_STORE, "readwrite");
+    tx.objectStore(HYPERFRAMES_SMART_DB_STORE).put(file, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error ?? new Error("Could not save video locally."));
+  });
+  db.close();
+}
+
+async function readSmartFramesSourceBlob(key: string): Promise<Blob | null> {
+  const db = await openSmartFramesDb();
+  const blob = await new Promise<Blob | null>((resolve, reject) => {
+    const tx = db.transaction(HYPERFRAMES_SMART_DB_STORE, "readonly");
+    const request = tx.objectStore(HYPERFRAMES_SMART_DB_STORE).get(key);
+    request.onsuccess = () => {
+      const value = request.result;
+      resolve(value instanceof Blob ? value : null);
+    };
+    request.onerror = () => reject(request.error ?? new Error("Could not restore video."));
+  });
+  db.close();
+  return blob;
+}
+
+function smartFramesPlanLines(plan: string, fallback: string[]): string[] {
+  const lines = plan
+    .split(/\r?\n/)
+    .map((line) =>
+      line
+        .replace(/^#{1,6}\s+/, "")
+        .replace(/^[-*•\d.)\s]+/, "")
+        .replace(/\*\*/g, "")
+        .trim(),
+    )
+    .filter((line) => line.length >= 10 && !/^concept:?$/i.test(line))
+    .slice(0, 4);
+  return lines.length > 0 ? lines : fallback;
+}
+
+type SmartFramesPersistedState = {
+  version: number;
+  prompt: string;
+  presetId: HyperFramesSmartPresetId;
+  plan: string;
+  outputFileName: string;
+  createdAt: number;
+  sourceFileName: string;
+  sourceFileType: string;
+  sourceFileSize: number;
+  sourceMeta: SmartFramesVideoMeta | null;
+  sourceBlobKey: string;
+  editorProjectId?: string;
+  renderedOutputUrl?: string;
+  renderedBy?: string;
+  removedDuration?: number;
+};
+
+type SmartFramesDraftCue = {
+  startTime: number;
+  duration: number;
+  text: string;
+};
+
+type SmartFramesDemoResult = {
+  plan: string;
+  outputUrl: string;
+  outputFileName: string;
+  createdAt: number;
+  presetId: HyperFramesSmartPresetId;
+  presetLabel: string;
+  sourceFileName: string;
+  sourceBlobKey?: string;
+  editorProjectId?: string;
+  editorProjectError?: string;
+  renderedBy?: string;
+  renderWarning?: string | null;
+  cutUrl?: string;
+  cutFileName?: string;
+  originalDuration?: number;
+  renderedDuration?: number;
+  removedDuration?: number;
+  changedByCut?: boolean;
+  cues?: SmartFramesDraftCue[];
+  segments?: Array<{ start: number; end: number; duration: number }>;
+};
+
+type SmartFramesVideoMeta = {
+  width: number;
+  height: number;
+  duration: number;
+};
+
+function formatSmartFramesDuration(seconds?: number): string {
+  if (!Number.isFinite(seconds) || !seconds) return "0:00";
+  const totalSeconds = Math.max(0, Math.round(seconds));
+  const minutes = Math.floor(totalSeconds / 60);
+  const rest = totalSeconds % 60;
+  return `${minutes}:${String(rest).padStart(2, "0")}`;
+}
+
+function smartFramesOutputName(fileName: string): string {
+  const base = fileName.replace(/\.[^.]+$/, "").trim() || "smart-frames-demo";
+  return `${base}-smart-frames-draft.mp4`;
+}
+
+function smartFramesRenderedOutputName(fileName: string): string {
+  const base = fileName.replace(/\.[^.]+$/, "").trim() || "smart-frames";
+  return `${base}-hyperframes.mp4`;
+}
+
+function smartFramesDraftLineText(line: string): string {
+  const compact = line
+    .replace(/^\s*(concept|timeline beats?|text overlays?|motion|transition|render notes?)\s*:\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (compact.length <= 84) return compact;
+  return compact.slice(0, 84).replace(/\s+\S*$/, "");
+}
+
+function buildSmartFramesDraftBeats({
+  plan,
+  presetId,
+  duration,
+}: {
+  plan: string;
+  presetId: HyperFramesSmartPresetId;
+  duration: number;
+}): Array<{ startTime: number; duration: number; text: string }> {
+  const visual = HYPERFRAMES_SMART_VISUALS[presetId] ?? HYPERFRAMES_SMART_VISUALS.cleancut;
+  const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 12;
+  const planLines = smartFramesPlanLines(plan, visual.beats)
+    .map(smartFramesDraftLineText)
+    .filter(Boolean);
+  const texts = [visual.title, ...planLines].slice(0, 5);
+  const segmentDuration = Math.max(1.2, safeDuration / Math.max(1, texts.length));
+
+  return texts.map((text, index) => {
+    const startTime = Math.min(safeDuration - 0.2, index * segmentDuration);
+    const endTime =
+      index === texts.length - 1
+        ? safeDuration
+        : Math.min(safeDuration, (index + 1) * segmentDuration);
+    return {
+      startTime,
+      duration: Math.max(0.5, endTime - startTime),
+      text,
+    };
+  });
+}
+
+function persistSmartFramesState({
+  userId,
+  projectId,
+  state,
+}: {
+  userId: string | undefined;
+  projectId: string | null;
+  state: SmartFramesPersistedState;
+}) {
+  try {
+    localStorage.setItem(smartFramesStorageKey(userId, projectId), JSON.stringify(state));
+  } catch {
+    /* local persistence is a best-effort demo convenience */
+  }
+}
+
+function clearPersistedSmartFramesState(userId: string | undefined, projectId: string | null) {
+  try {
+    localStorage.removeItem(smartFramesStorageKey(userId, projectId));
+  } catch {
+    /* ignore storage cleanup failures */
+  }
+}
+
+function readPersistedSmartFramesState(
+  userId: string | undefined,
+  projectId: string | null,
+): SmartFramesPersistedState | null {
+  try {
+    const raw = localStorage.getItem(smartFramesStorageKey(userId, projectId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<SmartFramesPersistedState>;
+    const knownPreset = HYPERFRAMES_SMART_PRESETS.some((preset) => preset.id === parsed.presetId);
+    if (
+      parsed.version !== HYPERFRAMES_SMART_STORAGE_VERSION ||
+      !knownPreset ||
+      typeof parsed.plan !== "string" ||
+      typeof parsed.sourceBlobKey !== "string" ||
+      typeof parsed.sourceFileName !== "string"
+    ) {
+      return null;
+    }
+    return parsed as SmartFramesPersistedState;
+  } catch {
+    return null;
+  }
+}
+
+async function readSmartFramesVideoMeta(sourceUrl: string): Promise<SmartFramesVideoMeta> {
+  const video = document.createElement("video");
+  video.preload = "metadata";
+  video.src = sourceUrl;
+  await new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      video.onloadedmetadata = null;
+      video.onerror = null;
+    };
+    video.onloadedmetadata = () => {
+      cleanup();
+      resolve();
+    };
+    video.onerror = () => {
+      cleanup();
+      reject(new Error("Could not read video metadata."));
+    };
+  });
+  const meta = {
+    width: video.videoWidth || 1920,
+    height: video.videoHeight || 1080,
+    duration: Number.isFinite(video.duration) ? video.duration : 0,
+  };
+  video.removeAttribute("src");
+  video.load();
+  return meta;
+}
+
+type SmartFramesWorkerRenderResult = {
+  ok: boolean;
+  error?: string;
+  outputUrl?: string;
+  outputFileName?: string;
+  cutUrl?: string;
+  cutFileName?: string;
+  renderedBy?: string;
+  renderWarning?: string | null;
+  changedByCut?: boolean;
+  duration?: number;
+  originalDuration?: number;
+  removedDuration?: number;
+  width?: number;
+  height?: number;
+  cues?: SmartFramesDraftCue[];
+  segments?: Array<{ start: number; end: number; duration: number }>;
+};
+
+function smartFramesWorkerBaseUrl(): string {
+  const configured = import.meta.env.VITE_SMART_FRAMES_WORKER_URL as string | undefined;
+  return (configured || "http://127.0.0.1:8787").replace(/\/+$/, "");
+}
+
+async function renderSmartFramesWithLocalWorker({
+  file,
+  plan,
+  prompt,
+  presetId,
+  presetLabel,
+}: {
+  file: File;
+  plan: string;
+  prompt: string;
+  presetId: HyperFramesSmartPresetId;
+  presetLabel: string;
+}): Promise<SmartFramesWorkerRenderResult> {
+  const body = new FormData();
+  body.set("file", file);
+  body.set("plan", plan);
+  body.set("prompt", prompt);
+  body.set("presetId", presetId);
+  body.set("presetLabel", presetLabel);
+
+  const response = await fetch(`${smartFramesWorkerBaseUrl()}/render`, {
+    method: "POST",
+    body,
+  });
+  const data = (await response.json().catch(() => null)) as SmartFramesWorkerRenderResult | null;
+  if (!response.ok || !data?.ok) {
+    throw new Error(data?.error || `Smart Frames worker returned HTTP ${response.status}.`);
+  }
+  return data;
+}
+
+async function fileFromRemoteUrl(url: string, fileName: string, type = "video/mp4"): Promise<File> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Could not download rendered media (HTTP ${response.status}).`);
+  }
+  const blob = await response.blob();
+  return new File([blob], fileName, { type: blob.type || type, lastModified: Date.now() });
+}
+
+async function createSmartFramesEditorProject({
+  file,
+  sourceUrl,
+  meta,
+  result,
+}: {
+  file: File;
+  sourceUrl: string;
+  meta: SmartFramesVideoMeta | null;
+  result: Pick<SmartFramesDemoResult, "plan" | "presetId" | "presetLabel" | "cues">;
+}): Promise<string> {
+  const [{ useProjectStore }, { saveProject }] = await Promise.all([
+    import("@/features/editor/stores/project-store"),
+    import("@/features/editor/services/project-cloud"),
+  ]);
+  const metadata =
+    meta ??
+    (await readSmartFramesVideoMeta(sourceUrl).catch(() => ({
+      width: 1920,
+      height: 1080,
+      duration: 0,
+    })));
+  const baseName = file.name.replace(/\.[^.]+$/, "").trim() || "Video";
+
+  useProjectStore.getState().createNewProject(`Smart Frames - ${baseName}`.slice(0, 96), {
+    width: metadata.width,
+    height: metadata.height,
+    frameRate: 30,
+  });
+
+  const importResult = await useProjectStore.getState().importMedia(file);
+  if (!importResult.success || !importResult.actionId) {
+    throw new Error(importResult.error?.message || "Could not import video into the editor.");
+  }
+
+  useProjectStore.setState((state) => ({
+    project: {
+      ...state.project,
+      mediaLibrary: {
+        ...state.project.mediaLibrary,
+        items: state.project.mediaLibrary.items.map((item) =>
+          item.id === importResult.actionId
+            ? {
+                ...item,
+                originalUrl: sourceUrl,
+              }
+            : item,
+        ),
+      },
+    },
+  }));
+
+  const clipResult = await useProjectStore.getState().addClipToNewTrack(importResult.actionId, 0);
+  if (!clipResult.success) {
+    throw new Error(clipResult.error?.message || "Could not add video to the editor timeline.");
+  }
+
+  const projectAfterVideo = useProjectStore.getState().project;
+  const sourceClip = projectAfterVideo.timeline.tracks
+    .flatMap((track) => track.clips)
+    .find((clip) => clip.mediaId === importResult.actionId);
+  const timelineDuration =
+    sourceClip?.duration || metadata.duration || projectAfterVideo.timeline.duration || 12;
+  const shouldCreateTextTrack = result.presetId !== "cleancut";
+  const draftBeats = shouldCreateTextTrack
+    ? result.cues && result.cues.length > 0
+      ? result.cues.map((cue) => ({
+          startTime: Math.max(0, cue.startTime),
+          duration: Math.max(0.5, cue.duration),
+          text: smartFramesDraftLineText(cue.text),
+        }))
+      : buildSmartFramesDraftBeats({
+          plan: result.plan,
+          presetId: result.presetId,
+          duration: timelineDuration,
+        })
+    : [];
+
+  if (sourceClip && draftBeats.length > 1) {
+    const splitTimes = draftBeats
+      .slice(1)
+      .map((beat) => beat.startTime)
+      .filter((time) => time > 0.1 && time < sourceClip.duration - 0.1)
+      .sort((a, b) => b - a);
+
+    for (const splitTime of splitTimes) {
+      const currentClip = useProjectStore
+        .getState()
+        .project.timeline.tracks.flatMap((track) => track.clips)
+        .find(
+          (clip) =>
+            clip.mediaId === importResult.actionId &&
+            splitTime > clip.startTime + 0.05 &&
+            splitTime < clip.startTime + clip.duration - 0.05,
+        );
+      if (currentClip) {
+        await useProjectStore.getState().splitClip(currentClip.id, splitTime);
+      }
+    }
+  }
+
+  const existingTrackIds = new Set(
+    useProjectStore.getState().project.timeline.tracks.map((track) => track.id),
+  );
+  const textTrackResult = shouldCreateTextTrack
+    ? await useProjectStore.getState().addTrack("text", 0)
+    : { success: false };
+  if (shouldCreateTextTrack && textTrackResult.success) {
+    const textTrack = useProjectStore
+      .getState()
+      .project.timeline.tracks.find(
+        (track) => track.type === "text" && !existingTrackIds.has(track.id),
+      );
+    if (textTrack) {
+      useProjectStore.getState().renameTrack(textTrack.id, "Smart Frames Draft");
+      const visual =
+        HYPERFRAMES_SMART_VISUALS[result.presetId] ?? HYPERFRAMES_SMART_VISUALS.cleancut;
+      const groupId = `smart-frames-${Date.now()}`;
+      const createdAt = Date.now();
+      for (const beat of draftBeats) {
+        useProjectStore.getState().createCaptionTextClip({
+          trackId: textTrack.id,
+          startTime: beat.startTime,
+          duration: beat.duration,
+          text: beat.text,
+          style: {
+            fontFamily: "Inter",
+            fontSize: metadata.height >= 1200 ? 54 : 46,
+            fontWeight: 800,
+            color: "#ffffff",
+            strokeColor: "#000000",
+            strokeWidth: 4,
+            textAlign: "center",
+            verticalAlign: "middle",
+            lineHeight: 1.05,
+            letterSpacing: 0,
+            effects: {
+              shadow: {
+                enabled: true,
+                color: "rgba(0,0,0,0.72)",
+                offsetX: 0,
+                offsetY: 8,
+                blur: 20,
+              },
+              glow: {
+                enabled: true,
+                color: visual.accent,
+                intensity: 0.28,
+              },
+            },
+          },
+          transform: {
+            position: { x: 0.5, y: 0.78 },
+            scale: { x: 1, y: 1 },
+            rotation: 0,
+            anchor: { x: 0.5, y: 0.5 },
+            opacity: 1,
+          },
+          animation: {
+            preset: "fade",
+            outPreset: "fade",
+            inDuration: 0.18,
+            outDuration: 0.18,
+            params: { fadeOpacity: { start: 0, end: 1 } },
+          },
+          captionMeta: {
+            groupId,
+            generatedAt: createdAt,
+            language: "draft",
+            sourceClipId: sourceClip?.id ?? "",
+            animation: "fade",
+            accentColor: visual.accent,
+            highlightColor: visual.accent,
+            role: "subtitle",
+            relativePosition: { x: 0, y: 0 },
+          },
+        });
+      }
+    }
+  }
+
+  const project = useProjectStore.getState().getFullProject();
+  const saved = await saveProject(project);
+  if (!saved) {
+    throw new Error("Could not save the Smart Frames editor project.");
+  }
+  return project.id;
+}
+
+const SmartFramesResultPreview = ({ result }: { result: SmartFramesDemoResult }) => {
+  const visual = HYPERFRAMES_SMART_VISUALS[result.presetId] ?? HYPERFRAMES_SMART_VISUALS.cleancut;
+  const beats = smartFramesPlanLines(result.plan, visual.beats);
+  const showBeats = result.presetId !== "cleancut";
+
+  return (
+    <div
+      className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-black"
+      style={{ boxShadow: `0 0 34px ${visual.glow}` }}
+    >
+      {result.outputUrl ? (
+        <video
+          src={result.outputUrl}
+          controls
+          playsInline
+          className="aspect-video w-full bg-black object-contain"
+        />
+      ) : (
+        <div className="grid aspect-video w-full place-items-center bg-black text-[13px] font-semibold text-zinc-500">
+          Source video is not available in this browser session.
+        </div>
+      )}
+      <div className="pointer-events-none absolute inset-x-0 top-0 bg-gradient-to-b from-black/75 via-black/20 to-transparent px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div
+            className="rounded-full border px-3 py-1 text-[11px] font-bold tracking-[0.18em] text-black"
+            style={{
+              borderColor: visual.accent,
+              backgroundColor: visual.accent,
+              boxShadow: `0 0 18px ${visual.glow}`,
+            }}
+          >
+            {visual.title}
+          </div>
+          <div className="rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white/85">
+            Smart Frames preview
+          </div>
+        </div>
+      </div>
+      {showBeats ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-11 bg-gradient-to-t from-black/85 via-black/35 to-transparent px-4 pb-4 pt-12">
+          <div className="max-w-[92%]">
+            <div
+              className="mb-2 inline-flex rounded-md px-2 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-black"
+              style={{ backgroundColor: visual.accent }}
+            >
+              {result.presetLabel}
+            </div>
+            <div className="grid gap-1.5 sm:grid-cols-2">
+              {beats.slice(0, 4).map((beat, index) => (
+                <div
+                  key={`${beat}-${index}`}
+                  className="min-w-0 rounded-lg border border-white/12 bg-black/55 px-3 py-2 backdrop-blur-sm"
+                >
+                  <div className="text-[10px] font-semibold text-white/40">
+                    Beat {index + 1}
+                  </div>
+                  <div className="truncate text-[12px] font-semibold text-white">{beat}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
+const HyperFramesSmartView = ({
+  projects,
+  activeProjectId,
+  onOpenSidebar,
+}: {
+  projects: StandaloneProjectOption[];
+  activeProjectId: string | null;
+  onOpenSidebar?: () => void;
+}) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const activeProject = projects.find((project) => project.id === activeProjectId) ?? null;
+  const activeStorageProjectId = activeProjectId ?? "default";
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [prompt, setPrompt] = useState("");
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
+  const [sourceUrl, setSourceUrl] = useState<string | null>(null);
+  const [sourceMeta, setSourceMeta] = useState<SmartFramesVideoMeta | null>(null);
+  const [presetId, setPresetId] =
+    useState<(typeof HYPERFRAMES_SMART_PRESETS)[number]["id"]>("cleancut");
+  const [result, setResult] = useState<SmartFramesDemoResult | null>(null);
+  const [running, setRunning] = useState(false);
+  const [creatingEditor, setCreatingEditor] = useState(false);
+  const [runStatus, setRunStatus] = useState<string | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
+  const selectedPreset =
+    HYPERFRAMES_SMART_PRESETS.find((preset) => preset.id === presetId) ??
+    HYPERFRAMES_SMART_PRESETS[0];
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    const persisted = readPersistedSmartFramesState(user.id, activeStorageProjectId);
+    if (!persisted) return;
+
+    setPrompt(persisted.prompt);
+    setPresetId(persisted.presetId);
+    setSourceMeta(persisted.sourceMeta);
+    setRunError(null);
+    setRunStatus("Restored the latest Smart Frames result from this project.");
+    void readSmartFramesSourceBlob(persisted.sourceBlobKey)
+      .then((blob) => {
+        if (cancelled || !blob) return;
+        const file = new File([blob], persisted.sourceFileName, {
+          type: persisted.sourceFileType || blob.type || "video/mp4",
+          lastModified: persisted.createdAt,
+        });
+        const objectUrl = URL.createObjectURL(blob);
+        const preset =
+          HYPERFRAMES_SMART_PRESETS.find((item) => item.id === persisted.presetId) ??
+          HYPERFRAMES_SMART_PRESETS[0];
+        setSourceFile(file);
+        setSourceUrl(objectUrl);
+        setResult({
+          plan: persisted.plan,
+          outputUrl: persisted.renderedOutputUrl || objectUrl,
+          outputFileName: persisted.outputFileName,
+          createdAt: persisted.createdAt,
+          presetId: preset.id,
+          presetLabel: preset.label,
+          sourceFileName: persisted.sourceFileName,
+          sourceBlobKey: persisted.sourceBlobKey,
+          editorProjectId: persisted.editorProjectId,
+          renderedBy: persisted.renderedBy,
+          removedDuration: persisted.removedDuration,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRunStatus(null);
+          setRunError("The saved plan was found, but the browser could not restore the source video.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, activeStorageProjectId]);
+
+  useEffect(() => {
+    return () => {
+      if (sourceUrl) URL.revokeObjectURL(sourceUrl);
+    };
+  }, [sourceUrl]);
+
+  const handleSourceFile = (file: File) => {
+    const isVideo =
+      file.type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/i.test(file.name);
+    if (!isVideo) {
+      toast.info("Upload an MP4, MOV, or WEBM video.");
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setSourceFile(file);
+    setSourceUrl(objectUrl);
+    setSourceMeta(null);
+    setResult(null);
+    setRunError(null);
+    setRunStatus("Source video loaded. Run Clean Cut to remove dead air.");
+    clearPersistedSmartFramesState(user?.id, activeStorageProjectId);
+    void readSmartFramesVideoMeta(objectUrl)
+      .then(setSourceMeta)
+      .catch(() => setSourceMeta(null));
+
+    if (!prompt.trim()) {
+      setPrompt(
+        "Remove dead air while keeping the speech rhythm natural.",
+      );
+    }
+  };
+
+  const handleGenerate = async () => {
+    const source = prompt.trim() || "Clean cut this video by removing dead air while preserving natural speech rhythm.";
+    if (!user?.id) {
+      toast.info("Sign in before using Smart Frames.");
+      return;
+    }
+    if (!sourceFile || !sourceUrl) {
+      toast.info("Upload a source MP4 before creating the draft.");
+      return;
+    }
+
+    setRunning(true);
+    setResult(null);
+    setRunError(null);
+    setRunStatus("Cutting dead air with the local Clean Cut worker...");
+    try {
+      const meta = sourceMeta;
+      const cleaned = [
+        "Clean Cut",
+        "",
+        "Goal:",
+        source,
+        "",
+        "Processing rules:",
+        "- Detect silence/dead air from the audio waveform.",
+        "- Remove pauses longer than the short-form editing threshold.",
+        "- Preserve small handles around speech so cuts do not feel abrupt.",
+        "- Return a cut MP4 and create an editable MediaForge project.",
+      ].join("\n");
+
+      const sourceBlobKey = smartFramesSourceBlobKey(user.id, activeStorageProjectId);
+      let sourcePersisted = false;
+      try {
+        await writeSmartFramesSourceBlob(sourceBlobKey, sourceFile);
+        sourcePersisted = true;
+      } catch {
+        setRunStatus(
+          "Cutting dead air. Browser storage is full, so this result may not survive refresh.",
+        );
+      }
+
+      const workerResult = await renderSmartFramesWithLocalWorker({
+        file: sourceFile,
+        plan: cleaned,
+        prompt: source,
+        presetId: selectedPreset.id,
+        presetLabel: selectedPreset.label,
+      });
+
+      const nextResult: SmartFramesDemoResult = {
+        plan: cleaned,
+        outputUrl: workerResult.outputUrl || sourceUrl,
+        outputFileName:
+          workerResult.outputFileName ||
+          (workerResult.renderedBy ? smartFramesRenderedOutputName(sourceFile.name) : smartFramesOutputName(sourceFile.name)),
+        createdAt: Date.now(),
+        presetId: selectedPreset.id,
+        presetLabel: selectedPreset.label,
+        sourceFileName: sourceFile.name,
+        sourceBlobKey: sourcePersisted ? sourceBlobKey : undefined,
+        renderedBy: workerResult.renderedBy,
+        renderWarning: workerResult.renderWarning,
+        cutUrl: workerResult.cutUrl,
+        cutFileName: workerResult.cutFileName,
+        changedByCut: workerResult.changedByCut,
+        originalDuration: workerResult.originalDuration,
+        renderedDuration: workerResult.duration,
+        removedDuration: workerResult.removedDuration,
+        segments: workerResult.segments,
+        cues: workerResult.cues,
+      };
+      setRunStatus("Creating the editable MediaForge project...");
+      try {
+        const editorFile =
+          workerResult.cutUrl && workerResult.cutFileName
+            ? await fileFromRemoteUrl(workerResult.cutUrl, workerResult.cutFileName)
+            : sourceFile;
+        const editorSourceUrl = workerResult.cutUrl || sourceUrl;
+        const editorMeta =
+          workerResult.duration && workerResult.width && workerResult.height
+            ? {
+                duration: workerResult.duration,
+                width: workerResult.width,
+                height: workerResult.height,
+              }
+            : meta;
+        const editorProjectId = await createSmartFramesEditorProject({
+          file: editorFile,
+          sourceUrl: editorSourceUrl,
+          meta: editorMeta,
+          result: nextResult,
+        });
+        nextResult.editorProjectId = editorProjectId;
+      } catch (editorError) {
+        nextResult.editorProjectError =
+          editorError instanceof Error
+            ? editorError.message
+            : "Could not create the editable MediaForge project.";
+      }
+
+      setResult(nextResult);
+      if (sourcePersisted) {
+        persistSmartFramesState({
+          userId: user.id,
+          projectId: activeStorageProjectId,
+          state: {
+            version: HYPERFRAMES_SMART_STORAGE_VERSION,
+            prompt: source,
+            presetId: selectedPreset.id,
+            plan: cleaned,
+            outputFileName: nextResult.outputFileName,
+            createdAt: nextResult.createdAt,
+            sourceFileName: sourceFile.name,
+            sourceFileType: sourceFile.type || "video/mp4",
+            sourceFileSize: sourceFile.size,
+            sourceMeta: meta,
+            sourceBlobKey,
+            editorProjectId: nextResult.editorProjectId,
+            renderedOutputUrl: workerResult.outputUrl,
+            renderedBy: workerResult.renderedBy,
+            removedDuration: workerResult.removedDuration,
+          },
+        });
+      }
+      setRunStatus(
+        nextResult.changedByCut
+          ? "Clean Cut complete. Dead air removed and an editable project is ready."
+          : "Clean Cut complete. No removable dead air was detected; an editable project is ready.",
+      );
+      toast.success(
+        nextResult.editorProjectId
+          ? "Clean Cut project ready."
+          : "Clean Cut result ready, but editor handoff needs attention.",
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not create Smart Frames draft.";
+      setRunError(message);
+      setRunStatus(null);
+      toast.error(message);
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const handleDownloadDemo = () => {
+    if (!result) return;
+    const anchor = document.createElement("a");
+    anchor.href = result.outputUrl;
+    anchor.download = result.outputFileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  };
+
+  const handleOpenEditor = async () => {
+    if (!sourceFile || !sourceUrl || !result) return;
+    if (result.editorProjectId) {
+      navigate(`/app/editor/${result.editorProjectId}`);
+      return;
+    }
+    setCreatingEditor(true);
+    try {
+      const editorFile =
+        result.cutUrl && result.cutFileName
+          ? await fileFromRemoteUrl(result.cutUrl, result.cutFileName)
+          : result.outputUrl && result.outputUrl !== sourceUrl
+            ? await fileFromRemoteUrl(result.outputUrl, result.outputFileName)
+            : sourceFile;
+      const editorSourceUrl =
+        result.cutUrl || (result.outputUrl && result.outputUrl !== sourceUrl ? result.outputUrl : sourceUrl);
+      const editorMeta =
+        result.renderedDuration && sourceMeta
+          ? { ...sourceMeta, duration: result.renderedDuration }
+          : sourceMeta;
+      const editorProjectId = await createSmartFramesEditorProject({
+        file: editorFile,
+        sourceUrl: editorSourceUrl,
+        meta: editorMeta,
+        result,
+      });
+      setResult((current) =>
+        current
+          ? {
+              ...current,
+              editorProjectId,
+              editorProjectError: undefined,
+            }
+          : current,
+      );
+      if (result.sourceBlobKey) {
+        const persisted = readPersistedSmartFramesState(user?.id, activeStorageProjectId);
+        if (persisted) {
+          persistSmartFramesState({
+            userId: user?.id,
+            projectId: activeStorageProjectId,
+            state: { ...persisted, editorProjectId },
+          });
+        }
+      }
+      navigate(`/app/editor/${editorProjectId}`);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not create the editable project.";
+      setResult((current) =>
+        current
+          ? {
+              ...current,
+              editorProjectError: message,
+            }
+          : current,
+      );
+      toast.error(message);
+    } finally {
+      setCreatingEditor(false);
+    }
+  };
+
+  const copyResult = async () => {
+    if (!result) return;
+    await navigator.clipboard.writeText(result.plan);
+    toast.success("Copied the summary.");
+  };
+
+  return (
+    <>
+      <PageHeader title="Smart Frames" rightSlot={<UserMenu />} onOpenSidebar={onOpenSidebar} />
+      <div className="flex-1 overflow-y-auto px-4 py-5 md:px-6">
+        <div className="mx-auto grid w-full max-w-[1520px] gap-5 xl:grid-cols-[minmax(440px,560px)_1fr]">
+          <section className="rounded-[18px] border border-white/[0.08] bg-[hsl(0_0%_7%)] shadow-[0_24px_80px_rgba(0,0,0,.28)]">
+            <div className="border-b border-white/[0.07] px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-xl bg-cyan-300/10 text-cyan-200">
+                  <Clapperboard className="h-5 w-5" />
+                </div>
+                <div>
+                  <h1 className="text-[17px] font-semibold text-white">Smart Frames</h1>
+                  <p className="mt-1 text-[12px] leading-5 text-zinc-400">
+                    Clean Cut removes dead air and opens the result as an editable MediaForge project.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm,.m4v"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) handleSourceFile(file);
+                  event.target.value = "";
+                }}
+              />
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => fileInputRef.current?.click()}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  const file = event.dataTransfer.files?.[0];
+                  if (file) handleSourceFile(file);
+                }}
+                className={cn(
+                  "group rounded-2xl border border-dashed p-3 transition",
+                  sourceUrl
+                    ? "border-cyan-300/25 bg-cyan-300/[0.045]"
+                    : "border-cyan-300/25 bg-cyan-300/[0.035] hover:border-cyan-200/45 hover:bg-cyan-300/[0.06]",
+                )}
+              >
+                {sourceUrl ? (
+                  <div className="flex gap-3">
+                    <video
+                      src={sourceUrl}
+                      muted
+                      playsInline
+                      className="h-[92px] w-[132px] rounded-xl bg-black object-cover"
+                    />
+                    <div className="min-w-0 flex-1 py-1">
+                      <div className="flex items-center gap-2 text-[12px] font-semibold text-white">
+                        <FileVideo className="h-4 w-4 text-cyan-200" />
+                        <span className="truncate">{sourceFile?.name}</span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold text-zinc-300">
+                        <span className="rounded-lg bg-white/[0.06] px-2 py-1">
+                          {(sourceFile ? sourceFile.size / 1024 / 1024 : 0).toFixed(1)} MB
+                        </span>
+                        <span className="rounded-lg bg-white/[0.06] px-2 py-1">
+                          {sourceMeta ? formatSmartFramesDuration(sourceMeta.duration) : "Reading"}
+                        </span>
+                        <span className="rounded-lg bg-white/[0.06] px-2 py-1">
+                          {sourceMeta ? `${sourceMeta.width}x${sourceMeta.height}` : "Video"}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-[11px] leading-4 text-cyan-50/65">
+                        Click or drop a new video to replace the source.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex min-h-[116px] items-center gap-4 px-3">
+                    <div className="grid h-12 w-12 place-items-center rounded-2xl bg-cyan-300/10 text-cyan-200">
+                      <UploadCloud className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <div className="text-[13px] font-semibold text-white">Source MP4</div>
+                      <p className="mt-1 text-[12px] leading-5 text-zinc-400">
+                        Drop an MP4 here or click to upload.
+                      </p>
+                      <p className="mt-1 text-[11px] font-semibold text-cyan-200/80">
+                        MP4/MOV/WEBM demo input
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <label className="block">
+                <span className="text-[12px] font-semibold text-zinc-200">
+                  Optional note
+                </span>
+                <textarea
+                  value={prompt}
+                  onChange={(event) => setPrompt(event.target.value)}
+                  placeholder="Optional note, e.g. keep short breaths but remove long pauses."
+                  className="mt-2 min-h-[140px] w-full resize-y rounded-xl border border-white/[0.08] bg-black/35 px-3 py-3 text-[13px] leading-6 text-white outline-none transition placeholder:text-zinc-600 focus:border-[#eaff00]/70"
+                />
+              </label>
+
+              <div className="grid grid-cols-1 gap-2">
+                {HYPERFRAMES_SMART_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => setPresetId(preset.id)}
+                    className={cn(
+                      "rounded-xl border px-3 py-2 text-left transition",
+                      preset.id === presetId
+                        ? "border-[#eaff00] bg-[#eaff00]/10 text-white shadow-[0_0_18px_rgba(234,255,0,.12)]"
+                        : "border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-white/[0.16] hover:bg-white/[0.06]",
+                    )}
+                  >
+                    <div className="flex items-center gap-2 text-[12px] font-semibold">
+                      <WandSparkles className="h-3.5 w-3.5 text-[#eaff00]" />
+                      {preset.label}
+                    </div>
+                    <p className="mt-0.5 text-[10px] leading-4 text-zinc-500">{preset.description}</p>
+                  </button>
+                ))}
+              </div>
+
+              <div className="rounded-xl border border-cyan-300/15 bg-cyan-300/[0.045] p-3 text-[12px] leading-5 text-cyan-50/75">
+                Clean Cut uses local audio silence detection to remove dead air, preserves short speech handles, returns a real MP4, and creates an editable MediaForge project from the cut file.
+              </div>
+
+              {runStatus ? (
+                <div className="flex items-start gap-2 rounded-xl border border-white/[0.08] bg-white/[0.04] p-3 text-[12px] leading-5 text-zinc-200">
+                  {running ? (
+                    <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-[#eaff00]" />
+                  ) : (
+                    <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#eaff00]" />
+                  )}
+                  <span>{runStatus}</span>
+                </div>
+              ) : null}
+
+              {runError ? (
+                <div className="rounded-xl border border-red-400/20 bg-red-500/10 p-3 text-[12px] leading-5 text-red-100">
+                  <div className="font-semibold">Smart Frames did not finish.</div>
+                  <div className="mt-1 text-red-100/85">{runError}</div>
+                </div>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => void handleGenerate()}
+                disabled={running || !sourceFile}
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#fbff2f,#b9ff50)] px-4 text-[13px] font-semibold text-zinc-950 shadow-[0_0_22px_rgba(234,255,0,.18)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                Clean Cut
+              </button>
+            </div>
+          </section>
+
+          <section className="flex min-h-[640px] flex-col rounded-[18px] border border-white/[0.08] bg-[hsl(0_0%_6%)] shadow-[0_24px_80px_rgba(0,0,0,.28)]">
+            <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="grid h-9 w-9 place-items-center rounded-xl bg-white/[0.06] text-[#eaff00]">
+                  <Code2 className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="whitespace-nowrap text-[15px] font-semibold text-white">
+                  Result
+                  </h2>
+                  <p className="sr-only">
+                    Preview the rendered output and open an editable project.
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void copyResult()}
+                  disabled={!result}
+                  className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 text-[12px] font-semibold text-zinc-200 hover:bg-white/[0.08] disabled:opacity-40"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Copy summary
+                </button>
+              </div>
+            </div>
+
+            {running ? (
+              <div className="flex flex-1 items-center justify-center p-8">
+                <div className="max-w-[520px] text-center">
+                  <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl border border-[#eaff00]/20 bg-[#eaff00]/10 text-[#eaff00]">
+                    <Loader2 className="h-7 w-7 animate-spin" />
+                  </div>
+                  <h3 className="mt-5 text-[18px] font-semibold text-white">
+                    Creating Smart Frames
+                  </h3>
+                  <p className="mt-2 text-[13px] leading-6 text-zinc-500">
+                    {runStatus ?? "Detecting silence and preparing the cut video."}
+                  </p>
+                </div>
+              </div>
+            ) : result ? (
+              <div className="min-h-0 flex-1 overflow-auto p-5">
+                <div className="grid gap-5 lg:grid-cols-[minmax(360px,0.9fr)_1fr]">
+                  <div className="space-y-4">
+                    <SmartFramesResultPreview result={result} />
+                    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-[14px] font-semibold text-white">
+                          {result.outputFileName}
+                        </h3>
+                        <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold text-zinc-300">
+                          <span className="rounded-lg bg-white/[0.06] px-2 py-1">
+                            {result.presetLabel}
+                          </span>
+                          <span className="rounded-lg bg-white/[0.06] px-2 py-1">
+                            {sourceMeta ? formatSmartFramesDuration(sourceMeta.duration) : "Video"}
+                          </span>
+                          <span className="rounded-lg bg-white/[0.06] px-2 py-1">
+                            {result.renderedBy ? result.renderedBy : "Editable draft"}
+                          </span>
+                          {result.changedByCut ? (
+                            <span className="rounded-lg bg-[#eaff00]/15 px-2 py-1 text-[#eaff00]">
+                              dead air cut
+                            </span>
+                          ) : null}
+                          {typeof result.removedDuration === "number" && result.removedDuration > 0 ? (
+                            <span className="rounded-lg bg-white/[0.06] px-2 py-1">
+                              removed {formatSmartFramesDuration(result.removedDuration)}
+                            </span>
+                          ) : null}
+                          {result.segments?.length ? (
+                            <span className="rounded-lg bg-white/[0.06] px-2 py-1">
+                              {result.segments.length} clips
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                      {result.renderWarning ? (
+                        <p className="mt-3 rounded-lg border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-[12px] leading-5 text-amber-50">
+                          HyperFrames warning: {result.renderWarning}
+                        </p>
+                      ) : null}
+                      {result.editorProjectError ? (
+                        <p className="mt-3 rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-[12px] text-red-100">
+                          {result.editorProjectError}
+                        </p>
+                      ) : null}
+                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                        <button
+                          type="button"
+                          onClick={handleDownloadDemo}
+                          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.04] text-[13px] font-semibold text-white hover:bg-white/[0.08]"
+                        >
+                          <Download className="h-4 w-4" />
+                          Download MP4
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleOpenEditor()}
+                          disabled={creatingEditor}
+                          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-cyan-200 px-4 text-[13px] font-semibold text-zinc-950 hover:brightness-105 disabled:cursor-wait disabled:opacity-70"
+                        >
+                          {creatingEditor ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <ArrowRight className="h-4 w-4" />
+                          )}
+                          Edit in MediaForge
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <pre className="max-h-[560px] overflow-auto whitespace-pre-wrap rounded-2xl border border-white/[0.08] bg-black/35 p-5 text-[13px] leading-6 text-zinc-100">
+                    {result.plan}
+                  </pre>
+                </div>
+              </div>
+            ) : sourceUrl ? (
+              <div className="flex flex-1 items-center justify-center p-8">
+                <div className="w-full max-w-[760px]">
+                  <video
+                    src={sourceUrl}
+                    controls
+                    playsInline
+                    className="aspect-video w-full rounded-2xl bg-black object-contain"
+                  />
+                  <div className="mt-5 text-center">
+                    <h3 className="text-[18px] font-semibold text-white">Source ready</h3>
+                    <p className="mt-2 text-[13px] leading-6 text-zinc-500">
+                    Run Clean Cut to remove dead air locally and open the cut video in MediaForge.
+                    </p>
+                    {runError ? (
+                      <p className="mx-auto mt-4 max-w-[560px] rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[12px] leading-5 text-red-100">
+                        {runError}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-1 items-center justify-center p-8">
+                <div className="max-w-[520px] text-center">
+                  <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl border border-white/[0.08] bg-white/[0.04] text-zinc-300">
+                    <Boxes className="h-7 w-7" />
+                  </div>
+                  <h3 className="mt-5 text-[18px] font-semibold text-white">
+                    Ready for Smart Frames
+                  </h3>
+                  <p className="mt-2 text-[13px] leading-6 text-zinc-500">
+                    Upload a source MP4 on the left. Clean Cut will remove dead air and create an editable MediaForge project.
+                  </p>
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
+    </>
   );
 };
 

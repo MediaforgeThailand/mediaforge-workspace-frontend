@@ -267,13 +267,124 @@ async function startVideoPlayback(video: HTMLVideoElement): Promise<void> {
   }
 }
 
-function wrapCaptionText(
-  text: string,
+const CAPTION_WRAP_SPACELESS_RE = /[\u0E00-\u0E7F\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]/;
+const CAPTION_WRAP_CLOSING_PUNCTUATION_RE = /^[,.;:!?\u2026\u3002\u3001\uff01\uff1f\uff09\u300d\u300f\u3011\uff05%]+$/;
+const CAPTION_WRAP_OPENING_PUNCTUATION_RE = /[\uff08\u300c\u300e\u3010]$/;
+
+function captionWrapSegmenter(
+  granularity: "grapheme" | "word",
+): { segment(input: string): Iterable<{ segment: string }> } | null {
+  const Segmenter = (
+    Intl as unknown as {
+      Segmenter?: new (
+        locales?: string | string[],
+        options?: { granularity?: "grapheme" | "word" },
+      ) => { segment(input: string): Iterable<{ segment: string }> };
+    }
+  ).Segmenter;
+  return Segmenter ? new Segmenter(undefined, { granularity }) : null;
+}
+
+function captionWrapGraphemes(text: string): string[] {
+  const segmenter = captionWrapSegmenter("grapheme");
+  if (!segmenter) return Array.from(text);
+  return Array.from(segmenter.segment(text), (part) => part.segment).filter(Boolean);
+}
+
+function captionWrapUnits(text: string): string[] {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return [];
+  return normalized.split(" ").flatMap((part) => {
+    if (!CAPTION_WRAP_SPACELESS_RE.test(part)) return [part];
+    const segmenter = captionWrapSegmenter("word");
+    const units = segmenter
+      ? Array.from(segmenter.segment(part), (segment) => segment.segment.trim()).filter(Boolean)
+      : [];
+    return units.length > 0 ? units : captionWrapGraphemes(part);
+  });
+}
+
+function shouldJoinWrappedCaptionUnit(previous: string, next: string): boolean {
+  if (!previous || !next) return false;
+  if (CAPTION_WRAP_CLOSING_PUNCTUATION_RE.test(next)) return true;
+  if (CAPTION_WRAP_OPENING_PUNCTUATION_RE.test(previous)) return true;
+  return CAPTION_WRAP_SPACELESS_RE.test(previous) && CAPTION_WRAP_SPACELESS_RE.test(next);
+}
+
+function joinWrappedCaptionUnits(units: readonly string[]): string {
+  return units.reduce((line, unit) => {
+    const next = unit.trim();
+    if (!next) return line;
+    if (!line) return next;
+    return shouldJoinWrappedCaptionUnit(line, next) ? `${line}${next}` : `${line} ${next}`;
+  }, "");
+}
+
+function wrapOverwideCaptionUnit(
+  ctx: CanvasRenderingContext2D,
+  unit: string,
+  maxWidth: number,
 ): string[] {
-  return text
-    .split("\n")
-    .map((line) => line.replace(/\s+/g, " ").trim())
-    .filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+  for (const grapheme of captionWrapGraphemes(unit)) {
+    const next = `${current}${grapheme}`;
+    if (current && ctx.measureText(next).width > maxWidth) {
+      lines.push(current);
+      current = grapheme;
+    } else {
+      current = next;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+function wrapCaptionLineByWidth(
+  ctx: CanvasRenderingContext2D,
+  line: string,
+  maxWidth: number,
+): string[] {
+  const units = captionWrapUnits(line);
+  const lines: string[] = [];
+  let current: string[] = [];
+
+  for (const unit of units) {
+    const nextUnits = [...current, unit];
+    const nextText = joinWrappedCaptionUnits(nextUnits);
+    if (nextText && ctx.measureText(nextText).width <= maxWidth) {
+      current = nextUnits;
+      continue;
+    }
+
+    if (current.length > 0) {
+      lines.push(joinWrappedCaptionUnits(current));
+      current = [];
+    }
+
+    if (ctx.measureText(unit).width > maxWidth) {
+      lines.push(...wrapOverwideCaptionUnit(ctx, unit, maxWidth));
+    } else {
+      current = [unit];
+    }
+  }
+
+  if (current.length > 0) {
+    lines.push(joinWrappedCaptionUnits(current));
+  }
+
+  return lines;
+}
+
+function wrapCaptionText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+): string[] {
+  void ctx;
+  void maxWidth;
+  const singleLine = text.replace(/\s+/g, " ").trim();
+  return singleLine ? [singleLine] : [];
 }
 
 function captionCanvasFont(
@@ -362,6 +473,7 @@ function easeOutBack(value: number): number {
 function cueTransitionFrame(
   cue: AutoSuptitleCue,
   animation: CaptionAnimation,
+  outAnimation: CaptionAnimation | undefined,
   currentTime: number,
   pixelScale: number,
 ): CueTransitionFrame {
@@ -372,11 +484,26 @@ function cueTransitionFrame(
   const outProgress = outDuration > 0 ? easeInCubic((cue.endTime - currentTime) / outDuration) : 1;
   const outAmount = 1 - outProgress;
   const distance = 18 * pixelScale;
+  const inFrame = cueTransitionInFrame(animation, inProgress, distance);
+  const outFrame = cueTransitionOutFrame(outAnimation ?? animation, outAmount, distance);
 
+  return {
+    opacity: inFrame.opacity * outFrame.opacity,
+    scale: inFrame.scale * outFrame.scale,
+    offsetX: inFrame.offsetX + outFrame.offsetX,
+    offsetY: inFrame.offsetY + outFrame.offsetY,
+  };
+}
+
+function cueTransitionInFrame(
+  animation: CaptionAnimation,
+  progress: number,
+  distance: number,
+): CueTransitionFrame {
   switch (animation) {
     case "fade":
       return {
-        opacity: inProgress * outProgress,
+        opacity: progress,
         scale: 1,
         offsetX: 0,
         offsetY: 0,
@@ -384,36 +511,91 @@ function cueTransitionFrame(
     case "slideIn":
     case "slideUp":
       return {
-        opacity: inProgress * outProgress,
+        opacity: progress,
         scale: 1,
         offsetX: 0,
-        offsetY: (1 - inProgress) * distance - outAmount * distance * 0.7,
+        offsetY: (1 - progress) * distance,
       };
     case "slideDown":
       return {
-        opacity: inProgress * outProgress,
+        opacity: progress,
         scale: 1,
         offsetX: 0,
-        offsetY: -(1 - inProgress) * distance + outAmount * distance * 0.7,
+        offsetY: -(1 - progress) * distance,
       };
     case "scale":
       return {
-        opacity: inProgress * outProgress,
-        scale: (0.92 + inProgress * 0.08) * (1 - outAmount * 0.05),
+        opacity: progress,
+        scale: 0.92 + progress * 0.08,
         offsetX: 0,
         offsetY: 0,
       };
     case "pop": {
-      const overshoot = inProgress < 0.72
-        ? 0.82 + inProgress * 0.3
-        : 1 + (1 - inProgress) * 0.08;
+      const overshoot = progress < 0.72
+        ? 0.82 + progress * 0.3
+        : 1 + (1 - progress) * 0.08;
       return {
-        opacity: Math.min(1, inProgress * 1.4) * outProgress,
-        scale: Math.max(0.72, overshoot * (1 - outAmount * 0.1)),
+        opacity: Math.min(1, progress * 1.4),
+        scale: Math.max(0.72, overshoot),
         offsetX: 0,
         offsetY: 0,
       };
     }
+    case "typewriter":
+    case "wordHighlight":
+    case "none":
+    default:
+      return {
+        opacity: 1,
+        scale: 1,
+        offsetX: 0,
+        offsetY: 0,
+      };
+  }
+}
+
+function cueTransitionOutFrame(
+  animation: CaptionAnimation,
+  amount: number,
+  distance: number,
+): CueTransitionFrame {
+  switch (animation) {
+    case "fade":
+      return {
+        opacity: 1 - amount,
+        scale: 1,
+        offsetX: 0,
+        offsetY: 0,
+      };
+    case "slideIn":
+    case "slideUp":
+      return {
+        opacity: 1 - amount,
+        scale: 1,
+        offsetX: 0,
+        offsetY: -amount * distance * 0.7,
+      };
+    case "slideDown":
+      return {
+        opacity: 1 - amount,
+        scale: 1,
+        offsetX: 0,
+        offsetY: amount * distance * 0.7,
+      };
+    case "scale":
+      return {
+        opacity: 1 - amount,
+        scale: 1 - amount * 0.05,
+        offsetX: 0,
+        offsetY: 0,
+      };
+    case "pop":
+      return {
+        opacity: 1 - amount,
+        scale: 1 - amount * 0.1,
+        offsetX: 0,
+        offsetY: 0,
+      };
     case "typewriter":
     case "wordHighlight":
     case "none":
@@ -573,13 +755,14 @@ function drawCue(
   ctx.textAlign = settings.positionH === "left" ? "left" : settings.positionH === "right" ? "right" : "center";
 
   const formattedText = formatAutoSuptitleCueText(cue.text, settings.wordsPerLine);
-  const lines = wrapCaptionText(formattedText);
+  const maxTextWidth = Math.max(48, width - margin * 2);
+  ctx.font = captionCanvasFont(settings, baseFontSize, weight, family);
+  const lines = wrapCaptionText(ctx, formattedText, maxTextWidth);
   if (lines.length === 0) {
     ctx.restore();
     return;
   }
 
-  const maxTextWidth = Math.max(48, width - margin * 2);
   const fontSize = fitCaptionFontSize(
     ctx,
     lines,
@@ -611,7 +794,13 @@ function drawCue(
           ? height - margin - blockHeight / 2
           : height / 2;
   const firstY = centerY - blockHeight / 2 + lineHeight / 2;
-  const transition = cueTransitionFrame(cue, settings.animation, currentTime, scale);
+  const transition = cueTransitionFrame(
+    cue,
+    settings.animation,
+    settings.outAnimation,
+    currentTime,
+    scale,
+  );
   const textMotion = cueTextAnimationFrame(
     cue,
     settings.textAnimation,
@@ -683,10 +872,10 @@ function drawCue(
       ctx.miterLimit = 2;
       ctx.lineWidth = Math.max(1, settings.stroke.width * scale);
       ctx.strokeStyle = settings.stroke.color;
-      ctx.strokeText(lines[index], x, y, maxTextWidth);
+      ctx.strokeText(lines[index], x, y);
     }
     ctx.fillStyle = settings.fill;
-    ctx.fillText(lines[index], x, y, maxTextWidth);
+    ctx.fillText(lines[index], x, y);
   }
 
   ctx.restore();

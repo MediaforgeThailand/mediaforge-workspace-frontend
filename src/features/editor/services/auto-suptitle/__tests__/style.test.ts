@@ -40,12 +40,26 @@ describe("auto-suptitle transition style", () => {
     const animation = autoSuptitleSettingsToTextAnimation({
       ...DEFAULT_CAPTION_SETTINGS,
       animation: "none",
+      outAnimation: "none",
     });
 
     expect(animation?.preset).toBe("none");
     expect(animation?.outPreset).toBe("none");
     expect(animation?.inDuration).toBe(0);
     expect(animation?.outDuration).toBe(0);
+  });
+
+  it("maps separate in and out transitions to distinct text presets", () => {
+    const animation = autoSuptitleSettingsToTextAnimation({
+      ...DEFAULT_CAPTION_SETTINGS,
+      animation: "none",
+      outAnimation: "fade",
+    });
+
+    expect(animation?.preset).toBe("none");
+    expect(animation?.outPreset).toBe("fade");
+    expect(animation?.inDuration).toBe(0);
+    expect(animation?.outDuration).toBeGreaterThan(0);
   });
 
   it("plays an exit transition even when the entry preset is none", () => {

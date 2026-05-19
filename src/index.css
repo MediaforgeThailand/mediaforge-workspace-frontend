@@ -1977,3 +1977,60 @@ html.editor-mounted body {
   animation: editor-transition-rings 1.8s ease-out infinite;
 }
 
+.standalone-voice-scroll,
+.standalone-voice-list-scroll {
+  scrollbar-color: hsl(66 100% 52% / 0.9) hsl(0 0% 100% / 0.1);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin !important;
+}
+
+.standalone-voice-scroll::-webkit-scrollbar,
+.standalone-voice-list-scroll::-webkit-scrollbar {
+  display: block !important;
+  width: 7px !important;
+  height: 7px !important;
+}
+
+.standalone-voice-scroll::-webkit-scrollbar-track,
+.standalone-voice-list-scroll::-webkit-scrollbar-track {
+  background: hsl(0 0% 100% / 0.1) !important;
+  border-radius: 999px;
+  margin: 2px 0;
+}
+
+.standalone-voice-scroll::-webkit-scrollbar-thumb,
+.standalone-voice-list-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, hsl(64 100% 52%), hsl(183 100% 79% / 0.7)) !important;
+  border: 1px solid hsl(0 0% 0% / 0.45);
+  border-radius: 999px;
+}
+
+.standalone-create-panel-voice .standalone-voice-settings {
+  min-height: 0;
+}
+
+.standalone-create-panel-voice .standalone-voice-list-scroll:not(.standalone-audio-tags-panel) {
+  flex: 1 1 0 !important;
+  min-height: 220px;
+  overflow-y: scroll !important;
+  scrollbar-width: thin !important;
+}
+
+.standalone-create-panel-voice .standalone-audio-tags-panel {
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  max-height: clamp(112px, 16vh, 150px) !important;
+  overflow-y: auto;
+  scrollbar-width: thin !important;
+}
+
+@media (max-width: 768px) {
+  .standalone-create-panel-voice .standalone-voice-list-scroll:not(.standalone-audio-tags-panel) {
+    min-height: 248px;
+  }
+
+  .standalone-create-panel-voice .standalone-audio-tags-panel {
+    max-height: clamp(102px, 15vh, 132px) !important;
+  }
+}
+
