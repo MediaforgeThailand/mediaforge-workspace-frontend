@@ -767,12 +767,24 @@ function standaloneJobFailureMessage(
   );
 }
 
+function threeDRigTypeLabel(value: string | null | undefined): string {
+  const normalized = String(value || TRIPO_AUTO_RIG_TYPE).trim().toLowerCase();
+  if (!normalized || normalized === TRIPO_AUTO_RIG_TYPE) return "Auto from Rig Check";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function isGenericThreeDFailureMessage(message: string): boolean {
+  return /^(failed|error|something went wrong|try again|support|permanent failed)$/i.test(
+    message.trim(),
+  );
+}
+
 function threeDJobTypeLabel(job: Pick<StandaloneJobRow, "node_type">): string {
   switch (job.node_type) {
     case "tripoPreRigCheckNode":
       return "Rig Check";
     case "tripoRigNode":
-      return "Auto Rig";
+      return "AI Rig Draft";
     case "tripoAnimateNode":
       return "Animate Preset";
     case "tripoImportModelNode":
@@ -811,14 +823,22 @@ function cleanThreeDJobFailureMessage(message: string): string {
 
 function threeDJobFailureHint(job: StandaloneJobRow): string {
   const raw = cleanThreeDJobFailureMessage(standaloneJobFailureMessage(job, ""));
-  if (raw && !/^failed$/i.test(raw)) return raw;
+  if (raw && !isGenericThreeDFailureMessage(raw)) {
+    if (job.node_type === "tripoRigNode") {
+      return `${raw}. Treat the AI rig as a draft: run Rig Check, choose the closest rig type, or send the model to manual rigging.`;
+    }
+    if (job.node_type === "tripoPreRigCheckNode") {
+      return `${raw}. Manual rigging is safer when the body shape is unclear, occluded, or not in a clean T/A-pose.`;
+    }
+    return raw;
+  }
   switch (job.node_type) {
     case "tripoPreRigCheckNode":
-      return "Tripo could not confirm that this model is riggable. Try a clearer body shape, less occlusion, or a T/A-pose style model.";
+      return "Tripo could not confirm that this model is riggable. Use a clearer body shape, less occlusion, or send it to manual rigging.";
     case "tripoRigNode":
-      return "Tripo rejected rigging. Run Rig Check first, then match the rig type to the model: biped for humanoid, quadruped for four-legged characters.";
+      return "Tripo rejected this rig draft. Run Rig Check first, choose the closest type, or use a human rig pass for production work.";
     case "tripoAnimateNode":
-      return "Animation preset needs a rigged model first. Run Auto Rig successfully before animation.";
+      return "Animation preset needs a rigged model first. Run Rig Assistant successfully before animation.";
     case "tripoImportModelNode":
       return "The uploaded model could not be imported. Try GLB/OBJ/FBX/STL with a clean mesh and supported file size.";
     case "imageTo3dNode":
@@ -829,29 +849,29 @@ function threeDJobFailureHint(job: StandaloneJobRow): string {
 
 function threeDJobTimelineSummary(job: StandaloneJobRow): string {
   if (job.status === "failed" || job.status === "permanent_failed") {
-    return `Why: ${threeDJobFailureHint(job)}`;
+    return `Failed: ${threeDJobFailureHint(job)}`;
   }
   if (job.status === "queued") return "Waiting for the worker to start this run.";
   if (job.status === "running") return "Processing with Tripo. The output will appear here when ready.";
   switch (job.node_type) {
     case "tripoPreRigCheckNode": {
       const info = tripoPreRigInfoFromJob(job);
-      if (info.riggable === false) return "Rig Check finished: Tripo says this model is not riggable yet.";
+      if (info.riggable === false) return "Manual recommended: Rig Check says this model is not riggable yet.";
       return info.rigType
-        ? `Rig Check passed. Suggested rig type: ${info.rigType}.`
-        : "Rig Check passed. You can continue to Auto Rig.";
+        ? `Rig Check passed. Suggested type: ${threeDRigTypeLabel(info.rigType)}.`
+        : "Rig Check passed, but no safe rig type was returned. Choose one manually.";
     }
     case "tripoRigNode":
-      return "Rigged model is ready. Use it for animation presets or export.";
+      return "AI rig draft is ready. Review motion, then export or refine manually.";
     case "tripoAnimateNode":
       return "Animated model is ready. Export GLB/FBX when you are happy with it.";
     case "tripoImportModelNode":
-      return "External 3D model is imported and ready for Rig Check or Auto Rig.";
+      return "External model is imported. Run Rig Check before drafting a rig.";
     case "tripoExportNode":
       return "Export package is ready to download.";
     case "imageTo3dNode":
     default:
-      return "3D model is ready. Use it for Auto Rig, animation, or export.";
+      return "3D model is ready. Run Rig Check before rigging; export anytime.";
   }
 }
 
@@ -1801,7 +1821,7 @@ function standaloneCreateButtonLabelForForm(
   ) {
     const action =
       standaloneThreeDMode(form) === "auto_rig"
-        ? "Auto Rig"
+        ? "Draft Rig"
         : standaloneThreeDMode(form) === "animate"
           ? "Animate"
           : "Generate";
@@ -1811,7 +1831,7 @@ function standaloneCreateButtonLabelForForm(
   }
   switch (standaloneThreeDMode(form)) {
     case "auto_rig":
-      return "Auto Rig";
+      return "Run Rig Assistant";
     case "animate":
       return "Animate 3D";
     case "image_to_3d":
@@ -2974,6 +2994,7 @@ export default function StandaloneGenerator({
     return [];
   }, [
     activeTool,
+    activeThreeDMode,
     form,
     videoPanelMode,
     videoSupportsEnd,
@@ -4618,7 +4639,7 @@ export default function StandaloneGenerator({
           }
           throw new Error(
             lastWarning ||
-              "Rig Check is taking too long. Please try Auto Rig again in a moment.",
+              "Rig Check is taking too long. Please try Rig Assistant again in a moment.",
           );
         };
 
@@ -4628,7 +4649,7 @@ export default function StandaloneGenerator({
           if (form.model3dSource && !tripoModelTaskIdFromReference(form.model3dSource)) {
             const importPayload = externalModel3dInputFromReference(form.model3dSource);
             if (!importPayload) {
-              throw new Error("Upload a GLB, OBJ, FBX, or STL model before Auto Rig.");
+              throw new Error("Upload a GLB, OBJ, FBX, or STL model before rigging.");
             }
             const importJobId = await enqueueStandaloneJob(
               "tripoImportModelNode",
@@ -4639,12 +4660,12 @@ export default function StandaloneGenerator({
             toast.success(
               language === "th"
                 ? "กำลัง import โมเดลเข้า Tripo ก่อน Auto Rig"
-                : "Importing the model into Tripo before Auto Rig.",
+                : "Importing the model into Tripo before the rig draft.",
             );
             const importJob = await waitForStandaloneJob(importJobId);
             if (importJob.status !== "completed") {
               throw new Error(
-                standaloneJobFailureMessage(importJob, "Tripo import failed before Auto Rig."),
+                standaloneJobFailureMessage(importJob, "Tripo import failed before rigging."),
               );
             }
             const importedSource = referenceFromGenerationJob(importJob);
@@ -4665,18 +4686,18 @@ export default function StandaloneGenerator({
           toast.success(
             language === "th"
               ? "กำลังตรวจ Rig Check ก่อน Auto Rig"
-              : "Running Rig Check before Auto Rig.",
+              : "Running Rig Check before the rig draft.",
           );
           const preflightJob = await waitForStandaloneJob(preflightJobId);
           if (preflightJob.status !== "completed") {
             throw new Error(
-              standaloneJobFailureMessage(preflightJob, "Rig Check failed before Auto Rig."),
+              standaloneJobFailureMessage(preflightJob, "Rig Check failed before rigging."),
             );
           }
           const preflight = tripoPreRigInfoFromJob(preflightJob);
           if (preflight.riggable === false) {
             throw new Error(
-              "Tripo pre-rig check says this model is not riggable yet. Try another 3D model or generate a clearer body shape.",
+              "Rig Check says this model is not safe for an AI rig draft yet. Use a clearer T/A-pose style model, choose manual rigging, or send it to a human rig pass.",
             );
           }
           if (preflight.rigType) {
@@ -4684,11 +4705,15 @@ export default function StandaloneGenerator({
             if (preflight.rigType !== form.rigType) {
               updateForm({ rigType: preflight.rigType });
             }
+          } else if (!form.rigType || form.rigType === TRIPO_AUTO_RIG_TYPE) {
+            throw new Error(
+              "Rig Check passed but did not return a safe rig type. Choose biped, quadruped, or another matching type manually before drafting the rig.",
+            );
           }
           toast.success(
             preflight.rigType
-              ? `Rig Check passed (${preflight.rigType}). Starting Auto Rig.`
-              : "Rig Check passed. Starting Auto Rig.",
+              ? `Rig Check passed (${threeDRigTypeLabel(preflight.rigType)}). Starting AI rig draft.`
+              : "Rig Check passed. Starting AI rig draft with your selected type.",
           );
         }
 
@@ -10043,9 +10068,9 @@ const THREE_D_MODE_ITEMS: Array<{
   },
   {
     id: "auto_rig",
-    title: "Auto Rig 3D",
+    title: "Rig Assistant",
     shortTitle: "Rig",
-    caption: "Run rig preflight, then prepare the model for motion.",
+    caption: "Rig Check first, draft with AI, finish manually when needed.",
     icon: SlidersHorizontal,
   },
   {
@@ -10153,14 +10178,14 @@ function ThreeDWorkshop({
       : selectedJob
         ? `${selectedJob.status} / ${formatDate(selectedJob.created_at, "en")}`
         : "";
-  const hasMainPreview = Boolean(mainPreviewModelUrl || selectedPosterUrl);
+  const hasMainPreview = Boolean(mainPreviewModelUrl || mainPreviewPosterUrl);
   const disabled = running || uploading || activeJobCount > 0;
   const ModeIcon = modeMeta.icon;
   const compactModeCaption =
     mode === "image_to_3d"
       ? "Textured GLB from images."
       : mode === "auto_rig"
-        ? "Preflight, rig, then prepare motion."
+        ? "Check, draft rig, review."
         : "Apply motion presets to rigged models.";
 
   useEffect(() => {
@@ -10243,7 +10268,7 @@ function ThreeDWorkshop({
         </div>
 
         <div className="flex min-w-0 min-h-0 flex-1 flex-col px-[12px] py-[12px]">
-          <div className="mb-[12px] flex items-center justify-between gap-[8px]">
+          <div className="mb-[12px] flex items-center justify-between gap-[8px] pl-12 lg:pl-0">
             <div className="min-w-0">
               <h1 className="[font-size:16px] font-bold [line-height:20px] text-white">3D Workshop</h1>
               <p className="[font-size:11px] font-medium [line-height:14px] text-zinc-500">
@@ -10282,15 +10307,15 @@ function ThreeDWorkshop({
           <div className="ws-scroll-hide min-h-0 flex-1 overflow-y-auto">
             <div className="rounded-[14px] border border-white/[0.055] bg-[#1d1f21] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,.035)]">
             <div className="flex items-start gap-2">
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-white/[0.06] text-[#f4ff00]">
-                <ModeIcon className="h-4 w-4" />
+              <span className="grid h-[32px] w-[32px] shrink-0 place-items-center rounded-[9px] bg-white/[0.06] text-[#f4ff00]">
+                <ModeIcon className="h-[16px] w-[16px]" />
               </span>
               <div className="min-w-0">
-                <h2 className="text-[14px] font-bold leading-tight text-white">{modeMeta.title}</h2>
-                <p className="mt-1 truncate text-[11px] leading-[15px] text-zinc-400">{compactModeCaption}</p>
+                <h2 className="[font-size:14px] font-bold [line-height:17px] text-white">{modeMeta.title}</h2>
+                <p className="mt-1 truncate [font-size:11px] [line-height:14px] text-zinc-400">{compactModeCaption}</p>
                 {mode === "auto_rig" && (
-                  <div className="mt-2 inline-flex max-w-full items-center rounded-full border border-emerald-300/15 bg-emerald-300/[0.055] px-2 py-0.5 text-[10px] font-semibold text-emerald-100/85">
-                    Rig Check first / credits
+                  <div className="mt-2 inline-flex max-w-full items-center rounded-full border border-emerald-300/15 bg-emerald-300/[0.055] px-2 py-[3px] [font-size:10px] font-semibold [line-height:12px] text-emerald-100/85">
+                    Human review recommended
                   </div>
                 )}
               </div>
@@ -10384,28 +10409,34 @@ function ThreeDWorkshop({
                 />
 
                 {mode === "auto_rig" ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="col-span-2">
+                  <>
+                    <ThreeDRigAssistantGuide
+                      hasSource={Boolean(selectedSource)}
+                      rigType={form.rigType ?? TRIPO_AUTO_RIG_TYPE}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="col-span-2">
+                        <SelectField
+                          label="Rig type"
+                          value={form.rigType ?? TRIPO_AUTO_RIG_TYPE}
+                          options={[TRIPO_AUTO_RIG_TYPE, ...TRIPO_RIG_TYPES]}
+                          onChange={(rigType) => onChange({ rigType })}
+                        />
+                      </div>
                       <SelectField
-                        label="Rig type"
-                        value={form.rigType ?? TRIPO_AUTO_RIG_TYPE}
-                        options={[TRIPO_AUTO_RIG_TYPE, ...TRIPO_RIG_TYPES]}
-                        onChange={(rigType) => onChange({ rigType })}
+                        label="Spec"
+                        value={form.rigSpec ?? "tripo"}
+                        options={["tripo", "mixamo"]}
+                        onChange={(rigSpec) => onChange({ rigSpec: rigSpec === "mixamo" ? "mixamo" : "tripo" })}
+                      />
+                      <SelectField
+                        label="Output"
+                        value={form.rigOutFormat ?? "glb"}
+                        options={["glb", "fbx"]}
+                        onChange={(rigOutFormat) => onChange({ rigOutFormat: rigOutFormat === "fbx" ? "fbx" : "glb" })}
                       />
                     </div>
-                    <SelectField
-                      label="Spec"
-                      value={form.rigSpec ?? "tripo"}
-                      options={["tripo", "mixamo"]}
-                      onChange={(rigSpec) => onChange({ rigSpec: rigSpec === "mixamo" ? "mixamo" : "tripo" })}
-                    />
-                    <SelectField
-                      label="Output"
-                      value={form.rigOutFormat ?? "glb"}
-                      options={["glb", "fbx"]}
-                      onChange={(rigOutFormat) => onChange({ rigOutFormat: rigOutFormat === "fbx" ? "fbx" : "glb" })}
-                    />
-                  </div>
+                  </>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
                     <SelectField
@@ -10443,7 +10474,7 @@ function ThreeDWorkshop({
               type="button"
               onClick={onCreate}
               disabled={disabled}
-              className="btn-cta flex h-11 w-full items-center justify-center gap-2 rounded-[12px] text-[13px] disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-300 disabled:shadow-none disabled:opacity-70"
+              className="btn-cta flex h-[44px] w-full items-center justify-center gap-2 rounded-[12px] [font-size:13px] [line-height:16px] disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-300 disabled:shadow-none disabled:opacity-70"
             >
               {disabled ? <Loader2 className="h-4 w-4 animate-spin" /> : <GenerateIcon className="h-4 w-4" />}
               {createLabel}
@@ -10508,8 +10539,8 @@ function ThreeDWorkshop({
                       variant="main"
                       interactive
                     />
-                  ) : selectedPosterUrl ? (
-                    <img src={selectedPosterUrl} alt="" className="max-h-full max-w-full object-contain" />
+                  ) : mainPreviewPosterUrl ? (
+                    <img src={mainPreviewPosterUrl} alt="" className="max-h-full max-w-full object-contain" />
                   ) : (
                     <div className="rounded-full bg-red-500/20 px-5 py-3 text-[13px] font-bold text-red-100">
                       {selectedJob?.status === "completed" ? "No preview available" : selectedJob?.status}
@@ -10957,6 +10988,59 @@ function ThreeDCompactToggle({
   );
 }
 
+function ThreeDRigAssistantGuide({
+  hasSource,
+  rigType,
+}: {
+  hasSource: boolean;
+  rigType: string;
+}) {
+  const isAuto = !rigType || rigType === TRIPO_AUTO_RIG_TYPE;
+  const statusTitle = !hasSource
+    ? "Choose a model first"
+    : isAuto
+      ? "AI selects only after Rig Check"
+      : `Manual type: ${threeDRigTypeLabel(rigType)}`;
+  const statusCopy = !hasSource
+    ? "Upload or select a model, then run the preflight before drafting a rig."
+    : isAuto
+      ? "If Rig Check cannot identify a safe type, we stop instead of forcing biped."
+      : "This type is used after Rig Check. Review deformation before production export.";
+  return (
+    <div className="rounded-[12px] border border-emerald-300/15 bg-emerald-300/[0.035] px-3 py-2.5">
+      <div className="flex items-start gap-2">
+        <span className="mt-[1px] grid h-7 w-7 shrink-0 place-items-center rounded-[8px] bg-emerald-300/10 text-emerald-100">
+          {hasSource ? <Check className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate [font-size:11px] font-black [line-height:13px] text-emerald-50">
+            {statusTitle}
+          </span>
+          <span className="mt-1 block [font-size:10px] font-semibold [line-height:13px] text-emerald-50/62">
+            {statusCopy}
+          </span>
+        </span>
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-1.5">
+        {[
+          ["1", "Rig Check", "fit"],
+          ["2", "AI draft", "fast"],
+          ["3", "Human pass", "final"],
+        ].map(([step, label, hint]) => (
+          <div
+            key={step}
+            className="rounded-[9px] bg-black/18 px-2 py-[5px] text-center"
+          >
+            <div className="[font-size:9px] font-black [line-height:10px] text-[#f4ff00]">{step}</div>
+            <div className="mt-[2px] truncate [font-size:9px] font-bold [line-height:10px] text-white/90">{label}</div>
+            <div className="mt-[1px] truncate [font-size:8px] font-semibold [line-height:9px] text-zinc-500">{hint}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ThreeDSourcePicker({
   mode,
   sourceOptions,
@@ -10975,17 +11059,17 @@ function ThreeDSourcePicker({
     <div>
       <FieldLabel label="Source model" meta={pickerSourceOptions.length ? `${pickerSourceOptions.length} ready` : "Upload or Tripo"} />
       {pickerSourceOptions.length === 0 ? (
-        <div className="mt-2 rounded-[12px] border border-dashed border-white/[0.10] bg-black/20 p-3 text-[11px] leading-5 text-zinc-400">
+        <div className="mt-2 rounded-[12px] border border-dashed border-white/[0.10] bg-black/20 p-[10px] [font-size:11px] [line-height:15px] text-zinc-400">
           <p>
             {mode === "animate"
-              ? "Run Auto Rig first. Animate preset expects a rigged Tripo model."
+              ? "Run Rig Assistant first. Animate preset expects a rigged Tripo model."
               : "Upload a GLB/OBJ/FBX/STL model or create an Image to 3D result first."}
           </p>
           {mode === "auto_rig" && (
             <button
               type="button"
               onClick={onUpload}
-              className="mt-3 inline-flex h-8 items-center gap-2 rounded-[9px] bg-[#f4ff00] px-3 text-[11px] font-black text-zinc-950 transition hover:bg-[#fbff69]"
+              className="mt-3 inline-flex h-[32px] items-center gap-2 rounded-[9px] bg-[#f4ff00] px-3 [font-size:11px] font-black [line-height:13px] text-zinc-950 transition hover:bg-[#fbff69]"
             >
               <UploadCloud className="h-3.5 w-3.5" />
               Upload 3D model
@@ -10998,7 +11082,7 @@ function ThreeDSourcePicker({
             <button
               type="button"
               onClick={onUpload}
-              className="flex h-9 w-full items-center justify-center gap-2 rounded-[10px] border border-dashed border-[#f4ff00]/35 bg-[#f4ff00]/[0.04] text-[11px] font-black text-[#f4ff00] transition hover:bg-[#f4ff00]/[0.08]"
+              className="flex h-[34px] w-full items-center justify-center gap-2 rounded-[10px] border border-dashed border-[#f4ff00]/35 bg-[#f4ff00]/[0.04] [font-size:11px] font-black [line-height:13px] text-[#f4ff00] transition hover:bg-[#f4ff00]/[0.08]"
             >
               <UploadCloud className="h-3.5 w-3.5" />
               Upload external 3D
@@ -11020,8 +11104,8 @@ function ThreeDSourcePicker({
               >
                 <ThreeDReferenceThumb reference={source} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[11px] font-bold text-white">{source.name}</span>
-                  <span className="mt-1 block truncate text-[10px] font-semibold text-zinc-500">
+                  <span className="block truncate [font-size:11px] font-bold [line-height:13px] text-white">{source.name}</span>
+                  <span className="mt-1 block truncate [font-size:10px] font-semibold [line-height:12px] text-zinc-500">
                     {tripoModelTaskIdFromReference(source).slice(0, 12) || "Needs Tripo import"}
                   </span>
                 </span>
@@ -11201,7 +11285,7 @@ function SelectField({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 h-10 w-full rounded-xl border border-[var(--border-faint)] bg-[var(--bg-panel)] px-1 text-[10px] font-semibold text-white outline-none transition hover:bg-[var(--bg-surface-2)] focus:border-[var(--brand-primary)]/40 disabled:cursor-not-allowed"
+        className="mt-[6px] h-[34px] w-full rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-2 [font-size:11px] font-semibold [line-height:13px] text-white outline-none transition hover:bg-[var(--bg-surface-2)] focus:border-[var(--brand-primary)]/40 disabled:cursor-not-allowed"
       >
         {options.map((option) => (
           <option key={option} value={option} className="bg-zinc-950">
@@ -14166,11 +14250,11 @@ function MiniMeta({ label }: { label: string }) {
 
 function FieldLabel({ label, meta }: { label: string; meta?: string }) {
   return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-default)]">
+    <div className="flex items-center justify-between gap-2 [line-height:12px]">
+      <span className="[font-size:10px] font-bold uppercase [line-height:12px] tracking-[0.08em] text-[var(--text-default)]">
         {label}
       </span>
-      {meta && <span className="text-[10px] text-[var(--text-tertiary)]">{meta}</span>}
+      {meta && <span className="[font-size:10px] [line-height:12px] text-[var(--text-tertiary)]">{meta}</span>}
     </div>
   );
 }
@@ -15060,7 +15144,7 @@ function buildCurrentParams(
     if (mode === "auto_rig") {
       return {
         model_name: "tripo3d-rig",
-        rig_type: form.rigType && form.rigType !== TRIPO_AUTO_RIG_TYPE ? form.rigType : "biped",
+        rig_type: form.rigType && form.rigType !== TRIPO_AUTO_RIG_TYPE ? form.rigType : TRIPO_AUTO_RIG_TYPE,
         spec: form.rigSpec ?? "tripo",
         out_format: form.rigOutFormat ?? "glb",
       };
@@ -15274,7 +15358,7 @@ function validateForm(
         return "This model is missing a Tripo task ID. Use a model generated by Tripo in this project.";
       }
       if (mode === "animate" && (!hasTripoTaskId || !isRiggedTripoSourceReference(form.model3dSource))) {
-        return "Run Auto Rig first, then choose the rigged result for animation.";
+        return "Run Rig Assistant first, then choose the rigged result for animation.";
       }
     }
   }
