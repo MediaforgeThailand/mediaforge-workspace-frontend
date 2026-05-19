@@ -16,6 +16,9 @@ const MAX_UPLOAD_BYTES = 1024 * 1024 * 1024;
 const MAX_RENDER_DURATION_SECONDS = Number(process.env.SMART_FRAMES_MAX_DURATION_SECONDS || 600);
 const MAX_CONCURRENT_RENDERS = Math.max(1, Number(process.env.SMART_FRAMES_MAX_CONCURRENT_RENDERS || 1));
 const HYPERFRAMES_VERSION = process.env.HYPERFRAMES_VERSION || "0.6.21";
+const SILENCE_NOISE_DB = Number(process.env.SMART_FRAMES_SILENCE_NOISE_DB || -35);
+const MIN_DEAD_AIR_SECONDS = Number(process.env.SMART_FRAMES_MIN_DEAD_AIR_SECONDS || 0.5);
+const SPEECH_HANDLE_SECONDS = Number(process.env.SMART_FRAMES_SPEECH_HANDLE_SECONDS || 0.1);
 const BASE_URL = `http://${HOST}:${PORT}`;
 let activeRenderCount = 0;
 
@@ -119,7 +122,7 @@ async function detectSilences(inputPath, duration, hasAudio) {
       "-i",
       inputPath,
       "-af",
-      "silencedetect=noise=-35dB:d=0.45",
+      `silencedetect=noise=${SILENCE_NOISE_DB}dB:d=${MIN_DEAD_AIR_SECONDS}`,
       "-f",
       "null",
       "-",
@@ -162,7 +165,7 @@ function buildKeepSegments(duration, silences) {
     }, []);
   const keep = [];
   let cursor = 0;
-  const pad = 0.12;
+  const pad = Math.max(0, SPEECH_HANDLE_SECONDS);
   for (const silence of merged) {
     const cutStart = Math.max(0, silence.start + pad);
     const cutEnd = Math.min(duration, silence.end - pad);
@@ -444,7 +447,7 @@ async function muxAudio(renderedVideoPath, audioSourcePath, outputPath, hasAudio
   ]);
 }
 
-async function renderJob({ file, plan, presetLabel }) {
+async function renderJob({ file, plan, presetLabel, presetId }) {
   const jobId = randomUUID();
   const jobDir = join(OUTPUT_ROOT, jobId);
   await mkdir(jobDir, { recursive: true });
@@ -474,6 +477,42 @@ async function renderJob({ file, plan, presetLabel }) {
   const cutPath = join(jobDir, "smart-cut.mp4");
   const changedByCut = await cutVideo(inputPath, cutPath, keepSegments, inputInfo);
   const cutInfo = await ffprobe(cutPath);
+  const removedDuration = Math.max(0, inputInfo.duration - cutInfo.duration);
+  const isCleanCut = presetId === "cleancut";
+  const outputName = `${safeName(file.name?.replace(/\.[^.]+$/, "") || "smart-frames")}-${isCleanCut ? "cleancut" : "hyperframes"}.mp4`;
+  const outputPath = join(jobDir, outputName);
+
+  if (isCleanCut) {
+    await copyFile(cutPath, outputPath);
+    const publicBase = `http://${HOST}:${PORT}/outputs/${jobId}`;
+    return {
+      jobId,
+      renderedBy: "ffmpeg-cleancut",
+      renderWarning: null,
+      changedByCut,
+      outputFileName: outputName,
+      outputUrl: `${publicBase}/${encodeURIComponent(outputName)}`,
+      cutFileName: outputName,
+      cutUrl: `${publicBase}/${encodeURIComponent(outputName)}`,
+      duration: cutInfo.duration,
+      originalDuration: inputInfo.duration,
+      removedDuration,
+      width: cutInfo.width,
+      height: cutInfo.height,
+      segments: keepSegments.map((segment) => ({
+        start: Number(segment.start.toFixed(3)),
+        end: Number(segment.end.toFixed(3)),
+        duration: Number((segment.end - segment.start).toFixed(3)),
+      })),
+      silences: silences.map((range) => ({
+        start: Number(range.start.toFixed(3)),
+        end: Number(range.end.toFixed(3)),
+        duration: Number((range.end - range.start).toFixed(3)),
+      })),
+      cues: [],
+    };
+  }
+
   const cues = makeCues(plan, presetLabel, cutInfo.duration);
   const compositionPath = await writeComposition({
     jobDir,
@@ -483,8 +522,6 @@ async function renderJob({ file, plan, presetLabel }) {
     presetLabel,
   });
   const renderOnlyPath = join(jobDir, "hyperframes-video.mp4");
-  const outputName = `${safeName(file.name?.replace(/\.[^.]+$/, "") || "smart-frames")}-hyperframes.mp4`;
-  const outputPath = join(jobDir, outputName);
   let renderedBy = "hyperframes";
   let renderWarning = null;
 
@@ -529,6 +566,7 @@ async function renderJob({ file, plan, presetLabel }) {
     cutUrl: `${publicBase}/smart-cut.mp4`,
     duration: cutInfo.duration,
     originalDuration: inputInfo.duration,
+    removedDuration,
     width: cutInfo.width,
     height: cutInfo.height,
     segments: keepSegments.map((segment) => ({
@@ -568,8 +606,9 @@ async function handleRender(req, res) {
       return;
     }
     const plan = String(form.get("plan") || "");
+    const presetId = String(form.get("presetId") || "");
     const presetLabel = String(form.get("presetLabel") || "Smart Frames");
-    const result = await renderJob({ file, plan, presetLabel });
+    const result = await renderJob({ file, plan, presetLabel, presetId });
     json(res, 200, { ok: true, ...result });
   } finally {
     activeRenderCount = Math.max(0, activeRenderCount - 1);
@@ -679,6 +718,9 @@ const server = createServer(async (req, res) => {
         maxConcurrentRenders: MAX_CONCURRENT_RENDERS,
         maxUploadBytes: MAX_UPLOAD_BYTES,
         maxRenderDurationSeconds: MAX_RENDER_DURATION_SECONDS,
+        silenceNoiseDb: SILENCE_NOISE_DB,
+        minDeadAirSeconds: MIN_DEAD_AIR_SECONDS,
+        speechHandleSeconds: SPEECH_HANDLE_SECONDS,
       });
       return;
     }

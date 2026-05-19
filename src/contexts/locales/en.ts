@@ -2255,6 +2255,7 @@ export const en = {
   "workspace.sidebar.image_upscale": "Upscale",
   "workspace.sidebar.url_asset": "URL Asset",
   "workspace.sidebar.auto_subtitle": "Auto Subtitle",
+  "workspace.sidebar.smart_frames": "Smart Frames",
   "workspace.sidebar.video_gen": "Video Gen",
   "workspace.sidebar.voice_gen": "Voice Gen",
   "workspace.sidebar.voice_translate": "Voice Translate",
@@ -2295,6 +2296,8 @@ export const en = {
     "Import files from a direct URL into your asset library.",
   "workspace.sidebar.auto_subtitle_tip":
     "Generate subtitles automatically from video.",
+  "workspace.sidebar.smart_frames_tip":
+    "Use OpenAI to plan HyperFrames video edits and create an editable draft.",
   "workspace.sidebar.threed_gen_tip": "Create 3D models from image references.",
   "workspace.sidebar.editor_tip": "Edit videos and manage timeline projects.",
   "workspace.sidebar.spaces_tip":
