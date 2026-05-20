@@ -9,6 +9,12 @@ import ffmpegPath from "ffmpeg-static";
 
 type OutputFormat = "mp4" | "mp3" | "png";
 
+interface YtDlpRuntimeOptions {
+  cookiesFile?: string | null;
+  proxy?: string | null;
+  extractorArgs?: string | null;
+}
+
 interface DownloadRequest {
   source_url?: string;
   output_format?: string;
@@ -140,7 +146,35 @@ async function findOutputFile(dir: string, prefix: string, expectedExt: string):
   throw new Error("Downloader did not produce a media file.");
 }
 
-function ytdlpFlags(format: OutputFormat, outputTemplate: string): Record<string, unknown> {
+async function writeOptionalCookiesFile(tempDir: string): Promise<string | null> {
+  const explicitPath = process.env.SOCIAL_DOWNLOADER_YOUTUBE_COOKIES_PATH || process.env.SOCIAL_DOWNLOADER_COOKIES_PATH;
+  if (explicitPath) return explicitPath;
+
+  const rawBase64 =
+    process.env.SOCIAL_DOWNLOADER_YOUTUBE_COOKIES_B64 ||
+    process.env.SOCIAL_DOWNLOADER_COOKIES_B64 ||
+    "";
+  const rawText =
+    process.env.SOCIAL_DOWNLOADER_YOUTUBE_COOKIES ||
+    process.env.SOCIAL_DOWNLOADER_COOKIES ||
+    "";
+  const cookies = rawBase64
+    ? Buffer.from(rawBase64, "base64").toString("utf8")
+    : rawText;
+
+  const normalised = cookies.replace(/\\n/g, "\n").trim();
+  if (!normalised) return null;
+
+  const cookiesFile = path.join(tempDir, "youtube-cookies.txt");
+  await fs.writeFile(cookiesFile, `${normalised}\n`, { mode: 0o600 });
+  return cookiesFile;
+}
+
+function ytdlpFlags(
+  format: OutputFormat,
+  outputTemplate: string,
+  runtime: YtDlpRuntimeOptions = {},
+): Record<string, unknown> {
   const base: Record<string, unknown> = {
     output: outputTemplate,
     noPlaylist: true,
@@ -151,7 +185,11 @@ function ytdlpFlags(format: OutputFormat, outputTemplate: string): Record<string
     fragmentRetries: 2,
     socketTimeout: 20,
     ffmpegLocation: ffmpegPath || undefined,
+    userAgent: CHROME_USER_AGENT,
   };
+  if (runtime.cookiesFile) base.cookies = runtime.cookiesFile;
+  if (runtime.proxy) base.proxy = runtime.proxy;
+  if (runtime.extractorArgs) base.extractorArgs = runtime.extractorArgs;
 
   if (format === "mp4") {
     const heightCap = SOCIAL_MP4_MAX_HEIGHT;
@@ -688,6 +726,10 @@ function humanizeDownloaderError(error: unknown): string {
     return "Social downloader is temporarily unavailable. Please try again later or upload the file directly.";
   }
 
+  if (lower.includes("sign in to confirm") && lower.includes("not a bot")) {
+    return "YouTube blocked our downloader server with a bot check. Server-side YouTube cookies or a downloader proxy must be configured, or upload the file directly.";
+  }
+
   if (
     lower.includes("unsupported url") ||
     lower.includes("no video formats") ||
@@ -764,7 +806,12 @@ export default async function handler(req: SocialDownloadRequest, res: SocialDow
       createdFiles.push(...pageImage.cleanup);
     } else {
       const outputTemplate = path.join(tempDir, `${prefix}.%(ext)s`);
-      await youtubedl.exec(source.toString(), ytdlpFlags(format, outputTemplate), {
+      const runtimeOptions: YtDlpRuntimeOptions = {
+        cookiesFile: await writeOptionalCookiesFile(tempDir),
+        proxy: process.env.SOCIAL_DOWNLOADER_PROXY || null,
+        extractorArgs: process.env.SOCIAL_DOWNLOADER_EXTRACTOR_ARGS || null,
+      };
+      await youtubedl.exec(source.toString(), ytdlpFlags(format, outputTemplate, runtimeOptions), {
         timeout: 55_000,
         killSignal: "SIGKILL",
       });
