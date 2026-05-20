@@ -3061,6 +3061,35 @@ export default function StandaloneGenerator({
     return null;
   };
 
+  const getPanelReferenceSlotForMedia = (
+    media?: Pick<UploadedRef, "mime" | "name" | "url"> | File | null,
+  ): UploadSlot | null => {
+    if (
+      activeTool !== "video_gen" ||
+      videoPanelMode !== "reference" ||
+      !media
+    ) {
+      return getPanelReferenceSlot();
+    }
+    const mime =
+      typeof File !== "undefined" && media instanceof File
+        ? inferReferenceMime(media.name, media.type)
+        : inferReferenceMime(
+            firstText("url" in media ? media.url : "", "name" in media ? media.name : ""),
+            "mime" in media ? media.mime : undefined,
+          );
+    if (mime.startsWith("video/")) {
+      return videoSupportsReferenceVideo(form.model) ? "video-ref-video" : null;
+    }
+    if (mime.startsWith("audio/")) {
+      return null;
+    }
+    if (mime.startsWith("image/")) {
+      return videoSupportsReferenceImage(form.model) ? "video-ref-image" : null;
+    }
+    return getPanelReferenceSlot();
+  };
+
   const openPanelReferenceUpload = () => {
     const slot = getPanelReferenceSlot();
     if (slot) {
@@ -3141,7 +3170,7 @@ export default function StandaloneGenerator({
       toast.error(t("workspace.toast.create_project_first_upload"));
       return;
     }
-    const slot = slotOverride ?? getPanelReferenceSlot();
+    const slot = slotOverride ?? getPanelReferenceSlotForMedia(files[0]);
     if (!slot) return;
     const candidates =
       slot === "model-3d"
@@ -3248,9 +3277,12 @@ export default function StandaloneGenerator({
     reference: PanelReferenceAsset,
     slotOverride?: UploadSlot,
   ) => {
-    const slot = slotOverride ?? getPanelReferenceSlot();
+    const slot = slotOverride ?? getPanelReferenceSlotForMedia(reference);
     if (!slot) return;
-    const referenceMime = reference.mime ?? "image/jpeg";
+    const referenceMime = inferReferenceMime(
+      firstText(reference.url, reference.name),
+      reference.mime,
+    );
     const expectsVideo = slot === "video-ref-video";
     const expectsTranslateMedia = slot === "translate-video";
     const expectsAutoSubtitleMedia = slot === "auto-subtitle-video";
@@ -3573,8 +3605,7 @@ export default function StandaloneGenerator({
       activeTool === "voice_translate" ||
       (activeTool === "video_gen" &&
         videoPanelMode === "reference" &&
-        videoSupportsReferenceVideo(form.model) &&
-        (!videoSupportsReferenceImage(form.model) || !!form.videoRefImage));
+        videoSupportsReferenceVideo(form.model));
     const wantsModelAssets =
       activeTool === "image_to_3d" && activeThreeDMode !== "image_to_3d";
     return mergeReferenceOptions([
@@ -3583,24 +3614,35 @@ export default function StandaloneGenerator({
       ...(projectReferencesQuery.data ?? []),
     ])
       .filter((ref) => {
+        const refMime = inferReferenceMime(firstText(ref.url, ref.name), ref.mime);
         if (usesDedicatedMotionSlots) {
-          return ref.mime.startsWith("image/") || ref.mime.startsWith("video/");
+          return refMime.startsWith("image/") || refMime.startsWith("video/");
         }
         if (activeTool === "image_upscale") {
-          return ref.mime.startsWith("image/");
+          return refMime.startsWith("image/");
         }
         if (wantsModelAssets) {
           return isStandaloneModel3dReference(ref);
         }
+        if (activeTool === "video_gen" && videoPanelMode === "reference") {
+          if (
+            videoSupportsReferenceImage(form.model) &&
+            videoSupportsReferenceVideo(form.model)
+          ) {
+            return refMime.startsWith("image/") || refMime.startsWith("video/");
+          }
+          return wantsVideoAssets
+            ? refMime.startsWith("video/")
+            : refMime.startsWith("image/");
+        }
         return wantsVideoAssets
-          ? ref.mime.startsWith("video/") || ref.mime.startsWith("audio/")
-          : ref.mime.startsWith("image/");
+          ? refMime.startsWith("video/") || refMime.startsWith("audio/")
+          : refMime.startsWith("image/");
       })
       .slice(0, 120);
   }, [
     activeTool,
     form.model,
-    form.videoRefImage,
     jobsQuery.data,
     projectReferencesQuery.data,
     activeThreeDMode,
