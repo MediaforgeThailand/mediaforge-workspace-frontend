@@ -92,6 +92,15 @@ import GenerateIcon from "@/components/GenerateIcon";
 import { cloneNodeFresh } from "./cloneNode";
 import { useFreshSignedUrl } from "./useFreshSignedUrl";
 import { getSignedUrl } from "@/hooks/useSignedUrl";
+import {
+  isSeedanceReferenceVideoDurationValid,
+  isSeedanceReferenceVideoPixelCountValid,
+  readVideoMetadataFromSource,
+  SEEDANCE_REF_VIDEO_MAX_SEC,
+  SEEDANCE_REF_VIDEO_MIN_SEC,
+  seedanceReferenceVideoPixelMessage,
+  type VideoMetadata,
+} from "./videoMetadata";
 import NodeQuickActionRail from "./NodeQuickActionRail";
 import { normalizeUrlAssetSource, validateUrlAssetSource } from "./urlAssetValidation";
 // Workspace-local schema + helpers — kept out of the shared file so
@@ -155,8 +164,6 @@ const PROMPT_TOP_RESERVE_RATIO = 0.3;
 const PROMPT_TOP_RESERVE_MIN = 52;
 const PROMPT_MIN_EDIT_H = 38;
 const PROMPT_MAX_EDIT_H = 240;
-const SEEDANCE_REF_VIDEO_MIN_SEC = 2;
-const SEEDANCE_REF_VIDEO_MAX_SEC = 15;
 
 /**
  * Per-row ▶ button rendered INSIDE each item in the searchable Gemini
@@ -235,48 +242,14 @@ function seedanceReferenceVideoDurationMessage(durationSec?: number | null): str
   return `Seedance 2.0 reference videos must be ${SEEDANCE_REF_VIDEO_MIN_SEC}-${SEEDANCE_REF_VIDEO_MAX_SEC} seconds${durationLabel}.`;
 }
 
-function isSeedanceReferenceVideoDurationValid(
-  durationSec: number | null | undefined,
-): durationSec is number {
-  return (
-    typeof durationSec === "number" &&
-    Number.isFinite(durationSec) &&
-    durationSec >= SEEDANCE_REF_VIDEO_MIN_SEC &&
-    durationSec <= SEEDANCE_REF_VIDEO_MAX_SEC
-  );
-}
-
-function readVideoDurationFromSource(src: string): Promise<number | null> {
-  return new Promise((resolve) => {
-    const video = document.createElement("video");
-    let settled = false;
-    const finish = (value: number | null) => {
-      if (settled) return;
-      settled = true;
-      video.removeAttribute("src");
-      video.load();
-      resolve(value);
-    };
-    video.preload = "metadata";
-    video.muted = true;
-    video.playsInline = true;
-    video.onloadedmetadata = () =>
-      finish(Number.isFinite(video.duration) ? video.duration : null);
-    video.onerror = () => finish(null);
-    window.setTimeout(() => finish(null), 5000);
-    video.src = src;
-  });
-}
-
 function videoInputUrls(value: unknown): string[] {
   const values = Array.isArray(value) ? value : [value];
   return values.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
 }
 
-async function readReferenceVideoDuration(url: string): Promise<number | null> {
-  const readableUrl =
-    /^(https?:|blob:|data:)/i.test(url) ? url : await getSignedUrl(url);
-  return readVideoDurationFromSource(readableUrl);
+async function readReferenceVideoMetadata(url: string): Promise<VideoMetadata | null> {
+  const readableUrl = /^(blob:|data:)/i.test(url) ? url : await getSignedUrl(url);
+  return readVideoMetadataFromSource(readableUrl);
 }
 
 async function validateSeedanceReferenceVideos(inputs: Record<string, unknown>): Promise<void> {
@@ -284,14 +257,18 @@ async function validateSeedanceReferenceVideos(inputs: Record<string, unknown>):
   if (urls.length === 0) return;
   let totalDuration = 0;
   for (const url of urls) {
-    const durationSec = await readReferenceVideoDuration(url);
+    const metadata = await readReferenceVideoMetadata(url);
+    const durationSec = metadata?.durationSec ?? null;
     if (durationSec == null) {
       throw new Error(
-        "Could not read the Seedance 2.0 reference video duration. Use an MP4/MOV video between 2 and 15 seconds.",
+        "Could not read the Seedance 2.0 reference video metadata. Use an MP4/MOV video between 2 and 15 seconds at 1080p or smaller.",
       );
     }
     if (!isSeedanceReferenceVideoDurationValid(durationSec)) {
       throw new Error(seedanceReferenceVideoDurationMessage(durationSec));
+    }
+    if (!metadata || !isSeedanceReferenceVideoPixelCountValid(metadata)) {
+      throw new Error(seedanceReferenceVideoPixelMessage(metadata));
     }
     totalDuration += durationSec;
   }

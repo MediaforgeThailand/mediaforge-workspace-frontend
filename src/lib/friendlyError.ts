@@ -299,6 +299,14 @@ const MAPPINGS: ErrorMapping[] = [
     hi: "संदर्भ फ़ाइल अभी अपलोड हो रही है — कुछ देर रुकें और फिर से Run दबाएँ।",
   },
   {
+    match: /Seedance reference video is too large|video pixel count|2086876/i,
+    th: "วิดีโออ้างอิง Seedance 2.0 ใหญ่เกินไป ใช้วิดีโอ ref ไม่เกิน 1080p หรือไม่เกิน 2,086,876 พิกเซลต่อเฟรม",
+    en: "Seedance 2.0 reference video is too large. Use a ref video at 1080p or smaller, max 2,086,876 pixels per frame.",
+    ja: "Seedance 2.0 の参照動画が大きすぎます。1080p 以下、または 1 フレームあたり 2,086,876 ピクセル以下の動画を使用してください。",
+    es: "El video de referencia de Seedance 2.0 es demasiado grande. Usa un video de referencia de 1080p o menor, máximo 2.086.876 píxeles por fotograma.",
+    hi: "Seedance 2.0 संदर्भ वीडियो बहुत बड़ा है। 1080p या उससे कम, अधिकतम 2,086,876 पिक्सेल प्रति फ्रेम वाला वीडियो इस्तेमाल करें।",
+  },
+  {
     match: /Seedance 2\.0 reference videos?|reference video.*2-15|reference video duration|total.*reference.*15|content\[\d+\].*video duration/i,
     th: "วิดีโออ้างอิงของ Seedance 2.0 ต้องยาว 2-15 วินาที และรวมกันไม่เกิน 15 วินาที",
     en: "Seedance 2.0 reference videos must be 2-15 seconds, with total reference video duration up to 15 seconds.",

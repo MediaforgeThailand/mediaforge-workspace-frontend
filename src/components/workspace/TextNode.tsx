@@ -98,8 +98,11 @@ const MAX_H = 800;
 const BODY_CHROME_H = 88;
 const PROMPT_OPTIMIZER_FUNCTION = "workspace-chat";
 const PROMPT_OPTIMIZER_MODEL = "gpt-5.5";
-const PROMPT_OPTIMIZER_MEDIA_MODEL = "gemini-3-pro-preview";
+const PROMPT_OPTIMIZER_MEDIA_MODEL = "gpt-5.5";
 const WORKSPACE_MEDIA_BUCKET = "ai-media";
+const PROMPT_OPTIMIZER_VIDEO_FRAME_COUNT = 3;
+const PROMPT_OPTIMIZER_VIDEO_FRAME_MAX_SIDE = 768;
+const PROMPT_OPTIMIZER_VIDEO_FRAME_JPEG_QUALITY = 0.78;
 const BRACKETED_TOKEN_RE = /([#@])\[([^\]]+)\]\(([^)]+)\)/g;
 const PLAIN_MENTION_RE = /@([A-Za-z0-9_][A-Za-z0-9_.-]*)/g;
 
@@ -130,7 +133,7 @@ Use concrete, production-ready language: subject, action, visual changes, compos
 Do not add new references. Do not invent unsupported model features.`;
 
 const PROMPT_MEDIA_UNDERSTANDING_SYSTEM_PROMPT = `You are a MediaForge visual understanding prompt writer.
-Use attached images and videos only as source material to understand subject, identity, scene, style, motion, composition, and mood.
+Use attached images and sampled video frames only as source material to understand subject, identity, scene, style, motion, composition, and mood.
 Turn the user's intent and the attached media into one ready-to-use generation prompt.
 Return only the final prompt text. Do not include explanations, headings, markdown labels, code fences, notes, translations, "Prompt:" prefixes, or mention tokens.
 Follow the user's requested language, format, and level of detail when possible.`;
@@ -594,7 +597,7 @@ function stripPromptWrapper(text: string): string {
     const lines = cleaned.split(/\r?\n/);
     while (
       lines.length > 1 &&
-      /^(?:here(?:'s| is)|sure[, ]|of course|นี่คือ|ด้านล่าง|ต่อไปนี้|แน่นอน|ได้เลย)(?:\s|[:：,.!?\-]|$)/i.test(
+      /^(?:here(?:'s| is)|sure[, ]|of course|นี่คือ|ด้านล่าง|ต่อไปนี้|แน่นอน|ได้เลย)(?:\s|[:：,.!?-]|$)/i.test(
         lines[0]?.trim() ?? "",
       )
     ) {
@@ -665,6 +668,129 @@ function inferDataUrlMime(dataUrl: string): string | undefined {
   return match?.[1];
 }
 
+function promptOptimizerVideoSampleTimes(durationSec: number | null): number[] {
+  const duration =
+    typeof durationSec === "number" && Number.isFinite(durationSec) && durationSec > 0
+      ? durationSec
+      : 1;
+  if (duration <= 0.5) return [0];
+  const guard = Math.min(0.25, duration / 8);
+  const seen = new Set<number>();
+  return [guard, duration * 0.5, Math.max(guard, duration - guard)]
+    .map((value) => Math.max(0, Math.min(duration - 0.05, value)))
+    .map((value) => Math.round(value * 100) / 100)
+    .filter((value) => {
+      if (seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    })
+    .slice(0, PROMPT_OPTIMIZER_VIDEO_FRAME_COUNT);
+}
+
+function loadPromptOptimizerVideo(src: string): Promise<HTMLVideoElement> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    let settled = false;
+    const cleanup = () => {
+      video.removeEventListener("loadedmetadata", onLoaded);
+      video.removeEventListener("error", onError);
+    };
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      fn();
+    };
+    const onLoaded = () => finish(() => resolve(video));
+    const onError = () => finish(() => reject(new Error("Could not load reference video.")));
+    video.crossOrigin = "anonymous";
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    video.addEventListener("loadedmetadata", onLoaded, { once: true });
+    video.addEventListener("error", onError, { once: true });
+    window.setTimeout(() => finish(() => reject(new Error("Timed out loading reference video."))), 8000);
+    video.src = src;
+    video.load();
+  });
+}
+
+function seekPromptOptimizerVideo(video: HTMLVideoElement, timeSec: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      video.removeEventListener("seeked", onSeeked);
+      video.removeEventListener("error", onError);
+    };
+    const onSeeked = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error("Could not seek reference video."));
+    };
+    video.addEventListener("seeked", onSeeked, { once: true });
+    video.addEventListener("error", onError, { once: true });
+    video.currentTime = timeSec;
+  });
+}
+
+function promptOptimizerVideoFrameDataUrl(video: HTMLVideoElement): string {
+  const width = video.videoWidth || 1;
+  const height = video.videoHeight || 1;
+  const scale = Math.min(1, PROMPT_OPTIMIZER_VIDEO_FRAME_MAX_SIDE / Math.max(width, height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not create a canvas for reference video frames.");
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", PROMPT_OPTIMIZER_VIDEO_FRAME_JPEG_QUALITY);
+}
+
+async function buildPromptOptimizerVideoFrameAttachments(
+  ref: TextMediaMentionOption,
+  src: string,
+): Promise<PromptOptimizerAttachment[]> {
+  let video: HTMLVideoElement;
+  try {
+    video = await loadPromptOptimizerVideo(src);
+  } catch {
+    throw new Error(
+      `Video reference "${ref.label}" could not be opened for Prompt. Re-upload the video or use a generated/uploaded MediaForge asset.`,
+    );
+  }
+  try {
+    const times = promptOptimizerVideoSampleTimes(
+      Number.isFinite(video.duration) ? video.duration : null,
+    );
+    const frames: PromptOptimizerAttachment[] = [];
+    for (let i = 0; i < times.length; i += 1) {
+      await seekPromptOptimizerVideo(video, times[i]);
+      let dataUrl = "";
+      try {
+        dataUrl = promptOptimizerVideoFrameDataUrl(video);
+      } catch {
+        throw new Error(
+          `Video reference "${ref.label}" could not be sampled for Prompt. Re-upload the video or use a generated/uploaded MediaForge asset.`,
+        );
+      }
+      frames.push({
+        dataUrl,
+        mime: "image/jpeg",
+        detail: "low",
+        label: `${ref.label} frame ${i + 1}`,
+        sourceNodeId: ref.nodeId,
+        mediaKind: "video",
+      });
+    }
+    return frames;
+  } finally {
+    video.removeAttribute("src");
+    video.load();
+  }
+}
+
 async function buildPromptOptimizerAttachments(
   refs: TextMediaMentionOption[],
 ): Promise<PromptOptimizerAttachment[]> {
@@ -689,6 +815,10 @@ async function buildPromptOptimizerAttachments(
       const key = `${ref.nodeId}:data`;
       if (seen.has(key)) continue;
       seen.add(key);
+      if (ref.mediaKind === "video") {
+        attachments.push(...(await buildPromptOptimizerVideoFrameAttachments(ref, sourceUrl)));
+        continue;
+      }
       attachments.push({
         dataUrl: sourceUrl,
         mime: inferDataUrlMime(sourceUrl) ?? inferMediaMime(ref, sourceUrl),
@@ -713,6 +843,10 @@ async function buildPromptOptimizerAttachments(
     const key = imageUrl;
     if (seen.has(key)) continue;
     seen.add(key);
+    if (ref.mediaKind === "video") {
+      attachments.push(...(await buildPromptOptimizerVideoFrameAttachments(ref, imageUrl)));
+      continue;
+    }
     attachments.push({
       imageUrl,
       mime: inferMediaMime(ref, imageUrl),
@@ -794,14 +928,14 @@ function buildMediaUnderstandingUserMessage(
     "Create or improve a generation prompt from the user's intent and the attached media.",
     "Output only one final ready-to-use prompt. Do not include an intro, explanation, heading, markdown, code fence, list of refs, or a Prompt/Final Prompt label.",
     "The user may write Thai or mixed Thai/English. Match the user's requested language or format when they specify one.",
-    "Use the attached media to understand visual/video details such as subject, identity, scene, composition, lighting, style, action, and camera/motion.",
+    "Use the attached images and sampled video frames to understand visual/video details such as subject, identity, scene, composition, lighting, style, action, and camera/motion.",
     "If the user wants a reusable prompt, describe the media naturally instead of relying on node labels or filenames.",
     "Describe the subject, identity cues, scene, composition, lighting, style, action, and camera/motion details naturally.",
     "",
     "Connected media selected by the user:",
     requestedRefs,
     "",
-    "Attached media available to inspect:",
+    "Attached media available to inspect (video refs are sampled frames):",
     attachedRefs,
     "",
     "User instruction with mention tokens removed:",

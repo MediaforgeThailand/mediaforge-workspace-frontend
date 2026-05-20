@@ -118,6 +118,16 @@ import {
   videoSupportsStartEndFrames,
 } from "./standaloneGenerationCatalog";
 import {
+  isSeedanceReferenceVideoDurationValid,
+  isSeedanceReferenceVideoPixelCountValid,
+  readVideoFileMetadata,
+  readVideoUrlMetadata,
+  SEEDANCE_REF_VIDEO_MAX_SEC,
+  SEEDANCE_REF_VIDEO_MIN_SEC,
+  seedanceReferenceVideoPixelMessage,
+  type VideoMetadata,
+} from "./videoMetadata";
+import {
   composeGptImageSize,
   GEMINI_TTS_VOICES,
   DEFAULT_GEMINI_TTS_VOICE,
@@ -194,7 +204,11 @@ const AUTO_PROMPT_SYSTEM_PROMPT = `You help MediaForge users create production-r
 Turn rough human language into a clear prompt that can be used immediately.
 Preserve every @mention token exactly as provided, including label and id.
 If selected references are listed, include the relevant @mention tokens when they should be passed into generation.
+Use attached images and sampled video frames to understand the real visual content of the user's references.
 Do not invent references, models, parameters, or provider capabilities.`;
+const AUTO_PROMPT_VIDEO_FRAME_COUNT = 3;
+const AUTO_PROMPT_VIDEO_FRAME_MAX_SIDE = 768;
+const AUTO_PROMPT_VIDEO_FRAME_JPEG_QUALITY = 0.78;
 const STANDALONE_CANVAS_ID = "standalone";
 const STORAGE_BUCKET = "ai-media";
 const AUTO_SUBTITLE_RESULT_SOURCE = "auto_subtitle";
@@ -242,9 +256,6 @@ const STANDALONE_JOB_SELECT =
   "id,node_type,provider,model,request,status,attempts,result,error,last_error,created_at,completed_at,run_after,deadline_at,locked_by,lock_expires_at,credits_charged,credits_refunded";
 const DEFAULT_WORKSPACE_INFRASTRUCTURE_BUFFER_PERCENT = 40;
 const FAILED_STANDALONE_HISTORY_TTL_MS = 24 * 60 * 60 * 1000;
-const SEEDANCE_REF_VIDEO_MIN_SEC = 2;
-const SEEDANCE_REF_VIDEO_MAX_SEC = 15;
-
 const isInsufficientCreditsError = (message: string) =>
   /insufficient|not enough|credit/i.test(message) &&
   !/api credit|provider credit/i.test(message);
@@ -258,7 +269,7 @@ function seedanceReferenceVideoDurationMessage(durationSec?: number | null): str
 }
 
 function unreadableSeedanceReferenceVideoMessage(): string {
-  return "Could not read the reference video duration. Upload an MP4/MOV video between 2 and 15 seconds.";
+  return "Could not read the reference video metadata. Upload an MP4/MOV video between 2 and 15 seconds at 1080p or smaller.";
 }
 
 function isAutoSubtitleDurationValid(durationSec?: number | null): durationSec is number {
@@ -300,50 +311,33 @@ function isTranslateVideoOverUploadLimit(slot: UploadSlot, file: File): boolean 
   );
 }
 
-function isSeedanceReferenceVideoDurationValid(
-  durationSec: number | null | undefined,
-): durationSec is number {
-  return (
-    typeof durationSec === "number" &&
-    Number.isFinite(durationSec) &&
-    durationSec >= SEEDANCE_REF_VIDEO_MIN_SEC &&
-    durationSec <= SEEDANCE_REF_VIDEO_MAX_SEC
-  );
-}
-
-function readVideoDurationFromSource(
-  src: string,
-  revoke?: () => void,
-): Promise<number | null> {
-  return new Promise((resolve) => {
-    const video = document.createElement("video");
-    let settled = false;
-    const finish = (value: number | null) => {
-      if (settled) return;
-      settled = true;
-      video.removeAttribute("src");
-      video.load();
-      revoke?.();
-      resolve(value);
-    };
-    video.preload = "metadata";
-    video.muted = true;
-    video.playsInline = true;
-    video.onloadedmetadata = () =>
-      finish(Number.isFinite(video.duration) ? video.duration : null);
-    video.onerror = () => finish(null);
-    window.setTimeout(() => finish(null), 5000);
-    video.src = src;
-  });
-}
-
 function readVideoFileDuration(file: File): Promise<number | null> {
-  const objectUrl = URL.createObjectURL(file);
-  return readVideoDurationFromSource(objectUrl, () => URL.revokeObjectURL(objectUrl));
+  return readVideoFileMetadata(file).then((metadata) => metadata?.durationSec ?? null);
 }
 
-function readVideoUrlDuration(url: string): Promise<number | null> {
-  return readVideoDurationFromSource(url);
+async function resolveReadableMediaUrl(url: string): Promise<string> {
+  return /^(blob:|data:)/i.test(url) ? url : await getSignedUrl(url);
+}
+
+async function readVideoUrlDuration(url: string): Promise<number | null> {
+  const readableUrl = await resolveReadableMediaUrl(url);
+  return readVideoUrlMetadata(readableUrl).then((metadata) => metadata?.durationSec ?? null);
+}
+
+async function readSeedanceReferenceVideoUrlMetadata(url: string): Promise<VideoMetadata | null> {
+  const readableUrl = await resolveReadableMediaUrl(url);
+  return readVideoUrlMetadata(readableUrl);
+}
+
+function validateSeedanceReferenceVideoMetadata(metadata: VideoMetadata | null): string | null {
+  if (!metadata) return unreadableSeedanceReferenceVideoMessage();
+  if (!isSeedanceReferenceVideoDurationValid(metadata.durationSec)) {
+    return seedanceReferenceVideoDurationMessage(metadata.durationSec);
+  }
+  if (!isSeedanceReferenceVideoPixelCountValid(metadata)) {
+    return seedanceReferenceVideoPixelMessage(metadata);
+  }
+  return null;
 }
 
 function loadImageElement(file: File): Promise<HTMLImageElement> {
@@ -642,6 +636,15 @@ type PanelReferenceAsset = {
   providerTaskId?: string;
   providerMeta?: Record<string, unknown>;
   nodeType?: string;
+};
+
+type StandaloneAutoPromptAttachment = {
+  imageUrl?: string;
+  dataUrl?: string;
+  mime?: string;
+  detail?: "low" | "high" | "auto";
+  label?: string;
+  sourceNodeId?: string;
 };
 
 type DeletableReference = {
@@ -3237,15 +3240,13 @@ export default function StandaloneGenerator({
           activeTool === "video_gen" &&
           isSeedance20VideoModel(form.model)
         ) {
-          durationSec = await readVideoFileDuration(file);
-          if (durationSec == null) {
-            toast.error(unreadableSeedanceReferenceVideoMessage());
+          const metadata = await readVideoFileMetadata(file);
+          const metadataError = validateSeedanceReferenceVideoMetadata(metadata);
+          if (metadataError) {
+            toast.error(metadataError);
             continue;
           }
-          if (!isSeedanceReferenceVideoDurationValid(durationSec)) {
-            toast.error(seedanceReferenceVideoDurationMessage(durationSec));
-            continue;
-          }
+          durationSec = metadata?.durationSec ?? null;
         } else if (needsAutoSubtitleMedia) {
           durationSec = await readVideoFileDuration(file);
           if (durationSec == null) {
@@ -3336,15 +3337,13 @@ export default function StandaloneGenerator({
       activeTool === "video_gen" &&
       isSeedance20VideoModel(form.model)
     ) {
-      durationSec = durationSec ?? (await readVideoUrlDuration(reference.url)) ?? undefined;
-      if (durationSec == null) {
-        toast.error(unreadableSeedanceReferenceVideoMessage());
+      const metadata = await readSeedanceReferenceVideoUrlMetadata(reference.url);
+      const metadataError = validateSeedanceReferenceVideoMetadata(metadata);
+      if (metadataError) {
+        toast.error(metadataError);
         return;
       }
-      if (!isSeedanceReferenceVideoDurationValid(durationSec)) {
-        toast.error(seedanceReferenceVideoDurationMessage(durationSec));
-        return;
-      }
+      durationSec = metadata?.durationSec ?? undefined;
     }
     if (expectsAutoSubtitleMedia) {
       durationSec = durationSec ?? (await readVideoUrlDuration(reference.url)) ?? undefined;
@@ -3673,6 +3672,8 @@ export default function StandaloneGenerator({
 
     setAutoPrompting(true);
     try {
+      const autoPromptAttachments =
+        await buildStandaloneAutoPromptAttachments(referenceOptions);
       const userMessage = buildStandaloneAutoPromptUserMessage({
         prompt: source,
         tool: activeTool,
@@ -3687,7 +3688,13 @@ export default function StandaloneGenerator({
           body: {
             model: AUTO_PROMPT_MODEL,
             system_prompt: AUTO_PROMPT_SYSTEM_PROMPT,
-            messages: [{ role: "user", content: userMessage }],
+            messages: [
+              {
+                role: "user",
+                content: userMessage,
+                attachments: autoPromptAttachments,
+              },
+            ],
             canvas_context: {
               project_id: activeProject?.id ?? null,
               project_name: activeProject?.name ?? null,
@@ -4467,15 +4474,13 @@ export default function StandaloneGenerator({
         activeTool === "video_gen" &&
         isSeedance20VideoModel(form.model)
       ) {
-        durationSec = await readVideoFileDuration(file);
-        if (durationSec == null) {
-          toast.error(unreadableSeedanceReferenceVideoMessage());
+        const metadata = await readVideoFileMetadata(file);
+        const metadataError = validateSeedanceReferenceVideoMetadata(metadata);
+        if (metadataError) {
+          toast.error(metadataError);
           return;
         }
-        if (!isSeedanceReferenceVideoDurationValid(durationSec)) {
-          toast.error(seedanceReferenceVideoDurationMessage(durationSec));
-          return;
-        }
+        durationSec = metadata?.durationSec ?? null;
       } else if (needsAutoSubtitleMedia) {
         durationSec = await readVideoFileDuration(file);
         if (durationSec == null) {
@@ -4564,17 +4569,13 @@ export default function StandaloneGenerator({
         isSeedance20VideoModel(form.model) &&
         form.videoRefVideo
       ) {
-        const durationSec =
-          form.videoRefVideo.durationSec ??
-          (await readVideoUrlDuration(form.videoRefVideo.url));
-        if (durationSec == null) {
-          toast.error(unreadableSeedanceReferenceVideoMessage());
+        const metadata = await readSeedanceReferenceVideoUrlMetadata(form.videoRefVideo.url);
+        const metadataError = validateSeedanceReferenceVideoMetadata(metadata);
+        if (metadataError) {
+          toast.error(metadataError);
           return;
         }
-        if (!isSeedanceReferenceVideoDurationValid(durationSec)) {
-          toast.error(seedanceReferenceVideoDurationMessage(durationSec));
-          return;
-        }
+        const durationSec = metadata?.durationSec ?? null;
         if (form.videoRefVideo.durationSec == null) {
           updateForm({ videoRefVideo: { ...form.videoRefVideo, durationSec } });
         }
@@ -14877,6 +14878,171 @@ function autoPromptReferenceToken(
   return `@[${autoPromptReferenceLabel(reference, index)}](${reference.id})`;
 }
 
+function autoPromptMediaKind(reference: Pick<PanelReferenceAsset, "url" | "mime" | "name">): "image" | "video" | "audio" {
+  const mime = inferReferenceMime(firstText(reference.url, reference.name), reference.mime);
+  if (mime.startsWith("video/")) return "video";
+  if (mime.startsWith("audio/")) return "audio";
+  return "image";
+}
+
+function autoPromptVideoSampleTimes(durationSec: number | null): number[] {
+  const duration = typeof durationSec === "number" && Number.isFinite(durationSec) && durationSec > 0
+    ? durationSec
+    : 1;
+  if (duration <= 0.5) return [0];
+  const guard = Math.min(0.25, duration / 8);
+  const candidates = [
+    guard,
+    duration * 0.5,
+    Math.max(guard, duration - guard),
+  ];
+  const seen = new Set<number>();
+  return candidates
+    .map((value) => Math.max(0, Math.min(duration - 0.05, value)))
+    .map((value) => Math.round(value * 100) / 100)
+    .filter((value) => {
+      if (seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    })
+    .slice(0, AUTO_PROMPT_VIDEO_FRAME_COUNT);
+}
+
+function seekVideo(video: HTMLVideoElement, timeSec: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      video.removeEventListener("seeked", onSeeked);
+      video.removeEventListener("error", onError);
+    };
+    const onSeeked = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error("Could not seek reference video."));
+    };
+    video.addEventListener("seeked", onSeeked, { once: true });
+    video.addEventListener("error", onError, { once: true });
+    video.currentTime = timeSec;
+  });
+}
+
+function loadVideoElement(src: string): Promise<HTMLVideoElement> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    let settled = false;
+    const cleanup = () => {
+      video.removeEventListener("loadedmetadata", onLoaded);
+      video.removeEventListener("error", onError);
+    };
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      fn();
+    };
+    const onLoaded = () => finish(() => resolve(video));
+    const onError = () => finish(() => reject(new Error("Could not load reference video.")));
+    video.crossOrigin = "anonymous";
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    video.addEventListener("loadedmetadata", onLoaded, { once: true });
+    video.addEventListener("error", onError, { once: true });
+    window.setTimeout(() => finish(() => reject(new Error("Timed out loading reference video."))), 8000);
+    video.src = src;
+    video.load();
+  });
+}
+
+function videoFrameDataUrl(video: HTMLVideoElement): string {
+  const width = video.videoWidth || 1;
+  const height = video.videoHeight || 1;
+  const scale = Math.min(1, AUTO_PROMPT_VIDEO_FRAME_MAX_SIDE / Math.max(width, height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not create a canvas for reference video frames.");
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", AUTO_PROMPT_VIDEO_FRAME_JPEG_QUALITY);
+}
+
+async function extractAutoPromptVideoFrameAttachments(
+  reference: PanelReferenceAsset,
+): Promise<StandaloneAutoPromptAttachment[]> {
+  const signedUrl = await resolveReadableMediaUrl(reference.url);
+  let video: HTMLVideoElement;
+  try {
+    video = await loadVideoElement(signedUrl);
+  } catch {
+    throw new Error(
+      `Video reference "${autoPromptReferenceLabel(reference, 0)}" could not be opened for Auto Prompt. Re-upload the video or use a generated/uploaded MediaForge asset.`,
+    );
+  }
+  try {
+    const label = autoPromptReferenceLabel(reference, 0);
+    const times = autoPromptVideoSampleTimes(
+      Number.isFinite(video.duration) ? video.duration : null,
+    );
+    const attachments: StandaloneAutoPromptAttachment[] = [];
+    for (let i = 0; i < times.length; i += 1) {
+      await seekVideo(video, times[i]);
+      let dataUrl = "";
+      try {
+        dataUrl = videoFrameDataUrl(video);
+      } catch {
+        throw new Error(
+          `Video reference "${label}" could not be sampled for Auto Prompt. Re-upload the video or use a generated/uploaded MediaForge asset.`,
+        );
+      }
+      attachments.push({
+        dataUrl,
+        mime: "image/jpeg",
+        detail: "low",
+        label: `${label} frame ${i + 1}`,
+        sourceNodeId: reference.id,
+      });
+    }
+    return attachments;
+  } finally {
+    video.removeAttribute("src");
+    video.load();
+  }
+}
+
+async function buildStandaloneAutoPromptAttachments(
+  references: PanelReferenceAsset[],
+): Promise<StandaloneAutoPromptAttachment[]> {
+  const attachments: StandaloneAutoPromptAttachment[] = [];
+  const seen = new Set<string>();
+  for (const reference of references) {
+    const mediaKind = autoPromptMediaKind(reference);
+    if (mediaKind === "audio") continue;
+    if (mediaKind === "video") {
+      const frames = await extractAutoPromptVideoFrameAttachments(reference);
+      attachments.push(...frames);
+      continue;
+    }
+
+    const signedUrl = await resolveReadableMediaUrl(reference.url);
+    if (!signedUrl || !/^(https?:|data:|blob:)/i.test(signedUrl)) {
+      throw new Error(`Image reference "${autoPromptReferenceLabel(reference, 0)}" could not be resolved to a readable URL.`);
+    }
+    if (seen.has(signedUrl)) continue;
+    seen.add(signedUrl);
+    attachments.push({
+      imageUrl: signedUrl,
+      mime: inferReferenceMime(firstText(reference.url, reference.name), reference.mime),
+      detail: "low",
+      label: autoPromptReferenceLabel(reference, 0),
+      sourceNodeId: reference.id,
+    });
+  }
+  return attachments;
+}
+
 function buildStandaloneAutoPromptUserMessage({
   prompt,
   tool,
@@ -14895,11 +15061,7 @@ function buildStandaloneAutoPromptUserMessage({
   const referenceLines = references.length
     ? references
         .map((reference, index) => {
-          const mediaKind = reference.mime?.startsWith("video/")
-            ? "video"
-            : reference.mime?.startsWith("audio/")
-              ? "audio"
-              : "image";
+          const mediaKind = autoPromptMediaKind(reference);
           return `- ${mediaKind} ${index + 1}: ${autoPromptReferenceToken(reference, index)}`;
         })
         .join("\n")
@@ -14921,6 +15083,7 @@ function buildStandaloneAutoPromptUserMessage({
     "For image/video tools, write clear English unless the user explicitly requests another language.",
     "Keep every @mention token exactly as written. Do not change labels or ids inside mention tokens.",
     "If selected references should be passed into generation, include their exact @mention tokens in the prompt.",
+    "Actual image references are attached. Video references are attached as sampled frames from the real clip.",
     "",
     "Selected reference mention tokens:",
     referenceLines,
