@@ -14,7 +14,7 @@ interface Profile {
   avatar_url: string | null;
   company: string | null;
   role: string | null;
-  subscription_status: "free" | "professional" | "agency";
+  subscription_status: "free" | "professional" | "agency" | "past_due";
   created_at: string;
   updated_at: string;
   // Subscription fields
