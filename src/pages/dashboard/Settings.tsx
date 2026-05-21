@@ -215,6 +215,9 @@ const Settings = () => {
       </span>
     );
 
+    if (profile?.subscription_status === "past_due") {
+      return compactPill(t("planPastDue"), "border-amber-500/30 bg-amber-500/10 text-amber-200");
+    }
     if ((profile as { plan_name?: string | null } | null)?.plan_name) {
       return compactPill((profile as { plan_name?: string }).plan_name, "border-primary/30 bg-primary/15 text-primary");
     }

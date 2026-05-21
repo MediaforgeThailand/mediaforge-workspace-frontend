@@ -206,7 +206,7 @@ const Pricing = () => {
   const [teamSeats, setTeamSeats] = useState(TEAM_MIN_SEATS);
   const [teamCheckoutOpen, setTeamCheckoutOpen] = useState(false);
   const [affiliateCode, setAffiliateCode] = useState(() =>
-    (searchParams.get("code") || searchParams.get("creator") || getStoredCode() || "").toUpperCase(),
+    (getStoredCode() || searchParams.get("code") || searchParams.get("creator") || "").toUpperCase(),
   );
 
   useEffect(() => {
@@ -412,11 +412,11 @@ const Pricing = () => {
               </button>
             </div>
             <label className="flex h-[42px] min-w-[240px] items-center gap-2 rounded-full border border-white/10 bg-[#252525] px-4 text-left text-[12px] text-zinc-400 shadow-[0_8px_20px_rgba(0,0,0,0.18)]">
-              <span className="whitespace-nowrap font-semibold text-zinc-300">Creator code</span>
+              <span className="whitespace-nowrap font-semibold text-zinc-300">{i18n("pricing.affiliate.creatorCode")}</span>
               <input
                 value={affiliateCode}
                 onChange={(event) => setAffiliateCode(event.target.value.toUpperCase())}
-                placeholder="Optional"
+                placeholder={i18n("pricing.affiliate.optional")}
                 className="h-full min-w-0 flex-1 bg-transparent text-[12.5px] font-bold tracking-[0.08em] text-white outline-none placeholder:font-medium placeholder:tracking-normal placeholder:text-zinc-600"
               />
             </label>
@@ -425,7 +425,7 @@ const Pricing = () => {
                 onClick={() => navigate("/app/settings?tab=affiliate")}
               className="h-[42px] rounded-full border border-white/10 bg-white/[0.04] px-4 text-[12px] font-bold text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white"
             >
-              Creator signup
+              {i18n("pricing.affiliate.creatorSignup")}
             </button>
               {/* Currency selector intentionally removed — user
                *  asked for the currency to be auto-detected from

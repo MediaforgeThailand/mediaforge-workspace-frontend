@@ -76,12 +76,19 @@ export async function captureFromUrl(): Promise<void> {
     const alreadyTracked =
       window.sessionStorage.getItem(sessionFlag) === "1";
 
-    // Always (re)persist storage tokens so attribution survives across pages
-    setCookie(code);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, code);
-    } catch {
-      // ignore
+    const existingCode = getStoredCode();
+    const shouldPersist =
+      !existingCode || !CODE_PATTERN.test(existingCode) || existingCode === code;
+
+    // First-touch attribution: once a valid referral is stored, later links
+    // still get click analytics but do not replace the checkout/signup code.
+    if (shouldPersist) {
+      setCookie(code);
+      try {
+        window.localStorage.setItem(STORAGE_KEY, code);
+      } catch {
+        // ignore
+      }
     }
 
     if (alreadyTracked) {
