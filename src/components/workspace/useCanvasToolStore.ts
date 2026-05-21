@@ -23,7 +23,7 @@
 
 import { create } from "zustand";
 
-export type CanvasTool = "select" | "hand" | "cut" | "sticky";
+export type CanvasTool = "select" | "hand" | "cut" | "pen" | "text" | "sticky";
 
 interface CanvasToolState {
   tool: CanvasTool;

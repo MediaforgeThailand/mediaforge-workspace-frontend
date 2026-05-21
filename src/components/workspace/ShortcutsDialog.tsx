@@ -22,6 +22,8 @@ type ScLabelKey =
   | "workspace.shortcuts.select"
   | "workspace.shortcuts.hand_momentary"
   | "workspace.shortcuts.cut_connector"
+  | "workspace.shortcuts.pen"
+  | "workspace.shortcuts.text_note"
   | "workspace.shortcuts.sticky"
   | "workspace.shortcuts.add_node_picker"
   | "workspace.shortcuts.right_click_menu"
@@ -80,6 +82,8 @@ const GROUPS: ShortcutGroup[] = [
       { labelKey: "workspace.shortcuts.select", keys: ["V"] },
       { labelKey: "workspace.shortcuts.hand_momentary", keys: [{ tk: "workspace.shortcuts.key_hold_space" }] },
       { labelKey: "workspace.shortcuts.cut_connector", keys: ["C"] },
+      { labelKey: "workspace.shortcuts.pen", keys: ["P"] },
+      { labelKey: "workspace.shortcuts.text_note", keys: ["T"] },
       { labelKey: "workspace.shortcuts.sticky", keys: ["S"] },
       { labelKey: "workspace.shortcuts.add_node_picker", keys: ["N"] },
     ],

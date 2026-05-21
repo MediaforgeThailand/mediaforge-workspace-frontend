@@ -56,6 +56,8 @@ import WorkspaceToolNode from "./WorkspaceToolNode";
 import AssetNode from "./AssetNode";
 import ElementNode from "./ElementNode";
 import TextNode from "./TextNode";
+import BoardTextNode from "./BoardTextNode";
+import DrawingNode from "./DrawingNode";
 import GroupNode from "./GroupNode";
 import StickyNoteNode from "./StickyNoteNode";
 import { cloneNodeFresh, remapNodeMentionRefs } from "./cloneNode";
@@ -130,6 +132,8 @@ const VIEWPORT_KEY = (canvasId: string) => `workspace-viewport-${canvasId}`;
 const STORAGE_BUCKET = "ai-media";
 const MEDIA_UPLOAD_MAX_BYTES = 1024 * 1024 * 1024;
 const MEDIA_UPLOAD_MAX_LABEL = "1GB";
+const DRAWING_NODE_PADDING = 10;
+const DRAWING_MIN_SCREEN_DISTANCE = 4;
 
 type NodeDataWithParams = {
   params?: { model_name?: string };
@@ -140,9 +144,29 @@ type AssetNodeData = {
   durationSec?: number;
 };
 
+type DrawingDraft = {
+  pointerId: number;
+  flowPoints: XYPosition[];
+  screenPoints: XYPosition[];
+};
+
 function nodeModelName(node: Node | undefined, fallback: string): string {
   const data = node?.data as NodeDataWithParams | undefined;
   return data?.params?.model_name ?? fallback;
+}
+
+function pointDistance(a: XYPosition, b: XYPosition): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function pointsToSvgPath(points: XYPosition[], minX: number, minY: number): string {
+  return points
+    .map((point, index) => {
+      const x = Math.round(point.x - minX + DRAWING_NODE_PADDING);
+      const y = Math.round(point.y - minY + DRAWING_NODE_PADDING);
+      return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+    })
+    .join(" ");
 }
 
 /* Build the optional history-strip props for NodePreviewLightbox.
@@ -626,6 +650,8 @@ const nodeTypes = {
   assetNode: AssetNode,
   elementNode: ElementNode,
   textNode: TextNode,
+  boardTextNode: BoardTextNode,
+  drawingNode: DrawingNode,
   groupNode: GroupNode,
   stickyNoteNode: StickyNoteNode,
 };
@@ -900,6 +926,7 @@ const Inner = () => {
   const publishCursor = useCanvasCollaborationStore((s) => s.publishCursor);
   const publishSelection = useCanvasCollaborationStore((s) => s.publishSelection);
   const cursorThrottleRef = useRef(0);
+  const [drawingDraft, setDrawingDraft] = useState<DrawingDraft | null>(null);
 
   const publishCanvasCursor = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -1099,6 +1126,85 @@ const Inner = () => {
     [setNodes],
   );
 
+  const appendBoardNode = useCallback(
+    (node: Node, dropPointAbs: XYPosition) => {
+      if (isViewer) return;
+      pushHistory();
+      useWorkspaceStore.setState((s) => {
+        if (!s.current) return {};
+        const deselected = s.current.nodes.map((existing) => ({
+          ...existing,
+          selected: false,
+        }));
+        const nextNodes = [...deselected, { ...node, selected: true }];
+        return {
+          current: { ...s.current, nodes: nextNodes },
+          graphs: { ...s.graphs, [s.current.id]: { ...s.current, nodes: nextNodes } },
+        };
+      });
+      setSelectedNode(node.id);
+      publishSelection(node.id);
+      reparentSpawned(node.id, dropPointAbs);
+    },
+    [isViewer, publishSelection, pushHistory, reparentSpawned, setSelectedNode],
+  );
+
+  const addBoardTextNode = useCallback(
+    (position: XYPosition) => {
+      const id = `bt_${crypto.randomUUID()}`;
+      appendBoardNode(
+        {
+          id,
+          type: "boardTextNode",
+          position,
+          data: {
+            label: "Text",
+            text: "",
+            params: {},
+          },
+        },
+        position,
+      );
+      useCanvasToolStore.getState().setTool("select");
+    },
+    [appendBoardNode],
+  );
+
+  const addDrawingNode = useCallback(
+    (points: XYPosition[]) => {
+      if (points.length < 2) return;
+      const minX = Math.min(...points.map((point) => point.x));
+      const minY = Math.min(...points.map((point) => point.y));
+      const maxX = Math.max(...points.map((point) => point.x));
+      const maxY = Math.max(...points.map((point) => point.y));
+      const width = Math.max(24, Math.ceil(maxX - minX + DRAWING_NODE_PADDING * 2));
+      const height = Math.max(24, Math.ceil(maxY - minY + DRAWING_NODE_PADDING * 2));
+      const position = {
+        x: minX - DRAWING_NODE_PADDING,
+        y: minY - DRAWING_NODE_PADDING,
+      };
+      const id = `draw_${crypto.randomUUID()}`;
+      appendBoardNode(
+        {
+          id,
+          type: "drawingNode",
+          position,
+          data: {
+            label: "Drawing",
+            params: {},
+            paths: [pointsToSvgPath(points, minX, minY)],
+            stroke: "#dfff1f",
+            strokeWidth: 4,
+            width,
+            height,
+          },
+        },
+        position,
+      );
+    },
+    [appendBoardNode],
+  );
+
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -1213,24 +1319,23 @@ const Inner = () => {
       // the cursor is. Falls through to deselection for the default
       // (select / cursor) tool so single-clicks still clear focus.
       const t = useCanvasToolStore.getState().tool;
+      if (t === "pen") return;
+      if (t === "text") {
+        addBoardTextNode(screenToFlowPosition({ x: e.clientX, y: e.clientY }));
+        return;
+      }
       if (t === "sticky") {
         const flowPos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
         const id = `s_${crypto.randomUUID()}`;
-        useWorkspaceStore.setState((s) => {
-          const stickyNode: Node = {
+        appendBoardNode(
+          {
             id,
             type: "stickyNoteNode",
             position: flowPos,
-            data: { text: "" },
-          };
-          if (!s.current) return {};
-          const nextNodes = [...s.current.nodes, stickyNode];
-          return {
-            current: { ...s.current, nodes: nextNodes },
-            graphs: { ...s.graphs, [s.current.id]: { ...s.current, nodes: nextNodes } },
-          };
-        });
-        reparentSpawned(id, flowPos);
+            data: { text: "", params: {} },
+          },
+          flowPos,
+        );
         // Drop the user back into select mode after planting one — a
         // single sticky is the common case; if they want to spam
         // them, they can re-click the sticky tool.
@@ -1240,7 +1345,69 @@ const Inner = () => {
       setSelectedNode(null);
       publishSelection(null);
     },
-    [publishSelection, setSelectedNode, screenToFlowPosition, reparentSpawned],
+    [addBoardTextNode, appendBoardNode, publishSelection, screenToFlowPosition, setSelectedNode],
+  );
+
+  const onCanvasPointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (isViewer || event.button !== 0) return;
+      if (useCanvasToolStore.getState().tool !== "pen") return;
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest?.(".react-flow__pane")) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      const screenPoint = { x: event.clientX, y: event.clientY };
+      setSelectedNode(null);
+      publishSelection(null);
+      setDrawingDraft({
+        pointerId: event.pointerId,
+        screenPoints: [screenPoint],
+        flowPoints: [screenToFlowPosition(screenPoint)],
+      });
+    },
+    [isViewer, publishSelection, screenToFlowPosition, setSelectedNode],
+  );
+
+  const onCanvasPointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      publishCanvasCursor(event);
+      if (!drawingDraft || drawingDraft.pointerId !== event.pointerId) return;
+      if (useCanvasToolStore.getState().tool !== "pen") return;
+      const screenPoint = { x: event.clientX, y: event.clientY };
+      const last = drawingDraft.screenPoints[drawingDraft.screenPoints.length - 1];
+      if (last && pointDistance(last, screenPoint) < DRAWING_MIN_SCREEN_DISTANCE) return;
+      event.preventDefault();
+      setDrawingDraft((current) => {
+        if (!current || current.pointerId !== event.pointerId) return current;
+        return {
+          ...current,
+          screenPoints: [...current.screenPoints, screenPoint],
+          flowPoints: [...current.flowPoints, screenToFlowPosition(screenPoint)],
+        };
+      });
+    },
+    [drawingDraft, publishCanvasCursor, screenToFlowPosition],
+  );
+
+  const onCanvasPointerUp = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!drawingDraft || drawingDraft.pointerId !== event.pointerId) return;
+      event.preventDefault();
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      const totalDistance = drawingDraft.screenPoints.reduce((sum, point, index, arr) => {
+        if (index === 0) return sum;
+        return sum + pointDistance(arr[index - 1], point);
+      }, 0);
+      const flowPoints = drawingDraft.flowPoints;
+      setDrawingDraft(null);
+      if (flowPoints.length >= 2 && totalDistance >= DRAWING_MIN_SCREEN_DISTANCE * 2) {
+        addDrawingNode(flowPoints);
+      }
+    },
+    [addDrawingNode, drawingDraft],
   );
 
   /** Cut tool: clicking a wire deletes it. Bound to React Flow's
@@ -2643,7 +2810,10 @@ const Inner = () => {
       className="workspace-root relative h-full w-full bg-[#1b1c1c]"
       onDragOver={onDragOver}
       onDrop={onDrop}
-      onPointerMove={publishCanvasCursor}
+      onPointerDown={onCanvasPointerDown}
+      onPointerMove={onCanvasPointerMove}
+      onPointerUp={onCanvasPointerUp}
+      onPointerCancel={onCanvasPointerUp}
       onPointerLeave={hideCanvasCursor}
       onContextMenu={(e) => {
         // Wrapper-level right-click handler — fires for clicks on
@@ -2763,6 +2933,8 @@ const Inner = () => {
         className={cn(
           tool === "hand" && "ws-tool-hand",
           tool === "cut" && "ws-tool-cut",
+          tool === "pen" && "ws-tool-pen",
+          tool === "text" && "ws-tool-text",
           tool === "sticky" && "ws-tool-sticky",
         )}
       >
@@ -2782,6 +2954,23 @@ const Inner = () => {
          *  mutation, no autosave dirty. */}
         <EdgeHighlightOnNodeSelect />
       </ReactFlow>
+      {drawingDraft && (
+        <svg
+          className="pointer-events-none fixed inset-0 z-30"
+          aria-hidden="true"
+        >
+          <path
+            d={drawingDraft.screenPoints
+              .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
+              .join(" ")}
+            fill="none"
+            stroke="#dfff1f"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={4}
+          />
+        </svg>
+      )}
       <CanvasCollaborationOverlay />
       {picker && (
         <CanvasNodePicker

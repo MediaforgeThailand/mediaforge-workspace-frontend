@@ -1,6 +1,11 @@
 import type { TranslationMap } from "../LanguageContext";
 
 export const ja = {
+  "workspace.tools.pen": "Draw",
+  "workspace.tools.text_note": "Text",
+  "workspace.node.board_text_placeholder": "Type text...",
+  "workspace.shortcuts.pen": "Draw with pen",
+  "workspace.shortcuts.text_note": "Text label",
   createVideo: "動画を作成",
   dropImageOrClick: "画像をドロップするかクリックして選択します",
   promptPlaceholder: "例:浮遊粒子のあるカメラのズームが遅い...",

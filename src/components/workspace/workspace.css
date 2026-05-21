@@ -394,6 +394,12 @@ body[data-rfc="true"]
 .ws-tool-cut .react-flow__edge-interaction {
   cursor: not-allowed;
 }
+.ws-tool-pen .react-flow__pane {
+  cursor: crosshair;
+}
+.ws-tool-text .react-flow__pane {
+  cursor: text;
+}
 .ws-tool-sticky .react-flow__pane {
   cursor: copy;
 }

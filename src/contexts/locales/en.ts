@@ -3223,11 +3223,14 @@ export const en = {
   "workspace.tools.assets": "Open assets",
   "workspace.tools.select": "Select",
   "workspace.tools.hand": "Hand (hold Space)",
+  "workspace.tools.pen": "Draw",
+  "workspace.tools.text_note": "Text",
   "workspace.tools.cut_connector": "Cut connector",
   "workspace.tools.sticky_note": "Sticky note",
   "workspace.tools.undo": "Undo",
   "workspace.tools.redo": "Redo",
   "workspace.tools.settings_shortcuts": "Settings & shortcuts",
+  "workspace.node.board_text_placeholder": "Type text...",
 
   // ─── Node atoms (sticky / text / asset / group) ────────────────
   "workspace.node.sticky_placeholder": "Type a note…",
@@ -3276,6 +3279,8 @@ export const en = {
   "workspace.shortcuts.select": "Select / cursor",
   "workspace.shortcuts.hand_momentary": "Hand (pan canvas) — momentary",
   "workspace.shortcuts.cut_connector": "Cut connector",
+  "workspace.shortcuts.pen": "Draw with pen",
+  "workspace.shortcuts.text_note": "Text label",
   "workspace.shortcuts.sticky": "Sticky note",
   "workspace.shortcuts.add_node_picker": "Add node picker",
   "workspace.shortcuts.right_click_menu": "Open right-click tool menu",

@@ -1,6 +1,11 @@
 import type { TranslationMap } from "../LanguageContext";
 
 export const th = {
+  "workspace.tools.pen": "วาด",
+  "workspace.tools.text_note": "ข้อความ",
+  "workspace.node.board_text_placeholder": "พิมพ์ข้อความ...",
+  "workspace.shortcuts.pen": "วาดด้วยปากกา",
+  "workspace.shortcuts.text_note": "ข้อความบนบอร์ด",
   createVideo: "สร้างวิดีโอ",
   dropImageOrClick: "ลากรูปมาวางหรือคลิกเพื่อเลือก",
   promptPlaceholder: "เช่น กล้องซูมช้าๆ พร้อมอนุภาคลอยตัว...",

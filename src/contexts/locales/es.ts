@@ -1,6 +1,11 @@
 import type { TranslationMap } from "../LanguageContext";
 
 export const es = {
+  "workspace.tools.pen": "Dibujar",
+  "workspace.tools.text_note": "Texto",
+  "workspace.node.board_text_placeholder": "Escribe texto...",
+  "workspace.shortcuts.pen": "Dibujar con pluma",
+  "workspace.shortcuts.text_note": "Etiqueta de texto",
   // Create page
   createVideo: "Crear vídeo",
   dropImageOrClick: "Suelta la imagen o haz clic para seleccionar",

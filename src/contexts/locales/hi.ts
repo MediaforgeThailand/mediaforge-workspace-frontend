@@ -1,6 +1,11 @@
 import type { TranslationMap } from "../LanguageContext";
 
 export const hi = {
+  "workspace.tools.pen": "Draw",
+  "workspace.tools.text_note": "Text",
+  "workspace.node.board_text_placeholder": "Type text...",
+  "workspace.shortcuts.pen": "Draw with pen",
+  "workspace.shortcuts.text_note": "Text label",
   createVideo: "वीडियो बनाएं",
   dropImageOrClick: "छवि छोड़ें या चयन करने के लिए क्लिक करें",
   promptPlaceholder: "जैसे, तैरते कणों के साथ धीमा कैमरा ज़ूम...",
