@@ -900,6 +900,8 @@ interface AutoSubtitleResultItem {
   assetId?: string;
   sourceName: string;
   sourceUrl: string;
+  sourceStorageBucket?: "ai-media" | "user_assets";
+  sourceStoragePath?: string;
   outputUrl: string;
   outputName: string;
   outputMime: string;
@@ -920,7 +922,29 @@ function autoSubtitleResultMatchesMedia(
   media: UploadedRef | null | undefined,
 ): boolean {
   if (!media) return false;
-  return result.sourceUrl === media.url || result.sourceName === media.name;
+  const resultSourceKey =
+    autoSubtitleStorageKey(result.sourceStorageBucket, result.sourceStoragePath) ||
+    autoSubtitleStorageKeyFromUrl(result.sourceUrl);
+  const mediaSourceKey =
+    autoSubtitleStorageKey(media.storageBucket, media.storagePath) ||
+    autoSubtitleStorageKeyFromUrl(media.url);
+  if (resultSourceKey && mediaSourceKey && resultSourceKey === mediaSourceKey) {
+    return true;
+  }
+
+  const resultUrl = autoSubtitleComparableUrl(result.sourceUrl);
+  const mediaUrl = autoSubtitleComparableUrl(media.url);
+  if (resultUrl && mediaUrl && resultUrl === mediaUrl) return true;
+
+  const resultName = autoSubtitleComparableName(result.sourceName);
+  const mediaName = autoSubtitleComparableName(media.name);
+  return (
+    resultName.length > 0 &&
+    mediaName.length > 0 &&
+    (resultName === mediaName ||
+      resultName.includes(mediaName) ||
+      mediaName.includes(resultName))
+  );
 }
 
 interface AutoSubtitleProgress {
@@ -4138,6 +4162,8 @@ export default function StandaloneGenerator({
           assetId: persistedResult?.assetId,
           sourceName: source.name,
           sourceUrl: source.url,
+          sourceStorageBucket: source.storageBucket,
+          sourceStoragePath: source.storagePath,
           outputUrl,
           outputName,
           outputMime,
@@ -11901,6 +11927,7 @@ function AutoSubtitleMiniEditorPanel({
   const cueDragRef = useRef<AutoSubtitleMiniCueDrag | null>(null);
   const cueDragMovedRef = useRef(false);
   const pendingGeneratedResultPreviewRef = useRef(false);
+  const pendingGeneratedResultStartedAtRef = useRef<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
@@ -11919,6 +11946,7 @@ function AutoSubtitleMiniEditorPanel({
   useEffect(() => {
     if (running || progress) {
       pendingGeneratedResultPreviewRef.current = true;
+      pendingGeneratedResultStartedAtRef.current = Date.now();
     }
   }, [progress, running]);
 
@@ -11935,13 +11963,22 @@ function AutoSubtitleMiniEditorPanel({
     if (!pendingGeneratedResultPreviewRef.current || running || progress || results.length === 0) {
       return;
     }
+    const startedAt = pendingGeneratedResultStartedAtRef.current ?? 0;
+    const recentResults =
+      startedAt > 0
+        ? results.filter((result) => result.createdAt >= startedAt - 1500)
+        : results;
+    const candidates = recentResults.length > 0 ? recentResults : [];
     const generatedResult = media
-      ? results.find((result) => autoSubtitleResultMatchesMedia(result, media))
-      : results[0] ?? null;
+      ? candidates.find((result) => autoSubtitleResultMatchesMedia(result, media)) ??
+        candidates[0] ??
+        null
+      : candidates[0] ?? null;
     if (!generatedResult) return;
     setSelectedResultId(generatedResult.id);
     setPreviewMode("result");
     pendingGeneratedResultPreviewRef.current = false;
+    pendingGeneratedResultStartedAtRef.current = null;
   }, [media, progress, results, running]);
 
   const selectedResult =
@@ -13363,6 +13400,49 @@ function storagePointerFromReferenceUrl(rawUrl: string): Pick<UploadedRef, "stor
   return {};
 }
 
+function autoSubtitleStorageKey(
+  bucket?: "ai-media" | "user_assets" | null,
+  path?: string | null,
+): string {
+  const cleanBucket = String(bucket ?? "").trim().toLowerCase();
+  const cleanPath = String(path ?? "")
+    .trim()
+    .replace(/^\/+/, "")
+    .split(/[?#]/)[0]
+    .toLowerCase();
+  if (!cleanBucket || !cleanPath) return "";
+  return `${cleanBucket}/${cleanPath}`;
+}
+
+function autoSubtitleStorageKeyFromUrl(rawUrl?: string | null): string {
+  if (!rawUrl) return "";
+  const pointer = storagePointerFromReferenceUrl(rawUrl);
+  return autoSubtitleStorageKey(pointer.storageBucket, pointer.storagePath);
+}
+
+function autoSubtitleComparableUrl(rawUrl?: string | null): string {
+  if (!rawUrl) return "";
+  try {
+    const parsed = new URL(rawUrl);
+    return `${parsed.origin}${decodeURIComponent(parsed.pathname)}`.toLowerCase();
+  } catch {
+    return String(rawUrl).trim().replace(/^\/+/, "").split(/[?#]/)[0].toLowerCase();
+  }
+}
+
+function autoSubtitleComparableName(rawName?: string | null): string {
+  const fileName = String(rawName ?? "")
+    .trim()
+    .split(/[\\/]/)
+    .pop()
+    ?.split(/[?#]/)[0]
+    .replace(/\.[^.]+$/, "") ?? "";
+  return fileName
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[^a-z0-9\u0E00-\u0E7F]+/g, "");
+}
+
 function standaloneReferenceKey(
   reference: Pick<UploadedRef, "url" | "assetId" | "storageBucket" | "storagePath">,
 ): string {
@@ -14686,6 +14766,8 @@ async function autoSubtitleResultFromUserAsset(
     assetId: row.id != null ? String(row.id) : undefined,
     sourceName: firstText(metadata.source_name, metadata.source_file_name) ?? "Source video",
     sourceUrl,
+    sourceStorageBucket,
+    sourceStoragePath,
     outputUrl,
     outputName,
     outputMime,
