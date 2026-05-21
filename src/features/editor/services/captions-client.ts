@@ -33,7 +33,8 @@ export async function transcribeAudio(
 
   // Confirm the user is signed in — the function rejects anonymous calls.
   const { data: sessionData } = await supabase.auth.getSession();
-  if (!sessionData.session) {
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) {
     throw new Error(
       "Please sign in to MediaForge to use AI Captions. (Authentication required.)",
     );
@@ -56,7 +57,12 @@ export async function transcribeAudio(
 
   const { data, error } = await supabase.functions.invoke(
     "captions-transcribe",
-    { body: formData },
+    {
+      body: formData,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
   );
 
   if (error) {
@@ -78,13 +84,17 @@ export async function transcribeAudio(
     }
 
     // Friendly error for the common deploy-misconfiguration cases.
-    // The actual response body usually carries an `OpenAI API key not
-    // configured` string; we also catch raw 401/404 from the edge layer.
+    // Do not treat every 401 as an OpenAI key problem: Supabase Edge
+    // Functions also return 401 when the caller JWT is missing/stale.
     const lower = detail.toLowerCase();
     const apiKeyMissing =
       lower.includes("openai api key") ||
       lower.includes("api key not configured") ||
-      lower.includes("missing api key") ||
+      lower.includes("missing api key");
+    const authMissing =
+      lower.includes("unauthorized") ||
+      lower.includes("jwt") ||
+      lower.includes("authorization") ||
       status === 401;
     const functionMissing =
       lower.includes("not deployed") ||
@@ -97,6 +107,9 @@ export async function transcribeAudio(
       );
       (e as Error & { setupDocUrl?: string }).setupDocUrl = "/CAPTIONS_SETUP.md";
       throw e;
+    }
+    if (authMissing) {
+      throw new Error("Your sign-in session expired. Refresh the page, sign in again, and retry Auto Subtitle.");
     }
     if (functionMissing) {
       const e = new Error(
