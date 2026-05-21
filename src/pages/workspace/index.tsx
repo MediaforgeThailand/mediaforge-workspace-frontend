@@ -596,10 +596,6 @@ const WorkspaceDashboardInner = () => {
     () => (isSignedIn ? projects : []),
     [isSignedIn, projects],
   );
-  const visibleWorkspaces = useMemo(
-    () => (isSignedIn ? workspaces : []),
-    [isSignedIn, workspaces],
-  );
   const visibleActiveProjectId = isSignedIn ? activeProjectId : null;
 
   useEducationPresence({
@@ -622,17 +618,6 @@ const WorkspaceDashboardInner = () => {
         })),
     [visibleProjects],
   );
-  const projectIdsWithSpaces = useMemo(() => {
-    const knownProjectIds = new Set(visibleProjects.map((project) => project.id));
-    const ids = new Set<string>();
-    for (const workspace of visibleWorkspaces) {
-      if (workspace.projectId && knownProjectIds.has(workspace.projectId)) {
-        ids.add(workspace.projectId);
-      }
-    }
-    return ids;
-  }, [visibleProjects, visibleWorkspaces]);
-
   const standaloneSyncRef = useRef<string | null>(null);
   useEffect(() => {
     if (authLoading) return;
@@ -710,16 +695,17 @@ const WorkspaceDashboardInner = () => {
 
       const stateAfterSync = useWorkspaceStore.getState();
       const currentActive = stateAfterSync.activeProjectId;
-      const currentActiveHasSpaces =
+      const currentActiveExists =
         !!currentActive &&
-        stateAfterSync.workspaces.some((w) => w.projectId === currentActive);
-      if (!currentActiveHasSpaces) {
+        stateAfterSync.projects.some((p) => p.id === currentActive);
+      if (!currentActiveExists) {
         const knownProjectIds = new Set(stateAfterSync.projects.map((p) => p.id));
         const preferredProjectId =
           server.find((w) => !!w.projectId && knownProjectIds.has(w.projectId))?.projectId ??
           stateAfterSync.projects.find((p) =>
             stateAfterSync.workspaces.some((w) => w.projectId === p.id),
           )?.id ??
+          stateAfterSync.projects[0]?.id ??
           null;
         if (preferredProjectId && preferredProjectId !== currentActive) {
           setActiveProject(preferredProjectId);
@@ -737,14 +723,10 @@ const WorkspaceDashboardInner = () => {
       return;
     }
     const activeProjectExists = standaloneProjects.some((project) => project.id === activeProjectId);
-    const activeProjectHasSpaces = Boolean(activeProjectId && projectIdsWithSpaces.has(activeProjectId));
-    if (!activeProjectExists || (!activeProjectHasSpaces && projectIdsWithSpaces.size > 0)) {
-      const preferred =
-        standaloneProjects.find((project) => projectIdsWithSpaces.has(project.id)) ??
-        standaloneProjects[0];
-      setActiveProject(preferred.id);
+    if (!activeProjectExists) {
+      setActiveProject(standaloneProjects[0].id);
     }
-  }, [activeProjectId, projectIdsWithSpaces, setActiveProject, standaloneProjects]);
+  }, [activeProjectId, setActiveProject, standaloneProjects]);
 
   /* "Create project" dialog state. We replaced the native browser
    * prompt() with a styled dialog (see CreateProjectDialog) that
@@ -1874,6 +1856,7 @@ type SmartFramesPersistedState = {
   editorProjectId?: string;
   renderedOutputUrl?: string;
   renderedBy?: string;
+  plannerUsed?: string;
   removedDuration?: number;
 };
 
@@ -1885,6 +1868,7 @@ type SmartFramesDraftCue = {
 
 type SmartFramesDemoResult = {
   plan: string;
+  editPlan?: unknown;
   outputUrl: string;
   outputFileName: string;
   createdAt: number;
@@ -1895,6 +1879,7 @@ type SmartFramesDemoResult = {
   editorProjectId?: string;
   editorProjectError?: string;
   renderedBy?: string;
+  plannerUsed?: string;
   renderWarning?: string | null;
   cutUrl?: string;
   cutFileName?: string;
@@ -2049,11 +2034,14 @@ async function readSmartFramesVideoMeta(sourceUrl: string): Promise<SmartFramesV
 type SmartFramesWorkerRenderResult = {
   ok: boolean;
   error?: string;
+  plan?: string;
+  editPlan?: unknown;
   outputUrl?: string;
   outputFileName?: string;
   cutUrl?: string;
   cutFileName?: string;
   renderedBy?: string;
+  plannerUsed?: string;
   renderWarning?: string | null;
   changedByCut?: boolean;
   duration?: number;
@@ -2065,9 +2053,35 @@ type SmartFramesWorkerRenderResult = {
   segments?: Array<{ start: number; end: number; duration: number }>;
 };
 
-function smartFramesWorkerBaseUrl(): string {
+function isLocalSmartFramesHost(): boolean {
+  if (typeof window === "undefined") return true;
+  return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+}
+
+function smartFramesWorkerBaseUrl(): string | null {
   const configured = import.meta.env.VITE_SMART_FRAMES_WORKER_URL as string | undefined;
-  return (configured || "http://127.0.0.1:8787").replace(/\/+$/, "");
+  if (configured?.trim()) return configured.trim().replace(/\/+$/, "");
+  return isLocalSmartFramesHost() ? "http://127.0.0.1:8787" : null;
+}
+
+async function ensureSmartFramesWorkerReady(baseUrl: string): Promise<void> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 3500);
+  try {
+    const response = await fetch(`${baseUrl}/health`, { signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`Smart Frames render worker returned HTTP ${response.status}.`);
+    }
+  } catch (error) {
+    const detail =
+      error instanceof Error && error.name !== "AbortError" ? ` ${error.message}` : "";
+    throw new Error(
+      `Cannot connect to the Smart Frames render worker at ${baseUrl}.${detail} ` +
+        "For local testing, run `npm run smart-frames:worker`. For production, configure VITE_SMART_FRAMES_WORKER_URL to a hosted HyperFrame renderer.",
+    );
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }
 
 async function renderSmartFramesWithLocalWorker({
@@ -2083,6 +2097,14 @@ async function renderSmartFramesWithLocalWorker({
   presetId: HyperFramesSmartPresetId;
   presetLabel: string;
 }): Promise<SmartFramesWorkerRenderResult> {
+  const workerBaseUrl = smartFramesWorkerBaseUrl();
+  if (!workerBaseUrl) {
+    throw new Error(
+      "Smart Frames render worker is not connected for this hosted site. Configure VITE_SMART_FRAMES_WORKER_URL to a hosted HyperFrame renderer before enabling this feature in production.",
+    );
+  }
+  await ensureSmartFramesWorkerReady(workerBaseUrl);
+
   const body = new FormData();
   body.set("file", file);
   body.set("plan", plan);
@@ -2090,10 +2112,18 @@ async function renderSmartFramesWithLocalWorker({
   body.set("presetId", presetId);
   body.set("presetLabel", presetLabel);
 
-  const response = await fetch(`${smartFramesWorkerBaseUrl()}/render`, {
-    method: "POST",
-    body,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${workerBaseUrl}/render`, {
+      method: "POST",
+      body,
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? ` ${error.message}` : "";
+    throw new Error(
+      `Cannot upload to the Smart Frames render worker at ${workerBaseUrl}.${detail}`,
+    );
+  }
   const data = (await response.json().catch(() => null)) as SmartFramesWorkerRenderResult | null;
   if (!response.ok || !data?.ok) {
     throw new Error(data?.error || `Smart Frames worker returned HTTP ${response.status}.`);
@@ -2431,6 +2461,7 @@ const HyperFramesSmartView = ({
           sourceBlobKey: persisted.sourceBlobKey,
           editorProjectId: persisted.editorProjectId,
           renderedBy: persisted.renderedBy,
+          plannerUsed: persisted.plannerUsed,
           removedDuration: persisted.removedDuration,
         });
       })
@@ -2466,7 +2497,7 @@ const HyperFramesSmartView = ({
     setSourceMeta(null);
     setResult(null);
     setRunError(null);
-    setRunStatus("Source video loaded. Run Clean Cut to remove dead air.");
+    setRunStatus("Source video loaded. Run Smart Frames to plan the cut and render with HyperFrame.");
     clearPersistedSmartFramesState(user?.id, activeStorageProjectId);
     void readSmartFramesVideoMeta(objectUrl)
       .then(setSourceMeta)
@@ -2493,7 +2524,7 @@ const HyperFramesSmartView = ({
     setRunning(true);
     setResult(null);
     setRunError(null);
-    setRunStatus("Cutting dead air with the local Clean Cut worker...");
+    setRunStatus("Planning the edit, cutting dead air, and rendering with HyperFrame...");
     try {
       const meta = sourceMeta;
       const cleaned = [
@@ -2529,7 +2560,8 @@ const HyperFramesSmartView = ({
       });
 
       const nextResult: SmartFramesDemoResult = {
-        plan: cleaned,
+        plan: workerResult.plan || cleaned,
+        editPlan: workerResult.editPlan,
         outputUrl: workerResult.outputUrl || sourceUrl,
         outputFileName:
           workerResult.outputFileName ||
@@ -2540,6 +2572,7 @@ const HyperFramesSmartView = ({
         sourceFileName: sourceFile.name,
         sourceBlobKey: sourcePersisted ? sourceBlobKey : undefined,
         renderedBy: workerResult.renderedBy,
+        plannerUsed: workerResult.plannerUsed,
         renderWarning: workerResult.renderWarning,
         cutUrl: workerResult.cutUrl,
         cutFileName: workerResult.cutFileName,
@@ -2552,11 +2585,14 @@ const HyperFramesSmartView = ({
       };
       setRunStatus("Creating the editable MediaForge project...");
       try {
+        const preferredEditorUrl = workerResult.outputUrl || workerResult.cutUrl || sourceUrl;
+        const preferredEditorName =
+          workerResult.outputFileName || workerResult.cutFileName || sourceFile.name;
         const editorFile =
-          workerResult.cutUrl && workerResult.cutFileName
-            ? await fileFromRemoteUrl(workerResult.cutUrl, workerResult.cutFileName)
+          preferredEditorUrl !== sourceUrl
+            ? await fileFromRemoteUrl(preferredEditorUrl, preferredEditorName)
             : sourceFile;
-        const editorSourceUrl = workerResult.cutUrl || sourceUrl;
+        const editorSourceUrl = preferredEditorUrl;
         const editorMeta =
           workerResult.duration && workerResult.width && workerResult.height
             ? {
@@ -2588,7 +2624,7 @@ const HyperFramesSmartView = ({
             version: HYPERFRAMES_SMART_STORAGE_VERSION,
             prompt: source,
             presetId: selectedPreset.id,
-            plan: cleaned,
+            plan: nextResult.plan,
             outputFileName: nextResult.outputFileName,
             createdAt: nextResult.createdAt,
             sourceFileName: sourceFile.name,
@@ -2599,19 +2635,20 @@ const HyperFramesSmartView = ({
             editorProjectId: nextResult.editorProjectId,
             renderedOutputUrl: workerResult.outputUrl,
             renderedBy: workerResult.renderedBy,
+            plannerUsed: workerResult.plannerUsed,
             removedDuration: workerResult.removedDuration,
           },
         });
       }
       setRunStatus(
         nextResult.changedByCut
-          ? "Clean Cut complete. Dead air removed and an editable project is ready."
-          : "Clean Cut complete. No removable dead air was detected; an editable project is ready.",
+          ? "Smart Frames complete. HyperFrame rendered the clean cut and an editable project is ready."
+          : "Smart Frames complete. HyperFrame rendered the project; no removable dead air was detected.",
       );
       toast.success(
         nextResult.editorProjectId
-          ? "Clean Cut project ready."
-          : "Clean Cut result ready, but editor handoff needs attention.",
+          ? "Smart Frames project ready."
+          : "Smart Frames result ready, but editor handoff needs attention.",
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : "Could not create Smart Frames draft.";
@@ -2642,13 +2679,15 @@ const HyperFramesSmartView = ({
     setCreatingEditor(true);
     try {
       const editorFile =
-        result.cutUrl && result.cutFileName
-          ? await fileFromRemoteUrl(result.cutUrl, result.cutFileName)
-          : result.outputUrl && result.outputUrl !== sourceUrl
-            ? await fileFromRemoteUrl(result.outputUrl, result.outputFileName)
+        result.outputUrl && result.outputUrl !== sourceUrl
+          ? await fileFromRemoteUrl(result.outputUrl, result.outputFileName)
+          : result.cutUrl && result.cutFileName
+            ? await fileFromRemoteUrl(result.cutUrl, result.cutFileName)
             : sourceFile;
       const editorSourceUrl =
-        result.cutUrl || (result.outputUrl && result.outputUrl !== sourceUrl ? result.outputUrl : sourceUrl);
+        result.outputUrl && result.outputUrl !== sourceUrl
+          ? result.outputUrl
+          : result.cutUrl || sourceUrl;
       const editorMeta =
         result.renderedDuration && sourceMeta
           ? { ...sourceMeta, duration: result.renderedDuration }
@@ -2839,7 +2878,7 @@ const HyperFramesSmartView = ({
               </div>
 
               <div className="rounded-xl border border-cyan-300/15 bg-cyan-300/[0.045] p-3 text-[12px] leading-5 text-cyan-50/75">
-                Clean Cut uses local audio silence detection to remove dead air, preserves short speech handles, returns a real MP4, and creates an editable MediaForge project from the cut file.
+                Clean Cut sends the source video to the connected Smart Frames render worker, creates a HyperFrame-rendered MP4, and opens an editable MediaForge project.
               </div>
 
               {runStatus ? (
@@ -2934,6 +2973,11 @@ const HyperFramesSmartView = ({
                           <span className="rounded-lg bg-white/[0.06] px-2 py-1">
                             {result.renderedBy ? result.renderedBy : "Editable draft"}
                           </span>
+                          {result.plannerUsed ? (
+                            <span className="rounded-lg bg-cyan-300/10 px-2 py-1 text-cyan-100">
+                              {result.plannerUsed}
+                            </span>
+                          ) : null}
                           {result.changedByCut ? (
                             <span className="rounded-lg bg-[#eaff00]/15 px-2 py-1 text-[#eaff00]">
                               dead air cut
@@ -2953,7 +2997,7 @@ const HyperFramesSmartView = ({
                       </div>
                       {result.renderWarning ? (
                         <p className="mt-3 rounded-lg border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-[12px] leading-5 text-amber-50">
-                          HyperFrames warning: {result.renderWarning}
+                          Pipeline note: {result.renderWarning}
                         </p>
                       ) : null}
                       {result.editorProjectError ? (
@@ -3003,7 +3047,7 @@ const HyperFramesSmartView = ({
                   <div className="mt-5 text-center">
                     <h3 className="text-[18px] font-semibold text-white">Source ready</h3>
                     <p className="mt-2 text-[13px] leading-6 text-zinc-500">
-                    Run Clean Cut to remove dead air locally and open the cut video in MediaForge.
+                      Run Smart Frames to plan the cut, render with HyperFrame, and open the editable project.
                     </p>
                     {runError ? (
                       <p className="mx-auto mt-4 max-w-[560px] rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[12px] leading-5 text-red-100">
@@ -3023,7 +3067,7 @@ const HyperFramesSmartView = ({
                     Ready for Smart Frames
                   </h3>
                   <p className="mt-2 text-[13px] leading-6 text-zinc-500">
-                    Upload a source MP4 on the left. Clean Cut will remove dead air and create an editable MediaForge project.
+                    Upload a source MP4 on the left. Smart Frames will plan the clean cut, render with HyperFrame, and create an editable project.
                   </p>
                 </div>
               </div>

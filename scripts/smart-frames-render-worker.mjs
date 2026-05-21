@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "dotenv/config";
 import { createServer } from "node:http";
 import { createReadStream, createWriteStream, existsSync } from "node:fs";
 import { copyFile, mkdir, rm, stat, writeFile } from "node:fs/promises";
@@ -16,6 +17,9 @@ const MAX_UPLOAD_BYTES = 1024 * 1024 * 1024;
 const MAX_RENDER_DURATION_SECONDS = Number(process.env.SMART_FRAMES_MAX_DURATION_SECONDS || 600);
 const MAX_CONCURRENT_RENDERS = Math.max(1, Number(process.env.SMART_FRAMES_MAX_CONCURRENT_RENDERS || 1));
 const HYPERFRAMES_VERSION = process.env.HYPERFRAMES_VERSION || "0.6.21";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+const OPENAI_MODEL = process.env.SMART_FRAMES_OPENAI_MODEL || "gpt-5.5";
+const OPENAI_PLANNER_TIMEOUT_MS = Number(process.env.SMART_FRAMES_OPENAI_TIMEOUT_MS || 45_000);
 const SILENCE_NOISE_DB = Number(process.env.SMART_FRAMES_SILENCE_NOISE_DB || -35);
 const MIN_DEAD_AIR_SECONDS = Number(process.env.SMART_FRAMES_MIN_DEAD_AIR_SECONDS || 0.5);
 const SPEECH_HANDLE_SECONDS = Number(process.env.SMART_FRAMES_SPEECH_HANDLE_SECONDS || 0.1);
@@ -280,6 +284,242 @@ function makeCues(plan, presetLabel, duration) {
   });
 }
 
+function roundSeconds(value) {
+  return Number(Math.max(0, value).toFixed(3));
+}
+
+function publicSegments(segments) {
+  return segments.map((segment) => ({
+    start: roundSeconds(segment.start),
+    end: roundSeconds(segment.end),
+    duration: roundSeconds(segment.end - segment.start),
+  }));
+}
+
+function publicRanges(ranges) {
+  return ranges.map((range) => ({
+    start: roundSeconds(range.start),
+    end: roundSeconds(range.end),
+    duration: roundSeconds(range.end - range.start),
+  }));
+}
+
+function normalizePlannerSegments(rawSegments, duration, fallbackSegments) {
+  const source = Array.isArray(rawSegments) ? rawSegments : [];
+  const cleaned = source
+    .map((segment) => {
+      const start = Number(segment.start ?? segment.sourceStart ?? segment.in ?? segment.from);
+      const end = Number(segment.end ?? segment.sourceEnd ?? segment.out ?? segment.to);
+      if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+      return {
+        start: Math.max(0, Math.min(duration, start)),
+        end: Math.max(0, Math.min(duration, end)),
+      };
+    })
+    .filter(Boolean)
+    .filter((segment) => segment.end - segment.start >= 0.2)
+    .sort((a, b) => a.start - b.start)
+    .reduce((acc, segment) => {
+      const last = acc[acc.length - 1];
+      if (last && segment.start <= last.end + 0.05) {
+        last.end = Math.max(last.end, segment.end);
+      } else if (!last || segment.start >= last.end) {
+        acc.push({ ...segment });
+      }
+      return acc;
+    }, []);
+  return cleaned.length ? cleaned : fallbackSegments;
+}
+
+function buildFallbackEditPlan({
+  prompt,
+  presetId,
+  presetLabel,
+  inputInfo,
+  suggestedSegments,
+  silences,
+}) {
+  const originalDuration = inputInfo.duration || 0;
+  const keptDuration = suggestedSegments.reduce(
+    (sum, segment) => sum + Math.max(0, segment.end - segment.start),
+    0,
+  );
+  const removedDuration = Math.max(0, originalDuration - keptDuration);
+  return {
+    version: 1,
+    planner: "deterministic-analysis",
+    presetId,
+    presetLabel,
+    objective: prompt || "Remove dead air while preserving natural speech rhythm.",
+    strategy:
+      silences.length > 0
+        ? "Remove detected dead-air regions and keep short handles around speech."
+        : "No confident dead-air region detected; keep the full source timeline.",
+    source: {
+      duration: roundSeconds(originalDuration),
+      width: inputInfo.width,
+      height: inputInfo.height,
+      hasAudio: inputInfo.hasAudio,
+    },
+    timeline: {
+      segments: publicSegments(suggestedSegments),
+      silences: publicRanges(silences),
+      removedDuration: roundSeconds(removedDuration),
+    },
+    captions: [],
+    render: {
+      engine: "hyperframes",
+      overlays: false,
+      preserveAudio: true,
+    },
+  };
+}
+
+function extractOpenAIResponseText(data) {
+  if (typeof data?.output_text === "string") return data.output_text;
+  const chunks = [];
+  for (const item of data?.output || []) {
+    if (item?.type !== "message") continue;
+    for (const part of item?.content || []) {
+      if (part?.type === "output_text" && typeof part.text === "string") {
+        chunks.push(part.text);
+      }
+    }
+  }
+  return chunks.join("");
+}
+
+function parsePlannerJson(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return null;
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  const candidate = fenced?.[1]?.trim() || raw;
+  const firstBrace = candidate.indexOf("{");
+  const lastBrace = candidate.lastIndexOf("}");
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) return null;
+  return JSON.parse(candidate.slice(firstBrace, lastBrace + 1));
+}
+
+async function callOpenAIEditPlanner({ prompt, presetId, presetLabel, inputInfo, suggestedSegments, silences }) {
+  const fallbackPlan = buildFallbackEditPlan({
+    prompt,
+    presetId,
+    presetLabel,
+    inputInfo,
+    suggestedSegments,
+    silences,
+  });
+  if (!OPENAI_API_KEY) {
+    return {
+      plan: fallbackPlan,
+      plannerUsed: "deterministic-fallback",
+      plannerWarning: "OPENAI_API_KEY is not configured; used deterministic audio analysis.",
+    };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OPENAI_PLANNER_TIMEOUT_MS);
+  const analysis = {
+    presetId,
+    presetLabel,
+    objective: prompt,
+    video: {
+      duration: roundSeconds(inputInfo.duration),
+      width: inputInfo.width,
+      height: inputInfo.height,
+      hasAudio: inputInfo.hasAudio,
+    },
+    detectedSilences: publicRanges(silences),
+    suggestedKeepSegments: publicSegments(suggestedSegments),
+    rules: [
+      "Return only JSON.",
+      "For Clean Cut, only remove dead air from detected silence ranges.",
+      "Do not invent trims outside the suggested keep segments unless the suggestion is unsafe.",
+      "If no confident dead air exists, return one full-length keep segment.",
+      "Every segment must be sorted, non-overlapping, and within the source duration.",
+      "Do not add visual overlays for Clean Cut.",
+    ],
+  };
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        instructions:
+          "You are MediaForge Smart Frames edit planner. Return a compact JSON edit plan for a HyperFrame renderer. Keep the plan conservative and production-safe.",
+        input: [
+          {
+            role: "user",
+            content:
+              "Create an edit plan using this analyzed video metadata and silence map.\n\n" +
+              JSON.stringify(analysis, null, 2),
+          },
+        ],
+        reasoning: { effort: "low" },
+        text: { verbosity: "low" },
+        store: false,
+      }),
+    });
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      throw new Error(`OpenAI planner returned HTTP ${response.status}: ${errorText.slice(0, 220)}`);
+    }
+    const data = await response.json();
+    const parsed = parsePlannerJson(extractOpenAIResponseText(data));
+    if (!parsed || typeof parsed !== "object") {
+      throw new Error("OpenAI planner did not return a JSON object.");
+    }
+    const normalizedSegments = normalizePlannerSegments(
+      parsed?.timeline?.segments ?? parsed?.segments,
+      inputInfo.duration,
+      suggestedSegments,
+    );
+    return {
+      plan: {
+        ...fallbackPlan,
+        ...parsed,
+        version: 1,
+        planner: `openai:${OPENAI_MODEL}`,
+        presetId,
+        presetLabel,
+        source: fallbackPlan.source,
+        timeline: {
+          ...fallbackPlan.timeline,
+          ...(typeof parsed.timeline === "object" && parsed.timeline ? parsed.timeline : {}),
+          segments: publicSegments(normalizedSegments),
+          silences: publicRanges(silences),
+        },
+        render: {
+          ...fallbackPlan.render,
+          ...(typeof parsed.render === "object" && parsed.render ? parsed.render : {}),
+          engine: "hyperframes",
+          overlays: Boolean(parsed?.render?.overlays && presetId !== "cleancut"),
+          preserveAudio: true,
+        },
+      },
+      plannerUsed: `openai:${OPENAI_MODEL}`,
+      plannerWarning: null,
+    };
+  } catch (error) {
+    return {
+      plan: fallbackPlan,
+      plannerUsed: "deterministic-fallback",
+      plannerWarning:
+        error instanceof Error
+          ? `OpenAI planner failed; used deterministic audio analysis. ${error.message}`
+          : "OpenAI planner failed; used deterministic audio analysis.",
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, "&amp;")
@@ -288,12 +528,13 @@ function escapeHtml(value) {
     .replace(/"/g, "&quot;");
 }
 
-async function writeComposition({ jobDir, videoPath, cues, info, presetLabel }) {
+async function writeComposition({ jobDir, videoPath, cues, info, presetLabel, showOverlays }) {
   const width = info.width || 1080;
   const height = info.height || 1920;
   const duration = Math.max(1, info.duration || 12);
   const videoName = basename(videoPath);
-  const cueHtml = cues
+  const safeCues = showOverlays ? cues : [];
+  const cueHtml = safeCues
     .map(
       (cue, index) => `
         <div
@@ -396,17 +637,21 @@ async function writeComposition({ jobDir, videoPath, cues, info, presetLabel }) 
         data-duration="${duration}"
         data-track-index="0"
       ></video>
-      <div class="grade" data-start="0" data-duration="${duration}" data-track-index="1"></div>
-      <div class="badge" data-start="0" data-duration="${Math.min(2.4, duration)}" data-track-index="2">${escapeHtml(presetLabel)}</div>
+      ${
+        showOverlays
+          ? `<div class="grade" data-start="0" data-duration="${duration}" data-track-index="1"></div>
+      <div class="badge" data-start="0" data-duration="${Math.min(2.4, duration)}" data-track-index="2">${escapeHtml(presetLabel)}</div>`
+          : ""
+      }
       ${cueHtml}
     </div>
     <script>
       window.__timelines = window.__timelines || {};
       const tl = gsap.timeline({ paused: true });
-      ${cues
+      ${safeCues
         .map(
           (_, index) =>
-            `tl.fromTo("#caption-${index}", { opacity: 0, y: 24, scale: .98 }, { opacity: 1, y: 0, scale: 1, duration: .22 }, ${cues[index].startTime});`,
+            `tl.fromTo("#caption-${index}", { opacity: 0, y: 24, scale: .98 }, { opacity: 1, y: 0, scale: 1, duration: .22 }, ${safeCues[index].startTime});`,
         )
         .join("\n      ")}
       window.__timelines["main"] = tl;
@@ -473,57 +718,54 @@ async function renderJob({ file, plan, presetLabel, presetId }) {
     );
   }
   const silences = await detectSilences(inputPath, inputInfo.duration, inputInfo.hasAudio);
-  const keepSegments = buildKeepSegments(inputInfo.duration, silences);
+  const suggestedSegments = buildKeepSegments(inputInfo.duration, silences);
+  const plannerResult = await callOpenAIEditPlanner({
+    prompt: plan,
+    presetId,
+    presetLabel,
+    inputInfo,
+    suggestedSegments,
+    silences,
+  });
+  const keepSegments = normalizePlannerSegments(
+    plannerResult.plan?.timeline?.segments,
+    inputInfo.duration,
+    suggestedSegments,
+  );
   const cutPath = join(jobDir, "smart-cut.mp4");
   const changedByCut = await cutVideo(inputPath, cutPath, keepSegments, inputInfo);
   const cutInfo = await ffprobe(cutPath);
   const removedDuration = Math.max(0, inputInfo.duration - cutInfo.duration);
   const isCleanCut = presetId === "cleancut";
-  const outputName = `${safeName(file.name?.replace(/\.[^.]+$/, "") || "smart-frames")}-${isCleanCut ? "cleancut" : "hyperframes"}.mp4`;
+  const outputName = `${safeName(file.name?.replace(/\.[^.]+$/, "") || "smart-frames")}-${isCleanCut ? "cleancut-hyperframes" : "hyperframes"}.mp4`;
   const outputPath = join(jobDir, outputName);
 
-  if (isCleanCut) {
-    await copyFile(cutPath, outputPath);
-    const publicBase = `http://${HOST}:${PORT}/outputs/${jobId}`;
-    return {
-      jobId,
-      renderedBy: "ffmpeg-cleancut",
-      renderWarning: null,
-      changedByCut,
-      outputFileName: outputName,
-      outputUrl: `${publicBase}/${encodeURIComponent(outputName)}`,
-      cutFileName: outputName,
-      cutUrl: `${publicBase}/${encodeURIComponent(outputName)}`,
-      duration: cutInfo.duration,
-      originalDuration: inputInfo.duration,
-      removedDuration,
-      width: cutInfo.width,
-      height: cutInfo.height,
-      segments: keepSegments.map((segment) => ({
-        start: Number(segment.start.toFixed(3)),
-        end: Number(segment.end.toFixed(3)),
-        duration: Number((segment.end - segment.start).toFixed(3)),
-      })),
-      silences: silences.map((range) => ({
-        start: Number(range.start.toFixed(3)),
-        end: Number(range.end.toFixed(3)),
-        duration: Number((range.end - range.start).toFixed(3)),
-      })),
-      cues: [],
-    };
-  }
-
-  const cues = makeCues(plan, presetLabel, cutInfo.duration);
+  const plannerCaptions = Array.isArray(plannerResult.plan?.captions)
+    ? plannerResult.plan.captions
+        .map((caption) => ({
+          startTime: Number(caption.startTime ?? caption.start ?? 0),
+          duration: Number(caption.duration ?? Math.max(0, Number(caption.end ?? 0) - Number(caption.start ?? 0))),
+          text: String(caption.text ?? "").trim(),
+        }))
+        .filter((caption) => caption.text && caption.duration > 0)
+    : [];
+  const showOverlays = Boolean(plannerResult.plan?.render?.overlays && !isCleanCut);
+  const cues = showOverlays
+    ? plannerCaptions.length
+      ? plannerCaptions
+      : makeCues(JSON.stringify(plannerResult.plan, null, 2), presetLabel, cutInfo.duration)
+    : [];
   const compositionPath = await writeComposition({
     jobDir,
     videoPath: cutPath,
     cues,
     info: cutInfo,
     presetLabel,
+    showOverlays,
   });
   const renderOnlyPath = join(jobDir, "hyperframes-video.mp4");
   let renderedBy = "hyperframes";
-  let renderWarning = null;
+  let renderWarning = plannerResult.plannerWarning;
 
   try {
     await run(
@@ -547,10 +789,11 @@ async function renderJob({ file, plan, presetLabel, presetId }) {
     await muxAudio(renderOnlyPath, cutPath, outputPath, cutInfo.hasAudio);
   } catch (error) {
     renderedBy = "ffmpeg-fallback";
-    renderWarning =
+    const hyperFrameError =
       error instanceof Error
         ? error.message.split(/\r?\n/).slice(0, 3).join("\n")
         : "HyperFrames render failed.";
+    renderWarning = renderWarning ? `${renderWarning}\n${hyperFrameError}` : hyperFrameError;
     await copyFile(cutPath, outputPath);
   }
 
@@ -559,6 +802,9 @@ async function renderJob({ file, plan, presetLabel, presetId }) {
     jobId,
     renderedBy,
     renderWarning,
+    plannerUsed: plannerResult.plannerUsed,
+    editPlan: plannerResult.plan,
+    plan: JSON.stringify(plannerResult.plan, null, 2),
     changedByCut,
     outputFileName: outputName,
     outputUrl: `${publicBase}/${encodeURIComponent(outputName)}`,
@@ -569,11 +815,8 @@ async function renderJob({ file, plan, presetLabel, presetId }) {
     removedDuration,
     width: cutInfo.width,
     height: cutInfo.height,
-    segments: keepSegments.map((segment) => ({
-      start: Number(segment.start.toFixed(3)),
-      end: Number(segment.end.toFixed(3)),
-      duration: Number((segment.end - segment.start).toFixed(3)),
-    })),
+    segments: publicSegments(keepSegments),
+    silences: publicRanges(silences),
     cues,
   };
 }
@@ -718,6 +961,8 @@ const server = createServer(async (req, res) => {
         maxConcurrentRenders: MAX_CONCURRENT_RENDERS,
         maxUploadBytes: MAX_UPLOAD_BYTES,
         maxRenderDurationSeconds: MAX_RENDER_DURATION_SECONDS,
+        openAIPlannerConfigured: Boolean(OPENAI_API_KEY),
+        openAIPlannerModel: OPENAI_MODEL,
         silenceNoiseDb: SILENCE_NOISE_DB,
         minDeadAirSeconds: MIN_DEAD_AIR_SECONDS,
         speechHandleSeconds: SPEECH_HANDLE_SECONDS,
