@@ -13472,13 +13472,11 @@ async function createStorageSignedUrl(
   bucket: "ai-media" | "user_assets",
   path: string,
 ): Promise<string> {
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .createSignedUrl(path, SIGNED_URL_TTL_SEC);
-  if (error || !data?.signedUrl) {
-    throw new Error(`Could not create signed URL: ${error?.message ?? ""}`);
+  const signedUrl = await getSignedUrl(`${bucket}/${path.replace(/^\/+/, "")}`);
+  if (!/^https?:\/\//i.test(signedUrl)) {
+    throw new Error("Could not create signed URL: object not found");
   }
-  return data.signedUrl;
+  return signedUrl;
 }
 
 function isMissingProjectIdColumn(error: { code?: string; message?: string } | null | undefined): boolean {
