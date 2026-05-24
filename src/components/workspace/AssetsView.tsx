@@ -194,10 +194,8 @@ async function resolveAiMediaUrl(rawUrl: string): Promise<string | null> {
   if (isRemoteUrl(normalized)) return getSignedUrl(normalized);
 
   const signFromBucket = async (bucket: "ai-media" | "user_assets", path: string) => {
-    const { data } = await supabase.storage
-      .from(bucket)
-      .createSignedUrl(path.replace(/^\/+/, ""), 60 * 60 * 24);
-    return data?.signedUrl ?? null;
+    const signed = await getSignedUrl(`${bucket}/${path.replace(/^\/+/, "")}`);
+    return isRemoteUrl(signed) ? signed : null;
   };
 
   const aiMediaMatch = normalized.match(/^ai-media\/(.+)$/i);
@@ -481,7 +479,7 @@ export default function AssetsView({
           items.push(asset);
         };
 
-        const { data: userAssetRows, error: userAssetError } = await (supabase as any)
+        const { data: userAssetRows, error: userAssetError } = await supabase
           .from("user_assets")
           .select("*")
           .eq("user_id", user.id)
