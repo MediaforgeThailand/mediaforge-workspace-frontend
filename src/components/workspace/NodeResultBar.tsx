@@ -20,6 +20,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 
 export interface Generation {
   id: string;
+  job_id?: string;
   type: "image" | "video" | "text" | "audio";
   url?: string;
   text?: string;

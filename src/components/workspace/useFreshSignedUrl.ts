@@ -58,15 +58,20 @@ interface ParsedPath {
   path: string;
 }
 
+interface FreshSignedUrlContext {
+  jobId?: string | null;
+}
+
 /** Pulls bucket + path out of a Supabase Storage URL of either
  *  shape: `/storage/v1/object/sign/<bucket>/<path>?token=…` or
- *  `/storage/v1/object/public/<bucket>/<path>`. Returns null for
+ *  `/storage/v1/object/public/<bucket>/<path>`, including imgproxy
+ *  `/storage/v1/render/image/...` variants. Returns null for
  *  external / data / blob URLs. */
 function parseStorageUrl(url: string): ParsedPath | null {
   if (!url || typeof url !== "string") return null;
   // We only care about supabase.co storage URLs.
   const m = url.match(
-    /\/storage\/v1\/object\/(?:sign|public)\/([^/?#]+)\/([^?#]+)/,
+    /\/storage\/v1\/(?:object|render\/image)\/(?:sign|public|authenticated)\/([^/?#]+)\/([^?#]+)/,
   );
   if (!m) return null;
   return {
@@ -75,12 +80,35 @@ function parseStorageUrl(url: string): ParsedPath | null {
   };
 }
 
+function isClientSignablePath(parsed: ParsedPath, userId: string): boolean {
+  if (parsed.path.split("/").some((part) => part === "..")) return false;
+  if (parsed.bucket === "user_assets") {
+    return parsed.path.startsWith(`${userId}/`) || parsed.path.startsWith(`tts/${userId}/`);
+  }
+  if (parsed.bucket === "ai-media") {
+    return parsed.path.startsWith(`${userId}/`) || parsed.path.startsWith(`tripo3d-mirror/${userId}/`);
+  }
+  return false;
+}
+
+function isLegacyWorkspacePipelinePath(parsed: ParsedPath): boolean {
+  return (
+    parsed.bucket === "ai-media" &&
+    parsed.path.startsWith("pipeline/") &&
+    parsed.path.split("/").every((part) => part.length > 0 && part !== "..")
+  );
+}
+
 export function useFreshSignedUrl(
   input: string | null | undefined,
   transform?: FreshSignedUrlTransform,
+  context?: FreshSignedUrlContext,
 ): string | null {
   const { user } = useAuth();
   const userId = user?.id ?? null;
+  const jobId = typeof context?.jobId === "string" && context.jobId.length > 0
+    ? context.jobId
+    : null;
   const initial = typeof input === "string" && input.length > 0 ? input : null;
   const transformKey = useMemo(
     () => (transform ? JSON.stringify(transform) : ""),
@@ -103,13 +131,9 @@ export function useFreshSignedUrl(
     if (!parsed) return; // not a Supabase URL, leave the caller's URL alone
     if (!userId) return; // no JWT yet, so a private re-sign cannot succeed
 
-    const ownUserAsset =
-      parsed.bucket === "user_assets" &&
-      (parsed.path.startsWith(`${userId}/`) || parsed.path.startsWith(`tts/${userId}/`));
-    const ownAiMedia =
-      parsed.bucket === "ai-media" &&
-      (parsed.path.startsWith(`${userId}/`) || parsed.path.startsWith(`tripo3d-mirror/${userId}/`));
-    if ((parsed.bucket === "user_assets" && !ownUserAsset) || (parsed.bucket === "ai-media" && !ownAiMedia)) {
+    const canClientSign = isClientSignablePath(parsed, userId);
+    const canUseEdgeRefresh = canClientSign || isLegacyWorkspacePipelinePath(parsed);
+    if (!canUseEdgeRefresh) {
       return;
     }
 
@@ -134,6 +158,40 @@ export function useFreshSignedUrl(
     }
 
     let cancelled = false;
+    const refreshViaEdge = () => {
+      void supabase.functions
+        .invoke("workspace-run-node", {
+          body: {
+            action: "refresh_storage_url",
+            url: initial,
+            ...(jobId ? { job_id: jobId } : {}),
+          },
+        })
+        .then(({ data: refreshed, error: refreshError }) => {
+          if (cancelled) return;
+          const signedUrl =
+            typeof refreshed?.signed_url === "string"
+              ? refreshed.signed_url
+              : typeof refreshed?.url === "string"
+                ? refreshed.url
+                : null;
+          if (refreshError || !signedUrl) {
+            if (refreshError) console.warn("[useFreshSignedUrl:fallback]", refreshError);
+            NEGATIVE_CACHE.set(negKey, Date.now() + NEGATIVE_TTL_MS);
+            return;
+          }
+          CACHE.set(cacheKey, { url: signedUrl, signedAt: Date.now() });
+          setUrl(signedUrl);
+        });
+    };
+
+    if (!canClientSign) {
+      refreshViaEdge();
+      return () => {
+        cancelled = true;
+      };
+    }
+
     void supabase.storage
       .from(parsed.bucket)
       .createSignedUrl(
@@ -154,26 +212,7 @@ export function useFreshSignedUrl(
             NEGATIVE_CACHE.set(negKey, Date.now() + NEGATIVE_TTL_MS);
             return;
           }
-          void supabase.functions
-            .invoke("workspace-run-node", {
-              body: { action: "refresh_storage_url", url: initial },
-            })
-            .then(({ data: refreshed, error: refreshError }) => {
-              if (cancelled) return;
-              const signedUrl =
-                typeof refreshed?.signed_url === "string"
-                  ? refreshed.signed_url
-                  : typeof refreshed?.url === "string"
-                    ? refreshed.url
-                    : null;
-              if (refreshError || !signedUrl) {
-                if (refreshError) console.warn("[useFreshSignedUrl:fallback]", refreshError);
-                NEGATIVE_CACHE.set(negKey, Date.now() + NEGATIVE_TTL_MS);
-                return;
-              }
-              CACHE.set(cacheKey, { url: signedUrl, signedAt: Date.now() });
-              setUrl(signedUrl);
-            });
+          refreshViaEdge();
           return;
         }
         CACHE.set(cacheKey, { url: data.signedUrl, signedAt: Date.now() });
@@ -183,7 +222,7 @@ export function useFreshSignedUrl(
     return () => {
       cancelled = true;
     };
-  }, [initial, normalizedTransform, transformKey, userId]);
+  }, [initial, jobId, normalizedTransform, transformKey, userId]);
 
   return url;
 }
@@ -200,6 +239,6 @@ export function getCachedFreshUrl(input: string | null | undefined): string | nu
   const negKey = `${parsed.bucket}:${parsed.path}`;
   const negativeUntil = NEGATIVE_CACHE.get(negKey);
   if (negativeUntil !== undefined && negativeUntil > Date.now()) return null;
-  const cached = CACHE.get(negKey);
+  const cached = CACHE.get(`${negKey}:`);
   return cached?.url ?? input;
 }

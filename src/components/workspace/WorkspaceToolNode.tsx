@@ -3382,14 +3382,25 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       ? currentGen.url
       : null,
     imagePreviewTransform,
+    { jobId: currentGen?.job_id ?? null },
   );
 
+  const [previewImageFailed, setPreviewImageFailed] = useState(false);
   const [imgDims, setImgDims] = useState<{ w: number; h: number } | null>(null);
   // Reset measured dims when the displayed media swaps so the badge
   // reflects the new generation, not the previous one.
   useEffect(() => {
     setImgDims(null);
-  }, [currentGen?.url]);
+    setPreviewImageFailed(false);
+  }, [currentGen?.id, currentGen?.url, currentGen?.model_url, previewImageUrl]);
+
+  const showBrokenImagePlaceholder =
+    previewImageFailed &&
+    Boolean(
+      currentGen &&
+        currentGen.url &&
+        (currentGen.type === "image" || currentGen.model_url),
+    );
 
   const previewBadge = useMemo(() => {
     if (!currentGen) return null;
@@ -3786,13 +3797,17 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
            *  the thumbnail. */}
           {currentGen?.model_url ? (
             <div className="relative h-full w-full">
-              {currentGen.url ? (
+              {currentGen.url && !previewImageFailed ? (
                 <img
                   src={previewImageUrl ?? currentGen.url}
                   alt={t("workspace.toolNode.modelPreviewAlt")}
                   draggable={false}
                   loading="lazy"
                   decoding="async"
+                  onError={() => {
+                    setImgDims(null);
+                    setPreviewImageFailed(true);
+                  }}
                   style={{
                     width: "100%",
                     aspectRatio: "1 / 1",
@@ -3818,7 +3833,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                 {t("workspace.toolNode.open3dPreviewHint")}
               </span>
             </div>
-          ) : currentGen?.type === "image" && currentGen.url && (
+          ) : currentGen?.type === "image" && currentGen.url && !previewImageFailed && (
             <img
               src={previewImageUrl ?? currentGen.url}
               alt=""
@@ -3828,6 +3843,10 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               onLoad={(e) => {
                 const img = e.target as HTMLImageElement;
                 setImgDims({ w: img.naturalWidth, h: img.naturalHeight });
+              }}
+              onError={() => {
+                setImgDims(null);
+                setPreviewImageFailed(true);
               }}
               style={{
                 // Blur the prior image during a re-run so the running
@@ -3897,7 +3916,9 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               </div>
             </div>
           )}
-          {!hasRenderableContent && <div className="ws-compact-preview-empty" />}
+          {(!hasRenderableContent || showBrokenImagePlaceholder) && (
+            <div className="ws-compact-preview-empty" />
+          )}
 
           {/* Top-right info badge */}
           {previewBadge && (
