@@ -3409,6 +3409,8 @@ export const es = {
   "workspace.tools.sticky_note": "nota adhesiva",
   "workspace.tools.undo": "Deshacer",
   "workspace.tools.redo": "Rehacer",
+  "workspace.tools.light_background": "Fondo claro",
+  "workspace.tools.dark_background": "Fondo oscuro",
   "workspace.tools.settings_shortcuts": "Configuraciones y atajos",
 
   // ─── Node atoms (sticky / text / asset / group) ────────────────
@@ -4463,6 +4465,7 @@ export const es = {
     "Razona sobre prompts, briefs y contexto conectado.",
   "workspace.picker.section.basics": "BÁSICOS",
   "workspace.picker.section.media": "MEDIA",
+  "workspace.picker.section.vfx": "VFX",
   "workspace.picker.section.video": "VIDEO",
   "workspace.picker.section.threed": "3D",
   "workspace.picker.section.tools": "HERRAMIENTAS",

@@ -23,7 +23,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import {
   ChevronLeft, ChevronRight, Film, Loader2, Pause, Play, RotateCw, Sparkles, Scissors, Combine, FileVideo, Languages,
-  Maximize2, Box, Image as ImageIcon, Music, Info,
+  Maximize2, Box, Image as ImageIcon, Music, Info, Users, SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
 import { CLEAN_NODE_BODY_TOP_PX, PortIcon } from "./PortIcon";
@@ -124,8 +124,10 @@ import {
 } from "./workspaceSchema";
 import { cleanModelLabelMap } from "./modelDisplay";
 import {
+  captureVideoFrameAtSecondsBlob,
   extractAndUploadVideoFrames,
   safeStorageSegment,
+  uploadExtractedFrame,
 } from "./videoFrameExtraction";
 
 const RUN_EDGE_FUNCTION = "workspace-run-node";
@@ -638,7 +640,7 @@ function nodeCanProvideImageMentionRef(
   if (sourceHandle && portTypeFromHandleId(sourceHandle) !== "image") return false;
   const generation = selectedNodeGeneration(data);
   if (generation) return generation.type === "image" && typeof generation.url === "string";
-  return ["imageGenNode", "upscaleImageNode", "removeBackgroundNode", "bananaProNode"].includes(node.type ?? "");
+  return ["imageGenNode", "upscaleImageNode", "removeBackgroundNode", "bananaProNode", "vfxQwenImageNode"].includes(node.type ?? "");
 }
 
 function nodeCanProvideVideoMentionRef(
@@ -1172,11 +1174,400 @@ const ICONS: Record<string, LucideIcon> = {
   mergeAudioNode: Combine,
   videoToPromptNode: FileVideo,
   imageTo3dNode: Box,
+  vfxStartFrameNode: ImageIcon,
+  vfxBackgroundNode: Film,
+  vfxDepthNode: Box,
+  vfxCannyNode: Scissors,
+  vfxPoseNode: Users,
+  vfxTrackNode: Maximize2,
+  vfxMaskNode: Scissors,
+  vfxQwenImageNode: Sparkles,
+  vfxVariableNode: SlidersHorizontal,
 };
+
+const VFX_PREPROCESS_NODE_TYPES = new Set([
+  "vfxVariableNode",
+  "vfxStartFrameNode",
+  "vfxBackgroundNode",
+  "vfxDepthNode",
+  "vfxCannyNode",
+  "vfxPoseNode",
+  "vfxTrackNode",
+  "vfxMaskNode",
+]);
+
+function firstStringInput(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = firstStringInput(item);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function requiredInput(
+  inputs: Record<string, unknown>,
+  keys: string[],
+  message: string,
+): string {
+  for (const key of keys) {
+    const value = firstStringInput(inputs[key]);
+    if (value) return value;
+  }
+  throw new Error(message);
+}
+
+function secondsForFrame(params: Record<string, unknown>): number {
+  const frameIndex = Math.max(0, Number(params.frame_index ?? 0));
+  const fps = Math.max(1, Number(params.force_rate || params.fps || 24));
+  if (!Number.isFinite(frameIndex) || !Number.isFinite(fps)) return 0;
+  return frameIndex / fps;
+}
+
+async function uploadVfxFrameFromVideo(args: {
+  sourceUrl: string;
+  seconds: number;
+  userId: string;
+  nodeId: string;
+  label: string;
+}): Promise<string> {
+  const blob = await captureVideoFrameAtSecondsBlob(args.sourceUrl, args.seconds);
+  const path = [
+    args.userId,
+    "vfx-preprocess",
+    safeStorageSegment(args.nodeId),
+    `${safeStorageSegment(args.label)}-${Date.now()}.jpg`,
+  ].join("/");
+  return uploadExtractedFrame(blob, path);
+}
+
+async function prepareLocalVfxGeneration(args: {
+  schemaKey: string;
+  inputs: Record<string, unknown>;
+  params: Record<string, unknown>;
+  userId: string;
+  nodeId: string;
+}): Promise<Record<string, unknown>> {
+  const genBase = {
+    id: NEW_ID(),
+    createdAt: Date.now(),
+    prompt_used: "VFX local preprocess",
+    prompt_source: "local_preprocess",
+  };
+
+  if (args.schemaKey === "vfxVariableNode") {
+    const videoUrl = requiredInput(
+      args.inputs,
+      ["input_video", "video", "ref_video"],
+      "Connect a source video into VFX Variables before preparing this stage.",
+    );
+    return {
+      ...genBase,
+      type: "video",
+      url: videoUrl,
+      label: "Source video",
+    };
+  }
+
+  if (args.schemaKey === "vfxStartFrameNode") {
+    const videoUrl = requiredInput(
+      args.inputs,
+      ["input_video", "video", "ref_video"],
+      "Connect the source video before extracting a start frame.",
+    );
+    const url = await uploadVfxFrameFromVideo({
+      sourceUrl: videoUrl,
+      seconds: secondsForFrame(args.params),
+      userId: args.userId,
+      nodeId: args.nodeId,
+      label: "start-frame",
+    });
+    return {
+      ...genBase,
+      type: "image",
+      url,
+      label: "Start frame",
+    };
+  }
+
+  if (args.schemaKey === "vfxMaskNode") {
+    const maskImage = firstStringInput(args.inputs.mask_image);
+    if (maskImage) {
+      return {
+        ...genBase,
+        type: "image",
+        url: maskImage,
+        label: "Provided mask image",
+      };
+    }
+    const maskVideo = firstStringInput(args.inputs.mask_video);
+    if (maskVideo) {
+      const url = await uploadVfxFrameFromVideo({
+        sourceUrl: maskVideo,
+        seconds: secondsForFrame(args.params),
+        userId: args.userId,
+        nodeId: args.nodeId,
+        label: "mask-frame",
+      });
+      return {
+        ...genBase,
+        type: "image",
+        url,
+        label: "Mask frame",
+      };
+    }
+    throw new Error(
+      "Connect a prepared black/white mask image or mask video to VFX Mask. SAM/Depth/Canny GPU preprocessing is not wired to the workspace runtime yet.",
+    );
+  }
+
+  if (args.schemaKey === "vfxBackgroundNode") {
+    const imageUrl = firstStringInput(args.inputs.start_image);
+    if (imageUrl) {
+      return {
+        ...genBase,
+        type: "image",
+        url: imageUrl,
+        label: "Background reference",
+      };
+    }
+    throw new Error(
+      "Background pass needs a start image or a dedicated GPU preprocess service before it can output a plate.",
+    );
+  }
+
+  throw new Error(
+    "This VFX control pass is configured in the canvas, but its GPU preprocess executor is not connected yet.",
+  );
+}
+
+type VfxCardTone = "source" | "matte" | "control" | "generate" | "review";
+
+interface VfxCardMeta {
+  stage: string;
+  stageLabel: string;
+  title: string;
+  summary: string;
+  artifactLabel: string;
+  tone: VfxCardTone;
+  primaryParamKeys: string[];
+}
+
+function getVfxCardMeta(
+  schemaKey: string,
+  params: Record<string, unknown>,
+  fallbackTitle: string,
+): VfxCardMeta | null {
+  if (!schemaKey.startsWith("vfx")) return null;
+
+  if (schemaKey === "vfxVariableNode") {
+    return {
+      stage: "01",
+      stageLabel: "Setup",
+      title: "VFX Variables",
+      summary: "Project-wide size, fps, model pack, and frame sampling.",
+      artifactLabel: "Shared settings",
+      tone: "source",
+      primaryParamKeys: ["resolution", "aspect_ratio", "fps"],
+    };
+  }
+
+  if (schemaKey === "vfxStartFrameNode") {
+    return {
+      stage: "02",
+      stageLabel: "Source",
+      title: fallbackTitle || "Start Frame",
+      summary: "Choose the exact frame that anchors the rest of the VFX pipeline.",
+      artifactLabel: "Start image",
+      tone: "source",
+      primaryParamKeys: ["frame_index", "frame_load_cap"],
+    };
+  }
+
+  if (schemaKey === "vfxMaskNode") {
+    return {
+      stage: "03",
+      stageLabel: "Matte",
+      title: fallbackTitle || "Subject Mask",
+      summary: "Build the protected subject matte that decides what must stay untouched.",
+      artifactLabel: "Mask plate",
+      tone: "matte",
+      primaryParamKeys: ["segment_prompt", "confidence_threshold", "mask_expand", "mask_blur", "plate_mask_expand"],
+    };
+  }
+
+  if (schemaKey === "vfxTrackNode") {
+    return {
+      stage: "04",
+      stageLabel: "Track",
+      title: fallbackTitle || "Camera Track",
+      summary: "Extract motion and anchor points for camera continuity.",
+      artifactLabel: "Tracking pass",
+      tone: "matte",
+      primaryParamKeys: ["points", "track_step", "confidence_threshold", "track_length", "mask_expand"],
+    };
+  }
+
+  if (schemaKey === "vfxBackgroundNode") {
+    return {
+      stage: "05",
+      stageLabel: "Background",
+      title: fallbackTitle || "Background Pass",
+      summary: "Generate or prepare a clean background/control plate.",
+      artifactLabel: "Background plate",
+      tone: "control",
+      primaryParamKeys: ["background_mode", "width", "height"],
+    };
+  }
+
+  if (schemaKey === "vfxDepthNode") {
+    return {
+      stage: "06",
+      stageLabel: "Depth",
+      title: fallbackTitle || "Depth Map",
+      summary: "Estimate scene depth so later generation respects foreground and space.",
+      artifactLabel: "Depth map",
+      tone: "control",
+      primaryParamKeys: ["num_inference_steps", "guidance_scale", "window_size", "overlap"],
+    };
+  }
+
+  if (schemaKey === "vfxCannyNode") {
+    return {
+      stage: "07",
+      stageLabel: "Edges",
+      title: fallbackTitle || "Canny",
+      summary: "Capture hard structure lines for layout and object boundaries.",
+      artifactLabel: "Edge pass",
+      tone: "control",
+      primaryParamKeys: ["low_threshold", "high_threshold"],
+    };
+  }
+
+  if (schemaKey === "vfxPoseNode") {
+    return {
+      stage: "08",
+      stageLabel: "Pose",
+      title: fallbackTitle || "Pose",
+      summary: "Extract body, hand, and face guides when character continuity matters.",
+      artifactLabel: "Pose guide",
+      tone: "control",
+      primaryParamKeys: ["detect_body", "detect_hand", "detect_face", "pose_resolution"],
+    };
+  }
+
+  if (schemaKey === "vfxQwenImageNode") {
+    const preset = String(params.workflow_preset ?? "");
+    if (preset === "masked_edit") {
+      return {
+        stage: "10",
+        stageLabel: "Edit",
+        title: fallbackTitle || "Masked Edit",
+        summary: "Change only the masked area while protecting the original plate.",
+        artifactLabel: "Edited frame",
+        tone: "generate",
+        primaryParamKeys: ["workflow_preset", "model_name", "protect_original", "mask_expand", "mask_feather", "steps"],
+      };
+    }
+    if (preset === "plate_generate") {
+      return {
+        stage: "09",
+        stageLabel: "Plate",
+        title: fallbackTitle || "Plate Generator",
+      summary: "Create a clean environment plate before the masked edit step.",
+      artifactLabel: "Plate image",
+      tone: "generate",
+      primaryParamKeys: ["model_name", "aspect_ratio", "steps"],
+      };
+    }
+    return {
+      stage: "09",
+      stageLabel: "Start Image",
+      title: fallbackTitle || "Qwen Start Image",
+      summary: "Generate the hero start frame used as the visual reference.",
+      artifactLabel: "Reference frame",
+      tone: "generate",
+      primaryParamKeys: ["model_name", "lightning_lora", "steps"],
+    };
+  }
+
+  return {
+    stage: "00",
+    stageLabel: "VFX",
+    title: fallbackTitle || "VFX Node",
+    summary: "Pipeline stage",
+    artifactLabel: "Output",
+    tone: "review",
+    primaryParamKeys: [],
+  };
+}
+
+function getVfxPortIds(
+  schemaKey: string,
+  params: Record<string, unknown>,
+  direction: "input" | "output",
+): Set<string> {
+  if (schemaKey === "vfxVariableNode") {
+    return new Set(direction === "input" ? ["input_video"] : ["input_video"]);
+  }
+  if (schemaKey === "vfxStartFrameNode") {
+    return new Set(direction === "input" ? ["input_video"] : ["start_image"]);
+  }
+  if (schemaKey === "vfxBackgroundNode") {
+    return new Set(direction === "input" ? ["input_video", "start_image"] : ["background_image"]);
+  }
+  if (schemaKey === "vfxDepthNode") {
+    return new Set(direction === "input" ? ["input_video"] : ["depth_video"]);
+  }
+  if (schemaKey === "vfxCannyNode") {
+    return new Set(direction === "input" ? ["input_video"] : ["canny_video"]);
+  }
+  if (schemaKey === "vfxPoseNode") {
+    return new Set(direction === "input" ? ["input_video"] : ["pose_video"]);
+  }
+  if (schemaKey === "vfxTrackNode") {
+    return new Set(direction === "input" ? ["input_video", "mask_image", "mask_video"] : ["track_video"]);
+  }
+  if (schemaKey === "vfxMaskNode") {
+    return new Set(
+      direction === "input"
+        ? ["input_video", "start_image", "mask_image", "mask_video"]
+        : ["mask_image"],
+    );
+  }
+  if (schemaKey === "vfxQwenImageNode") {
+    const preset = String(params.workflow_preset ?? "");
+    if (preset === "plate_generate") {
+      return new Set(direction === "input" ? ["text"] : ["image"]);
+    }
+    if (preset === "masked_edit") {
+      return new Set(direction === "input" ? ["text", "ref_image", "mask_image"] : ["image"]);
+    }
+    return new Set(direction === "input" ? ["text", "ref_image"] : ["image"]);
+  }
+  return new Set<string>();
+}
+
+function formatVfxParamValue(param: ParamDef, value: unknown): string {
+  const raw = value ?? param.default;
+  if (typeof raw === "string") {
+    return param.optionLabels?.[raw] ?? raw.replace(/_/g, " ");
+  }
+  if (typeof raw === "number") {
+    return Number.isInteger(raw) ? String(raw) : raw.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+  }
+  if (typeof raw === "boolean") return raw ? "On" : "Off";
+  return String(raw ?? "");
+}
 
 const DURATION_COST_MODELS = new Set(["kling-v3-pro", "kling-v3-omni"]);
 const WORKSPACE_NODE_UI_SCALE = 1.15;
 const DEFAULT_COMPACT_WIDTH = 437;
+const DEFAULT_VFX_COMPACT_WIDTH = 250;
+const MIN_VFX_COMPACT_WIDTH = 220;
+const MAX_VFX_COMPACT_WIDTH = 250;
 
 const PORT_LABEL_KEYS = {
   ref_audio: "workspace.port.ref_audio",
@@ -1263,6 +1654,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const previewRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [promptMaxH, setPromptMaxH] = useState<number | null>(null);
+  const [showAdvancedParams, setShowAdvancedParams] = useState(false);
   const patchNodeDataNow = useCallback(
     (
       patch: Record<string, unknown>,
@@ -1466,6 +1858,9 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     schemaKey === "upscaleImageNode" && rawSelectedModel !== "gpt-image-2-enhance"
       ? "gpt-image-2-enhance"
       : rawSelectedModel;
+  useEffect(() => {
+    setShowAdvancedParams(false);
+  }, [schemaKey, selectedModel]);
   useEffect(() => {
     if (schemaKey !== "upscaleImageNode") return;
     if (params.model_name === "gpt-image-2-enhance") return;
@@ -1711,6 +2106,34 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
     try {
       const { inputs, textMentioned } = resolveInputs(id);
+      if (VFX_PREPROCESS_NODE_TYPES.has(schemaKey)) {
+        const gen = await prepareLocalVfxGeneration({
+          schemaKey,
+          inputs,
+          params,
+          userId: user.id,
+          nodeId: id,
+        });
+
+        storeState.addGeneration(id, gen);
+        patchNodeDataNow(
+          {
+            status: "done",
+            runStartedAt: null,
+            activeRunId: null,
+            lastRunError: null,
+          },
+          { activeRunId: runId },
+        );
+        log({
+          level: "success",
+          nodeId: id,
+          title: `Prepared VFX stage · ${nodeLabelForLog}`,
+          payload: { inputs, generation: gen },
+        });
+        toast.success(`Prepared ${nodeLabelForLog}`);
+        return;
+      }
 
       // The schema's `text` input port semantically IS the prompt — a
       // wired Text node should populate `params.prompt` directly so
@@ -2373,10 +2796,15 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         const isVeo = pollProvider === "veo";
         const isReplicateVeo = pollProvider === "replicate_veo";
         const isReplicateVideo = pollProvider === "replicate_video";
+        const isRunpodQwen = pollProvider === "runpod_qwen";
         const isFreepikVideo = pollProvider === "freepik_veo" || pollProvider === "freepik_seedance";
         const isElevenLabsDubbing = pollProvider === "elevenlabs_dubbing";
         const POLL_INTERVAL_MS = isTripo3d ? 4_000 : 5_000;
-        const POLL_TIMEOUT_MS = isElevenLabsDubbing ? 30 * 60_000 : isTripo3d ? 8 * 60_000 : 6 * 60_000;
+        const POLL_TIMEOUT_MS = isElevenLabsDubbing
+          ? 30 * 60_000
+          : isRunpodQwen
+            ? 20 * 60_000
+            : isTripo3d ? 8 * 60_000 : 6 * 60_000;
         const pollAction = isTripo3d
           ? "poll_tripo3d"
           : isSeedance
@@ -2387,6 +2815,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                 ? "poll_replicate_veo"
                 : isReplicateVideo
                   ? "poll_replicate_video"
+                  : isRunpodQwen
+                    ? "poll_runpod_qwen"
                   : isFreepikVideo
                     ? "poll_freepik_video"
                     : isElevenLabsDubbing
@@ -2402,6 +2832,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                 ? "Replicate Veo"
                 : isReplicateVideo
                   ? "Replicate Video"
+                : isRunpodQwen
+                  ? "Runpod Qwen"
                 : isFreepikVideo
                   ? pollProvider === "freepik_seedance" ? "Freepik Seedance" : "Freepik Veo"
                   : isElevenLabsDubbing
@@ -3366,7 +3798,10 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         Math.min(
           1600,
           Math.ceil(
-            ((d.compactWidth ?? DEFAULT_COMPACT_WIDTH) as number) *
+            ((d.compactWidth ??
+              (schemaKey.startsWith("vfx")
+                ? DEFAULT_VFX_COMPACT_WIDTH
+                : DEFAULT_COMPACT_WIDTH)) as number) *
               WORKSPACE_NODE_UI_SCALE *
               2,
           ),
@@ -3375,7 +3810,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       quality: 82,
       resize: "contain" as const,
     }),
-    [d.compactWidth],
+    [d.compactWidth, schemaKey],
   );
   const previewImageUrl = useFreshSignedUrl(
     currentGen?.url && (currentGen.type === "image" || currentGen.model_url)
@@ -3424,7 +3859,6 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       if (p.key === "prompt") return false;
       // negative_prompt is a long textarea — would explode the toolbar.
       // Reserved for an "advanced" popover later; hidden in toolbar.
-      if (p.key === "negative_prompt") return false;
       if (p.key === "multi_prompt") return false;
       if (p.visibleWhen) {
         const hidden = Object.entries(p.visibleWhen).some(
@@ -3434,7 +3868,25 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       }
       // In multi-shot mode, duration is dictated by the scene sum.
       if (isMultiShot && p.key === "duration") return false;
+      const group = String(p.group ?? "").toLowerCase();
+      if (group.includes("advanced") || p.key === "negative_prompt") return false;
       return true;
+    });
+  }, [visibleParams, params, isMultiShot]);
+
+  const advancedToolbarParams = useMemo(() => {
+    return visibleParams.filter((p) => {
+      if (p.key === "prompt") return false;
+      if (p.key === "multi_prompt") return false;
+      if (p.visibleWhen) {
+        const hidden = Object.entries(p.visibleWhen).some(
+          ([k, v]) => String(params[k] ?? "") !== v,
+        );
+        if (hidden) return false;
+      }
+      if (isMultiShot && p.key === "duration") return false;
+      const group = String(p.group ?? "").toLowerCase();
+      return group.includes("advanced") || p.key === "negative_prompt";
     });
   }, [visibleParams, params, isMultiShot]);
 
@@ -3622,6 +4074,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     [schema],
   );
   const isUrlAssetNode = schemaKey === "urlAssetNode";
+  const isVfxNode = schemaKey.startsWith("vfx");
+  const isVfxControlNode = isVfxNode && schemaKey !== "vfxQwenImageNode";
 
   // The Tripo3D rendered_image is a small square thumbnail — letting
   // it drive the preview's height collapses the node to a tiny
@@ -3646,12 +4100,17 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       e.preventDefault();
       e.stopPropagation();
       const startX = e.clientX;
-      const startWidth = (d.compactWidth as number | undefined) ?? DEFAULT_COMPACT_WIDTH;
+      const defaultWidth = isVfxNode
+        ? DEFAULT_VFX_COMPACT_WIDTH
+        : DEFAULT_COMPACT_WIDTH;
+      const minWidth = isVfxNode ? MIN_VFX_COMPACT_WIDTH : 320;
+      const maxWidth = isVfxNode ? MAX_VFX_COMPACT_WIDTH : 1200;
+      const startWidth = (d.compactWidth as number | undefined) ?? defaultWidth;
       const onMove = (ev: PointerEvent) => {
         const delta = (ev.clientX - startX) / WORKSPACE_NODE_UI_SCALE;
         const next = Math.max(
-          320,
-          Math.min(1200, Math.round(startWidth + delta)),
+          minWidth,
+          Math.min(maxWidth, Math.round(startWidth + delta)),
         );
         setNodes((ns) =>
           ns.map((n) =>
@@ -3670,7 +4129,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       window.addEventListener("pointerup", onUp);
       document.body.classList.add("ws-resizing");
     },
-    [id, d.compactWidth, setNodes],
+    [id, d.compactWidth, isVfxNode, setNodes],
   );
   const onSelectHistoryIndex = useCallback(
     (i: number) => updateNodeField("selectedGenIndex", i),
@@ -3685,12 +4144,358 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   const multiShotScenes: SceneBlock[] = Array.isArray(params.multi_prompt)
     ? (params.multi_prompt as SceneBlock[])
     : [];
+  const vfxMeta = useMemo(
+    () =>
+      getVfxCardMeta(
+        schemaKey,
+        params,
+        String((d.params?.nodeName as string | undefined) ?? schema?.displayName ?? ""),
+      ),
+    [d.params?.nodeName, params, schema?.displayName, schemaKey],
+  );
+  const vfxPrimaryParams = useMemo(() => {
+    if (!vfxMeta) return [];
+    const primaryKeys = new Set(vfxMeta.primaryParamKeys);
+    return visibleParams.filter((param) => {
+      if (param.key === "prompt" || param.key === "multi_prompt") return false;
+      if (param.visibleWhen) {
+        const hidden = Object.entries(param.visibleWhen).some(
+          ([key, value]) => String(params[key] ?? "") !== value,
+        );
+        if (hidden) return false;
+      }
+      return primaryKeys.has(param.key);
+    });
+  }, [params, vfxMeta, visibleParams]);
+  const vfxAdvancedParams = useMemo(() => {
+    if (!vfxMeta) return [];
+    const primaryKeys = new Set(vfxMeta.primaryParamKeys);
+    return visibleParams.filter((param) => {
+      if (param.key === "prompt" || param.key === "multi_prompt") return false;
+      if (primaryKeys.has(param.key)) return false;
+      if (param.visibleWhen) {
+        const hidden = Object.entries(param.visibleWhen).some(
+          ([key, value]) => String(params[key] ?? "") !== value,
+        );
+        if (hidden) return false;
+      }
+      return true;
+    });
+  }, [params, vfxMeta, visibleParams]);
+  const vfxPromptParam = useMemo(
+    () => visibleParams.find((param) => param.key === "prompt") ?? null,
+    [visibleParams],
+  );
+  const vfxVisibleInputs = useMemo(() => {
+    if (!vfxMeta) return visibleInputs;
+    const ids = getVfxPortIds(schemaKey, params, "input");
+    return visibleInputs.filter((input) => ids.has(input.id));
+  }, [params, schemaKey, vfxMeta, visibleInputs]);
+  const vfxVisibleOutputs = useMemo(() => {
+    if (!vfxMeta) return visibleOutputs;
+    const ids = getVfxPortIds(schemaKey, params, "output");
+    return visibleOutputs.filter((output) => ids.has(output.id));
+  }, [params, schemaKey, vfxMeta, visibleOutputs]);
 
   if (!schema) {
     return (
       <div className="rounded-md border border-red-500 bg-red-950 px-3 py-2 text-xs text-red-200">
         {t("workspace.toolNode.unknownNodeType", { nodeType: schemaKey })}
       </div>
+    );
+  }
+
+  if (isVfxNode && vfxMeta) {
+    const vfxStatusLabel = isRunning
+      ? "Running"
+      : runStatus === "error"
+        ? "Review"
+        : runStatus === "done"
+          ? "Ready"
+          : VFX_PREPROCESS_NODE_TYPES.has(schemaKey)
+            ? "Setup"
+            : "Ready";
+
+    return (
+      <>
+        <div
+          className={cn("ws-vfx-node nodrag-shell", `is-${vfxMeta.tone}`)}
+          data-state={selected ? "selected" : "idle"}
+          data-status={runStatus}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          style={{
+            width:
+              Math.min(
+                (d.compactWidth as number | undefined) ?? DEFAULT_VFX_COMPACT_WIDTH,
+                MAX_VFX_COMPACT_WIDTH,
+              ) *
+              WORKSPACE_NODE_UI_SCALE,
+          }}
+          title={vfxMeta.summary}
+        >
+          <NodeQuickActionRail
+            visible={selected || isHovered}
+            selected={selected}
+            onDelete={!isViewer ? onDeleteNode : undefined}
+            nodeId={id}
+            mediaKind={
+              currentGen?.type === "image" || currentGen?.type === "video" || currentGen?.type === "audio"
+                ? currentGen.type
+                : null
+            }
+            mediaUrl={
+              currentGen?.type === "image"
+                ? (previewImageUrl ?? currentGen.url ?? null)
+                : currentGen?.type === "video"
+                  ? (currentGen.url ?? null)
+                  : currentGen?.type === "audio"
+                    ? (currentGen.url ?? null)
+                    : currentGen?.model_url
+                      ? (previewImageUrl ?? currentGen.url ?? null)
+                      : null
+            }
+            mediaFileName={schema.displayName}
+            mediaCreatedAt={currentGen?.createdAt ?? null}
+            bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
+          />
+
+          <div className="ws-vfx-card workspace-node-shell">
+            <div className="ws-vfx-header">
+              <div className="ws-vfx-stage-mark">
+                <span>{vfxMeta.stage}</span>
+              </div>
+              <div className="ws-vfx-title-block">
+                <div className="ws-vfx-kicker">
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{vfxMeta.stageLabel}</span>
+                </div>
+                <input
+                  value={(d.params?.nodeName as string) ?? vfxMeta.title}
+                  onChange={(e) =>
+                    updateNodeField("params", { ...params, nodeName: e.target.value })
+                  }
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="ws-vfx-title-input nodrag"
+                  placeholder={vfxMeta.title}
+                />
+              </div>
+              <Tooltip delayDuration={150}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="ws-vfx-info-button nodrag"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    aria-label="Stage info"
+                  >
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top"
+                  className="max-w-[260px] border-white/10 bg-[#151515] text-xs leading-5 text-zinc-100 shadow-2xl shadow-black/40"
+                >
+                  {vfxMeta.summary}
+                </TooltipContent>
+              </Tooltip>
+              <span className="ws-vfx-status-pill" data-status={runStatus}>
+                {vfxStatusLabel}
+              </span>
+            </div>
+
+            <div className="ws-vfx-tabs" aria-hidden="true">
+              <span className="is-active">Edit</span>
+              <span>Results</span>
+            </div>
+
+            <div className="ws-vfx-preview">
+              {currentGen?.type === "image" && currentGen.url && !previewImageFailed ? (
+                <img
+                  src={previewImageUrl ?? currentGen.url}
+                  alt=""
+                  draggable={false}
+                  loading="lazy"
+                  decoding="async"
+                  onError={() => {
+                    setImgDims(null);
+                    setPreviewImageFailed(true);
+                  }}
+                />
+              ) : currentGen?.type === "video" && currentGen.url ? (
+                <video
+                  src={currentGen.url}
+                  muted
+                  playsInline
+                  onMouseEnter={(e) =>
+                    (e.target as HTMLVideoElement).play().catch(() => {})
+                  }
+                  onMouseLeave={(e) => {
+                    const v = e.target as HTMLVideoElement;
+                    v.pause();
+                    v.currentTime = 0;
+                  }}
+                />
+              ) : (
+                <div className="ws-vfx-preview-empty">
+                  <Icon className="h-5 w-5" />
+                  <span>{vfxMeta.artifactLabel}</span>
+                </div>
+              )}
+              {isRunning && (
+                <div className="ws-vfx-running-overlay">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <RunTimer startedAt={(visibleRunStartedAt as number | null | undefined) ?? null} />
+                </div>
+              )}
+            </div>
+
+            {vfxPrimaryParams.length > 0 && (
+              <div className="ws-vfx-param-grid nodrag">
+                {vfxPrimaryParams.map((param) => (
+                  <div className="ws-vfx-control" key={param.key}>
+                    <div className="ws-vfx-control-head">
+                      <span className="ws-vfx-control-label">{param.label}</span>
+                      <span className="ws-vfx-control-value">
+                        {formatVfxParamValue(param, params[param.key])}
+                      </span>
+                    </div>
+                    <div className="ws-vfx-control-widget">{renderToolbarParam(param)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {vfxPromptParam && (
+              <textarea
+                value={String(params.prompt ?? "")}
+                onChange={(e) => updateParam("prompt", e.target.value)}
+                onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="ws-vfx-prompt-input nodrag nowheel"
+                placeholder={String(vfxPromptParam.placeholder ?? "Describe the VFX change")}
+                rows={3}
+                spellCheck={false}
+              />
+            )}
+
+            {(vfxAdvancedParams.length > 0 || runStatus === "error") && (
+              <div className="ws-vfx-footer">
+                {vfxAdvancedParams.length > 0 && (
+                  <button
+                    type="button"
+                    className="ws-vfx-secondary-action nodrag"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setShowAdvancedParams((value) => !value);
+                    }}
+                    onMouseDown={(event) => event.stopPropagation()}
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    <span>{showAdvancedParams ? "Less" : "Advanced"}</span>
+                  </button>
+                )}
+                {runStatus === "error" && d.lastRunError && (
+                  <span className="ws-vfx-error-text">{d.lastRunError}</span>
+                )}
+              </div>
+            )}
+
+            {showAdvancedParams && vfxAdvancedParams.length > 0 && (
+              <div className="ws-vfx-advanced-panel nodrag">
+                {vfxAdvancedParams.map((param) => (
+                  <div className="ws-vfx-control" key={param.key}>
+                    <div className="ws-vfx-control-head">
+                      <span className="ws-vfx-control-label">{param.label}</span>
+                      <span className="ws-vfx-control-value">
+                        {formatVfxParamValue(param, params[param.key])}
+                      </span>
+                    </div>
+                    <div className="ws-vfx-control-widget">{renderToolbarParam(param)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="ws-vfx-action-row">
+              <button
+                type="button"
+                className={cn("ws-vfx-run-button nodrag", runStatus === "error" && "is-error")}
+                onPointerDownCapture={(e) => e.stopPropagation()}
+                onMouseDownCapture={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void runNode();
+                }}
+                disabled={isRunning || isViewer}
+              >
+                {isRunning ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : runStatus === "error" ? (
+                  <RotateCw className="h-4 w-4" />
+                ) : (
+                  <GenerateIcon className="h-4 w-4" />
+                )}
+                <span>{VFX_PREPROCESS_NODE_TYPES.has(schemaKey) ? "Prepare" : "Run"}</span>
+              </button>
+            </div>
+
+            <div
+              className="ws-compact-resize-handle nodrag"
+              onPointerDown={onResizeStart}
+              onMouseDown={(e) => e.stopPropagation()}
+              title={t("workspace.toolNode.dragToResize")}
+              aria-label={t("workspace.toolNode.resizeNode")}
+            />
+          </div>
+        </div>
+
+        {historyOpen && generations.length > 0 && (
+          <NodeResultDialog
+            open={historyOpen}
+            onOpenChange={setHistoryOpen}
+            generations={generations}
+            selectedIndex={selectedGenIndex}
+            onSelect={onSelectHistoryIndex}
+          />
+        )}
+
+        {vfxVisibleInputs.map((inp, i) => (
+          <PortIcon
+            key={`in-${inp.id}`}
+            dir="target"
+            handleId={inp.id}
+            label={localizePortLabel(inp.id, inp.label)}
+            portType={portTypeFromHandleId(inp.id)}
+            color={colorOf(inp.color)}
+            index={i}
+          />
+        ))}
+        {vfxVisibleOutputs.map((out, i) => (
+          <PortIcon
+            key={`out-${out.id}`}
+            dir="source"
+            handleId={out.id}
+            label={localizePortLabel(out.id, out.label)}
+            portType={portTypeFromHandleId(out.id)}
+            color={colorOf(out.color)}
+            index={i}
+            bodyTopOffsetPx={CLEAN_NODE_BODY_TOP_PX}
+          />
+        ))}
+        {insufficientOpen && (
+          <InsufficientCreditsDialog
+            open={insufficientOpen}
+            onOpenChange={setInsufficientOpen}
+            requiredCredits={nodeCost ?? undefined}
+            workspaceId={currentWorkspaceId}
+            reason={insufficientReason}
+            featureName={featureLabelForPlanLock(insufficientFeature)}
+          />
+        )}
+      </>
     );
   }
 
@@ -3769,6 +4574,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           ref={previewRef}
           className="ws-compact-preview ws-preview-zone"
           data-square={forceSquarePreview ? "true" : undefined}
+          data-compact-empty={isVfxControlNode ? "true" : undefined}
           onDoubleClick={(event) => {
             const target = event.target as HTMLElement | null;
             if (
@@ -3947,6 +4753,24 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             <div className="ws-compact-overlay">
               <div ref={toolbarRef} className="ws-compact-toolbar">
                 {toolbarParams.map((p) => renderToolbarParam(p))}
+                {advancedToolbarParams.length > 0 && (
+                  <button
+                    type="button"
+                    className="ws-advanced-param-toggle nodrag"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setShowAdvancedParams((value) => !value);
+                    }}
+                    onMouseDown={(event) => event.stopPropagation()}
+                    title={showAdvancedParams ? "Hide advanced settings" : "Show advanced settings"}
+                  >
+                    <SlidersHorizontal className="h-3 w-3" />
+                    <span>{showAdvancedParams ? "Less" : "More"}</span>
+                  </button>
+                )}
+                {showAdvancedParams &&
+                  advancedToolbarParams.map((p) => renderToolbarParam(p))}
                 {supportsMultiGen && !isMultiShot && (
                   <MultiGenStepper
                     count={multiGenCount}
@@ -4013,6 +4837,15 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                     "urlAssetNode",
                     "videoToPromptNode",
                     "imageTo3dNode",
+                    "vfxVariableNode",
+                    "vfxStartFrameNode",
+                    "vfxBackgroundNode",
+                    "vfxDepthNode",
+                    "vfxCannyNode",
+                    "vfxPoseNode",
+                    "vfxTrackNode",
+                    "vfxMaskNode",
+                    "vfxQwenImageNode",
                     "upscaleImageNode",
                     "removeBackgroundNode",
                     "mergeAudioNode",

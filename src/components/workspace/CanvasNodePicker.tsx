@@ -31,7 +31,7 @@ export interface PickerOption {
   nodeType: string;
   /** Display label in the row */
   label: string;
-  labelKey: TranslationKey;
+  labelKey?: TranslationKey;
   /** lucide icon name */
   icon: string;
   /** Default `data.label` for the new node */
@@ -120,13 +120,15 @@ export function portTypeOf(
 interface CatalogEntry {
   nodeType: string;
   label: string;
-  labelKey: TranslationKey;
+  labelKey?: TranslationKey;
   defaultLabel: string;
   icon: string;
   /** Handles on this node that can RECEIVE a wire (target side). */
   inputs: Array<{ id: string; type: WirePortType; hint: string; hintKey: TranslationKey }>;
   /** Handles on this node that can SEND a wire (source side). */
   outputs: Array<{ id: string; type: WirePortType; hint: string; hintKey: TranslationKey }>;
+  /** Optional initial data overrides for the spawned node. */
+  initialData?: Record<string, unknown>;
 }
 
 const lucideIcon = (name: string): Lucide.LucideIcon => {
@@ -175,6 +177,179 @@ const CATALOG: CatalogEntry[] = [
       { id: "ref_image", type: "image", hint: "→ ref image", hintKey: "workspace.picker.port.to_ref_image" },
     ],
     outputs: [{ id: "image", type: "image", hint: "image", hintKey: "workspace.picker.port.image" }],
+  },
+  {
+    nodeType: "vfxVariableNode",
+    label: "VFX Variables",
+    defaultLabel: "VFX Variables",
+    icon: "SlidersHorizontal",
+    inputs: [
+      { id: "input_video", type: "video", hint: "-> video", hintKey: "workspace.picker.port.to_video" },
+      { id: "start_image", type: "image", hint: "-> start image", hintKey: "workspace.picker.port.to_image" },
+      { id: "mask_image", type: "image", hint: "-> mask image", hintKey: "workspace.picker.port.to_image" },
+      { id: "mask_video", type: "video", hint: "-> mask video", hintKey: "workspace.picker.port.to_video" },
+      { id: "text", type: "text", hint: "-> text", hintKey: "workspace.picker.port.to_prompt" },
+    ],
+    outputs: [
+      { id: "input_video", type: "video", hint: "video", hintKey: "workspace.picker.port.video" },
+      { id: "start_image", type: "image", hint: "start image", hintKey: "workspace.picker.port.image" },
+      { id: "mask_image", type: "image", hint: "mask image", hintKey: "workspace.picker.port.image" },
+      { id: "mask_video", type: "video", hint: "mask video", hintKey: "workspace.picker.port.video" },
+      { id: "text", type: "text", hint: "text", hintKey: "workspace.picker.port.text" },
+    ],
+  },
+  {
+    nodeType: "vfxStartFrameNode",
+    label: "VFX Start Frame",
+    defaultLabel: "VFX Start Frame",
+    icon: "Image",
+    inputs: [{ id: "input_video", type: "video", hint: "-> video", hintKey: "workspace.picker.port.to_video" }],
+    outputs: [{ id: "start_image", type: "image", hint: "start image", hintKey: "workspace.picker.port.image" }],
+  },
+  {
+    nodeType: "vfxBackgroundNode",
+    label: "VFX Background",
+    defaultLabel: "VFX Background",
+    icon: "Film",
+    inputs: [
+      { id: "input_video", type: "video", hint: "-> video", hintKey: "workspace.picker.port.to_video" },
+      { id: "start_image", type: "image", hint: "-> start image", hintKey: "workspace.picker.port.to_image" },
+    ],
+    outputs: [
+      { id: "background_video", type: "video", hint: "bg video", hintKey: "workspace.picker.port.video" },
+      { id: "background_image", type: "image", hint: "bg image", hintKey: "workspace.picker.port.image" },
+    ],
+  },
+  {
+    nodeType: "vfxDepthNode",
+    label: "VFX Depth",
+    defaultLabel: "VFX Depth",
+    icon: "Box",
+    inputs: [{ id: "input_video", type: "video", hint: "-> video", hintKey: "workspace.picker.port.to_video" }],
+    outputs: [
+      { id: "depth_video", type: "video", hint: "depth video", hintKey: "workspace.picker.port.video" },
+      { id: "depth_image", type: "image", hint: "depth image", hintKey: "workspace.picker.port.image" },
+    ],
+  },
+  {
+    nodeType: "vfxCannyNode",
+    label: "VFX Canny",
+    defaultLabel: "VFX Canny",
+    icon: "Scissors",
+    inputs: [{ id: "input_video", type: "video", hint: "-> video", hintKey: "workspace.picker.port.to_video" }],
+    outputs: [
+      { id: "canny_video", type: "video", hint: "canny video", hintKey: "workspace.picker.port.video" },
+      { id: "canny_image", type: "image", hint: "canny image", hintKey: "workspace.picker.port.image" },
+    ],
+  },
+  {
+    nodeType: "vfxPoseNode",
+    label: "VFX Pose",
+    defaultLabel: "VFX Pose",
+    icon: "Users",
+    inputs: [{ id: "input_video", type: "video", hint: "-> video", hintKey: "workspace.picker.port.to_video" }],
+    outputs: [
+      { id: "pose_video", type: "video", hint: "pose video", hintKey: "workspace.picker.port.video" },
+      { id: "pose_image", type: "image", hint: "pose image", hintKey: "workspace.picker.port.image" },
+    ],
+  },
+  {
+    nodeType: "vfxTrackNode",
+    label: "VFX Track",
+    defaultLabel: "VFX Track",
+    icon: "Maximize2",
+    inputs: [
+      { id: "input_video", type: "video", hint: "-> video", hintKey: "workspace.picker.port.to_video" },
+      { id: "mask_video", type: "video", hint: "-> mask video", hintKey: "workspace.picker.port.to_video" },
+      { id: "mask_image", type: "image", hint: "-> mask image", hintKey: "workspace.picker.port.to_image" },
+    ],
+    outputs: [
+      { id: "track_video", type: "video", hint: "track video", hintKey: "workspace.picker.port.video" },
+      { id: "track_image", type: "image", hint: "track image", hintKey: "workspace.picker.port.image" },
+    ],
+  },
+  {
+    nodeType: "vfxMaskNode",
+    label: "VFX Mask",
+    defaultLabel: "VFX Mask",
+    icon: "Scissors",
+    inputs: [
+      { id: "input_video", type: "video", hint: "-> video", hintKey: "workspace.picker.port.to_video" },
+      { id: "start_image", type: "image", hint: "-> start image", hintKey: "workspace.picker.port.to_image" },
+      { id: "ref_image", type: "image", hint: "-> ref image", hintKey: "workspace.picker.port.to_ref_image" },
+    ],
+    outputs: [
+      { id: "mask_video", type: "video", hint: "mask video", hintKey: "workspace.picker.port.video" },
+      { id: "mask_image", type: "image", hint: "mask image", hintKey: "workspace.picker.port.image" },
+    ],
+  },
+  {
+    nodeType: "vfxQwenImageNode",
+    label: "VFX Start",
+    defaultLabel: "VFX Start Image",
+    icon: "Sparkles",
+    inputs: [
+      { id: "text", type: "text", hint: "-> prompt", hintKey: "workspace.picker.port.to_prompt" },
+      { id: "ref_image", type: "image", hint: "-> ref image", hintKey: "workspace.picker.port.to_ref_image" },
+      { id: "mask_image", type: "image", hint: "-> mask", hintKey: "workspace.picker.port.to_image" },
+    ],
+    outputs: [{ id: "image", type: "image", hint: "image", hintKey: "workspace.picker.port.image" }],
+    initialData: {
+      params: {
+        nodeName: "VFX Start Image",
+        workflow_preset: "start_image",
+        model_name: "qwen-image-edit-2511-runpod",
+        steps: 4,
+        cfg: 1,
+        denoise: 1,
+        lightning_lora: "on",
+        protect_original: "off",
+      },
+    },
+  },
+  {
+    nodeType: "vfxQwenImageNode",
+    label: "VFX Mask",
+    defaultLabel: "VFX Mask Edit",
+    icon: "Scissors",
+    inputs: [
+      { id: "text", type: "text", hint: "-> prompt", hintKey: "workspace.picker.port.to_prompt" },
+      { id: "ref_image", type: "image", hint: "-> ref image", hintKey: "workspace.picker.port.to_ref_image" },
+      { id: "mask_image", type: "image", hint: "-> mask", hintKey: "workspace.picker.port.to_image" },
+    ],
+    outputs: [{ id: "image", type: "image", hint: "image", hintKey: "workspace.picker.port.image" }],
+    initialData: {
+      params: {
+        nodeName: "VFX Mask Edit",
+        workflow_preset: "masked_edit",
+        model_name: "qwen-image-edit-2511-runpod",
+        protect_original: "on",
+        mask_expand: 4,
+        mask_feather: 12,
+      },
+    },
+  },
+  {
+    nodeType: "vfxQwenImageNode",
+    label: "VFX Plate",
+    defaultLabel: "VFX Plate Generator",
+    icon: "ImageIcon",
+    inputs: [
+      { id: "text", type: "text", hint: "-> prompt", hintKey: "workspace.picker.port.to_prompt" },
+    ],
+    outputs: [{ id: "image", type: "image", hint: "image", hintKey: "workspace.picker.port.image" }],
+    initialData: {
+      params: {
+        nodeName: "VFX Plate Generator",
+        workflow_preset: "plate_generate",
+        model_name: "qwen-image-runpod",
+        aspect_ratio: "16:9",
+        width: 1664,
+        height: 928,
+        steps: 20,
+        cfg: 4,
+      },
+    },
   },
   {
     nodeType: "videoGenNode",
@@ -318,6 +493,7 @@ export function getPickerOptions(state: CanvasNodePickerState): PickerOption[] {
         newNodeHandle: firstPort?.id ?? "",
         portHint: firstPort?.hint,
         portHintKey: firstPort?.hintKey ?? "workspace.picker.port.text",
+        initialData: entry.initialData,
       };
     });
   }
@@ -339,6 +515,7 @@ export function getPickerOptions(state: CanvasNodePickerState): PickerOption[] {
         newNodeHandle: p.id,
         portHint: p.hint,
         portHintKey: p.hintKey,
+        initialData: entry.initialData,
       });
     }
   }
@@ -411,7 +588,7 @@ const CanvasNodePicker = ({ state, onPick, onClose }: Props) => {
     () =>
       getPickerOptions(state).map((option) => ({
         ...option,
-        label: t(option.labelKey),
+        label: option.labelKey ? t(option.labelKey) : option.label,
         portHint: t(option.portHintKey),
       })),
     [state, t],

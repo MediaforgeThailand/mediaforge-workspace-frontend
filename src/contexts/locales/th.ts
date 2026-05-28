@@ -3257,6 +3257,8 @@ export const th = {
   "workspace.tools.sticky_note": "โน้ต",
   "workspace.tools.undo": "ย้อนกลับ",
   "workspace.tools.redo": "ทำซ้ำ",
+  "workspace.tools.light_background": "พื้นหลังสว่าง",
+  "workspace.tools.dark_background": "พื้นหลังมืด",
   "workspace.tools.settings_shortcuts": "ตั้งค่า & ทางลัด",
 
   // ─── Node atoms (sticky / text / asset / group) ────────────────
@@ -4252,6 +4254,7 @@ export const th = {
   "workspace.picker.section.basics": "หลัก",
   "workspace.picker.section.media": "ไฟล์และสื่อ",
   "workspace.picker.section.video": "วิดีโอ",
+  "workspace.picker.section.vfx": "VFX",
   "workspace.picker.section.threed": "3D",
   "workspace.picker.section.tools": "ปรับแต่ง",
   "workspace.picker.section.references": "อ้างอิง",

@@ -87,6 +87,7 @@ import CanvasNodePicker, {
   type PickerOption,
 } from "./CanvasNodePicker";
 import type { ContextMenuState, ToolItem } from "./CanvasContextMenu";
+import { createVfxWorkflowTemplate } from "./vfxWorkflowTemplate";
 // Lazy: CanvasContextMenu only renders on canvas right-click. No other
 // file imports it eagerly, so Vite carves it into its own chunk.
 const CanvasContextMenu = lazy(() => import("./CanvasContextMenu"));
@@ -353,13 +354,15 @@ function countGroupChildrenOfType(
 /** TextNode's img_1/2/3 slots accept either image OR video, so they   */
 /* appear in both sets below.                                         */
 const IMAGE_TARGETS = new Set([
-  "image", "image_input", "ref_image", "reference_image", "start_frame", "end_frame", "mask",
+  "image", "image_input", "ref_image", "reference_image", "start_image", "start_frame", "end_frame", "mask", "mask_image",
+  "background_image", "depth_image", "canny_image", "pose_image", "track_image",
   "img_1", "img_2", "img_3",
   // ElementNode (Kling element) — 4 reference slots + 1 frontal
   "ref_1", "ref_2", "ref_3", "ref_4", "frontal",
 ]);
 const VIDEO_TARGETS = new Set([
-  "video", "ref_video",
+  "video", "input_video", "ref_video",
+  "background_video", "depth_video", "canny_video", "pose_video", "track_video", "mask_video",
   "img_1", "img_2", "img_3",
 ]);
 const AUDIO_TARGETS = new Set(["audio", "ref_audio"]);
@@ -644,6 +647,15 @@ const nodeTypes = {
   mergeAudioNode: WorkspaceToolNode,
   videoToPromptNode: WorkspaceToolNode,
   imageTo3dNode: WorkspaceToolNode,
+  vfxVariableNode: WorkspaceToolNode,
+  vfxStartFrameNode: WorkspaceToolNode,
+  vfxBackgroundNode: WorkspaceToolNode,
+  vfxDepthNode: WorkspaceToolNode,
+  vfxCannyNode: WorkspaceToolNode,
+  vfxPoseNode: WorkspaceToolNode,
+  vfxTrackNode: WorkspaceToolNode,
+  vfxMaskNode: WorkspaceToolNode,
+  vfxQwenImageNode: WorkspaceToolNode,
   // Workspace-only.
   assetNode: AssetNode,
   elementNode: ElementNode,
@@ -799,6 +811,7 @@ const EdgeHighlightOnNodeSelect = () => {
 
 const Inner = () => {
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const vfxInitialViewportAppliedRef = useRef<string | null>(null);
   const {
     screenToFlowPosition,
     setViewport,
@@ -858,6 +871,50 @@ const Inner = () => {
   // fresh `[]` literal each call would loop the store-snapshot check.
   const nodes = useWorkspaceStore((s) => (s.current?.nodes as Node[] | undefined) ?? STABLE_EMPTY_NODES);
   const edges = useWorkspaceStore((s) => (s.current?.edges as Edge[] | undefined) ?? STABLE_EMPTY_EDGES);
+  const isVfxWorkflowCanvas = useMemo(
+    () => nodes.some((node) => String(node.type ?? "").startsWith("vfx")),
+    [nodes],
+  );
+  const vfxDefaultViewport = useMemo<Viewport | undefined>(() => {
+    if (!isVfxWorkflowCanvas || nodes.length === 0) return undefined;
+    const minX = Math.min(...nodes.map((node) => node.position.x));
+    const minY = Math.min(...nodes.map((node) => node.position.y));
+    const zoom = 0.62;
+    return {
+      x: 96 - minX * zoom,
+      y: 112 - minY * zoom,
+      zoom,
+    };
+  }, [isVfxWorkflowCanvas, nodes]);
+  const renderedEdges = useMemo(() => {
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+
+    return edges.map((edge) => {
+      const sourceNode = nodeById.get(edge.source);
+      const targetNode = nodeById.get(edge.target);
+      const sourceType = String(sourceNode?.type ?? "");
+      const targetType = String(targetNode?.type ?? "");
+      const sourceIsVfx = sourceType.startsWith("vfx");
+      const targetIsVfx = targetType.startsWith("vfx");
+
+      if (!sourceIsVfx || !targetIsVfx) return edge;
+
+      const vfxClass = cn(
+        edge.className,
+        "ws-vfx-technical-edge",
+        "ws-vfx-primary-edge",
+      );
+
+      return {
+        ...edge,
+        className: vfxClass,
+        data: {
+          ...(edge.data ?? {}),
+          vfxTechnical: true,
+        },
+      };
+    });
+  }, [edges, nodes]);
   const onNodesChange = useWorkspaceStore((s) => s.onNodesChange);
   const onEdgesChange = useWorkspaceStore((s) => s.onEdgesChange);
   const onConnect = useWorkspaceStore((s) => s.onConnect);
@@ -925,6 +982,46 @@ const Inner = () => {
   useEffect(() => {
     if (!canvasId) return;
     const raw = localStorage.getItem(VIEWPORT_KEY(canvasId));
+    const applyVfxViewport = () => {
+      if (!vfxDefaultViewport) return undefined;
+      localStorage.setItem(VIEWPORT_KEY(canvasId), JSON.stringify(vfxDefaultViewport));
+
+      const applyViewport = () => {
+        setViewport(vfxDefaultViewport);
+      };
+      applyViewport();
+      const raf = window.requestAnimationFrame(applyViewport);
+      const t1 = window.setTimeout(applyViewport, 120);
+      const t2 = window.setTimeout(applyViewport, 360);
+      return () => {
+        window.cancelAnimationFrame(raf);
+        window.clearTimeout(t1);
+        window.clearTimeout(t2);
+      };
+    };
+
+    if (isVfxWorkflowCanvas && nodes.length > 0 && vfxDefaultViewport) {
+      const shouldApplyDefault = (() => {
+        if (!raw) return true;
+        try {
+          const vp = JSON.parse(raw) as Partial<Viewport>;
+          return (
+            typeof vp.zoom !== "number" ||
+            !Number.isFinite(vp.zoom) ||
+            vp.zoom < 0.55 ||
+            vp.zoom > 0.9
+          );
+        } catch {
+          return true;
+        }
+      })();
+
+      if (shouldApplyDefault) {
+        if (vfxInitialViewportAppliedRef.current === canvasId) return;
+        vfxInitialViewportAppliedRef.current = canvasId;
+        return applyVfxViewport();
+      }
+    }
     if (!raw) return;
     try {
       const vp = JSON.parse(raw) as Viewport;
@@ -932,7 +1029,7 @@ const Inner = () => {
     } catch {
       /* ignore */
     }
-  }, [canvasId, setViewport]);
+  }, [canvasId, isVfxWorkflowCanvas, nodes, setViewport, vfxDefaultViewport]);
 
   const onMoveEnd = useCallback(() => {
     if (!canvasId) return;
@@ -1906,7 +2003,7 @@ const Inner = () => {
         });
         newId = id;
       } else {
-        newId = addSchemaNode(item.nodeType, item.defaultLabel, pos);
+        newId = addSchemaNode(item.nodeType, item.defaultLabel, pos, item.initialData);
       }
       if (newId) reparentSpawned(newId, pos);
       setContextMenu(null);
@@ -1927,10 +2024,31 @@ const Inner = () => {
       } else if (item.action === "stock") {
         // Inline picker — never navigates the user away from the canvas.
         window.dispatchEvent(new CustomEvent("workspace-open-stock"));
+      } else if (item.action === "vfx-template" && contextMenu) {
+        const template = createVfxWorkflowTemplate({
+          origin: contextMenu.flow,
+          createId: () => crypto.randomUUID(),
+        });
+        pushHistory();
+        useWorkspaceStore.setState((s) => {
+          if (!s.current) return s;
+          const nextNodes = [...s.current.nodes, ...template.nodes];
+          const nextEdges = [...s.current.edges, ...template.edges];
+          const nextCurrent = {
+            ...s.current,
+            nodes: nextNodes,
+            edges: nextEdges,
+            updatedAt: Date.now(),
+          };
+          return {
+            current: nextCurrent,
+            graphs: { ...s.graphs, [s.current.id]: nextCurrent },
+          };
+        });
       }
       setContextMenu(null);
     },
-    [],
+    [contextMenu, pushHistory],
   );
 
   /** "+" button in the floating sidebar — opens the same picker, but
@@ -2562,11 +2680,7 @@ const Inner = () => {
                   ? "image"
                   : assetFieldType(src) ?? "media";
               } else if (src?.type) {
-                const sh = start.handleId ?? "";
-                if (sh === "output_video" || sh === "video") srcKind = "video";
-                else if (sh === "audio") srcKind = "audio";
-                else if (sh === "text") srcKind = "text";
-                else srcKind = "image";
+                srcKind = portTypeFromHandleId(start.handleId ?? "");
               }
               const portKindOf = (id: string): string => {
                 if (TEXT_TARGETS.has(id)) return "text";
@@ -2625,9 +2739,22 @@ const Inner = () => {
         targetSchema,
         option.nodeType,
       );
-      const newId = addSchemaNode(option.nodeType, option.defaultLabel, picker.flow, {
-        params: inheritedParams,
-      });
+      const presetParams =
+        option.initialData?.params && typeof option.initialData.params === "object"
+          ? (option.initialData.params as Record<string, unknown>)
+          : {};
+      const initialData = option.initialData
+        ? {
+            ...option.initialData,
+            params: { ...inheritedParams, ...presetParams },
+          }
+        : { params: inheritedParams };
+      const newId = addSchemaNode(
+        option.nodeType,
+        option.defaultLabel,
+        picker.flow,
+        initialData,
+      );
       // No source (keyboard `N` shortcut) → just spawn the node, no
       // edge to create. Drag-from-port path → wire the new node back
       // to the source on the matching handle.
@@ -2767,11 +2894,18 @@ const Inner = () => {
   }, []);
 
   const memoNodeTypes = useMemo(() => nodeTypes, []);
+  const hasVfxNodes = useMemo(
+    () => nodes.some((node) => String(node.type ?? "").startsWith("vfx")),
+    [nodes],
+  );
 
   return (
     <div
       ref={wrapperRef}
-      className="workspace-root relative h-full w-full bg-[#050606]"
+      className={cn(
+        "workspace-root relative h-full w-full bg-[#050606]",
+        hasVfxNodes && "workspace-root-vfx",
+      )}
       onDragOver={onDragOver}
       onDrop={onDrop}
       onPointerDown={onCanvasPointerDown}
@@ -2842,7 +2976,7 @@ const Inner = () => {
 
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={renderedEdges}
         nodeTypes={memoNodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
@@ -2870,10 +3004,11 @@ const Inner = () => {
         nodesConnectable={!isViewer}
         edgesReconnectable={!isViewer}
         deleteKeyCode={isViewer ? null : DELETE_KEYS}
-        fitView
+        fitView={!hasVfxNodes}
+        defaultViewport={vfxDefaultViewport}
         onlyRenderVisibleElements
         proOptions={PRO_OPTIONS}
-        minZoom={0.25}
+        minZoom={hasVfxNodes ? 0.55 : 0.25}
         maxZoom={2.5}
         // Edges are bezier-curved by default — matches the soft,
         // organic look of Figma / Krea wires. The colour palette

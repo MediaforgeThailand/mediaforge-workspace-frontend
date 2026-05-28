@@ -103,6 +103,10 @@ function openAiEnhancePriceKeys(params: Record<string, unknown>) {
 function modelDiscountPercent({ schemaKey, params, creditCosts }: NodeCostParams): number {
   const modelName = params.model_name as string | undefined;
   if (schemaKey === "urlAssetNode") return 0;
+  if (schemaKey === "vfxQwenImageNode") {
+    const apiModel = modelName || "qwen-image-edit-2511-runpod";
+    return maxDiscountForRows(rowsForFeatureModels(creditCosts, "generate_qwen_image", [apiModel]));
+  }
   if (schemaKey === "bananaProNode" || schemaKey === "imageGenNode") {
     const apiModel = modelName || "nano-banana-pro";
     if (apiModel.startsWith("gpt-image") || apiModel.startsWith("replicate-gpt-image") || apiModel.startsWith("dall-e")) {
@@ -246,6 +250,14 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
   if (!creditCosts || creditCosts.length === 0) return null;
 
   const modelName = params.model_name as string | undefined;
+
+  if (schemaKey === "vfxQwenImageNode") {
+    const apiModel = modelName || "qwen-image-edit-2511-runpod";
+    const match = creditCosts.find(
+      (r) => r.feature === "generate_qwen_image" && r.model === apiModel,
+    );
+    return match?.cost ?? null;
+  }
 
   // ── Image generation (Banana) ──
   if (schemaKey === "bananaProNode" || schemaKey === "imageGenNode") {

@@ -5,6 +5,7 @@ import {
   useState,
   type DragEvent,
   type KeyboardEvent,
+  type MouseEvent,
 } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -18,6 +19,8 @@ import {
   Languages,
   Scissors,
   Search,
+  SlidersHorizontal,
+  Sparkles,
   Type,
   Upload,
   Users,
@@ -32,25 +35,46 @@ export type ToolCategory =
   | "media"
   | "threed"
   | "image"
+  | "vfx"
   | "video"
   | "audio"
   | "text"
   | "addon";
 
-type ToolSection = "basics" | "media" | "video" | "threed" | "tools";
+type ToolSection = "basics" | "media" | "vfx" | "video" | "threed" | "tools";
+type VfxStage = "input" | "control" | "mask" | "generate";
 
-const SECTION_ORDER: ToolSection[] = ["basics", "media", "video", "threed", "tools"];
+const SECTION_ORDER: ToolSection[] = ["basics", "media", "vfx", "video", "threed", "tools"];
 const SECTION_LABEL_KEYS: Record<ToolSection, TranslationKey> = {
   basics: "workspace.picker.section.basics",
   media: "workspace.picker.section.media",
+  vfx: "workspace.picker.section.vfx",
   video: "workspace.picker.section.video",
   threed: "workspace.picker.section.threed",
   tools: "workspace.picker.section.tools",
 };
-
+const VFX_STAGE_ORDER: VfxStage[] = ["input", "control", "mask", "generate"];
+const VFX_STAGE_META: Record<VfxStage, { label: string; hint: string }> = {
+  input: {
+    label: "1. Input & Plate Setup",
+    hint: "Prepare source video, first frame, size, FPS, and base plates.",
+  },
+  control: {
+    label: "2. Control Passes",
+    hint: "Create structure guides like background, depth, edges, and pose.",
+  },
+  mask: {
+    label: "3. Mask & Tracking",
+    hint: "Define protected areas and motion guidance before generation.",
+  },
+  generate: {
+    label: "4. Generate & Edit",
+    hint: "Use prepared refs/masks to create or edit final VFX imagery.",
+  },
+};
 export interface ToolItem {
   nodeType: string;
-  action?: "upload" | "assets" | "stock";
+  action?: "upload" | "assets" | "stock" | "vfx-template";
   labelKey?: string;
   labelText?: string;
   descriptionKey?: string;
@@ -58,10 +82,12 @@ export interface ToolItem {
   defaultLabel: string;
   section: ToolSection;
   category: ToolCategory;
+  stage?: VfxStage;
   icon: LucideIcon;
   tint?: "violet" | "emerald" | "sky" | "amber" | "rose" | "zinc";
   isNew?: boolean;
   comingSoon?: boolean;
+  initialData?: Record<string, unknown>;
   keywords?: string[];
   label?: string;
   description?: string;
@@ -89,6 +115,206 @@ const CATALOG: ToolItem[] = [
     icon: ImageIcon,
     tint: "sky",
     keywords: ["banana", "seedream", "gpt image", "photo"],
+  },
+  {
+    nodeType: "__vfx_template__",
+    action: "vfx-template",
+    labelText: "VFX Full Setup",
+    descriptionText: "Create the full staged VFX graph: variables, input, controls, mask, track, and Qwen edit nodes.",
+    defaultLabel: "VFX Full Setup",
+    section: "vfx",
+    category: "vfx",
+    stage: "input",
+    icon: Sparkles,
+    tint: "amber",
+    isNew: true,
+    keywords: ["vfx", "template", "workflow", "setup", "comfy", "auto"],
+  },
+  {
+    nodeType: "vfxVariableNode",
+    labelText: "VFX Variables",
+    descriptionText: "Central hub for video size, FPS, model pack names, and reusable workflow values.",
+    defaultLabel: "VFX Variables",
+    section: "vfx",
+    category: "vfx",
+    stage: "input",
+    icon: SlidersHorizontal,
+    tint: "sky",
+    isNew: true,
+    keywords: ["vfx", "variable", "set", "get", "rgthree", "workflow"],
+  },
+  {
+    nodeType: "vfxStartFrameNode",
+    labelText: "VFX Start Frame",
+    descriptionText: "Extract a controllable first frame or start image from the source video.",
+    defaultLabel: "VFX Start Frame",
+    section: "vfx",
+    category: "vfx",
+    stage: "input",
+    icon: ImageIcon,
+    tint: "amber",
+    isNew: true,
+    keywords: ["vfx", "start frame", "preprocess", "video input", "comfy"],
+  },
+  {
+    nodeType: "vfxBackgroundNode",
+    labelText: "VFX Background",
+    descriptionText: "Prepare grey, empty, or source background plates for later VFX generation.",
+    defaultLabel: "VFX Background",
+    section: "vfx",
+    category: "vfx",
+    stage: "control",
+    icon: Film,
+    tint: "emerald",
+    isNew: true,
+    keywords: ["vfx", "background", "plate", "grey", "preprocess"],
+  },
+  {
+    nodeType: "vfxDepthNode",
+    labelText: "VFX Depth",
+    descriptionText: "Generate a depth control pass from video for spatial continuity.",
+    defaultLabel: "VFX Depth",
+    section: "vfx",
+    category: "vfx",
+    stage: "control",
+    icon: Box,
+    tint: "violet",
+    isNew: true,
+    keywords: ["vfx", "depth", "depthcrafter", "control", "preprocess"],
+  },
+  {
+    nodeType: "vfxCannyNode",
+    labelText: "VFX Canny",
+    descriptionText: "Extract edge lines as a control pass for structure-preserving edits.",
+    defaultLabel: "VFX Canny",
+    section: "vfx",
+    category: "vfx",
+    stage: "control",
+    icon: Scissors,
+    tint: "sky",
+    isNew: true,
+    keywords: ["vfx", "canny", "edges", "line", "control"],
+  },
+  {
+    nodeType: "vfxPoseNode",
+    labelText: "VFX Pose",
+    descriptionText: "Build a pose control pass to keep body movement consistent.",
+    defaultLabel: "VFX Pose",
+    section: "vfx",
+    category: "vfx",
+    stage: "control",
+    icon: Users,
+    tint: "rose",
+    isNew: true,
+    keywords: ["vfx", "pose", "dwpose", "person", "motion"],
+  },
+  {
+    nodeType: "vfxTrackNode",
+    labelText: "VFX Track",
+    descriptionText: "Create tracking guidance from masks and video motion.",
+    defaultLabel: "VFX Track",
+    section: "vfx",
+    category: "vfx",
+    stage: "mask",
+    icon: Maximize2,
+    tint: "emerald",
+    isNew: true,
+    keywords: ["vfx", "track", "cotracker", "motion", "mask"],
+  },
+  {
+    nodeType: "vfxMaskNode",
+    labelText: "VFX Mask",
+    descriptionText: "Generate and refine subject/object masks for protected VFX edits.",
+    defaultLabel: "VFX Mask",
+    section: "vfx",
+    category: "vfx",
+    stage: "mask",
+    icon: Scissors,
+    tint: "violet",
+    isNew: true,
+    keywords: ["vfx", "mask", "sam", "segmentation", "subject"],
+  },
+  {
+    nodeType: "vfxQwenImageNode",
+    labelText: "VFX Start Image",
+    descriptionText: "Qwen first-frame design from a video frame or reference image, based on the Startimage workflow.",
+    defaultLabel: "VFX Start Image",
+    section: "vfx",
+    category: "vfx",
+    stage: "generate",
+    icon: Sparkles,
+    tint: "amber",
+    isNew: true,
+    initialData: {
+      params: {
+        nodeName: "VFX Start Image",
+        workflow_preset: "start_image",
+        model_name: "qwen-image-edit-2511-runpod",
+        steps: 4,
+        cfg: 1,
+        denoise: 1,
+        lightning_lora: "on",
+        protect_original: "off",
+        prompt:
+          "Create a cinematic VFX start frame from the reference frame. Preserve the subject identity and camera perspective while designing the new environment.",
+      },
+    },
+    keywords: ["vfx", "qwen", "start image", "first frame", "comfy", "runpod"],
+  },
+  {
+    nodeType: "vfxQwenImageNode",
+    labelText: "VFX Mask Edit",
+    descriptionText: "Qwen masked image edit with protect-outside-mask controls for VFX plate fixes.",
+    defaultLabel: "VFX Mask Edit",
+    section: "vfx",
+    category: "vfx",
+    stage: "generate",
+    icon: Scissors,
+    tint: "amber",
+    isNew: true,
+    initialData: {
+      params: {
+        nodeName: "VFX Mask Edit",
+        workflow_preset: "masked_edit",
+        model_name: "qwen-image-edit-2511-runpod",
+        steps: 40,
+        cfg: 4,
+        denoise: 1,
+        protect_original: "on",
+        mask_expand: 4,
+        mask_feather: 12,
+        prompt:
+          "Edit only the masked area. Match the original lighting, perspective, texture, grain, and edge continuity.",
+      },
+    },
+    keywords: ["vfx", "qwen", "image edit", "mask", "inpaint", "comfy", "runpod"],
+  },
+  {
+    nodeType: "vfxQwenImageNode",
+    labelText: "VFX Plate Generator",
+    descriptionText: "Text-to-image background/reference plate generator for VFX look development.",
+    defaultLabel: "VFX Plate Generator",
+    section: "vfx",
+    category: "vfx",
+    stage: "generate",
+    icon: ImageIcon,
+    tint: "amber",
+    initialData: {
+      params: {
+        nodeName: "VFX Plate Generator",
+        workflow_preset: "plate_generate",
+        model_name: "qwen-image-runpod",
+        aspect_ratio: "16:9",
+        width: 1664,
+        height: 928,
+        steps: 20,
+        cfg: 4,
+        denoise: 1,
+        prompt:
+          "Generate a clean cinematic VFX background plate with realistic lighting, production design, and camera perspective.",
+      },
+    },
+    keywords: ["vfx", "qwen", "background", "plate", "reference", "comfy", "runpod"],
   },
   {
     nodeType: "videoGenNode",
@@ -236,6 +462,13 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
   const { t } = useLanguage();
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
+  const [hoverTip, setHoverTip] = useState<{
+    label: string;
+    description: string;
+    stage?: string;
+    left: number;
+    top: number;
+  } | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -259,6 +492,8 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
           item.label,
           item.description,
           item.defaultLabel,
+          item.stage ? VFX_STAGE_META[item.stage].label : "",
+          item.stage ? VFX_STAGE_META[item.stage].hint : "",
           ...(item.keywords ?? []),
         ]
           .join(" ")
@@ -286,6 +521,10 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
       setHighlight(Math.max(0, visibleItems.length - 1));
     }
   }, [highlight, visibleItems.length]);
+
+  useEffect(() => {
+    setHoverTip(null);
+  }, [query]);
 
   const viewportWidth = typeof window === "undefined" ? PANEL_WIDTH : window.innerWidth;
   const viewportHeight = typeof window === "undefined" ? PANEL_MAX_HEIGHT : window.innerHeight;
@@ -330,8 +569,40 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
     }
     event.dataTransfer.setData("application/reactflow-type", item.nodeType);
     event.dataTransfer.setData("application/reactflow-label", item.defaultLabel);
+    if (item.initialData) {
+      event.dataTransfer.setData(
+        "application/reactflow-overrides",
+        JSON.stringify(item.initialData),
+      );
+    }
     event.dataTransfer.effectAllowed = "move";
     setTimeout(onClose, 0);
+  };
+
+  const showHoverTip = (
+    event: MouseEvent<HTMLButtonElement>,
+    item: ToolItem,
+  ) => {
+    if (!item.description) {
+      setHoverTip(null);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const width = 268;
+    const gap = 10;
+    const canShowRight = rect.right + gap + width <= window.innerWidth - 8;
+    const left = canShowRight ? rect.right + gap : Math.max(8, rect.left - width - gap);
+    const top = Math.min(
+      Math.max(8, rect.top - 8),
+      Math.max(8, window.innerHeight - 118),
+    );
+    setHoverTip({
+      label: item.label ?? item.defaultLabel,
+      description: item.description,
+      stage: item.stage ? VFX_STAGE_META[item.stage].label : undefined,
+      left,
+      top,
+    });
   };
 
   return createPortal(
@@ -375,50 +646,114 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
           />
         </label>
 
-        <div className="ws-picker-scroll mt-[8px] max-h-[372px] overflow-y-auto px-[8px] pb-[8px]">
+        <div
+          className="ws-picker-scroll mt-[8px] max-h-[372px] overflow-y-auto px-[8px] pb-[8px]"
+          onScroll={() => setHoverTip(null)}
+        >
           {visibleItems.length === 0 ? (
             <div className="px-1 py-8 text-center text-[14px] font-medium text-zinc-400">
               {t("workspace.picker.no_match", { query })}
             </div>
           ) : (
-            groupedItems.map((group) => (
-              <div key={group.section} className="pb-[8px]">
-                <div className="px-[6px] pb-[5px] pt-[5px] text-[11px] font-medium uppercase tracking-normal text-[#7b7f86]">
-                  {t(SECTION_LABEL_KEYS[group.section])}
+            groupedItems.map((group) => {
+              const renderItem = ({ item, index }: (typeof group.items)[number]) => {
+                const isHighlight = index === highlight;
+                return (
+                  <li key={`${item.nodeType}-${item.defaultLabel}`}>
+                    <button
+                      type="button"
+                      draggable={!item.action && !item.comingSoon}
+                      disabled={item.comingSoon}
+                      title={item.description}
+                      onDragStart={(event) => onItemDragStart(event, item)}
+                      onMouseEnter={(event) => {
+                        setHighlight(index);
+                        showHoverTip(event, item);
+                      }}
+                      onMouseLeave={() => setHoverTip(null)}
+                      onClick={() => fire(item)}
+                      className={cn(
+                        "group flex h-[28px] w-full items-center rounded-[4px] px-[8px] text-left transition-colors",
+                        isHighlight
+                          ? "bg-white/[0.12] text-zinc-50"
+                          : "text-[#f2f2f2] hover:bg-white/[0.08] hover:text-zinc-50",
+                        item.comingSoon && "cursor-not-allowed opacity-45",
+                      )}
+                    >
+                      <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-none text-inherit">
+                        {item.label}
+                      </span>
+                    </button>
+                  </li>
+                );
+              };
+
+              const stageGroups = group.section === "vfx"
+                ? VFX_STAGE_ORDER.map((stage) => ({
+                    stage,
+                    items: group.items.filter(({ item }) => item.stage === stage),
+                  })).filter((stageGroup) => stageGroup.items.length > 0)
+                : [];
+              const unstagedVfxItems = group.section === "vfx"
+                ? group.items.filter(({ item }) => !item.stage)
+                : [];
+
+              return (
+                <div key={group.section} className="pb-[8px]">
+                  <div className="px-[6px] pb-[5px] pt-[5px] text-[11px] font-medium uppercase tracking-normal text-[#7b7f86]">
+                    {t(SECTION_LABEL_KEYS[group.section])}
+                  </div>
+                  {group.section === "vfx" ? (
+                    <div className="space-y-[7px]">
+                      {stageGroups.map(({ stage, items }) => (
+                        <div key={stage}>
+                          <div className="px-[7px] pb-[3px] pt-[2px]">
+                            <div className="text-[11px] font-semibold leading-none text-zinc-300">
+                              {VFX_STAGE_META[stage].label}
+                            </div>
+                            <div className="mt-[3px] text-[10px] leading-[1.25] text-zinc-500">
+                              {VFX_STAGE_META[stage].hint}
+                            </div>
+                          </div>
+                          <ul className="space-y-[1px]">{items.map(renderItem)}</ul>
+                        </div>
+                      ))}
+                      {unstagedVfxItems.length > 0 ? (
+                        <ul className="space-y-[1px]">{unstagedVfxItems.map(renderItem)}</ul>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <ul className="space-y-[1px]">{group.items.map(renderItem)}</ul>
+                  )}
                 </div>
-                <ul className="space-y-[1px]">
-                  {group.items.map(({ item, index }) => {
-                    const isHighlight = index === highlight;
-                    return (
-                      <li key={`${item.nodeType}-${item.defaultLabel}`}>
-                        <button
-                          type="button"
-                          draggable={!item.action && !item.comingSoon}
-                          disabled={item.comingSoon}
-                          onDragStart={(event) => onItemDragStart(event, item)}
-                          onMouseEnter={() => setHighlight(index)}
-                          onClick={() => fire(item)}
-                          className={cn(
-                            "group flex h-[28px] w-full items-center rounded-[4px] px-[8px] text-left transition-colors",
-                            isHighlight
-                              ? "bg-white/[0.12] text-zinc-50"
-                              : "text-[#f2f2f2] hover:bg-white/[0.08] hover:text-zinc-50",
-                            item.comingSoon && "cursor-not-allowed opacity-45",
-                          )}
-                        >
-                          <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-none text-inherit">
-                            {item.label}
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
+      {hoverTip ? (
+        <div
+          role="tooltip"
+          className={cn(
+            "pointer-events-none fixed z-[1320] w-[268px] rounded-[7px]",
+            "border border-white/[0.12] bg-[#171818] px-[10px] py-[9px]",
+            "text-left shadow-[0_14px_36px_rgba(0,0,0,.45)]",
+          )}
+          style={{ left: hoverTip.left, top: hoverTip.top }}
+        >
+          {hoverTip.stage ? (
+            <div className="mb-[5px] text-[10px] font-semibold uppercase leading-none tracking-normal text-[#a7ff3f]">
+              {hoverTip.stage}
+            </div>
+          ) : null}
+          <div className="text-[12px] font-semibold leading-none text-zinc-100">
+            {hoverTip.label}
+          </div>
+          <div className="mt-[6px] text-[11px] leading-[1.35] text-zinc-400">
+            {hoverTip.description}
+          </div>
+        </div>
+      ) : null}
     </>,
     document.body,
   );

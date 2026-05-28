@@ -3307,6 +3307,8 @@ export const en = {
   "workspace.tools.sticky_note": "Sticky note",
   "workspace.tools.undo": "Undo",
   "workspace.tools.redo": "Redo",
+  "workspace.tools.light_background": "Light background",
+  "workspace.tools.dark_background": "Dark background",
   "workspace.tools.settings_shortcuts": "Settings & shortcuts",
   "workspace.node.board_text_placeholder": "Type text...",
 
@@ -4325,6 +4327,7 @@ export const en = {
     "Reason about prompts, briefs, and connected context.",
   "workspace.picker.section.basics": "BASICS",
   "workspace.picker.section.media": "MEDIA",
+  "workspace.picker.section.vfx": "VFX",
   "workspace.picker.section.video": "VIDEO",
   "workspace.picker.section.threed": "3D",
   "workspace.picker.section.tools": "TOOLS",

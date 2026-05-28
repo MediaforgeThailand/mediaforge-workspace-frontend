@@ -56,6 +56,59 @@ async function seekVideo(video: HTMLVideoElement, time: number): Promise<void> {
   await seeked;
 }
 
+export async function captureVideoFrameAtSecondsBlob(
+  sourceUrl: string,
+  targetSeconds: number,
+): Promise<Blob> {
+  const video = document.createElement("video");
+  video.crossOrigin = "anonymous";
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "auto";
+
+  const metadataReady = waitForVideoEvent(video, "loadedmetadata");
+  video.src = sourceUrl;
+  video.load();
+  await metadataReady;
+
+  const duration = Number.isFinite(video.duration) && video.duration > 0
+    ? video.duration
+    : 0;
+  const targetTime = Math.min(
+    duration > 0 ? duration : Number.POSITIVE_INFINITY,
+    Math.max(0, targetSeconds),
+  );
+
+  await seekVideo(video, Number.isFinite(targetTime) ? targetTime : 0);
+
+  const width = video.videoWidth || 1;
+  const height = video.videoHeight || 1;
+  const scale = Math.min(1, 1920 / Math.max(width, height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not prepare video frame canvas");
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  video.removeAttribute("src");
+  video.load();
+
+  return new Promise<Blob>((resolve, reject) => {
+    try {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error("Could not capture video frame"));
+        },
+        "image/jpeg",
+        0.88,
+      );
+    } catch (error) {
+      reject(error instanceof Error ? error : new Error(String(error)));
+    }
+  });
+}
+
 export async function captureVideoFrameBlob(
   sourceUrl: string,
   position: "start" | "end",

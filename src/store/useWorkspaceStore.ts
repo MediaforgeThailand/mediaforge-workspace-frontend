@@ -1176,11 +1176,29 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             nodeType === "textNode"
               ? { label, content: "", params: {} }
               : { label, params: defaultParamsFor(nodeType), exposed: {} };
+          const extra = extraData as Record<string, unknown>;
+          const extraParams =
+            extra && typeof extra.params === "object" && extra.params !== null
+              ? (extra.params as Record<string, unknown>)
+              : {};
+          const extraExposed =
+            extra && typeof extra.exposed === "object" && extra.exposed !== null
+              ? (extra.exposed as Record<string, boolean>)
+              : {};
+          const baseExposed =
+            "exposed" in baseData && baseData.exposed
+              ? (baseData.exposed as Record<string, boolean>)
+              : {};
           const node: WorkspaceNode = {
             id: nodeId,
             type: nodeType,
             position,
-            data: { ...baseData, ...extraData },
+            data: {
+              ...baseData,
+              ...extraData,
+              params: { ...baseData.params, ...extraParams },
+              exposed: { ...baseExposed, ...extraExposed },
+            },
           };
           // Snapshot BEFORE adding so Ctrl+Z removes this node.
           const snap: HistorySnap = {
