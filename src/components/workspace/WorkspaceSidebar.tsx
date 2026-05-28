@@ -145,6 +145,10 @@ const SIDEBAR_NAV_ITEMS: NavItem[] = [
   { id: "editor", labelKey: "workspace.sidebar.editing_tools", icon: Clapperboard },
 ];
 
+// Keep Smart Frames wired, but hide its Home/sidebar entry until the hosted
+// renderer is ready for users.
+const SHOW_SMART_FRAMES_NAV = false;
+
 const NAV_SECTIONS: SidebarSection[] = [
   {
     labelKey: "workspace.sidebar.create",
@@ -160,7 +164,9 @@ const NAV_SECTIONS: SidebarSection[] = [
       ],
       [{ id: "image_upscale", labelKey: "workspace.sidebar.image_upscale", icon: Maximize2, width: "full" }],
       [{ id: "auto_subtitle", labelKey: "workspace.sidebar.auto_subtitle", badgeKey: "workspace.sidebar.editor_new", icon: Captions, width: "full" }],
-      [{ id: "smart_frames", labelKey: "workspace.sidebar.smart_frames", badgeKey: "workspace.sidebar.editor_new", icon: Sparkles, width: "full", tone: "accent" }],
+      ...(SHOW_SMART_FRAMES_NAV
+        ? [[{ id: "smart_frames", labelKey: "workspace.sidebar.smart_frames", badgeKey: "workspace.sidebar.editor_new", icon: Sparkles, width: "full", tone: "accent" }]]
+        : []),
       [{ id: "image_to_3d", labelKey: "workspace.sidebar.threed_gen", icon: Box, width: "full" }],
     ],
   },
