@@ -14,26 +14,21 @@ import OrgLoginPanel from "@/components/auth/OrgLoginPanel";
 import { resolveOrgLogin, type OrgLoginResolution } from "@/lib/orgLoginResolver";
 import { useSearchParams } from "react-router-dom";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
-
-const DEFAULT_POST_AUTH_PATH = "/app/workspace";
-
-const normalizePostAuthPath = (path: string) => {
-  // /app/university is a demo surface that should only be entered by
-  // pressing the PSC sidebar button after login. Never make it the
-  // automatic post-auth landing page.
-  if (path === "/app/university" || path.startsWith("/app/university?")) {
-    return DEFAULT_POST_AUTH_PATH;
-  }
-  return path;
-};
+import {
+  buildAuthRedirectUrl,
+  buildResetPasswordRedirectUrl,
+  DEFAULT_POST_AUTH_PATH,
+  getSafePostAuthPath,
+} from "@/lib/authRedirect";
 
 type AuthProps = {
   mode?: "page" | "modal";
   onClose?: () => void;
   redirectPath?: string | null;
+  initialTab?: "login" | "signup";
 };
 
-const Auth = ({ mode = "page", onClose, redirectPath }: AuthProps) => {
+const Auth = ({ mode = "page", onClose, redirectPath, initialTab }: AuthProps) => {
   const { t, t: i18n } = useLanguage();
   useDocumentTitle(i18n("auth.signInMediaforge"));
   const navigate = useNavigate();
@@ -45,6 +40,7 @@ const Auth = ({ mode = "page", onClose, redirectPath }: AuthProps) => {
   // logo so they see "their" brand on sign-in. Falls back to MediaForge
   // when the host doesn't match any tenant.
   const branding = useOrgBranding();
+  const tabParam = searchParams.get("tab");
   const {
     signIn,
     signUp,
@@ -54,7 +50,9 @@ const Auth = ({ mode = "page", onClose, redirectPath }: AuthProps) => {
     toast
   } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("login");
+  const resolveInitialTab = () =>
+    initialTab ?? (tabParam === "signup" ? "signup" : "login");
+  const [activeTab, setActiveTab] = useState<"login" | "signup">(resolveInitialTab);
   const [emailSent, setEmailSent] = useState(false);
   const [sentEmail, setSentEmail] = useState("");
   // Form states
@@ -65,6 +63,11 @@ const Auth = ({ mode = "page", onClose, redirectPath }: AuthProps) => {
   const [signupPassword, setSignupPassword] = useState("");
   const [isForgotLoading, setIsForgotLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  useEffect(() => {
+    setActiveTab(resolveInitialTab());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTab, tabParam]);
 
   // Org SSO detection — when an email's domain is registered to an org,
   // we replace the consumer login form with OrgLoginPanel (SSO only).
@@ -95,13 +98,7 @@ const Auth = ({ mode = "page", onClose, redirectPath }: AuthProps) => {
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     const redirectTarget = redirectPath ?? searchParams.get("redirect");
-    const safeRedirectTarget =
-      redirectTarget && redirectTarget.startsWith("/") && !redirectTarget.startsWith("//")
-        ? normalizePostAuthPath(redirectTarget)
-        : null;
-    const callbackUrl = safeRedirectTarget
-      ? `${window.location.origin}/auth?redirect=${encodeURIComponent(safeRedirectTarget)}`
-      : `${window.location.origin}/auth`;
+    const callbackUrl = buildAuthRedirectUrl(redirectTarget);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: callbackUrl },
@@ -123,7 +120,7 @@ const Auth = ({ mode = "page", onClose, redirectPath }: AuthProps) => {
     }
     setIsForgotLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: buildResetPasswordRedirectUrl(),
     });
     setIsForgotLoading(false);
     if (error) {
@@ -152,15 +149,15 @@ const Auth = ({ mode = "page", onClose, redirectPath }: AuthProps) => {
    * product doesn't grant credits via shareable links.
    */
   const resolveRedirect = () => {
-    if (redirectPath && redirectPath.startsWith("/") && !redirectPath.startsWith("//")) {
-      return normalizePostAuthPath(redirectPath);
-    }
+    const propRedirect = getSafePostAuthPath(redirectPath);
+    if (propRedirect) return propRedirect;
     const fromState = (location.state as { from?: { pathname?: string; search?: string } } | null)?.from;
-    if (fromState?.pathname && fromState.pathname.startsWith("/") && !fromState.pathname.startsWith("//")) {
-      return normalizePostAuthPath(`${fromState.pathname}${fromState.search ?? ""}`);
-    }
-    const r = searchParams.get("redirect");
-    if (r && r.startsWith("/") && !r.startsWith("//")) return normalizePostAuthPath(r);
+    const stateRedirect = fromState?.pathname
+      ? getSafePostAuthPath(`${fromState.pathname}${fromState.search ?? ""}`)
+      : null;
+    if (stateRedirect) return stateRedirect;
+    const queryRedirect = getSafePostAuthPath(searchParams.get("redirect"));
+    if (queryRedirect) return queryRedirect;
     return DEFAULT_POST_AUTH_PATH;
   };
 
@@ -283,7 +280,11 @@ const Auth = ({ mode = "page", onClose, redirectPath }: AuthProps) => {
                {i18n("auth.checkingOrganisation")}
              </div>
            )}
-           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+           <Tabs
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value === "signup" ? "signup" : "login")}
+            className="w-full"
+           >
             <TabsList className="grid w-full grid-cols-2 bg-muted">
               <TabsTrigger value="login">{t("authLoginTab")}</TabsTrigger>
               <TabsTrigger value="signup">{t("authSignupTab")}</TabsTrigger>

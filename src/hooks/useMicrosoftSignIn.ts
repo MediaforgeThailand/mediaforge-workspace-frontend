@@ -2,6 +2,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { buildAuthRedirectUrl } from "@/lib/authRedirect";
 
 interface MicrosoftSignInOptions {
   redirectPath?: string | null;
@@ -19,10 +20,7 @@ export const useMicrosoftSignIn = () => {
     setIsMicrosoftLoading(true);
     const { redirectPath, tenantId } = opts;
 
-    const callbackUrl =
-      redirectPath && redirectPath.startsWith("/") && redirectPath !== "/auth"
-        ? `${window.location.origin}/auth?redirect=${encodeURIComponent(redirectPath)}`
-        : `${window.location.origin}/auth`;
+    const callbackUrl = buildAuthRedirectUrl(redirectPath);
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "azure",

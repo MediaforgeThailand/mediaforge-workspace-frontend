@@ -169,7 +169,19 @@ function UsageRow({
   );
 }
 
-export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
+type SidebarAccountTrigger = {
+  name: string;
+  subtitle: string;
+  collapsed?: boolean;
+};
+
+export function UserMenu({
+  compact = false,
+  sidebarAccount,
+}: {
+  compact?: boolean;
+  sidebarAccount?: SidebarAccountTrigger;
+} = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, profile, signOut, loading: authLoading } = useAuth();
@@ -291,17 +303,36 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
     navigate("/auth", { replace: true });
   };
 
-  return (
-    <DropdownMenu
-      open={profileMenuOpen}
-      onOpenChange={(open) => {
-        setProfileMenuOpen(open);
-        if (!open) {
-          setLanguageMenuOpen(false);
-          setLanguageQuery("");
-        }
-      }}
-    >
+  const renderTrigger = () => {
+    if (sidebarAccount) {
+      return (
+        <DropdownMenuTrigger
+          className={cn("mf-ref-account-row", sidebarAccount.collapsed && "is-collapsed")}
+          aria-label={t("workspace.usermenu.account")}
+          title={sidebarAccount.name}
+        >
+          <CreditAvatarRing
+            src={profile?.avatar_url}
+            initial={initial}
+            personalPercent={personalPercent}
+            sharedPercent={sharedPercent}
+            showShared={showSharedUsage}
+            size={ringSize}
+          />
+          {!sidebarAccount.collapsed && (
+            <>
+              <span className="mf-ref-account-copy">
+                <strong>{sidebarAccount.name}</strong>
+                <span>{sidebarAccount.subtitle}</span>
+              </span>
+              <ChevronDown className="mf-ref-account-chevron" />
+            </>
+          )}
+        </DropdownMenuTrigger>
+      );
+    }
+
+    return (
       <DropdownMenuTrigger
         className={cn(
           "flex items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/50",
@@ -323,11 +354,26 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
           size={ringSize}
         />
       </DropdownMenuTrigger>
+    );
+  };
+
+  return (
+    <DropdownMenu
+      open={profileMenuOpen}
+      onOpenChange={(open) => {
+        setProfileMenuOpen(open);
+        if (!open) {
+          setLanguageMenuOpen(false);
+          setLanguageQuery("");
+        }
+      }}
+    >
+      {renderTrigger()}
 
       <DropdownMenuContent
         align="end"
         sideOffset={6}
-        className="max-h-[calc(100vh-48px)] w-[288px] overflow-y-auto rounded-[14px] border-white/[0.10] bg-[#121212] p-0 text-white shadow-2xl"
+        className="z-[1200] max-h-[calc(100vh-48px)] w-[288px] overflow-y-auto rounded-[14px] border-white/[0.10] bg-[#121212] p-0 text-white shadow-2xl"
         onInteractOutside={(event) => {
           const target = event.target;
           if (target instanceof HTMLElement && target.closest("[data-language-popover]")) {
@@ -482,7 +528,7 @@ export function UserMenu({ compact = false }: { compact?: boolean } = {}) {
                 collisionPadding={12}
                 onOpenAutoFocus={(event) => event.preventDefault()}
                 onCloseAutoFocus={(event) => event.preventDefault()}
-                className="z-[70] w-[256px] rounded-[10px] border border-white/[0.10] bg-[#1b1b1b] p-2 text-white shadow-2xl"
+                className="z-[1201] w-[256px] rounded-[10px] border border-white/[0.10] bg-[#1b1b1b] p-2 text-white shadow-2xl"
               >
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-2.5 top-1/2 h-[14px] w-[14px] -translate-y-1/2 text-white/55" />

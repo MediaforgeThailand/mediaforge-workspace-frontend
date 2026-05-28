@@ -11,9 +11,6 @@ import { createPortal } from "react-dom";
 import clsx from "clsx";
 import PromptMentionTextarea from "@/components/flow/nodes/PromptMentionTextarea";
 import { useLanguage, type Language } from "@/contexts/LanguageContext";
-import sampleRefOne from "@/assets/showcase-cat-astronaut.jpg";
-import sampleRefTwo from "@/assets/mock-packshot-perfume.jpg";
-import sampleRefThree from "@/assets/pro-trend-space-cat.jpg";
 import GenerateIcon from "@/components/GenerateIcon";
 import ModelHoverPreview from "./ModelHoverPreview";
 import {
@@ -80,6 +77,7 @@ function usePanelCopy() {
     imagePromptPlaceholder: t("createImagePanel.imagePromptPlaceholder"),
     videoPromptLabel: t("createImagePanel.videoPromptLabel"),
     videoPromptPlaceholder: t("createImagePanel.videoPromptPlaceholder"),
+    prompt: language === "th" ? "พรอมป์" : "Prompt",
     imageReferenceHint: t("createImagePanel.imageReferenceHint"),
     videoReferenceHint: t("createImagePanel.videoReferenceHint"),
     createForFree: t("createImagePanel.createForFree"),
@@ -273,6 +271,16 @@ export interface CreatePanelCostQuote {
   packageDiscountPercent: number;
   packageDiscountLabel?: string | null;
   totalDiscountPercent: number;
+}
+
+export function StandaloneToolHeaderCard({ title }: { title?: string }) {
+  if (!title) return null;
+
+  return (
+    <div className="mf-function-header-card">
+      <h2 className="mf-function-header-title">{title}</h2>
+    </div>
+  );
 }
 
 function CostDiscountLine({ quote }: { quote?: CreatePanelCostQuote | null }) {
@@ -541,29 +549,19 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   return (
     <div
       className={clsx(
-        "standalone-create-panel flex h-full w-full max-w-[480px] flex-col overflow-hidden bg-[#121314] rounded-[20px] border border-white/[0.02]",
+        "standalone-create-panel mf-clean-generator flex h-full w-full max-w-[480px] flex-col overflow-hidden bg-[#121314] rounded-[20px] border border-white/[0.02]",
         compactVoice && "standalone-create-panel-voice",
       )}
     >
-      {/* ===== HEADER ===== */}
-      <header
-        className={clsx(
-          "flex shrink-0 items-center",
-          compactVoice ? "h-[46px] px-[18px]" : "h-[56px] px-[20px]",
-        )}
-      >
-        <h1 className="flex min-w-0 flex-1 items-center text-[16px] font-semibold leading-[24px] tracking-[-0.12px] text-white">
-          <span className="standalone-panel-title line-clamp-1">{resolvedTitle}</span>
-        </h1>
-      </header>
-
       {/* ===== SCROLLABLE CONTENT ===== */}
       <div
         className={clsx(
-          "flex flex-1 min-h-0 flex-col overflow-y-auto px-[12px]",
+          "flex flex-1 min-h-0 flex-col overflow-y-auto px-[12px] pt-[12px]",
           compactVoice ? "gap-[3px] pb-[46px]" : "gap-[12px] pb-[12px]",
         )}
       >
+        <StandaloneToolHeaderCard title={title} />
+
         {/* Model Selector */}
         {showModelSelector && (
           <>
@@ -571,7 +569,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
               <button
                 type="button"
                 onClick={() => setModelOpen(true)}
-                className="standalone-model-card group relative inline-flex min-h-[50px] w-full shrink-0 items-center gap-[10px] overflow-hidden rounded-[14px] border border-white/[0.02] bg-[#16181a] py-[6px] pl-[8px] pr-[10px] transition-colors hover:bg-[#1c1f22]"
+                className="standalone-model-card mf-clean-model-card group relative inline-flex min-h-[50px] w-full shrink-0 items-center gap-[10px] overflow-hidden rounded-[14px] border border-white/[0.02] bg-[#16181a] py-[6px] pl-[8px] pr-[10px] transition-colors hover:bg-[#1c1f22]"
               >
                 <ModelLogoBadge model={{ id: selectedModelId, label: modelLabel }} size="md" />
                 <div className="flex-1 flex flex-col items-start min-w-0">
@@ -610,7 +608,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
         {(showPromptInput || showReferences) && (
         <section
           className={clsx(
-            "shrink-0 rounded-[16px] bg-[#151719] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]",
+            "mf-clean-input-section shrink-0 rounded-[16px] bg-[#151719] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]",
             compactVoice ? "min-h-[92px] border border-transparent p-[8px]" : "border border-white/[0.05] p-[10px]",
           )}
           onPasteCapture={handlePromptPaste}
@@ -618,9 +616,13 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
           onDragOverCapture={handlePromptDragOver}
           onDropCapture={handlePromptDrop}
         >
-          <div className="flex items-center gap-[10px]">
-            <span className="standalone-section-title text-[14px] font-semibold leading-[20px] text-white">{resolvedPromptLabel}</span>
-          </div>
+          {showReferences && (
+            <div className="mf-clean-step-heading flex items-center gap-[10px]">
+              <span className="standalone-section-title text-[14px] font-semibold leading-[20px] text-white">
+                1. {resolvedReferenceTitle}
+              </span>
+            </div>
+          )}
 
           {showReferences && (
             <div className="relative mt-[7px] overflow-hidden rounded-[10px]">
@@ -644,13 +646,19 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
                 }}
                 onDrop={handleReferenceDrop}
                 className={clsx(
+                  "mf-clean-reference-dropzone",
                   "relative flex min-h-[48px] items-center gap-[9px] rounded-[10px] border border-[#f4ff00]/70 bg-[radial-gradient(circle_at_16%_50%,rgba(244,255,0,0.15),rgba(244,255,0,0.045)_52%,rgba(0,0,0,0)_100%)] px-[9px] py-[6px] shadow-[inset_0_0_14px_rgba(244,255,0,0.075)] transition-all duration-150 outline-none focus:ring-1 focus:ring-[#f4ff00]/70",
                   onAddReferences || onReferenceFiles || onSelectReferenceAsset
-                    ? "cursor-pointer hover:-translate-y-[1px] hover:border-[#f4ff00] hover:bg-[#f4ff00]/[0.075] hover:shadow-[0_0_20px_rgba(244,255,0,0.22),inset_0_0_16px_rgba(244,255,0,0.1)] active:translate-y-0"
+                    ? "cursor-pointer hover:border-[#f4ff00] hover:bg-[#f4ff00]/[0.075] hover:shadow-[0_0_20px_rgba(244,255,0,0.22),inset_0_0_16px_rgba(244,255,0,0.1)] active:translate-y-0"
                     : "cursor-default",
                 )}
               >
-                <div className="flex shrink-0 -space-x-[7px]">
+                <div
+                  className={clsx(
+                    "shrink-0",
+                    references.length > 0 ? "flex -space-x-[7px]" : "standalone-reference-empty-glyph",
+                  )}
+                >
                   {references.length > 0 ? (
                     references.slice(0, 3).map((reference) => (
                       reference.mime?.startsWith("video/") ? (
@@ -670,14 +678,9 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
                       )
                     ))
                   ) : (
-                    DEFAULT_REFERENCE_THUMBS.map((src) => (
-                      <img
-                        key={src}
-                        src={src}
-                        alt=""
-                        className="h-[30px] w-[30px] rounded-[5px] object-cover ring-2 ring-[#121314]"
-                      />
-                    ))
+                    <span className="standalone-reference-empty-icon" aria-hidden="true">
+                      <ImageIcon className="h-[20px] w-[20px]" />
+                    </span>
                   )}
                 </div>
                 <div className="flex min-h-[34px] min-w-0 flex-1 flex-col justify-center pr-[40px]">
@@ -699,19 +702,33 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
           )}
 
           {showPromptInput && (
-            <StandalonePromptMentionTextarea
-              value={prompt}
-              onChange={updatePrompt}
-              placeholder={resolvedPromptPlaceholder}
-              mentionOptions={mentionOptions}
-              maxHeightPx={compactVoice ? 48 : undefined}
-              className={clsx(
-                "mt-[8px] rounded-none border-transparent bg-transparent px-[4px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-transparent focus:ring-0",
-                compactVoice
-                  ? "min-h-[34px] max-h-[48px] py-[1px]"
-                  : "min-h-[116px] max-h-[230px] py-[8px]",
-              )}
-            />
+            <>
+              <div className="mf-clean-prompt-head mt-[10px] flex items-center justify-between gap-[10px]">
+                <span className="standalone-section-title text-[14px] font-semibold leading-[20px] text-white">
+                  {showReferences ? copy.prompt : resolvedPromptLabel}
+                </span>
+                <AutoPromptButton
+                  label={autoPromptLabel}
+                  title={autoPromptTitle}
+                  running={autoPromptRunning}
+                  disabled={autoPromptDisabled}
+                  onClick={onAutoPrompt}
+                />
+              </div>
+              <StandalonePromptMentionTextarea
+                value={prompt}
+                onChange={updatePrompt}
+                placeholder={resolvedPromptPlaceholder}
+                mentionOptions={mentionOptions}
+                maxHeightPx={compactVoice ? 48 : undefined}
+                className={clsx(
+                  "mt-[8px] rounded-none border-transparent bg-transparent px-[4px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-transparent focus:ring-0",
+                  compactVoice
+                    ? "min-h-[34px] max-h-[48px] py-[1px]"
+                    : "min-h-[116px] max-h-[230px] py-[8px]",
+                )}
+              />
+            </>
           )}
 
           <div className="mt-[5px] flex items-center justify-between gap-[10px]">
@@ -739,21 +756,12 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
                 </button>
               )}
             </div>
-            {showPromptInput && (
-              <AutoPromptButton
-                label={autoPromptLabel}
-                title={autoPromptTitle}
-                running={autoPromptRunning}
-                disabled={autoPromptDisabled}
-                onClick={onAutoPrompt}
-              />
-            )}
           </div>
         </section>
         )}
 
         {settings.length > 0 && (
-          <div className="grid shrink-0 grid-cols-2 gap-[5px]">
+          <div className="mf-clean-settings-grid grid shrink-0 grid-cols-2 gap-[5px]">
             {settings.map((setting) => (
               <VideoSettingCard key={setting.id} setting={setting} />
             ))}
@@ -779,13 +787,13 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
       {/* ===== FOOTER ===== */}
       <div
         className={clsx(
-          "relative z-10 flex w-full flex-row items-center justify-between bg-[#121314] px-[12px]",
+          "mf-clean-footer relative z-10 flex w-full flex-row items-center justify-between bg-[#121314] px-[12px]",
           compactVoice ? "gap-[10px] pb-[7px] pt-[3px]" : "gap-[16px] pb-[12px]",
         )}
       >
         {/* Quantity stepper */}
         {showQuantity && (
-        <div className="flex h-[48px] items-center gap-[8px] px-[12px] rounded-[16px] bg-[#16181a] border border-white/[0.02]">
+        <div className="mf-clean-quantity-row flex h-[48px] items-center gap-[8px] px-[12px] rounded-[16px] bg-[#16181a] border border-white/[0.02]">
           <button onClick={() => updateQuantity(qty - 1)}
                   className="h-[28px] w-[28px] flex items-center justify-center rounded-[8px] hover:bg-white/[0.06] text-white">
             <Minus className="h-[16px] w-[16px]" />
@@ -800,7 +808,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
         </div>
         )}
 
-        <div className="flex min-w-0 flex-1 flex-col gap-[4px]">
+        <div className="mf-clean-action-stack flex min-w-0 flex-1 flex-col gap-[4px]">
           <CostDiscountLine quote={costQuote} />
           <button
             onClick={handleCreate}
@@ -1041,14 +1049,10 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
   };
 
   return (
-    <div className="standalone-create-panel flex h-full w-full max-w-[480px] flex-col overflow-hidden rounded-[20px] border border-white/[0.02] bg-[#121314]">
-      <header className="flex h-[56px] shrink-0 items-center px-[20px]">
-        <h1 className="flex min-w-0 flex-1 items-center text-[16px] font-semibold leading-[24px] tracking-[-0.12px] text-white">
-          <span className="standalone-panel-title line-clamp-1">{resolvedTitle}</span>
-        </h1>
-      </header>
+    <div className="standalone-create-panel mf-clean-generator flex h-full w-full max-w-[480px] flex-col overflow-hidden rounded-[20px] border border-white/[0.02] bg-[#121314]">
+      <div className="flex min-h-0 flex-1 flex-col gap-[10px] overflow-y-auto px-[12px] pb-[10px] pt-[12px]">
+        <StandaloneToolHeaderCard title={title} />
 
-      <div className="flex min-h-0 flex-1 flex-col gap-[10px] overflow-y-auto px-[12px] pb-[10px]">
         <div className="grid shrink-0 grid-cols-2 gap-[8px] rounded-[14px] border border-white/[0.02] bg-[#16181a] p-[4px]">
           <VideoModeCard
             active={activeMode === "frames"}
@@ -1070,7 +1074,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           <button
             type="button"
             onClick={() => setModelOpen(true)}
-            className="standalone-model-card group relative inline-flex min-h-[54px] w-full shrink-0 items-center gap-[10px] overflow-hidden rounded-[14px] border border-white/[0.02] bg-[#16181a] py-[6px] pl-[8px] pr-[10px] transition-colors hover:bg-[#1c1f22]"
+            className="standalone-model-card mf-clean-model-card group relative inline-flex min-h-[54px] w-full shrink-0 items-center gap-[10px] overflow-hidden rounded-[14px] border border-white/[0.02] bg-[#16181a] py-[6px] pl-[8px] pr-[10px] transition-colors hover:bg-[#1c1f22]"
           >
             <ModelLogoBadge model={{ id: selectedModelId, label: modelLabel }} size="lg" />
             <div className="flex min-w-0 flex-1 flex-col items-start">
@@ -1135,9 +1139,9 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
         />
 
         {activeMode === "frames" && visibleFrameSlots.length > 0 && (
-          <section className="shrink-0 rounded-[16px] border border-white/[0.035] bg-[#151719] p-[9px] shadow-[inset_0_1px_0_rgba(255,255,255,.035)]">
-            <h2 className="mb-[8px] text-[13px] font-semibold leading-[18px] text-white">
-              {visibleFrameSlots.length > 1 ? copy.setStartEndFrame : copy.setStartFrame}
+          <section className="mf-clean-input-section shrink-0 rounded-[16px] border border-white/[0.035] bg-[#151719] p-[9px] shadow-[inset_0_1px_0_rgba(255,255,255,.035)]">
+            <h2 className="mf-clean-step-heading mb-[8px] text-[13px] font-semibold leading-[18px] text-white">
+              1. {visibleFrameSlots.length > 1 ? copy.setStartEndFrame : copy.setStartFrame}
             </h2>
             <div className={clsx("grid gap-[8px]", visibleFrameSlots.length > 1 ? "grid-cols-2" : "grid-cols-1")}>
               {visibleFrameSlots.map((slot) => (
@@ -1152,10 +1156,14 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
         )}
 
         {showPromptSection && (
-        <section className="shrink-0 rounded-[16px] border border-white/[0.02] bg-[#16181a] p-[7px]">
-          <div className="mb-[6px] flex items-center px-[2px]">
-            <span className="standalone-section-title text-[14px] font-semibold leading-[20px] text-white">{resolvedPromptLabel}</span>
-          </div>
+        <section className="mf-clean-input-section shrink-0 rounded-[16px] border border-white/[0.02] bg-[#16181a] p-[7px]">
+          {activeMode === "reference" && (
+            <div className="mf-clean-step-heading mb-[6px] flex items-center px-[2px]">
+              <span className="standalone-section-title text-[14px] font-semibold leading-[20px] text-white">
+                1. {resolvedReferenceTitle}
+              </span>
+            </div>
+          )}
 
           {activeMode === "reference" && (
             <>
@@ -1192,13 +1200,19 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
                     }}
                     onDrop={handleReferenceDrop}
                     className={clsx(
+                      "mf-clean-reference-dropzone",
                       "flex min-h-[48px] items-center gap-[9px] rounded-[9px] border border-[#f4ff00]/75 bg-[#f4ff00]/[0.055] px-[9px] py-[6px] shadow-[inset_0_0_14px_rgba(238,255,0,0.09)] transition-all duration-150 outline-none focus:ring-1 focus:ring-[#f4ff00]/70",
                       onAddReferences || onReferenceFiles || onSelectReferenceAsset
-                        ? "cursor-pointer hover:-translate-y-[1px] hover:border-[#f4ff00] hover:bg-[#f4ff00]/[0.085] hover:shadow-[0_0_18px_rgba(238,255,0,0.2),inset_0_0_16px_rgba(238,255,0,0.1)] active:translate-y-0"
+                        ? "cursor-pointer hover:border-[#f4ff00] hover:bg-[#f4ff00]/[0.085] hover:shadow-[0_0_18px_rgba(238,255,0,0.2),inset_0_0_16px_rgba(238,255,0,0.1)] active:translate-y-0"
                         : "cursor-default",
                     )}
                   >
-                    <div className="flex -space-x-[7px]">
+                    <div
+                      className={clsx(
+                        "shrink-0",
+                        references.length > 0 ? "flex -space-x-[7px]" : "standalone-reference-empty-glyph",
+                      )}
+                    >
                       {references.length > 0 ? (
                         references.slice(0, 3).map((reference) => (
                           reference.mime?.startsWith("video/") ? (
@@ -1217,21 +1231,14 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
                             />
                           )
                         ))
-                      ) : referenceAcceptsImage ? (
-                        DEFAULT_REFERENCE_THUMBS.map((src) => (
-                          <img
-                            key={src}
-                            src={src}
-                            alt=""
-                            className="h-[32px] w-[32px] rounded-[5px] object-cover ring-2 ring-[#121314]"
-                          />
-                        ))
-                      ) : referenceAcceptsVideo ? (
-                        <div className="grid h-[32px] w-[32px] place-items-center rounded-[5px] bg-[#16181a] ring-2 ring-[#121314]">
-                          <Video className="h-[14px] w-[14px] text-white/80" />
-                        </div>
                       ) : (
-                        <div className="h-[32px] w-[32px] rounded-[5px] bg-white/[0.06] ring-2 ring-[#121314]" />
+                        <span className="standalone-reference-empty-icon" aria-hidden="true">
+                          {referenceAcceptsVideo && !referenceAcceptsImage ? (
+                            <Video className="h-[20px] w-[20px]" />
+                          ) : (
+                            <ImageIcon className="h-[20px] w-[20px]" />
+                          )}
+                        </span>
                       )}
                     </div>
                     <div className="flex min-h-[34px] min-w-0 flex-1 flex-col justify-center">
@@ -1262,14 +1269,10 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
               onDragOverCapture={handlePromptDragOver}
               onDropCapture={handlePromptDrop}
             >
-              <StandalonePromptMentionTextarea
-                value={prompt}
-                onChange={updatePrompt}
-                placeholder={resolvedPromptPlaceholder}
-                mentionOptions={mentionOptions}
-                className="min-h-[70px] max-h-[190px] rounded-[10px] border-white/[0.06] bg-[#121314] px-[10px] py-[8px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-[#f4ff00]/50"
-              />
-              <div className="flex justify-end">
+              <div className="mf-clean-prompt-head flex items-center justify-between gap-[10px]">
+                <span className="standalone-section-title text-[14px] font-semibold leading-[20px] text-white">
+                  {activeMode === "reference" ? copy.prompt : `2. ${copy.prompt}`}
+                </span>
                 <AutoPromptButton
                   label={autoPromptLabel}
                   title={autoPromptTitle}
@@ -1278,13 +1281,20 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
                   onClick={onAutoPrompt}
                 />
               </div>
+              <StandalonePromptMentionTextarea
+                value={prompt}
+                onChange={updatePrompt}
+                placeholder={resolvedPromptPlaceholder}
+                mentionOptions={mentionOptions}
+                className="min-h-[70px] max-h-[190px] rounded-[10px] border-white/[0.06] bg-[#121314] px-[10px] py-[8px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-[#f4ff00]/50"
+              />
             </div>
           )}
         </section>
         )}
 
         {settings.length > 0 && (
-          <div className="grid shrink-0 grid-cols-2 gap-[5px]">
+          <div className="mf-clean-settings-grid grid shrink-0 grid-cols-2 gap-[5px]">
             {settings.map((setting) => (
               <VideoSettingCard key={setting.id} setting={setting} />
             ))}
@@ -1302,8 +1312,8 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
         )}
       </div>
 
-      <div className="flex w-full flex-row items-center justify-between gap-[12px] border-t border-white/[0.03] bg-[#141618] px-[12px] py-[10px]">
-        <div className="flex h-[42px] items-center gap-[8px] rounded-[14px] border border-white/[0.05] bg-[#16181a] px-[10px]">
+      <div className="mf-clean-footer flex w-full flex-row items-center justify-between gap-[12px] border-t border-white/[0.03] bg-[#141618] px-[12px] py-[10px]">
+        <div className="mf-clean-quantity-row flex h-[42px] items-center gap-[8px] rounded-[14px] border border-white/[0.05] bg-[#16181a] px-[10px]">
           <button
             type="button"
             onClick={() => updateQuantity(qty - 1)}
@@ -1323,7 +1333,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           </button>
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-[4px]">
+        <div className="mf-clean-action-stack flex min-w-0 flex-1 flex-col gap-[4px]">
           <CostDiscountLine quote={costQuote} />
           <button
             type="button"
@@ -1480,7 +1490,7 @@ function FrameReferenceSlot({
         event.stopPropagation();
       }}
       onDrop={handleFrameDrop}
-      className="group relative flex min-h-[82px] flex-col overflow-hidden rounded-[12px] border border-white/[0.055] bg-[linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012))] p-[6px] shadow-[inset_0_1px_0_rgba(255,255,255,.04),0_8px_22px_-18px_rgba(0,0,0,.9)] outline-none transition hover:border-[#f4ff00]/45 hover:bg-[linear-gradient(180deg,rgba(244,255,0,.055),rgba(255,255,255,.012))] focus:border-[#f4ff00]/45"
+      className="mf-clean-frame-slot group relative flex min-h-[82px] flex-col overflow-hidden rounded-[12px] border border-white/[0.055] bg-[linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012))] p-[6px] shadow-[inset_0_1px_0_rgba(255,255,255,.04),0_8px_22px_-18px_rgba(0,0,0,.9)] outline-none transition hover:border-[#f4ff00]/45 hover:bg-[linear-gradient(180deg,rgba(244,255,0,.055),rgba(255,255,255,.012))] focus:border-[#f4ff00]/45"
     >
       <div className="pointer-events-none absolute inset-x-[10px] top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent opacity-70" />
       <button
@@ -1614,7 +1624,7 @@ function MotionReferenceSlot({
         event.stopPropagation();
       }}
       onDrop={handleDrop}
-      className="group relative flex min-h-[76px] items-center gap-[10px] overflow-hidden rounded-[12px] border border-[#f4ff00]/55 bg-[#f4ff00]/[0.06] p-[8px] outline-none shadow-[inset_0_-8px_22px_rgba(238,255,0,0.12),inset_0_1px_6px_rgba(255,255,255,0.04)] transition hover:border-[#f4ff00]/80 hover:bg-[#f4ff00]/[0.1] focus:ring-1 focus:ring-[#f4ff00]/60"
+      className="mf-clean-reference-dropzone group relative flex min-h-[76px] items-center gap-[10px] overflow-hidden rounded-[12px] border border-[#f4ff00]/55 bg-[#f4ff00]/[0.06] p-[8px] outline-none shadow-[inset_0_-8px_22px_rgba(238,255,0,0.12),inset_0_1px_6px_rgba(255,255,255,0.04)] transition hover:border-[#f4ff00]/80 hover:bg-[#f4ff00]/[0.1] focus:ring-1 focus:ring-[#f4ff00]/60"
     >
       <div className="grid h-[56px] w-[64px] shrink-0 place-items-center overflow-hidden rounded-[10px] bg-black/35 ring-1 ring-white/[0.08]">
         {refItem ? (
@@ -1877,8 +1887,6 @@ function VideoTextControlCard({ control }: { control: CreateVideoPanelTextContro
     </label>
   );
 }
-
-const DEFAULT_REFERENCE_THUMBS = [sampleRefOne, sampleRefTwo, sampleRefThree];
 
 const REFERENCE_MEDIA_EXT_RE = /\.(png|jpe?g|webp|gif|mp4|mov|webm|m4v)$/i;
 

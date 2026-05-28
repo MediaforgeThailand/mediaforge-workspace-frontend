@@ -147,7 +147,7 @@ const WorkspaceCanvasPagePill = () => {
 
   return (
     <div
-      className="fixed bottom-4 left-4 z-50"
+      className="fixed bottom-4 left-[56px] z-50"
       style={{
         fontFamily: "var(--font-sans)",
       }}

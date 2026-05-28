@@ -42,10 +42,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { friendlyError, functionErrorMessage } from "@/lib/friendlyError";
 import { uploadSupabaseStorageFile } from "@/lib/supabase/resumableUpload";
-import { UserMenu } from "@/components/workspace/UserMenu";
 import {
   CreateImagePanel,
   CreateVideoPanel,
+  StandaloneToolHeaderCard,
   StandalonePromptMentionTextarea,
   type CreatePanelCostQuote,
   type CreateVideoPanelSetting,
@@ -1770,13 +1770,13 @@ function standaloneCreateActionTitle(
 ) {
   const labels: Record<StandaloneToolKey, { en: string; th: string }> = {
     image_gen: { en: "Create Image", th: "สร้างรูปภาพ" },
-    image_upscale: { en: "Upscale Mediaforge", th: "Upscale Mediaforge" },
+    image_upscale: { en: "Upscale Mediaforge", th: "เพิ่มความละเอียดภาพ" },
     video_gen: { en: "Create Video", th: "สร้างวิดีโอ" },
     voice_gen: { en: "Create Audio", th: "สร้างเสียง" },
     voice_translate: { en: "Translate Voice", th: "แปลเสียงวิดีโอ" },
     image_to_3d: { en: "Create 3D", th: "สร้าง 3D" },
     auto_subtitle: { en: "Auto Subtitle", th: "ซับอัตโนมัติ" },
-    url_asset: { en: "URL to Asset", th: "URL to Asset" },
+    url_asset: { en: "URL to Asset", th: "URL แอสเซ็ต" },
   };
   const lang = language === "th" ? "th" : "en";
   return labels[tool][lang];
@@ -3592,7 +3592,7 @@ export default function StandaloneGenerator({
       : activeTool === "video_gen"
         ? t("workspace.standalone.describe_video")
         : activeTool === "image_upscale"
-          ? language === "th" ? "ไฟล์ต้นฉบับ" : "Source media"
+          ? t("workspace.standalone.source_media")
         : activeTool === "image_to_3d"
           ? t("workspace.standalone.reference_image")
           : t("workspace.standalone.describe_image");
@@ -3610,11 +3610,11 @@ export default function StandaloneGenerator({
 
   const panelReferenceTitle =
     activeTool === "image_upscale"
-      ? language === "th" ? "ไฟล์ต้นฉบับ" : "Source media"
+      ? t("workspace.standalone.source_file")
       : activeTool === "image_to_3d"
       ? activeThreeDMode === "image_to_3d"
         ? t("workspace.standalone.reference_image")
-        : "Source 3D model"
+        : t("workspace.standalone.source_3d_model")
       : activeTool === "video_gen"
         ? t("workspace.standalone.reference_image")
         : t("workspace.standalone.references");
@@ -4394,7 +4394,7 @@ export default function StandaloneGenerator({
       ? [
           {
             id: "source-url",
-            label: language === "th" ? "YouTube / Source URL" : "YouTube / Source URL",
+            label: t("workspace.standalone.source_url"),
             value: form.urlAssetSource ?? "",
             placeholder:
               form.model === "url-to-mp3" || form.model === "url-to-mp4"
@@ -4410,22 +4410,19 @@ export default function StandaloneGenerator({
       ? [
           {
             id: "url-output-format",
-            label: language === "th" ? "Output" : "Output",
+            label: t("workspace.standalone.output"),
             value: form.model,
             kind: "select" as const,
             options: [
-              { value: "url-to-mp4", label: "MP4 Video" },
-              { value: "url-to-mp3", label: "MP3 Audio" },
-              { value: "url-to-png", label: "PNG Image" },
+              { value: "url-to-mp4", label: t("workspace.standalone.output.mp4_video") },
+              { value: "url-to-mp3", label: t("workspace.standalone.output.mp3_audio") },
+              { value: "url-to-png", label: t("workspace.standalone.output.png_image") },
             ],
             onChange: setToolModel,
           },
         ]
       : [];
-  const videoPanelTitle =
-    videoPanelMode === "reference"
-      ? standaloneInlineLabel("textToVideo", language)
-      : standaloneInlineLabel("frameToVideo", language);
+  const videoPanelTitle = standaloneToolTitle("video_gen", t);
 
   const onFileSelected = async (file: File | undefined) => {
     if (!file) return;
@@ -4842,19 +4839,15 @@ export default function StandaloneGenerator({
         onChange={(event) => void onFileSelected(event.target.files?.[0])}
       />
 
-      <button
-        type="button"
-        onClick={onOpenSidebar}
-        className="fixed left-2 top-2 z-[40] grid h-9 w-9 place-items-center rounded-[10px] border border-white/[0.08] bg-black/75 text-zinc-100 shadow-[0_12px_28px_-22px_rgba(0,0,0,.95)] backdrop-blur-md transition hover:border-[#eaff00]/45 hover:text-[#eaff00] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#eaff00]/70 md:hidden"
-        aria-label={t("workspace.standalone.menu")}
-      >
-        <Menu className="h-[18px] w-[18px]" />
-      </button>
-
-      {activeTool !== "auto_subtitle" && activeTool !== "image_to_3d" && (
-        <div className="fixed right-1.5 top-1.5 z-[40] origin-top-right scale-[0.86] md:right-4 md:top-4 md:z-[80] md:scale-100">
-          <UserMenu />
-        </div>
+      {onOpenSidebar && (
+        <button
+          type="button"
+          onClick={onOpenSidebar}
+          className="fixed left-2 top-2 z-[40] grid h-9 w-9 place-items-center rounded-[10px] border border-white/[0.08] bg-black/75 text-zinc-100 shadow-[0_12px_28px_-22px_rgba(0,0,0,.95)] backdrop-blur-md transition hover:border-[#eaff00]/45 hover:text-[#eaff00] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#eaff00]/70 md:hidden"
+          aria-label={t("workspace.standalone.menu")}
+        >
+          <Menu className="h-[18px] w-[18px]" />
+        </button>
       )}
 
       <div className="ws-scroll-hide flex min-h-0 flex-1 flex-col overflow-y-auto bg-[var(--bg-app)] lg:flex-row lg:overflow-hidden">
@@ -4865,7 +4858,7 @@ export default function StandaloneGenerator({
               ? "lg:flex-1 lg:w-auto lg:max-w-none lg:p-0"
               : activeTool === "auto_subtitle"
                 ? "lg:w-[376px] xl:w-[405px] 2xl:w-[442px]"
-                : "lg:w-[488px]",
+                : "lg:w-[364px] xl:w-[386px]",
           )}
         >
           {STANDALONE_TOOL_ORDER.includes(activeTool) ? (
@@ -5009,7 +5002,7 @@ export default function StandaloneGenerator({
             />
             ) : (
             <CreateImagePanel
-              title={standaloneCreateActionTitle(activeTool, language)}
+              title={standaloneToolTitle(activeTool, t)}
               modelCaption={t("workspace.standalone.model")}
               prompt={panelPrompt}
               promptLabel={panelPromptLabel}
@@ -5450,7 +5443,7 @@ function MobileHeader({
         ) : (
           <div className="h-8 min-w-[32px]" aria-hidden />
         )}
-        <UserMenu />
+        <div className="h-8 min-w-[32px]" aria-hidden />
       </div>
       <div className="mx-auto max-w-[390px]">
         <ToolTabs
@@ -5491,7 +5484,7 @@ function DesktopTopBar({
       ) : (
         <div aria-hidden />
       )}
-      <UserMenu />
+      <div aria-hidden />
     </div>
   );
 }
@@ -6014,19 +6007,11 @@ function VoiceTranslatePanel({
     task?.status === "running";
 
   return (
-    <section className="standalone-translate-panel flex min-h-0 flex-1 flex-col overflow-hidden rounded-[18px] border border-[var(--border-overlay)] bg-[var(--bg-sidebar)] shadow-[inset_0_1px_0_rgba(255,255,255,.05)]">
-      <div className="flex h-[52px] shrink-0 items-center gap-2.5 border-b border-white/[0.05] px-3.5">
-        <span className="grid h-8 w-8 shrink-0 place-items-center text-cyan-200">
-          <Languages className="h-4 w-4" />
-        </span>
-        <div className="min-w-0">
-          <h2 className="truncate text-[15px] font-bold leading-[17px] text-white">{copy.title}</h2>
-          <p className="mt-0.5 truncate text-[10px] leading-[13px] text-zinc-400">{copy.subtitle}</p>
-        </div>
-      </div>
+    <section className="standalone-create-panel standalone-translate-panel mf-clean-generator flex h-full w-full max-w-[480px] flex-col overflow-hidden rounded-[20px] border border-white/[0.02] bg-[#121314]">
+      <div className="ws-scroll-hide flex min-h-0 flex-1 flex-col gap-[10px] overflow-y-auto px-[12px] pb-[10px] pt-[12px]">
+        <div className="space-y-[10px]">
+          <StandaloneToolHeaderCard title={copy.title} />
 
-      <div className="ws-scroll-hide min-h-0 flex-1 overflow-y-auto px-3 py-2.5">
-        <div className="space-y-2.5">
           <div
             role={!media ? "button" : undefined}
             tabIndex={!media ? 0 : undefined}
@@ -6044,10 +6029,10 @@ function VoiceTranslatePanel({
             }}
             onDrop={handleDrop}
             className={cn(
-              "group relative flex min-h-[94px] w-full overflow-hidden rounded-[12px] border text-left transition",
+              "mf-clean-reference-dropzone mf-clean-translate-dropzone group relative flex w-full items-center overflow-hidden text-left outline-none transition",
               media
-                ? "border-white/10 bg-black/30"
-                : "border-dashed border-cyan-300/35 bg-cyan-300/[0.04] hover:border-cyan-200/70 hover:bg-cyan-300/[0.07]",
+                ? "is-loaded cursor-default"
+                : "cursor-pointer focus:ring-1 focus:ring-[#f4ff00]/60",
             )}
           >
             {media ? (
@@ -6092,21 +6077,24 @@ function VoiceTranslatePanel({
                 </button>
               </>
             ) : (
-              <div className="flex w-full items-center gap-2.5 px-3 py-3">
-                <span className="grid h-9 w-9 shrink-0 place-items-center text-cyan-200">
-                  {uploading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <UploadCloud className="h-4 w-4" />
-                  )}
+              <div className="flex w-full items-center gap-[14px]">
+                <span className="standalone-reference-empty-glyph">
+                  <span className="standalone-reference-empty-icon" aria-hidden="true">
+                    {uploading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <UploadCloud className="h-[18px] w-[18px]" />
+                    )}
+                  </span>
                 </span>
-                <div className="min-w-0">
-                  <p className="text-[13px] font-bold leading-[15px] text-white">{copy.uploadTitle}</p>
-                  <p className="mt-1 truncate text-[11px] leading-[14px] text-zinc-400">{copy.uploadHint}</p>
-                  <p className="mt-1 text-[10px] font-semibold leading-[12px] text-cyan-100/70">
+                <div className="min-w-0 flex-1">
+                  <p className="standalone-reference-title truncate font-semibold text-white">{copy.uploadTitle}</p>
+                  <p className="standalone-reference-hint mt-[3px] truncate text-zinc-400">{copy.uploadHint}</p>
+                  <p className="mt-[6px] text-[12px] font-semibold leading-[16px] text-[#f4ff00]">
                     {copy.uploadLimit}
                   </p>
                 </div>
+                <span className="self-center text-[13px] font-bold leading-[18px] text-white">0/1</span>
               </div>
             )}
           </div>
@@ -6173,7 +6161,7 @@ function VoiceTranslatePanel({
               className={cn(
                 "grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[5px] border transition",
                 form.translateConsent
-                  ? "border-cyan-200 bg-cyan-200 text-black"
+                  ? "border-[#f4ff00] bg-[#f4ff00] text-black"
                   : "border-white/20 bg-black/30 text-transparent",
               )}
             >
@@ -6188,7 +6176,7 @@ function VoiceTranslatePanel({
             <span className="text-[15px] font-semibold leading-[18px] text-zinc-200">{copy.consent}</span>
           </label>
 
-          <p className="rounded-[10px] border border-[var(--border-faint)] bg-black/20 px-2.5 py-2 text-[13px] font-medium leading-[18px] text-zinc-400">
+          <p className="rounded-[10px] border border-white/[0.04] bg-black/20 px-2.5 py-2 text-[13px] font-medium leading-[18px] text-zinc-400">
             {copy.sourceHint}
           </p>
 
@@ -6219,24 +6207,26 @@ function VoiceTranslatePanel({
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-white/[0.05] bg-[var(--bg-sidebar)] px-3 py-2.5">
-        <div className="grid grid-cols-2 gap-2.5">
-          <div className="flex h-[40px] items-center gap-2 rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-panel)] px-2.5 text-[13px] font-semibold text-zinc-300">
-            <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-400" />
-            <span className="truncate">{media ? translateOutputShortLabel(media) : t("workspace.standalone.panel.media")}</span>
-          </div>
+      <div className="mf-clean-footer flex w-full flex-col items-stretch gap-[10px] bg-[#121314] px-[12px] py-[10px]">
+        <div className="mf-clean-translate-media-row flex h-[36px] w-full items-center gap-2 rounded-[14px] border border-white/[0.05] bg-[#16181a] px-[10px] text-[13px] font-semibold text-zinc-300">
+          <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-400" />
+          <span className="truncate">{media ? translateOutputShortLabel(media) : t("workspace.standalone.panel.media")}</span>
+        </div>
+        <div className="mf-clean-action-stack flex w-full min-w-0 flex-col gap-[4px]">
           <button
             type="button"
             onClick={onCreate}
-            disabled={isBusy || !media || !form.translateConsent}
-            className="btn-cta flex !h-10 w-full items-center justify-center gap-2 text-[13px] disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-300 disabled:shadow-none disabled:opacity-70"
+            disabled={isBusy}
+            className="standalone-generate-button ci-gloss-button group relative flex w-full items-center justify-center gap-[8px] overflow-hidden rounded-full border px-[14px] text-[15px] font-semibold leading-[20px] transition-all active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
           >
+            <span className="pointer-events-none absolute inset-x-4 top-0 h-[16px] rounded-b-full bg-white/30 blur-[10px]" />
+            <span className="pointer-events-none absolute -right-8 top-1/2 h-20 w-28 -translate-y-1/2 rounded-full bg-sky-200/25 blur-2xl" />
             {isBusy ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="relative h-4 w-4 animate-spin" />
             ) : (
-              <GenerateIcon className="h-3.5 w-3.5" />
+              <GenerateIcon className="relative h-4 w-4" />
             )}
-            {isBusy ? copy.processing : copy.action}
+            <span className="relative truncate">{isBusy ? copy.processing : copy.action}</span>
           </button>
         </div>
       </div>
@@ -6424,7 +6414,7 @@ function AutoSubtitlePanelV2({
   return (
     <section className="standalone-create-panel standalone-translate-panel flex h-full w-full max-w-none flex-col overflow-hidden rounded-[20px] border border-white/[0.02] bg-[#121314]">
       <AutoSubtitlePreviewKeyframes />
-      <div className="flex h-[58px] shrink-0 items-center gap-[10px] border-b border-white/[0.035] px-[18px]">
+      <div className="mf-function-header flex h-[58px] shrink-0 items-center gap-[10px] border-b border-white/[0.035] px-[18px]">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-[var(--brand-primary)]/10 text-[var(--brand-soft)]">
           <Captions className="h-[16px] w-[16px]" />
         </span>
@@ -7987,7 +7977,7 @@ function AutoSubtitlePanel({
 
   return (
     <section className="standalone-translate-panel flex min-h-0 flex-1 flex-col overflow-hidden rounded-[18px] border border-[var(--border-overlay)] bg-[var(--bg-sidebar)] shadow-[inset_0_1px_0_rgba(255,255,255,.05)]">
-      <div className="flex h-[52px] shrink-0 items-center gap-2.5 border-b border-white/[0.05] px-3.5">
+      <div className="mf-function-header flex h-[52px] shrink-0 items-center gap-2.5 border-b border-white/[0.05] px-3.5">
         <span className="grid h-8 w-8 shrink-0 place-items-center text-cyan-200">
           <Captions className="h-4 w-4" />
         </span>
@@ -10337,15 +10327,12 @@ function ThreeDWorkshop({
         </div>
 
         <div className="flex min-w-0 min-h-0 flex-1 flex-col px-[12px] py-[12px]">
-          <div className="mb-[12px] flex items-center justify-between gap-[8px] pl-12 lg:pl-0">
+          <div className="mf-function-header mb-[12px] flex items-center justify-between gap-[8px] pl-12 lg:pl-0">
             <div className="min-w-0">
               <h1 className="[font-size:16px] font-bold [line-height:20px] text-white">3D Workshop</h1>
               <p className="[font-size:11px] font-medium [line-height:14px] text-zinc-500">
                 Tripo model, rig, animate, export
               </p>
-            </div>
-            <div className="lg:hidden">
-              <UserMenu />
             </div>
           </div>
 
@@ -10686,9 +10673,6 @@ function ThreeDWorkshop({
       </main>
 
       <aside className="hidden min-h-0 w-[252px] shrink-0 border-l border-white/[0.06] bg-[#151617] lg:flex lg:flex-col">
-        <div className="hidden h-[44px] shrink-0 items-center justify-end border-b border-white/[0.055] bg-[#151617] px-[12px] lg:flex">
-          <UserMenu />
-        </div>
         <div className="grid h-10 shrink-0 grid-cols-2 border-b border-white/[0.06]">
           <button
             type="button"
@@ -12833,8 +12817,8 @@ function CreationFeed({
 
   return (
     <>
-      <div className="mb-2 flex min-h-0 items-center justify-start">
-        <div className="inline-flex h-6 items-center gap-[1px] rounded-[7px] bg-[#1b1b1b]/95 p-[2px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]">
+      <div className="mb-2.5 flex min-h-0 items-center justify-start">
+        <div className="inline-flex h-7 items-center gap-0.5 rounded-[8px] bg-[#1b1b1b]/95 p-[2px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07)]">
           {viewModes.map((mode) => {
             const active = layoutMode === mode.id;
             const Icon = mode.icon;
@@ -12847,13 +12831,13 @@ function CreationFeed({
                 title={mode.label}
                 onClick={() => setLayoutMode(mode.id)}
                 className={cn(
-                  "grid h-[18px] w-[18px] place-items-center rounded-[4px] text-zinc-400 transition",
+                  "grid h-[22px] w-[24px] place-items-center rounded-[5px] text-zinc-400 transition",
                   active
                     ? "bg-white text-zinc-950 shadow-[0_8px_18px_rgba(0,0,0,0.24)]"
                     : "hover:bg-white/[0.07] hover:text-white",
                 )}
               >
-                <Icon className="h-[11px] w-[11px]" />
+                <Icon className="h-[12px] w-[12px]" />
               </button>
             );
           })}
@@ -14299,7 +14283,7 @@ function CreationRow({
           )}
         </div>
 
-        <div className="flex shrink-0 gap-2 md:flex-col">
+        <div className="flex shrink-0 gap-1.5 md:flex-col">
           {downloadUrl && (
             <>
               <button
@@ -14310,20 +14294,20 @@ function CreationRow({
                   void handleDownload();
                 }}
                 data-testid="standalone-download"
-                className="grid h-9 w-9 place-items-center rounded-lg bg-white text-zinc-950 hover:bg-zinc-200"
+                className="grid h-8 w-8 place-items-center rounded-[9px] bg-white text-zinc-950 hover:bg-zinc-200"
                 aria-label={t("workspace.standalone.download")}
               >
-                <Download className="h-4 w-4" />
+                <Download className="h-[14px] w-[14px]" />
               </button>
               {externalUrl && (
                 <a
                   href={externalUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="grid h-9 w-9 place-items-center rounded-lg bg-[#2f2f2f] text-zinc-300 hover:bg-[#3a3a3a]"
+                  className="grid h-8 w-8 place-items-center rounded-[9px] bg-[#2f2f2f] text-zinc-300 hover:bg-[#3a3a3a]"
                   aria-label={t("workspace.standalone.open_file")}
                 >
-                  <ExternalLink className="h-4 w-4" />
+                  <ExternalLink className="h-[14px] w-[14px]" />
                 </a>
               )}
             </>
@@ -14333,11 +14317,11 @@ function CreationRow({
               type="button"
               onClick={openModelPreview}
               data-testid="standalone-open-3d-preview"
-              className="grid h-9 w-9 place-items-center rounded-lg bg-amber-300 text-zinc-950 hover:bg-amber-200"
+              className="grid h-8 w-8 place-items-center rounded-[9px] bg-amber-300 text-zinc-950 hover:bg-amber-200"
               aria-label={t("workspace.standalone.preview_3d_model")}
               title={t("workspace.standalone.preview_3d_model")}
             >
-              <Box className="h-4 w-4" />
+              <Box className="h-[14px] w-[14px]" />
             </button>
           )}
           {canDelete && (
@@ -14348,11 +14332,11 @@ function CreationRow({
                 event.stopPropagation();
                 onDelete();
               }}
-              className="grid h-9 w-9 place-items-center rounded-lg bg-white/[0.06] text-zinc-400 transition hover:bg-red-500/15 hover:text-red-200"
+              className="grid h-8 w-8 place-items-center rounded-[9px] bg-white/[0.06] text-zinc-400 transition hover:bg-red-500/15 hover:text-red-200"
               aria-label={language === "th" ? "ลบรายการ" : "Delete result"}
               title={language === "th" ? "ลบรายการ" : "Delete result"}
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-[14px] w-[14px]" />
             </button>
           )}
         </div>

@@ -33,6 +33,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
 import WorkspaceCanvasPagePill from "@/components/workspace/WorkspaceCanvasPagePill";
 import CanvasHeader from "@/components/workspace/CanvasHeader";
+import CanvasSideRail from "@/components/workspace/CanvasSideRail";
 // Tool palette is replaced by the in-canvas floating sidebar (see
 // CanvasFloatingSidebar) + the right-click context menu (see
 // CanvasContextMenu). Both live inside WorkspaceCanvas and don't
@@ -374,7 +375,7 @@ const WorkspaceCanvasPage = () => {
     // the dashboard, even when portals or isolated canvas surfaces
     // would otherwise inherit a browser default.
     <div
-      className="mf-readable flex h-screen w-screen flex-col bg-[#1b1c1c] text-zinc-100"
+      className="mf-readable flex h-screen w-screen bg-[#050606] text-zinc-100"
       style={{
         fontFamily: "var(--font-sans)",
       }}
@@ -385,40 +386,43 @@ const WorkspaceCanvasPage = () => {
           unmounting the React tree and leaving the user staring at a
           black void with no escape but F5. */}
       <WorkspaceErrorBoundary>
-        <CanvasHeader />
-        <ShareModeBanner />
-        <div className="flex flex-1 overflow-hidden">
-          <main className="min-w-0 flex-1">
-            {/* Share-token resolution gates the canvas when the URL
-             *  carries a `?share=` param. error → invalid screen;
-             *  resolving / redirecting → loading state; ok / no-token
-             *  → normal hydration path below. */}
-            {shareStatus.phase === "error" ? (
-              <ShareLinkInvalidScreen reason={shareStatus.reason} />
-            ) : shareStatus.phase === "resolving" ||
-              shareStatus.phase === "redirecting" ? (
-              <CanvasHydrationStatus
-                authLoading={authLoading}
-                hasUser={!!user?.id}
-                customStatus={
-                  shareStatus.phase === "redirecting"
-                    ? "Redirecting to sign in…"
-                    : "Verifying share link…"
-                }
-              />
-            ) : hydrated ? (
-              <WorkspaceCanvas />
-            ) : (
-              <CanvasHydrationStatus
-                authLoading={authLoading}
-                hasUser={!!user?.id}
-              />
-            )}
-          </main>
-          {/* Always-mounted bridges so the canvas right-click menu's
-           *  Upload / Assets / Stock entries keep working even while
-           *  the right sidebar (which used to host them) is hidden. */}
-          <WorkspaceCanvasMediaBridges />
+        <CanvasSideRail />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <CanvasHeader />
+          <ShareModeBanner />
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            <main className="min-w-0 flex-1">
+              {/* Share-token resolution gates the canvas when the URL
+               *  carries a `?share=` param. error → invalid screen;
+               *  resolving / redirecting → loading state; ok / no-token
+               *  → normal hydration path below. */}
+              {shareStatus.phase === "error" ? (
+                <ShareLinkInvalidScreen reason={shareStatus.reason} />
+              ) : shareStatus.phase === "resolving" ||
+                shareStatus.phase === "redirecting" ? (
+                <CanvasHydrationStatus
+                  authLoading={authLoading}
+                  hasUser={!!user?.id}
+                  customStatus={
+                    shareStatus.phase === "redirecting"
+                      ? "Redirecting to sign in…"
+                      : "Verifying share link…"
+                  }
+                />
+              ) : hydrated ? (
+                <WorkspaceCanvas />
+              ) : (
+                <CanvasHydrationStatus
+                  authLoading={authLoading}
+                  hasUser={!!user?.id}
+                />
+              )}
+            </main>
+            {/* Always-mounted bridges so the canvas right-click menu's
+             *  Upload / Assets / Stock entries keep working even while
+             *  the right sidebar (which used to host them) is hidden. */}
+            <WorkspaceCanvasMediaBridges />
+          </div>
         </div>
         {/* <WorkspaceDebugPanel /> — kept disabled until persist
          *   middleware is audited (not blocking demo). */}
@@ -461,7 +465,7 @@ function CanvasHydrationStatus({
       <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-700 border-t-zinc-200" />
       <div className="text-sm">{status}</div>
       <a
-        href="/app/workspace"
+        href="/app/workspace?section=spaces"
         className="text-[11px] text-zinc-500 underline-offset-4 hover:text-zinc-300 hover:underline"
       >
         {i18n("workspace.canvas.backToWorkspaces")}

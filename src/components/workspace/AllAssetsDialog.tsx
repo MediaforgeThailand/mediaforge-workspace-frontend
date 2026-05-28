@@ -18,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import { DEFAULT_PROJECT_NAME, useWorkspaceStore } from "@/store/useWorkspaceStore";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -248,18 +248,28 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
     [workspaces],
   );
 
+  const localizeProjectName = useCallback(
+    (name: string | null | undefined) => {
+      const trimmed = name?.trim();
+      if (!trimmed) return t("workspace.allAssets.untitledProject");
+      if (trimmed === DEFAULT_PROJECT_NAME) return t("workspace.allAssets.defaultProject");
+      return trimmed;
+    },
+    [t],
+  );
+
   const projectOptions = useMemo(
     () =>
       projects.map((project) => ({
         id: project.id,
-        name: project.name || "Untitled project",
+        name: localizeProjectName(project.name),
         color: project.color ?? null,
       })),
-    [projects],
+    [projects, localizeProjectName],
   );
 
   const activeProjectName =
-    projectOptions.find((p) => p.id === effectiveProjectId)?.name ?? "All projects";
+    projectOptions.find((p) => p.id === effectiveProjectId)?.name ?? t("workspace.allAssets.allProjects");
 
   const graphAssets = useMemo<DialogAsset[]>(() => {
     const out: DialogAsset[] = [];
@@ -293,13 +303,13 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
               label:
                 (d.label as string | undefined) ||
                 (d.fileName as string | undefined) ||
-                "asset",
+                t("workspace.allAssets.asset"),
               fileName: d.fileName as string | undefined,
               fromNodeId: n.id,
               fromNodeLabel:
                 (d.label as string | undefined) ||
                 (d.fileName as string | undefined) ||
-                "asset",
+                t("workspace.allAssets.asset"),
               projectId,
               workspaceId,
               canvasId,
@@ -369,7 +379,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
       if (b.createdAt) return 1;
       return a.label.localeCompare(b.label);
     });
-  }, [allGraphs, canvasMetaById, workspaceProjectById]);
+  }, [allGraphs, canvasMetaById, t, workspaceProjectById]);
 
   useEffect(() => {
     let cancelled = false;
@@ -421,7 +431,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
         );
         const mediaUrls = modelUrl ? [modelUrl] : outputUrlsFromRecord(result).concat(outputUrlsFromRecord(outputs));
         const modelLabel =
-          firstString(row.model, row.node_type, row.provider) ?? "Generation";
+          firstString(row.model, row.node_type, row.provider) ?? t("workspace.allAssets.generation");
         const request = asRecord(row.request);
         const params = asRecord(request.params);
         const prompt = firstString(params.prompt, params.system_prompt, result.prompt);
@@ -530,13 +540,13 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
               firstString(row.name, row.file_name, row.filename, metadata.name, metadata.file_name),
             ) ??
             cleanAssetName(rawUrl) ??
-            "asset",
+            t("workspace.allAssets.asset"),
           fileName:
             cleanAssetName(
               firstString(row.file_name, row.filename, metadata.file_name, metadata.filename),
             ) ?? cleanAssetName(rawUrl),
           fromNodeId: String(row.id ?? rawUrl),
-          fromNodeLabel: "Upload",
+          fromNodeLabel: t("workspace.allAssets.upload"),
           projectId,
           workspaceId: null,
           canvasId: `upload:${projectId ?? user.id}`,
@@ -564,7 +574,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
           : [];
         const editorProjectId = firstString(row.id, projectData.id) ?? "editor-project";
         const editorProjectName =
-          firstString(row.name, projectData.name) ?? "Editing project";
+          firstString(row.name, projectData.name) ?? t("workspace.allAssets.editingProject");
         const rowCreatedAt =
           dateMs(row.updated_at) ?? dateMs(row.created_at) ?? dateMs(projectData.modifiedAt);
 
@@ -617,7 +627,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
           const displayName =
             cleanAssetName(firstString(item.name, item.fileName, item.filename)) ??
             cleanAssetName(rawUrl) ??
-            `${editorProjectName} asset`;
+            t("workspace.allAssets.projectAsset", { name: editorProjectName });
           addAsset({
             id: `editor_${editorProjectId}_${itemId}`,
             source: "uploaded",
@@ -678,7 +688,10 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
             label: displayName,
             fileName: displayName,
             fromNodeId: path,
-            fromNodeLabel: bucket === "user_assets" ? "Editor upload" : "Upload",
+            fromNodeLabel:
+              bucket === "user_assets"
+                ? t("workspace.allAssets.editorUpload")
+                : t("workspace.allAssets.upload"),
             projectId: effectiveProjectId,
             workspaceId: null,
             canvasId: `storage:${bucket}`,
@@ -708,7 +721,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [effectiveProjectId, open, user]);
+  }, [effectiveProjectId, open, t, user]);
 
   const assets = useMemo<DialogAsset[]>(() => {
     const out: DialogAsset[] = [];
@@ -851,7 +864,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
           <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center bg-yellow-500/12 text-yellow-100">
             <div className="flex items-center gap-2 rounded-md border border-yellow-400/40 bg-black/70 px-4 py-2 text-sm font-semibold">
               <UploadCloud className="h-4 w-4" />
-              Drop files to upload
+              {t("workspace.allAssets.dropToUpload")}
             </div>
           </div>
         )}
@@ -879,7 +892,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
                 <button
                   type="button"
                   className="flex h-[30px] shrink-0 items-center gap-2 rounded-[5px] bg-[#1f1f1f] px-2.5 text-left text-[13.5px] font-semibold tracking-tight text-[#e8e8e8] outline-none transition hover:bg-[#262626] focus-visible:bg-[#262626]"
-                  title="Switch project"
+                  title={t("workspace.allAssets.switchProject")}
                 >
                   {projectOptions.find((p) => p.id === effectiveProjectId)
                     ?.color ? (
@@ -905,7 +918,7 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
                     disabled
                     className="flex h-[30px] items-center px-2 text-[13px] text-[#9a9a9a]"
                   >
-                    No projects
+                    {t("workspace.allAssets.noProjects")}
                   </DropdownMenuItem>
                 ) : (
                   projectOptions.map((project) => {
@@ -981,13 +994,14 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
               </button>
             </div>
             <span className="ml-auto shrink-0 text-[11.5px] font-medium leading-none text-[#8f8f8f]">
-              {visibleAssets.length} files
+              {t("workspace.allAssets.fileCount", { n: visibleAssets.length })}
             </span>
             <button
               type="button"
               onClick={onClose}
               className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-[#a7a7a7] transition hover:bg-[#242424] hover:text-white"
-              title="Close"
+              title={t("common.close")}
+              aria-label={t("common.close")}
             >
               <X className="h-[16px] w-[16px]" />
             </button>
@@ -996,18 +1010,20 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
           <div className="flex min-h-0 flex-1">
             <aside className="w-[180px] shrink-0 bg-[#202020] px-3 py-4">
               <div>
-                <p className="mb-3 text-[12px] font-semibold text-[#969696]">Asset</p>
+                <p className="mb-3 text-[12px] font-semibold text-[#969696]">
+                  {t("workspace.allAssets.asset")}
+                </p>
                 <SidebarItem
                   active={activeTab === "recent"}
                   icon={Clock3}
-                  label="Recent"
+                  label={t("workspace.allAssets.recent")}
                   count={Math.min(projectAssets.length, 24)}
                   onClick={() => setActiveTab("recent")}
                 />
                 <SidebarItem
                   active={activeTab === "project"}
                   icon={Folder}
-                  label="Project Files"
+                  label={t("workspace.allAssets.projectFiles")}
                   count={projectAssets.length}
                   onClick={() => setActiveTab("project")}
                 />
@@ -1017,7 +1033,9 @@ const AllAssetsDialog = ({ open, onClose }: Props) => {
             <main className="ws-scroll-hide min-w-0 flex-1 overflow-y-auto bg-[#151515] p-5">
               {visibleAssets.length === 0 ? (
                 <div className="flex h-full items-center justify-center text-[13px] font-medium text-[#777]">
-                  {projectAssets.length === 0 ? "No project files yet" : "No matching assets"}
+                  {projectAssets.length === 0
+                    ? t("workspace.allAssets.noProjectFiles")
+                    : t("workspace.allAssets.noMatchingAssets")}
                 </div>
               ) : viewMode === "grid" ? (
                 <ul className="grid grid-cols-4 gap-3">
@@ -1096,39 +1114,42 @@ const AssetGridCard = ({
   onClick: () => void;
   onDoubleClick: () => void;
   onDragStart: (event: React.DragEvent) => void;
-}) => (
-  <li
-    draggable
-    onDragStart={onDragStart}
-    onClick={onClick}
-    onDoubleClick={onDoubleClick}
-    title={`${asset.label} - ${asset.fieldType}`}
-    className={cn(
-      "group cursor-pointer overflow-hidden rounded-[6px] border bg-[#1b1b1b] transition",
-      selected
-        ? "border-yellow-500 shadow-[0_0_0_1px_rgba(238,255,0,.85)]"
-        : "border-[#3a3a3a] hover:border-[#666]",
-    )}
-  >
-    <div className="relative flex h-[104px] items-center justify-center overflow-hidden bg-[#181818]">
-      <AssetPreview asset={asset} />
-      {asset.fieldType === "video" && (
-        <Play className="absolute bottom-2 left-2 h-[14px] w-[14px] text-white drop-shadow" />
+}) => {
+  const { t } = useLanguage();
+  return (
+    <li
+      draggable
+      onDragStart={onDragStart}
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
+      title={`${asset.label} - ${kindLabel(asset.fieldType, t)}`}
+      className={cn(
+        "group cursor-pointer overflow-hidden rounded-[6px] border bg-[#1b1b1b] transition",
+        selected
+          ? "border-yellow-500 shadow-[0_0_0_1px_rgba(238,255,0,.85)]"
+          : "border-[#3a3a3a] hover:border-[#666]",
       )}
-      {selected && (
-        <div className="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-[#f4ff00] text-black">
-          <Check className="h-3 w-3" />
-        </div>
-      )}
-    </div>
-    <div className="flex h-[30px] items-center gap-1.5 border-t border-[#303030] px-2">
-      <AssetKindIcon type={asset.fieldType} className="h-[12px] w-[12px] shrink-0 text-[#8d8d8d]" />
-      <span className="min-w-0 truncate text-[11px] font-semibold text-[#d7d7d7]">
-        {asset.fileName || asset.label}
-      </span>
-    </div>
-  </li>
-);
+    >
+      <div className="relative flex h-[104px] items-center justify-center overflow-hidden bg-[#181818]">
+        <AssetPreview asset={asset} />
+        {asset.fieldType === "video" && (
+          <Play className="absolute bottom-2 left-2 h-[14px] w-[14px] text-white drop-shadow" />
+        )}
+        {selected && (
+          <div className="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-[#f4ff00] text-black">
+            <Check className="h-3 w-3" />
+          </div>
+        )}
+      </div>
+      <div className="flex h-[30px] items-center gap-1.5 border-t border-[#303030] px-2">
+        <AssetKindIcon type={asset.fieldType} className="h-[12px] w-[12px] shrink-0 text-[#8d8d8d]" />
+        <span className="min-w-0 truncate text-[11px] font-semibold text-[#d7d7d7]">
+          {asset.fileName || asset.label}
+        </span>
+      </div>
+    </li>
+  );
+};
 
 const AssetListRow = ({
   asset,
@@ -1142,29 +1163,34 @@ const AssetListRow = ({
   onClick: () => void;
   onDoubleClick: () => void;
   onDragStart: (event: React.DragEvent) => void;
-}) => (
-  <li
-    draggable
-    onDragStart={onDragStart}
-    onClick={onClick}
-    onDoubleClick={onDoubleClick}
-    className={cn(
-      "flex h-10 cursor-pointer items-center gap-3 rounded-[5px] border px-2 transition",
-      selected
-        ? "border-yellow-500 bg-yellow-500/10"
-        : "border-transparent bg-[#1b1b1b] hover:border-[#444]",
-    )}
-  >
-    <div className="h-7 w-10 overflow-hidden rounded-[3px] bg-[#111]">
-      <AssetPreview asset={asset} compact />
-    </div>
-    <AssetKindIcon type={asset.fieldType} className="h-[13px] w-[13px] text-[#969696]" />
-    <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[#dfdfdf]">
-      {asset.fileName || asset.label}
-    </span>
-    <span className="text-[12px] font-medium capitalize text-[#838383]">{kindLabel(asset.fieldType)}</span>
-  </li>
-);
+}) => {
+  const { t } = useLanguage();
+  return (
+    <li
+      draggable
+      onDragStart={onDragStart}
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
+      className={cn(
+        "flex h-10 cursor-pointer items-center gap-3 rounded-[5px] border px-2 transition",
+        selected
+          ? "border-yellow-500 bg-yellow-500/10"
+          : "border-transparent bg-[#1b1b1b] hover:border-[#444]",
+      )}
+    >
+      <div className="h-7 w-10 overflow-hidden rounded-[3px] bg-[#111]">
+        <AssetPreview asset={asset} compact />
+      </div>
+      <AssetKindIcon type={asset.fieldType} className="h-[13px] w-[13px] text-[#969696]" />
+      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[#dfdfdf]">
+        {asset.fileName || asset.label}
+      </span>
+      <span className="text-[12px] font-medium text-[#838383]">
+        {kindLabel(asset.fieldType, t)}
+      </span>
+    </li>
+  );
+};
 
 const AssetPreview = ({
   asset,
@@ -1219,9 +1245,11 @@ const AssetKindIcon = ({
   return <Icon className={className} />;
 };
 
-function kindLabel(type: AssetType) {
+function kindLabel(type: AssetType, t: ReturnType<typeof useLanguage>["t"]) {
   if (type === "model3d") return "3D";
-  return type;
+  if (type === "image") return t("workspace.allAssets.kindImage");
+  if (type === "video") return t("workspace.allAssets.kindVideo");
+  return t("workspace.allAssets.kindAudio");
 }
 
 export default AllAssetsDialog;

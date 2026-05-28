@@ -5,7 +5,6 @@ import {
   useState,
   type DragEvent,
   type KeyboardEvent,
-  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -14,13 +13,9 @@ import {
   Film,
   FolderOpen,
   Image as ImageIcon,
-  Layers2,
-  Languages,
-  LayoutGrid,
   Link,
   Maximize2,
-  Music,
-  PenTool,
+  Languages,
   Scissors,
   Search,
   Type,
@@ -30,6 +25,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
+import type { TranslationKey } from "@/contexts/locales/en";
 
 export type ToolCategory =
   | "all"
@@ -44,28 +40,13 @@ export type ToolCategory =
 type ToolSection = "basics" | "media" | "video" | "threed" | "tools";
 
 const SECTION_ORDER: ToolSection[] = ["basics", "media", "video", "threed", "tools"];
-const SECTION_LABELS: Record<ToolSection, string> = {
-  basics: "BASICS",
-  media: "ASSETS",
-  video: "VIDEO",
-  threed: "3D",
-  tools: "TOOLS",
+const SECTION_LABEL_KEYS: Record<ToolSection, TranslationKey> = {
+  basics: "workspace.picker.section.basics",
+  media: "workspace.picker.section.media",
+  video: "workspace.picker.section.video",
+  threed: "workspace.picker.section.threed",
+  tools: "workspace.picker.section.tools",
 };
-
-const CATEGORY_TABS: Array<{
-  id: ToolCategory;
-  labelKey: string;
-  icon: LucideIcon;
-}> = [
-  { id: "all", labelKey: "workspace.picker.cat_all", icon: LayoutGrid },
-  { id: "media", labelKey: "workspace.picker.cat_media", icon: Layers2 },
-  { id: "image", labelKey: "workspace.picker.cat_image", icon: ImageIcon },
-  { id: "threed", labelKey: "workspace.picker.cat_3d", icon: Box },
-  { id: "video", labelKey: "workspace.picker.cat_video", icon: Film },
-  { id: "audio", labelKey: "workspace.picker.cat_audio", icon: Music },
-  { id: "text", labelKey: "workspace.picker.cat_text", icon: Type },
-  { id: "addon", labelKey: "workspace.picker.cat_addon", icon: PenTool },
-];
 
 export interface ToolItem {
   nodeType: string;
@@ -248,13 +229,12 @@ interface Props {
   onAction: (item: ToolItem) => void;
 }
 
-const PANEL_WIDTH = 252;
-const PANEL_MAX_HEIGHT = 360;
+const PANEL_WIDTH = 270;
+const PANEL_MAX_HEIGHT = 430;
 
 const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
   const { t } = useLanguage();
   const [query, setQuery] = useState("");
-  const [active, setActive] = useState<ToolCategory>("all");
   const [highlight, setHighlight] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -274,7 +254,6 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
         return { ...item, label, description };
       })
       .filter((item) => {
-        if (active !== "all" && item.category !== active) return false;
         if (!q) return true;
         return [
           item.label,
@@ -286,7 +265,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
           .toLowerCase()
           .includes(q);
       });
-  }, [active, query, t]);
+  }, [query, t]);
 
   const groupedItems = useMemo(() => {
     let nextIndex = 0;
@@ -300,7 +279,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
 
   useEffect(() => {
     setHighlight(0);
-  }, [active, query]);
+  }, [query]);
 
   useEffect(() => {
     if (highlight > visibleItems.length - 1) {
@@ -371,8 +350,8 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
         aria-modal="true"
         className={cn(
           "fixed z-[1310] flex flex-col overflow-hidden rounded-[9px]",
-          "border border-[#2d2d2d] bg-[#171717] text-white",
-          "shadow-[0_16px_34px_rgba(0,0,0,.52)]",
+          "border border-white/[0.12] bg-[#101111] text-white",
+          "shadow-[0_18px_46px_rgba(0,0,0,.54)]",
         )}
         style={{
           left,
@@ -384,57 +363,31 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
         onClick={(event) => event.stopPropagation()}
         onContextMenu={(event) => event.preventDefault()}
       >
-        <label className="flex h-8 shrink-0 items-center border-b border-[#262626] px-3">
-          <Search className="h-[14px] w-[14px] shrink-0 text-[#75777b]" />
+        <label className="mx-[10px] mt-[10px] flex h-[38px] shrink-0 items-center rounded-[7px] bg-[#151616] px-[11px] ring-1 ring-white/[0.1] transition focus-within:ring-[#f4ff00]/45">
+          <Search className="h-[15px] w-[15px] shrink-0 text-[#83878d]" />
           <input
             ref={inputRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKeyDown}
             placeholder={t("workspace.picker.search")}
-            className="nodrag h-full min-w-0 flex-1 bg-transparent px-2 text-[13px] font-medium leading-none text-zinc-100 outline-none placeholder:text-[#777a80]"
+            className="nodrag h-full min-w-0 flex-1 bg-transparent px-2 text-[14px] font-medium leading-none text-zinc-100 outline-none placeholder:text-[#777a80]"
           />
         </label>
 
-        <div className="flex shrink-0 items-center gap-[2px] px-2.5 py-1.5">
-          {CATEGORY_TABS.map((category) => {
-            const Icon = category.icon;
-            const isActive = active === category.id;
-            return (
-              <button
-                key={category.id}
-                type="button"
-                onClick={() => setActive(category.id)}
-                title={t(category.labelKey)}
-                aria-label={t(category.labelKey)}
-                aria-pressed={isActive}
-                className={cn(
-                  "grid h-[24px] w-[24px] shrink-0 place-items-center rounded-md transition-colors [aspect-ratio:1/1]",
-                  isActive
-                    ? "bg-[#2a2a2a] text-zinc-50"
-                    : "text-[#9a9da3] hover:bg-[#242424] hover:text-zinc-100",
-                )}
-              >
-                <Icon className="h-[13.5px] w-[13.5px]" strokeWidth={2.15} />
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="ws-picker-scroll max-h-[312px] overflow-y-auto px-2.5 pb-1.5">
+        <div className="ws-picker-scroll mt-[8px] max-h-[372px] overflow-y-auto px-[8px] pb-[8px]">
           {visibleItems.length === 0 ? (
             <div className="px-1 py-8 text-center text-[14px] font-medium text-zinc-400">
               {t("workspace.picker.no_match", { query })}
             </div>
           ) : (
             groupedItems.map((group) => (
-              <div key={group.section} className="pb-0.5">
-                <div className="px-1 pb-0.5 pt-1 text-[9.5px] font-semibold uppercase tracking-[0.03em] text-[#71747a]">
-                  {SECTION_LABELS[group.section]}
+              <div key={group.section} className="pb-[8px]">
+                <div className="px-[6px] pb-[5px] pt-[5px] text-[11px] font-medium uppercase tracking-normal text-[#7b7f86]">
+                  {t(SECTION_LABEL_KEYS[group.section])}
                 </div>
-                <ul className="space-y-0">
+                <ul className="space-y-[1px]">
                   {group.items.map(({ item, index }) => {
-                    const Icon = item.icon;
                     const isHighlight = index === highlight;
                     return (
                       <li key={`${item.nodeType}-${item.defaultLabel}`}>
@@ -445,28 +398,17 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
                           onDragStart={(event) => onItemDragStart(event, item)}
                           onMouseEnter={() => setHighlight(index)}
                           onClick={() => fire(item)}
-                          title={item.description}
                           className={cn(
-                            "group flex h-[28px] w-full items-center gap-2 rounded-md px-1.5 text-left transition-colors",
+                            "group flex h-[28px] w-full items-center rounded-[4px] px-[8px] text-left transition-colors",
                             isHighlight
-                              ? "bg-[#242424] text-zinc-50"
-                              : "text-[#d7d7d7] hover:bg-[#242424] hover:text-zinc-50",
+                              ? "bg-white/[0.12] text-zinc-50"
+                              : "text-[#f2f2f2] hover:bg-white/[0.08] hover:text-zinc-50",
                             item.comingSoon && "cursor-not-allowed opacity-45",
                           )}
                         >
-                          <span
-                            className={cn(
-                              "grid h-[20px] w-[20px] shrink-0 place-items-center rounded-[4px] text-[#c6c8cc] [aspect-ratio:1/1]",
-                              isHighlight && "text-zinc-100",
-                            )}
-                          >
-                            <Icon className="h-[13px] w-[13px]" strokeWidth={2.1} />
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-[13px] font-medium leading-none text-inherit">
+                          <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-none text-inherit">
                             {item.label}
                           </span>
-                          {item.isNew && <Chip>{t("workspace.picker.new")}</Chip>}
-                          {item.comingSoon && <Chip>{t("workspace.picker.soon")}</Chip>}
                         </button>
                       </li>
                     );
@@ -481,14 +423,5 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
     document.body,
   );
 };
-
-function Chip({ children }: { children: ReactNode }) {
-  return (
-    <span className="shrink-0 rounded bg-white/[0.08] px-1.5 py-0.5 text-[9px] font-semibold uppercase leading-none text-zinc-400">
-      {children}
-    </span>
-  );
-}
-
 
 export default CanvasContextMenu;

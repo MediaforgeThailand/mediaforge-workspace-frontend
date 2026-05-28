@@ -64,7 +64,6 @@ import {
   WalletCards,
   ChevronDown,
   ChevronRight,
-  Clapperboard,
   Code2,
   ArrowRight,
   Boxes,
@@ -76,7 +75,9 @@ import {
   Sparkles,
   UploadCloud,
   UserCircle2,
+  Video,
   WandSparkles,
+  Workflow,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -97,13 +98,14 @@ import {
   type WorkspaceMeta,
 } from "@/store/useWorkspaceStore";
 import { CreateProjectDialog } from "@/components/workspace/CreateProjectDialog";
-import { UserMenu } from "@/components/workspace/UserMenu";
+import WorkspaceTopBar from "@/components/workspace/WorkspaceTopBar";
 import WorkspaceSidebar, {
   type SectionKey,
 } from "@/components/workspace/WorkspaceSidebar";
 import StandaloneGenerator, {
   type StandaloneProjectOption,
 } from "@/components/workspace/StandaloneGenerator";
+import { StandaloneToolHeaderCard } from "@/components/workspace/CreateImagePanel";
 import StockView from "@/components/workspace/StockView";
 import AssetsView from "@/components/workspace/AssetsView";
 import {
@@ -837,7 +839,7 @@ const WorkspaceDashboardInner = () => {
         <WorkspaceSidebar
           active={section}
           onNavigate={setSection}
-          onCreate={isSignedIn ? handleCreateProject : undefined}
+          onCreate={handleCreateProject}
           projects={visibleProjects}
           activeProjectId={visibleActiveProjectId}
           onSelectProject={isSignedIn ? setActiveProject : undefined}
@@ -858,10 +860,10 @@ const WorkspaceDashboardInner = () => {
             className="absolute inset-0 bg-black/65"
             onClick={() => setMobileSidebarOpen(false)}
           />
-          <div className="relative z-10 h-full w-[228px] max-w-[84vw]">
+          <div className="relative z-10 h-full w-[240px] max-w-[84vw]">
             <WorkspaceSidebar
               active={section}
-              onCreate={isSignedIn ? handleCreateProject : undefined}
+              onCreate={handleCreateProject}
               projects={visibleProjects}
               activeProjectId={visibleActiveProjectId}
               onSelectProject={isSignedIn ? setActiveProject : undefined}
@@ -1655,80 +1657,333 @@ const HomeView = ({
     (membership) => membership.role === "member" && membership.status === "active",
   );
   const visibleInspirations = HOME_INSPIRATIONS;
+  const featuredTools = HOME_TOOLS.slice(0, 5);
+  const featuredTemplates = HOME_FEATURE_SHOWCASE.slice(0, 6);
+  const previewInspirationCards = visibleInspirations.slice(0, 3);
+  const totalSpaceCount = workspaces.filter(
+    (ws) =>
+      (educationLockedStudent ? Boolean(ws.classId) : true) &&
+      (educationLockedStudent || !activeProjectId || !ws.projectId || ws.projectId === activeProjectId),
+  ).length;
+  const showRecentCreations = Boolean(user?.id && recentSpaces.length > 0);
+  const toolStripRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const strip = toolStripRef.current;
+    if (!strip) return undefined;
+
+    let drag:
+      | {
+          pointerId: number;
+          startX: number;
+          scrollLeft: number;
+          moved: boolean;
+        }
+      | null = null;
+    let suppressClick = false;
+
+    const canScroll = () => strip.scrollWidth > strip.clientWidth + 1;
+    const clampScroll = (value: number) => {
+      const maxScroll = strip.scrollWidth - strip.clientWidth;
+      return Math.max(0, Math.min(maxScroll, value));
+    };
+
+    const onWheel = (event: WheelEvent) => {
+      if (!canScroll()) return;
+      const delta =
+        Math.abs(event.deltaX) > Math.abs(event.deltaY)
+          ? event.deltaX
+          : event.deltaY;
+      if (delta === 0) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      strip.scrollLeft = clampScroll(strip.scrollLeft + delta);
+    };
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.button !== 0 || !canScroll()) return;
+      drag = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        scrollLeft: strip.scrollLeft,
+        moved: false,
+      };
+      strip.setPointerCapture?.(event.pointerId);
+      strip.classList.add("is-dragging");
+    };
+
+    const onPointerMove = (event: PointerEvent) => {
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      const distance = event.clientX - drag.startX;
+      if (Math.abs(distance) > 4) drag.moved = true;
+      strip.scrollLeft = clampScroll(drag.scrollLeft - distance);
+      if (!drag.moved) return;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    const endDrag = (event: PointerEvent) => {
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      if (drag.moved) {
+        suppressClick = true;
+        window.setTimeout(() => {
+          suppressClick = false;
+        }, 0);
+      }
+      strip.releasePointerCapture?.(event.pointerId);
+      strip.classList.remove("is-dragging");
+      drag = null;
+    };
+
+    const onClickCapture = (event: MouseEvent) => {
+      if (!suppressClick) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+
+    strip.addEventListener("wheel", onWheel, { passive: false });
+    strip.addEventListener("pointerdown", onPointerDown);
+    strip.addEventListener("pointermove", onPointerMove);
+    strip.addEventListener("pointerup", endDrag);
+    strip.addEventListener("pointercancel", endDrag);
+    strip.addEventListener("click", onClickCapture, true);
+
+    return () => {
+      strip.removeEventListener("wheel", onWheel);
+      strip.removeEventListener("pointerdown", onPointerDown);
+      strip.removeEventListener("pointermove", onPointerMove);
+      strip.removeEventListener("pointerup", endDrag);
+      strip.removeEventListener("pointercancel", endDrag);
+      strip.removeEventListener("click", onClickCapture, true);
+      strip.classList.remove("is-dragging");
+    };
+  }, []);
+
+  const openFeature = (feature: HomeFeatureShowcaseItem) => {
+    if (feature.actionSection) {
+      onSection(feature.actionSection);
+      return;
+    }
+    if (feature.actionAnchor) {
+      document.getElementById(feature.actionAnchor)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  };
 
   return (
-    <>
-      <div className="ws-scroll-hide flex-1 overflow-y-auto overflow-x-hidden">
-        <section aria-label="MediaForge hero video" className="relative bg-[var(--bg-app)]">
-          <video
-            src="/inspire/to-bangkok.webm"
-            className="block h-[260px] w-full object-cover sm:h-[360px] lg:h-[clamp(430px,48vw,760px)]"
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="metadata"
+    <div className="mf-home-page ws-scroll-hide flex-1 overflow-y-auto overflow-x-hidden">
+      <WorkspaceTopBar
+        title={t("workspace.home.title")}
+        onOpenSidebar={onOpenSidebar}
+      />
+
+      <div className="mf-home-content">
+        {activeClass && (
+          <EducationClassDashboard
+            active={activeClass}
+            classes={studentClasses}
+            onOpenSpaces={() => onSection("spaces")}
           />
-          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[46%] bg-[linear-gradient(90deg,rgba(10,10,11,.9)_0%,rgba(10,10,11,.58)_18%,rgba(10,10,11,.24)_42%,rgba(10,10,11,0)_100%)]" />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-28 bg-[linear-gradient(0deg,rgba(10,10,11,1)_0%,rgba(10,10,11,.72)_34%,rgba(10,10,11,.28)_68%,rgba(10,10,11,0)_100%)] md:h-32" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-[linear-gradient(180deg,rgba(10,10,11,.3)_0%,rgba(10,10,11,0)_100%)]" />
-          <div className="absolute inset-x-0 top-0 z-20">
-            <PageHeader title="" rightSlot={<UserMenu />} onOpenSidebar={onOpenSidebar} />
+        )}
+
+        <section className="mf-home-hero" aria-label={t("workspace.home.hero.aria")}>
+          <div className="mf-home-hero-copy">
+            <div className="mf-home-hero-icon" aria-hidden="true">
+              <Workflow className="h-[35px] w-[35px]" strokeWidth={1.45} />
+            </div>
+            <div>
+              <p className="mf-home-hero-kicker">MediaForge Canvas</p>
+              <h2 className="mf-home-hero-title">
+                {t("workspace.home.hero.line1")}{" "}
+                {t("workspace.home.hero.line2_prefix")}{" "}
+                <span className="text-[#f4ff00]">{t("workspace.home.hero.line2_accent")}</span>
+              </h2>
+              <p className="mf-home-hero-subtitle">
+                {t("workspace.home.feature.workspace.kicker")}
+              </p>
+            </div>
+            <div className="mf-home-hero-actions">
+              <button type="button" onClick={handleNew} className="mf-home-button mf-home-button-primary">
+                <Plus className="h-4 w-4" />
+                {t("workspace.home.new_space_tooltip")}
+              </button>
+              <button type="button" onClick={() => onSection("video_gen")} className="mf-home-button mf-home-button-secondary">
+                <Video className="h-4 w-4" />
+                {STANDALONE_TOOLS.video_gen.title}
+              </button>
+            </div>
+          </div>
+
+          <div className="mf-home-node-scene" aria-hidden="true">
+            <span className="mf-home-node mf-home-node-a" />
+            <span className="mf-home-node mf-home-node-b" />
+            <span className="mf-home-node mf-home-node-c" />
+            <span className="mf-home-node mf-home-node-d" />
+            <span className="mf-home-connector mf-home-connector-a" />
+            <span className="mf-home-connector mf-home-connector-b" />
+            <span className="mf-home-connector mf-home-connector-c" />
+            <span className="mf-home-label-chip mf-home-label-chip-a">Canvas</span>
+            <span className="mf-home-label-chip mf-home-label-chip-b">AI</span>
           </div>
         </section>
 
-        <div className="mx-auto min-w-0 w-full max-w-[1680px] px-4 pb-16 pt-3 md:px-7 md:pt-4 lg:px-10 lg:pt-4">
-          {activeClass && (
-            <EducationClassDashboard
-              active={activeClass}
-              classes={studentClasses}
-              onOpenSpaces={() => onSection("spaces")}
-            />
-          )}
+        <section className="mf-home-section">
+          <div className="mf-home-section-heading">
+            <h2>{t("workspace.home.tools")}</h2>
+            <button
+              type="button"
+              onClick={() => onSection("spaces")}
+              className="mf-home-section-link"
+            >
+              {t("workspace.home.my_work")} →
+            </button>
+          </div>
+          <div
+            ref={toolStripRef}
+            className="mf-home-tool-strip"
+            aria-label={t("workspace.home.tools")}
+          >
+            <button
+              type="button"
+              onClick={handleNew}
+              className="mf-home-tool-card"
+              style={{ "--tool-accent": "#f4ff00" } as React.CSSProperties}
+            >
+              <span className="mf-home-tool-icon">
+                <Workflow className="h-[18px] w-[18px]" />
+              </span>
+              <span className="min-w-0">
+                <span className="mf-home-tool-title">{t("workspace.home.spaces")}</span>
+                <span className="mf-home-tool-desc">{totalSpaceCount} spaces</span>
+              </span>
+              <strong className="mf-home-badge">New</strong>
+            </button>
+            {featuredTools.map((tool) => (
+              <button
+                key={tool.id}
+                type="button"
+                onClick={() => onSection(tool.id)}
+                className="mf-home-tool-card"
+                style={{ "--tool-accent": tool.accent } as React.CSSProperties}
+              >
+                <span className="mf-home-tool-icon">
+                  <tool.icon className="h-[18px] w-[18px]" />
+                </span>
+                <span className="min-w-0">
+                  <span className="mf-home-tool-title">{tool.label}</span>
+                  <span className="mf-home-tool-desc">{tool.subtitle}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
 
-          <HomeFeatureShowcase onSection={onSection} />
-
-          <section id="workspace-inspirations" className="mt-12 scroll-mt-8">
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-[26px] font-semibold leading-tight text-white md:text-[30px]">
-                {t("workspace.home.inspirations")}
-              </h2>
+        {showRecentCreations && (
+          <section className="mf-home-section">
+            <div className="mf-home-section-heading">
+              <h2>Recent creations</h2>
             </div>
-
-            <ul className="mt-5 columns-1 gap-3 md:columns-2 xl:columns-3">
-              {visibleInspirations.map((item, index) => (
-                <li key={item.id} className="mb-3 break-inside-avoid">
-                  <div className="group block w-full overflow-hidden rounded-[13px] bg-[var(--bg-app)]">
-                    <div className="relative overflow-hidden rounded-[13px] bg-[var(--bg-app)]">
-                      {item.kind === "video" ? (
-                        <video
-                          src={item.previewVideoSrc ?? item.src}
-                          poster={item.posterSrc}
-                          className="block h-auto w-full rounded-[13px] object-contain"
-                          autoPlay
-                          muted
-                          loop
-                          playsInline
-                          preload="none"
-                        />
-                      ) : (
-                        <img
-                          src={item.previewSrc ?? item.src}
-                          alt={t(item.titleKey)}
-                          className="block h-auto w-full rounded-[13px] object-contain transition duration-500 group-hover:scale-[1.012]"
-                          loading={index < 3 ? "eager" : "lazy"}
-                          decoding="async"
-                        />
-                      )}
-                    </div>
+            <div className="mf-home-recent-grid">
+              {recentSpaces.slice(0, 5).map((space) => (
+                <button
+                  key={space.id}
+                  type="button"
+                  onClick={() => navigate(`/app/workspace/${space.id}`)}
+                  className="mf-home-recent-card group/space"
+                >
+                  <div className="mf-home-recent-thumb">
+                    <SpaceMediaPreview media={space.previewMedia} />
+                    <span className="mf-home-recent-icon" aria-hidden="true">
+                      <Workflow className="h-[16px] w-[16px]" />
+                    </span>
                   </div>
-                </li>
+                  <div className="mf-home-recent-copy">
+                    <h3>{space.name}</h3>
+                    <p>{timeAgo(space.updatedAt)}</p>
+                  </div>
+                </button>
               ))}
-            </ul>
+            </div>
           </section>
-        </div>
+        )}
+
+        <section className="mf-home-section">
+          <div className="mf-home-section-heading">
+            <h2>Templates</h2>
+          </div>
+          <div className="mf-home-card-grid">
+            {featuredTemplates.slice(0, 3).map((feature) => (
+              <button
+                key={feature.id}
+                type="button"
+                onClick={() => openFeature(feature)}
+                className="mf-home-media-card"
+              >
+                <div className="mf-home-media-thumb">
+                  <img src={feature.tileImage} alt={t(feature.titleKey)} loading="lazy" decoding="async" />
+                </div>
+                <div className="mf-home-card-copy">
+                  <h3>{t(feature.titleKey)}</h3>
+                  <p>{t(feature.kickerKey)}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section id="workspace-inspirations" className="mf-home-section scroll-mt-8">
+          <div className="mf-home-section-heading">
+            <h2>What's New</h2>
+          </div>
+          <div className="mf-home-news-grid">
+            <button
+              type="button"
+              onClick={() => onSection("spaces")}
+              className="mf-home-news-card mf-home-canvas-news"
+            >
+              <div className="mf-home-news-art">
+                <span className="mf-home-tiny-node" />
+                <span className="mf-home-tiny-node two" />
+                <span className="mf-home-tiny-node three" />
+              </div>
+              <div className="mf-home-news-copy">
+                <h3>Introducing Canvas</h3>
+                <p>Stop prompting, start composing.</p>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSection("smart_frames")}
+              className="mf-home-news-card mf-home-key-news"
+            >
+              <div className="mf-home-news-art mf-home-checker">
+                <span className="mf-home-mask-circle" />
+              </div>
+              <div className="mf-home-news-copy">
+                <h3>MediaForge Smart Frames</h3>
+                <p>Plan editable AI video cuts in one pass.</p>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSection("image_gen")}
+              className="mf-home-news-card mf-home-remover-news"
+            >
+              <div className="mf-home-news-art mf-home-sports">
+                <span className="mf-home-cutout" />
+              </div>
+              <div className="mf-home-news-copy">
+                <h3>Background Remover</h3>
+                <p>Clean AI cutouts for production assets.</p>
+              </div>
+            </button>
+          </div>
+        </section>
       </div>
-    </>
+    </div>
   );
 };
 
@@ -1742,7 +1997,7 @@ const EducationLockedToolView = ({
   const { t: i18n } = useLanguage();
   return (
   <>
-    <PageHeader title={i18n("workspace.home.classWorkspace")} rightSlot={<UserMenu />} onOpenSidebar={onOpenSidebar} />
+    <PageHeader title={i18n("workspace.home.classWorkspace")} onOpenSidebar={onOpenSidebar} />
     <div className="flex flex-1 items-center justify-center px-5 py-10">
       <div className="w-full max-w-[520px] rounded-2xl border border-white/[0.08] bg-[hsl(0_0%_7%)] p-6 text-center">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300">
@@ -1774,6 +2029,16 @@ const HYPERFRAMES_SMART_PRESETS = [
 ] as const;
 
 type HyperFramesSmartPresetId = (typeof HYPERFRAMES_SMART_PRESETS)[number]["id"];
+
+function smartFramesPresetLabel(id: HyperFramesSmartPresetId, t: (key: TranslationKey, params?: Record<string, string | number>) => string): string {
+  if (id === "cleancut") return t("workspace.standalone.smart_frames.preset_clean_cut");
+  return HYPERFRAMES_SMART_PRESETS.find((preset) => preset.id === id)?.label ?? id;
+}
+
+function smartFramesPresetDescription(id: HyperFramesSmartPresetId, t: (key: TranslationKey, params?: Record<string, string | number>) => string): string {
+  if (id === "cleancut") return t("workspace.standalone.smart_frames.preset_clean_cut_desc");
+  return HYPERFRAMES_SMART_PRESETS.find((preset) => preset.id === id)?.description ?? "";
+}
 
 const HYPERFRAMES_SMART_STORAGE_VERSION = 2;
 const HYPERFRAMES_SMART_STORAGE_PREFIX = "mediaforge:smart-frames:v1";
@@ -2300,6 +2565,7 @@ async function createSmartFramesEditorProject({
 }
 
 const SmartFramesResultPreview = ({ result }: { result: SmartFramesDemoResult }) => {
+  const { t } = useLanguage();
   const visual = HYPERFRAMES_SMART_VISUALS[result.presetId] ?? HYPERFRAMES_SMART_VISUALS.cleancut;
   const beats = smartFramesPlanLines(result.plan, visual.beats);
   const showBeats = result.presetId !== "cleancut";
@@ -2318,7 +2584,7 @@ const SmartFramesResultPreview = ({ result }: { result: SmartFramesDemoResult })
         />
       ) : (
         <div className="grid aspect-video w-full place-items-center bg-black text-[13px] font-semibold text-zinc-500">
-          Source video is not available in this browser session.
+          {t("workspace.standalone.smart_frames.source_unavailable")}
         </div>
       )}
       <div className="pointer-events-none absolute inset-x-0 top-0 bg-gradient-to-b from-black/75 via-black/20 to-transparent px-4 py-3">
@@ -2334,7 +2600,7 @@ const SmartFramesResultPreview = ({ result }: { result: SmartFramesDemoResult })
             {visual.title}
           </div>
           <div className="rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white/85">
-            Smart Frames preview
+            {t("workspace.standalone.smart_frames.preview")}
           </div>
         </div>
       </div>
@@ -2354,7 +2620,7 @@ const SmartFramesResultPreview = ({ result }: { result: SmartFramesDemoResult })
                   className="min-w-0 rounded-lg border border-white/12 bg-black/55 px-3 py-2 backdrop-blur-sm"
                 >
                   <div className="text-[10px] font-semibold text-white/40">
-                    Beat {index + 1}
+                    {t("workspace.standalone.smart_frames.beat", { index: index + 1 })}
                   </div>
                   <div className="truncate text-[12px] font-semibold text-white">{beat}</div>
                 </div>
@@ -2377,6 +2643,7 @@ const HyperFramesSmartView = ({
   onOpenSidebar?: () => void;
 }) => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const activeProject = projects.find((project) => project.id === activeProjectId) ?? null;
   const activeStorageProjectId = activeProjectId ?? "default";
@@ -2395,6 +2662,7 @@ const HyperFramesSmartView = ({
   const selectedPreset =
     HYPERFRAMES_SMART_PRESETS.find((preset) => preset.id === presetId) ??
     HYPERFRAMES_SMART_PRESETS[0];
+  const selectedPresetLabel = smartFramesPresetLabel(selectedPreset.id, t);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -2406,7 +2674,7 @@ const HyperFramesSmartView = ({
     setPresetId(persisted.presetId);
     setSourceMeta(persisted.sourceMeta);
     setRunError(null);
-    setRunStatus("Restored the latest Smart Frames result from this project.");
+    setRunStatus(t("workspace.standalone.smart_frames.source_restore"));
     void readSmartFramesSourceBlob(persisted.sourceBlobKey)
       .then((blob) => {
         if (cancelled || !blob) return;
@@ -2426,7 +2694,7 @@ const HyperFramesSmartView = ({
           outputFileName: persisted.outputFileName,
           createdAt: persisted.createdAt,
           presetId: preset.id,
-          presetLabel: preset.label,
+          presetLabel: smartFramesPresetLabel(preset.id, t),
           sourceFileName: persisted.sourceFileName,
           sourceBlobKey: persisted.sourceBlobKey,
           editorProjectId: persisted.editorProjectId,
@@ -2437,14 +2705,14 @@ const HyperFramesSmartView = ({
       .catch(() => {
         if (!cancelled) {
           setRunStatus(null);
-          setRunError("The saved plan was found, but the browser could not restore the source video.");
+          setRunError(t("workspace.standalone.smart_frames.source_restore_failed"));
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [user?.id, activeStorageProjectId]);
+  }, [user?.id, activeStorageProjectId, t]);
 
   useEffect(() => {
     return () => {
@@ -2456,7 +2724,7 @@ const HyperFramesSmartView = ({
     const isVideo =
       file.type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/i.test(file.name);
     if (!isVideo) {
-      toast.info("Upload an MP4, MOV, or WEBM video.");
+      toast.info(t("workspace.standalone.smart_frames.toast_upload_video"));
       return;
     }
 
@@ -2466,38 +2734,36 @@ const HyperFramesSmartView = ({
     setSourceMeta(null);
     setResult(null);
     setRunError(null);
-    setRunStatus("Source video loaded. Run Clean Cut to remove dead air.");
+    setRunStatus(t("workspace.standalone.smart_frames.source_loaded"));
     clearPersistedSmartFramesState(user?.id, activeStorageProjectId);
     void readSmartFramesVideoMeta(objectUrl)
       .then(setSourceMeta)
       .catch(() => setSourceMeta(null));
 
     if (!prompt.trim()) {
-      setPrompt(
-        "Remove dead air while keeping the speech rhythm natural.",
-      );
+      setPrompt(t("workspace.standalone.smart_frames.default_prompt"));
     }
   };
 
   const handleGenerate = async () => {
-    const source = prompt.trim() || "Clean cut this video by removing dead air while preserving natural speech rhythm.";
+    const source = prompt.trim() || t("workspace.standalone.smart_frames.default_prompt");
     if (!user?.id) {
-      toast.info("Sign in before using Smart Frames.");
+      toast.info(t("workspace.standalone.smart_frames.toast_sign_in"));
       return;
     }
     if (!sourceFile || !sourceUrl) {
-      toast.info("Upload a source MP4 before creating the draft.");
+      toast.info(t("workspace.standalone.smart_frames.toast_upload_source"));
       return;
     }
 
     setRunning(true);
     setResult(null);
     setRunError(null);
-    setRunStatus("Cutting dead air with the local Clean Cut worker...");
+    setRunStatus(t("workspace.standalone.smart_frames.cutting"));
     try {
       const meta = sourceMeta;
       const cleaned = [
-        "Clean Cut",
+        selectedPresetLabel,
         "",
         "Goal:",
         source,
@@ -2516,7 +2782,7 @@ const HyperFramesSmartView = ({
         sourcePersisted = true;
       } catch {
         setRunStatus(
-          "Cutting dead air. Browser storage is full, so this result may not survive refresh.",
+          t("workspace.standalone.smart_frames.storage_warning"),
         );
       }
 
@@ -2525,7 +2791,7 @@ const HyperFramesSmartView = ({
         plan: cleaned,
         prompt: source,
         presetId: selectedPreset.id,
-        presetLabel: selectedPreset.label,
+        presetLabel: selectedPresetLabel,
       });
 
       const nextResult: SmartFramesDemoResult = {
@@ -2536,7 +2802,7 @@ const HyperFramesSmartView = ({
           (workerResult.renderedBy ? smartFramesRenderedOutputName(sourceFile.name) : smartFramesOutputName(sourceFile.name)),
         createdAt: Date.now(),
         presetId: selectedPreset.id,
-        presetLabel: selectedPreset.label,
+        presetLabel: selectedPresetLabel,
         sourceFileName: sourceFile.name,
         sourceBlobKey: sourcePersisted ? sourceBlobKey : undefined,
         renderedBy: workerResult.renderedBy,
@@ -2550,7 +2816,7 @@ const HyperFramesSmartView = ({
         segments: workerResult.segments,
         cues: workerResult.cues,
       };
-      setRunStatus("Creating the editable MediaForge project...");
+      setRunStatus(t("workspace.standalone.smart_frames.creating_project"));
       try {
         const editorFile =
           workerResult.cutUrl && workerResult.cutFileName
@@ -2576,7 +2842,7 @@ const HyperFramesSmartView = ({
         nextResult.editorProjectError =
           editorError instanceof Error
             ? editorError.message
-            : "Could not create the editable MediaForge project.";
+            : t("workspace.standalone.smart_frames.create_editable_error");
       }
 
       setResult(nextResult);
@@ -2605,13 +2871,13 @@ const HyperFramesSmartView = ({
       }
       setRunStatus(
         nextResult.changedByCut
-          ? "Clean Cut complete. Dead air removed and an editable project is ready."
-          : "Clean Cut complete. No removable dead air was detected; an editable project is ready.",
+          ? t("workspace.standalone.smart_frames.complete_changed")
+          : t("workspace.standalone.smart_frames.complete_unchanged"),
       );
       toast.success(
         nextResult.editorProjectId
-          ? "Clean Cut project ready."
-          : "Clean Cut result ready, but editor handoff needs attention.",
+          ? t("workspace.standalone.smart_frames.toast_project_ready")
+          : t("workspace.standalone.smart_frames.toast_project_attention"),
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : "Could not create Smart Frames draft.";
@@ -2699,30 +2965,17 @@ const HyperFramesSmartView = ({
   const copyResult = async () => {
     if (!result) return;
     await navigator.clipboard.writeText(result.plan);
-    toast.success("Copied the summary.");
+    toast.success(t("workspace.standalone.smart_frames.copied_summary"));
   };
 
   return (
     <>
-      <PageHeader title="Smart Frames" rightSlot={<UserMenu />} onOpenSidebar={onOpenSidebar} />
-      <div className="flex-1 overflow-y-auto px-4 py-5 md:px-6">
-        <div className="mx-auto grid w-full max-w-[1520px] gap-5 xl:grid-cols-[minmax(440px,560px)_1fr]">
-          <section className="rounded-[18px] border border-white/[0.08] bg-[hsl(0_0%_7%)] shadow-[0_24px_80px_rgba(0,0,0,.28)]">
-            <div className="border-b border-white/[0.07] px-5 py-4">
-              <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 place-items-center rounded-xl bg-cyan-300/10 text-cyan-200">
-                  <Clapperboard className="h-5 w-5" />
-                </div>
-                <div>
-                  <h1 className="text-[17px] font-semibold text-white">Smart Frames</h1>
-                  <p className="mt-1 text-[12px] leading-5 text-zinc-400">
-                    Clean Cut removes dead air and opens the result as an editable MediaForge project.
-                  </p>
-                </div>
-              </div>
-            </div>
+      <div className="mf-smart-frames-page flex-1 overflow-hidden">
+        <div className="mf-smart-frames-layout grid h-full min-h-0 w-full gap-3 xl:grid-cols-[386px_minmax(0,1fr)]">
+          <section className="mf-smart-frames-panel mf-clean-generator flex h-full min-h-0 flex-col overflow-hidden rounded-[18px] border border-white/[0.08] bg-[hsl(0_0%_7%)] shadow-[0_24px_80px_rgba(0,0,0,.28)]">
+            <div className="mf-smart-frames-body ws-scroll-hide min-h-0 flex-1 overflow-y-auto p-5">
+              <StandaloneToolHeaderCard title={t("workspace.standalone.tool.smart_frames.title")} />
 
-            <div className="space-y-4 p-5">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -2734,96 +2987,103 @@ const HyperFramesSmartView = ({
                   event.target.value = "";
                 }}
               />
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => fileInputRef.current?.click()}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
+              <div className="mf-clean-input-section mf-smart-source-section">
+                <div className="mf-clean-step-heading mb-3">{t("workspace.standalone.smart_frames.step_source")}</div>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => fileInputRef.current?.click()}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
                     event.preventDefault();
-                    fileInputRef.current?.click();
-                  }
-                }}
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  const file = event.dataTransfer.files?.[0];
-                  if (file) handleSourceFile(file);
-                }}
-                className={cn(
-                  "group rounded-2xl border border-dashed p-3 transition",
-                  sourceUrl
-                    ? "border-cyan-300/25 bg-cyan-300/[0.045]"
-                    : "border-cyan-300/25 bg-cyan-300/[0.035] hover:border-cyan-200/45 hover:bg-cyan-300/[0.06]",
-                )}
-              >
-                {sourceUrl ? (
-                  <div className="flex gap-3">
-                    <video
-                      src={sourceUrl}
-                      muted
-                      playsInline
-                      className="h-[92px] w-[132px] rounded-xl bg-black object-cover"
-                    />
-                    <div className="min-w-0 flex-1 py-1">
-                      <div className="flex items-center gap-2 text-[12px] font-semibold text-white">
-                        <FileVideo className="h-4 w-4 text-cyan-200" />
-                        <span className="truncate">{sourceFile?.name}</span>
+                    const file = event.dataTransfer.files?.[0];
+                    if (file) handleSourceFile(file);
+                  }}
+                  className={cn(
+                    "mf-clean-reference-dropzone mf-smart-source-dropzone group relative flex w-full items-center overflow-hidden text-left outline-none transition",
+                    sourceUrl
+                      ? "is-loaded cursor-pointer"
+                      : "cursor-pointer focus:ring-1 focus:ring-[#f4ff00]/60",
+                  )}
+                >
+                  {sourceUrl ? (
+                    <div className="mf-smart-source-loaded flex gap-3">
+                      <video
+                        src={sourceUrl}
+                        muted
+                        playsInline
+                        className="h-[92px] w-[132px] rounded-xl bg-black object-cover"
+                      />
+                      <div className="min-w-0 flex-1 py-1">
+                        <div className="flex items-center gap-2 text-[12px] font-semibold text-white">
+                          <FileVideo className="h-4 w-4 text-cyan-200" />
+                          <span className="truncate">{sourceFile?.name}</span>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold text-zinc-300">
+                          <span className="rounded-lg bg-white/[0.06] px-2 py-1">
+                            {(sourceFile ? sourceFile.size / 1024 / 1024 : 0).toFixed(1)} MB
+                          </span>
+                          <span className="rounded-lg bg-white/[0.06] px-2 py-1">
+                            {sourceMeta ? formatSmartFramesDuration(sourceMeta.duration) : t("workspace.standalone.loading")}
+                          </span>
+                          <span className="rounded-lg bg-white/[0.06] px-2 py-1">
+                            {sourceMeta ? `${sourceMeta.width}x${sourceMeta.height}` : t("workspace.standalone.smart_frames.video_fallback")}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-[11px] leading-4 text-cyan-50/65">
+                          {t("workspace.standalone.smart_frames.source_replace")}
+                        </p>
                       </div>
-                      <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold text-zinc-300">
-                        <span className="rounded-lg bg-white/[0.06] px-2 py-1">
-                          {(sourceFile ? sourceFile.size / 1024 / 1024 : 0).toFixed(1)} MB
+                    </div>
+                  ) : (
+                    <div className="mf-smart-source-empty flex w-full items-center gap-[14px]">
+                      <span className="standalone-reference-empty-glyph">
+                        <span className="standalone-reference-empty-icon" aria-hidden="true">
+                          <UploadCloud className="h-[18px] w-[18px]" />
                         </span>
-                        <span className="rounded-lg bg-white/[0.06] px-2 py-1">
-                          {sourceMeta ? formatSmartFramesDuration(sourceMeta.duration) : "Reading"}
-                        </span>
-                        <span className="rounded-lg bg-white/[0.06] px-2 py-1">
-                          {sourceMeta ? `${sourceMeta.width}x${sourceMeta.height}` : "Video"}
-                        </span>
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="standalone-reference-title truncate font-semibold text-white">{t("workspace.standalone.smart_frames.source_title")}</div>
+                        <p className="standalone-reference-hint mt-[3px] truncate text-zinc-400">
+                          {t("workspace.standalone.smart_frames.source_hint")}
+                        </p>
+                        <p className="mt-[6px] text-[12px] font-semibold leading-[16px] text-[#f4ff00]">
+                          {t("workspace.standalone.smart_frames.source_limit")}
+                        </p>
                       </div>
-                      <p className="mt-2 text-[11px] leading-4 text-cyan-50/65">
-                        Click or drop a new video to replace the source.
-                      </p>
+                      <span className="self-center text-[13px] font-bold leading-[18px] text-white">0/1</span>
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex min-h-[116px] items-center gap-4 px-3">
-                    <div className="grid h-12 w-12 place-items-center rounded-2xl bg-cyan-300/10 text-cyan-200">
-                      <UploadCloud className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <div className="text-[13px] font-semibold text-white">Source MP4</div>
-                      <p className="mt-1 text-[12px] leading-5 text-zinc-400">
-                        Drop an MP4 here or click to upload.
-                      </p>
-                      <p className="mt-1 text-[11px] font-semibold text-cyan-200/80">
-                        MP4/MOV/WEBM demo input
-                      </p>
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
-              <label className="block">
-                <span className="text-[12px] font-semibold text-zinc-200">
-                  Optional note
+              <label className="mf-clean-input-section mf-smart-note-field block">
+                <span className="mf-clean-step-heading block">
+                  {t("workspace.standalone.smart_frames.step_optional_note")}
                 </span>
                 <textarea
                   value={prompt}
                   onChange={(event) => setPrompt(event.target.value)}
-                  placeholder="Optional note, e.g. keep short breaths but remove long pauses."
-                  className="mt-2 min-h-[140px] w-full resize-y rounded-xl border border-white/[0.08] bg-black/35 px-3 py-3 text-[13px] leading-6 text-white outline-none transition placeholder:text-zinc-600 focus:border-[#eaff00]/70"
+                  placeholder={t("workspace.standalone.smart_frames.note_placeholder")}
+                  className="mf-smart-note-input mt-2 min-h-[92px] w-full resize-none rounded-xl border border-white/[0.08] bg-black/35 px-3 py-3 text-[13px] leading-6 text-white outline-none transition placeholder:text-zinc-600 focus:border-[#eaff00]/70"
                 />
               </label>
 
-              <div className="grid grid-cols-1 gap-2">
+              <div className="mf-clean-input-section mf-smart-presets grid grid-cols-1 gap-2">
+                <div className="mf-clean-step-heading">{t("workspace.standalone.smart_frames.step_mode")}</div>
                 {HYPERFRAMES_SMART_PRESETS.map((preset) => (
                   <button
                     key={preset.id}
                     type="button"
                     onClick={() => setPresetId(preset.id)}
                     className={cn(
-                      "rounded-xl border px-3 py-2 text-left transition",
+                      "mf-smart-preset-card rounded-xl border px-3 py-2 text-left transition",
                       preset.id === presetId
                         ? "border-[#eaff00] bg-[#eaff00]/10 text-white shadow-[0_0_18px_rgba(234,255,0,.12)]"
                         : "border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-white/[0.16] hover:bg-white/[0.06]",
@@ -2831,15 +3091,15 @@ const HyperFramesSmartView = ({
                   >
                     <div className="flex items-center gap-2 text-[12px] font-semibold">
                       <WandSparkles className="h-3.5 w-3.5 text-[#eaff00]" />
-                      {preset.label}
+                      {smartFramesPresetLabel(preset.id, t)}
                     </div>
-                    <p className="mt-0.5 text-[10px] leading-4 text-zinc-500">{preset.description}</p>
+                    <p className="mt-0.5 text-[10px] leading-4 text-zinc-500">{smartFramesPresetDescription(preset.id, t)}</p>
                   </button>
                 ))}
               </div>
 
-              <div className="rounded-xl border border-cyan-300/15 bg-cyan-300/[0.045] p-3 text-[12px] leading-5 text-cyan-50/75">
-                Clean Cut uses local audio silence detection to remove dead air, preserves short speech handles, returns a real MP4, and creates an editable MediaForge project from the cut file.
+              <div className="mf-smart-info-card rounded-xl border border-cyan-300/15 bg-cyan-300/[0.045] p-3 text-[12px] leading-5 text-cyan-50/75">
+                {t("workspace.standalone.smart_frames.info")}
               </div>
 
               {runStatus ? (
@@ -2855,50 +3115,63 @@ const HyperFramesSmartView = ({
 
               {runError ? (
                 <div className="rounded-xl border border-red-400/20 bg-red-500/10 p-3 text-[12px] leading-5 text-red-100">
-                  <div className="font-semibold">Smart Frames did not finish.</div>
+                  <div className="font-semibold">{t("workspace.standalone.smart_frames.error_title")}</div>
                   <div className="mt-1 text-red-100/85">{runError}</div>
                 </div>
               ) : null}
 
-              <button
-                type="button"
-                onClick={() => void handleGenerate()}
-                disabled={running || !sourceFile}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#fbff2f,#b9ff50)] px-4 text-[13px] font-semibold text-zinc-950 shadow-[0_0_22px_rgba(234,255,0,.18)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                Clean Cut
-              </button>
             </div>
-          </section>
 
-          <section className="flex min-h-[640px] flex-col rounded-[18px] border border-white/[0.08] bg-[hsl(0_0%_6%)] shadow-[0_24px_80px_rgba(0,0,0,.28)]">
-            <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-5 py-4">
-              <div className="flex items-center gap-3">
-                <div className="grid h-9 w-9 place-items-center rounded-xl bg-white/[0.06] text-[#eaff00]">
-                  <Code2 className="h-4 w-4" />
-                </div>
-                <div className="min-w-0">
-                  <h2 className="whitespace-nowrap text-[15px] font-semibold text-white">
-                  Result
-                  </h2>
-                  <p className="sr-only">
-                    Preview the rendered output and open an editable project.
-                  </p>
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
+            <div className="mf-clean-footer mf-smart-frames-footer flex shrink-0">
+              <div className="mf-clean-action-stack">
                 <button
                   type="button"
-                  onClick={() => void copyResult()}
-                  disabled={!result}
-                  className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 text-[12px] font-semibold text-zinc-200 hover:bg-white/[0.08] disabled:opacity-40"
+                  onClick={() => void handleGenerate()}
+                  disabled={running}
+                  className="mf-generate-pill-button mf-smart-generate-button inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#fbff2f,#b9ff50)] px-4 text-[13px] font-semibold text-zinc-950 shadow-[0_0_22px_rgba(234,255,0,.18)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <Copy className="h-3.5 w-3.5" />
-                  Copy summary
+                  {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
+                  {running ? t("workspace.standalone.smart_frames.generating") : t("workspace.standalone.smart_frames.generate_one")}
                 </button>
               </div>
             </div>
+          </section>
+
+          <section className="mf-smart-result-panel relative flex h-full min-h-0 flex-col rounded-[20px] border border-white/[0.08] bg-[hsl(0_0%_6%)] shadow-[0_24px_80px_rgba(0,0,0,.28)]">
+            {!running && !result && !sourceUrl ? (
+              <div className="mf-smart-result-view-toggle" aria-hidden="true">
+                <span className="is-active"><LayoutGrid className="h-[11px] w-[11px]" /></span>
+                <span><List className="h-[11px] w-[11px]" /></span>
+              </div>
+            ) : null}
+            {(running || result) ? (
+              <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-5 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-white/[0.06] text-[#eaff00]">
+                    <Code2 className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="whitespace-nowrap text-[15px] font-semibold text-white">
+                      {t("workspace.standalone.smart_frames.result")}
+                    </h2>
+                    <p className="sr-only">
+                      {t("workspace.standalone.smart_frames.result_sr")}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void copyResult()}
+                    disabled={!result}
+                    className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 text-[12px] font-semibold text-zinc-200 hover:bg-white/[0.08] disabled:opacity-40"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    {t("workspace.standalone.smart_frames.copy_summary")}
+                  </button>
+                </div>
+              </div>
+            ) : null}
 
             {running ? (
               <div className="flex flex-1 items-center justify-center p-8">
@@ -2907,10 +3180,10 @@ const HyperFramesSmartView = ({
                     <Loader2 className="h-7 w-7 animate-spin" />
                   </div>
                   <h3 className="mt-5 text-[18px] font-semibold text-white">
-                    Creating Smart Frames
+                    {t("workspace.standalone.smart_frames.generating")}
                   </h3>
                   <p className="mt-2 text-[13px] leading-6 text-zinc-500">
-                    {runStatus ?? "Detecting silence and preparing the cut video."}
+                    {runStatus ?? t("workspace.standalone.smart_frames.detecting")}
                   </p>
                 </div>
               </div>
@@ -2929,31 +3202,31 @@ const HyperFramesSmartView = ({
                             {result.presetLabel}
                           </span>
                           <span className="rounded-lg bg-white/[0.06] px-2 py-1">
-                            {sourceMeta ? formatSmartFramesDuration(sourceMeta.duration) : "Video"}
+                            {sourceMeta ? formatSmartFramesDuration(sourceMeta.duration) : t("workspace.standalone.smart_frames.video_fallback")}
                           </span>
                           <span className="rounded-lg bg-white/[0.06] px-2 py-1">
-                            {result.renderedBy ? result.renderedBy : "Editable draft"}
+                            {result.renderedBy ? result.renderedBy : t("workspace.standalone.smart_frames.editable_draft")}
                           </span>
                           {result.changedByCut ? (
                             <span className="rounded-lg bg-[#eaff00]/15 px-2 py-1 text-[#eaff00]">
-                              dead air cut
+                              {t("workspace.standalone.smart_frames.dead_air_cut")}
                             </span>
                           ) : null}
                           {typeof result.removedDuration === "number" && result.removedDuration > 0 ? (
                             <span className="rounded-lg bg-white/[0.06] px-2 py-1">
-                              removed {formatSmartFramesDuration(result.removedDuration)}
+                              {t("workspace.standalone.smart_frames.removed_duration", { duration: formatSmartFramesDuration(result.removedDuration) })}
                             </span>
                           ) : null}
                           {result.segments?.length ? (
                             <span className="rounded-lg bg-white/[0.06] px-2 py-1">
-                              {result.segments.length} clips
+                              {t("workspace.standalone.smart_frames.clips", { count: result.segments.length })}
                             </span>
                           ) : null}
                         </div>
                       </div>
                       {result.renderWarning ? (
                         <p className="mt-3 rounded-lg border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-[12px] leading-5 text-amber-50">
-                          HyperFrames warning: {result.renderWarning}
+                          {t("workspace.standalone.smart_frames.render_warning", { warning: result.renderWarning })}
                         </p>
                       ) : null}
                       {result.editorProjectError ? (
@@ -2968,7 +3241,7 @@ const HyperFramesSmartView = ({
                           className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.04] text-[13px] font-semibold text-white hover:bg-white/[0.08]"
                         >
                           <Download className="h-4 w-4" />
-                          Download MP4
+                          {t("workspace.standalone.smart_frames.download_mp4")}
                         </button>
                         <button
                           type="button"
@@ -2981,7 +3254,7 @@ const HyperFramesSmartView = ({
                           ) : (
                             <ArrowRight className="h-4 w-4" />
                           )}
-                          Edit in MediaForge
+                          {t("workspace.standalone.smart_frames.edit_mediaforge")}
                         </button>
                       </div>
                     </div>
@@ -3001,9 +3274,9 @@ const HyperFramesSmartView = ({
                     className="aspect-video w-full rounded-2xl bg-black object-contain"
                   />
                   <div className="mt-5 text-center">
-                    <h3 className="text-[18px] font-semibold text-white">Source ready</h3>
+                    <h3 className="text-[18px] font-semibold text-white">{t("workspace.standalone.smart_frames.source_ready")}</h3>
                     <p className="mt-2 text-[13px] leading-6 text-zinc-500">
-                    Run Clean Cut to remove dead air locally and open the cut video in MediaForge.
+                      {t("workspace.standalone.smart_frames.source_ready_desc")}
                     </p>
                     {runError ? (
                       <p className="mx-auto mt-4 max-w-[560px] rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[12px] leading-5 text-red-100">
@@ -3020,10 +3293,10 @@ const HyperFramesSmartView = ({
                     <Boxes className="h-7 w-7" />
                   </div>
                   <h3 className="mt-5 text-[18px] font-semibold text-white">
-                    Ready for Smart Frames
+                    {t("workspace.standalone.smart_frames.ready")}
                   </h3>
                   <p className="mt-2 text-[13px] leading-6 text-zinc-500">
-                    Upload a source MP4 on the left. Clean Cut will remove dead air and create an editable MediaForge project.
+                    {t("workspace.standalone.smart_frames.ready_desc")}
                   </p>
                 </div>
               </div>
@@ -3813,6 +4086,99 @@ function buildSpaceCardData(
   };
 }
 
+type RenameSpaceTarget = { id: string; name: string };
+
+const RenameSpaceDialog = ({
+  target,
+  onOpenChange,
+  onRename,
+}: {
+  target: RenameSpaceTarget | null;
+  onOpenChange: (open: boolean) => void;
+  onRename: (id: string, currentName: string, nextName: string) => void;
+}) => {
+  const { t } = useLanguage();
+  const [name, setName] = useState("");
+  const open = Boolean(target);
+  const trimmedName = name.trim();
+
+  useEffect(() => {
+    if (target) setName(target.name);
+  }, [target]);
+
+  const close = () => onOpenChange(false);
+
+  const handleSubmit = () => {
+    if (!target || !trimmedName) return;
+    if (trimmedName !== target.name) {
+      onRename(target.id, target.name, trimmedName);
+    }
+    close();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && close()}>
+      <DialogContent
+        className="w-[calc(100vw-2rem)] gap-4 overflow-hidden border-white/10 bg-[hsl(0_0%_7.5%)] p-0 text-zinc-100 shadow-2xl shadow-black/60 sm:max-w-[430px]"
+        style={{ fontFamily: "'Prompt', system-ui, sans-serif" }}
+      >
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            handleSubmit();
+          }}
+          className="space-y-4 p-5"
+        >
+          <DialogHeader className="space-y-1 pr-8">
+            <DialogTitle className="flex items-center gap-2 text-[18px] font-semibold leading-6 text-zinc-50">
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-white/[0.06] text-[#f4ff00]">
+                <Pencil className="h-4 w-4" />
+              </span>
+              {t("workspace.spaces.action_rename")}
+            </DialogTitle>
+            <DialogDescription className="text-[13px] leading-5 text-zinc-400">
+              {t("workspace.spaces.rename_prompt")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-1.5">
+            <label htmlFor="rename-space-name" className="sr-only">
+              {t("workspace.spaces.rename_prompt")}
+            </label>
+            <input
+              id="rename-space-name"
+              type="text"
+              value={name}
+              onChange={(event) => setName(event.target.value.slice(0, 90))}
+              autoFocus
+              spellCheck={false}
+              className="h-11 w-full rounded-[10px] border border-white/[0.09] bg-black/35 px-3 text-[14px] font-medium text-zinc-50 outline-none transition placeholder:text-zinc-600 focus:border-[#f4ff00]/70 focus:ring-2 focus:ring-[#f4ff00]/15"
+            />
+          </div>
+
+          <DialogFooter className="gap-2 pt-1 sm:gap-2">
+            <button
+              type="button"
+              onClick={close}
+              className="inline-flex h-9 items-center justify-center rounded-full bg-white/[0.06] px-4 text-[13px] font-medium text-zinc-200 transition-colors hover:bg-white/[0.1]"
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              type="submit"
+              disabled={!trimmedName}
+              className="ci-gloss-button inline-flex h-9 items-center justify-center gap-2 rounded-full px-4 text-[13px] font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              {t("common.save")}
+            </button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 const ProjectsManagerView = ({
   projects,
   activeProjectId,
@@ -3846,6 +4212,7 @@ const ProjectsManagerView = ({
   const selectedProject =
     projects.find((project) => project.id === selectedProjectId) ?? projects[0] ?? null;
   const [filter, setFilter] = useState<"all" | "mine" | "team">("all");
+  const [renameTarget, setRenameTarget] = useState<RenameSpaceTarget | null>(null);
 
   const projectCards = useMemo<ProjectCardItem[]>(() => {
     const spaceCountByProject = new Map<string, number>();
@@ -3937,13 +4304,16 @@ const ProjectsManagerView = ({
   };
 
   const handleRename = (id: string, currentName: string) => {
-    const next = prompt(t("workspace.spaces.rename_prompt"), currentName);
-    if (next?.trim() && next.trim() !== currentName) {
-      renameWorkspace(id, next.trim());
-      if (user?.id) {
-        const meta = useWorkspaceStore.getState().workspaces.find((w) => w.id === id);
-        if (meta) void upsertWorkspaceToServer(meta, user.id);
-      }
+    setRenameTarget({ id, name: currentName });
+  };
+
+  const handleConfirmRename = (id: string, currentName: string, nextName: string) => {
+    const trimmed = nextName.trim();
+    if (!trimmed || trimmed === currentName) return;
+    renameWorkspace(id, trimmed);
+    if (user?.id) {
+      const meta = useWorkspaceStore.getState().workspaces.find((w) => w.id === id);
+      if (meta) void upsertWorkspaceToServer(meta, user.id);
     }
   };
 
@@ -4010,9 +4380,15 @@ const ProjectsManagerView = ({
 
   return (
     <>
+      <RenameSpaceDialog
+        target={renameTarget}
+        onOpenChange={(open) => {
+          if (!open) setRenameTarget(null);
+        }}
+        onRename={handleConfirmRename}
+      />
       <PageHeader
         title={t("workspace.home.projects")}
-        rightSlot={<UserMenu />}
         onOpenSidebar={onOpenSidebar}
       />
       {educationLockedStudent ? (
@@ -4213,6 +4589,7 @@ const SpacesView = ({
   );
   const { data: educationSpaceStatuses = EMPTY_EDUCATION_SPACE_STATUS_MAP } =
     useEducationSpaceStatusMap(user?.id, educationLockedStudent);
+  const [renameTarget, setRenameTarget] = useState<RenameSpaceTarget | null>(null);
 
   /* Cross-device sync — same one-shot pattern used elsewhere on the
    * dashboard. Ref-guard avoids HMR / re-mount duplicates. The
@@ -4352,15 +4729,18 @@ const SpacesView = ({
   }, [activeProjectId, educationLockedStudent, tab, user?.id, workspaces, canvasIndex, graphs, educationSpaceStatuses, language]);
 
   const handleRename = (id: string, currentName: string) => {
-    const next = prompt(t("workspace.spaces.rename_prompt"), currentName);
-    if (next?.trim() && next.trim() !== currentName) {
-      renameWorkspace(id, next.trim());
-      if (user?.id) {
-        const meta = useWorkspaceStore
-          .getState()
-          .workspaces.find((w) => w.id === id);
-        if (meta) void upsertWorkspaceToServer(meta, user.id);
-      }
+    setRenameTarget({ id, name: currentName });
+  };
+
+  const handleConfirmRename = (id: string, currentName: string, nextName: string) => {
+    const trimmed = nextName.trim();
+    if (!trimmed || trimmed === currentName) return;
+    renameWorkspace(id, trimmed);
+    if (user?.id) {
+      const meta = useWorkspaceStore
+        .getState()
+        .workspaces.find((w) => w.id === id);
+      if (meta) void upsertWorkspaceToServer(meta, user.id);
     }
   };
   const handleDelete = (id: string, displayName: string) => {
@@ -4455,17 +4835,19 @@ const SpacesView = ({
   // shows an inline empty-state so the click isn't a dead-end.
   return (
     <>
+      <RenameSpaceDialog
+        target={renameTarget}
+        onOpenChange={(open) => {
+          if (!open) setRenameTarget(null);
+        }}
+        onRename={handleConfirmRename}
+      />
       {/* Slim chrome bar — keeps the workspace selector + user menu
           visible. Title moved to the hero block below per the new
           Magnific-style layout. */}
       <PageHeader
         title=""
         onOpenSidebar={onOpenSidebar}
-        rightSlot={
-          <div className="flex items-center gap-3">
-            <UserMenu />
-          </div>
-        }
       />
 
       <div className="ws-scroll-hide flex-1 overflow-y-auto">
@@ -4829,11 +5211,9 @@ const ActionButton = ({
 
 const PageHeader = ({
   title,
-  rightSlot,
   onOpenSidebar,
 }: {
   title: string;
-  rightSlot?: React.ReactNode;
   /** When provided, renders a hamburger button on mobile (`md:hidden`)
    *  that calls back into the dashboard to open the WorkspaceSidebar
    *  drawer. Pages that don't pass this (very few — pretty much only
@@ -4861,13 +5241,12 @@ const PageHeader = ({
         </svg>
       </button>
     )}
-    <h1 className="flex-1 truncate text-[15.5px] font-medium tracking-tight text-zinc-300">
-      {title}
-    </h1>
-    {rightSlot && (
-      <div className="fixed right-4 top-4 z-[80] pointer-events-auto md:right-6 lg:right-8">
-        {rightSlot}
-      </div>
+    {title ? (
+      <h1 className="flex-1 truncate text-[15.5px] font-medium tracking-tight text-zinc-300">
+        {title}
+      </h1>
+    ) : (
+      <div className="flex-1" aria-hidden="true" />
     )}
   </div>
   );
@@ -4998,7 +5377,6 @@ const Placeholder = ({
     <>
       <PageHeader
         title={title}
-        rightSlot={<UserMenu />}
         onOpenSidebar={onOpenSidebar}
       />
       <div className="flex flex-1 items-center justify-center p-12">

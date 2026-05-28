@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   Hand,
   Images,
-  Languages,
   MousePointer2,
   Pencil,
   Plus,
@@ -15,7 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useLanguage, type Language } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useCanvasToolStore, type CanvasTool } from "./useCanvasToolStore";
 
@@ -65,7 +64,6 @@ const CanvasFloatingSidebar = ({ onAddNode, onOpenSettings }: Props) => {
   const setTool = useCanvasToolStore((s) => s.setTool);
   const undo = useWorkspaceStore((s) => s.undo);
   const redo = useWorkspaceStore((s) => s.redo);
-  const { language, setLanguage } = useLanguage();
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -123,10 +121,10 @@ const CanvasFloatingSidebar = ({ onAddNode, onOpenSettings }: Props) => {
   };
 
   return (
-    <div className="pointer-events-none fixed bottom-5 left-1/2 z-40 w-[min(calc(100vw-28px),760px)] -translate-x-1/2">
+    <div className="pointer-events-none fixed left-[58px] top-1/2 z-40 -translate-y-1/2">
       <div
         data-testid="board-toolbar"
-        className="pointer-events-auto mx-auto flex w-max max-w-full items-center gap-1 overflow-x-auto rounded-full border border-white/[0.09] bg-[#0f1010]/92 p-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.42),0_0_0_1px_rgba(255,255,255,0.04)] backdrop-blur-xl"
+        className="pointer-events-auto flex max-h-[calc(100vh-32px)] w-[38px] flex-col items-center gap-[3px] overflow-y-auto rounded-[15px] border border-white/[0.11] bg-[#2a2b2c]/94 p-[5px] shadow-[0_14px_32px_rgba(0,0,0,0.34),0_0_0_1px_rgba(255,255,255,0.035)] backdrop-blur-xl"
       >
         {BUTTONS.map((button, index) => (
           <ToolbarButton
@@ -137,10 +135,6 @@ const CanvasFloatingSidebar = ({ onAddNode, onOpenSettings }: Props) => {
             onClick={(event) => onClick(button, event)}
           />
         ))}
-        <LanguageToggleButton
-          language={language}
-          onToggle={() => setLanguage(language === "th" ? "en" : "th")}
-        />
       </div>
     </div>
   );
@@ -162,8 +156,8 @@ function ToolbarButton({
   const Icon = button.icon;
   const label = t(button.labelKey);
   return (
-    <div className="relative flex items-center">
-      {button.divider && !isFirst && <div className="mx-1 h-6 w-px bg-white/10" />}
+    <div className="relative flex flex-col items-center">
+      {button.divider && !isFirst && <div className="my-[3px] h-px w-[24px] bg-white/[0.14]" />}
       <button
         type="button"
         data-testid={`board-tool-${button.id}`}
@@ -173,53 +167,22 @@ function ToolbarButton({
         aria-label={label}
         aria-pressed={button.isMode ? isActive : undefined}
         className={cn(
-          "grid h-10 w-10 shrink-0 place-items-center rounded-full transition-colors",
+          "grid h-[28px] w-[28px] shrink-0 place-items-center rounded-[7px] transition-colors",
           isActive
-            ? "bg-[#e5ff1c] text-zinc-950 shadow-[0_10px_24px_rgba(218,255,34,0.2)]"
-            : "text-zinc-300 hover:bg-white/10 hover:text-zinc-50",
+            ? "bg-[#e8ff12] text-zinc-950 shadow-[0_0_16px_rgba(232,255,18,0.22)]"
+            : "text-zinc-300 hover:bg-white/[0.12] hover:text-zinc-50",
         )}
       >
-        <Icon className="h-[17px] w-[17px]" strokeWidth={2.2} />
+        <Icon className="h-[15px] w-[15px]" strokeWidth={2.15} />
       </button>
       {showTip && (
-        <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-zinc-950/95 px-2.5 py-1.5 text-[12px] font-medium text-zinc-100 shadow-lg">
+        <div className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded-[7px] border border-white/[0.08] bg-zinc-950/95 px-2.5 py-1.5 text-[12px] font-medium text-zinc-100 shadow-lg">
           <span>{label}</span>
           {button.shortcut && (
             <span className="ml-2 font-mono text-[10px] text-zinc-500">
               {button.shortcut}
             </span>
           )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function LanguageToggleButton({
-  language,
-  onToggle,
-}: {
-  language: Language;
-  onToggle: () => void;
-}) {
-  const [showTip, setShowTip] = useState(false);
-  const targetLabel = language === "th" ? "English" : "ภาษาไทย";
-  return (
-    <div className="relative flex items-center">
-      <button
-        type="button"
-        data-testid="board-tool-language"
-        onClick={onToggle}
-        onMouseEnter={() => setShowTip(true)}
-        onMouseLeave={() => setShowTip(false)}
-        aria-label={targetLabel}
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-zinc-300 transition-colors hover:bg-white/10 hover:text-zinc-50"
-      >
-        <Languages className="h-[17px] w-[17px]" strokeWidth={2.2} />
-      </button>
-      {showTip && (
-        <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-zinc-950/95 px-2.5 py-1.5 text-[12px] font-medium text-zinc-100 shadow-lg">
-          {targetLabel}
         </div>
       )}
     </div>

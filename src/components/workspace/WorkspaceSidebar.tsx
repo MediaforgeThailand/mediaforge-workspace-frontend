@@ -49,8 +49,10 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { useAuthModal } from "@/contexts/AuthModalContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { TranslationKey } from "@/contexts/locales/en";
 import { useIsClassTeacher, useIsOrgAdmin } from "@/hooks/useIsOrgUser";
@@ -60,8 +62,9 @@ import { supabase } from "@/integrations/supabase/client";
 import OrgCreditBadge from "@/components/OrgCreditBadge";
 import ActiveClassPicker from "@/components/ActiveClassPicker";
 import AllAssetsDialog from "@/components/workspace/AllAssetsDialog";
+import { UserMenu } from "@/components/workspace/UserMenu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { DEFAULT_BRAND_LOGO, DEFAULT_BRAND_NAME } from "@/components/workspace/brandAssets";
+import { DEFAULT_BRAND_LOGO } from "@/components/workspace/brandAssets";
 import { getProjectAvatar } from "@/components/workspace/projectAvatars";
 import type { ProjectMeta } from "@/store/useWorkspaceStore";
 
@@ -127,8 +130,19 @@ type SidebarSection = {
   rows: NavItem[][];
 };
 
-const NAV_TOP: NavItem[] = [
-  { id: "home",   labelKey: "workspace.sidebar.home",       icon: HomeIcon },
+const SIDEBAR_NAV_ITEMS: NavItem[] = [
+  { id: "home", labelKey: "workspace.sidebar.home", icon: HomeIcon },
+  { id: "spaces", labelKey: "workspace.sidebar.spaces", badgeKey: "workspace.sidebar.editor_new", icon: Workflow },
+  { id: "image_gen", labelKey: "workspace.sidebar.image_gen", icon: ImageIcon },
+  { id: "video_gen", labelKey: "workspace.sidebar.video_gen", icon: Video },
+  { id: "image_upscale", labelKey: "workspace.sidebar.image_upscale", icon: Maximize2 },
+  { id: "url_asset", labelKey: "workspace.sidebar.url_asset", icon: Link },
+  { id: "voice_translate", labelKey: "workspace.sidebar.voice_translate", badgeKey: "workspace.sidebar.editor_new", icon: Languages },
+  { id: "voice_gen", labelKey: "workspace.sidebar.voice_gen", icon: Mic2 },
+  { id: "smart_frames", labelKey: "workspace.sidebar.smart_frames", badgeKey: "workspace.sidebar.editor_new", icon: Sparkles },
+  { id: "auto_subtitle", labelKey: "workspace.sidebar.auto_subtitle", icon: Captions },
+  { id: "image_to_3d", labelKey: "workspace.sidebar.threed_gen", icon: Box },
+  { id: "editor", labelKey: "workspace.sidebar.editing_tools", icon: Clapperboard },
 ];
 
 const NAV_SECTIONS: SidebarSection[] = [
@@ -236,7 +250,10 @@ export default function WorkspaceSidebar({
   collapsed = false,
 }: WorkspaceSidebarProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useLanguage();
+  const { user, profile, loading: authLoading } = useAuth();
+  const { openAuthModal } = useAuthModal();
   const [libraryOpen, setLibraryOpen] = useState(false);
   // Tenant branding override (e.g. dmd.mediaforge.co → DMD logo +
   // "DMD" short name). Returns null on the bare workspace.mediaforge.co
@@ -244,7 +261,7 @@ export default function WorkspaceSidebar({
   // mascot brand in that case so the chrome doesn't flicker empty.
   const branding = useOrgBranding();
   const brandLogo = branding?.logoUrl ?? DEFAULT_BRAND_LOGO;
-  const brandName = branding?.shortName ?? DEFAULT_BRAND_NAME;
+  const brandName = branding?.shortName ?? "Workspace";
   const usingDefaultBrand = !branding?.logoUrl;
   const projectOptions = [...projects].sort(
     (a, b) =>
@@ -273,135 +290,146 @@ export default function WorkspaceSidebar({
     else navigate(`/app/workspace?section=${s}`);
   };
 
-  // 2026-05 redesign: sidebar floats as a Layer-1 panel.
-  //   • Outer wrapper carries the page-bg padding (8px around).
-  //   • aside itself is a rounded card sitting inside.
-  //   • No more right border — the page bg already separates the
-  //     panel from the main content (different elevation).
-  //   • Width tightened 198 → 192 keeps the visual rhythm.
+  const openAuth = (initialTab: "login" | "signup") => {
+    openAuthModal({
+      initialTab,
+      redirectPath: `${location.pathname}${location.search}${location.hash}`,
+    });
+  };
+
+  const accountName =
+    profile?.display_name?.trim() ||
+    user?.email?.split("@")[0] ||
+    "Media Forge";
+  const accountSubtitle = user?.email ?? "Personal workspace";
+
   return (
     <div
       className={cn(
-        "ws-scroll-hide h-full shrink-0 bg-[#070808] py-2 pl-0 transition-[width] duration-200",
-        collapsed ? "w-[66px]" : "w-[230px]",
+        "mf-ref-sidebar-frame ws-scroll-hide",
+        collapsed && "is-collapsed",
       )}
     >
       <aside
         className={cn(
-          "mf-readable ws-scroll-hide flex h-full flex-col gap-[4px] overflow-y-auto rounded-[18px] border border-white/[0.10] py-[12px] text-[#b0b4ba] transition-[width,padding] duration-200",
-          collapsed ? "w-[60px] px-[5px]" : "w-[230px] px-[6px]",
+          "mf-readable mf-ref-sidebar ws-scroll-hide",
+          collapsed && "is-collapsed",
         )}
-        style={{
-          background:
-            "radial-gradient(95% 70% at 50% -10%, rgba(234,255,0,.04), transparent 50%), linear-gradient(180deg, #171a19 0%, #111313 46%, #0c0d0d 100%)",
-          boxShadow:
-            "inset 0 1px 0 rgba(255,255,255,.08), inset 0 -1px 0 rgba(255,255,255,.035), 0 24px 64px -52px rgba(0,0,0,.95), 0 0 28px -26px rgba(234,255,0,.72)",
-        }}
       >
-      {/* ── Brand row — PSC : Digital Media ──────────────────────
-       *  Logo lives at /public/psc-logo.png. Save the orange
-       *  Digital Media wordmark there; the full lockup is wide
-       *  so we use object-contain to fit the 34px square slot
-       *  without distorting the trefoil + wordmark proportions. */}
-      <div className={cn("flex shrink-0 items-center pb-[12px] pt-[4px]", collapsed ? "justify-center px-0" : "px-[12px]")}>
+        <div className="mf-ref-brand-row">
+          <button
+            type="button"
+            onClick={() => navigate("/app/workspace")}
+            title={brandName}
+            className="mf-ref-brand"
+          >
+            <span className={cn("mf-ref-brand-mark", usingDefaultBrand && "is-default")} aria-hidden="true">
+              <img
+                src={brandLogo}
+                alt=""
+                className={cn(usingDefaultBrand ? "object-contain" : "rounded-full object-cover")}
+                draggable={false}
+              />
+            </span>
+            {!collapsed && <span className="mf-ref-brand-name">{brandName}</span>}
+          </button>
+        </div>
+
+        {!collapsed && (projectOptions.length > 0 || onCreate) && (
+          <SidebarProjectPicker
+            projects={projectOptions}
+            activeProject={selectedProject}
+            onSelectProject={(id) => onSelectProject?.(id)}
+            onCreateProject={onCreate}
+            projectLabel={t("workspace.home.projects")}
+            newProjectLabel={t("workspace.standalone.new_project")}
+            createProjectLabel={t("workspace.home.projects")}
+          />
+        )}
+
+        <nav className="mf-ref-nav-stack" aria-label="Primary navigation">
+          {SIDEBAR_NAV_ITEMS.map((it) => (
+            <NavLink
+              key={it.id}
+              label={t(it.labelKey)}
+              icon={it.icon}
+              active={active === it.id}
+              onClick={() => handleClick(it.id)}
+              badge={it.badgeKey ? t(it.badgeKey) : undefined}
+              iconOnly={collapsed}
+              tooltip={collapsed ? t(it.labelKey) : undefined}
+            />
+          ))}
+        </nav>
+
         <button
           type="button"
-          onClick={() => navigate("/app/workspace")}
-          title={brandName}
-          className={cn(
-            "flex min-w-0 items-center text-[18px] font-bold text-white transition-colors hover:text-white",
-            collapsed ? "justify-center gap-0" : "gap-[8px]",
-          )}
+          onClick={() => handleClick("library")}
+          className={cn("mf-ref-resources", collapsed && "is-icon-only")}
+          title={t("workspace.sidebar.library")}
+          aria-label={t("workspace.sidebar.library")}
         >
-          {/* Brand logo — defaults to the MediaForge mark, swapped
-           *  to the tenant org logo when the user is on a claimed
-           *  subdomain (e.g. dmd.mediaforge.co → DMD logo). */}
-          <img
-            src={brandLogo}
-            alt={brandName}
-            className={cn(
-              "shrink-0 select-none object-contain",
-              collapsed
-                ? "h-[28px] w-[34px]"
-                : usingDefaultBrand
-                ? "h-[28px] w-[42px]"
-                : "h-[26px] w-[26px] rounded-full bg-white",
-            )}
-            draggable={false}
-          />
-          {!collapsed && <span className="truncate leading-tight">{brandName}</span>}
+          <FolderOpen className="mf-ref-nav-icon" />
+          {!collapsed && (
+            <>
+              <span>{t("workspace.sidebar.library")}</span>
+              <span aria-hidden="true">›</span>
+            </>
+          )}
         </button>
-      </div>
 
-      {!collapsed && (onSelectProject || onCreate) && (
-        <SidebarProjectPicker
-          projects={projectOptions}
-          activeProject={selectedProject}
-          onSelectProject={(id) => onSelectProject?.(id)}
-          onCreateProject={onCreate}
-          projectLabel={t("workspace.standalone.projects")}
-          newProjectLabel={t("workspace.standalone.new_project")}
-          createProjectLabel={t("workspace.standalone.create_project")}
-        />
-      )}
+        {!collapsed && (
+          <div className="mf-ref-context-stack">
+            <ActiveClassPicker variant="compact" className="w-full" />
+            <OrgCreditBadge variant="card" />
+            <OrgAdminLink />
+          </div>
+        )}
 
-      {/* ── Top nav group ──────────────────────────────────────── */}
-      <nav className="flex flex-col gap-[4px]">
-        {NAV_TOP.map((it) => (
-          <NavLink
-            key={it.id}
-            label={t(it.labelKey)}
-            icon={it.icon}
-            active={active === it.id}
-            onClick={() => handleClick(it.id)}
-            variant="list"
-            iconOnly={collapsed}
-            tooltip={collapsed ? t(it.labelKey) : undefined}
-          />
-        ))}
-      </nav>
-
-      {/* ── Section divider with label ─────────────────────────── */}
-      {/* ── Tools nav group ────────────────────────────────────── */}
-      {NAV_SECTIONS.map((section) => (
-        <SidebarNavSection
-          key={section.labelKey}
-          label={t(section.labelKey)}
-          rows={section.rows}
-          variant={section.variant}
-          active={active}
-          onSelect={handleClick}
-          translate={t}
-          collapsed={collapsed}
-        />
-      ))}
-
-      {/* ── Org / class extras (SSO branch) ────────────────────────
-       *  These slots sit above the bottom utility row so the chrome
-       *  order from top to bottom is: nav → tools → org context →
-       *  utility cluster. `mt-auto` lives on the first of these so
-       *  the whole stack hugs the bottom. */}
-
-      {/* Active class switcher — only renders when student is in 2+
-       *  classes; consumers/single-class students see nothing. */}
-      {!collapsed && <div className="mt-auto px-[8px] pt-[10px]">
-        <ActiveClassPicker variant="compact" className="w-full" />
-      </div>}
-
-      {/* Org credit badge — visible to org members so they can see
-       *  their balance at a glance. Returns null for consumer/guests. */}
-      {!collapsed && <div className="px-[8px] py-[6px]">
-        <OrgCreditBadge variant="card" />
-      </div>}
-
-      {/* Org admin / class teacher entry to the management surface. */}
-      {!collapsed && <OrgAdminLink />}
-
-      {/* ── Bottom utility row ─────────────────────────────────── */}
-      <div className={cn("flex items-center gap-[4px] pb-[2px] pt-[8px]", collapsed ? "mt-auto justify-center px-0" : "px-[8px]")}>
-        <UtilityBtn icon={SettingsIcon} title={t("workspace.sidebar.settings")} onClick={() => navigate("/app/settings")} />
-      </div>
-      <AllAssetsDialog open={libraryOpen} onClose={() => setLibraryOpen(false)} />
+        <div className={cn("mf-ref-auth-panel", collapsed && "is-collapsed")}>
+          {authLoading ? (
+            <div className={cn("mf-ref-account-row is-loading", collapsed && "is-collapsed")}>
+              <span className="mf-ref-account-skeleton" />
+              {!collapsed && (
+                <span className="min-w-0 flex-1">
+                  <span />
+                  <span />
+                </span>
+              )}
+            </div>
+          ) : user ? (
+            <UserMenu
+              compact
+              sidebarAccount={{
+                name: accountName,
+                subtitle: accountSubtitle,
+                collapsed,
+              }}
+            />
+          ) : (
+            <>
+              {!collapsed && (
+                <button
+                  type="button"
+                  onClick={() => openAuth("signup")}
+                  className="mf-ref-bottom-button is-primary"
+                >
+                  Sign Up
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => openAuth("login")}
+                className="mf-ref-bottom-button is-secondary"
+                title="Sign In"
+                aria-label="Sign In"
+              >
+                {collapsed ? <SettingsIcon className="h-[16px] w-[16px]" /> : "Sign In"}
+              </button>
+            </>
+          )}
+        </div>
+        <AllAssetsDialog open={libraryOpen} onClose={() => setLibraryOpen(false)} />
       </aside>
     </div>
   );
@@ -439,7 +467,7 @@ function SidebarProjectPicker({
       if (!rect) return;
       const gutter = 10;
       const margin = 12;
-      const menuWidth = 306;
+      const menuWidth = 286;
       const rightSideLeft = rect.right + gutter;
       const hasRoomOnRight = rightSideLeft + menuWidth + margin <= window.innerWidth;
       const fallbackLeft = Math.min(
@@ -475,20 +503,20 @@ function SidebarProjectPicker({
       ? createPortal(
           <div
             ref={menuRef}
-            className="fixed z-[1000] w-[306px] rounded-[14px] border border-[#eaff00]/20 bg-[#101211]/95 p-[10px] text-white shadow-[0_28px_80px_-36px_rgba(0,0,0,.98),0_0_42px_-22px_rgba(234,255,0,.9)] backdrop-blur-xl"
+            className="fixed z-[1000] w-[286px] rounded-[12px] border border-[#eaff00]/20 bg-[#101211]/95 p-[8px] text-white shadow-[0_28px_80px_-36px_rgba(0,0,0,.98),0_0_42px_-22px_rgba(234,255,0,.9)] backdrop-blur-xl"
             style={{
               left: menuPosition.left,
               top: menuPosition.top,
             }}
             role="menu"
           >
-            <div className="flex items-center justify-between px-[8px] pb-[9px] pt-[2px]">
-              <span className="text-[11px] font-semibold text-zinc-400">
+            <div className="flex items-center justify-between px-[7px] pb-[8px] pt-[1px]">
+              <span className="mf-ref-project-menu-heading text-zinc-400">
                 {projectLabel}
               </span>
               <span className="h-[5px] w-[5px] rounded-full bg-[#eaff00] shadow-[0_0_14px_rgba(234,255,0,.9)]" />
             </div>
-            <div className="flex max-h-[256px] flex-col gap-[7px] overflow-y-auto pr-[1px]">
+            <div className="flex max-h-[236px] flex-col gap-[6px] overflow-y-auto pr-[1px]">
               {projects.map((project) => {
                 const active = project.id === activeProject?.id;
                 const avatar = getProjectAvatar(project);
@@ -501,14 +529,14 @@ function SidebarProjectPicker({
                       setOpen(false);
                     }}
                     className={cn(
-                      "group flex h-[46px] items-center gap-[10px] rounded-[10px] border px-[11px] text-left transition duration-150",
+                      "group flex h-[40px] items-center gap-[8px] rounded-[9px] border px-[9px] text-left transition duration-150",
                       active
                         ? "border-[#eaff00]/70 bg-black text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.08),0_0_20px_-8px_rgba(234,255,0,.92)]"
                         : "border-white/[0.075] bg-[#171917] text-zinc-200 hover:border-[#eaff00]/35 hover:bg-[#20231c] hover:text-white",
                     )}
                     role="menuitem"
                   >
-                    <span className="grid h-[30px] w-[30px] shrink-0 place-items-center overflow-hidden rounded-full bg-[#0b0d0d] ring-1 ring-white/12">
+                    <span className="grid h-[26px] w-[26px] shrink-0 place-items-center overflow-hidden rounded-full bg-[#0b0d0d] ring-1 ring-white/12">
                       <img
                         src={avatar}
                         alt=""
@@ -518,7 +546,7 @@ function SidebarProjectPicker({
                         draggable={false}
                       />
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-[-0.01em]">
+                    <span className="mf-ref-project-menu-name min-w-0 flex-1 truncate">
                       {project.name}
                     </span>
                     {active && (
@@ -535,11 +563,11 @@ function SidebarProjectPicker({
                   onCreateProject();
                   setOpen(false);
                 }}
-                className="ci-gloss-button mt-[10px] flex h-[40px] w-full items-center justify-center gap-[9px] rounded-[10px] px-[14px] text-[13px] font-bold transition hover:-translate-y-px active:translate-y-px"
+                className="ci-gloss-button mf-ref-project-create mt-[8px] flex h-[36px] w-full items-center justify-center gap-[8px] rounded-[9px] px-[12px] transition hover:-translate-y-px active:translate-y-px"
                 role="menuitem"
               >
-                <span className="grid h-[19px] w-[19px] place-items-center rounded-full bg-black/90 text-[#eaff00] shadow-[inset_0_0_0_1px_rgba(234,255,0,.22)]">
-                  <Plus className="h-[12px] w-[12px]" strokeWidth={2.5} />
+                <span className="grid h-[17px] w-[17px] place-items-center rounded-full bg-black/90 text-[#eaff00] shadow-[inset_0_0_0_1px_rgba(234,255,0,.22)]">
+                  <Plus className="h-[11px] w-[11px]" strokeWidth={2.5} />
                 </span>
                 {newProjectLabel}
               </button>
@@ -550,20 +578,20 @@ function SidebarProjectPicker({
       : null;
 
   return (
-    <div className="relative mx-[6px] mb-[10px]">
+    <div className="relative mx-[4px] mb-[8px] mt-[14px]">
       <button
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
         className={cn(
-          "flex h-[43px] w-full items-center gap-[10px] rounded-[10px] border border-white/[0.09] bg-[#1a1d1d] px-[10px] text-left text-white outline-none transition",
+          "flex h-[36px] w-full items-center gap-[8px] rounded-[8px] border border-white/[0.09] bg-[#1a1d1d] px-[8px] text-left text-white outline-none transition",
           "shadow-[inset_0_1px_0_rgba(255,255,255,.045)] hover:border-[#eaff00]/36 hover:bg-[#202321] focus-visible:ring-1 focus-visible:ring-[#eaff00]/70",
           open && "border-[#eaff00]/70 bg-[#141710] shadow-[0_0_22px_-14px_rgba(234,255,0,.9),inset_0_0_0_1px_rgba(255,255,255,.06)]",
         )}
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        <span className="grid h-[30px] w-[30px] shrink-0 place-items-center overflow-hidden rounded-full bg-[#0b0d0d] ring-1 ring-white/12">
+        <span className="grid h-[24px] w-[24px] shrink-0 place-items-center overflow-hidden rounded-full bg-[#0b0d0d] ring-1 ring-white/12">
           <img
             src={projectAvatar}
             alt=""
@@ -573,12 +601,12 @@ function SidebarProjectPicker({
             draggable={false}
           />
         </span>
-        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
+        <span className="mf-ref-project-trigger-label min-w-0 flex-1 truncate">
           {projectName}
         </span>
         <ChevronDown
           className={cn(
-            "h-[14px] w-[14px] shrink-0 text-zinc-500 transition-transform",
+            "h-[13px] w-[13px] shrink-0 text-zinc-500 transition-transform",
             open && "rotate-180 text-zinc-300",
           )}
         />
@@ -755,66 +783,20 @@ const NavLink = ({
   iconOnly?: boolean;
 }) => {
   const button = (
-  <button
-    type="button"
-    onClick={onClick}
-    aria-label={tooltip ? `${label}: ${tooltip}` : label}
-    className={cn(
-      "group relative flex h-[32px] min-w-0 items-center gap-[10px] text-left text-[12px] font-medium transition-colors",
-      iconOnly && "mx-auto h-[36px] w-[36px] flex-none justify-center gap-0 rounded-[10px] px-0",
-      variant === "tool" && tone === "accent"
-        ? "rounded-[7px] border border-cyan-300/35 bg-cyan-950/50 px-[8px] text-cyan-50 shadow-[inset_0_1px_0_rgba(255,255,255,.08),0_0_18px_-12px_rgba(34,211,238,.95)]"
-        : variant === "tool"
-        ? "rounded-[7px] border border-white/[0.075] bg-[#171a19] px-[8px] shadow-[inset_0_1px_0_rgba(255,255,255,.035)]"
-        : "mx-[12px] rounded-md bg-transparent px-[4px]",
-      variant === "tool" && (badge ? (compact ? "overflow-visible pr-[39px]" : "overflow-visible pr-[52px]") : "overflow-hidden"),
-      variant === "tool" && !compact && "w-full",
-      compact && variant === "tool" && "mx-0 flex-1 gap-[7px] px-[7px] text-[12px]",
-      compact && variant === "list" && "mx-[12px]",
-      iconOnly && "mx-auto flex-none px-0",
-      active && variant === "tool" && tone === "accent"
-        ? "border-cyan-200/80 bg-cyan-500/20 text-white shadow-[0_0_18px_-8px_rgba(34,211,238,.95),inset_0_0_0_1px_rgba(255,255,255,.08)]"
-        : active && variant === "tool"
-        ? "border-[#eaff00]/70 bg-[#121411] text-white shadow-[0_0_16px_-8px_rgba(234,255,0,.95),inset_0_0_0_1px_rgba(255,255,255,.05)]"
-        : active
-          ? "text-white"
-          : variant === "tool"
-            ? tone === "accent"
-              ? "hover:border-cyan-200/70 hover:bg-cyan-500/20 hover:text-white"
-              : "text-[#e4e7e9] hover:border-[#eaff00]/30 hover:bg-[#20231f] hover:text-white"
-            : "text-[#b0b4ba] hover:text-white",
-    )}
-  >
-    {variant === "tool" && !active && (
-      <span
-        className={cn(
-          "pointer-events-none absolute inset-0 rounded-[7px] bg-[linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0)_44%)] transition-opacity group-hover:opacity-0",
-          tone === "accent"
-            ? "bg-[linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,0)_44%),radial-gradient(90%_120%_at_0%_0%,rgba(34,211,238,.28),transparent_48%)]"
-            : "bg-[linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0)_44%),radial-gradient(90%_120%_at_0%_0%,rgba(234,255,0,.045),transparent_42%)]",
-        )}
-      />
-    )}
-    {variant === "tool" && active && (
-      <span className="pointer-events-none absolute inset-[-1px] rounded-[8px] shadow-[inset_0_-3px_8px_0_rgba(234,255,0,.30),inset_0_1px_8px_0_rgba(255,255,255,.16),0_0_12px_rgba(234,255,0,.32)]" />
-    )}
-    <Icon className={cn("relative shrink-0", iconOnly ? "h-[17px] w-[17px]" : variant === "tool" ? "h-[15px] w-[15px]" : "h-[16px] w-[16px]")} />
-    {!iconOnly && <span className="relative min-w-0 truncate whitespace-nowrap">{label}</span>}
-    {badge && !iconOnly && (
-      <span
-        className={cn(
-          "pointer-events-none absolute z-20 flex items-center justify-center rounded-full border border-[#f7ff7b] bg-[linear-gradient(135deg,#fbff17_0%,#d7ff00_48%,#fff38a_100%)] font-black uppercase leading-none text-[#071004] motion-safe:animate-[sidebar-new-badge_2.6s_ease-in-out_infinite]",
-          compact
-            ? "-right-[4px] -top-[6px] h-[15px] min-w-[34px] px-[6px] text-[8px] tracking-[0.045em] shadow-[0_0_0_2px_rgba(5,10,10,.86),0_7px_14px_-7px_rgba(234,255,0,.92),inset_0_1px_0_rgba(255,255,255,.82)]"
-            : "-right-[5px] -top-[7px] h-[18px] min-w-[42px] px-[8px] text-[9px] tracking-[0.06em] shadow-[0_0_0_2px_rgba(5,10,10,.88),0_8px_18px_-7px_rgba(234,255,0,.98),inset_0_1px_0_rgba(255,255,255,.85)]",
-        )}
-      >
-        <span className={cn("absolute rounded-full bg-[#eaff00]/25", compact ? "inset-[-4px] blur-[6px]" : "inset-[-5px] blur-[7px]")} aria-hidden />
-        <span className={cn("absolute rounded-full bg-white/80", compact ? "left-[7px] top-[3px] h-[2px] w-[9px]" : "left-[8px] top-[3px] h-[2px] w-[12px]")} aria-hidden />
-        <span className="relative">{badge}</span>
-      </span>
-    )}
-  </button>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={tooltip ? `${label}: ${tooltip}` : label}
+      className={cn(
+        "mf-ref-nav-item",
+        active && "is-active",
+        iconOnly && "is-icon-only",
+      )}
+    >
+      <Icon className="mf-ref-nav-icon" />
+      {!iconOnly && <span>{label}</span>}
+      {badge && !iconOnly && <strong>{badge}</strong>}
+    </button>
   );
 
   if (!tooltip) return button;

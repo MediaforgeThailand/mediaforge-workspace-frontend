@@ -122,8 +122,6 @@ import { useCanvasToolStore } from "./useCanvasToolStore";
 import { useWorkspaceShortcuts } from "./useWorkspaceShortcuts";
 import { useCanvasAutosave } from "./useCanvasAutosave";
 import { useCanvasRealtime } from "./useCanvasRealtime";
-import CanvasCollaborationOverlay from "./CanvasCollaborationOverlay";
-import { useCanvasCollaborationStore } from "./canvasCollaboration";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { friendlyError } from "@/lib/friendlyError";
 import { uploadSupabaseStorageFile } from "@/lib/supabase/resumableUpload";
@@ -922,41 +920,7 @@ const Inner = () => {
   const updateNodeData = useWorkspaceStore((s) => s.updateNodeData);
   const setSelectedNode = useWorkspaceStore((s) => s.setSelectedNode);
   const pushHistory = useWorkspaceStore((s) => s.pushHistory);
-  const cursorEnabled = useCanvasCollaborationStore((s) => s.cursorEnabled);
-  const publishCursor = useCanvasCollaborationStore((s) => s.publishCursor);
-  const publishSelection = useCanvasCollaborationStore((s) => s.publishSelection);
-  const cursorThrottleRef = useRef(0);
   const [drawingDraft, setDrawingDraft] = useState<DrawingDraft | null>(null);
-
-  const publishCanvasCursor = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>) => {
-      if (!canvasId || !cursorEnabled) return;
-      const rect = wrapperRef.current?.getBoundingClientRect();
-      if (!rect || rect.width <= 0 || rect.height <= 0) return;
-      const now = Date.now();
-      if (now - cursorThrottleRef.current < 100) return;
-      cursorThrottleRef.current = now;
-      publishCursor({
-        canvasId,
-        xPct: (event.clientX - rect.left) / rect.width,
-        yPct: (event.clientY - rect.top) / rect.height,
-        sentAt: now,
-        cursorEnabled: true,
-      });
-    },
-    [canvasId, cursorEnabled, publishCursor],
-  );
-
-  const hideCanvasCursor = useCallback(() => {
-    if (!canvasId) return;
-    publishCursor({
-      canvasId,
-      xPct: 0,
-      yPct: 0,
-      sentAt: Date.now(),
-      cursorEnabled: false,
-    });
-  }, [canvasId, publishCursor]);
 
   useEffect(() => {
     if (!canvasId) return;
@@ -1143,10 +1107,9 @@ const Inner = () => {
         };
       });
       setSelectedNode(node.id);
-      publishSelection(node.id);
       reparentSpawned(node.id, dropPointAbs);
     },
-    [isViewer, publishSelection, pushHistory, reparentSpawned, setSelectedNode],
+    [isViewer, pushHistory, reparentSpawned, setSelectedNode],
   );
 
   const addBoardTextNode = useCallback(
@@ -1309,9 +1272,8 @@ const Inner = () => {
     (e, node) => {
       if (isNodeControlEvent(e)) return;
       setSelectedNode(node.id);
-      publishSelection(node.id);
     },
-    [publishSelection, setSelectedNode],
+    [setSelectedNode],
   );
   const onPaneClick = useCallback(
     (e: React.MouseEvent) => {
@@ -1343,9 +1305,8 @@ const Inner = () => {
         return;
       }
       setSelectedNode(null);
-      publishSelection(null);
     },
-    [addBoardTextNode, appendBoardNode, publishSelection, screenToFlowPosition, setSelectedNode],
+    [addBoardTextNode, appendBoardNode, screenToFlowPosition, setSelectedNode],
   );
 
   const onCanvasPointerDown = useCallback(
@@ -1359,19 +1320,17 @@ const Inner = () => {
       event.currentTarget.setPointerCapture(event.pointerId);
       const screenPoint = { x: event.clientX, y: event.clientY };
       setSelectedNode(null);
-      publishSelection(null);
       setDrawingDraft({
         pointerId: event.pointerId,
         screenPoints: [screenPoint],
         flowPoints: [screenToFlowPosition(screenPoint)],
       });
     },
-    [isViewer, publishSelection, screenToFlowPosition, setSelectedNode],
+    [isViewer, screenToFlowPosition, setSelectedNode],
   );
 
   const onCanvasPointerMove = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
-      publishCanvasCursor(event);
       if (!drawingDraft || drawingDraft.pointerId !== event.pointerId) return;
       if (useCanvasToolStore.getState().tool !== "pen") return;
       const screenPoint = { x: event.clientX, y: event.clientY };
@@ -1387,7 +1346,7 @@ const Inner = () => {
         };
       });
     },
-    [drawingDraft, publishCanvasCursor, screenToFlowPosition],
+    [drawingDraft, screenToFlowPosition],
   );
 
   const onCanvasPointerUp = useCallback(
@@ -1467,6 +1426,12 @@ const Inner = () => {
   // lists were deleted. Audio gen nodes use the backend's
   // per-provider default voice; users override only in the
   // standalone /app voice gen tool.
+
+  useEffect(() => {
+    const openShortcuts = () => setSettingsOpen(true);
+    window.addEventListener("workspace-open-shortcuts", openShortcuts);
+    return () => window.removeEventListener("workspace-open-shortcuts", openShortcuts);
+  }, []);
 
   // Tool mode (select / hand / cut / sticky). Read once at the top
   // so we can flip ReactFlow props (panOnDrag, selectionOnDrag) and
@@ -2339,7 +2304,6 @@ const Inner = () => {
    */
   const onNodeDragStart = useCallback(
     (event: React.MouseEvent, _node: Node, draggedNodes: Node[]) => {
-      publishSelection(_node.id);
       if (!event.altKey) return;
       if (!draggedNodes || draggedNodes.length === 0) return;
 
@@ -2379,7 +2343,7 @@ const Inner = () => {
       setNodes((nds) => [...nds, ...cloned]);
       setEdges((eds) => [...eds, ...clonedEdges]);
     },
-    [getEdges, publishSelection, setNodes, setEdges, pushHistory],
+    [getEdges, setNodes, setEdges, pushHistory],
   );
 
   const onNodeDragStop = useCallback(
@@ -2807,14 +2771,13 @@ const Inner = () => {
   return (
     <div
       ref={wrapperRef}
-      className="workspace-root relative h-full w-full bg-[#1b1c1c]"
+      className="workspace-root relative h-full w-full bg-[#050606]"
       onDragOver={onDragOver}
       onDrop={onDrop}
       onPointerDown={onCanvasPointerDown}
       onPointerMove={onCanvasPointerMove}
       onPointerUp={onCanvasPointerUp}
       onPointerCancel={onCanvasPointerUp}
-      onPointerLeave={hideCanvasCursor}
       onContextMenu={(e) => {
         // Wrapper-level right-click handler — fires for clicks on
         // the pane AND on nodes. We open the categorised picker at
@@ -2971,7 +2934,6 @@ const Inner = () => {
           />
         </svg>
       )}
-      <CanvasCollaborationOverlay />
       {picker && (
         <CanvasNodePicker
           state={picker}

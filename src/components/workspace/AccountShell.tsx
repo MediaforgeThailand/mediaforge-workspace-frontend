@@ -32,7 +32,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { UserMenu } from "@/components/workspace/UserMenu";
 import WorkspaceSidebar from "@/components/workspace/WorkspaceSidebar";
 
 /* Wave 2 trim — Usage + Pricing tabs removed from the visible sub-
@@ -111,13 +110,6 @@ export default function AccountShell({ children }: { children?: ReactNode }) {
             })}
           </nav>
 
-          {/* Right edge — user menu (Settings re-link is redundant
-           *  since you're on /app/settings, but keeping the same
-           *  avatar everywhere means muscle-memory works across
-           *  surfaces). */}
-          <div className="ml-auto">
-            <UserMenu />
-          </div>
         </header>
 
         <div className="ws-scroll-hide flex-1 overflow-y-auto bg-[hsl(var(--surface-0))]">

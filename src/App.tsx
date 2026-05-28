@@ -102,6 +102,7 @@ const BlogPage = lazyWithRetry(() => import("./pages/marketing/Blog"));
 // whole viewport without competing with sidebar/topbar.
 const WorkspaceDashboard = lazyWithRetry(() => import("./pages/workspace"));
 const WorkspaceCanvasPage = lazyWithRetry(() => import("./pages/workspace/Canvas"));
+const DesignDraft = lazyWithRetry(() => import("./pages/DesignDraft"));
 
 // ── Account surfaces — wrapped in AccountShell (workspace-shaped
 //     chrome) instead of the legacy DashboardLayout. The pages
@@ -180,6 +181,7 @@ const App = () => (
                    *  inline guards inside the dashboard's interactive
                    *  surfaces. */}
                   <Route path="/app/workspace" element={<WorkspaceDashboard />} />
+                  <Route path="/app/ui-draft" element={<DesignDraft />} />
 
                   {/* Org-admin panel — DEFINED BEFORE the AccountShell outlet
                       below because the outlet's `*` catch-all otherwise

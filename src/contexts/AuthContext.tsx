@@ -6,6 +6,7 @@ import { getStoredCode, clearStoredCode } from "@/lib/tracking/referralCapture";
 import { getVisitorId } from "@/lib/tracking/fingerprint";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useCanvasJobsRecovery } from "@/store/useCanvasJobsRecovery";
+import { buildAuthRedirectUrl } from "@/lib/authRedirect";
 
 interface Profile {
   id: string;
@@ -276,7 +277,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth`,
+        emailRedirectTo: buildAuthRedirectUrl(),
         data: {
           full_name: fullName,
           referral_code_used: refCode ?? null,

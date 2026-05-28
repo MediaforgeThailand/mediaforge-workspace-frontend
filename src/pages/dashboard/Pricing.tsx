@@ -10,7 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
-import { UserMenu } from "@/components/workspace/UserMenu";
 import { getStoredCode } from "@/lib/tracking/referralCapture";
 import {
   // `WORKSPACE_CURRENCIES` previously fed the now-removed
@@ -355,10 +354,6 @@ const Pricing = () => {
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-[#151515] text-white">
-      <div className="fixed right-[18px] top-[18px] z-30">
-        <UserMenu compact />
-      </div>
-
       {/* Hero */}
       <section className="relative w-full px-4 pb-[76px] pt-[86px] text-center">
         <button
