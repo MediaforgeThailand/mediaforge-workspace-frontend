@@ -7,6 +7,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useGoogleSignIn } from "@/hooks/useGoogleSignIn";
 import { useMicrosoftSignIn } from "@/hooks/useMicrosoftSignIn";
 import type { OrgLoginResolution } from "@/lib/orgLoginResolver";
+import { buildAuthRedirectUrl } from "@/lib/authRedirect";
 
 type OrgResolution = Extract<OrgLoginResolution, { is_org: true }>;
 
@@ -51,9 +52,7 @@ export default function OrgLoginPanel({ email, resolution, redirectPath, onBack 
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth${
-          redirectPath ? `?redirect=${encodeURIComponent(redirectPath)}` : ""
-        }`,
+        emailRedirectTo: buildAuthRedirectUrl(redirectPath),
       },
     });
     setIsOtpSending(false);

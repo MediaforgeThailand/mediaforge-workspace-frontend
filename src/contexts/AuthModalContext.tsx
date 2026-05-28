@@ -4,6 +4,7 @@ const AuthModal = lazy(() => import("@/pages/Auth"));
 
 type OpenAuthModalOptions = {
   redirectPath?: string | null;
+  initialTab?: "login" | "signup";
 };
 
 type AuthModalContextValue = {
@@ -37,6 +38,7 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
           <AuthModal
             mode="modal"
             redirectPath={options.redirectPath}
+            initialTab={options.initialTab}
             onClose={closeAuthModal}
           />
         </Suspense>

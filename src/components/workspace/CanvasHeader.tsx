@@ -7,7 +7,7 @@
  *   ◀  [project chip]  >  Untitled Space            [ Share ] [👤]
  *
  * Left:
- *   • Back arrow → /app/workspace (dashboard)
+ *   • Back arrow → /app/workspace?section=spaces (space picker)
  *   • Project chip — coloured square + name. Until the projects
  *     feature actually lands (the dashboard sidebar still shows
  *     "Projects (mockup)") this defaults to a "Personal" chip with
@@ -19,7 +19,7 @@
  *   • Share — stub button (Wave 4 will hook into team_members /
  *     SSO orgs for actual share modal). Stays clickable so the
  *     affordance is visible; clicking just toasts "coming soon".
- *   • UserMenu (Settings / Usage / Pricing / Theme / Sign out)
+ *   • Presence / sharing controls
  *
  * Background is solid hsl(0 0% 4%) — no backdrop blur — to match
  * the reference. The tab bar below uses the same tone so the two
@@ -32,12 +32,9 @@ import { ChevronLeft, ChevronRight, Users, Layers } from "lucide-react";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { useWorkspaceShareRole } from "@/store/useWorkspaceShareRole";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { UserMenu } from "@/components/workspace/UserMenu";
 import ShareDialog from "@/components/workspace/ShareDialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { CollaborationPresencePill } from "@/components/workspace/CanvasCollaborationOverlay";
 import OrgCreditBadge from "@/components/OrgCreditBadge";
-import { DEFAULT_BRAND_LOGO, DEFAULT_BRAND_NAME } from "@/components/workspace/brandAssets";
 
 const CanvasHeader = () => {
   const { t } = useLanguage();
@@ -74,31 +71,24 @@ const CanvasHeader = () => {
 
   return (
     <div
-      className="relative z-[80] flex h-[42px] shrink-0 items-center justify-between gap-[11px] bg-[#1b1c1c] px-[14px] shadow-[0_14px_34px_-22px_rgba(0,0,0,0.92)]"
+      className="relative z-[80] flex h-[44px] shrink-0 items-center justify-between gap-[11px] border-b border-white/[0.07] bg-[#050606] px-[12px] shadow-[0_14px_34px_-24px_rgba(0,0,0,0.92)]"
       style={{ fontFamily: "var(--font-sans)" }}
     >
       {/* Left — back arrow + breadcrumb */}
       <div className="flex min-w-0 flex-1 items-center gap-[8px]">
         <Link
-          to="/app/workspace"
-          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-100"
-          title={t("workspace.canvas.back_dashboard")}
-          aria-label={t("workspace.canvas.back_dashboard")}
+          to="/app/workspace?section=spaces"
+          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[8px] text-zinc-400 transition-colors hover:bg-white/[0.07] hover:text-zinc-100"
+          title={t("workspace.canvas.backToWorkspaces")}
+          aria-label={t("workspace.canvas.backToWorkspaces")}
         >
           <ChevronLeft className="h-[16px] w-[16px]" />
         </Link>
 
-        <img
-          src={DEFAULT_BRAND_LOGO}
-          alt={DEFAULT_BRAND_NAME}
-          className="h-[24px] w-[36px] shrink-0 select-none object-contain"
-          draggable={false}
-        />
-
         {/* Project chip — coloured square + label */}
         <button
           type="button"
-          className="flex h-[32px] shrink-0 items-center gap-[6px] rounded-md px-[8px] text-[13px] leading-[17px] text-zinc-200 transition-colors hover:bg-white/[0.04]"
+          className="flex h-[30px] shrink-0 items-center gap-[7px] rounded-[8px] px-[8px] text-[14px] leading-[18px] text-zinc-100 transition-colors hover:bg-white/[0.055]"
           title={t("workspace.canvas.project_tooltip", { name: projectLabel })}
         >
           <span
@@ -114,31 +104,30 @@ const CanvasHeader = () => {
 
         {/* Workspace name — slightly italic + soft glyph to read as
          *  "the document title", consistent with Figma/Notion patterns. */}
-        <span className="min-w-0 truncate text-[13px] leading-[17px] italic text-zinc-300">
+        <span className="min-w-0 truncate text-[14px] font-semibold leading-[18px] text-zinc-100">
           {workspace?.name || t("workspace.canvas.untitled_space")}
         </span>
       </div>
 
-      {/* Right — Share + UserMenu */}
-      <div className="fixed right-[18px] top-[3px] z-[95] flex shrink-0 items-center gap-[10px]">
+      {/* Right — share and workspace presence controls. Account lives
+       *  in the workspace sidebar, matching the redesigned app shell. */}
+      <div className="flex shrink-0 items-center gap-[10px]">
         <OrgCreditBadge
           variant="pill"
           workspaceId={currentWorkspaceId}
           className="hidden h-[30px] md:inline-flex"
         />
-        <CollaborationPresencePill />
         {canShare && (
           <button
             type="button"
             onClick={() => setShareOpen(true)}
-            className="flex h-[35px] items-center gap-[7px] rounded-lg bg-white px-[13px] text-[14px] font-semibold leading-[17px] text-zinc-900 shadow-[0_8px_18px_rgba(0,0,0,0.24)] transition-colors hover:bg-zinc-200"
+            className="flex h-[34px] items-center gap-[7px] rounded-full bg-white px-[14px] text-[14px] font-semibold leading-[17px] text-zinc-900 shadow-[0_8px_18px_rgba(0,0,0,0.24)] transition-colors hover:bg-zinc-200"
             title={t("workspace.canvas.share_workspace")}
           >
             <Users className="h-[16px] w-[16px]" />
             {t("workspace.canvas.share")}
           </button>
         )}
-        <UserMenu compact />
       </div>
 
       {canShare && currentWorkspaceId && (
