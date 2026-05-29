@@ -2976,8 +2976,8 @@ button.mf-ref-account-row:focus-visible {
 
 .mf-translate-source-tile-label {
   display: block;
-  width: 46px;
-  max-width: 46px;
+  width: 54px;
+  max-width: 54px;
   overflow: hidden;
   color: #dfe4ea;
   font-size: 12px;
@@ -3001,8 +3001,8 @@ button.mf-ref-account-row:focus-visible {
 
 .mf-clean-translate-dropzone:not(.is-loaded) .mf-media-upload-tile-icon {
   box-sizing: border-box;
-  width: 46px;
-  height: 56px;
+  width: 52px;
+  height: 62px;
   transform: rotate(-5deg);
   transform-origin: center;
   border: 1px dashed rgba(255, 255, 255, 0.16) !important;
