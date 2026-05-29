@@ -2950,7 +2950,7 @@ button.mf-ref-account-row:focus-visible {
   display: flex;
   width: fit-content;
   justify-content: flex-start;
-  padding: 0 !important;
+  padding: 4px 0 0 10px !important;
   text-align: center;
 }
 
