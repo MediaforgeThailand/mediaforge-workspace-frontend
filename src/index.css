@@ -2954,13 +2954,6 @@ button.mf-ref-account-row:focus-visible {
   text-align: center;
 }
 
-.mf-translate-source-tile {
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  text-align: center;
-}
-
 .mf-smart-source-tile-label {
   display: block;
   width: 46px;
@@ -2974,20 +2967,6 @@ button.mf-ref-account-row:focus-visible {
   white-space: nowrap;
 }
 
-.mf-translate-source-tile-label {
-  display: block;
-  width: 54px;
-  max-width: 54px;
-  overflow: hidden;
-  color: #dfe4ea;
-  font-size: 12px;
-  font-weight: 560;
-  line-height: 15px;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .mf-clean-reference-dropzone.mf-clean-translate-dropzone:not(.is-loaded):hover,
 .mf-clean-reference-dropzone.mf-clean-translate-dropzone:not(.is-loaded):focus,
 .mf-clean-reference-dropzone.mf-clean-translate-dropzone:not(.is-loaded):focus-visible,
@@ -2997,35 +2976,6 @@ button.mf-ref-account-row:focus-visible {
   border: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
-}
-
-.mf-clean-translate-dropzone:not(.is-loaded) .mf-media-upload-tile-icon {
-  box-sizing: border-box;
-  width: 52px;
-  height: 62px;
-  transform: rotate(-5deg);
-  transform-origin: center;
-  border: 1px dashed rgba(255, 255, 255, 0.16) !important;
-  border-radius: 7px;
-  background: #28292e;
-  color: rgba(255, 255, 255, 0.7);
-  box-shadow:
-    0 12px 26px -18px rgba(0, 0, 0, 0.9),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  will-change: transform;
-}
-
-.mf-clean-translate-dropzone:not(.is-loaded):hover .mf-media-upload-tile-icon,
-.mf-clean-translate-dropzone:not(.is-loaded):focus-visible .mf-media-upload-tile-icon,
-.mf-clean-translate-dropzone:not(.is-loaded) .mf-media-upload-tile:hover .mf-media-upload-tile-icon,
-.mf-clean-translate-dropzone:not(.is-loaded) .mf-media-upload-tile:active .mf-media-upload-tile-icon {
-  transform: translateY(-2px) rotate(-2deg) scale(1.06);
-  border: 1px dashed rgba(244, 255, 0, 0.72) !important;
-  background: #28292e;
-  color: #f4ff00;
-  box-shadow:
-    0 12px 26px -18px rgba(0, 0, 0, 0.9),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .mf-smart-source-loaded video {

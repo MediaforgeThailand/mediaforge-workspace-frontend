@@ -6082,15 +6082,17 @@ function VoiceTranslatePanel({
               </>
             ) : (
               <div className="mf-translate-source-empty">
-                <span className="mf-media-upload-tile mf-translate-source-tile group/tile" aria-hidden="true">
-                  <span className="mf-media-upload-tile-icon">
+                <span className="group/tile flex w-[58px] shrink-0 flex-col items-center gap-[6px]" aria-hidden="true">
+                  <span className="relative grid h-[62px] w-[52px] -rotate-[5deg] place-items-center overflow-hidden rounded-[7px] border border-dashed border-white/[0.16] bg-[#28292e] text-white/70 shadow-[0_12px_26px_-18px_rgba(0,0,0,.9),inset_0_1px_0_rgba(255,255,255,.05)] transition duration-150 ease-out group-hover/tile:-translate-y-[2px] group-hover/tile:-rotate-[2deg] group-hover/tile:scale-[1.06] group-hover/tile:border-[#f4ff00]/65 group-hover/tile:text-[#f4ff00]">
                     {uploading ? (
-                      <Loader2 className="h-[16px] w-[16px] animate-spin" />
+                      <Loader2 className="h-[18px] w-[18px] animate-spin" />
                     ) : (
-                      <Camera className="h-[16px] w-[16px]" />
+                      <Camera className="h-[18px] w-[18px]" />
                     )}
                   </span>
-                  <span className="mf-translate-source-tile-label">{copy.videoInput}</span>
+                  <span className="max-w-full truncate text-[11px] font-medium leading-[14px] text-neutral-300">
+                    {copy.videoInput}
+                  </span>
                 </span>
               </div>
             )}
