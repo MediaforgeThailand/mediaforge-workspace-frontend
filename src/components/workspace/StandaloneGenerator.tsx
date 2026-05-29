@@ -6082,7 +6082,7 @@ function VoiceTranslatePanel({
               </>
             ) : (
               <div className="mf-translate-source-empty">
-                <span className="mf-media-upload-tile mf-translate-source-tile" aria-hidden="true">
+                <span className="mf-media-upload-tile mf-translate-source-tile group/tile" aria-hidden="true">
                   <span className="mf-media-upload-tile-icon">
                     {uploading ? (
                       <Loader2 className="h-[16px] w-[16px] animate-spin" />
