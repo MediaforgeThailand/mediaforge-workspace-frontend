@@ -65,6 +65,7 @@ export interface ProjectMeta {
   id: string;
   ownerId?: string | null;
   name: string;
+  createdAt?: number;
   updatedAt: number;
   description?: string | null;
   color?: string | null;
@@ -130,6 +131,7 @@ interface WorkspaceState {
   /** Top-level workspaces shown on /app/workspace dashboard. Each
    *  workspace owns 1+ canvases (= tabs). */
   workspaces: WorkspaceMeta[];
+  recentWorkspaceOpenIds: string[];
   canvases: CanvasMeta[];
   graphs: Record<string, CanvasGraph>;
   current: CanvasGraph | null;
@@ -169,6 +171,7 @@ interface WorkspaceState {
   deleteProject: (id: string) => void;
   setActiveProject: (id: string | null) => void;
   mergeServerProjects: (server: ProjectMeta[]) => void;
+  markWorkspaceOpened: (id: string) => void;
 
   // workspace-level (top-level entity)
   /** Creates a workspace + a default "Untitled canvas" tab inside it.
@@ -437,6 +440,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       projects: [],
       activeProjectId: null,
       workspaces: [],
+      recentWorkspaceOpenIds: [],
       canvases: [],
       graphs: {},
       current: null,
@@ -451,10 +455,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
       createProject: (name, options) => {
         const id = uid();
+        const timestamp = now();
         const project: ProjectMeta = {
           id,
           name: name || "Untitled project",
-          updatedAt: now(),
+          createdAt: timestamp,
+          updatedAt: timestamp,
           description: options?.description ?? null,
           color: options?.color ?? null,
           isPrivate: options?.isPrivate ?? false,
@@ -493,6 +499,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             activeProjectId:
               s.activeProjectId === id ? projects[0]?.id ?? null : s.activeProjectId,
             workspaces: s.workspaces.filter((w) => w.projectId !== id),
+            recentWorkspaceOpenIds: s.recentWorkspaceOpenIds.filter(
+              (workspaceId) => !ownedWorkspaces.has(workspaceId),
+            ),
             canvases: s.canvases.filter((c) => !ownedCanvases.has(c.id)),
             graphs,
             current: ownedCanvases.has(s.current?.id ?? "") ? null : s.current,
@@ -508,7 +517,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const localById = new Map(s.projects.map((p) => [p.id, p]));
           const merged = serverList.map((server) => {
             const local = localById.get(server.id);
-            return local && local.updatedAt > server.updatedAt ? local : server;
+            return local && local.updatedAt > server.updatedAt
+              ? { ...local, createdAt: local.createdAt ?? server.createdAt }
+              : server;
           });
           for (const local of s.projects) {
             if (!serverList.some((server) => server.id === local.id)) {
@@ -524,7 +535,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             }
           }
           const withDefault = merged;
-          withDefault.sort((a, b) => b.updatedAt - a.updatedAt);
+          withDefault.sort(
+            (a, b) =>
+              (a.createdAt ?? a.updatedAt) - (b.createdAt ?? b.updatedAt) ||
+              a.name.localeCompare(b.name),
+          );
           return {
             projects: withDefault,
             activeProjectId:
@@ -533,6 +548,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 : withDefault[0]?.id ?? null,
           };
         }),
+
+      markWorkspaceOpened: (id) =>
+        set((s) => ({
+          recentWorkspaceOpenIds: [
+            id,
+            ...s.recentWorkspaceOpenIds.filter((workspaceId) => workspaceId !== id),
+          ].slice(0, 20),
+        })),
 
       createWorkspace: (name, projectIdArg) => {
         const state = get();
@@ -544,10 +567,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         let projectToInsert: ProjectMeta | null = null;
         if (!projectId) {
           projectId = uid();
+          const timestamp = now();
           projectToInsert = {
             id: projectId,
             name: "Untitled project",
-            updatedAt: now(),
+            createdAt: timestamp,
+            updatedAt: timestamp,
           };
         }
         const wsId = uid();
@@ -628,6 +653,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           // tombstones can be pruned on a TTL.
           return {
             workspaces: s.workspaces.filter((w) => w.id !== id),
+            recentWorkspaceOpenIds: s.recentWorkspaceOpenIds.filter(
+              (workspaceId) => workspaceId !== id,
+            ),
             canvases: s.canvases.filter((c) => c.workspaceId !== id),
             graphs: remainingGraphs,
             current: owned.has(s.current?.id ?? "") ? null : s.current,
@@ -1728,6 +1756,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         projects: state.projects,
         activeProjectId: state.activeProjectId,
         workspaces: state.workspaces,
+        recentWorkspaceOpenIds: state.recentWorkspaceOpenIds,
         canvases: state.canvases,
         graphs: state.graphs,
         // Persist tombstones across reloads — that's the whole point.
@@ -1753,6 +1782,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             projects: [],
             activeProjectId: null,
             workspaces: [],
+            recentWorkspaceOpenIds: [],
             canvases: [],
             graphs: {},
           } as never;
@@ -1813,6 +1843,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 {
                   id: defaultProjectId,
                   name: "My project",
+                  createdAt: defaultWs.updatedAt,
                   updatedAt: defaultWs.updatedAt,
                 },
               ],
@@ -1847,6 +1878,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           ).map((p) => ({
             id: p.id,
             name: p.name,
+            createdAt: typeof p.createdAt === "number" ? p.createdAt : undefined,
             updatedAt: typeof p.updatedAt === "number" ? p.updatedAt : Date.now(),
           }));
 
@@ -1856,6 +1888,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 globalThis.crypto?.randomUUID?.() ??
                 `prj_${Math.random().toString(36).slice(2, 10)}`,
               name: DEFAULT_PROJECT_NAME,
+              createdAt: Date.now(),
               updatedAt: Date.now(),
             }];
           }
@@ -1988,6 +2021,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 ? working.activeProjectId
                 : finalProjects[0]?.id ?? null,
             workspaces: validWorkspaces,
+            recentWorkspaceOpenIds: Array.isArray(working.recentWorkspaceOpenIds)
+              ? (working.recentWorkspaceOpenIds as unknown[])
+                  .filter((id): id is string => typeof id === "string" && wsIds.has(id))
+                  .slice(0, 20)
+              : [],
             canvases: validCanvases,
             graphs: validGraphs,
           } as never;

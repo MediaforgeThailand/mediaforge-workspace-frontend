@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Minus, Plus,
-  Video, Image as ImageIcon, Box, Music, Languages, Maximize2, ChevronRight,
-  FileText,
+  Video, Camera, Image as ImageIcon, Box, Music, Languages, Maximize2, ChevronRight,
   X, ChevronDown, Check, Upload, Clipboard,
   SlidersHorizontal, Trash2,
 } from "lucide-react";
@@ -44,6 +43,10 @@ function usePanelCopy() {
     setStartFrame: t("createImagePanel.setStartFrame"),
     startFrame: t("createImagePanel.startFrame"),
     endFrame: t("createImagePanel.endFrame"),
+    start: language === "th" ? "เริ่ม" : "Start",
+    end: language === "th" ? "จบ" : "End",
+    imageInput: language === "th" ? "รูปภาพ" : "Image",
+    videoInput: language === "th" ? "วิดีโอ" : "Video",
     addVisualReference: t("createImagePanel.addVisualReference"),
     creations: t("createImagePanel.creations"),
     uploads: t("createImagePanel.uploads"),
@@ -139,6 +142,7 @@ interface CreateImagePanelProps {
   referenceBadge?: string;
   referenceHint?: string;
   referenceAccept?: string;
+  compactReferenceInput?: boolean;
   referenceAssets?: CreateImagePanelReference[];
   onAddReferences?: () => void;
   onReferenceFiles?: (files: File[]) => MaybePromise<void>;
@@ -425,6 +429,7 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   referenceTitle,
   referenceHint,
   referenceAccept = "image/*",
+  compactReferenceInput = false,
   referenceAssets = [],
   onAddReferences,
   onReferenceFiles,
@@ -466,6 +471,11 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
   const qty = controlledQuantity ?? qtyState;
   const selectedModelId = modelValue ?? modelOptions[0]?.id ?? "selected";
   const compactVoice = density === "voice";
+  const referenceAcceptsImage = referenceAccept.includes("image");
+  const referenceAcceptsVideo = referenceAccept.includes("video");
+  const useWireframeInput = showPromptInput && showReferences && !compactVoice;
+  const useReferenceOnlyWireframe =
+    compactReferenceInput && showReferences && !showPromptInput && !compactVoice;
 
   const updatePrompt = (nextPrompt: string) => {
     setPromptState(nextPrompt);
@@ -541,11 +551,6 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
     onCreate?.();
   };
 
-  const clearReferences = () => {
-    if (!onRemoveReference) return;
-    references.forEach((reference) => onRemoveReference(reference.id));
-  };
-
   return (
     <div
       className={clsx(
@@ -616,16 +621,8 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
           onDragOverCapture={handlePromptDragOver}
           onDropCapture={handlePromptDrop}
         >
-          {showReferences && (
-            <div className="mf-clean-step-heading flex items-center gap-[10px]">
-              <span className="standalone-section-title text-[14px] font-semibold leading-[20px] text-white">
-                1. {resolvedReferenceTitle}
-              </span>
-            </div>
-          )}
-
-          {showReferences && (
-            <div className="relative mt-[7px] overflow-hidden rounded-[10px]">
+          {showReferences && !useWireframeInput && !useReferenceOnlyWireframe && (
+            <div className="relative overflow-hidden rounded-[10px]">
               <div
                 role="button"
                 tabIndex={0}
@@ -647,116 +644,177 @@ export const CreateImagePanel: React.FC<CreateImagePanelProps> = ({
                 onDrop={handleReferenceDrop}
                 className={clsx(
                   "mf-clean-reference-dropzone",
-                  "relative flex min-h-[48px] items-center gap-[9px] rounded-[10px] border border-[#f4ff00]/70 bg-[radial-gradient(circle_at_16%_50%,rgba(244,255,0,0.15),rgba(244,255,0,0.045)_52%,rgba(0,0,0,0)_100%)] px-[9px] py-[6px] shadow-[inset_0_0_14px_rgba(244,255,0,0.075)] transition-all duration-150 outline-none focus:ring-1 focus:ring-[#f4ff00]/70",
+                  "relative flex min-h-[88px] items-center justify-between gap-[12px] rounded-[12px] border border-[#f4ff00]/65 bg-[radial-gradient(circle_at_16%_50%,rgba(244,255,0,0.13),rgba(244,255,0,0.04)_52%,rgba(0,0,0,0)_100%)] px-[12px] py-[10px] shadow-[inset_0_0_14px_rgba(244,255,0,0.075)] transition-all duration-150 outline-none focus:ring-1 focus:ring-[#f4ff00]/70",
                   onAddReferences || onReferenceFiles || onSelectReferenceAsset
                     ? "cursor-pointer hover:border-[#f4ff00] hover:bg-[#f4ff00]/[0.075] hover:shadow-[0_0_20px_rgba(244,255,0,0.22),inset_0_0_16px_rgba(244,255,0,0.1)] active:translate-y-0"
                     : "cursor-default",
                 )}
               >
-                <div
-                  className={clsx(
-                    "shrink-0",
-                    references.length > 0 ? "flex -space-x-[7px]" : "standalone-reference-empty-glyph",
-                  )}
-                >
-                  {references.length > 0 ? (
-                    references.slice(0, 3).map((reference) => (
-                      reference.mime?.startsWith("video/") ? (
-                        <div
-                          key={reference.id}
-                          className="grid h-[30px] w-[30px] place-items-center rounded-[5px] bg-[#16181a] ring-2 ring-[#121314]"
-                        >
-                          <Video className="h-[14px] w-[14px] text-white/80" />
-                        </div>
-                      ) : (
-                        <img
-                          key={reference.id}
-                          src={reference.url}
-                          alt=""
-                          className="h-[30px] w-[30px] rounded-[5px] object-cover ring-2 ring-[#121314]"
-                        />
-                      )
-                    ))
-                  ) : (
-                    <span className="standalone-reference-empty-icon" aria-hidden="true">
-                      <ImageIcon className="h-[20px] w-[20px]" />
-                    </span>
-                  )}
+                <div className="flex w-full items-center justify-center">
+                  <ReferenceInputTiles
+                    acceptsImage={referenceAcceptsImage}
+                    acceptsVideo={referenceAcceptsVideo}
+                    references={references}
+                    imageLabel={copy.imageInput}
+                    videoLabel={copy.videoInput}
+                  />
                 </div>
-                <div className="flex min-h-[34px] min-w-0 flex-1 flex-col justify-center pr-[40px]">
-                  <span className="standalone-reference-title truncate text-[13px] font-semibold leading-[16px] text-white">{resolvedReferenceTitle}</span>
-                  <p className="standalone-reference-hint mt-[1px] truncate text-[11px] leading-[14px] text-neutral-400">{resolvedReferenceHint}</p>
-                </div>
-                <span className="absolute right-[9px] top-1/2 -translate-y-1/2 text-[11px] font-semibold leading-[14px] text-white">
-                  {references.length}/{maxReferences}
-                </span>
               </div>
             </div>
           )}
 
-          {showReferences && references.length > 0 && (
+          {showReferences && useReferenceOnlyWireframe && (
+            <>
+              <div
+                className="mf-reference-only-input"
+                onPaste={handleReferencePaste}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                onDrop={handleReferenceDrop}
+              >
+                <button
+                  type="button"
+                  onClick={openReferencePicker}
+                  className="mf-wireframe-media-zone"
+                  aria-label={resolvedReferenceTitle}
+                  title={resolvedReferenceTitle}
+                >
+                  <ReferenceInputTiles
+                    acceptsImage={referenceAcceptsImage}
+                    acceptsVideo={referenceAcceptsVideo}
+                    references={references}
+                    imageLabel={copy.imageInput}
+                    videoLabel={copy.videoInput}
+                  />
+                </button>
+              </div>
+            </>
+          )}
+
+          {showReferences && !useWireframeInput && !useReferenceOnlyWireframe && references.length > 0 && (
             <SelectedReferenceStrip
               references={references}
               onRemove={onRemoveReference}
             />
           )}
 
-          {showPromptInput && (
+          {showPromptInput && useWireframeInput && (
+            <>
+              <div
+                className="mf-wireframe-input mt-[6px]"
+                onPaste={handleReferencePaste}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                onDrop={handleReferenceDrop}
+              >
+                <div className="mf-wireframe-controls-row">
+                  <button
+                    type="button"
+                    onClick={openReferencePicker}
+                    className="mf-wireframe-media-zone"
+                    aria-label={resolvedReferenceTitle}
+                    title={resolvedReferenceTitle}
+                  >
+                    <ReferenceInputTiles
+                      acceptsImage={referenceAcceptsImage}
+                      acceptsVideo={referenceAcceptsVideo}
+                      references={references}
+                      imageLabel={copy.imageInput}
+                      videoLabel={copy.videoInput}
+                    />
+                  </button>
+                  {onAutoPrompt && (
+                    <div className="mf-wireframe-top-actions">
+                      <AutoPromptButton
+                        label={autoPromptLabel}
+                        title={autoPromptTitle}
+                        running={autoPromptRunning}
+                        disabled={autoPromptDisabled}
+                        onClick={onAutoPrompt}
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="mf-wireframe-prompt mf-wireframe-prompt-box relative min-w-0">
+                  <StandalonePromptMentionTextarea
+                    value={prompt}
+                    onChange={updatePrompt}
+                    placeholder={resolvedPromptPlaceholder}
+                    mentionOptions={mentionOptions}
+                    maxHeightPx={144}
+                    className={clsx(
+                      "mf-wireframe-prompt-editable border-transparent bg-transparent px-[2px] py-[4px] text-[14px] leading-[24px] text-white placeholder:text-neutral-500 focus:border-transparent focus:ring-0",
+                    )}
+                  />
+                </div>
+              </div>
+              {references.length > 0 && (
+                <SelectedReferenceStrip
+                  references={references}
+                  onRemove={onRemoveReference}
+                />
+              )}
+            </>
+          )}
+
+          {showPromptInput && !useWireframeInput && (
             <>
               <div className="mf-clean-prompt-head mt-[10px] flex items-center justify-between gap-[10px]">
                 <span className="standalone-section-title text-[14px] font-semibold leading-[20px] text-white">
                   {showReferences ? copy.prompt : resolvedPromptLabel}
                 </span>
-                <AutoPromptButton
-                  label={autoPromptLabel}
-                  title={autoPromptTitle}
-                  running={autoPromptRunning}
-                  disabled={autoPromptDisabled}
-                  onClick={onAutoPrompt}
-                />
-              </div>
-              <StandalonePromptMentionTextarea
-                value={prompt}
-                onChange={updatePrompt}
-                placeholder={resolvedPromptPlaceholder}
-                mentionOptions={mentionOptions}
-                maxHeightPx={compactVoice ? 48 : undefined}
-                className={clsx(
-                  "mt-[8px] rounded-none border-transparent bg-transparent px-[4px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-transparent focus:ring-0",
-                  compactVoice
-                    ? "min-h-[34px] max-h-[48px] py-[1px]"
-                    : "min-h-[116px] max-h-[230px] py-[8px]",
+                {onAutoPrompt && compactVoice && (
+                  <AutoPromptButton
+                    label={autoPromptLabel}
+                    title={autoPromptTitle}
+                    running={autoPromptRunning}
+                    disabled={autoPromptDisabled}
+                    onClick={onAutoPrompt}
+                  />
                 )}
-              />
+              </div>
+              <div className="mf-clean-prompt-input relative mt-[8px]">
+                <StandalonePromptMentionTextarea
+                  value={prompt}
+                  onChange={updatePrompt}
+                  placeholder={resolvedPromptPlaceholder}
+                  mentionOptions={mentionOptions}
+                  maxHeightPx={compactVoice ? 48 : undefined}
+                  className={clsx(
+                    "rounded-none border-transparent bg-transparent px-[4px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-transparent focus:ring-0",
+                    compactVoice
+                      ? "min-h-[34px] max-h-[48px] py-[1px]"
+                      : "min-h-[116px] max-h-[230px] py-[8px]",
+                    onAutoPrompt && !compactVoice && "pb-[48px] pr-[144px]",
+                  )}
+                />
+                {onAutoPrompt && !compactVoice && (
+                  <div className="absolute bottom-[8px] right-[8px] z-10">
+                    <AutoPromptButton
+                      label={autoPromptLabel}
+                      title={autoPromptTitle}
+                      running={autoPromptRunning}
+                      disabled={autoPromptDisabled}
+                      onClick={onAutoPrompt}
+                    />
+                  </div>
+                )}
+              </div>
             </>
           )}
 
-          <div className="mt-[5px] flex items-center justify-between gap-[10px]">
-            <div className="flex items-center gap-[6px]">
-              {showReferences && (
-                <button
-                  type="button"
-                  onClick={openReferencePicker}
-                  className="grid h-[26px] w-[26px] place-items-center rounded-[8px] text-white/55 transition hover:bg-white/[0.06] hover:text-white"
-                  aria-label={resolvedReferenceTitle}
-                  title={resolvedReferenceTitle}
-                >
-                  <Clipboard className="h-[14px] w-[14px]" />
-                </button>
-              )}
-              {showReferences && references.length > 0 && onRemoveReference && (
-                <button
-                  type="button"
-                  onClick={clearReferences}
-                  className="grid h-[26px] w-[26px] place-items-center rounded-[8px] text-white/40 transition hover:bg-red-500/10 hover:text-red-300"
-                  aria-label={copy.removeReference}
-                  title={copy.removeReference}
-                >
-                  <Trash2 className="h-[14px] w-[14px]" />
-                </button>
-              )}
-            </div>
-          </div>
         </section>
         )}
 
@@ -953,6 +1011,9 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
     visibleReferenceSlots.find((slot) => slot.id === referenceSlotId) ?? null;
   const referenceAcceptsImage = referenceAccept.includes("image");
   const referenceAcceptsVideo = referenceAccept.includes("video");
+  const useFrameWireframeInput =
+    showPromptInput && activeMode === "frames" && visibleFrameSlots.length > 0;
+  const useReferenceWireframeInput = showPromptInput && activeMode === "reference";
 
   const updatePrompt = (nextPrompt: string) => {
     setPromptState(nextPrompt);
@@ -1138,11 +1199,8 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
           closeOnSelect
         />
 
-        {activeMode === "frames" && visibleFrameSlots.length > 0 && (
+        {activeMode === "frames" && visibleFrameSlots.length > 0 && !useFrameWireframeInput && (
           <section className="mf-clean-input-section shrink-0 rounded-[16px] border border-white/[0.035] bg-[#151719] p-[9px] shadow-[inset_0_1px_0_rgba(255,255,255,.035)]">
-            <h2 className="mf-clean-step-heading mb-[8px] text-[13px] font-semibold leading-[18px] text-white">
-              1. {visibleFrameSlots.length > 1 ? copy.setStartEndFrame : copy.setStartFrame}
-            </h2>
             <div className={clsx("grid gap-[8px]", visibleFrameSlots.length > 1 ? "grid-cols-2" : "grid-cols-1")}>
               {visibleFrameSlots.map((slot) => (
                 <FrameReferenceSlot
@@ -1157,15 +1215,7 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
 
         {showPromptSection && (
         <section className="mf-clean-input-section shrink-0 rounded-[16px] border border-white/[0.02] bg-[#16181a] p-[7px]">
-          {activeMode === "reference" && (
-            <div className="mf-clean-step-heading mb-[6px] flex items-center px-[2px]">
-              <span className="standalone-section-title text-[14px] font-semibold leading-[20px] text-white">
-                1. {resolvedReferenceTitle}
-              </span>
-            </div>
-          )}
-
-          {activeMode === "reference" && (
+          {activeMode === "reference" && !useReferenceWireframeInput && (
             <>
               {visibleReferenceSlots.length > 0 ? (
                 <div className="grid grid-cols-2 gap-[8px]">
@@ -1201,53 +1251,21 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
                     onDrop={handleReferenceDrop}
                     className={clsx(
                       "mf-clean-reference-dropzone",
-                      "flex min-h-[48px] items-center gap-[9px] rounded-[9px] border border-[#f4ff00]/75 bg-[#f4ff00]/[0.055] px-[9px] py-[6px] shadow-[inset_0_0_14px_rgba(238,255,0,0.09)] transition-all duration-150 outline-none focus:ring-1 focus:ring-[#f4ff00]/70",
+                      "flex min-h-[88px] items-center justify-between gap-[12px] rounded-[12px] border border-[#f4ff00]/65 bg-[#f4ff00]/[0.055] px-[12px] py-[10px] shadow-[inset_0_0_14px_rgba(238,255,0,0.09)] transition-all duration-150 outline-none focus:ring-1 focus:ring-[#f4ff00]/70",
                       onAddReferences || onReferenceFiles || onSelectReferenceAsset
                         ? "cursor-pointer hover:border-[#f4ff00] hover:bg-[#f4ff00]/[0.085] hover:shadow-[0_0_18px_rgba(238,255,0,0.2),inset_0_0_16px_rgba(238,255,0,0.1)] active:translate-y-0"
                         : "cursor-default",
                     )}
                   >
-                    <div
-                      className={clsx(
-                        "shrink-0",
-                        references.length > 0 ? "flex -space-x-[7px]" : "standalone-reference-empty-glyph",
-                      )}
-                    >
-                      {references.length > 0 ? (
-                        references.slice(0, 3).map((reference) => (
-                          reference.mime?.startsWith("video/") ? (
-                            <div
-                              key={reference.id}
-                              className="grid h-[32px] w-[32px] place-items-center rounded-[5px] bg-[#16181a] ring-2 ring-[#121314]"
-                            >
-                              <Video className="h-[14px] w-[14px] text-white/80" />
-                            </div>
-                          ) : (
-                            <img
-                              key={reference.id}
-                              src={reference.url}
-                              alt=""
-                              className="h-[32px] w-[32px] rounded-[5px] object-cover ring-2 ring-[#121314]"
-                            />
-                          )
-                        ))
-                      ) : (
-                        <span className="standalone-reference-empty-icon" aria-hidden="true">
-                          {referenceAcceptsVideo && !referenceAcceptsImage ? (
-                            <Video className="h-[20px] w-[20px]" />
-                          ) : (
-                            <ImageIcon className="h-[20px] w-[20px]" />
-                          )}
-                        </span>
-                      )}
+                    <div className="flex w-full items-center justify-center">
+                      <ReferenceInputTiles
+                        acceptsImage={referenceAcceptsImage}
+                        acceptsVideo={referenceAcceptsVideo}
+                        references={references}
+                        imageLabel={copy.imageInput}
+                        videoLabel={copy.videoInput}
+                      />
                     </div>
-                    <div className="flex min-h-[34px] min-w-0 flex-1 flex-col justify-center">
-                      <span className="standalone-reference-title truncate text-[13px] font-semibold leading-[16px] text-white">{resolvedReferenceTitle}</span>
-                      <p className="standalone-reference-hint mt-[1px] truncate text-[11px] leading-[14px] text-neutral-400">{resolvedReferenceHint}</p>
-                    </div>
-                    <span className="self-center text-[11px] font-semibold leading-[14px] text-white">
-                      {references.length}/{maxReferences}
-                    </span>
                   </div>
                 </div>
               )}
@@ -1269,25 +1287,129 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
               onDragOverCapture={handlePromptDragOver}
               onDropCapture={handlePromptDrop}
             >
-              <div className="mf-clean-prompt-head flex items-center justify-between gap-[10px]">
-                <span className="standalone-section-title text-[14px] font-semibold leading-[20px] text-white">
-                  {activeMode === "reference" ? copy.prompt : `2. ${copy.prompt}`}
-                </span>
-                <AutoPromptButton
-                  label={autoPromptLabel}
-                  title={autoPromptTitle}
-                  running={autoPromptRunning}
-                  disabled={autoPromptDisabled}
-                  onClick={onAutoPrompt}
-                />
+              {!(useFrameWireframeInput || useReferenceWireframeInput) && (
+                <div className="mf-clean-prompt-head flex items-center justify-between gap-[10px]">
+                  <span className="standalone-section-title text-[14px] font-semibold leading-[20px] text-white">
+                    {copy.prompt}
+                  </span>
+                </div>
+              )}
+              <div
+                className={clsx(
+                  useFrameWireframeInput || useReferenceWireframeInput
+                    ? "mf-wireframe-input"
+                    : "mf-clean-prompt-input relative",
+                )}
+              >
+                {(useFrameWireframeInput || useReferenceWireframeInput) && (
+                  <div className="mf-wireframe-controls-row">
+                    {useFrameWireframeInput && (
+                      <div className="mf-wireframe-media-zone">
+                        {visibleFrameSlots.map((slot) => (
+                          <InlineFrameReferenceSlot
+                            key={slot.id}
+                            slot={slot}
+                            label={slot.id === "start" ? copy.start : copy.end}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {useReferenceWireframeInput && (
+                      visibleReferenceSlots.length > 0 ? (
+                        <div className="mf-wireframe-media-zone">
+                          {visibleReferenceSlots.map((slot) => (
+                            <InlineMotionReferenceSlot
+                              key={slot.id}
+                              slot={slot}
+                              onOpen={() => openReferenceSlotPicker(slot)}
+                              onFiles={(files) => addReferenceSlotFiles(slot, files)}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={openReferencePicker}
+                          onPaste={handleReferencePaste}
+                          onDragEnter={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                          }}
+                          onDragOver={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                          }}
+                          onDrop={handleReferenceDrop}
+                          className="mf-wireframe-media-zone"
+                          aria-label={resolvedReferenceTitle}
+                          title={resolvedReferenceTitle}
+                        >
+                          <ReferenceInputTiles
+                            acceptsImage={referenceAcceptsImage}
+                            acceptsVideo={referenceAcceptsVideo}
+                            references={references}
+                            imageLabel={copy.imageInput}
+                            videoLabel={copy.videoInput}
+                          />
+                        </button>
+                      )
+                    )}
+
+                    {onAutoPrompt && (
+                      <div className="mf-wireframe-top-actions">
+                        <AutoPromptButton
+                          label={autoPromptLabel}
+                          title={autoPromptTitle}
+                          running={autoPromptRunning}
+                          disabled={autoPromptDisabled}
+                          onClick={onAutoPrompt}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div
+                  className={clsx(
+                    "relative min-w-0",
+                    useFrameWireframeInput || useReferenceWireframeInput
+                      ? "mf-wireframe-prompt mf-wireframe-prompt-box"
+                      : "flex-1",
+                  )}
+                >
+                  <StandalonePromptMentionTextarea
+                    value={prompt}
+                    onChange={updatePrompt}
+                    placeholder={resolvedPromptPlaceholder}
+                    mentionOptions={mentionOptions}
+                    maxHeightPx={useFrameWireframeInput || useReferenceWireframeInput ? 144 : undefined}
+                    className={clsx(
+                      useFrameWireframeInput || useReferenceWireframeInput
+                        ? "mf-wireframe-prompt-editable border-transparent bg-transparent px-[2px] py-[4px] text-[14px] leading-[24px] text-white placeholder:text-neutral-500 focus:border-transparent focus:ring-0"
+                        : "min-h-[96px] max-h-[190px] rounded-[10px] border-white/[0.06] bg-[#121314] px-[10px] py-[8px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-[#f4ff00]/50",
+                      onAutoPrompt && !(useFrameWireframeInput || useReferenceWireframeInput) && "pb-[48px] pr-[144px]",
+                    )}
+                  />
+                </div>
+                {onAutoPrompt && !(useFrameWireframeInput || useReferenceWireframeInput) && (
+                  <div className="absolute bottom-[8px] right-[8px] z-10">
+                    <AutoPromptButton
+                      label={autoPromptLabel}
+                      title={autoPromptTitle}
+                      running={autoPromptRunning}
+                      disabled={autoPromptDisabled}
+                      onClick={onAutoPrompt}
+                    />
+                  </div>
+                )}
               </div>
-              <StandalonePromptMentionTextarea
-                value={prompt}
-                onChange={updatePrompt}
-                placeholder={resolvedPromptPlaceholder}
-                mentionOptions={mentionOptions}
-                className="min-h-[70px] max-h-[190px] rounded-[10px] border-white/[0.06] bg-[#121314] px-[10px] py-[8px] text-[13px] leading-[20px] text-white placeholder:text-neutral-500 focus:border-[#f4ff00]/50"
-              />
+              {useReferenceWireframeInput && visibleReferenceSlots.length === 0 && references.length > 0 && (
+                <SelectedReferenceStrip
+                  references={references}
+                  onRemove={onRemoveReference}
+                />
+              )}
             </div>
           )}
         </section>
@@ -1382,6 +1504,100 @@ export const CreateVideoPanel: React.FC<CreateVideoPanelProps> = ({
   );
 };
 
+type MiniInputKind = "image" | "video";
+type MiniInputTilt = "left" | "right" | "none";
+
+function MiniInputTile({
+  kind,
+  label,
+  reference,
+  uploading = false,
+  tilt = "none",
+  compact = false,
+}: {
+  kind: MiniInputKind;
+  label: string;
+  reference?: CreateImagePanelReference | null;
+  uploading?: boolean;
+  tilt?: MiniInputTilt;
+  compact?: boolean;
+}) {
+  const isVideoReference = reference?.mime?.startsWith("video/");
+  const displayLabel = reference?.name ?? label;
+  const rotationClass =
+    tilt === "left"
+      ? "-rotate-[5deg] group-hover/tile:-rotate-[2deg]"
+      : tilt === "right"
+        ? "rotate-[5deg] group-hover/tile:rotate-[2deg]"
+        : "-rotate-[2deg] group-hover/tile:rotate-0";
+
+  return (
+    <span className={clsx("group/tile flex shrink-0 flex-col items-center gap-[6px]", compact ? "w-[48px]" : "w-[58px]")}>
+      <span
+        className={clsx(
+          "relative grid place-items-center overflow-hidden rounded-[7px] border border-dashed border-white/[0.16] bg-[#28292e] text-white/70 shadow-[0_12px_26px_-18px_rgba(0,0,0,.9),inset_0_1px_0_rgba(255,255,255,.05)] transition duration-150 ease-out",
+          compact ? "h-[50px] w-[42px]" : "h-[56px] w-[46px]",
+          rotationClass,
+          "group-hover/tile:-translate-y-[2px] group-hover/tile:scale-[1.06] group-hover/tile:border-[#f4ff00]/65 group-hover/tile:text-[#f4ff00]",
+        )}
+      >
+        {reference ? (
+          isVideoReference ? (
+            <Camera className={clsx(compact ? "h-[16px] w-[16px]" : "h-[18px] w-[18px]")} />
+          ) : (
+            <img src={reference.url} alt="" className="h-full w-full object-cover" />
+          )
+        ) : uploading ? (
+          <span className="h-[16px] w-[16px] animate-spin rounded-full border-2 border-white/70 border-t-transparent" />
+        ) : kind === "video" ? (
+          <Camera className={clsx(compact ? "h-[16px] w-[16px]" : "h-[18px] w-[18px]")} />
+        ) : (
+          <Plus className={clsx(compact ? "h-[16px] w-[16px]" : "h-[18px] w-[18px]")} />
+        )}
+      </span>
+      <span className="max-w-full truncate text-[11px] font-medium leading-[14px] text-neutral-300" title={displayLabel}>
+        {displayLabel}
+      </span>
+    </span>
+  );
+}
+
+function ReferenceInputTiles({
+  acceptsImage,
+  acceptsVideo,
+  references,
+  imageLabel,
+  videoLabel,
+}: {
+  acceptsImage: boolean;
+  acceptsVideo: boolean;
+  references: CreateImagePanelReference[];
+  imageLabel: string;
+  videoLabel: string;
+}) {
+  const imageReference = references.find((reference) => !reference.mime?.startsWith("video/")) ?? null;
+  const videoReference = references.find((reference) => reference.mime?.startsWith("video/")) ?? null;
+
+  if (acceptsImage && acceptsVideo) {
+    return (
+      <span className="flex shrink-0 items-start gap-[6px]">
+        <MiniInputTile kind="image" label={imageLabel} reference={imageReference} tilt="left" compact />
+        <MiniInputTile kind="video" label={videoLabel} reference={videoReference} tilt="right" compact />
+      </span>
+    );
+  }
+
+  const kind: MiniInputKind = acceptsVideo && !acceptsImage ? "video" : "image";
+  return (
+    <MiniInputTile
+      kind={kind}
+      label={kind === "video" ? videoLabel : imageLabel}
+      reference={kind === "video" ? videoReference : imageReference}
+      tilt="left"
+    />
+  );
+}
+
 function VideoModeCard({
   active,
   disabled,
@@ -1425,25 +1641,169 @@ function VideoModeIcon({
   disabled?: boolean;
 }) {
   const isFrames = mode === "frames";
-  const Icon = isFrames ? ImageIcon : FileText;
   return (
     <div
       className={clsx(
-        "relative grid h-[30px] w-[34px] translate-y-[4px] place-items-center overflow-hidden rounded-[10px] shadow-[inset_0_1px_0_rgba(255,255,255,.22)] transition-transform",
-        disabled
-          ? "bg-[linear-gradient(135deg,#3a3d42_0%,#25272b_54%,#16181a_100%)] opacity-70 shadow-[inset_0_1px_0_rgba(255,255,255,.08)]"
-          : isFrames
-            ? "bg-[linear-gradient(135deg,#f8ff66_0%,#d7e600_48%,#f4ff00_100%)]"
-            : "bg-[linear-gradient(135deg,#f4ff00_0%,#9fb800_48%,#f8ff66_100%)]",
-        active && !disabled && "scale-105 shadow-[0_0_18px_rgba(238,255,0,.35),inset_0_1px_0_rgba(255,255,255,.28)]",
+        "relative h-[32px] w-[62px] translate-y-[3px] transition-transform",
+        disabled && "opacity-55",
+        active && !disabled && "scale-105",
       )}
     >
-      <div className={clsx("absolute inset-x-0 top-0 h-1/2 blur-[6px]", disabled ? "bg-white/5" : "bg-white/20")} />
-      <Icon className={clsx("relative h-[17px] w-[17px] drop-shadow-[0_1px_3px_rgba(0,0,0,.45)]", disabled ? "text-neutral-400" : "text-white")} />
       {isFrames ? (
-        <span className={clsx("absolute -right-[3px] bottom-[4px] h-[13px] w-[13px] rounded-[4px] border bg-black/30 backdrop-blur-sm", disabled ? "border-white/10" : "border-white/35")} />
+        <>
+          <span className="absolute left-[7px] top-[1px] grid h-[30px] w-[24px] -rotate-[5deg] place-items-center rounded-[5px] border border-dashed border-white/[0.14] bg-[#2a2b30] text-white/55 shadow-[inset_0_1px_0_rgba(255,255,255,.05)] transition group-hover:-translate-y-[1px] group-hover:scale-105 group-hover:text-[#f4ff00]">
+            <Plus className="h-[13px] w-[13px]" />
+          </span>
+          <span className="absolute right-[7px] top-[1px] grid h-[30px] w-[24px] rotate-[5deg] place-items-center rounded-[5px] border border-dashed border-white/[0.14] bg-[#2a2b30] text-white/55 shadow-[inset_0_1px_0_rgba(255,255,255,.05)] transition group-hover:-translate-y-[1px] group-hover:scale-105 group-hover:text-[#f4ff00]">
+            <Plus className="h-[13px] w-[13px]" />
+          </span>
+        </>
       ) : (
-        <span className={clsx("absolute right-[5px] top-[4px] h-[6px] w-[6px] rounded-full", disabled ? "bg-neutral-500" : "bg-emerald-300 shadow-[0_0_8px_rgba(110,231,183,.9)]")} />
+        <span className="absolute left-1/2 top-[1px] grid h-[30px] w-[26px] -translate-x-1/2 rotate-[5deg] place-items-center rounded-[5px] border border-dashed border-white/[0.14] bg-[#2a2b30] text-white/55 shadow-[inset_0_1px_0_rgba(255,255,255,.05)] transition group-hover:-translate-y-[1px] group-hover:scale-105 group-hover:text-[#f4ff00]">
+          <Camera className="h-[13px] w-[13px]" />
+        </span>
+      )}
+    </div>
+  );
+}
+
+function InlineFrameReferenceSlot({
+  slot,
+  label,
+}: {
+  slot: CreateVideoPanelFrameSlot;
+  label: string;
+}) {
+  const refItem = slot.refItem;
+  const canUpload = Boolean(slot.onUpload);
+  const addFrameFiles = (files: FileList | File[] | null | undefined) => {
+    const list = Array.from(files ?? []);
+    if (list.length > 0) slot.onHistoryFiles?.(list);
+  };
+  const handleFramePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    const files = Array.from(event.clipboardData.files ?? []);
+    if (files.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    addFrameFiles(files);
+  };
+  const handleFrameDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    addFrameFiles(event.dataTransfer.files);
+  };
+
+  return (
+    <div
+      tabIndex={0}
+      onPaste={handleFramePaste}
+      onDragEnter={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+      onDragOver={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+      onDrop={handleFrameDrop}
+      className="mf-wireframe-inline-slot group relative"
+    >
+      <button
+        type="button"
+        onClick={slot.onUpload}
+        disabled={!canUpload}
+        className="mf-wireframe-inline-button"
+      >
+        <MiniInputTile
+          kind="image"
+          label={label}
+          reference={refItem}
+          uploading={slot.uploading}
+          tilt={slot.id === "start" ? "left" : "right"}
+          compact
+        />
+      </button>
+      {slot.onRemove && refItem && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            slot.onRemove?.();
+          }}
+          className="mf-wireframe-remove-button"
+        >
+          <X className="h-[11px] w-[11px]" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function InlineMotionReferenceSlot({
+  slot,
+  onOpen,
+  onFiles,
+}: {
+  slot: CreateVideoPanelReferenceSlot;
+  onOpen: () => void;
+  onFiles: (files: FileList | File[] | null | undefined) => void;
+}) {
+  const refItem = slot.refItem;
+  const isVideo = slot.accept === "video";
+  const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    const files = Array.from(event.clipboardData.files ?? []);
+    if (files.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onFiles(files);
+  };
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onFiles(event.dataTransfer.files);
+  };
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onOpen();
+      }}
+      onPaste={handlePaste}
+      onDragEnter={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+      onDragOver={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+      onDrop={handleDrop}
+      className="mf-wireframe-inline-slot group relative"
+    >
+      <MiniInputTile
+        kind={isVideo ? "video" : "image"}
+        label={slot.label}
+        reference={refItem}
+        uploading={slot.uploading}
+        tilt={isVideo ? "right" : "left"}
+        compact
+      />
+      {slot.onRemove && refItem && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            slot.onRemove?.();
+          }}
+          className="mf-wireframe-remove-button"
+        >
+          <X className="h-[11px] w-[11px]" />
+        </button>
       )}
     </div>
   );
@@ -1458,8 +1818,7 @@ function FrameReferenceSlot({
 }) {
   const copy = usePanelCopy();
   const refItem = slot.refItem;
-  const isVideo = refItem?.mime?.startsWith("video/");
-  const frameLabel = slot.id === "start" ? copy.startFrame : copy.endFrame;
+  const frameLabel = slot.id === "start" ? copy.start : copy.end;
   const canUpload = Boolean(slot.onUpload);
   const addFrameFiles = (files: FileList | File[] | null | undefined) => {
     const list = Array.from(files ?? []);
@@ -1490,7 +1849,7 @@ function FrameReferenceSlot({
         event.stopPropagation();
       }}
       onDrop={handleFrameDrop}
-      className="mf-clean-frame-slot group relative flex min-h-[82px] flex-col overflow-hidden rounded-[12px] border border-white/[0.055] bg-[linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012))] p-[6px] shadow-[inset_0_1px_0_rgba(255,255,255,.04),0_8px_22px_-18px_rgba(0,0,0,.9)] outline-none transition hover:border-[#f4ff00]/45 hover:bg-[linear-gradient(180deg,rgba(244,255,0,.055),rgba(255,255,255,.012))] focus:border-[#f4ff00]/45"
+      className="mf-clean-frame-slot group relative flex min-h-[104px] flex-col items-center justify-center overflow-hidden rounded-[12px] border border-white/[0.055] bg-[linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012))] p-[8px] shadow-[inset_0_1px_0_rgba(255,255,255,.04),0_8px_22px_-18px_rgba(0,0,0,.9)] outline-none transition hover:border-[#f4ff00]/45 hover:bg-[linear-gradient(180deg,rgba(244,255,0,.055),rgba(255,255,255,.012))] focus:border-[#f4ff00]/45"
     >
       <div className="pointer-events-none absolute inset-x-[10px] top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent opacity-70" />
       <button
@@ -1498,71 +1857,33 @@ function FrameReferenceSlot({
         onClick={slot.onUpload}
         disabled={!canUpload}
         className={clsx(
-          "relative flex min-h-[54px] flex-1 overflow-hidden rounded-[10px] outline-none transition",
-          refItem
-            ? "items-center gap-[9px] px-[8px] text-left"
-            : "flex-col items-center justify-center gap-[8px] px-[6px] text-center",
+          "relative flex w-full flex-1 flex-col items-center justify-center rounded-[10px] px-[6px] py-[4px] text-center outline-none transition",
           canUpload
             ? "cursor-pointer hover:bg-white/[0.035]"
             : "cursor-default",
         )}
       >
-        {refItem ? (
-          <>
-            {isVideo ? (
-              <div className="grid h-[46px] w-[54px] shrink-0 place-items-center rounded-[9px] bg-black/55 ring-1 ring-white/[0.08]">
-                <Video className="h-[18px] w-[18px] text-white/80" />
-              </div>
-            ) : (
-              <img src={refItem.url} alt="" className="h-[46px] w-[54px] shrink-0 rounded-[9px] object-cover ring-1 ring-white/[0.08]" />
-            )}
-            <span className="min-w-0 flex-1">
-              <span className="block text-[10px] font-medium uppercase leading-[13px] tracking-[0.04em] text-[#f4ff00]">
-                {frameLabel}
-              </span>
-              <span className="block truncate text-[12px] font-semibold leading-[16px] text-white">
-                {refItem.name ?? slot.label}
-              </span>
-              <span className="mt-[1px] block text-[10px] leading-[13px] text-neutral-500">
-                {copy.clickToReplace}
-              </span>
-            </span>
-            {slot.onRemove && (
-              <span
-                role="button"
-                tabIndex={0}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  slot.onRemove?.();
-                }}
-                className="grid h-[24px] w-[24px] shrink-0 place-items-center rounded-full bg-black/45 text-white opacity-0 ring-1 ring-white/[0.08] backdrop-blur transition hover:bg-white hover:text-black group-hover:opacity-100"
-              >
-                <Trash2 className="h-[12px] w-[12px]" />
-              </span>
-            )}
-          </>
-        ) : (
-          <>
-            <span className="relative grid h-[34px] w-[34px] shrink-0 place-items-center rounded-[10px] bg-[radial-gradient(circle_at_30%_15%,rgba(255,255,255,.2),transparent_42%),linear-gradient(135deg,rgba(238,255,0,.34),rgba(244,255,0,.16))] text-white ring-1 ring-[#f4ff00]/25">
-              {slot.uploading ? (
-                <span className="h-[14px] w-[14px] animate-spin rounded-full border-2 border-white/70 border-t-transparent" />
-              ) : (
-                <>
-                  <ImageIcon className="h-[16px] w-[16px]" />
-                  <span className="absolute -bottom-[4px] -right-[4px] grid h-[15px] w-[15px] place-items-center rounded-full bg-[#16181a] text-white ring-1 ring-white/[0.12]">
-                    <Plus className="h-[10px] w-[10px]" />
-                  </span>
-                </>
-              )}
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[10px] font-medium uppercase leading-[13px] tracking-[0.04em] text-[#f4ff00]">
-                {frameLabel}
-              </span>
-            </span>
-          </>
-        )}
+        <MiniInputTile
+          kind="image"
+          label={frameLabel}
+          reference={refItem}
+          uploading={slot.uploading}
+          tilt={slot.id === "start" ? "left" : "right"}
+        />
       </button>
+
+      {slot.onRemove && refItem && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            slot.onRemove?.();
+          }}
+          className="absolute right-[7px] top-[7px] grid h-[24px] w-[24px] place-items-center rounded-full bg-black/45 text-white opacity-0 ring-1 ring-white/[0.08] backdrop-blur transition hover:bg-white hover:text-black group-hover:opacity-100"
+        >
+          <Trash2 className="h-[12px] w-[12px]" />
+        </button>
+      )}
 
       {slot.historyLabel && (
         <button
@@ -1571,7 +1892,7 @@ function FrameReferenceSlot({
             event.stopPropagation();
             onHistory?.();
           }}
-          className="mx-auto mt-[4px] inline-flex h-[21px] min-w-[58px] items-center justify-center rounded-full border border-white/[0.06] bg-black/[0.18] px-[10px] text-center text-[10px] font-semibold leading-none text-neutral-400 transition hover:border-[#f4ff00]/35 hover:bg-[#f4ff00]/10 hover:text-white"
+          className="mx-auto mt-[2px] inline-flex h-[21px] min-w-[58px] items-center justify-center rounded-full border border-white/[0.06] bg-black/[0.18] px-[10px] text-center text-[10px] font-semibold leading-none text-neutral-400 transition hover:border-[#f4ff00]/35 hover:bg-[#f4ff00]/10 hover:text-white"
         >
           {slot.historyLabel}
         </button>
@@ -1624,26 +1945,15 @@ function MotionReferenceSlot({
         event.stopPropagation();
       }}
       onDrop={handleDrop}
-      className="mf-clean-reference-dropzone group relative flex min-h-[76px] items-center gap-[10px] overflow-hidden rounded-[12px] border border-[#f4ff00]/55 bg-[#f4ff00]/[0.06] p-[8px] outline-none shadow-[inset_0_-8px_22px_rgba(238,255,0,0.12),inset_0_1px_6px_rgba(255,255,255,0.04)] transition hover:border-[#f4ff00]/80 hover:bg-[#f4ff00]/[0.1] focus:ring-1 focus:ring-[#f4ff00]/60"
+      className="mf-clean-reference-dropzone group relative flex min-h-[104px] flex-col items-center justify-center overflow-hidden rounded-[12px] border border-[#f4ff00]/55 bg-[#f4ff00]/[0.06] p-[8px] outline-none shadow-[inset_0_-8px_22px_rgba(238,255,0,0.12),inset_0_1px_6px_rgba(255,255,255,0.04)] transition hover:border-[#f4ff00]/80 hover:bg-[#f4ff00]/[0.1] focus:ring-1 focus:ring-[#f4ff00]/60"
     >
-      <div className="grid h-[56px] w-[64px] shrink-0 place-items-center overflow-hidden rounded-[10px] bg-black/35 ring-1 ring-white/[0.08]">
-        {refItem ? (
-          refItem.mime?.startsWith("video/") ? (
-            <Video className="h-[20px] w-[20px] text-white/85" />
-          ) : (
-            <img src={refItem.url} alt="" className="h-full w-full object-cover" />
-          )
-        ) : slot.uploading ? (
-          <span className="h-[18px] w-[18px] animate-spin rounded-full border-2 border-white/70 border-t-transparent" />
-        ) : isVideo ? (
-          <Video className="h-[20px] w-[20px] text-white/70" />
-        ) : (
-          <ImageIcon className="h-[20px] w-[20px] text-white/70" />
-        )}
-      </div>
-      <span className="min-w-0 flex-1 truncate text-[14px] font-semibold leading-[20px] text-white">
-        {slot.label}
-      </span>
+      <MiniInputTile
+        kind={isVideo ? "video" : "image"}
+        label={slot.label}
+        reference={refItem}
+        uploading={slot.uploading}
+        tilt={isVideo ? "right" : "left"}
+      />
       {slot.onRemove && refItem && (
         <button
           type="button"
@@ -2593,6 +2903,7 @@ function ModelLogoBadge({
   className?: string;
 }) {
   const logo = modelLogoFor(model);
+  const hasImageLogo = Boolean(logo.imageSrc);
   const markLength = logo.mark.length;
   const markClass =
     markLength > 5
@@ -2610,22 +2921,27 @@ function ModelLogoBadge({
       aria-label={`${logo.label} logo`}
       title={logo.label}
       className={clsx(
-        "flex shrink-0 items-center justify-center overflow-hidden border font-black uppercase leading-none tracking-normal",
-        size === "lg" ? "h-[38px] w-[38px] rounded-[10px]" : "h-[34px] w-[34px] rounded-[8px]",
+        "flex shrink-0 items-center justify-center overflow-hidden leading-none tracking-normal",
+        hasImageLogo ? "border-0 bg-transparent shadow-none" : "border font-black uppercase",
+        size === "lg"
+          ? hasImageLogo ? "h-[38px] w-[38px] rounded-none" : "h-[38px] w-[38px] rounded-[10px]"
+          : hasImageLogo ? "h-[34px] w-[34px] rounded-none" : "h-[34px] w-[34px] rounded-[8px]",
         className,
       )}
-      style={{
-        background: logo.background,
-        color: logo.color,
-        borderColor: logo.borderColor,
-        boxShadow: logo.shadow,
-      }}
+      style={hasImageLogo
+        ? { color: logo.color }
+        : {
+            background: logo.background,
+            color: logo.color,
+            borderColor: logo.borderColor,
+            boxShadow: logo.shadow,
+          }}
     >
       {logo.imageSrc ? (
         <img
           src={logo.imageSrc}
           alt=""
-          className="h-full w-full object-contain p-[5px]"
+          className="h-full w-full object-contain p-0"
           draggable={false}
         />
       ) : (

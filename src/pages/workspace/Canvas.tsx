@@ -72,6 +72,7 @@ const WorkspaceCanvasPage = () => {
   const { workspaceId: routeId } = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
   const openCanvas = useWorkspaceStore((s) => s.openCanvas);
+  const markWorkspaceOpened = useWorkspaceStore((s) => s.markWorkspaceOpened);
   const replaceCanvasGraph = useWorkspaceStore((s) => s.replaceCanvasGraph);
   const mergeServerWorkspaces = useWorkspaceStore((s) => s.mergeServerWorkspaces);
   const createCanvas = useWorkspaceStore((s) => s.createCanvas);
@@ -136,6 +137,11 @@ const WorkspaceCanvasPage = () => {
     canvasId: targetCanvasId,
     activity: hydrated ? "Workspace canvas" : "Loading workspace canvas",
   });
+
+  useEffect(() => {
+    if (!hydrated || !routeId) return;
+    markWorkspaceOpened(routeId);
+  }, [hydrated, markWorkspaceOpened, routeId]);
 
   useEffect(() => {
     if (!routeId) return;

@@ -749,7 +749,7 @@ export async function loadProjectsFromServer(): Promise<ProjectMeta[] | null> {
     const { data, error } = await (supabase as any)
       .from("workspace_projects")
       .select("id, user_id, name, description, color, is_private, created_at, updated_at")
-      .order("updated_at", { ascending: false });
+      .order("created_at", { ascending: true });
 
     if (error) {
       if (isMissingProjectsTableError(error)) {
@@ -767,6 +767,7 @@ export async function loadProjectsFromServer(): Promise<ProjectMeta[] | null> {
       description: row.description ?? null,
       color: row.color ?? null,
       isPrivate: Boolean(row.is_private),
+      createdAt: new Date(row.created_at).getTime(),
       updatedAt: new Date(row.updated_at).getTime(),
     }));
   } catch (err) {

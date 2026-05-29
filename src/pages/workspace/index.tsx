@@ -73,7 +73,6 @@ import {
   Loader2,
   SlidersHorizontal,
   Sparkles,
-  UploadCloud,
   UserCircle2,
   Video,
   WandSparkles,
@@ -185,6 +184,15 @@ const PREVIEW_CACHE_PREFIX = "mf:workspace-preview:v2:";
 const PREVIEW_CACHE_INDEX_KEY = `${PREVIEW_CACHE_PREFIX}index`;
 const PREVIEW_CACHE_MAX_ITEMS = 80;
 const PREVIEW_CACHE_MAX_DATA_URI_LENGTH = 240_000;
+const SHOW_HOME_MOCKUP_SECTIONS = false;
+
+const projectCreatedAt = (project: ProjectMeta): number =>
+  project.createdAt ?? project.updatedAt;
+
+const compareProjectsByCreatedAt = (a: ProjectMeta, b: ProjectMeta): number =>
+  projectCreatedAt(a) - projectCreatedAt(b) ||
+  a.name.localeCompare(b.name) ||
+  a.id.localeCompare(b.id);
 
 type PreviewCanvasMeta = {
   id: string;
@@ -843,7 +851,7 @@ const WorkspaceDashboardInner = () => {
           projects={visibleProjects}
           activeProjectId={visibleActiveProjectId}
           onSelectProject={isSignedIn ? setActiveProject : undefined}
-          collapsed={section === "auto_subtitle" || section === "image_to_3d"}
+          collapsed={section !== "home"}
         />
       </div>
 
@@ -1049,6 +1057,104 @@ const HOME_TOOLS: HomeTool[] = STANDALONE_TOOL_ORDER.map((key) => {
     accent: tool.accent,
   };
 });
+
+function bindHorizontalScroller(strip: HTMLDivElement): () => void {
+  let drag:
+    | {
+        pointerId: number;
+        startX: number;
+        scrollLeft: number;
+        moved: boolean;
+        captured: boolean;
+      }
+    | null = null;
+  let suppressClick = false;
+  const DRAG_THRESHOLD = 10;
+
+  const canScroll = () => strip.scrollWidth > strip.clientWidth + 1;
+  const clampScroll = (value: number) => {
+    const maxScroll = strip.scrollWidth - strip.clientWidth;
+    return Math.max(0, Math.min(maxScroll, value));
+  };
+
+  const onWheel = (event: WheelEvent) => {
+    if (!canScroll()) return;
+    const delta =
+      Math.abs(event.deltaX) > Math.abs(event.deltaY)
+        ? event.deltaX
+        : event.deltaY;
+    if (delta === 0) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    strip.scrollLeft = clampScroll(strip.scrollLeft + delta);
+  };
+
+  const onPointerDown = (event: PointerEvent) => {
+    if (event.button !== 0 || !canScroll()) return;
+    drag = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      scrollLeft: strip.scrollLeft,
+      moved: false,
+      captured: false,
+    };
+  };
+
+  const onPointerMove = (event: PointerEvent) => {
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const distance = event.clientX - drag.startX;
+    if (!drag.moved && Math.abs(distance) <= DRAG_THRESHOLD) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      drag.captured = true;
+      strip.setPointerCapture?.(event.pointerId);
+      strip.classList.add("is-dragging");
+    }
+    strip.scrollLeft = clampScroll(drag.scrollLeft - distance);
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const finishDrag = (pointerId: number) => {
+    if (!drag || drag.pointerId !== pointerId) return;
+    if (drag.moved) {
+      suppressClick = true;
+      window.setTimeout(() => {
+        suppressClick = false;
+      }, 0);
+    }
+    if (drag.captured) strip.releasePointerCapture?.(pointerId);
+    strip.classList.remove("is-dragging");
+    drag = null;
+  };
+
+  const onPointerUp = (event: PointerEvent) => finishDrag(event.pointerId);
+  const onPointerCancel = (event: PointerEvent) => finishDrag(event.pointerId);
+
+  const onClickCapture = (event: MouseEvent) => {
+    if (!suppressClick) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  };
+
+  strip.addEventListener("wheel", onWheel, { passive: false });
+  strip.addEventListener("pointerdown", onPointerDown);
+  strip.addEventListener("pointermove", onPointerMove);
+  strip.addEventListener("click", onClickCapture, true);
+  window.addEventListener("pointerup", onPointerUp);
+  window.addEventListener("pointercancel", onPointerCancel);
+
+  return () => {
+    strip.removeEventListener("wheel", onWheel);
+    strip.removeEventListener("pointerdown", onPointerDown);
+    strip.removeEventListener("pointermove", onPointerMove);
+    strip.removeEventListener("click", onClickCapture, true);
+    window.removeEventListener("pointerup", onPointerUp);
+    window.removeEventListener("pointercancel", onPointerCancel);
+    strip.classList.remove("is-dragging");
+  };
+}
 
 interface HomeInspiration {
   id: string;
@@ -1485,6 +1591,7 @@ const HomeView = ({
   const { user, loading: authLoading } = useAuth();
   const openSignInModal = useSignInModal();
   const workspaces = useWorkspaceStore((s) => s.workspaces);
+  const recentWorkspaceOpenIds = useWorkspaceStore((s) => s.recentWorkspaceOpenIds);
   const canvases = useWorkspaceStore((s) => s.canvases);
   const graphs = useWorkspaceStore((s) => s.graphs);
   const canvasIndex = useMemo(() => buildCanvasIndex(canvases), [canvases]);
@@ -1497,6 +1604,7 @@ const HomeView = ({
   // are wired and avoids relying on a prop the type contract doesn't
   // even declare.
   const createWorkspace = useWorkspaceStore((s) => s.createWorkspace);
+  const markWorkspaceOpened = useWorkspaceStore((s) => s.markWorkspaceOpened);
   const mergeServerWorkspaces = useWorkspaceStore(
     (s) => s.mergeServerWorkspaces,
   );
@@ -1576,12 +1684,7 @@ const HomeView = ({
     let defaultProjectShown = false;
     return projects
       .filter((project) => Boolean(user?.id) && project.ownerId === user?.id)
-      .sort(
-        (a, b) =>
-          Number(b.id === activeProjectId) -
-            Number(a.id === activeProjectId) ||
-          b.updatedAt - a.updatedAt,
-      )
+      .sort(compareProjectsByCreatedAt)
       .filter((project) => {
         if (project.name !== DEFAULT_PROJECT_NAME) return true;
         if (defaultProjectShown) return false;
@@ -1596,28 +1699,31 @@ const HomeView = ({
       }));
   }, [activeProjectId, projects, user?.id, workspaces]);
 
-  /* Recent spaces — top 3 by updatedAt with rendered minimaps so the
-   * Home preview stays fixed-width and never pushes the Tools column
-   * off-screen when a project has many spaces. */
+  /* Recent creations — prefer spaces the user actually opened, then
+   * fall back to updatedAt. Opening a space is not an edit, so we keep
+   * this separate from WorkspaceMeta.updatedAt. */
   const recentWorkspaceIds = useMemo(() => {
-    return [...workspaces]
-      .filter(
-        (ws) =>
-          (educationLockedStudent ? Boolean(ws.classId) : true) &&
-          (educationLockedStudent || !activeProjectId || !ws.projectId || ws.projectId === activeProjectId),
-      )
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .slice(0, 3)
-      .map((ws) => ws.id);
-  }, [activeProjectId, educationLockedStudent, workspaces]);
+    const eligible = [...workspaces].filter((ws) =>
+      educationLockedStudent ? Boolean(ws.classId) : true,
+    );
+    const byId = new Map(eligible.map((ws) => [ws.id, ws]));
+    const ordered = recentWorkspaceOpenIds
+      .map((id) => byId.get(id))
+      .filter((ws): ws is WorkspaceMeta => Boolean(ws));
+    const seen = new Set(ordered.map((ws) => ws.id));
+    const fallback = eligible
+      .filter((ws) => !seen.has(ws.id))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+    return [...ordered, ...fallback].slice(0, 5).map((ws) => ws.id);
+  }, [educationLockedStudent, recentWorkspaceOpenIds, workspaces]);
 
   useHydrateSpacePreviewGraphs(recentWorkspaceIds, user?.id, authLoading);
 
   const recentSpaces = useMemo(() => {
-    const recentIds = new Set(recentWorkspaceIds);
-    return [...workspaces]
-      .filter((ws) => recentIds.has(ws.id))
-      .sort((a, b) => b.updatedAt - a.updatedAt)
+    const byId = new Map(workspaces.map((ws) => [ws.id, ws]));
+    return recentWorkspaceIds
+      .map((id) => byId.get(id))
+      .filter((ws): ws is WorkspaceMeta => Boolean(ws))
       .map((ws) =>
         applyEducationSpaceStatus(
           buildSpaceCardData(ws, canvasIndex, graphs),
@@ -1642,6 +1748,7 @@ const HomeView = ({
       return;
     }
     const { workspaceId, canvasId } = createWorkspace(t("workspace.spaces.untitled_space"), activeProjectId);
+    markWorkspaceOpened(workspaceId);
     if (user?.id) {
       const result = await persistNewWorkspaceBundle(workspaceId, canvasId, user.id);
       if (!result.ok) {
@@ -1667,98 +1774,19 @@ const HomeView = ({
   ).length;
   const showRecentCreations = Boolean(user?.id && recentSpaces.length > 0);
   const toolStripRef = useRef<HTMLDivElement | null>(null);
+  const recentGridRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const strip = toolStripRef.current;
-    if (!strip) return undefined;
-
-    let drag:
-      | {
-          pointerId: number;
-          startX: number;
-          scrollLeft: number;
-          moved: boolean;
-        }
-      | null = null;
-    let suppressClick = false;
-
-    const canScroll = () => strip.scrollWidth > strip.clientWidth + 1;
-    const clampScroll = (value: number) => {
-      const maxScroll = strip.scrollWidth - strip.clientWidth;
-      return Math.max(0, Math.min(maxScroll, value));
-    };
-
-    const onWheel = (event: WheelEvent) => {
-      if (!canScroll()) return;
-      const delta =
-        Math.abs(event.deltaX) > Math.abs(event.deltaY)
-          ? event.deltaX
-          : event.deltaY;
-      if (delta === 0) return;
-
-      event.preventDefault();
-      event.stopPropagation();
-      strip.scrollLeft = clampScroll(strip.scrollLeft + delta);
-    };
-
-    const onPointerDown = (event: PointerEvent) => {
-      if (event.button !== 0 || !canScroll()) return;
-      drag = {
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        scrollLeft: strip.scrollLeft,
-        moved: false,
-      };
-      strip.setPointerCapture?.(event.pointerId);
-      strip.classList.add("is-dragging");
-    };
-
-    const onPointerMove = (event: PointerEvent) => {
-      if (!drag || drag.pointerId !== event.pointerId) return;
-      const distance = event.clientX - drag.startX;
-      if (Math.abs(distance) > 4) drag.moved = true;
-      strip.scrollLeft = clampScroll(drag.scrollLeft - distance);
-      if (!drag.moved) return;
-      event.preventDefault();
-      event.stopPropagation();
-    };
-
-    const endDrag = (event: PointerEvent) => {
-      if (!drag || drag.pointerId !== event.pointerId) return;
-      if (drag.moved) {
-        suppressClick = true;
-        window.setTimeout(() => {
-          suppressClick = false;
-        }, 0);
-      }
-      strip.releasePointerCapture?.(event.pointerId);
-      strip.classList.remove("is-dragging");
-      drag = null;
-    };
-
-    const onClickCapture = (event: MouseEvent) => {
-      if (!suppressClick) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    };
-
-    strip.addEventListener("wheel", onWheel, { passive: false });
-    strip.addEventListener("pointerdown", onPointerDown);
-    strip.addEventListener("pointermove", onPointerMove);
-    strip.addEventListener("pointerup", endDrag);
-    strip.addEventListener("pointercancel", endDrag);
-    strip.addEventListener("click", onClickCapture, true);
+    const strips = [toolStripRef.current, recentGridRef.current].filter(
+      (strip): strip is HTMLDivElement => Boolean(strip),
+    );
+    if (strips.length === 0) return undefined;
+    const cleanups = strips.map(bindHorizontalScroller);
 
     return () => {
-      strip.removeEventListener("wheel", onWheel);
-      strip.removeEventListener("pointerdown", onPointerDown);
-      strip.removeEventListener("pointermove", onPointerMove);
-      strip.removeEventListener("pointerup", endDrag);
-      strip.removeEventListener("pointercancel", endDrag);
-      strip.removeEventListener("click", onClickCapture, true);
-      strip.classList.remove("is-dragging");
+      cleanups.forEach((cleanup) => cleanup());
     };
-  }, []);
+  }, [showRecentCreations, recentSpaces.length]);
 
   const openFeature = (feature: HomeFeatureShowcaseItem) => {
     if (feature.actionSection) {
@@ -1848,7 +1876,7 @@ const HomeView = ({
           >
             <button
               type="button"
-              onClick={handleNew}
+              onClick={() => onSection("spaces")}
               className="mf-home-tool-card"
               style={{ "--tool-accent": "#f4ff00" } as React.CSSProperties}
             >
@@ -1886,12 +1914,15 @@ const HomeView = ({
             <div className="mf-home-section-heading">
               <h2>Recent creations</h2>
             </div>
-            <div className="mf-home-recent-grid">
+            <div ref={recentGridRef} className="mf-home-recent-grid">
               {recentSpaces.slice(0, 5).map((space) => (
                 <button
                   key={space.id}
                   type="button"
-                  onClick={() => navigate(`/app/workspace/${space.id}`)}
+                  onClick={() => {
+                    markWorkspaceOpened(space.id);
+                    navigate(`/app/workspace/${space.id}`);
+                  }}
                   className="mf-home-recent-card group/space"
                 >
                   <div className="mf-home-recent-thumb">
@@ -1910,78 +1941,82 @@ const HomeView = ({
           </section>
         )}
 
-        <section className="mf-home-section">
-          <div className="mf-home-section-heading">
-            <h2>Templates</h2>
-          </div>
-          <div className="mf-home-card-grid">
-            {featuredTemplates.slice(0, 3).map((feature) => (
-              <button
-                key={feature.id}
-                type="button"
-                onClick={() => openFeature(feature)}
-                className="mf-home-media-card"
-              >
-                <div className="mf-home-media-thumb">
-                  <img src={feature.tileImage} alt={t(feature.titleKey)} loading="lazy" decoding="async" />
-                </div>
-                <div className="mf-home-card-copy">
-                  <h3>{t(feature.titleKey)}</h3>
-                  <p>{t(feature.kickerKey)}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-        </section>
+        {SHOW_HOME_MOCKUP_SECTIONS && (
+          <>
+            <section className="mf-home-section">
+              <div className="mf-home-section-heading">
+                <h2>Templates</h2>
+              </div>
+              <div className="mf-home-card-grid">
+                {featuredTemplates.slice(0, 3).map((feature) => (
+                  <button
+                    key={feature.id}
+                    type="button"
+                    onClick={() => openFeature(feature)}
+                    className="mf-home-media-card"
+                  >
+                    <div className="mf-home-media-thumb">
+                      <img src={feature.tileImage} alt={t(feature.titleKey)} loading="lazy" decoding="async" />
+                    </div>
+                    <div className="mf-home-card-copy">
+                      <h3>{t(feature.titleKey)}</h3>
+                      <p>{t(feature.kickerKey)}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
 
-        <section id="workspace-inspirations" className="mf-home-section scroll-mt-8">
-          <div className="mf-home-section-heading">
-            <h2>What's New</h2>
-          </div>
-          <div className="mf-home-news-grid">
-            <button
-              type="button"
-              onClick={() => onSection("spaces")}
-              className="mf-home-news-card mf-home-canvas-news"
-            >
-              <div className="mf-home-news-art">
-                <span className="mf-home-tiny-node" />
-                <span className="mf-home-tiny-node two" />
-                <span className="mf-home-tiny-node three" />
+            <section id="workspace-inspirations" className="mf-home-section scroll-mt-8">
+              <div className="mf-home-section-heading">
+                <h2>What's New</h2>
               </div>
-              <div className="mf-home-news-copy">
-                <h3>Introducing Canvas</h3>
-                <p>Stop prompting, start composing.</p>
+              <div className="mf-home-news-grid">
+                <button
+                  type="button"
+                  onClick={() => onSection("spaces")}
+                  className="mf-home-news-card mf-home-canvas-news"
+                >
+                  <div className="mf-home-news-art">
+                    <span className="mf-home-tiny-node" />
+                    <span className="mf-home-tiny-node two" />
+                    <span className="mf-home-tiny-node three" />
+                  </div>
+                  <div className="mf-home-news-copy">
+                    <h3>Introducing Canvas</h3>
+                    <p>Stop prompting, start composing.</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSection("smart_frames")}
+                  className="mf-home-news-card mf-home-key-news"
+                >
+                  <div className="mf-home-news-art mf-home-checker">
+                    <span className="mf-home-mask-circle" />
+                  </div>
+                  <div className="mf-home-news-copy">
+                    <h3>MediaForge Smart Frames</h3>
+                    <p>Plan editable AI video cuts in one pass.</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSection("image_gen")}
+                  className="mf-home-news-card mf-home-remover-news"
+                >
+                  <div className="mf-home-news-art mf-home-sports">
+                    <span className="mf-home-cutout" />
+                  </div>
+                  <div className="mf-home-news-copy">
+                    <h3>Background Remover</h3>
+                    <p>Clean AI cutouts for production assets.</p>
+                  </div>
+                </button>
               </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => onSection("smart_frames")}
-              className="mf-home-news-card mf-home-key-news"
-            >
-              <div className="mf-home-news-art mf-home-checker">
-                <span className="mf-home-mask-circle" />
-              </div>
-              <div className="mf-home-news-copy">
-                <h3>MediaForge Smart Frames</h3>
-                <p>Plan editable AI video cuts in one pass.</p>
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => onSection("image_gen")}
-              className="mf-home-news-card mf-home-remover-news"
-            >
-              <div className="mf-home-news-art mf-home-sports">
-                <span className="mf-home-cutout" />
-              </div>
-              <div className="mf-home-news-copy">
-                <h3>Background Remover</h3>
-                <p>Clean AI cutouts for production assets.</p>
-              </div>
-            </button>
-          </div>
-        </section>
+            </section>
+          </>
+        )}
       </div>
     </div>
   );
@@ -2038,6 +2073,10 @@ function smartFramesPresetLabel(id: HyperFramesSmartPresetId, t: (key: Translati
 function smartFramesPresetDescription(id: HyperFramesSmartPresetId, t: (key: TranslationKey, params?: Record<string, string | number>) => string): string {
   if (id === "cleancut") return t("workspace.standalone.smart_frames.preset_clean_cut_desc");
   return HYPERFRAMES_SMART_PRESETS.find((preset) => preset.id === id)?.description ?? "";
+}
+
+function stripStandaloneStepPrefix(label: string): string {
+  return label.replace(/^\s*\d+\.\s*/, "");
 }
 
 const HYPERFRAMES_SMART_STORAGE_VERSION = 2;
@@ -2970,8 +3009,8 @@ const HyperFramesSmartView = ({
 
   return (
     <>
-      <div className="mf-smart-frames-page flex-1 overflow-hidden">
-        <div className="mf-smart-frames-layout grid h-full min-h-0 w-full gap-3 xl:grid-cols-[386px_minmax(0,1fr)]">
+      <div className="mf-smart-frames-page ws-scroll-hide flex min-h-0 flex-1 flex-col overflow-y-auto bg-[var(--bg-app)] lg:flex-row lg:overflow-hidden">
+        <aside className="mf-smart-frames-input-shell ws-scroll-hide mx-auto flex min-h-dvh w-full max-w-[480px] shrink-0 flex-col bg-transparent px-[12px] pb-[12px] pt-[4px] lg:mx-0 lg:h-full lg:min-h-0 lg:w-[364px] lg:max-w-none lg:overflow-hidden lg:pb-0 lg:pl-2 lg:pr-0 lg:pt-4 xl:w-[386px]">
           <section className="mf-smart-frames-panel mf-clean-generator flex h-full min-h-0 flex-col overflow-hidden rounded-[18px] border border-white/[0.08] bg-[hsl(0_0%_7%)] shadow-[0_24px_80px_rgba(0,0,0,.28)]">
             <div className="mf-smart-frames-body ws-scroll-hide min-h-0 flex-1 overflow-y-auto p-5">
               <StandaloneToolHeaderCard title={t("workspace.standalone.tool.smart_frames.title")} />
@@ -2988,7 +3027,9 @@ const HyperFramesSmartView = ({
                 }}
               />
               <div className="mf-clean-input-section mf-smart-source-section">
-                <div className="mf-clean-step-heading mb-3">{t("workspace.standalone.smart_frames.step_source")}</div>
+                <div className="mf-clean-step-heading mb-3">
+                  {stripStandaloneStepPrefix(t("workspace.standalone.smart_frames.step_source"))}
+                </div>
                 <div
                   role="button"
                   tabIndex={0}
@@ -3042,22 +3083,15 @@ const HyperFramesSmartView = ({
                       </div>
                     </div>
                   ) : (
-                    <div className="mf-smart-source-empty flex w-full items-center gap-[14px]">
-                      <span className="standalone-reference-empty-glyph">
-                        <span className="standalone-reference-empty-icon" aria-hidden="true">
-                          <UploadCloud className="h-[18px] w-[18px]" />
+                    <div className="mf-smart-source-empty">
+                      <span className="mf-media-upload-tile mf-smart-source-tile">
+                        <span className="mf-media-upload-tile-icon" aria-hidden="true">
+                          <Video className="h-[16px] w-[16px]" />
+                        </span>
+                        <span className="mf-smart-source-tile-label">
+                          {t("workspace.standalone.smart_frames.video_fallback")}
                         </span>
                       </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="standalone-reference-title truncate font-semibold text-white">{t("workspace.standalone.smart_frames.source_title")}</div>
-                        <p className="standalone-reference-hint mt-[3px] truncate text-zinc-400">
-                          {t("workspace.standalone.smart_frames.source_hint")}
-                        </p>
-                        <p className="mt-[6px] text-[12px] font-semibold leading-[16px] text-[#f4ff00]">
-                          {t("workspace.standalone.smart_frames.source_limit")}
-                        </p>
-                      </div>
-                      <span className="self-center text-[13px] font-bold leading-[18px] text-white">0/1</span>
                     </div>
                   )}
                 </div>
@@ -3065,7 +3099,7 @@ const HyperFramesSmartView = ({
 
               <label className="mf-clean-input-section mf-smart-note-field block">
                 <span className="mf-clean-step-heading block">
-                  {t("workspace.standalone.smart_frames.step_optional_note")}
+                  {stripStandaloneStepPrefix(t("workspace.standalone.smart_frames.step_optional_note"))}
                 </span>
                 <textarea
                   value={prompt}
@@ -3076,7 +3110,9 @@ const HyperFramesSmartView = ({
               </label>
 
               <div className="mf-clean-input-section mf-smart-presets grid grid-cols-1 gap-2">
-                <div className="mf-clean-step-heading">{t("workspace.standalone.smart_frames.step_mode")}</div>
+                <div className="mf-clean-step-heading">
+                  {stripStandaloneStepPrefix(t("workspace.standalone.smart_frames.step_mode"))}
+                </div>
                 {HYPERFRAMES_SMART_PRESETS.map((preset) => (
                   <button
                     key={preset.id}
@@ -3137,6 +3173,8 @@ const HyperFramesSmartView = ({
             </div>
           </section>
 
+        </aside>
+        <main className="mf-smart-result-shell ws-scroll-hide min-h-0 flex-1 overflow-visible bg-[var(--bg-app)] px-3 pb-3 pt-3 md:px-4 lg:overflow-hidden lg:pb-0 lg:pl-2 lg:pr-3 lg:pt-4">
           <section className="mf-smart-result-panel relative flex h-full min-h-0 flex-col rounded-[20px] border border-white/[0.08] bg-[hsl(0_0%_6%)] shadow-[0_24px_80px_rgba(0,0,0,.28)]">
             {!running && !result && !sourceUrl ? (
               <div className="mf-smart-result-view-toggle" aria-hidden="true">
@@ -3302,7 +3340,7 @@ const HyperFramesSmartView = ({
               </div>
             )}
           </section>
-        </div>
+        </main>
       </div>
     </>
   );
@@ -3737,12 +3775,7 @@ const ProjectQuickSwitch = ({
   return (
     <div className="flex min-w-0 flex-wrap gap-1.5">
       {[...projects]
-        .sort(
-          (a, b) =>
-            Number(b.id === activeProjectId) -
-              Number(a.id === activeProjectId) ||
-            b.updatedAt - a.updatedAt,
-        )
+        .sort(compareProjectsByCreatedAt)
         .map((project) => {
           const active = activeProjectId === project.id;
           const teamProject = Boolean(project.ownerId && project.ownerId !== user?.id);
@@ -4205,6 +4238,7 @@ const ProjectsManagerView = ({
   const graphs = useWorkspaceStore((s) => s.graphs);
   const canvasIndex = useMemo(() => buildCanvasIndex(canvases), [canvases]);
   const createWorkspace = useWorkspaceStore((s) => s.createWorkspace);
+  const markWorkspaceOpened = useWorkspaceStore((s) => s.markWorkspaceOpened);
   const renameWorkspace = useWorkspaceStore((s) => s.renameWorkspace);
   const deleteWorkspace = useWorkspaceStore((s) => s.deleteWorkspace);
   const duplicateWorkspace = useWorkspaceStore((s) => s.duplicateWorkspace);
@@ -4225,12 +4259,7 @@ const ProjectsManagerView = ({
       );
     }
     return [...projects]
-      .sort(
-        (a, b) =>
-          Number(b.id === selectedProjectId) -
-            Number(a.id === selectedProjectId) ||
-          b.updatedAt - a.updatedAt,
-      )
+      .sort(compareProjectsByCreatedAt)
       .map((project, index) => ({
         ...project,
         color: project.color ?? PROJECT_COLOR_SWATCHES[index % PROJECT_COLOR_SWATCHES.length],
@@ -4294,6 +4323,7 @@ const ProjectsManagerView = ({
       t("workspace.spaces.untitled_space"),
       projectId,
     );
+    markWorkspaceOpened(workspaceId);
     if (user?.id) {
       const result = await persistNewWorkspaceBundle(workspaceId, canvasId, user.id);
       if (!result.ok) {
@@ -4339,7 +4369,10 @@ const ProjectsManagerView = ({
         id: toastId,
         action: {
           label: t("workspace.toast.open"),
-          onClick: () => navigate(`/app/workspace/${res.workspaceId}`),
+          onClick: () => {
+            markWorkspaceOpened(res.workspaceId);
+            navigate(`/app/workspace/${res.workspaceId}`);
+          },
         },
       });
       return;
@@ -4362,7 +4395,10 @@ const ProjectsManagerView = ({
           id: toastId,
           action: {
             label: t("workspace.toast.open"),
-            onClick: () => navigate(`/app/workspace/${res.workspaceId}`),
+            onClick: () => {
+              markWorkspaceOpened(res.workspaceId);
+              navigate(`/app/workspace/${res.workspaceId}`);
+            },
           },
         });
       } catch (err) {
@@ -4371,7 +4407,10 @@ const ProjectsManagerView = ({
           id: toastId,
           action: {
             label: t("workspace.toast.open"),
-            onClick: () => navigate(`/app/workspace/${res.workspaceId}`),
+            onClick: () => {
+              markWorkspaceOpened(res.workspaceId);
+              navigate(`/app/workspace/${res.workspaceId}`);
+            },
           },
         });
       }
@@ -4516,32 +4555,35 @@ const ProjectsManagerView = ({
                 }
               />
             ) : (
-              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+              <ul className="mf-space-card-grid">
                 {spaces.map((space) => (
                   <SpaceCard
                     key={space.id}
                     ws={space}
                     canManage={!space.ownerId || space.ownerId === user?.id}
-                    onOpen={() => navigate(`/app/workspace/${space.id}`)}
+                    onOpen={() => {
+                      markWorkspaceOpened(space.id);
+                      navigate(`/app/workspace/${space.id}`);
+                    }}
                     onRename={() => handleRename(space.id, space.name)}
                     onDuplicate={() => handleDuplicate(space.id)}
                     onDelete={() => handleDelete(space.id, space.name)}
                   />
                 ))}
-                <li className="group relative cursor-pointer overflow-hidden rounded-lg bg-[hsl(0_0%_8.5%)] transition-colors hover:bg-[hsl(0_0%_10%)]">
+                <li className="mf-space-card group relative cursor-pointer">
                   <button
                     type="button"
                     onClick={handleNewSpace}
                     className="block w-full text-left"
                   >
-                    <div className="flex aspect-[16/10] items-center justify-center bg-[hsl(0_0%_5%)] text-zinc-500">
+                    <div className="flex aspect-video items-center justify-center bg-[hsl(0_0%_5%)] text-zinc-500">
                       <Plus className="h-5 w-5" />
                     </div>
-                    <div className="px-3.5 py-3">
-                      <div className="truncate text-[13.5px] font-semibold leading-tight text-zinc-50">
+                    <div className="mf-space-card-copy">
+                      <div className="mf-space-card-title">
                         {t("workspace.spaces.new_space")}
                       </div>
-                      <div className="mt-1 text-[15.5px] leading-normal text-transparent" aria-hidden="true">
+                      <div className="mf-space-card-meta text-transparent" aria-hidden="true">
                         .
                       </div>
                     </div>
@@ -4581,6 +4623,7 @@ const SpacesView = ({
   const graphs = useWorkspaceStore((s) => s.graphs);
   const canvasIndex = useMemo(() => buildCanvasIndex(canvases), [canvases]);
   const createWorkspace = useWorkspaceStore((s) => s.createWorkspace);
+  const markWorkspaceOpened = useWorkspaceStore((s) => s.markWorkspaceOpened);
   const renameWorkspace = useWorkspaceStore((s) => s.renameWorkspace);
   const deleteWorkspace = useWorkspaceStore((s) => s.deleteWorkspace);
   const duplicateWorkspace = useWorkspaceStore((s) => s.duplicateWorkspace);
@@ -4667,6 +4710,7 @@ const SpacesView = ({
       return;
     }
     const { workspaceId, canvasId } = createWorkspace(t("workspace.spaces.untitled_space"), activeProjectId);
+    markWorkspaceOpened(workspaceId);
     if (user?.id) {
       const result = await persistNewWorkspaceBundle(workspaceId, canvasId, user.id);
       if (!result.ok) {
@@ -4797,7 +4841,10 @@ const SpacesView = ({
             id: toastId,
             action: {
               label: t("workspace.toast.open"),
-              onClick: () => navigate(`/app/workspace/${newWorkspaceId}`),
+              onClick: () => {
+                markWorkspaceOpened(newWorkspaceId);
+                navigate(`/app/workspace/${newWorkspaceId}`);
+              },
             },
           });
         } catch (err) {
@@ -4810,7 +4857,10 @@ const SpacesView = ({
             description: t("workspace.toast.duplicate_offline_desc"),
             action: {
               label: t("workspace.toast.open"),
-              onClick: () => navigate(`/app/workspace/${newWorkspaceId}`),
+              onClick: () => {
+                markWorkspaceOpened(newWorkspaceId);
+                navigate(`/app/workspace/${newWorkspaceId}`);
+              },
             },
           });
         }
@@ -4821,13 +4871,19 @@ const SpacesView = ({
         id: toastId,
         action: {
           label: t("workspace.toast.open"),
-          onClick: () => navigate(`/app/workspace/${newWorkspaceId}`),
+          onClick: () => {
+            markWorkspaceOpened(newWorkspaceId);
+            navigate(`/app/workspace/${newWorkspaceId}`);
+          },
         },
       });
     }
   };
 
-  const handleOpen = (id: string) => navigate(`/app/workspace/${id}`);
+  const handleOpen = (id: string) => {
+    markWorkspaceOpened(id);
+    navigate(`/app/workspace/${id}`);
+  };
 
   // Tab state for the Magnific-style segmented control. Only "My
   // spaces" is wired today — Shared and Templates are placeholders
@@ -4918,7 +4974,7 @@ const SpacesView = ({
             buckets.map((b) => (
               <section key={b.label} className="mb-10">
                 <MonthHeader label={b.label} />
-                <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <ul className="mf-space-card-grid">
                   {b.items.map((ws) => (
                     <SpaceCard
                       key={ws.id}
@@ -5129,7 +5185,7 @@ const SpaceCard = memo(function SpaceCard({
   }, [renderPreview]);
 
   return (
-    <li ref={cardRef} className="group relative cursor-pointer overflow-hidden rounded-lg bg-[hsl(0_0%_8.5%)] transition-colors hover:bg-[hsl(0_0%_10%)]">
+    <li ref={cardRef} className="mf-space-card group relative cursor-pointer">
       <button
         type="button"
         onClick={onOpen}
@@ -5143,9 +5199,9 @@ const SpaceCard = memo(function SpaceCard({
           )}
         </div>
 
-        <div className="flex h-[54px] flex-col justify-center gap-1 px-3.5">
+        <div className="mf-space-card-copy">
           <div className="flex min-h-0 items-center gap-2">
-            <div className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-[16px] text-zinc-50">
+            <div className="mf-space-card-title min-w-0 flex-1">
               {ws.name}
             </div>
             {!canManage && (
@@ -5160,7 +5216,7 @@ const SpaceCard = memo(function SpaceCard({
               </span>
             )}
           </div>
-          <div className="truncate text-[12px] leading-[15px] text-zinc-500">
+          <div className="mf-space-card-meta">
             {timeAgo(ws.updatedAt)}
           </div>
         </div>
