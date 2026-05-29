@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  Camera,
   Crop,
   Download,
   ExternalLink,
@@ -5062,6 +5063,7 @@ export default function StandaloneGenerator({
                   ? "image/*"
                   : activeTool === "video_gen" ? "image/*,video/*" : "image/*"
               }
+              compactReferenceInput={activeTool === "image_upscale"}
               referenceAssets={panelReferenceAssets}
               onAddReferences={
                 activeTool === "voice_gen" || activeTool === "url_asset" ? undefined : openPanelReferenceUpload
@@ -5117,6 +5119,7 @@ export default function StandaloneGenerator({
                 if (tab === "3d") onToolChange("image_to_3d");
                 if (tab === "audio") onToolChange("voice_gen");
               }}
+              density={activeTool === "voice_gen" ? "voice" : "default"}
             />
             )
           ) : (
@@ -5975,6 +5978,7 @@ function VoiceTranslatePanel({
     processing: t("workspace.standalone.voice_translate.processing"),
     ready: t("workspace.standalone.voice_translate.ready"),
     remove: t("workspace.standalone.voice_translate.remove"),
+    videoInput: t("workspace.standalone.smart_frames.video_fallback"),
   };
   const media = form.translateVideo;
   const isAudio = translateOutputTypeForMedia(media) === "audio";
@@ -6077,24 +6081,17 @@ function VoiceTranslatePanel({
                 </button>
               </>
             ) : (
-              <div className="flex w-full items-center gap-[14px]">
-                <span className="standalone-reference-empty-glyph">
-                  <span className="standalone-reference-empty-icon" aria-hidden="true">
+              <div className="mf-translate-source-empty">
+                <span className="mf-media-upload-tile mf-translate-source-tile" aria-hidden="true">
+                  <span className="mf-media-upload-tile-icon">
                     {uploading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 className="h-[16px] w-[16px] animate-spin" />
                     ) : (
-                      <UploadCloud className="h-[18px] w-[18px]" />
+                      <Camera className="h-[16px] w-[16px]" />
                     )}
                   </span>
+                  <span className="mf-translate-source-tile-label">{copy.videoInput}</span>
                 </span>
-                <div className="min-w-0 flex-1">
-                  <p className="standalone-reference-title truncate font-semibold text-white">{copy.uploadTitle}</p>
-                  <p className="standalone-reference-hint mt-[3px] truncate text-zinc-400">{copy.uploadHint}</p>
-                  <p className="mt-[6px] text-[12px] font-semibold leading-[16px] text-[#f4ff00]">
-                    {copy.uploadLimit}
-                  </p>
-                </div>
-                <span className="self-center text-[13px] font-bold leading-[18px] text-white">0/1</span>
               </div>
             )}
           </div>
@@ -8572,6 +8569,7 @@ function StandaloneModelLogo({
   className?: string;
 }) {
   const logo = modelLogoFor(model);
+  const hasImageLogo = Boolean(logo.imageSrc);
   const markLength = logo.mark.length;
   const markClass =
     markLength > 5
@@ -8589,22 +8587,27 @@ function StandaloneModelLogo({
       aria-label={`${logo.label} logo`}
       title={logo.label}
       className={cn(
-        "flex shrink-0 items-center justify-center overflow-hidden border font-black uppercase leading-none tracking-normal",
-        size === "xl" ? "h-10 w-10 rounded-lg" : "h-9 w-9 rounded-[10px]",
+        "flex shrink-0 items-center justify-center overflow-hidden leading-none tracking-normal",
+        hasImageLogo ? "border-0 bg-transparent shadow-none" : "border font-black uppercase",
+        size === "xl"
+          ? hasImageLogo ? "h-10 w-10 rounded-none" : "h-10 w-10 rounded-lg"
+          : hasImageLogo ? "h-9 w-9 rounded-none" : "h-9 w-9 rounded-[10px]",
         className,
       )}
-      style={{
-        background: logo.background,
-        color: logo.color,
-        borderColor: logo.borderColor,
-        boxShadow: logo.shadow,
-      }}
+      style={hasImageLogo
+        ? { color: logo.color }
+        : {
+            background: logo.background,
+            color: logo.color,
+            borderColor: logo.borderColor,
+            boxShadow: logo.shadow,
+          }}
     >
       {logo.imageSrc ? (
         <img
           src={logo.imageSrc}
           alt=""
-          className="h-full w-full object-contain p-[5px]"
+          className="h-full w-full object-contain p-0"
           draggable={false}
         />
       ) : (
@@ -9589,7 +9592,7 @@ function GeminiVoicePicker({
               type="button"
               onClick={() => onChange(voiceName)}
               className={cn(
-                "standalone-voice-card relative flex min-h-[50px] flex-col items-start justify-center rounded-[10px] border px-[7px] py-[4px] pr-[50px] text-left transition",
+                "standalone-voice-card relative flex min-h-[50px] flex-col items-start justify-center rounded-[10px] border px-[7px] py-[4px] pr-[40px] text-left transition",
                 active
                   ? "border-[#EFFF00]/45 bg-[#EFFF00]/10 shadow-[0_0_14px_rgba(244,255,0,0.10)]"
                   : "border-transparent bg-white/[0.055] hover:border-[#EFFF00]/25 hover:bg-white/[0.08]",
@@ -9626,17 +9629,17 @@ function GeminiVoicePicker({
                   }
                 }}
                 className={cn(
-                  "absolute right-[6px] top-1/2 grid h-[42px] w-[42px] -translate-y-1/2 cursor-pointer place-items-center rounded-full transition",
+                  "absolute right-[6px] top-1/2 grid h-[32px] w-[32px] -translate-y-1/2 cursor-pointer place-items-center rounded-full transition",
                   "bg-white/[0.12] text-zinc-100 hover:bg-white/[0.20] hover:text-white",
                   isPlaying && "bg-[#EFFF00]/25 text-[#F4FF33]",
                 )}
               >
                 {isLoading ? (
-                  <Loader2 className="h-[18px] w-[18px] animate-spin" />
+                  <Loader2 className="h-[14px] w-[14px] animate-spin" />
                 ) : isPlaying ? (
-                  <Pause className="h-[18px] w-[18px]" />
+                  <Pause className="h-[14px] w-[14px]" />
                 ) : (
-                  <Play className="h-[18px] w-[18px]" />
+                  <Play className="h-[14px] w-[14px]" />
                 )}
               </span>
             </button>
@@ -9681,7 +9684,7 @@ function GeminiAudioTagsPanel({
   };
   const prefix = composeGeminiAudioTagPrefix({ emotion, personality, speed });
   return (
-    <div className="standalone-voice-controls ws-scroll-hide max-h-[114px] overflow-y-auto pt-[1px]">
+    <div className="standalone-audio-tags-panel pt-[1px]">
       <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
         Audio tags
       </div>

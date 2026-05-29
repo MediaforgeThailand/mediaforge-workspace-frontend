@@ -148,6 +148,9 @@ const SIDEBAR_NAV_ITEMS: NavItem[] = [
 // Keep Smart Frames wired, but hide its Home/sidebar entry until the hosted
 // renderer is ready for users.
 const SHOW_SMART_FRAMES_NAV = false;
+const VISIBLE_SIDEBAR_NAV_ITEMS = SIDEBAR_NAV_ITEMS.filter(
+  (item) => SHOW_SMART_FRAMES_NAV || item.id !== "smart_frames",
+);
 
 const NAV_SECTIONS: SidebarSection[] = [
   {
@@ -354,7 +357,7 @@ export default function WorkspaceSidebar({
         )}
 
         <nav className="mf-ref-nav-stack" aria-label="Primary navigation">
-          {SIDEBAR_NAV_ITEMS.map((it) => (
+          {VISIBLE_SIDEBAR_NAV_ITEMS.map((it) => (
             <NavLink
               key={it.id}
               label={t(it.labelKey)}
@@ -368,21 +371,39 @@ export default function WorkspaceSidebar({
           ))}
         </nav>
 
-        <button
-          type="button"
-          onClick={() => handleClick("library")}
-          className={cn("mf-ref-resources", collapsed && "is-icon-only")}
-          title={t("workspace.sidebar.library")}
-          aria-label={t("workspace.sidebar.library")}
-        >
-          <FolderOpen className="mf-ref-nav-icon" />
-          {!collapsed && (
-            <>
-              <span>{t("workspace.sidebar.library")}</span>
-              <span aria-hidden="true">›</span>
-            </>
-          )}
-        </button>
+        {collapsed ? (
+          <Tooltip delayDuration={150}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => handleClick("library")}
+                className="mf-ref-resources is-icon-only"
+                aria-label={t("workspace.sidebar.library")}
+              >
+                <FolderOpen className="mf-ref-nav-icon" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent
+              side="right"
+              sideOffset={10}
+              className="pointer-events-none border-white/[0.12] bg-black px-[11px] py-[7px] text-[13px] font-semibold leading-[1.35] text-white shadow-[0_18px_48px_-24px_rgba(0,0,0,.95),0_0_24px_-18px_rgba(234,255,0,.75)]"
+            >
+              {t("workspace.sidebar.library")}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <button
+            type="button"
+            onClick={() => handleClick("library")}
+            className="mf-ref-resources"
+            title={t("workspace.sidebar.library")}
+            aria-label={t("workspace.sidebar.library")}
+          >
+            <FolderOpen className="mf-ref-nav-icon" />
+            <span>{t("workspace.sidebar.library")}</span>
+            <span aria-hidden="true">›</span>
+          </button>
+        )}
 
         {!collapsed && (
           <div className="mf-ref-context-stack">
@@ -813,7 +834,7 @@ const NavLink = ({
       <TooltipContent
         side="right"
         sideOffset={10}
-        className="pointer-events-none max-w-[230px] whitespace-normal border-white/[0.12] bg-black px-[9px] py-[6px] text-[11px] font-semibold leading-[1.35] text-white shadow-[0_18px_48px_-24px_rgba(0,0,0,.95),0_0_24px_-18px_rgba(234,255,0,.75)]"
+        className="pointer-events-none max-w-[260px] whitespace-normal border-white/[0.12] bg-black px-[11px] py-[7px] text-[13px] font-semibold leading-[1.35] text-white shadow-[0_18px_48px_-24px_rgba(0,0,0,.95),0_0_24px_-18px_rgba(234,255,0,.75)]"
       >
         {tooltip}
       </TooltipContent>
