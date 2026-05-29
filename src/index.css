@@ -3000,23 +3000,27 @@ button.mf-ref-account-row:focus-visible {
 }
 
 .mf-clean-translate-dropzone:not(.is-loaded) .mf-media-upload-tile-icon {
+  box-sizing: border-box;
   width: 46px;
   height: 56px;
   transform: rotate(-5deg);
-  border-color: rgba(255, 255, 255, 0.16);
+  transform-origin: center;
+  border: 1px dashed rgba(255, 255, 255, 0.16) !important;
   border-radius: 7px;
   background: #28292e;
   color: rgba(255, 255, 255, 0.7);
   box-shadow:
     0 12px 26px -18px rgba(0, 0, 0, 0.9),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  will-change: transform;
 }
 
 .mf-clean-translate-dropzone:not(.is-loaded):hover .mf-media-upload-tile-icon,
 .mf-clean-translate-dropzone:not(.is-loaded):focus-visible .mf-media-upload-tile-icon,
-.mf-clean-translate-dropzone:not(.is-loaded) .mf-media-upload-tile:hover .mf-media-upload-tile-icon {
+.mf-clean-translate-dropzone:not(.is-loaded) .mf-media-upload-tile:hover .mf-media-upload-tile-icon,
+.mf-clean-translate-dropzone:not(.is-loaded) .mf-media-upload-tile:active .mf-media-upload-tile-icon {
   transform: translateY(-2px) rotate(-2deg) scale(1.06);
-  border-color: rgba(244, 255, 0, 0.65);
+  border: 1px dashed rgba(244, 255, 0, 0.72) !important;
   background: #28292e;
   color: #f4ff00;
   box-shadow:
