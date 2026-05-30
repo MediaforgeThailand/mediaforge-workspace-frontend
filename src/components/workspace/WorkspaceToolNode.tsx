@@ -1562,6 +1562,391 @@ function formatVfxParamValue(param: ParamDef, value: unknown): string {
   return String(raw ?? "");
 }
 
+type VfxParamHelp = {
+  labelTh: string;
+  descriptionTh: string;
+  descriptionEn: string;
+};
+
+const VFX_PARAM_HELP_BY_KEY: Record<string, VfxParamHelp> = {
+  model_name: {
+    labelTh: "เอนจิน",
+    descriptionTh: "เลือก backend หรือ model executor ที่จะใช้รันขั้นตอนนี้",
+    descriptionEn: "Selects the engine or executor used for this stage.",
+  },
+  variable_scope: {
+    labelTh: "ชุดค่าตั้งต้น",
+    descriptionTh: "เลือกกลุ่มตัวแปรหลัก เช่น ขนาดวิดีโอ pass ควบคุม mask หรือชุดโมเดล Qwen",
+    descriptionEn: "Chooses which group of shared VFX variables this node is organizing.",
+  },
+  auto_wire: {
+    labelTh: "ต่อสายอัตโนมัติ",
+    descriptionTh: "ให้ระบบช่วยต่อค่าหลักไปยัง stage ถัดไป เพื่อลดการลากสายซ้ำ",
+    descriptionEn: "Lets the workspace wire shared values into downstream VFX stages.",
+  },
+  resolution: {
+    labelTh: "ความละเอียด",
+    descriptionTh: "กำหนด preset ความละเอียดของงาน เพื่อคุมคุณภาพและเวลาประมวลผล",
+    descriptionEn: "Sets the working resolution preset for quality and runtime control.",
+  },
+  aspect_ratio: {
+    labelTh: "อัตราส่วนภาพ",
+    descriptionTh: "กำหนดสัดส่วนภาพหลักของ plate หรือ output ให้ตรงกับ footage",
+    descriptionEn: "Sets the canvas aspect ratio used by plates and generated outputs.",
+  },
+  custom_width: {
+    labelTh: "ความกว้างเอง",
+    descriptionTh: "ใช้เมื่อเลือก Custom เพื่อระบุความกว้างเองเป็น pixel",
+    descriptionEn: "Custom pixel width used when the size preset is set to Custom.",
+  },
+  custom_height: {
+    labelTh: "ความสูงเอง",
+    descriptionTh: "ใช้เมื่อเลือก Custom เพื่อระบุความสูงเองเป็น pixel",
+    descriptionEn: "Custom pixel height used when the size preset is set to Custom.",
+  },
+  fps: {
+    labelTh: "เฟรมต่อวินาที",
+    descriptionTh: "กำหนด frame rate ของ pass/output ให้ตรงกับวิดีโอต้นฉบับ",
+    descriptionEn: "Sets the frame rate for prepared passes and outputs.",
+  },
+  frame_load_cap: {
+    labelTh: "จำนวนเฟรมสูงสุด",
+    descriptionTh: "จำกัดจำนวนเฟรมที่โหลดหรือประมวลผล ใช้ทดสอบสั้น ๆ ก่อนรันเต็ม",
+    descriptionEn: "Limits how many frames are loaded or processed for test runs.",
+  },
+  skip_first_frames: {
+    labelTh: "ข้ามเฟรมแรก",
+    descriptionTh: "ข้ามเฟรมช่วงต้นก่อนเริ่ม process เพื่อเลือกช่วงที่ต้องการจริง",
+    descriptionEn: "Skips the first frames before processing the selected clip range.",
+  },
+  qwen_unet: {
+    labelTh: "ไฟล์ Qwen UNet",
+    descriptionTh: "ชื่อไฟล์โมเดลหลักของ Qwen image edit ที่ worker จะโหลด",
+    descriptionEn: "Main Qwen image edit model file loaded by the worker.",
+  },
+  qwen_lora: {
+    labelTh: "ไฟล์ Qwen LoRA",
+    descriptionTh: "LoRA เร่งหรือปรับพฤติกรรม Qwen สำหรับ workflow นี้",
+    descriptionEn: "LoRA used to tune or speed up this Qwen workflow.",
+  },
+  qwen_clip: {
+    labelTh: "ไฟล์ Qwen CLIP",
+    descriptionTh: "text/image encoder ที่ช่วยให้ Qwen เข้าใจ prompt และ reference",
+    descriptionEn: "Encoder file used for prompt and reference-image conditioning.",
+  },
+  qwen_vae: {
+    labelTh: "ไฟล์ Qwen VAE",
+    descriptionTh: "VAE สำหรับ encode/decode latent กลับเป็นภาพจริง",
+    descriptionEn: "VAE used to encode and decode images through the latent space.",
+  },
+  frame_index: {
+    labelTh: "เฟรมที่เลือก",
+    descriptionTh: "เลือกเฟรมจากวิดีโอต้นฉบับเพื่อใช้เป็น start image หรือ reference",
+    descriptionEn: "Selects the source-video frame used as the start image/reference.",
+  },
+  force_rate: {
+    labelTh: "บังคับ FPS",
+    descriptionTh: "กำหนด FPS ใหม่ตอนอ่านวิดีโอ ถ้า footage เดิมอ่านค่าไม่ตรง",
+    descriptionEn: "Overrides detected FPS when the source clip needs a fixed rate.",
+  },
+  select_every_nth: {
+    labelTh: "เลือกทุก N เฟรม",
+    descriptionTh: "ลดจำนวนเฟรมโดยเลือกเป็นช่วง เหมาะสำหรับ preview หรือ preprocess เร็วขึ้น",
+    descriptionEn: "Samples every Nth frame to reduce workload for previews/preprocess.",
+  },
+  format: {
+    labelTh: "รูปแบบ output",
+    descriptionTh: "รูปแบบข้อมูลที่ส่งต่อให้ pipeline ถัดไป เช่น AnimateDiff-style batch",
+    descriptionEn: "Output format passed to the next stage in the VFX pipeline.",
+  },
+  output_prefix: {
+    labelTh: "ชื่อโฟลเดอร์ output",
+    descriptionTh: "prefix สำหรับตั้งชื่อไฟล์ผลลัพธ์ของ stage นี้",
+    descriptionEn: "Filename prefix for outputs produced by this stage.",
+  },
+  background_mode: {
+    labelTh: "โหมดพื้นหลัง",
+    descriptionTh: "กำหนดว่าจะสร้าง control plate เป็นสีเทา clean plate หรือ plate จากต้นฉบับ",
+    descriptionEn: "Chooses the background/control plate strategy for this pass.",
+  },
+  width: {
+    labelTh: "ความกว้าง",
+    descriptionTh: "ความกว้าง output เป็น pixel ถ้า stage นี้สร้างภาพหรือวิดีโอใหม่",
+    descriptionEn: "Output width in pixels for generated images or plates.",
+  },
+  height: {
+    labelTh: "ความสูง",
+    descriptionTh: "ความสูง output เป็น pixel ถ้า stage นี้สร้างภาพหรือวิดีโอใหม่",
+    descriptionEn: "Output height in pixels for generated images or plates.",
+  },
+  crf: {
+    labelTh: "คุณภาพบีบอัด",
+    descriptionTh: "ค่าคุณภาพวิดีโอ ยิ่งต่ำไฟล์ยิ่งคมแต่ขนาดใหญ่ขึ้น",
+    descriptionEn: "Video compression quality. Lower values look cleaner but create larger files.",
+  },
+  codec: {
+    labelTh: "ตัวเข้ารหัสวิดีโอ",
+    descriptionTh: "codec สำหรับบันทึกวิดีโอ output ให้เล่นได้กว้าง",
+    descriptionEn: "Video codec used when saving the prepared output.",
+  },
+  pix_fmt: {
+    labelTh: "รูปแบบพิกเซล",
+    descriptionTh: "pixel format ของวิดีโอ output เพื่อความเข้ากันได้กับ player/editor",
+    descriptionEn: "Pixel format used for compatibility with players and editors.",
+  },
+  depth_model: {
+    labelTh: "โมเดล Depth",
+    descriptionTh: "เลือกโมเดลสร้าง depth map เพื่อบอกระยะหน้า-หลังของฉาก",
+    descriptionEn: "Model used to generate a depth map for scene-space guidance.",
+  },
+  num_inference_steps: {
+    labelTh: "จำนวน step",
+    descriptionTh: "จำนวนรอบ inference ยิ่งสูงอาจละเอียดขึ้นแต่ใช้เวลามากขึ้น",
+    descriptionEn: "Inference steps. Higher values can improve detail but take longer.",
+  },
+  guidance_scale: {
+    labelTh: "แรงยึด guidance",
+    descriptionTh: "ควบคุมว่าผลลัพธ์จะยึดตาม guidance แรงแค่ไหน",
+    descriptionEn: "Controls how strongly the model follows the conditioning guidance.",
+  },
+  window_size: {
+    labelTh: "ขนาดหน้าต่าง",
+    descriptionTh: "จำนวนเฟรม/พื้นที่ที่โมเดลดูพร้อมกันเพื่อให้ depth ต่อเนื่อง",
+    descriptionEn: "Temporal/window size used to keep depth results consistent.",
+  },
+  overlap: {
+    labelTh: "เฟรมซ้อนทับ",
+    descriptionTh: "จำนวนเฟรมที่ซ้อนกันระหว่าง window เพื่อช่วยลดรอยต่อ",
+    descriptionEn: "Overlap between windows to reduce seams between processed chunks.",
+  },
+  low_threshold: {
+    labelTh: "ขอบขั้นต่ำ",
+    descriptionTh: "threshold ต่ำของ Canny สำหรับจับเส้นขอบที่ละเอียดกว่า",
+    descriptionEn: "Lower Canny threshold for detecting softer edge detail.",
+  },
+  high_threshold: {
+    labelTh: "ขอบขั้นสูง",
+    descriptionTh: "threshold สูงของ Canny สำหรับคุมเส้นขอบหลักที่ชัดเจน",
+    descriptionEn: "Upper Canny threshold for stronger structural edges.",
+  },
+  max_resolution: {
+    labelTh: "ความละเอียดสูงสุด",
+    descriptionTh: "จำกัดขนาดภาพตอนสร้าง control pass เพื่อไม่ให้หนักเกินจำเป็น",
+    descriptionEn: "Caps control-pass resolution to balance detail and processing cost.",
+  },
+  pose_model: {
+    labelTh: "โมเดล Pose",
+    descriptionTh: "เลือกโมเดลตรวจจับ skeleton/body guide สำหรับตัวละคร",
+    descriptionEn: "Model used to extract pose guides for character continuity.",
+  },
+  detect_body: {
+    labelTh: "ตรวจจับร่างกาย",
+    descriptionTh: "เปิด/ปิดการจับโครงร่างลำตัว แขน ขา",
+    descriptionEn: "Toggles body pose detection.",
+  },
+  detect_hand: {
+    labelTh: "ตรวจจับมือ",
+    descriptionTh: "เปิด/ปิดการจับตำแหน่งมือและนิ้ว",
+    descriptionEn: "Toggles hand landmark detection.",
+  },
+  detect_face: {
+    labelTh: "ตรวจจับใบหน้า",
+    descriptionTh: "เปิด/ปิดการจับตำแหน่งใบหน้า",
+    descriptionEn: "Toggles face landmark detection.",
+  },
+  pose_resolution: {
+    labelTh: "ความละเอียด Pose",
+    descriptionTh: "ขนาดภาพที่ใช้ประมวลผล pose ยิ่งสูงยิ่งละเอียดแต่ช้าขึ้น",
+    descriptionEn: "Resolution used for pose detection. Higher is more detailed but slower.",
+  },
+  track_model: {
+    labelTh: "โมเดล Track",
+    descriptionTh: "เลือกโมเดล tracking จุดเคลื่อนไหวเพื่อรักษา motion/camera continuity",
+    descriptionEn: "Model used to track motion points across frames.",
+  },
+  points: {
+    labelTh: "จำนวนจุด Track",
+    descriptionTh: "จำนวน anchor point ที่ใช้ติดตาม ยิ่งมากยิ่งละเอียดแต่หนักขึ้น",
+    descriptionEn: "Number of tracking points. More points add detail but cost more.",
+  },
+  track_length: {
+    labelTh: "ช่วง Track",
+    descriptionTh: "ความยาวเฟรมที่พยายามติดตามจุดเดียวกัน",
+    descriptionEn: "How long a point should be tracked through the clip.",
+  },
+  track_step: {
+    labelTh: "ระยะห่าง Track",
+    descriptionTh: "ความถี่ในการวางจุด track ค่าน้อยจะละเอียดและหนักขึ้น",
+    descriptionEn: "Point sampling interval. Lower values track more densely.",
+  },
+  confidence_threshold: {
+    labelTh: "ความมั่นใจ",
+    descriptionTh: "เกณฑ์ความมั่นใจของ detection/tracking ค่าสูงจะเข้มงวดขึ้น",
+    descriptionEn: "Confidence cutoff used by detection or tracking stages.",
+  },
+  mask_expand: {
+    labelTh: "ขยาย/หด Mask",
+    descriptionTh: "ปรับขอบ mask ให้กินพื้นที่มากขึ้นหรือน้อยลงเพื่อแก้ edge spill",
+    descriptionEn: "Expands or contracts mask boundaries to improve edge cleanup.",
+  },
+  subject_mask_expand: {
+    labelTh: "ขยาย/หดตัวแบบ",
+    descriptionTh: "ปรับขอบ mask ของตัวแบบหลัก เพื่อคุมพื้นที่ที่ต้องปกป้อง",
+    descriptionEn: "Adjusts the subject mask used for protected foreground areas.",
+  },
+  draw_tracks: {
+    labelTh: "แสดงเส้น Track",
+    descriptionTh: "เปิด preview เส้น tracking เพื่อ debug ก่อนนำไปใช้จริง",
+    descriptionEn: "Draws tracking lines for debugging the motion pass.",
+  },
+  segment_model: {
+    labelTh: "โมเดลตัด Mask",
+    descriptionTh: "เลือกโมเดล segmentation สำหรับแยกคน/วัตถุจากฉาก",
+    descriptionEn: "Segmentation model used to separate the subject or object.",
+  },
+  segment_prompt: {
+    labelTh: "คำสั่ง Mask",
+    descriptionTh: "บอกระบบว่าต้องการแยกอะไร เช่น person, actor หรือ object",
+    descriptionEn: "Text target for segmentation, such as person, actor, or object.",
+  },
+  mask_blur: {
+    labelTh: "เบลอขอบ Mask",
+    descriptionTh: "ทำให้ขอบ mask นุ่มขึ้น เพื่อลดขอบแข็งตอน composite",
+    descriptionEn: "Softens mask edges for smoother compositing.",
+  },
+  plate_mask_expand: {
+    labelTh: "ขยาย Mask สำหรับ Plate",
+    descriptionTh: "ปรับพื้นที่ mask ที่ใช้สร้าง clean plate หรือ background plate",
+    descriptionEn: "Adjusts the mask used when preparing a clean/background plate.",
+  },
+  max_segments: {
+    labelTh: "จำนวนชิ้นสูงสุด",
+    descriptionTh: "จำกัดจำนวน segment ที่โมเดลเลือก 0 คือให้ระบบตัดสินใจเอง",
+    descriptionEn: "Limits selected segments. 0 lets the system decide automatically.",
+  },
+  invert_mask: {
+    labelTh: "กลับด้าน Mask",
+    descriptionTh: "สลับพื้นที่ขาว/ดำ เมื่อ mask ที่ได้ตรงข้ามกับสิ่งที่ต้องการ",
+    descriptionEn: "Inverts the mask when white/black areas are reversed.",
+  },
+  mask_output_prefix: {
+    labelTh: "ชื่อ output Mask",
+    descriptionTh: "prefix สำหรับไฟล์ mask ที่ stage นี้สร้าง",
+    descriptionEn: "Filename prefix for generated mask outputs.",
+  },
+  plate_output_prefix: {
+    labelTh: "ชื่อ output Plate",
+    descriptionTh: "prefix สำหรับไฟล์ plate ที่สร้างจาก mask",
+    descriptionEn: "Filename prefix for mask-plate outputs.",
+  },
+  model_pack: {
+    labelTh: "ชุดโมเดล",
+    descriptionTh: "เลือกชุดไฟล์โมเดล/LoRA ที่ประกอบกันเป็น workflow นี้",
+    descriptionEn: "Selects the model bundle used by the Qwen workflow.",
+  },
+  workflow_preset: {
+    labelTh: "รูปแบบงาน VFX",
+    descriptionTh: "เลือกหน้าที่ของ Qwen node เช่น start image, masked edit หรือสร้าง plate",
+    descriptionEn: "Chooses whether Qwen generates a start image, masked edit, or plate.",
+  },
+  prompt: {
+    labelTh: "พรอมป์",
+    descriptionTh: "คำสั่งหลักที่บอกว่าต้องการเปลี่ยนภาพหรือสร้าง plate แบบไหน",
+    descriptionEn: "Main instruction describing the desired VFX change or plate.",
+  },
+  negative_prompt: {
+    labelTh: "สิ่งที่ไม่ต้องการ",
+    descriptionTh: "บอก artifact ที่ควรหลีกเลี่ยง เช่น ขอบเพี้ยน ตัวหนังสือ หรือภาพบิด",
+    descriptionEn: "Artifacts to avoid, such as bad edges, text, or warping.",
+  },
+  steps: {
+    labelTh: "จำนวน Sampling",
+    descriptionTh: "จำนวน sampling step ของการเจนภาพ ค่าสูงขึ้นมักช้าขึ้น",
+    descriptionEn: "Sampling steps for image generation. Higher usually takes longer.",
+  },
+  cfg: {
+    labelTh: "แรงตาม Prompt",
+    descriptionTh: "คุมว่าภาพจะยึด prompt มากแค่ไหน สูงไปอาจแข็งหรือเพี้ยน",
+    descriptionEn: "Prompt guidance strength. Too high can look rigid or distorted.",
+  },
+  denoise: {
+    labelTh: "แรงเปลี่ยนภาพ",
+    descriptionTh: "คุมระดับการเปลี่ยนจากภาพอ้างอิง ต่ำคือคงเดิมมาก สูงคือเปลี่ยนมาก",
+    descriptionEn: "Controls how strongly the image is changed from the reference.",
+  },
+  protect_original: {
+    labelTh: "ปกป้องนอก Mask",
+    descriptionTh: "เปิดไว้เพื่อ composite เฉพาะพื้นที่ mask และคงภาพเดิมด้านนอก",
+    descriptionEn: "Keeps the unmasked area from the original plate.",
+  },
+  mask_feather: {
+    labelTh: "เกลี่ยขอบ Mask",
+    descriptionTh: "เพิ่ม feather เพื่อให้ขอบส่วนที่แก้เนียนกับภาพเดิม",
+    descriptionEn: "Feathers edited edges so they blend into the original image.",
+  },
+  sampler_name: {
+    labelTh: "Sampler",
+    descriptionTh: "อัลกอริทึม sampling ที่ใช้สร้างภาพ",
+    descriptionEn: "Sampling algorithm used by the image generation workflow.",
+  },
+  scheduler: {
+    labelTh: "Scheduler",
+    descriptionTh: "ตารางการลด noise ระหว่าง sampling",
+    descriptionEn: "Noise schedule used during sampling.",
+  },
+  lightning_lora: {
+    labelTh: "LoRA เร่งความเร็ว",
+    descriptionTh: "เปิดเพื่อรันเร็วขึ้น เหมาะกับ draft ปิดเพื่อเน้นคุณภาพ",
+    descriptionEn: "Turns on the fast Lightning LoRA for drafts; off favors quality.",
+  },
+  seed: {
+    labelTh: "เลข Seed",
+    descriptionTh: "ใส่ seed เพื่อให้ผลลัพธ์ repeat ได้ เว้นว่างเพื่อสุ่มใหม่",
+    descriptionEn: "Seed for repeatable outputs. Leave blank for random.",
+  },
+};
+
+function getVfxParamHelp(param: ParamDef): VfxParamHelp {
+  return VFX_PARAM_HELP_BY_KEY[param.key] ?? {
+    labelTh: param.label,
+    descriptionTh: "ค่าตั้งต้นของ stage นี้ ใช้ปรับพฤติกรรมของ node ก่อนรัน",
+    descriptionEn: "Controls this node stage before it runs.",
+  };
+}
+
+function VfxParamTooltipContent({
+  param,
+  help,
+  value,
+}: {
+  param: ParamDef;
+  help: VfxParamHelp;
+  value?: string;
+}) {
+  return (
+    <TooltipContent
+      side="top"
+      align="start"
+      className="max-w-[300px] border-white/10 bg-[#171717] p-3 text-[11px] leading-4 text-zinc-100 shadow-2xl shadow-black/45"
+    >
+      <div className="mb-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 font-semibold text-white">
+        <span>{param.label}</span>
+        <span className="text-zinc-400">/</span>
+        <span className="text-sky-200">{help.labelTh}</span>
+      </div>
+      <div className="space-y-1 text-zinc-300">
+        <p>{help.descriptionTh}</p>
+        <p className="text-zinc-500">{help.descriptionEn}</p>
+      </div>
+      {value ? (
+        <div className="mt-2 border-t border-white/10 pt-2 text-[10px] font-medium text-zinc-400">
+          Current: <span className="text-zinc-200">{value}</span>
+        </div>
+      ) : null}
+    </TooltipContent>
+  );
+}
+
 const DURATION_COST_MODELS = new Set(["kling-v3-pro", "kling-v3-omni"]);
 const WORKSPACE_NODE_UI_SCALE = 1.15;
 const DEFAULT_COMPACT_WIDTH = 437;
@@ -4040,7 +4425,18 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           />
         );
       }
-      if (effectiveType === "text" && param.key === "seed") {
+      if (effectiveType === "text" && (param.key === "seed" || schemaKey.startsWith("vfx"))) {
+        return (
+          <MiniTextInput
+            key={param.key}
+            label={param.label}
+            value={String(value ?? "")}
+            placeholder={param.placeholder}
+            onChange={(v) => updateParam(param.key, v)}
+          />
+        );
+      }
+      if (effectiveType === "textarea" && schemaKey.startsWith("vfx")) {
         return (
           <MiniTextInput
             key={param.key}
@@ -4196,6 +4592,30 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     const ids = getVfxPortIds(schemaKey, params, "output");
     return visibleOutputs.filter((output) => ids.has(output.id));
   }, [params, schemaKey, vfxMeta, visibleOutputs]);
+  const renderVfxParamControl = useCallback(
+    (param: ParamDef) => {
+      const value = formatVfxParamValue(param, params[param.key]);
+      const help = getVfxParamHelp(param);
+      return (
+        <Tooltip key={param.key} delayDuration={1000}>
+          <TooltipTrigger asChild>
+            <div
+              className="ws-vfx-control"
+              aria-label={`${param.label} / ${help.labelTh}: ${help.descriptionTh}`}
+            >
+              <div className="ws-vfx-control-head">
+                <span className="ws-vfx-control-label">{param.label}</span>
+                <span className="ws-vfx-control-value">{value}</span>
+              </div>
+              <div className="ws-vfx-control-widget">{renderToolbarParam(param)}</div>
+            </div>
+          </TooltipTrigger>
+          <VfxParamTooltipContent param={param} help={help} value={value} />
+        </Tooltip>
+      );
+    },
+    [params, renderToolbarParam],
+  );
 
   if (!schema) {
     return (
@@ -4281,7 +4701,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                   placeholder={vfxMeta.title}
                 />
               </div>
-              <Tooltip delayDuration={150}>
+              <Tooltip delayDuration={1000}>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
@@ -4352,32 +4772,35 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
             {vfxPrimaryParams.length > 0 && (
               <div className="ws-vfx-param-grid nodrag">
-                {vfxPrimaryParams.map((param) => (
-                  <div className="ws-vfx-control" key={param.key}>
-                    <div className="ws-vfx-control-head">
-                      <span className="ws-vfx-control-label">{param.label}</span>
-                      <span className="ws-vfx-control-value">
-                        {formatVfxParamValue(param, params[param.key])}
-                      </span>
-                    </div>
-                    <div className="ws-vfx-control-widget">{renderToolbarParam(param)}</div>
-                  </div>
-                ))}
+                {vfxPrimaryParams.map((param) => renderVfxParamControl(param))}
               </div>
             )}
 
-            {vfxPromptParam && (
-              <textarea
-                value={String(params.prompt ?? "")}
-                onChange={(e) => updateParam("prompt", e.target.value)}
-                onMouseDown={(e) => e.stopPropagation()}
-                onPointerDown={(e) => e.stopPropagation()}
-                className="ws-vfx-prompt-input nodrag nowheel"
-                placeholder={String(vfxPromptParam.placeholder ?? "Describe the VFX change")}
-                rows={3}
-                spellCheck={false}
-              />
-            )}
+            {vfxPromptParam && (() => {
+              const help = getVfxParamHelp(vfxPromptParam);
+              return (
+                <Tooltip delayDuration={1000}>
+                  <TooltipTrigger asChild>
+                    <textarea
+                      value={String(params.prompt ?? "")}
+                      onChange={(e) => updateParam("prompt", e.target.value)}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      className="ws-vfx-prompt-input nodrag nowheel"
+                      placeholder={String(vfxPromptParam.placeholder ?? "Describe the VFX change")}
+                      rows={3}
+                      spellCheck={false}
+                      aria-label={`${vfxPromptParam.label} / ${help.labelTh}: ${help.descriptionTh}`}
+                    />
+                  </TooltipTrigger>
+                  <VfxParamTooltipContent
+                    param={vfxPromptParam}
+                    help={help}
+                    value={String(params.prompt ?? "").trim() ? undefined : "Blank"}
+                  />
+                </Tooltip>
+              );
+            })()}
 
             {(vfxAdvancedParams.length > 0 || runStatus === "error") && (
               <div className="ws-vfx-footer">
@@ -4404,17 +4827,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
 
             {showAdvancedParams && vfxAdvancedParams.length > 0 && (
               <div className="ws-vfx-advanced-panel nodrag">
-                {vfxAdvancedParams.map((param) => (
-                  <div className="ws-vfx-control" key={param.key}>
-                    <div className="ws-vfx-control-head">
-                      <span className="ws-vfx-control-label">{param.label}</span>
-                      <span className="ws-vfx-control-value">
-                        {formatVfxParamValue(param, params[param.key])}
-                      </span>
-                    </div>
-                    <div className="ws-vfx-control-widget">{renderToolbarParam(param)}</div>
-                  </div>
-                ))}
+                {vfxAdvancedParams.map((param) => renderVfxParamControl(param))}
               </div>
             )}
 
