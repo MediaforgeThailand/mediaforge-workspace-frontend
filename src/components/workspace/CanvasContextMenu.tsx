@@ -5,7 +5,6 @@ import {
   useState,
   type DragEvent,
   type KeyboardEvent,
-  type MouseEvent,
 } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -455,20 +454,20 @@ interface Props {
   onAction: (item: ToolItem) => void;
 }
 
-const PANEL_WIDTH = 270;
+type ResolvedToolItem = ToolItem & {
+  label: string;
+  description: string;
+};
+
+const PANEL_WIDTH = 590;
 const PANEL_MAX_HEIGHT = 430;
+const CATEGORY_WIDTH = 184;
 
 const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
   const { t } = useLanguage();
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
-  const [hoverTip, setHoverTip] = useState<{
-    label: string;
-    description: string;
-    stage?: string;
-    left: number;
-    top: number;
-  } | null>(null);
+  const [activeSection, setActiveSection] = useState<ToolSection>("basics");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -476,7 +475,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
     return () => window.clearTimeout(timer);
   }, []);
 
-  const visibleItems = useMemo(() => {
+  const visibleItems = useMemo<ResolvedToolItem[]>(() => {
     const q = query.trim().toLowerCase();
     return CATALOG
       .map((item) => {
@@ -503,28 +502,45 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
   }, [query, t]);
 
   const groupedItems = useMemo(() => {
-    let nextIndex = 0;
     return SECTION_ORDER.map((section) => {
       const items = visibleItems
         .filter((item) => item.section === section)
-        .map((item) => ({ item, index: nextIndex++ }));
-      return { section, items };
+      return {
+        section,
+        label: t(SECTION_LABEL_KEYS[section]),
+        items,
+      };
     }).filter((group) => group.items.length > 0);
-  }, [visibleItems]);
+  }, [t, visibleItems]);
+
+  const activeGroup = useMemo(() => {
+    return groupedItems.find((group) => group.section === activeSection)
+      ?? groupedItems[0]
+      ?? null;
+  }, [activeSection, groupedItems]);
+
+  const activeItems = activeGroup?.items ?? [];
 
   useEffect(() => {
     setHighlight(0);
   }, [query]);
 
   useEffect(() => {
-    if (highlight > visibleItems.length - 1) {
-      setHighlight(Math.max(0, visibleItems.length - 1));
+    if (highlight > activeItems.length - 1) {
+      setHighlight(Math.max(0, activeItems.length - 1));
     }
-  }, [highlight, visibleItems.length]);
+  }, [activeItems.length, highlight]);
 
   useEffect(() => {
-    setHoverTip(null);
-  }, [query]);
+    const hasActiveSection = groupedItems.some((group) => group.section === activeSection);
+    if (!hasActiveSection && groupedItems[0]) {
+      setActiveSection(groupedItems[0].section);
+    }
+  }, [activeSection, groupedItems]);
+
+  useEffect(() => {
+    setHighlight(0);
+  }, [activeSection]);
 
   const viewportWidth = typeof window === "undefined" ? PANEL_WIDTH : window.innerWidth;
   const viewportHeight = typeof window === "undefined" ? PANEL_MAX_HEIGHT : window.innerHeight;
@@ -540,19 +556,19 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      if (visibleItems.length === 0) return;
-      setHighlight((current) => Math.min(visibleItems.length - 1, current + 1));
+      if (activeItems.length === 0) return;
+      setHighlight((current) => Math.min(activeItems.length - 1, current + 1));
       return;
     }
     if (event.key === "ArrowUp") {
       event.preventDefault();
-      if (visibleItems.length === 0) return;
+      if (activeItems.length === 0) return;
       setHighlight((current) => Math.max(0, current - 1));
       return;
     }
     if (event.key === "Enter") {
       event.preventDefault();
-      const item = visibleItems[highlight];
+      const item = activeItems[highlight];
       if (item) fire(item);
       return;
     }
@@ -579,30 +595,60 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
     setTimeout(onClose, 0);
   };
 
-  const showHoverTip = (
-    event: MouseEvent<HTMLButtonElement>,
-    item: ToolItem,
-  ) => {
-    if (!item.description) {
-      setHoverTip(null);
-      return;
-    }
-    const rect = event.currentTarget.getBoundingClientRect();
-    const width = 268;
-    const gap = 10;
-    const canShowRight = rect.right + gap + width <= window.innerWidth - 8;
-    const left = canShowRight ? rect.right + gap : Math.max(8, rect.left - width - gap);
-    const top = Math.min(
-      Math.max(8, rect.top - 8),
-      Math.max(8, window.innerHeight - 118),
+  const renderToolRow = (item: ResolvedToolItem, index: number) => {
+    const Icon = item.icon;
+    const isHighlight = index === highlight;
+    return (
+      <li key={`${item.nodeType}-${item.defaultLabel}`}>
+        <button
+          type="button"
+          draggable={!item.action && !item.comingSoon}
+          disabled={item.comingSoon}
+          title={item.description}
+          onDragStart={(event) => onItemDragStart(event, item)}
+          onMouseEnter={() => setHighlight(index)}
+          onClick={() => fire(item)}
+          className={cn(
+            "group flex w-full items-center gap-[9px] rounded-[7px] px-[9px] py-[8px] text-left transition-colors",
+            isHighlight
+              ? "bg-white/[0.11] text-zinc-50"
+              : "text-[#f2f2f2] hover:bg-white/[0.075] hover:text-zinc-50",
+            item.comingSoon && "cursor-not-allowed opacity-45",
+          )}
+        >
+          <span
+            className={cn(
+              "grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[6px] bg-white/[0.06]",
+              item.tint === "sky" && "text-sky-300",
+              item.tint === "emerald" && "text-emerald-300",
+              item.tint === "amber" && "text-amber-300",
+              item.tint === "violet" && "text-violet-300",
+              item.tint === "rose" && "text-rose-300",
+              item.tint === "zinc" && "text-zinc-300",
+            )}
+          >
+            <Icon className="h-[14px] w-[14px]" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="flex min-w-0 items-center gap-[6px]">
+              <span className="truncate text-[13px] font-semibold leading-[1.15] text-inherit">
+                {item.label}
+              </span>
+              {item.isNew ? (
+                <span className="rounded-[4px] bg-[#d7ff30]/15 px-[4px] py-[1px] text-[9px] font-bold leading-none text-[#dcff42]">
+                  NEW
+                </span>
+              ) : null}
+            </span>
+            {item.description ? (
+              <span className="mt-[3px] block truncate text-[11px] font-medium leading-[1.25] text-zinc-500 group-hover:text-zinc-400">
+                {item.description}
+              </span>
+            ) : null}
+          </span>
+        </button>
+      </li>
     );
-    setHoverTip({
-      label: item.label ?? item.defaultLabel,
-      description: item.description,
-      stage: item.stage ? VFX_STAGE_META[item.stage].label : undefined,
-      left,
-      top,
-    });
   };
 
   return createPortal(
@@ -646,114 +692,99 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
           />
         </label>
 
-        <div
-          className="ws-picker-scroll mt-[8px] max-h-[372px] overflow-y-auto px-[8px] pb-[8px]"
-          onScroll={() => setHoverTip(null)}
-        >
+        <div className="mt-[8px] flex min-h-0 flex-1 border-t border-white/[0.07]">
           {visibleItems.length === 0 ? (
-            <div className="px-1 py-8 text-center text-[14px] font-medium text-zinc-400">
+            <div className="w-full px-1 py-8 text-center text-[14px] font-medium text-zinc-400">
               {t("workspace.picker.no_match", { query })}
             </div>
           ) : (
-            groupedItems.map((group) => {
-              const renderItem = ({ item, index }: (typeof group.items)[number]) => {
-                const isHighlight = index === highlight;
-                return (
-                  <li key={`${item.nodeType}-${item.defaultLabel}`}>
+            <>
+              <div
+                className="shrink-0 border-r border-white/[0.07] px-[8px] py-[8px]"
+                style={{ width: CATEGORY_WIDTH }}
+              >
+                <div className="space-y-[4px]">
+                  {groupedItems.map((group) => {
+                    const isActive = group.section === activeGroup?.section;
+                    return (
                     <button
+                      key={group.section}
                       type="button"
-                      draggable={!item.action && !item.comingSoon}
-                      disabled={item.comingSoon}
-                      title={item.description}
-                      onDragStart={(event) => onItemDragStart(event, item)}
-                      onMouseEnter={(event) => {
-                        setHighlight(index);
-                        showHoverTip(event, item);
-                      }}
-                      onMouseLeave={() => setHoverTip(null)}
-                      onClick={() => fire(item)}
+                      onMouseEnter={() => setActiveSection(group.section)}
+                      onClick={() => setActiveSection(group.section)}
                       className={cn(
-                        "group flex h-[28px] w-full items-center rounded-[4px] px-[8px] text-left transition-colors",
-                        isHighlight
+                        "flex h-[34px] w-full items-center justify-between rounded-[6px] px-[8px] text-left transition-colors",
+                        isActive
                           ? "bg-white/[0.12] text-zinc-50"
-                          : "text-[#f2f2f2] hover:bg-white/[0.08] hover:text-zinc-50",
-                        item.comingSoon && "cursor-not-allowed opacity-45",
+                          : "text-zinc-400 hover:bg-white/[0.07] hover:text-zinc-100",
                       )}
                     >
-                      <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-none text-inherit">
-                        {item.label}
+                      <span className="truncate text-[11px] font-bold uppercase leading-none tracking-normal">
+                        {group.label}
+                      </span>
+                      <span className="ml-[8px] rounded-full bg-white/[0.07] px-[6px] py-[2px] text-[10px] font-bold leading-none text-zinc-400">
+                        {group.items.length}
                       </span>
                     </button>
-                  </li>
-                );
-              };
-
-              const stageGroups = group.section === "vfx"
-                ? VFX_STAGE_ORDER.map((stage) => ({
-                    stage,
-                    items: group.items.filter(({ item }) => item.stage === stage),
-                  })).filter((stageGroup) => stageGroup.items.length > 0)
-                : [];
-              const unstagedVfxItems = group.section === "vfx"
-                ? group.items.filter(({ item }) => !item.stage)
-                : [];
-
-              return (
-                <div key={group.section} className="pb-[8px]">
-                  <div className="px-[6px] pb-[5px] pt-[5px] text-[11px] font-medium uppercase tracking-normal text-[#7b7f86]">
-                    {t(SECTION_LABEL_KEYS[group.section])}
-                  </div>
-                  {group.section === "vfx" ? (
-                    <div className="space-y-[7px]">
-                      {stageGroups.map(({ stage, items }) => (
-                        <div key={stage}>
-                          <div className="px-[7px] pb-[3px] pt-[2px]">
-                            <div className="text-[11px] font-semibold leading-none text-zinc-300">
-                              {VFX_STAGE_META[stage].label}
-                            </div>
-                            <div className="mt-[3px] text-[10px] leading-[1.25] text-zinc-500">
-                              {VFX_STAGE_META[stage].hint}
-                            </div>
-                          </div>
-                          <ul className="space-y-[1px]">{items.map(renderItem)}</ul>
-                        </div>
-                      ))}
-                      {unstagedVfxItems.length > 0 ? (
-                        <ul className="space-y-[1px]">{unstagedVfxItems.map(renderItem)}</ul>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <ul className="space-y-[1px]">{group.items.map(renderItem)}</ul>
-                  )}
+                    );
+                  })}
                 </div>
-              );
-            })
+              </div>
+
+              <div className="ws-picker-scroll min-w-0 flex-1 overflow-y-auto px-[10px] py-[8px]">
+                {activeGroup ? (
+                  <div>
+                    <div className="mb-[7px] flex h-[24px] items-center justify-between px-[2px]">
+                      <div className="min-w-0">
+                        <div className="truncate text-[12px] font-bold uppercase leading-none tracking-normal text-zinc-300">
+                          {activeGroup.label}
+                        </div>
+                      </div>
+                      <div className="text-[10px] font-semibold leading-none text-zinc-600">
+                        {activeGroup.items.length} nodes
+                      </div>
+                    </div>
+                    {activeGroup.section === "vfx" ? (
+                      <div className="space-y-[9px]">
+                        {VFX_STAGE_ORDER.map((stage) => {
+                          const stageItems = activeGroup.items.filter((item) => item.stage === stage);
+                          if (stageItems.length === 0) return null;
+                          return (
+                            <div key={stage}>
+                              <div className="px-[3px] pb-[5px]">
+                                <div className="text-[11px] font-bold leading-none text-zinc-300">
+                                  {VFX_STAGE_META[stage].label}
+                                </div>
+                                <div className="mt-[3px] truncate text-[10px] font-medium leading-none text-zinc-600">
+                                  {VFX_STAGE_META[stage].hint}
+                                </div>
+                              </div>
+                              <ul className="space-y-[2px]">
+                                {stageItems.map((item) => renderToolRow(item, activeItems.indexOf(item)))}
+                              </ul>
+                            </div>
+                          );
+                        })}
+                        {activeGroup.items.some((item) => !item.stage) ? (
+                          <ul className="space-y-[2px]">
+                            {activeGroup.items
+                              .filter((item) => !item.stage)
+                              .map((item) => renderToolRow(item, activeItems.indexOf(item)))}
+                          </ul>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <ul className="space-y-[2px]">
+                        {activeGroup.items.map((item, index) => renderToolRow(item, index))}
+                      </ul>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            </>
           )}
         </div>
       </div>
-      {hoverTip ? (
-        <div
-          role="tooltip"
-          className={cn(
-            "pointer-events-none fixed z-[1320] w-[268px] rounded-[7px]",
-            "border border-white/[0.12] bg-[#171818] px-[10px] py-[9px]",
-            "text-left shadow-[0_14px_36px_rgba(0,0,0,.45)]",
-          )}
-          style={{ left: hoverTip.left, top: hoverTip.top }}
-        >
-          {hoverTip.stage ? (
-            <div className="mb-[5px] text-[10px] font-semibold uppercase leading-none tracking-normal text-[#a7ff3f]">
-              {hoverTip.stage}
-            </div>
-          ) : null}
-          <div className="text-[12px] font-semibold leading-none text-zinc-100">
-            {hoverTip.label}
-          </div>
-          <div className="mt-[6px] text-[11px] leading-[1.35] text-zinc-400">
-            {hoverTip.description}
-          </div>
-        </div>
-      ) : null}
     </>,
     document.body,
   );
