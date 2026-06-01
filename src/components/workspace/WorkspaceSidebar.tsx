@@ -148,8 +148,13 @@ const SIDEBAR_NAV_ITEMS: NavItem[] = [
 // Keep Smart Frames wired, but hide its Home/sidebar entry until the hosted
 // renderer is ready for users.
 const SHOW_SMART_FRAMES_NAV = false;
+// Keep URL Asset runtime code available for existing canvases, but remove the
+// standalone entry point from the visible product surface.
+const SHOW_URL_ASSET_NAV = false;
 const VISIBLE_SIDEBAR_NAV_ITEMS = SIDEBAR_NAV_ITEMS.filter(
-  (item) => SHOW_SMART_FRAMES_NAV || item.id !== "smart_frames",
+  (item) =>
+    (SHOW_SMART_FRAMES_NAV || item.id !== "smart_frames") &&
+    (SHOW_URL_ASSET_NAV || item.id !== "url_asset"),
 );
 
 const NAV_SECTIONS: SidebarSection[] = [
@@ -195,7 +200,9 @@ const NAV_SECTIONS: SidebarSection[] = [
     variant: "list",
     rows: [
       [{ id: "library", labelKey: "workspace.sidebar.library", icon: FolderOpen }],
-      [{ id: "url_asset", labelKey: "workspace.sidebar.url_asset", icon: Link }],
+      ...(SHOW_URL_ASSET_NAV
+        ? [[{ id: "url_asset", labelKey: "workspace.sidebar.url_asset", icon: Link }]]
+        : []),
       [{ id: "stock", labelKey: "workspace.sidebar.stock", icon: Images }],
     ],
   },

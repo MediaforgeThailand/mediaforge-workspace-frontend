@@ -519,7 +519,6 @@ const VALID_SECTIONS: Section[] = [
   "auto_subtitle",
   "smart_frames",
   "image_to_3d",
-  "url_asset",
 ];
 
 const STANDALONE_SECTIONS = new Set<SectionKey>([
@@ -530,7 +529,6 @@ const STANDALONE_SECTIONS = new Set<SectionKey>([
   "voice_translate",
   "auto_subtitle",
   "image_to_3d",
-  "url_asset",
 ]);
 
 function isStandaloneSection(section: SectionKey): section is StandaloneToolKey {

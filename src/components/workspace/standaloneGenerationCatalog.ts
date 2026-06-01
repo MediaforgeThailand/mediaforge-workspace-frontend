@@ -474,7 +474,6 @@ export const STANDALONE_TOOL_ORDER: StandaloneToolKey[] = [
   "video_gen",
   "image_gen",
   "image_upscale",
-  "url_asset",
   "voice_translate",
   "auto_subtitle",
   "image_to_3d",

@@ -462,6 +462,7 @@ type ResolvedToolItem = ToolItem & {
 const PANEL_WIDTH = 590;
 const PANEL_MAX_HEIGHT = 430;
 const CATEGORY_WIDTH = 184;
+const HIDDEN_NODE_TYPES = new Set(["urlAssetNode"]);
 
 const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
   const { t } = useLanguage();
@@ -478,6 +479,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
   const visibleItems = useMemo<ResolvedToolItem[]>(() => {
     const q = query.trim().toLowerCase();
     return CATALOG
+      .filter((item) => !HIDDEN_NODE_TYPES.has(item.nodeType))
       .map((item) => {
         const label = item.labelKey ? t(item.labelKey) : item.labelText ?? item.defaultLabel;
         const description = item.descriptionKey

@@ -469,7 +469,12 @@ const CATALOG: CatalogEntry[] = [
   },
 ];
 
-const HIDDEN_NODE_TYPES = new Set(["chatAiNode", "mergeAudioNode", "videoToPromptNode"]);
+const HIDDEN_NODE_TYPES = new Set([
+  "chatAiNode",
+  "mergeAudioNode",
+  "urlAssetNode",
+  "videoToPromptNode",
+]);
 const VISIBLE_CATALOG = CATALOG.filter((entry) => !HIDDEN_NODE_TYPES.has(entry.nodeType));
 
 /**
