@@ -320,6 +320,23 @@ async function resolveReadableMediaUrl(url: string): Promise<string> {
   return /^(blob:|data:)/i.test(url) ? url : await getSignedUrl(url);
 }
 
+// Inline a client-only blob: URL as a base64 data URL so the Auto Prompt edge
+// function never has to fetch a URL it cannot reach from the server.
+async function blobUrlToDataUrl(blobUrl: string): Promise<string> {
+  const response = await fetch(blobUrl);
+  const blob = await response.blob();
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () =>
+      typeof reader.result === "string"
+        ? resolve(reader.result)
+        : reject(new Error("Could not read image reference."));
+    reader.onerror = () =>
+      reject(new Error("Could not read image reference."));
+    reader.readAsDataURL(blob);
+  });
+}
+
 async function readVideoUrlDuration(url: string): Promise<number | null> {
   const readableUrl = await resolveReadableMediaUrl(url);
   return readVideoUrlMetadata(readableUrl).then((metadata) => metadata?.durationSec ?? null);
@@ -15099,13 +15116,41 @@ async function buildStandaloneAutoPromptAttachments(
     if (!signedUrl || !/^(https?:|data:|blob:)/i.test(signedUrl)) {
       throw new Error(`Image reference "${autoPromptReferenceLabel(reference, 0)}" could not be resolved to a readable URL.`);
     }
+    const refMime = inferReferenceMime(
+      firstText(reference.url, reference.name),
+      reference.mime,
+    );
+    const refLabel = autoPromptReferenceLabel(reference, 0);
+    // blob: URLs are client-only; the edge function cannot fetch them, so inline
+    // the bytes as a base64 data URL (the same channel video frames already use).
+    if (/^blob:/i.test(signedUrl)) {
+      let dataUrl: string;
+      try {
+        dataUrl = await blobUrlToDataUrl(signedUrl);
+      } catch {
+        throw new Error(
+          `Image reference "${refLabel}" could not be read for Auto Prompt. Re-upload the image or use a generated/uploaded MediaForge asset.`,
+        );
+      }
+      if (seen.has(dataUrl)) continue;
+      seen.add(dataUrl);
+      attachments.push({
+        dataUrl,
+        mime: refMime,
+        detail: "low",
+        label: refLabel,
+        sourceNodeId: reference.id,
+      });
+      continue;
+    }
     if (seen.has(signedUrl)) continue;
     seen.add(signedUrl);
+    const isInlineData = /^data:/i.test(signedUrl);
     attachments.push({
-      imageUrl: signedUrl,
-      mime: inferReferenceMime(firstText(reference.url, reference.name), reference.mime),
+      ...(isInlineData ? { dataUrl: signedUrl } : { imageUrl: signedUrl }),
+      mime: refMime,
       detail: "low",
-      label: autoPromptReferenceLabel(reference, 0),
+      label: refLabel,
       sourceNodeId: reference.id,
     });
   }
