@@ -7101,7 +7101,7 @@ function AutoSubtitleTextAnimationCard({
 
 function AutoSubtitleTextPreviewBadge() {
   return (
-    <span className="pointer-events-none absolute right-[6px] top-[5px] z-[2] rounded-full bg-black/55 px-[5px] py-[2px] text-[8px] font-bold uppercase leading-none tracking-[.06em] text-white/75">
+    <span className="pointer-events-none absolute right-[6px] top-[5px] z-[2] rounded-full bg-black/55 px-[5px] py-[2px] text-[10.5px] font-bold uppercase leading-none tracking-[.06em] text-white/75">
       Text preview
     </span>
   );
@@ -7193,7 +7193,7 @@ function AutoSubtitleCapcutAnimationPreview({
       )}
       <span
         className={cn(
-          "autoSubtitleCapcutText relative z-[1] max-w-[94%] text-center text-[9px] font-black leading-[10px] tracking-[.01em]",
+          "autoSubtitleCapcutText relative z-[1] max-w-[94%] text-center text-[11px] font-black leading-[13px] tracking-[.01em]",
           `autoSubtitleCapcut-${animation}`,
         )}
         style={{ ...textStyle, whiteSpace: "normal" }}
@@ -8590,14 +8590,14 @@ function StandaloneModelLogo({
   const markLength = logo.mark.length;
   const markClass =
     markLength > 5
-      ? "text-[7px]"
+      ? "text-[10.5px]"
       : markLength > 4
-        ? "text-[8px]"
+        ? "text-[11px]"
         : markLength > 3
-          ? "text-[9px]"
+          ? "text-[12px]"
           : markLength > 2
-            ? "text-[10px]"
-            : "text-[15px]";
+            ? "text-[13px]"
+            : "text-[16px]";
 
   return (
     <span
@@ -10836,7 +10836,7 @@ function ThreeDReferenceThumb({
         <span className="relative block h-full w-full">
           <ThreeDImageAssetThumb src={src} modelFallback={Boolean(modelUrl)} />
           {modelUrl && (
-            <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/70 px-1 text-[8px] font-black text-[#f4ff00]">
+            <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/70 px-1 text-[10.5px] font-black text-[#f4ff00]">
               3D
             </span>
           )}
@@ -10893,11 +10893,11 @@ function ThreeDStaticModelThumb({
     <span className="relative grid h-full w-full place-items-center overflow-hidden bg-[radial-gradient(circle_at_35%_25%,rgba(244,255,0,.22),transparent_32%),linear-gradient(145deg,#090a0b,#17191c)] text-[#f4ff00]">
       <Box className={cn(compact ? "h-6 w-6" : "h-5 w-5")} />
       {!compact && (
-        <span className="pointer-events-none absolute bottom-1 rounded bg-black/65 px-1 text-[7px] font-black uppercase leading-[10px] text-white/80">
+        <span className="pointer-events-none absolute bottom-1 rounded bg-black/65 px-1 text-[10.5px] font-black uppercase leading-[12px] text-white/80">
           {modelFileExtension(modelUrl, label)}
         </span>
       )}
-      <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/70 px-1 text-[8px] font-black text-[#f4ff00]">
+      <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/70 px-1 text-[10.5px] font-black text-[#f4ff00]">
         3D
       </span>
     </span>

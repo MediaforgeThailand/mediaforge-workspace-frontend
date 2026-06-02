@@ -2409,7 +2409,7 @@ function SelectedReferenceThumb({
         "absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-[5px]",
         compact ? "pb-[4px] pt-[18px]" : "pb-[5px] pt-[22px]",
       )}>
-        <span className={clsx("block truncate font-semibold leading-none text-white", compact ? "text-[9px]" : "text-[10px]")}>
+        <span className={clsx("block truncate font-semibold leading-none text-white", compact ? "text-[11px]" : "text-[12px]")}>
           {label}
         </span>
       </div>
@@ -2745,7 +2745,7 @@ function ReferencePicker({
                   <img src={asset.url} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
                 )}
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-[8px] pb-[7px] pt-[30px]">
-                  <span className="block truncate text-[10px] font-semibold text-white">{label}</span>
+                  <span className="block truncate text-[12px] font-semibold text-white">{label}</span>
                 </div>
                 {selected && (
                   <span className="absolute left-[6px] top-[6px] grid h-[20px] w-[20px] place-items-center rounded-full bg-[#f4ff00] text-black">
@@ -2907,14 +2907,14 @@ function ModelLogoBadge({
   const markLength = logo.mark.length;
   const markClass =
     markLength > 5
-      ? "text-[7px]"
+      ? "text-[10.5px]"
       : markLength > 4
-        ? "text-[8px]"
+        ? "text-[11px]"
         : markLength > 3
-          ? "text-[9px]"
+          ? "text-[12px]"
           : markLength > 2
-            ? "text-[10px]"
-            : "text-[14px]";
+            ? "text-[13px]"
+            : "text-[15px]";
 
   return (
     <span

@@ -2191,7 +2191,7 @@ function VfxParamTooltipContent({
     <TooltipContent
       side="top"
       align="start"
-      className="max-w-[300px] border-white/10 bg-[#171717] p-3 text-[11px] leading-4 text-zinc-100 shadow-2xl shadow-black/45"
+      className="max-w-[340px] border-white/10 bg-[#171717] p-3 text-[13px] leading-[18px] text-zinc-100 shadow-2xl shadow-black/45"
     >
       <div className="mb-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 font-semibold text-white">
         <span>{param.label}</span>
@@ -2203,7 +2203,7 @@ function VfxParamTooltipContent({
         <p className="text-zinc-500">{help.descriptionEn}</p>
       </div>
       {value ? (
-        <div className="mt-2 border-t border-white/10 pt-2 text-[10px] font-medium text-zinc-400">
+        <div className="mt-2 border-t border-white/10 pt-2 text-[12px] font-medium text-zinc-400">
           Current: <span className="text-zinc-200">{value}</span>
         </div>
       ) : null}
@@ -4810,13 +4810,17 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           ),
         );
       };
-      const onUp = () => {
+      const cleanupResize = () => {
         window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointerup", cleanupResize);
+        window.removeEventListener("pointercancel", cleanupResize);
+        window.removeEventListener("blur", cleanupResize);
         document.body.classList.remove("ws-resizing");
       };
       window.addEventListener("pointermove", onMove);
-      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointerup", cleanupResize);
+      window.addEventListener("pointercancel", cleanupResize);
+      window.addEventListener("blur", cleanupResize);
       document.body.classList.add("ws-resizing");
     },
     [id, d.compactWidth, isVfxNode, setNodes],
@@ -5342,7 +5346,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                   <span className="text-xs">{t("workspace.lightbox.alt_3d_model")}</span>
                 </div>
               )}
-              <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wide text-amber-300">
+              <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/65 px-1.5 py-0.5 text-[11px] font-mono uppercase tracking-wide text-amber-300">
                 {t("workspace.toolNode.open3dPreviewHint")}
               </span>
             </div>
@@ -5391,7 +5395,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
             />
           )}
           {currentGen?.type === "text" && (
-            <div className="max-h-[220px] overflow-y-auto p-3 text-[11px] leading-snug text-white/80">
+              <div className="max-h-[220px] overflow-y-auto p-3 text-[13px] leading-snug text-white/80">
               {currentGen.text}
             </div>
           )}
@@ -5447,7 +5451,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                 setHistoryOpen(true);
               }}
               onMouseDown={(e) => e.stopPropagation()}
-              className="ws-history-toggle absolute left-2 top-2 nodrag flex items-center gap-1 rounded bg-black/65 px-1.5 py-0.5 text-[10px] text-white/80 backdrop-blur-sm hover:bg-black/80"
+              className="ws-history-toggle absolute left-2 top-2 nodrag flex items-center gap-1 rounded bg-black/65 px-1.5 py-0.5 text-[12px] text-white/80 backdrop-blur-sm hover:bg-black/80"
               title={t("workspace.toolNode.browseHistory")}
             >
               <Maximize2 className="h-2.5 w-2.5" />
@@ -5638,11 +5642,11 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                             <span>credits</span>
                             {hasCostDiscount && baseNodeCostDisplay != null && (
                               <>
-                                <span className="text-[10px] leading-none text-zinc-200/65 line-through">
+                                <span className="text-[12px] leading-none text-zinc-200/65 line-through">
                                   {formatCreditAmount(baseNodeCostDisplay)}
                                   {costSuffix ?? ""}
                                 </span>
-                                <span className="text-[10px] font-semibold leading-none text-zinc-100">
+                                <span className="text-[12px] font-semibold leading-none text-zinc-100">
                                   -{costTotalDiscountPercent}%
                                 </span>
                               </>
@@ -5659,7 +5663,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                             >
                               <Info className="h-[10px] w-[10px]" strokeWidth={2.4} />
                             </span>
-                            <span className="pointer-events-none absolute bottom-full right-0 z-[70] mb-2 hidden w-[168px] rounded-md border border-white/10 bg-[#111] p-2 text-left text-[11px] leading-[16px] text-zinc-100 shadow-2xl shadow-black/50 group-hover/cost:block">
+                            <span className="pointer-events-none absolute bottom-full right-0 z-[70] mb-2 hidden w-[190px] rounded-md border border-white/10 bg-[#111] p-2 text-left text-[13px] leading-[18px] text-zinc-100 shadow-2xl shadow-black/50 group-hover/cost:block">
                               {costDiscountRows.map((row) => (
                                 <span key={`${row.label}:${row.value}`} className="flex items-center justify-between gap-3">
                                   <span className="truncate text-zinc-300">{row.label}</span>
@@ -5689,7 +5693,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
          *  own row below the preview because the scene list grows
          *  too tall to overlay sensibly. */}
         {runStatus === "error" && d.lastRunError && (
-          <div className="border-t border-red-500/20 bg-red-950/45 px-3 py-2 text-[11px] font-medium leading-snug text-red-100">
+          <div className="border-t border-red-500/20 bg-red-950/45 px-3 py-2 text-[13px] font-medium leading-snug text-red-100">
             {d.lastRunError}
           </div>
         )}
