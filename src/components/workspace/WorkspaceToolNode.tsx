@@ -2171,6 +2171,13 @@ function getParamHelp(param: ParamDef): VfxParamHelp {
   );
 }
 
+// Display label for a setting pill: Thai users get the localized labelTh when
+// one exists (falls back to the schema's English label otherwise), so node
+// settings read in the UI language instead of always showing English.
+function paramDisplayLabel(param: ParamDef, language: string): string {
+  return language === "th" ? getParamHelp(param).labelTh : param.label;
+}
+
 function VfxParamTooltipContent({
   param,
   help,
@@ -4606,7 +4613,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           return (
             <TogglePill
               key={param.key}
-              label={param.label}
+              label={paramDisplayLabel(param, language)}
               value={String(value)}
               options={effectiveOptions as [string, string]}
               optionLabels={localizedEffectiveLabels}
@@ -4679,7 +4686,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         return (
           <MiniSlider
             key={param.key}
-            label={param.label}
+            label={paramDisplayLabel(param, language)}
             value={Number(value)}
             min={min}
             max={max}
@@ -4693,7 +4700,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         return (
           <MiniTextInput
             key={param.key}
-            label={param.label}
+            label={paramDisplayLabel(param, language)}
             value={String(value ?? "")}
             placeholder={param.placeholder}
             onChange={(v) => updateParam(param.key, v)}
@@ -4704,7 +4711,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         return (
           <MiniTextInput
             key={param.key}
-            label={param.label}
+            label={paramDisplayLabel(param, language)}
             value={String(value ?? "")}
             placeholder={param.placeholder}
             onChange={(v) => updateParam(param.key, v)}
@@ -4715,7 +4722,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
       // toolbar; falls through to nothing.
       return null;
     },
-    [params, selectedModel, t, updateParam, schemaKey, id, voicePreview],
+    [params, selectedModel, t, updateParam, schemaKey, id, voicePreview, language],
   );
 
   /** Wraps a standard toolbar param in a hover tooltip that explains
@@ -4891,7 +4898,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
               aria-label={`${param.label} / ${help.labelTh}: ${help.descriptionTh}`}
             >
               <div className="ws-vfx-control-head">
-                <span className="ws-vfx-control-label">{param.label}</span>
+                <span className="ws-vfx-control-label">{paramDisplayLabel(param, language)}</span>
                 <span className="ws-vfx-control-value">{value}</span>
               </div>
               <div className="ws-vfx-control-widget">{renderToolbarParam(param)}</div>
@@ -4901,7 +4908,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         </Tooltip>
       );
     },
-    [params, renderToolbarParam],
+    [params, renderToolbarParam, language],
   );
 
   if (!schema) {
