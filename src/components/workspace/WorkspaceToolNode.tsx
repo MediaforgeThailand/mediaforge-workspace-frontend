@@ -126,8 +126,11 @@ import { cleanModelLabelMap } from "./modelDisplay";
 import {
   captureVideoFrameAtSecondsBlob,
   extractAndUploadVideoFrames,
+  invertMaskImageBlob,
+  invertMaskVideoBlob,
   safeStorageSegment,
   uploadExtractedFrame,
+  uploadWorkspaceMediaBlob,
 } from "./videoFrameExtraction";
 
 const RUN_EDGE_FUNCTION = "workspace-run-node";
@@ -188,6 +191,7 @@ function VoicePreviewItemButton({
 }) {
   const { t } = useLanguage();
   const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     onPlay(voiceId);
   };
@@ -1182,6 +1186,7 @@ const ICONS: Record<string, LucideIcon> = {
   vfxTrackNode: Maximize2,
   vfxMaskNode: Scissors,
   vfxQwenImageNode: Sparkles,
+  vfxWanVaceNode: Film,
   vfxVariableNode: SlidersHorizontal,
 };
 
@@ -1226,6 +1231,30 @@ function secondsForFrame(params: Record<string, unknown>): number {
   return frameIndex / fps;
 }
 
+function vfxFrameRate(params: Record<string, unknown>): number {
+  const fps = Number(params.force_rate || params.fps || 24);
+  return Number.isFinite(fps) && fps > 0 ? Math.max(1, Math.min(60, Math.round(fps))) : 24;
+}
+
+function vfxFrameLoadCap(params: Record<string, unknown>): number | undefined {
+  const cap = Number(params.frame_load_cap ?? 0);
+  if (!Number.isFinite(cap) || cap <= 0) return undefined;
+  return Math.floor(cap);
+}
+
+function isInvertMaskEnabled(value: unknown): boolean {
+  return value === true || String(value ?? "off").toLowerCase() === "on";
+}
+
+function mediaExtensionForBlob(blob: Blob, fallback: string): string {
+  const type = blob.type.toLowerCase();
+  if (type.includes("mp4")) return "mp4";
+  if (type.includes("webm")) return "webm";
+  if (type.includes("png")) return "png";
+  if (type.includes("jpeg") || type.includes("jpg")) return "jpg";
+  return fallback;
+}
+
 async function uploadVfxFrameFromVideo(args: {
   sourceUrl: string;
   seconds: number;
@@ -1241,6 +1270,22 @@ async function uploadVfxFrameFromVideo(args: {
     `${safeStorageSegment(args.label)}-${Date.now()}.jpg`,
   ].join("/");
   return uploadExtractedFrame(blob, path);
+}
+
+async function uploadVfxMediaBlob(args: {
+  blob: Blob;
+  userId: string;
+  nodeId: string;
+  label: string;
+  extension: string;
+}): Promise<string> {
+  const path = [
+    args.userId,
+    "vfx-preprocess",
+    safeStorageSegment(args.nodeId),
+    `${safeStorageSegment(args.label)}-${Date.now()}.${args.extension}`,
+  ].join("/");
+  return uploadWorkspaceMediaBlob(args.blob, path);
 }
 
 async function prepareLocalVfxGeneration(args: {
@@ -1261,13 +1306,13 @@ async function prepareLocalVfxGeneration(args: {
     const videoUrl = requiredInput(
       args.inputs,
       ["input_video", "video", "ref_video"],
-      "Connect a source video into VFX Variables before preparing this stage.",
+      "Connect a source video into VFX Source Setup before preparing this stage.",
     );
     return {
       ...genBase,
       type: "video",
       url: videoUrl,
-      label: "Source video",
+      label: "Source clip",
     };
   }
 
@@ -1293,8 +1338,25 @@ async function prepareLocalVfxGeneration(args: {
   }
 
   if (args.schemaKey === "vfxMaskNode") {
+    const shouldInvert = isInvertMaskEnabled(args.params.invert_mask);
     const maskImage = firstStringInput(args.inputs.mask_image);
     if (maskImage) {
+      if (shouldInvert) {
+        const blob = await invertMaskImageBlob(maskImage);
+        const url = await uploadVfxMediaBlob({
+          blob,
+          userId: args.userId,
+          nodeId: args.nodeId,
+          label: "inverted-mask-image",
+          extension: "png",
+        });
+        return {
+          ...genBase,
+          type: "image",
+          url,
+          label: "Inverted mask image",
+        };
+      }
       return {
         ...genBase,
         type: "image",
@@ -1304,18 +1366,31 @@ async function prepareLocalVfxGeneration(args: {
     }
     const maskVideo = firstStringInput(args.inputs.mask_video);
     if (maskVideo) {
-      const url = await uploadVfxFrameFromVideo({
-        sourceUrl: maskVideo,
-        seconds: secondsForFrame(args.params),
-        userId: args.userId,
-        nodeId: args.nodeId,
-        label: "mask-frame",
-      });
+      if (shouldInvert) {
+        const blob = await invertMaskVideoBlob(maskVideo, {
+          fps: vfxFrameRate(args.params),
+          frameLoadCap: vfxFrameLoadCap(args.params),
+        });
+        const extension = mediaExtensionForBlob(blob, "webm");
+        const url = await uploadVfxMediaBlob({
+          blob,
+          userId: args.userId,
+          nodeId: args.nodeId,
+          label: "inverted-mask-video",
+          extension,
+        });
+        return {
+          ...genBase,
+          type: "video",
+          url,
+          label: "Inverted mask video",
+        };
+      }
       return {
         ...genBase,
-        type: "image",
-        url,
-        label: "Mask frame",
+        type: "video",
+        url: maskVideo,
+        label: "Provided mask video",
       };
     }
     throw new Error(
@@ -1365,12 +1440,12 @@ function getVfxCardMeta(
   if (schemaKey === "vfxVariableNode") {
     return {
       stage: "01",
-      stageLabel: "Setup",
-      title: "VFX Variables",
-      summary: "Project-wide size, fps, model pack, and frame sampling.",
-      artifactLabel: "Shared settings",
+      stageLabel: "Source",
+      title: fallbackTitle || "Source Clip",
+      summary: "Start here: choose the source clip and sync defaults. Each VFX pass keeps its own settings.",
+      artifactLabel: "Source video",
       tone: "source",
-      primaryParamKeys: ["resolution", "aspect_ratio", "fps"],
+      primaryParamKeys: ["resolution", "aspect_ratio", "fps", "frame_sync"],
     };
   }
 
@@ -1382,7 +1457,7 @@ function getVfxCardMeta(
       summary: "Choose the exact frame that anchors the rest of the VFX pipeline.",
       artifactLabel: "Start image",
       tone: "source",
-      primaryParamKeys: ["frame_index", "frame_load_cap"],
+      primaryParamKeys: ["frame_index", "frame_load_cap", "frame_sync"],
     };
   }
 
@@ -1394,7 +1469,7 @@ function getVfxCardMeta(
       summary: "Build the protected subject matte that decides what must stay untouched.",
       artifactLabel: "Mask plate",
       tone: "matte",
-      primaryParamKeys: ["segment_prompt", "confidence_threshold", "mask_expand", "mask_blur", "plate_mask_expand"],
+      primaryParamKeys: ["segment_prompt", "invert_mask", "confidence_threshold", "mask_expand", "mask_blur"],
     };
   }
 
@@ -1415,8 +1490,8 @@ function getVfxCardMeta(
       stage: "05",
       stageLabel: "Background",
       title: fallbackTitle || "Background Pass",
-      summary: "Generate or prepare a clean background/control plate.",
-      artifactLabel: "Background plate",
+      summary: "Prepare the 01_BACKGROUND control pass from the preprocess workflow.",
+      artifactLabel: "Background pass",
       tone: "control",
       primaryParamKeys: ["background_mode", "width", "height"],
     };
@@ -1465,7 +1540,7 @@ function getVfxCardMeta(
         stage: "10",
         stageLabel: "Edit",
         title: fallbackTitle || "Masked Edit",
-        summary: "Change only the masked area while protecting the original plate.",
+        summary: "Image-edit workflow that uses a mask boundary.",
         artifactLabel: "Edited frame",
         tone: "generate",
         primaryParamKeys: ["workflow_preset", "model_name", "protect_original", "mask_expand", "mask_feather", "steps"],
@@ -1474,10 +1549,10 @@ function getVfxCardMeta(
     if (preset === "plate_generate") {
       return {
         stage: "09",
-        stageLabel: "Plate",
-        title: fallbackTitle || "Plate Generator",
-      summary: "Create a clean environment plate before the masked edit step.",
-      artifactLabel: "Plate image",
+        stageLabel: "Reference",
+        title: fallbackTitle || "Reference Image",
+      summary: "Image workflow for creating a reference frame outside the preprocess template.",
+      artifactLabel: "Reference image",
       tone: "generate",
       primaryParamKeys: ["model_name", "aspect_ratio", "steps"],
       };
@@ -1490,6 +1565,18 @@ function getVfxCardMeta(
       artifactLabel: "Reference frame",
       tone: "generate",
       primaryParamKeys: ["model_name", "lightning_lora", "steps"],
+    };
+  }
+
+  if (schemaKey === "vfxWanVaceNode") {
+    return {
+      stage: "11",
+      stageLabel: "Wan VACE",
+      title: fallbackTitle || "Wan VACE Video Edit",
+      summary: "Final open-source video edit stage: sends source video, mask video, and reference image to Wan VACE.",
+      artifactLabel: "Edited video",
+      tone: "generate",
+      primaryParamKeys: ["model_name", "resolution", "fps", "frame_load_cap", "mask_polarity", "steps"],
     };
   }
 
@@ -1534,7 +1621,7 @@ function getVfxPortIds(
     return new Set(
       direction === "input"
         ? ["input_video", "start_image", "mask_image", "mask_video"]
-        : ["mask_image"],
+        : ["mask_video", "mask_image"],
     );
   }
   if (schemaKey === "vfxQwenImageNode") {
@@ -1546,6 +1633,13 @@ function getVfxPortIds(
       return new Set(direction === "input" ? ["text", "ref_image", "mask_image"] : ["image"]);
     }
     return new Set(direction === "input" ? ["text", "ref_image"] : ["image"]);
+  }
+  if (schemaKey === "vfxWanVaceNode") {
+    return new Set(
+      direction === "input"
+        ? ["input_video", "mask_video", "ref_image", "text"]
+        : ["video"],
+    );
   }
   return new Set<string>();
 }
@@ -1576,13 +1670,18 @@ const VFX_PARAM_HELP_BY_KEY: Record<string, VfxParamHelp> = {
   },
   variable_scope: {
     labelTh: "ชุดค่าตั้งต้น",
-    descriptionTh: "เลือกกลุ่มตัวแปรหลัก เช่น ขนาดวิดีโอ pass ควบคุม mask หรือชุดโมเดล Qwen",
-    descriptionEn: "Chooses which group of shared VFX variables this node is organizing.",
+    descriptionTh: "เลือกชุด preset ของ source/sync เพื่อเริ่ม workflow โดยไม่ต้องลากค่ากลางไปทุก node",
+    descriptionEn: "Chooses the source/sync preset used to start the VFX workflow.",
   },
   auto_wire: {
     labelTh: "ต่อสายอัตโนมัติ",
     descriptionTh: "ให้ระบบช่วยต่อค่าหลักไปยัง stage ถัดไป เพื่อลดการลากสายซ้ำ",
     descriptionEn: "Lets the workspace wire shared values into downstream VFX stages.",
+  },
+  frame_sync: {
+    labelTh: "ซิงก์เฟรม",
+    descriptionTh: "กำหนดให้วิดีโอต้นฉบับ, mask และ control pass ใช้จังหวะเฟรมเดียวกัน ถ้าไม่ตรงกันให้เปลี่ยนเป็น Manual แล้วปรับ FPS/ช่วงเฟรมเอง",
+    descriptionEn: "Keeps source video, mask, and control passes aligned. Use Manual only when you need to override FPS or frame ranges.",
   },
   resolution: {
     labelTh: "ความละเอียด",
@@ -1811,13 +1910,13 @@ const VFX_PARAM_HELP_BY_KEY: Record<string, VfxParamHelp> = {
   },
   mask_blur: {
     labelTh: "เบลอขอบ Mask",
-    descriptionTh: "ทำให้ขอบ mask นุ่มขึ้น เพื่อลดขอบแข็งตอน composite",
-    descriptionEn: "Softens mask edges for smoother compositing.",
+    descriptionTh: "ทำให้ขอบ mask นุ่มขึ้นก่อนส่งต่อให้ workflow inpaint/edit",
+    descriptionEn: "Softens mask edges before handing the mask to an inpaint/edit workflow.",
   },
   plate_mask_expand: {
     labelTh: "ขยาย Mask สำหรับ Plate",
-    descriptionTh: "ปรับพื้นที่ mask ที่ใช้สร้าง clean plate หรือ background plate",
-    descriptionEn: "Adjusts the mask used when preparing a clean/background plate.",
+    descriptionTh: "ปรับพื้นที่ mask สำหรับสร้าง MASK-PLATE ตาม preprocess workflow",
+    descriptionEn: "Adjusts the mask area used for the MASK-PLATE preprocess output.",
   },
   max_segments: {
     labelTh: "จำนวนชิ้นสูงสุด",
@@ -1846,8 +1945,8 @@ const VFX_PARAM_HELP_BY_KEY: Record<string, VfxParamHelp> = {
   },
   workflow_preset: {
     labelTh: "รูปแบบงาน VFX",
-    descriptionTh: "เลือกหน้าที่ของ Qwen node เช่น start image, masked edit หรือสร้าง plate",
-    descriptionEn: "Chooses whether Qwen generates a start image, masked edit, or plate.",
+    descriptionTh: "เลือกหน้าที่ของ Qwen node แยกจาก preprocess workflow หลัก",
+    descriptionEn: "Chooses the Qwen node role separately from the main preprocess workflow.",
   },
   prompt: {
     labelTh: "พรอมป์",
@@ -1876,8 +1975,8 @@ const VFX_PARAM_HELP_BY_KEY: Record<string, VfxParamHelp> = {
   },
   protect_original: {
     labelTh: "ปกป้องนอก Mask",
-    descriptionTh: "เปิดไว้เพื่อ composite เฉพาะพื้นที่ mask และคงภาพเดิมด้านนอก",
-    descriptionEn: "Keeps the unmasked area from the original plate.",
+    descriptionTh: "เปิดไว้เพื่อให้ image-edit workflow ใช้พื้นที่ mask เป็นขอบเขตการแก้",
+    descriptionEn: "Constrains image-edit workflows to the mask boundary.",
   },
   mask_feather: {
     labelTh: "เกลี่ยขอบ Mask",
@@ -1912,6 +2011,164 @@ function getVfxParamHelp(param: ParamDef): VfxParamHelp {
     descriptionTh: "ค่าตั้งต้นของ stage นี้ ใช้ปรับพฤติกรรมของ node ก่อนรัน",
     descriptionEn: "Controls this node stage before it runs.",
   };
+}
+
+// General per-setting help shown on hover for every (non-VFX) tool node param.
+// Keyed by the schema param key so one description serves every node that
+// reuses the key. VFX-specific keys keep their own copy in VFX_PARAM_HELP_BY_KEY.
+const GENERAL_PARAM_HELP_BY_KEY: Record<string, VfxParamHelp> = {
+  model_name: {
+    labelTh: "โมเดล",
+    descriptionTh: "เลือก AI model ที่ใช้สร้างผลลัพธ์ แต่ละรุ่นให้คุณภาพ ความเร็ว และราคาเครดิตต่างกัน",
+    descriptionEn: "Picks the AI model that generates the result. Models differ in quality, speed, and credit cost.",
+  },
+  prompt: {
+    labelTh: "คำสั่ง (Prompt)",
+    descriptionTh: "ข้อความบรรยายสิ่งที่อยากได้ ยิ่งระบุรายละเอียด (subject, สไตล์, องค์ประกอบ) ผลยิ่งตรง",
+    descriptionEn: "Describes what to generate. More detail (subject, style, composition) yields a closer result.",
+  },
+  negative_prompt: {
+    labelTh: "สิ่งที่ไม่ต้องการ",
+    descriptionTh: "ระบุสิ่งที่ไม่อยากให้ปรากฏในผลลัพธ์ เช่น เบลอ ลายน้ำ มือผิดรูป",
+    descriptionEn: "Lists things to avoid in the output, e.g. blur, watermarks, distorted hands.",
+  },
+  aspect_ratio: {
+    labelTh: "สัดส่วนภาพ",
+    descriptionTh: "อัตราส่วนกว้างต่อสูงของผลลัพธ์ เช่น 1:1 (จัตุรัส), 16:9 (แนวนอน), 9:16 (แนวตั้ง)",
+    descriptionEn: "Width-to-height ratio of the output, e.g. 1:1 square, 16:9 landscape, 9:16 portrait.",
+  },
+  resolution: {
+    labelTh: "ความละเอียด",
+    descriptionTh: "ระดับความคมชัดของผลลัพธ์ ยิ่งสูงยิ่งคมแต่ใช้เวลานานและเครดิตมากขึ้น",
+    descriptionEn: "Output sharpness tier. Higher is crisper but slower and costs more credits.",
+  },
+  size: {
+    labelTh: "ขนาดภาพ",
+    descriptionTh: "ขนาดผลลัพธ์เป็นพิกเซล เลือกสัดส่วนก่อนแล้วค่อยเลือกระดับความละเอียด",
+    descriptionEn: "Output dimensions in pixels. Pick the aspect ratio first, then the resolution tier.",
+  },
+  image_size: {
+    labelTh: "ขนาดภาพ",
+    descriptionTh: "กำหนดขนาด/สัดส่วนของภาพที่จะสร้าง",
+    descriptionEn: "Sets the size or aspect ratio of the generated image.",
+  },
+  duration: {
+    labelTh: "ความยาว",
+    descriptionTh: "ความยาวของวิดีโอ/เสียงเป็นวินาที ยิ่งยาวยิ่งใช้เครดิตมากขึ้น",
+    descriptionEn: "Length of the video/audio in seconds. Longer runs cost more credits.",
+  },
+  seed: {
+    labelTh: "Seed",
+    descriptionTh: "ตัวเลขสุ่มที่ล็อกผลให้ได้แบบเดิมซ้ำได้ ปล่อยว่างเพื่อสุ่มใหม่ทุกครั้ง",
+    descriptionEn: "Random seed that makes a result reproducible. Leave empty to randomize each run.",
+  },
+  quality: {
+    labelTh: "คุณภาพ",
+    descriptionTh: "ระดับคุณภาพของผลลัพธ์ คุณภาพสูงให้รายละเอียดดีกว่าแต่ช้าและแพงกว่า",
+    descriptionEn: "Output quality tier. Higher quality adds detail but is slower and costs more.",
+  },
+  out_format: {
+    labelTh: "รูปแบบไฟล์",
+    descriptionTh: "นามสกุล/ฟอร์แมตไฟล์ผลลัพธ์ เช่น PNG, JPG, MP4, WEBP",
+    descriptionEn: "File format of the output, e.g. PNG, JPG, MP4, WEBP.",
+  },
+  format: {
+    labelTh: "รูปแบบไฟล์",
+    descriptionTh: "นามสกุล/ฟอร์แมตไฟล์ผลลัพธ์",
+    descriptionEn: "Output file format.",
+  },
+  generate_audio: {
+    labelTh: "สร้างเสียงประกอบ",
+    descriptionTh: "เปิดให้โมเดลสร้างเสียง/เพลงประกอบไปกับวิดีโอด้วย",
+    descriptionEn: "Lets the model generate accompanying audio with the video.",
+  },
+  crf: {
+    labelTh: "ระดับบีบอัด (CRF)",
+    descriptionTh: "ค่าคุมคุณภาพการบีบอัดวิดีโอ ตัวเลขน้อย = คุณภาพสูงไฟล์ใหญ่ ตัวเลขมาก = ไฟล์เล็กคุณภาพลด",
+    descriptionEn: "Video compression quality. Lower means higher quality and bigger files; higher means smaller files.",
+  },
+  output_prefix: {
+    labelTh: "คำนำหน้าชื่อไฟล์",
+    descriptionTh: "ข้อความนำหน้าชื่อไฟล์ผลลัพธ์ ช่วยจัดระเบียบไฟล์ที่สร้าง",
+    descriptionEn: "Text prepended to output file names to help organize generated files.",
+  },
+  steps: {
+    labelTh: "จำนวนรอบ (Steps)",
+    descriptionTh: "จำนวนรอบประมวลผลของโมเดล ยิ่งมากยิ่งละเอียดแต่ช้าลง",
+    descriptionEn: "Number of sampling steps. More steps add detail but take longer.",
+  },
+  scheduler: {
+    labelTh: "Scheduler",
+    descriptionTh: "อัลกอริทึมการสุ่มภาพ มีผลต่อสไตล์และความเร็ว ปกติใช้ค่าเริ่มต้นได้",
+    descriptionEn: "Sampling algorithm; affects style and speed. The default is fine for most cases.",
+  },
+  temperature: {
+    labelTh: "ความสร้างสรรค์ (Temperature)",
+    descriptionTh: "คุมความสุ่ม/สร้างสรรค์ของคำตอบ ค่าต่ำ = ตรงและคงเส้นคงวา ค่าสูง = หลากหลายขึ้น",
+    descriptionEn: "Controls randomness/creativity. Lower is focused and consistent; higher is more varied.",
+  },
+  voice: {
+    labelTh: "เสียงพูด",
+    descriptionTh: "เลือกเสียงผู้พูดสำหรับการสร้างเสียง กดปุ่ม ▶ เพื่อฟังตัวอย่างก่อนเลือก",
+    descriptionEn: "Picks the speaker voice for audio generation. Use ▶ to preview before selecting.",
+  },
+  voice_style: {
+    labelTh: "อารมณ์เสียง",
+    descriptionTh: "โทน/อารมณ์ของเสียงพูด เช่น เป็นกันเอง ทางการ ตื่นเต้น",
+    descriptionEn: "Tone or emotion of the spoken voice, e.g. casual, formal, excited.",
+  },
+  speaking_rate: {
+    labelTh: "ความเร็วการพูด",
+    descriptionTh: "ปรับให้พูดเร็วหรือช้าลงจากปกติ",
+    descriptionEn: "Speeds up or slows down the speaking pace.",
+  },
+  speed: {
+    labelTh: "ความเร็ว",
+    descriptionTh: "ปรับความเร็วของผลลัพธ์ (เช่น การพูดหรือการเคลื่อนไหว)",
+    descriptionEn: "Adjusts the playback or motion speed of the result.",
+  },
+  stability: {
+    labelTh: "ความนิ่งของเสียง",
+    descriptionTh: "คุมความสม่ำเสมอของเสียง ค่าสูง = นิ่งสม่ำเสมอ ค่าต่ำ = มีอารมณ์/แปรปรวนมากขึ้น",
+    descriptionEn: "Controls voice consistency. Higher is steadier; lower is more expressive and variable.",
+  },
+  similarity_boost: {
+    labelTh: "ความเหมือนต้นเสียง",
+    descriptionTh: "คุมให้เสียงใกล้เคียงต้นแบบมากแค่ไหน ค่าสูง = เหมือนต้นแบบมากขึ้น",
+    descriptionEn: "How closely the voice matches the reference. Higher stays nearer the original.",
+  },
+  style: {
+    labelTh: "สไตล์",
+    descriptionTh: "กำหนดสไตล์ภาพรวมของผลลัพธ์",
+    descriptionEn: "Sets the overall style of the output.",
+  },
+  style_prompt: {
+    labelTh: "คำสั่งสไตล์",
+    descriptionTh: "ข้อความกำหนดสไตล์เพิ่มเติม แยกจาก prompt หลัก",
+    descriptionEn: "Extra text that steers the style, separate from the main prompt.",
+  },
+  sequential_image_generation: {
+    labelTh: "สร้างภาพต่อเนื่อง",
+    descriptionTh: "ให้สร้างภาพเป็นชุดต่อเนื่องกัน แทนการสร้างภาพเดียว",
+    descriptionEn: "Generates a connected series of images instead of a single one.",
+  },
+  confidence_threshold: {
+    labelTh: "เกณฑ์ความมั่นใจ",
+    descriptionTh: "ระดับความมั่นใจขั้นต่ำที่ระบบจะยอมรับผล ค่าสูง = เข้มงวดขึ้น",
+    descriptionEn: "Minimum confidence the model must reach to accept a detection. Higher is stricter.",
+  },
+};
+
+function getParamHelp(param: ParamDef): VfxParamHelp {
+  const override =
+    VFX_PARAM_HELP_BY_KEY[param.key] ?? GENERAL_PARAM_HELP_BY_KEY[param.key];
+  return (
+    override ?? {
+      labelTh: param.label,
+      descriptionTh: "ปรับค่านี้ก่อนกดรัน node เพื่อกำหนดผลลัพธ์",
+      descriptionEn: "Adjust this setting before running the node to shape the result.",
+    }
+  );
 }
 
 function VfxParamTooltipContent({
@@ -3182,11 +3439,14 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
         const isReplicateVeo = pollProvider === "replicate_veo";
         const isReplicateVideo = pollProvider === "replicate_video";
         const isRunpodQwen = pollProvider === "runpod_qwen";
+        const isRunpodWanVace = pollProvider === "runpod_wan_vace";
         const isFreepikVideo = pollProvider === "freepik_veo" || pollProvider === "freepik_seedance";
         const isElevenLabsDubbing = pollProvider === "elevenlabs_dubbing";
         const POLL_INTERVAL_MS = isTripo3d ? 4_000 : 5_000;
         const POLL_TIMEOUT_MS = isElevenLabsDubbing
           ? 30 * 60_000
+          : isRunpodWanVace
+            ? 60 * 60_000
           : isRunpodQwen
             ? 20 * 60_000
             : isTripo3d ? 8 * 60_000 : 6 * 60_000;
@@ -3202,6 +3462,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                   ? "poll_replicate_video"
                   : isRunpodQwen
                     ? "poll_runpod_qwen"
+                  : isRunpodWanVace
+                    ? "poll_runpod_wan_vace"
                   : isFreepikVideo
                     ? "poll_freepik_video"
                     : isElevenLabsDubbing
@@ -3219,6 +3481,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                   ? "Replicate Video"
                 : isRunpodQwen
                   ? "Runpod Qwen"
+                : isRunpodWanVace
+                  ? "Runpod Wan VACE"
                 : isFreepikVideo
                   ? pollProvider === "freepik_seedance" ? "Freepik Seedance" : "Freepik Veo"
                   : isElevenLabsDubbing
@@ -4454,6 +4718,28 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
     [params, selectedModel, t, updateParam, schemaKey, id, voicePreview],
   );
 
+  /** Wraps a standard toolbar param in a hover tooltip that explains
+   *  what the setting does (Thai + English), so every control on a
+   *  tool node is self-documenting. VFX nodes have their own wrapper. */
+  const renderToolbarParamWithHelp = useCallback(
+    (param: ParamDef) => {
+      const widget = renderToolbarParam(param);
+      if (!widget) return null;
+      const help = getParamHelp(param);
+      return (
+        <Tooltip key={param.key} delayDuration={400}>
+          <TooltipTrigger asChild>
+            <span className="ws-param-tip inline-flex items-center gap-1">
+              {widget}
+            </span>
+          </TooltipTrigger>
+          <VfxParamTooltipContent param={param} help={help} />
+        </Tooltip>
+      );
+    },
+    [renderToolbarParam],
+  );
+
   const localizePortLabel = (handleId: string, fallback: string): string => {
     const key = PORT_LABEL_KEYS[handleId as keyof typeof PORT_LABEL_KEYS];
     return key ? t(key) : fallback;
@@ -4471,7 +4757,8 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
   );
   const isUrlAssetNode = schemaKey === "urlAssetNode";
   const isVfxNode = schemaKey.startsWith("vfx");
-  const isVfxControlNode = isVfxNode && schemaKey !== "vfxQwenImageNode";
+  const isVfxControlNode =
+    isVfxNode && schemaKey !== "vfxQwenImageNode" && schemaKey !== "vfxWanVaceNode";
 
   // The Tripo3D rendered_image is a small square thumbnail — letting
   // it drive the preview's height collapses the node to a tiny
@@ -5165,7 +5452,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
           {showInteractiveControls && (
             <div className="ws-compact-overlay">
               <div ref={toolbarRef} className="ws-compact-toolbar">
-                {toolbarParams.map((p) => renderToolbarParam(p))}
+                {toolbarParams.map((p) => renderToolbarParamWithHelp(p))}
                 {advancedToolbarParams.length > 0 && (
                   <button
                     type="button"
@@ -5183,7 +5470,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                   </button>
                 )}
                 {showAdvancedParams &&
-                  advancedToolbarParams.map((p) => renderToolbarParam(p))}
+                  advancedToolbarParams.map((p) => renderToolbarParamWithHelp(p))}
                 {supportsMultiGen && !isMultiShot && (
                   <MultiGenStepper
                     count={multiGenCount}
@@ -5259,6 +5546,7 @@ const WorkspaceToolNode = memo(({ id, data, type, selected }: NodeProps) => {
                     "vfxTrackNode",
                     "vfxMaskNode",
                     "vfxQwenImageNode",
+                    "vfxWanVaceNode",
                     "upscaleImageNode",
                     "removeBackgroundNode",
                     "mergeAudioNode",

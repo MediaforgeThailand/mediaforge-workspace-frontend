@@ -9566,6 +9566,7 @@ function GeminiVoicePicker({
 }) {
   const { playingId, loadingId, play } = useVoicePreview("gemini");
   const handlePreview = async (event: React.MouseEvent, voiceName: string) => {
+    event.preventDefault();
     event.stopPropagation();
     try {
       await play(voiceName, { modelId });
@@ -9624,6 +9625,7 @@ function GeminiVoicePicker({
                 onClick={(e) => void handlePreview(e, voiceName)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
                     e.stopPropagation();
                     void handlePreview(e as unknown as React.MouseEvent, voiceName);
                   }

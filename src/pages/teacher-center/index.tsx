@@ -1,892 +1,198 @@
-/**
- * TeacherCenter — Variant A "Command Center" UI.
- *
- * Replaces the stacked-card OrgAdminPanel with a sidebar + tabs layout.
- * Same page works for both `class teacher` (their classes only) and
- * `org_admin` (all org classes — auto-fallback in useManageableClasses).
- *
- * Tab structure:
- *   • Overview     — stat strip + 7-day chart + AI model ranking + top spenders
- *   • Members      — sortable roster with per-student model breakdown
- *   • AI Usage     — deep-dive analytics on model_use events
- *   • Codes        — QR enrollment management (placeholder reuses existing)
- *   • Activity     — event feed (model_use / enrollment / credits_granted)
- *
- * The Live Class CTA in the header opens the existing QR modal (or jumps
- * to a future LiveClassroom page).
- */
-
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Ban,
+  BookOpen,
+  CheckCircle2,
+  Clipboard,
+  ExternalLink,
+  Loader2,
+  Lock,
+  Plus,
+  QrCode,
+  RefreshCw,
+  ShieldCheck,
+  Trash2,
+  Unlock,
+  UserPlus,
+  Users,
+  Wallet,
+} from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import { toast } from "sonner";
+
 import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
 import { friendlyError } from "@/lib/friendlyError";
-import { useIsOrgAdmin } from "@/hooks/useIsOrgUser";
 import {
   consumerOrgAdminApi,
   type ClassEnrollmentCode,
+  type ClassMember,
+  type ClassRow,
   type ClassStudentSpace,
 } from "@/lib/orgAdminApi";
-import {
-  useManageableClasses,
-  useClassMembers,
-  useClassMemberSummary,
-  useClassModelUsage,
-  useClassActivity,
-  useClassDailyUsage,
-  useClassTopSpenders,
-  useMemberModelBreakdown,
-  type TeacherClass,
-  type ClassMember,
-  type ClassMemberSummary,
-} from "./useTeacherData";
-import { getModelMeta, getCategoryColor, type ModelCategory } from "./modelMeta";
-
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
-} from "@/components/ui/sheet";
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
-
-import {
-  Users, Coins, Activity, AlertCircle, ChevronRight, Crown,
-  GraduationCap, BookOpen, Sparkles, ArrowLeft,
-  PlayCircle, QrCode, BarChart3, Plus, RefreshCw,
-  Copy, Trash2, Loader2, CheckCircle2, Ban,
-} from "lucide-react";
-import { toast } from "sonner";
-import { QRCodeSVG } from "qrcode.react";
-
-import {
-  BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip as RTooltip,
-} from "recharts";
-
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { useManageableClasses, type TeacherClass } from "./useTeacherData";
 
-// ─────────────────────────────────────────────────────────────────────
-// Root
-// ─────────────────────────────────────────────────────────────────────
-
-export default function TeacherCenter() {
-
-  const { user, profile } = useAuth();
-  const isOrgAdmin = useIsOrgAdmin();
-  const { data: classes, isLoading: loadingClasses } = useManageableClasses();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const selectedClassId = searchParams.get("class");
-
-  // Auto-select first class on mount when none chosen
-  const effectiveClassId =
-    selectedClassId ?? (classes && classes.length > 0 ? classes[0].id : null);
-
-  if (!user) return <Navigate to="/auth" replace />;
-  // Note: we DON'T block on role here. useManageableClasses returns []
-  // for users with no role — we render the empty-state below.
-
-  return (
-    <div className="min-h-screen bg-background flex">
-      {/* ─── Left Sidebar ───────────────────────────────────────────── */}
-      <Sidebar
-        classes={classes ?? []}
-        loading={loadingClasses}
-        activeId={effectiveClassId}
-        onSelect={(id) => setSearchParams({ class: id })}
-        isOrgAdmin={isOrgAdmin}
-        userName={profile?.display_name || "Teacher"}
-      />
-
-      {/* ─── Main ───────────────────────────────────────────────────── */}
-      <main className="flex-1 min-w-0 overflow-x-hidden">
-        {effectiveClassId ? (
-          <ClassDetail classId={effectiveClassId} classes={classes ?? []} />
-        ) : (
-          <EmptyState isOrgAdmin={isOrgAdmin} />
-        )}
-      </main>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// Sidebar
-// ─────────────────────────────────────────────────────────────────────
-
-function Sidebar(props: {
-  classes: TeacherClass[];
-  loading: boolean;
-  activeId: string | null;
-  onSelect: (id: string) => void;
-  isOrgAdmin: boolean;
-  userName: string;
-}) {
-  const { t: i18n } = useLanguage();
-  const navigate = useNavigate();
-  return (
-    <aside className="w-[260px] shrink-0 border-r border-border bg-card/40 flex flex-col">
-      {/* Brand row */}
-      <div className="px-5 py-5 border-b border-border">
-        <div className="flex items-center gap-2 mb-3">
-          <Crown className="h-4 w-4 text-amber-500" />
-          <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-            {i18n("teacherCenter.teacherCenter")}
-          </span>
-        </div>
-        <div className="text-sm font-medium truncate">{props.userName}</div>
-        {props.isOrgAdmin && (
-          <Badge variant="outline" className="mt-1.5 text-[10px] gap-1 border-amber-500/40 text-amber-700 dark:text-amber-300">
-            <Sparkles className="h-2.5 w-2.5" /> {i18n("teacherCenter.orgAdmin")}
-          </Badge>
-        )}
-      </div>
-
-      {/* Class list */}
-      <div className="px-3 py-3 flex-1 overflow-y-auto">
-        <div className="px-2 py-1.5 flex items-center justify-between">
-          <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
-            {props.isOrgAdmin ? "Classes (org-wide)" : "My Classes"}
-          </span>
-          <span className="text-[10px] text-muted-foreground">
-            {props.classes.length}
-          </span>
-        </div>
-
-        {props.loading ? (
-          <div className="px-2 py-4 text-xs text-muted-foreground">{i18n("common.loading")}</div>
-        ) : props.classes.length === 0 ? (
-          <div className="px-2 py-4 text-xs text-muted-foreground">
-            {i18n("teacherCenter.noClassesYet")}
-          </div>
-        ) : (
-          <ul className="space-y-0.5">
-            {props.classes.map((c) => {
-              const remaining = Math.max(c.credit_pool - c.credit_pool_consumed, 0);
-              const percent = c.credit_pool > 0
-                ? Math.round((c.credit_pool_consumed / c.credit_pool) * 100)
-                : 0;
-              return (
-                <li key={c.id}>
-                  <button
-                    onClick={() => props.onSelect(c.id)}
-                    className={cn(
-                      "w-full text-left px-2.5 py-2 rounded-md transition-colors",
-                      "hover:bg-accent/60",
-                      props.activeId === c.id && "bg-accent",
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <BookOpen
-                        className={cn(
-                          "h-3.5 w-3.5",
-                          props.activeId === c.id ? "text-primary" : "text-muted-foreground",
-                        )}
-                      />
-                      <span className="text-[13px] font-medium truncate flex-1 min-w-0">
-                        {c.name}
-                      </span>
-                    </div>
-                    <div className="mt-1 ml-5 flex items-center gap-1.5">
-                      <div className="flex-1 h-0.5 rounded-full bg-muted">
-                        <div
-                          className="h-0.5 rounded-full bg-primary"
-                          style={{ width: `${Math.min(percent, 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] text-muted-foreground tabular-nums">
-                        {remaining.toLocaleString()}
-                      </span>
-                    </div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-
-      {/* Footer */}
-      <div className="border-t border-border p-3 space-y-1.5">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start text-muted-foreground"
-          onClick={() => navigate("/app/workspace")}
-        >
-          <ArrowLeft className="h-3.5 w-3.5 mr-2" />
-          {i18n("common.backToWorkspace2")}
-        </Button>
-      </div>
-    </aside>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// Class detail (right side)
-// ─────────────────────────────────────────────────────────────────────
-
-function ClassDetail({ classId, classes }: { classId: string; classes: TeacherClass[] }) {
-  const { t: i18n } = useLanguage();
-  const cls = classes.find((c) => c.id === classId);
-  const [membersPage, setMembersPage] = useState(1);
-  const membersPageSize = 25;
-  const { data: membersData } = useClassMembers(classId, membersPage, membersPageSize);
-  const { data: memberSummary } = useClassMemberSummary(classId);
-  const { data: topSpenders } = useClassTopSpenders(classId, 5);
-  const { data: modelUsage } = useClassModelUsage(classId, 30);
-  const { data: dailyUsage } = useClassDailyUsage(classId, 7);
-  const { data: activity } = useClassActivity(classId, 30);
-
-  const members = membersData?.items ?? [];
-  const studentCount = memberSummary?.totalStudents ?? membersData?.total ?? 0;
-
-  const totalCredits = cls ? cls.credit_pool : 0;
-  const usedCredits = cls ? cls.credit_pool_consumed : 0;
-  const remaining = Math.max(totalCredits - usedCredits, 0);
-  const usedPercent = totalCredits > 0 ? Math.round((usedCredits / totalCredits) * 100) : 0;
-  const usageThisMonth = (modelUsage ?? []).reduce((sum, m) => sum + m.total_credits, 0);
-  const totalRuns = (modelUsage ?? []).reduce((sum, m) => sum + m.uses, 0);
-  const distinctModels = (modelUsage ?? []).length;
-
-  useEffect(() => {
-    setMembersPage(1);
-  }, [classId]);
-
-  if (!cls) {
-    return <div className="p-10 text-muted-foreground">{i18n("teacherCenter.classNotFound")}</div>;
-  }
-
-  return (
-    <div className="flex flex-col min-h-screen">
-      {/* Header */}
-      <header className="border-b border-border bg-card/30 backdrop-blur sticky top-0 z-10">
-        <div className="px-7 py-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1.5">
-                <GraduationCap className="h-3 w-3" />
-                {cls.code}
-                <span>·</span>
-                <span className="capitalize">{cls.credit_policy.replace("_", " ")}</span>
-              </div>
-              <h1 className="text-2xl font-bold truncate">{cls.name}</h1>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button variant="outline" size="sm">
-                <Plus className="h-3.5 w-3.5 mr-1.5" />
-                {i18n("teacherCenter.addStudent")}
-              </Button>
-              <Button size="sm" className="bg-primary">
-                <PlayCircle className="h-4 w-4 mr-1.5" />
-                {i18n("teacherCenter.liveClass")}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Tabs container */}
-      <Tabs defaultValue="overview" className="flex-1 flex flex-col">
-        <div className="border-b border-border bg-background sticky top-[73px] z-10">
-          <TabsList className="px-7 h-11 bg-transparent border-0 rounded-none gap-1">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-accent text-sm">
-              {i18n("common.overview")}</TabsTrigger>
-            <TabsTrigger value="members" className="data-[state=active]:bg-accent text-sm">
-              {i18n("common.members")}<Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0 h-4">
-                {studentCount}
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="ai" className="data-[state=active]:bg-accent text-sm">
-              {i18n("teacherCenter.aiUsage")}
-              <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0 h-4">
-                {distinctModels}
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="codes" className="data-[state=active]:bg-accent text-sm">
-              {i18n("education.common.qrCodes")}
-            </TabsTrigger>
-            <TabsTrigger value="activity" className="data-[state=active]:bg-accent text-sm">
-              {i18n("common.activity")}</TabsTrigger>
-          </TabsList>
-        </div>
-
-        <TabsContent value="overview" className="flex-1 m-0 p-7 space-y-6">
-          {/* Stat strip */}
-          <StatStrip
-            studentCount={studentCount}
-            remaining={remaining}
-            totalCredits={totalCredits}
-            usedThisMonth={usageThisMonth}
-            distinctModels={distinctModels}
-            totalRuns={totalRuns}
-            usedPercent={usedPercent}
-          />
-
-          {/* Daily usage chart */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Activity className="h-3.5 w-3.5" />
-                {i18n("teacherCenter.usageTrend7Days")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-32">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dailyUsage ?? []} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                    <XAxis
-                      dataKey="day"
-                      tick={{ fontSize: 11 }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 11 }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={28}
-                    />
-                    <RTooltip
-                      contentStyle={{
-                        background: "var(--card)",
-                        border: "1px solid var(--border)",
-                        borderRadius: 8,
-                        fontSize: 12,
-                      }}
-                      labelFormatter={(d) => `Day ${d}`}
-                    />
-                    <Bar dataKey="credits" fill="var(--primary, #3a2bff)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* AI Models ranking + Top spenders side by side */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ModelRankingCard models={modelUsage ?? []} />
-            <TopSpendersCard members={topSpenders ?? []} />
-          </div>
-
-          {/* Insights */}
-          <InsightsCard
-            models={modelUsage ?? []}
-            memberSummary={memberSummary}
-            totalCredits={totalCredits}
-            usedCredits={usedCredits}
-          />
-        </TabsContent>
-
-        <TabsContent value="members" className="flex-1 m-0 p-7">
-          <MembersPanel
-            members={members}
-            classId={classId}
-            currentPage={membersData?.page ?? membersPage}
-            pageSize={membersData?.pageSize ?? membersPageSize}
-            totalStudents={studentCount}
-            hasMore={membersData?.hasMore ?? false}
-            onPageChange={setMembersPage}
-          />
-        </TabsContent>
-
-        <TabsContent value="ai" className="flex-1 m-0 p-7">
-          <AIUsagePanel models={modelUsage ?? []} totalRuns={totalRuns} totalCredits={usageThisMonth} />
-        </TabsContent>
-
-        <TabsContent value="codes" className="flex-1 m-0 p-7">
-          <CodesPanel classId={classId} creditPoolRemaining={remaining} />
-        </TabsContent>
-
-        <TabsContent value="activity" className="flex-1 m-0 p-7">
-          <ActivityPanel events={activity ?? []} />
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// Stat strip
-// ─────────────────────────────────────────────────────────────────────
-
-function StatStrip(props: {
-  studentCount: number;
-  remaining: number;
-  totalCredits: number;
-  usedThisMonth: number;
-  distinctModels: number;
-  totalRuns: number;
-  usedPercent: number;
-}) {
-  const { t: i18n } = useLanguage();
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      <StatCard
-        label="Students"
-        value={props.studentCount.toString()}
-        sub={`active in class`}
-        icon={<Users className="h-3.5 w-3.5" />}
-        accent="primary"
-      />
-      <StatCard
-        label={i18n("teacherCenter.creditsRemaining")}
-        value={props.remaining.toLocaleString()}
-        sub={`of ${props.totalCredits.toLocaleString()} pool`}
-        icon={<Coins className="h-3.5 w-3.5" />}
-        accent="emerald"
-        progress={props.usedPercent}
-      />
-      <StatCard
-        label={i18n("teacherCenter.used30d")}
-        value={props.usedThisMonth.toLocaleString()}
-        sub={`${props.totalRuns.toLocaleString()} runs`}
-        icon={<Activity className="h-3.5 w-3.5" />}
-        accent="violet"
-      />
-      <StatCard
-        label={i18n("teacherCenter.aiModels")}
-        value={props.distinctModels.toString()}
-        sub="in use this month"
-        icon={<Sparkles className="h-3.5 w-3.5" />}
-        accent="amber"
-      />
-    </div>
-  );
-}
-
-function StatCard({
-  label, value, sub, icon, accent, progress,
-}: {
+type ModelGroup = {
+  id: string;
   label: string;
-  value: string;
-  sub: string;
-  icon: React.ReactNode;
-  accent: "primary" | "emerald" | "violet" | "amber";
-  progress?: number;
-}) {
-  const accentClass = {
-    primary: "text-primary",
-    emerald: "text-emerald-600 dark:text-emerald-400",
-    violet: "text-yellow-600 dark:text-yellow-400",
-    amber: "text-amber-600 dark:text-amber-400",
-  }[accent];
+  description: string;
+  modelIds: string[];
+};
 
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className={cn("flex items-center gap-1.5 text-xs uppercase tracking-wide", accentClass)}>
-          {icon}
-          {label}
-        </div>
-        <div className="mt-1 text-2xl font-bold tabular-nums">{value}</div>
-        <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>
-        {progress !== undefined && (
-          <div className="mt-2.5 h-1 rounded-full bg-muted">
-            <div
-              className={cn("h-1 rounded-full", {
-                "bg-primary":  accent === "primary",
-                "bg-emerald-500": accent === "emerald",
-                "bg-yellow-500":  accent === "violet",
-                "bg-amber-500":   accent === "amber",
-              })}
-              style={{ width: `${Math.min(progress, 100)}%` }}
-            />
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+const DEFAULT_QR_CREDITS = 250;
+const DEFAULT_CLASS_POOL = 10000;
+const DEFAULT_BLOCKED_MODELS = [
+  "seedance-2-0-lite",
+  "seedance-2-0-pro",
+  "dreamina-seedance-2-0-260128",
+  "dreamina-seedance-2-0-fast-260128",
+];
+
+const MODEL_GROUPS: ModelGroup[] = [
+  {
+    id: "image",
+    label: "Image",
+    description: "Banana, GPT Image, Seedream, Qwen",
+    modelIds: [
+      "nano-banana-2",
+      "nano-banana-pro",
+      "gpt-image-2",
+      "seedream-5-0-260128",
+      "seedream-5-0-lite-260128",
+      "seedream-4-5-251128",
+      "qwen-image-runpod",
+      "qwen-image-edit-2511-runpod",
+    ],
+  },
+  {
+    id: "video",
+    label: "Video",
+    description: "Kling, Veo, Seedance",
+    modelIds: [
+      "kling-v2-6-pro",
+      "kling-v2-6-motion-pro",
+      "kling-v3-pro",
+      "kling-v3-motion-pro",
+      "kling-v3-omni",
+      "veo-3.1-generate-001",
+      "seedance-1-5-pro-251215",
+      "seedance-2-0-lite",
+      "seedance-2-0-pro",
+      "dreamina-seedance-2-0-260128",
+      "dreamina-seedance-2-0-fast-260128",
+    ],
+  },
+  {
+    id: "audio",
+    label: "Audio",
+    description: "Voice, dubbing, subtitles, TTS",
+    modelIds: [
+      "elevenlabs-multilingual-v2",
+      "elevenlabs-turbo-v2-5",
+      "elevenlabs-dubbing-voice-clone",
+      "gemini-3.1-flash-tts-preview",
+      "gemini-2.5-pro-preview-tts",
+      "auto-suptitle-whisper",
+    ],
+  },
+  {
+    id: "utility",
+    label: "Utility",
+    description: "Upscale, 3D, URL asset",
+    modelIds: [
+      "gpt-image-2-enhance",
+      "tripo3d-v3.1",
+      "tripo3d-v3.0",
+      "tripo3d-v2.5",
+      "tripo3d-p1",
+      "hyper3d-gen2-260112",
+      "url-to-png",
+      "url-to-mp3",
+      "url-to-mp4",
+    ],
+  },
+];
+
+const MODEL_LABELS: Record<string, string> = {
+  "nano-banana-2": "Nano Banana 2",
+  "nano-banana-pro": "Nano Banana Pro",
+  "gpt-image-2": "GPT Image 2",
+  "seedream-5-0-260128": "Seedream 5",
+  "seedream-5-0-lite-260128": "Seedream 5 Lite",
+  "seedream-4-5-251128": "Seedream 4.5",
+  "qwen-image-runpod": "Qwen Image",
+  "qwen-image-edit-2511-runpod": "Qwen Edit",
+  "kling-v2-6-pro": "Kling 2.6 Pro",
+  "kling-v2-6-motion-pro": "Kling 2.6 Motion",
+  "kling-v3-pro": "Kling 3 Pro",
+  "kling-v3-motion-pro": "Kling 3 Motion",
+  "kling-v3-omni": "Kling 3 Omni",
+  "veo-3.1-generate-001": "Google Veo 3.1",
+  "seedance-1-5-pro-251215": "Seedance 1.5 Pro",
+  "seedance-2-0-lite": "Seedance 2.0 Fast",
+  "seedance-2-0-pro": "Seedance 2.0",
+  "dreamina-seedance-2-0-260128": "Seedance 2.0 API",
+  "dreamina-seedance-2-0-fast-260128": "Seedance 2.0 Fast API",
+  "elevenlabs-multilingual-v2": "ElevenLabs Voice",
+  "elevenlabs-turbo-v2-5": "ElevenLabs Turbo",
+  "elevenlabs-dubbing-voice-clone": "ElevenLabs Dubbing",
+  "gemini-3.1-flash-tts-preview": "Gemini TTS",
+  "gemini-2.5-pro-preview-tts": "Gemini Pro TTS",
+  "auto-suptitle-whisper": "Auto Subtitle",
+  "gpt-image-2-enhance": "Upscale",
+  "tripo3d-v3.1": "Tripo 3D v3.1",
+  "tripo3d-v3.0": "Tripo 3D v3.0",
+  "tripo3d-v2.5": "Tripo 3D v2.5",
+  "tripo3d-p1": "Tripo 3D P1",
+  "hyper3d-gen2-260112": "Hyper3D",
+  "url-to-png": "URL to PNG",
+  "url-to-mp3": "URL to MP3",
+  "url-to-mp4": "URL to MP4",
+};
+
+const allModelIds = Array.from(new Set(MODEL_GROUPS.flatMap((group) => group.modelIds)));
+
+function orgIdFromProfile(profile: unknown): string | null {
+  const p = profile as { organization_id?: string | null; org_id?: string | null } | null;
+  return p?.organization_id ?? p?.org_id ?? null;
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// AI Model Ranking (Overview card — compact)
-// ─────────────────────────────────────────────────────────────────────
-
-function ModelRankingCard({ models }: { models: import("./useTeacherData").ModelUsageRow[] }) {
-  const { t: i18n } = useLanguage();
-  const totalCredits = models.reduce((s, m) => s + m.total_credits, 0);
-  const top = models.slice(0, 5);
-  const rest = models.slice(5);
-  const restCredits = rest.reduce((s, m) => s + m.total_credits, 0);
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-          <BarChart3 className="h-3.5 w-3.5" />
-          {i18n("teacherCenter.aiModelsRankedByUsage30Days")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {top.map((m, i) => {
-          const meta = getModelMeta(m.model_id);
-          const percent = totalCredits > 0 ? Math.round((m.total_credits / totalCredits) * 100) : 0;
-          return (
-            <div key={m.model_id} className="flex items-center gap-3">
-              <div className="text-xs font-mono w-4 text-muted-foreground tabular-nums">
-                {i + 1}
-              </div>
-              <div className="text-base">{meta.emoji}</div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium truncate">{meta.display}</span>
-                  <span className="text-[10px] text-muted-foreground shrink-0">
-                    {m.uses} {i18n("teacherCenter.runs")} · {m.unique_users} {i18n("teacherCenter.users")}
-                  </span>
-                </div>
-                <div className="mt-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-1.5 rounded-full transition-all"
-                    style={{
-                      width: `${percent}%`,
-                      backgroundColor: getCategoryColor(meta.category),
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="text-right shrink-0 w-20">
-                <div className="text-sm font-semibold tabular-nums">
-                  {m.total_credits.toLocaleString()}
-                </div>
-                <div className="text-[10px] text-muted-foreground">{percent}%</div>
-              </div>
-            </div>
-          );
-        })}
-        {rest.length > 0 && (
-          <div className="pt-1 mt-1 border-t border-border/60">
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <div className="w-4" />
-              <div>+ {rest.length} {i18n("common.more")}</div>
-              <div className="flex-1" />
-              <div className="tabular-nums">{restCredits.toLocaleString()}</div>
-            </div>
-          </div>
-        )}
-        {models.length === 0 && (
-          <div className="text-sm text-muted-foreground py-6 text-center">
-            {i18n("teacherCenter.emptyModelUsageDescription")}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+function classSettings(row?: ClassRow | TeacherClass | null): Record<string, unknown> {
+  const settings = (row as { settings?: unknown } | null)?.settings;
+  return settings && typeof settings === "object" && !Array.isArray(settings)
+    ? { ...(settings as Record<string, unknown>) }
+    : {};
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// Top spenders card
-// ─────────────────────────────────────────────────────────────────────
-
-function TopSpendersCard({ members }: { members: ClassMember[] }) {
-  const { t: i18n } = useLanguage();
-  const sorted = [...members]
-    .filter((m) => m.status === "active")
-    .sort((a, b) => b.credits_lifetime_used - a.credits_lifetime_used)
-    .slice(0, 5);
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-          <Users className="h-3.5 w-3.5" />
-          {i18n("teacherCenter.topSpenders")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2.5">
-        {sorted.length === 0 && (
-          <div className="text-sm text-muted-foreground py-6 text-center">
-            {i18n("teacherCenter.noStudentsYet")}
-          </div>
-        )}
-        {sorted.map((m, i) => {
-          const cap = m.credits_lifetime_received || 200;
-          const percent = cap > 0 ? Math.min(Math.round((m.credits_lifetime_used / cap) * 100), 100) : 0;
-          return (
-            <div key={m.user_id} className="flex items-center gap-3">
-              <div className="text-xs font-mono w-4 text-muted-foreground tabular-nums">
-                {i + 1}
-              </div>
-              <Avatar className="h-7 w-7">
-                <AvatarImage src={m.avatar_url ?? undefined} />
-                <AvatarFallback className="text-[10px]">
-                  {(m.display_name ?? "??").slice(0, 2)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">
-                  {m.display_name ?? "Unnamed"}
-                </div>
-                <div className="text-[11px] text-muted-foreground font-mono truncate">
-                  {m.student_code ? `ID ${m.student_code}` : m.email ?? m.user_id.slice(0, 8)}
-                </div>
-                <div className="mt-1 h-1 rounded-full bg-muted overflow-hidden">
-                  <div className="h-1 rounded-full bg-primary" style={{ width: `${percent}%` }} />
-                </div>
-              </div>
-              <div className="text-right shrink-0">
-                <div className="text-sm font-semibold tabular-nums">
-                  {m.credits_balance}/{cap}
-                </div>
-                <div className="text-[10px] text-muted-foreground">{i18n("common.used_lower")}{m.credits_lifetime_used}</div>
-              </div>
-            </div>
-          );
-        })}
-      </CardContent>
-    </Card>
-  );
+function blockedModelIds(settings: Record<string, unknown>): string[] {
+  const raw = settings.blocked_model_ids;
+  if (!Array.isArray(raw)) return [...DEFAULT_BLOCKED_MODELS];
+  return raw.map((value) => String(value ?? "").trim()).filter(Boolean);
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// Insights — auto-generated tips
-// ─────────────────────────────────────────────────────────────────────
-
-function InsightsCard(props: {
-  models: import("./useTeacherData").ModelUsageRow[];
-  memberSummary?: ClassMemberSummary;
-  totalCredits: number;
-  usedCredits: number;
-}) {
-  const { t: i18n } = useLanguage();
-  const insights: { tone: "info" | "warn" | "ok"; text: string }[] = [];
-
-  // 1) Most-used model
-  if (props.models.length > 0) {
-    const top = props.models[0];
-    const meta = getModelMeta(top.model_id);
-    insights.push({
-      tone: "info",
-      text: `${meta.emoji} ${meta.display} ใช้มากที่สุด (${top.total_credits.toLocaleString()} เครดิต) — แนะนำเตรียมตัวอย่างให้นักเรียนเพิ่ม`,
-    });
-  }
-
-  // 2) Inactive students
-  const inactiveCount = props.memberSummary?.inactiveStudents ?? 0;
-  if (inactiveCount > 0) {
-    insights.push({
-      tone: "warn",
-      text: `🔔 มี ${inactiveCount} คนที่ยังไม่เคยใช้เครดิต — ส่ง notification เตือน?`,
-    });
-  }
-
-  // 3) Pool depletion warning
-  const remaining = props.totalCredits - props.usedCredits;
-  if (props.totalCredits > 0 && remaining / props.totalCredits < 0.2) {
-    insights.push({
-      tone: "warn",
-      text: `⚠️ เครดิตคลาสเหลือต่ำกว่า 20% — ขออนุมัติเพิ่มจาก org admin`,
-    });
-  }
-
-  // 4) Underused model (last in list with > 0)
-  if (props.models.length >= 3) {
-    const last = props.models[props.models.length - 1];
-    const meta = getModelMeta(last.model_id);
-    insights.push({
-      tone: "info",
-      text: `💭 ${meta.display} ใช้น้อยกว่าคาด (${last.total_credits} เครดิต) — อาจต้องสาธิตการใช้งานเพิ่ม`,
-    });
-  }
-
-  if (insights.length === 0) {
-    insights.push({ tone: "ok", text: "✅ ทุกอย่างดูปกติดี ไม่มี alert ในช่วงนี้" });
-  }
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-          <Sparkles className="h-3.5 w-3.5" />
-          {i18n("common.insights")}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {insights.map((it, i) => (
-          <div
-            key={i}
-            className={cn(
-              "text-sm px-3 py-2 rounded-md border",
-              it.tone === "warn" && "border-amber-500/30 bg-amber-500/5 text-amber-900 dark:text-amber-200",
-              it.tone === "info" && "border-border bg-accent/30",
-              it.tone === "ok"   && "border-emerald-500/30 bg-emerald-500/5 text-emerald-900 dark:text-emerald-200",
-            )}
-          >
-            {it.text}
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// AI Usage Panel (deep dive — separate tab)
-// ─────────────────────────────────────────────────────────────────────
-
-function AIUsagePanel({
-  models, totalRuns, totalCredits,
-}: {
-  models: import("./useTeacherData").ModelUsageRow[];
-  totalRuns: number;
-  totalCredits: number;
-}) {
-  const { t: i18n } = useLanguage();
-  const grouped = useMemo(() => {
-    const cats: Record<string, typeof models> = {};
-    models.forEach((m) => {
-      const cat = getModelMeta(m.model_id).category;
-      if (!cats[cat]) cats[cat] = [];
-      cats[cat].push(m);
-    });
-    return cats;
-  }, [models]);
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <StatCard
-          label={i18n("teacherCenter.totalRuns30d")}
-          value={totalRuns.toLocaleString()}
-          sub="across all models"
-          icon={<Activity className="h-3.5 w-3.5" />}
-          accent="primary"
-        />
-        <StatCard
-          label={i18n("teacherCenter.creditsSpent")}
-          value={totalCredits.toLocaleString()}
-          sub={`avg ${totalRuns > 0 ? (totalCredits / totalRuns).toFixed(1) : "0"} per run`}
-          icon={<Coins className="h-3.5 w-3.5" />}
-          accent="emerald"
-        />
-        <StatCard
-          label={i18n("teacherCenter.distinctModels")}
-          value={models.length.toString()}
-          sub="in use"
-          icon={<Sparkles className="h-3.5 w-3.5" />}
-          accent="violet"
-        />
-      </div>
-
-      {/* Bar chart */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">{i18n("teacherCenter.creditsPerModel")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={models.map((m) => ({
-                  ...m,
-                  display: getModelMeta(m.model_id).display,
-                  fill:    getCategoryColor(getModelMeta(m.model_id).category),
-                }))}
-                layout="vertical"
-                margin={{ top: 5, right: 16, left: 16, bottom: 5 }}
-              >
-                <XAxis type="number" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis
-                  dataKey="display"
-                  type="category"
-                  tick={{ fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={150}
-                />
-                <RTooltip
-                  contentStyle={{
-                    background: "var(--card)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                />
-                <Bar dataKey="total_credits" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Detailed table grouped by category */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">{i18n("teacherCenter.detailedBreakdown")}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          {Object.entries(grouped).map(([cat, list]) => (
-            <div key={cat}>
-              <div className="flex items-center gap-2 mb-2">
-                <div
-                  className="h-2 w-2 rounded-full"
-                  style={{ backgroundColor: getCategoryColor(cat as ModelCategory) }}
-                />
-                <span className="text-xs uppercase tracking-wider text-muted-foreground capitalize font-semibold">
-                  {cat}
-                </span>
-                <Separator className="flex-1" />
-                <span className="text-[10px] text-muted-foreground">
-                  {list.length} {list.length === 1 ? "model" : "models"}
-                </span>
-              </div>
-              <div className="space-y-1.5">
-                {list.map((m) => {
-                  const meta = getModelMeta(m.model_id);
-                  return (
-                    <div key={m.model_id} className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent/40 transition-colors">
-                      <div className="text-base">{meta.emoji}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{meta.display}</div>
-                        <div className="text-[11px] text-muted-foreground font-mono">
-                          {m.model_id}{meta.vendor ? ` · ${meta.vendor}` : ""}
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className="text-sm font-semibold tabular-nums">{m.uses}</div>
-                        <div className="text-[10px] text-muted-foreground">{i18n("common.runs")}</div>
-                      </div>
-                      <div className="text-right shrink-0 w-20">
-                        <div className="text-sm font-semibold tabular-nums">
-                          {m.total_credits.toLocaleString()}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground">{i18n("common.credits")}</div>
-                      </div>
-                      <div className="text-right shrink-0 w-12">
-                        <div className="text-xs tabular-nums text-muted-foreground">
-                          {m.unique_users}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground">{i18n("common.users")}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-          {models.length === 0 && (
-            <div className="text-sm text-muted-foreground py-10 text-center">
-              {i18n("teacherCenter.noModelUsageInLast30Days")}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// Members panel (table + drill-down sheet)
-// ─────────────────────────────────────────────────────────────────────
-
-function getPrimaryStudentSpace(member: ClassMember): ClassStudentSpace | null {
+function primarySpace(member: ClassMember): ClassStudentSpace | null {
   const spaces = member.spaces ?? [];
   return (
     spaces.find((space) => space.status === "active") ??
@@ -896,614 +202,913 @@ function getPrimaryStudentSpace(member: ClassMember): ClassStudentSpace | null {
   );
 }
 
-function MembersPanel({
-  members,
-  classId,
-  currentPage,
-  pageSize,
-  totalStudents,
-  hasMore,
-  onPageChange,
-}: {
-  members: ClassMember[];
-  classId: string;
-  currentPage: number;
-  pageSize: number;
-  totalStudents: number;
-  hasMore: boolean;
-  onPageChange: (page: number) => void;
-}) {
-  const { t: i18n } = useLanguage();
-  const [selected, setSelected] = useState<ClassMember | null>(null);
-  const startRow = totalStudents === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const endRow = totalStudents === 0 ? 0 : startRow + members.length - 1;
+function formatDateTime(value?: string | null): string {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+}
+
+function enrollmentUrl(code: string): string {
+  return `${window.location.origin}/enroll-class/${code}`;
+}
+
+function parsePositiveInt(value: string, fallback = 0): number {
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export default function TeacherCenter() {
+  const { user, profile } = useAuth();
+  const orgId = orgIdFromProfile(profile);
+  const { data: classes = [], isLoading } = useManageableClasses();
+  const [params, setParams] = useSearchParams();
+  const [createOpen, setCreateOpen] = useState(false);
+  const selectedClassId = params.get("class");
+  const effectiveClassId = selectedClassId ?? classes[0]?.id ?? null;
+
+  if (!user) return <Navigate to="/auth" replace />;
 
   return (
-    <>
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium">
-              {i18n("teacherCenter.classRoster")}
-              <span className="ml-2 text-xs text-muted-foreground font-normal">
-                {totalStudents} {i18n("common.students")}</span>
-            </CardTitle>
-            <Button size="sm" variant="outline">
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
-              {i18n("common.invite")}</Button>
+    <div className="min-h-screen bg-slate-50 text-slate-950">
+      <div className="flex min-h-screen">
+        <aside className="flex w-[280px] shrink-0 flex-col border-r border-slate-200 bg-white">
+          <div className="border-b border-slate-200 p-5">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+              University
+            </div>
+            <div className="mt-1 text-lg font-semibold">Teacher console</div>
+            <Button className="mt-4 h-9 w-full justify-center" onClick={() => setCreateOpen(true)} disabled={!orgId}>
+              <Plus className="mr-2 h-4 w-4" />
+              New class
+            </Button>
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <table className="w-full">
-            <thead>
-              <tr className="text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
-                <th className="text-left font-medium px-4 py-2.5">{i18n("common.student")}</th>
-                <th className="text-left font-medium px-4 py-2.5">{i18n("common.status")}</th>
-                <th className="text-left font-medium px-4 py-2.5">{i18n("common.space")}</th>
-                <th className="text-right font-medium px-4 py-2.5">{i18n("common.balance")}</th>
-                <th className="text-right font-medium px-4 py-2.5">{i18n("common.used")}</th>
-                <th className="w-10"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((m) => {
-                const space = getPrimaryStudentSpace(m);
-                const cap = m.credits_lifetime_received || space?.credits_lifetime_received || 200;
-                const percent = cap > 0 ? Math.min(Math.round((m.credits_balance / cap) * 100), 100) : 0;
-                return (
-                  <tr
-                    key={m.user_id}
-                    className="border-b border-border/40 hover:bg-accent/40 cursor-pointer"
-                    onClick={() => setSelected(m)}
-                  >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2.5">
-                        <Avatar className="h-7 w-7">
-                          <AvatarImage src={m.avatar_url ?? undefined} />
-                          <AvatarFallback className="text-[10px]">
-                            {(m.display_name ?? "??").slice(0, 2)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium truncate">
-                            {m.display_name ?? "Unnamed"}
-                          </div>
-                          <div className="max-w-[220px] truncate text-[11px] text-muted-foreground">
-                            {m.email ?? "No email"}
-                          </div>
-                          <div className="max-w-[220px] truncate text-[11px] text-muted-foreground font-mono">
-                            {m.student_code ? `ID ${m.student_code}` : `${m.user_id.slice(0, 8)}...`}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={m.status === "active" ? "default" : "secondary"} className="text-[10px]">
-                        {m.status}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      {space ? (
-                        <div className="space-y-1">
-                          <Badge variant={space.status === "active" ? "outline" : "secondary"} className="text-[10px]">
-                            {space.status}
-                          </Badge>
-                          <div className="max-w-[180px] truncate text-[11px] text-muted-foreground">
-                            {space.workspace_name ?? space.workspace_id}
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">{i18n("teacherCenter.noClassSpace")}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="text-sm font-semibold tabular-nums">
-                        {m.credits_balance}/{cap}
-                      </div>
-                      <Progress value={percent} className="h-1 mt-1 ml-auto w-20" />
-                    </td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums">
-                      {m.credits_lifetime_used}
-                    </td>
-                    <td className="px-4 py-3">
-                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground ml-auto" />
-                    </td>
-                  </tr>
-                );
-              })}
-              {members.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">
-                    {i18n("teacherCenter.emptyRosterDescription")}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </CardContent>
-        <div className="flex items-center justify-between border-t border-border px-4 py-3 text-xs text-muted-foreground">
-          <span>
-            {totalStudents === 0
-              ? "No students"
-              : `Showing ${startRow}-${endRow} of ${totalStudents}`}
-          </span>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={currentPage <= 1}
-              onClick={() => onPageChange(currentPage - 1)}
-            >
-              {i18n("common.previous")}</Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!hasMore}
-              onClick={() => onPageChange(currentPage + 1)}
-            >
-              {i18n("common.next")}</Button>
-          </div>
-        </div>
-      </Card>
 
-      {/* Member detail drill-down */}
-      <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
-        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
-          {selected && (
-            <MemberDetail member={selected} classId={classId} />
+          <div className="flex-1 overflow-y-auto p-3">
+            {isLoading ? (
+              <div className="flex items-center gap-2 px-2 py-4 text-sm text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading classes
+              </div>
+            ) : classes.length === 0 ? (
+              <div className="rounded-md border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+                Create a class to start issuing QR credits.
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {classes.map((cls) => (
+                  <button
+                    key={cls.id}
+                    onClick={() => setParams({ class: cls.id })}
+                    className={cn(
+                      "w-full rounded-md px-3 py-3 text-left transition",
+                      effectiveClassId === cls.id
+                        ? "bg-emerald-50 ring-1 ring-emerald-200"
+                        : "hover:bg-slate-50",
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 font-medium">{cls.name}</div>
+                      <Badge variant={cls.status === "active" ? "default" : "secondary"} className="shrink-0 text-[10px]">
+                        {cls.status}
+                      </Badge>
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {cls.code} · {Number(cls.credit_amount ?? 0).toLocaleString()} credits / join
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-slate-200 p-3">
+            <BackToWorkspaceButton />
+          </div>
+        </aside>
+
+        <main className="min-w-0 flex-1">
+          {effectiveClassId ? (
+            <ClassConsole classId={effectiveClassId} fallbackClass={classes.find((cls) => cls.id === effectiveClassId) ?? null} />
+          ) : (
+            <EmptyState canCreate={!!orgId} onCreate={() => setCreateOpen(true)} />
           )}
-        </SheetContent>
-      </Sheet>
-    </>
+        </main>
+      </div>
+
+      {orgId && (
+        <CreateClassDialog
+          open={createOpen}
+          orgId={orgId}
+          onOpenChange={setCreateOpen}
+          onCreated={(cls) => {
+            setCreateOpen(false);
+            setParams({ class: cls.id });
+          }}
+        />
+      )}
+    </div>
   );
 }
 
-function MemberDetail({ member, classId }: { member: ClassMember; classId: string }) {
-  const { t: i18n, language } = useLanguage();
-  const { data: breakdown } = useMemberModelBreakdown(classId, member.user_id, 30);
-  const queryClient = useQueryClient();
-  const activeSpace = getPrimaryStudentSpace(member);
-  const [creditAmount, setCreditAmount] = useState("250");
-  const [creditReason, setCreditReason] = useState("");
-  const cap = member.credits_lifetime_received || activeSpace?.credits_lifetime_received || 200;
-  const percent = cap > 0 ? Math.min(Math.round((member.credits_balance / cap) * 100), 100) : 0;
-  const refreshMemberData = () => {
-    queryClient.invalidateQueries({ queryKey: ["class-members-detailed", classId] });
-    queryClient.invalidateQueries({ queryKey: ["class-member-summary", classId] });
-    queryClient.invalidateQueries({ queryKey: ["class-top-spenders", classId] });
-    queryClient.invalidateQueries({ queryKey: ["teacher-classes"] });
-    queryClient.invalidateQueries({ queryKey: ["class-activity", classId] });
+function BackToWorkspaceButton() {
+  const navigate = useNavigate();
+  return (
+    <Button variant="ghost" className="h-9 w-full justify-start text-slate-600" onClick={() => navigate("/app/workspace")}>
+      <ArrowLeft className="mr-2 h-4 w-4" />
+      Workspace
+    </Button>
+  );
+}
+
+function EmptyState({ canCreate, onCreate }: { canCreate: boolean; onCreate: () => void }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center p-10">
+      <div className="max-w-sm text-center">
+        <BookOpen className="mx-auto h-10 w-10 text-slate-300" />
+        <h1 className="mt-4 text-xl font-semibold">No classes yet</h1>
+        <p className="mt-2 text-sm text-slate-500">
+          Start with one class, then share its QR code with students.
+        </p>
+        {canCreate && (
+          <Button className="mt-5" onClick={onCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create class
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ClassConsole({ classId, fallbackClass }: { classId: string; fallbackClass: TeacherClass | null }) {
+  const qc = useQueryClient();
+  const [selectedCreditTarget, setSelectedCreditTarget] = useState<ClassMember | null>(null);
+  const detail = useQuery({
+    queryKey: ["teacher-class-detail", classId],
+    queryFn: () => consumerOrgAdminApi.getClass(classId),
+  });
+  const members = useQuery({
+    queryKey: ["teacher-class-members", classId],
+    queryFn: () => consumerOrgAdminApi.listClassMembers(classId),
+  });
+  const codes = useQuery({
+    queryKey: ["teacher-class-codes", classId],
+    queryFn: () => consumerOrgAdminApi.listCodes(classId),
+  });
+
+  const cls = detail.data?.class ?? (fallbackClass as unknown as ClassRow | null);
+  const classMembers = (members.data?.members ?? []).filter((member) => member.status !== "removed");
+  const activeCode = (codes.data?.codes ?? []).find((code) => {
+    if (code.expires_at && Date.parse(code.expires_at) <= Date.now()) return false;
+    if (code.max_uses && code.uses_count >= code.max_uses) return false;
+    return true;
+  });
+  const remainingPool = detail.data?.credit_pool_remaining ?? Math.max(Number(cls?.credit_pool ?? 0) - Number(cls?.credit_pool_consumed ?? 0), 0);
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["teacher-classes"] });
+    qc.invalidateQueries({ queryKey: ["teacher-class-detail", classId] });
+    qc.invalidateQueries({ queryKey: ["teacher-class-members", classId] });
+    qc.invalidateQueries({ queryKey: ["teacher-class-codes", classId] });
   };
-  const grantCredits = useMutation({
-    mutationFn: async () => {
-      const amount = parseInt(creditAmount, 10);
-      if (!Number.isInteger(amount) || amount <= 0) {
-        throw new Error("amount_must_be_positive");
+
+  const endClass = useMutation({
+    mutationFn: () => consumerOrgAdminApi.endClass(classId),
+    onSuccess: () => {
+      toast.success("Class closed");
+      refresh();
+    },
+    onError: (error: any) => toast.error(friendlyError(error?.message ?? error)),
+  });
+
+  if (detail.isLoading && !cls) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+      </div>
+    );
+  }
+
+  if (!cls) {
+    return <div className="p-8 text-sm text-slate-500">Class not found.</div>;
+  }
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-5 p-6">
+      <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <Badge variant="outline" className="font-mono">{cls.code}</Badge>
+            <span>Created {formatDateTime((cls as any).created_at)}</span>
+          </div>
+          <h1 className="mt-2 truncate text-3xl font-semibold">{cls.name}</h1>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="outline" onClick={refresh}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" disabled={endClass.isPending}>
+                <Ban className="mr-2 h-4 w-4" />
+                Close class
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Close this class?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Students will no longer be able to join with QR codes. Existing class spaces are kept for review and download.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => endClass.mutate()}>Close class</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </header>
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <Metric label="Students" value={classMembers.length.toLocaleString()} icon={<Users className="h-4 w-4" />} />
+        <Metric label="Class pool" value={Number(cls.credit_pool ?? 0).toLocaleString()} icon={<Wallet className="h-4 w-4" />} />
+        <Metric label="Available" value={remainingPool.toLocaleString()} icon={<ShieldCheck className="h-4 w-4" />} />
+        <Metric label="Credits / join" value={Number(cls.credit_amount ?? 0).toLocaleString()} icon={<QrCode className="h-4 w-4" />} />
+      </div>
+
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="space-y-4">
+          <QrSection
+            classId={classId}
+            cls={cls}
+            activeCode={activeCode ?? null}
+            codes={codes.data?.codes ?? []}
+            remainingPool={remainingPool}
+            onChanged={refresh}
+          />
+          <StudentSection
+            classId={classId}
+            members={classMembers}
+            loading={members.isLoading}
+            onChanged={refresh}
+            onCreditTarget={setSelectedCreditTarget}
+          />
+        </div>
+        <div className="space-y-4">
+          <PoolTopUpSection classId={classId} remainingPool={remainingPool} onChanged={refresh} />
+          <ModelAccessSection cls={cls} onChanged={refresh} />
+          <ManualStudentSection classId={classId} onChanged={refresh} />
+          <EmergencyCreditSection classId={classId} members={classMembers} onChanged={refresh} />
+        </div>
+      </div>
+
+      <CreditDialog
+        classId={classId}
+        target={selectedCreditTarget}
+        onClose={() => setSelectedCreditTarget(null)}
+        onChanged={() => {
+          setSelectedCreditTarget(null);
+          refresh();
+        }}
+      />
+    </div>
+  );
+}
+
+function Metric({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-white p-4">
+      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+        {icon}
+        {label}
+      </div>
+      <div className="mt-2 text-2xl font-semibold tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+function QrSection({
+  classId,
+  cls,
+  activeCode,
+  codes,
+  remainingPool,
+  onChanged,
+}: {
+  classId: string;
+  cls: ClassRow;
+  activeCode: ClassEnrollmentCode | null;
+  codes: ClassEnrollmentCode[];
+  remainingPool: number;
+  onChanged: () => void;
+}) {
+  const [credits, setCredits] = useState(String(cls.credit_amount || DEFAULT_QR_CREDITS));
+  const [scanLimit, setScanLimit] = useState("");
+  const [showAllCodes, setShowAllCodes] = useState(false);
+  const createCode = useMutation({
+    mutationFn: () => {
+      const creditAmount = parsePositiveInt(credits, DEFAULT_QR_CREDITS);
+      const maxUses = scanLimit.trim() ? parsePositiveInt(scanLimit, 1) : null;
+      return consumerOrgAdminApi.createCode(classId, {
+        credit_amount: creditAmount,
+        max_uses: maxUses,
+      });
+    },
+    onSuccess: ({ code }) => {
+      toast.success(`QR ready: ${code.code}`);
+      onChanged();
+    },
+    onError: (error: any) => toast.error(friendlyError(error?.message ?? error)),
+  });
+  const revokeCode = useMutation({
+    mutationFn: (codeId: string) => consumerOrgAdminApi.revokeCode(classId, codeId),
+    onSuccess: () => {
+      toast.success("QR code revoked");
+      onChanged();
+    },
+    onError: (error: any) => toast.error(friendlyError(error?.message ?? error)),
+  });
+
+  const parsedCredits = parsePositiveInt(credits, 0);
+  const parsedLimit = scanLimit.trim() ? parsePositiveInt(scanLimit, 0) : null;
+  const requiredPool = parsedLimit ? parsedCredits * parsedLimit : parsedCredits;
+  const poolWarning = parsedCredits > 0 && requiredPool > remainingPool;
+  const url = activeCode ? enrollmentUrl(activeCode.code) : "";
+
+  const copy = async (text: string, label: string) => {
+    await navigator.clipboard.writeText(text);
+    toast.success(`${label} copied`);
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <QrCode className="h-5 w-5 text-emerald-600" />
+              Student entry
+            </CardTitle>
+            <p className="mt-1 text-sm text-slate-500">
+              Share one link. School-domain accounts join automatically and get a class space.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <div className="w-28">
+              <Label className="text-xs">Credits / scan</Label>
+              <Input className="h-9" type="number" min="1" value={credits} onChange={(event) => setCredits(event.target.value)} />
+            </div>
+            <div className="w-28">
+              <Label className="text-xs">Scan limit</Label>
+              <Input className="h-9" type="number" min="1" value={scanLimit} onChange={(event) => setScanLimit(event.target.value)} placeholder="No limit" />
+            </div>
+            <div className="flex items-end">
+              <Button className="h-9" disabled={createCode.isPending || poolWarning || parsedCredits <= 0} onClick={() => createCode.mutate()}>
+                {createCode.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                New QR
+              </Button>
+            </div>
+          </div>
+        </div>
+        {poolWarning && (
+          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Add class pool credits first. This QR needs at least {requiredPool.toLocaleString()} credits.
+          </div>
+        )}
+      </CardHeader>
+      <CardContent>
+        {activeCode ? (
+          <div className="grid gap-4 md:grid-cols-[160px_minmax(0,1fr)]">
+            <div className="rounded-md border bg-white p-3">
+              <QRCodeSVG value={url} size={132} level="M" />
+            </div>
+            <div className="min-w-0 space-y-3">
+              <div>
+                <div className="font-mono text-lg font-semibold">{activeCode.code}</div>
+                <div className="mt-1 break-all text-sm text-slate-600">{url}</div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="secondary">{Number(activeCode.credit_amount ?? 0).toLocaleString()} credits / student</Badge>
+                <Badge variant="outline">
+                  {activeCode.max_uses ? `${activeCode.uses_count}/${activeCode.max_uses} scans` : `${activeCode.uses_count} scans`}
+                </Badge>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => copy(activeCode.code, "Code")}>
+                  <Clipboard className="mr-2 h-4 w-4" />
+                  Copy code
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => copy(url, "Link")}>
+                  <Clipboard className="mr-2 h-4 w-4" />
+                  Copy link
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowAllCodes((value) => !value)}>
+                  {showAllCodes ? "Hide old QR" : "Show all QR"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
+            No active QR yet. Set credits per scan and create one.
+          </div>
+        )}
+
+        {showAllCodes && codes.length > 0 && (
+          <div className="mt-4 overflow-hidden rounded-md border border-slate-200">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Code</th>
+                  <th className="px-3 py-2 font-medium">Credits</th>
+                  <th className="px-3 py-2 font-medium">Scans</th>
+                  <th className="px-3 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {codes.map((code) => (
+                  <tr key={code.id} className="border-t border-slate-100">
+                    <td className="px-3 py-2 font-mono">{code.code}</td>
+                    <td className="px-3 py-2">{Number(code.credit_amount ?? 0).toLocaleString()}</td>
+                    <td className="px-3 py-2">{code.max_uses ? `${code.uses_count}/${code.max_uses}` : code.uses_count}</td>
+                    <td className="px-3 py-2 text-right">
+                      <Button variant="ghost" size="icon" disabled={revokeCode.isPending} onClick={() => revokeCode.mutate(code.id)}>
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PoolTopUpSection({ classId, remainingPool, onChanged }: { classId: string; remainingPool: number; onChanged: () => void }) {
+  const [amount, setAmount] = useState("");
+  const addPool = useMutation({
+    mutationFn: () => {
+      const parsed = parsePositiveInt(amount, 0);
+      if (parsed <= 0) throw new Error("amount_must_be_positive");
+      return consumerOrgAdminApi.allocateToClass(classId, parsed, "teacher_pool_top_up");
+    },
+    onSuccess: () => {
+      toast.success("Class pool updated");
+      setAmount("");
+      onChanged();
+    },
+    onError: (error: any) => toast.error(friendlyError(error?.message ?? error)),
+  });
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Wallet className="h-4 w-4 text-emerald-600" />
+          Class pool
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="rounded-md bg-emerald-50 px-3 py-2">
+          <div className="text-xs text-emerald-700">Available for QR and emergency grants</div>
+          <div className="text-2xl font-semibold tabular-nums">{remainingPool.toLocaleString()}</div>
+        </div>
+        <div className="flex gap-2">
+          <Input type="number" min="1" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Add credits" />
+          <Button className="shrink-0" disabled={!amount || addPool.isPending} onClick={() => addPool.mutate()}>
+            {addPool.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ModelAccessSection({ cls, onChanged }: { cls: ClassRow; onChanged: () => void }) {
+  const settings = useMemo(() => classSettings(cls), [cls]);
+  const initialBlocked = useMemo(() => blockedModelIds(settings), [settings]);
+  const [blocked, setBlocked] = useState<string[]>(initialBlocked);
+  useEffect(() => setBlocked(initialBlocked), [initialBlocked.join("|")]);
+
+  const save = useMutation({
+    mutationFn: () => consumerOrgAdminApi.updateClass(cls.id, {
+      settings: {
+        ...settings,
+        blocked_model_ids: Array.from(new Set(blocked)),
+      },
+    }),
+    onSuccess: () => {
+      toast.success("Model access saved");
+      onChanged();
+    },
+    onError: (error: any) => toast.error(friendlyError(error?.message ?? error)),
+  });
+
+  const setGroupAllowed = (group: ModelGroup, allowed: boolean) => {
+    setBlocked((current) => {
+      const next = new Set(current);
+      for (const id of group.modelIds) {
+        if (allowed) next.delete(id);
+        else next.add(id);
       }
-      if (activeSpace?.workspace_id) {
+      return Array.from(next);
+    });
+  };
+  const toggleModel = (modelId: string) => {
+    setBlocked((current) => current.includes(modelId)
+      ? current.filter((id) => id !== modelId)
+      : [...current, modelId]);
+  };
+  const blockSeedance2 = () => {
+    setBlocked((current) => Array.from(new Set([...current, ...DEFAULT_BLOCKED_MODELS])));
+  };
+
+  const changed = blocked.slice().sort().join("|") !== initialBlocked.slice().sort().join("|");
+  const blockedCount = blocked.filter((id) => allModelIds.includes(id)).length;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center justify-between gap-3 text-base">
+          <span className="flex items-center gap-2">
+            <Lock className="h-4 w-4 text-emerald-600" />
+            Model access
+          </span>
+          <Badge variant={blockedCount ? "secondary" : "outline"}>{blockedCount} blocked</Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-2">
+          {MODEL_GROUPS.map((group) => {
+            const groupBlocked = group.modelIds.filter((id) => blocked.includes(id)).length;
+            const allowed = groupBlocked < group.modelIds.length;
+            return (
+              <label key={group.id} className="flex cursor-pointer items-start gap-3 rounded-md border border-slate-200 p-3 hover:bg-slate-50">
+                <Checkbox checked={allowed} onCheckedChange={(value) => setGroupAllowed(group, Boolean(value))} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">{group.label}</span>
+                  <span className="block text-xs text-slate-500">{group.description}</span>
+                </span>
+                {groupBlocked > 0 && <Badge variant="outline" className="text-[10px]">{groupBlocked} off</Badge>}
+              </label>
+            );
+          })}
+        </div>
+
+        <details className="rounded-md border border-slate-200 p-3">
+          <summary className="cursor-pointer text-sm font-medium">Specific models</summary>
+          <div className="mt-3 grid max-h-56 gap-2 overflow-y-auto pr-1">
+            {allModelIds.map((modelId) => {
+              const isAllowed = !blocked.includes(modelId);
+              return (
+                <label key={modelId} className="flex cursor-pointer items-center gap-2 text-sm">
+                  <Checkbox checked={isAllowed} onCheckedChange={() => toggleModel(modelId)} />
+                  <span className={cn(!isAllowed && "text-slate-400 line-through")}>{MODEL_LABELS[modelId] ?? modelId}</span>
+                </label>
+              );
+            })}
+          </div>
+        </details>
+
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => setBlocked([])}>
+            <Unlock className="mr-2 h-4 w-4" />
+            Allow all
+          </Button>
+          <Button variant="outline" size="sm" onClick={blockSeedance2}>
+            Block Seedance 2.0
+          </Button>
+          <Button size="sm" disabled={!changed || save.isPending} onClick={() => save.mutate()}>
+            {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save access
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ManualStudentSection({ classId, onChanged }: { classId: string; onChanged: () => void }) {
+  const [email, setEmail] = useState("");
+  const [studentCode, setStudentCode] = useState("");
+  const [credits, setCredits] = useState("0");
+  const addStudent = useMutation({
+    mutationFn: () => consumerOrgAdminApi.addStudentByEmail(
+      classId,
+      email.trim().toLowerCase(),
+      Math.max(0, parseInt(credits, 10) || 0),
+      studentCode.trim() || undefined,
+      "teacher_manual_student",
+    ),
+    onSuccess: () => {
+      toast.success("Student added");
+      setEmail("");
+      setStudentCode("");
+      setCredits("0");
+      onChanged();
+    },
+    onError: (error: any) => toast.error(friendlyError(error?.message ?? error)),
+  });
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <UserPlus className="h-4 w-4 text-emerald-600" />
+          Manual student
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div>
+          <Label className="text-xs">Email</Label>
+          <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="student@gmail.com" />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Label className="text-xs">Student ID</Label>
+            <Input value={studentCode} onChange={(event) => setStudentCode(event.target.value)} placeholder="Optional" />
+          </div>
+          <div>
+            <Label className="text-xs">Starting credits</Label>
+            <Input type="number" min="0" value={credits} onChange={(event) => setCredits(event.target.value)} />
+          </div>
+        </div>
+        <Button className="w-full" disabled={!email.trim() || addStudent.isPending} onClick={() => addStudent.mutate()}>
+          {addStudent.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+          Add student
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function EmergencyCreditSection({ classId, members, onChanged }: { classId: string; members: ClassMember[]; onChanged: () => void }) {
+  const [email, setEmail] = useState("");
+  const [amount, setAmount] = useState("250");
+  const grant = useMutation({
+    mutationFn: async () => {
+      const cleanEmail = email.trim().toLowerCase();
+      const parsed = parsePositiveInt(amount, 0);
+      if (!cleanEmail || parsed <= 0) throw new Error("email_and_amount_required");
+      const member = members.find((candidate) => String(candidate.email ?? "").toLowerCase() === cleanEmail);
+      if (!member) {
+        return consumerOrgAdminApi.addStudentByEmail(
+          classId,
+          cleanEmail,
+          parsed,
+          undefined,
+          "teacher_emergency_credit_new_student",
+        );
+      }
+      const space = primarySpace(member);
+      if (space?.workspace_id) {
         return consumerOrgAdminApi.grantCredits(
           classId,
           member.user_id,
-          activeSpace.workspace_id,
-          amount,
-          creditReason || "teacher_center_space_grant",
+          space.workspace_id,
+          parsed,
+          "teacher_emergency_credit",
         );
       }
       return consumerOrgAdminApi.ensureStudentSpace(
         classId,
         member.user_id,
-        amount,
-        creditReason || "teacher_center_space_create_and_grant",
+        parsed,
+        "teacher_emergency_credit_create_space",
       );
     },
     onSuccess: () => {
-      toast.success(i18n("teacherCenter.spaceCreditsUpdated"));
-      setCreditAmount("250");
-      setCreditReason("");
-      refreshMemberData();
+      toast.success("Credits added");
+      setEmail("");
+      setAmount("250");
+      onChanged();
     },
-    onError: (error: any) => {
-      toast.error(friendlyError(error?.message ?? error, language === "th" ? "th" : "en"));
-    },
+    onError: (error: any) => toast.error(friendlyError(error?.message ?? error)),
   });
-  const setSpaceStatus = useMutation({
-    mutationFn: async (status: "active" | "submitted" | "passed" | "ended") => {
-      if (!activeSpace?.workspace_id) throw new Error("student_space_not_found");
-      return consumerOrgAdminApi.setSpaceStatus(classId, activeSpace.workspace_id, status);
-    },
-    onSuccess: (_, status) => {
-      toast.success(
-        status === "passed"
-          ? i18n("teacherCenter.spaceMarkedAsPassed")
-          : i18n("teacherCenter.spaceStatusSet", { status }),
-      );
-      refreshMemberData();
-    },
-    onError: (error: any) => toast.error(friendlyError(error?.message ?? error, language === "th" ? "th" : "en")),
-  });
-
-  return (
-    <div className="space-y-5">
-      <SheetHeader>
-        <div className="flex items-center gap-3">
-          <Avatar className="h-12 w-12">
-            <AvatarImage src={member.avatar_url ?? undefined} />
-            <AvatarFallback>{(member.display_name ?? "??").slice(0, 2)}</AvatarFallback>
-          </Avatar>
-          <div>
-            <SheetTitle className="text-left">{member.display_name ?? "Unnamed"}</SheetTitle>
-            <SheetDescription className="text-left">
-              <span className="block text-xs text-muted-foreground">
-                {member.email ?? "No email"}
-              </span>
-              <span className="block font-mono text-[11px] text-muted-foreground">
-                {member.student_code ? `Student ID ${member.student_code}` : member.user_id}
-              </span>
-            </SheetDescription>
-          </div>
-        </div>
-      </SheetHeader>
-
-      {/* Credit summary */}
-      <Card>
-        <CardContent className="p-4 space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">{i18n("common.classSpace")}</span>
-            <Badge variant={activeSpace?.status === "active" ? "outline" : "secondary"} className="text-[10px]">
-              {activeSpace?.status ?? "not created"}
-            </Badge>
-          </div>
-          <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="text-muted-foreground">{i18n("common.studentId")}</span>
-            <span className="max-w-[220px] truncate font-mono text-xs">
-              {member.student_code ?? "not set"}
-            </span>
-          </div>
-          {activeSpace && (
-            <div className="text-xs text-muted-foreground break-all">
-              {activeSpace.workspace_name ?? activeSpace.workspace_id}
-            </div>
-          )}
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">{i18n("teacherCenter.currentBalance")}</span>
-            <span className="font-semibold tabular-nums">{member.credits_balance}/{cap}</span>
-          </div>
-          <Progress value={percent} className="h-1.5" />
-          <div className="grid grid-cols-2 gap-3 pt-2 text-sm">
-            <div>
-              <div className="text-xs text-muted-foreground">{i18n("teacherCenter.lifetimeReceived")}</div>
-              <div className="font-semibold tabular-nums">{member.credits_lifetime_received}</div>
-            </div>
-            <div>
-              <div className="text-xs text-muted-foreground">{i18n("teacherCenter.lifetimeUsed")}</div>
-              <div className="font-semibold tabular-nums">{member.credits_lifetime_used}</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">{i18n("teacherCenter.spaceManagement")}</CardTitle>
-          <CardDescription>
-            {i18n("teacherCenter.spaceManagementDescription")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-[120px_1fr] gap-2">
-            <div>
-              <Label className="text-xs">{i18n("common.credits_title")}</Label>
-              <Input
-                type="number"
-                min="1"
-                value={creditAmount}
-                onChange={(event) => setCreditAmount(event.target.value)}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">{i18n("common.reason")}</Label>
-              <Input
-                value={creditReason}
-                onChange={(event) => setCreditReason(event.target.value)}
-                placeholder={i18n("teacherCenter.manualClassSpaceGrant")}
-              />
-            </div>
-          </div>
-          <Button
-            size="sm"
-            className="w-full"
-            disabled={grantCredits.isPending}
-            onClick={() => grantCredits.mutate()}
-          >
-            {grantCredits.isPending ? (
-              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-            ) : (
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
-            )}
-            {i18n("teacherCenter.addCreditsToSpace")}
-          </Button>
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!activeSpace || setSpaceStatus.isPending}
-              onClick={() => setSpaceStatus.mutate("passed")}
-            >
-              <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-              {i18n("teacherCenter.markPassed")}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!activeSpace || setSpaceStatus.isPending}
-              onClick={() => setSpaceStatus.mutate("ended")}
-            >
-              <Ban className="h-3.5 w-3.5 mr-1.5" />
-              {i18n("teacherCenter.endSpace")}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Per-model breakdown */}
-      <div>
-        <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-          {i18n("teacherCenter.modelUsage30Days")}
-        </div>
-        {(breakdown ?? []).length === 0 ? (
-          <div className="text-sm text-muted-foreground py-6 text-center border rounded-md">
-            {i18n("teacherCenter.noModelUsageYet")}
-          </div>
-        ) : (
-          <div className="space-y-1.5">
-            {(breakdown ?? []).map((m) => {
-              const meta = getModelMeta(m.model_id);
-              return (
-                <div key={m.model_id} className="flex items-center gap-3 p-2 rounded-md border">
-                  <div className="text-base">{meta.emoji}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{meta.display}</div>
-                    <div className="text-[10px] text-muted-foreground">{m.uses} {i18n("common.runs")}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-semibold tabular-nums">{m.total_credits}</div>
-                    <div className="text-[10px] text-muted-foreground">{i18n("common.credits")}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// Activity panel (event feed)
-// ─────────────────────────────────────────────────────────────────────
-
-function CodesPanel({
-  classId,
-  creditPoolRemaining,
-}: {
-  classId: string;
-  creditPoolRemaining: number;
-}) {
-  const { t: i18n } = useLanguage();
-  const [createOpen, setCreateOpen] = useState(false);
-  const [showQR, setShowQR] = useState<ClassEnrollmentCode | null>(null);
-  const codesQuery = useQuery({
-    queryKey: ["teacher-enrollment-codes", classId],
-    enabled: !!classId,
-    queryFn: () => consumerOrgAdminApi.listCodes(classId),
-  });
-  const revokeCode = useMutation({
-    mutationFn: (codeId: string) => consumerOrgAdminApi.revokeCode(classId, codeId),
-    onSuccess: () => {
-      toast.success(i18n("teacherCenter.qrCodeRevoked"));
-      codesQuery.refetch();
-    },
-    onError: (error: any) => toast.error(error?.message ?? "Could not revoke code"),
-  });
-  const codes = codesQuery.data?.codes ?? [];
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          Emergency credits
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
         <div>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <QrCode className="h-4 w-4" />
-            {i18n("teacherCenter.enrollmentQrCodes")}
-          </CardTitle>
-          <CardDescription>
-            {i18n("teacherCenter.codesDescription")}
-          </CardDescription>
+          <Label className="text-xs">Student email</Label>
+          <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="student@email.com" />
         </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => codesQuery.refetch()} disabled={codesQuery.isFetching}>
-            <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", codesQuery.isFetching && "animate-spin")} />
-            {i18n("common.refresh")}</Button>
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="h-3.5 w-3.5 mr-1.5" />
-            {i18n("teacherCenter.newQr")}
+        <div className="flex gap-2">
+          <Input type="number" min="1" value={amount} onChange={(event) => setAmount(event.target.value)} />
+          <Button className="shrink-0" disabled={!email.trim() || !amount || grant.isPending} onClick={() => grant.mutate()}>
+            {grant.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Grant"}
           </Button>
         </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        {codesQuery.isLoading ? (
-          <div className="py-10 flex items-center justify-center text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
-          </div>
-        ) : codes.length === 0 ? (
-          <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-            {i18n("teacherCenter.noActiveQrCodesYet")}
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
-                <th className="text-left font-medium px-4 py-2.5">{i18n("common.code")}</th>
-                <th className="text-right font-medium px-4 py-2.5">{i18n("common.credits_title")}</th>
-                <th className="text-right font-medium px-4 py-2.5">{i18n("common.uses")}</th>
-                <th className="text-left font-medium px-4 py-2.5">{i18n("common.expires")}</th>
-                <th className="text-left font-medium px-4 py-2.5">{i18n("common.description")}</th>
-                <th className="w-24"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {codes.map((code) => (
-                <tr key={code.id} className="border-b border-border/40 hover:bg-accent/40">
-                  <td className="px-4 py-3 font-mono">{code.code}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {Number(code.credit_amount ?? 0).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {code.uses_count}{code.max_uses ? ` / ${code.max_uses}` : " / unlimited"}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">
-                    {code.expires_at ? new Date(code.expires_at).toLocaleString() : "No expiry"}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">
-                    {code.description ?? "-"}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Button size="icon" variant="ghost" onClick={() => setShowQR(code)}>
-                      <QrCode className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      disabled={revokeCode.isPending}
-                      onClick={() => revokeCode.mutate(code.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
       </CardContent>
-
-      <CreateCodeDialog
-        open={createOpen}
-        classId={classId}
-        creditPoolRemaining={creditPoolRemaining}
-        onOpenChange={setCreateOpen}
-        onCreated={(code) => {
-          setCreateOpen(false);
-          codesQuery.refetch();
-          setShowQR(code);
-        }}
-      />
-      <QRDialog code={showQR} onClose={() => setShowQR(null)} />
     </Card>
   );
 }
 
-function CreateCodeDialog({
-  open,
+function StudentSection({
   classId,
-  creditPoolRemaining,
-  onOpenChange,
-  onCreated,
+  members,
+  loading,
+  onChanged,
+  onCreditTarget,
 }: {
-  open: boolean;
   classId: string;
-  creditPoolRemaining: number;
-  onOpenChange: (open: boolean) => void;
-  onCreated: (code: ClassEnrollmentCode) => void;
+  members: ClassMember[];
+  loading: boolean;
+  onChanged: () => void;
+  onCreditTarget: (member: ClassMember) => void;
 }) {
-  const { t: i18n } = useLanguage();
-  const [creditAmount, setCreditAmount] = useState("250");
-  const [maxUses, setMaxUses] = useState("");
-  const [expiresMinutes, setExpiresMinutes] = useState("");
-  const [description, setDescription] = useState("");
-  const parsedCredits = Math.max(0, parseInt(creditAmount, 10) || 0);
-  const tooMuch = parsedCredits > creditPoolRemaining;
-  const createCode = useMutation({
-    mutationFn: () => consumerOrgAdminApi.createCode(classId, {
-      credit_amount: parsedCredits,
-      max_uses: maxUses ? Math.max(1, parseInt(maxUses, 10) || 1) : null,
-      expires_at: expiresMinutes
-        ? new Date(Date.now() + (parseInt(expiresMinutes, 10) || 0) * 60_000).toISOString()
-        : null,
-      description: description || undefined,
-    }),
-    onSuccess: ({ code }) => {
-      toast.success(i18n("teacherCenter.qrCodeCreated"));
-      setCreditAmount("250");
-      setMaxUses("");
-      setExpiresMinutes("");
-      setDescription("");
-      onCreated(code);
+  const setStatus = useMutation({
+    mutationFn: ({ workspaceId, status }: { workspaceId: string; status: "passed" | "ended" }) =>
+      consumerOrgAdminApi.setSpaceStatus(classId, workspaceId, status),
+    onSuccess: (_, vars) => {
+      toast.success(vars.status === "passed" ? "Marked as passed" : "Space ended");
+      onChanged();
     },
-    onError: (error: any) => toast.error(error?.message ?? "Could not create QR code"),
+    onError: (error: any) => toast.error(friendlyError(error?.message ?? error)),
   });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center justify-between gap-3 text-lg">
+          <span className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-emerald-600" />
+            Students
+          </span>
+          <Badge variant="outline">{members.length} enrolled</Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="flex justify-center py-10">
+            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+          </div>
+        ) : members.length === 0 ? (
+          <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
+            Students will appear here after they scan the QR or are added manually.
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-md border border-slate-200">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Student</th>
+                  <th className="px-3 py-2 font-medium">Space</th>
+                  <th className="px-3 py-2 text-right font-medium">Credits</th>
+                  <th className="px-3 py-2 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {members.map((member) => {
+                  const space = primarySpace(member);
+                  const locked = space?.status === "passed" || space?.status === "ended";
+                  return (
+                    <tr key={member.user_id} className="border-t border-slate-100 align-top">
+                      <td className="px-3 py-3">
+                        <div className="font-medium">{member.display_name ?? member.email ?? "Student"}</div>
+                        <div className="text-xs text-slate-500">{member.email ?? "-"}</div>
+                        <div className="font-mono text-xs text-slate-400">{member.student_code ? `ID ${member.student_code}` : member.user_id.slice(0, 8)}</div>
+                      </td>
+                      <td className="px-3 py-3">
+                        {space ? (
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={locked ? "secondary" : "outline"} className="text-[10px]">
+                                {space.status}
+                              </Badge>
+                              {space.is_online && <Badge className="bg-emerald-600 text-[10px]">online</Badge>}
+                            </div>
+                            <div className="mt-1 max-w-[260px] truncate text-xs text-slate-500">
+                              {space.workspace_name ?? space.workspace_id}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400">No space yet</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <div className="font-mono font-semibold">{Number(space?.credits_balance ?? member.credits_balance ?? 0).toLocaleString()}</div>
+                        <div className="text-xs text-slate-500">{Number(space?.credits_lifetime_used ?? member.credits_lifetime_used ?? 0).toLocaleString()} used</div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <Button size="sm" variant="outline" onClick={() => onCreditTarget(member)}>
+                            Add credits
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!space?.workspace_id || setStatus.isPending}
+                            onClick={() => space?.workspace_id && setStatus.mutate({ workspaceId: space.workspace_id, status: "passed" })}
+                          >
+                            <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                            Pass
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!space?.workspace_id || setStatus.isPending}
+                            onClick={() => space?.workspace_id && setStatus.mutate({ workspaceId: space.workspace_id, status: "ended" })}
+                          >
+                            End
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={!space?.workspace_id}
+                            onClick={() => space?.workspace_id && window.open(`/app/workspace/${space.workspace_id}`, "_blank", "noopener,noreferrer")}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function CreditDialog({
+  classId,
+  target,
+  onClose,
+  onChanged,
+}: {
+  classId: string;
+  target: ClassMember | null;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [amount, setAmount] = useState("250");
+  const [mode, setMode] = useState<"add" | "remove">("add");
+  const space = target ? primarySpace(target) : null;
+  const grant = useMutation({
+    mutationFn: () => {
+      if (!target) throw new Error("student_required");
+      const parsed = parsePositiveInt(amount, 0);
+      if (parsed <= 0) throw new Error("amount_must_be_positive");
+      const signed = mode === "add" ? parsed : -parsed;
+      if (space?.workspace_id) {
+        return consumerOrgAdminApi.grantCredits(
+          classId,
+          target.user_id,
+          space.workspace_id,
+          signed,
+          mode === "add" ? "teacher_manual_credit" : "teacher_manual_credit_revoke",
+        );
+      }
+      if (mode === "remove") throw new Error("student_space_not_found");
+      return consumerOrgAdminApi.ensureStudentSpace(classId, target.user_id, parsed, "teacher_manual_credit_create_space");
+    },
+    onSuccess: () => {
+      toast.success(mode === "add" ? "Credits added" : "Credits removed");
+      setAmount("250");
+      setMode("add");
+      onChanged();
+    },
+    onError: (error: any) => toast.error(friendlyError(error?.message ?? error)),
+  });
+
+  return (
+    <Dialog open={!!target} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{i18n("teacherCenter.createEnrollmentQr")}</DialogTitle>
+          <DialogTitle>Adjust credits</DialogTitle>
           <DialogDescription>
-            {i18n("teacherCenter.createCodeDescription")}
+            {target?.display_name ?? target?.email ?? "Student"} · current {Number(space?.credits_balance ?? target?.credits_balance ?? 0).toLocaleString()} credits
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <div>
-            <Label>{i18n("education.common.creditsPerStudentSpace")}</Label>
-            <Input
-              type="number"
-              min="0"
-              value={creditAmount}
-              onChange={(event) => setCreditAmount(event.target.value)}
-            />
-            <div className={cn("mt-1 text-xs", tooMuch ? "text-destructive" : "text-muted-foreground")}>
-              {creditPoolRemaining.toLocaleString()} {i18n("teacherCenter.creditsRemainingInThisClassPool")}
-            </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant={mode === "add" ? "default" : "outline"} onClick={() => setMode("add")}>Add</Button>
+            <Button variant={mode === "remove" ? "default" : "outline"} onClick={() => setMode("remove")}>Remove</Button>
           </div>
           <div>
-            <Label>{i18n("teacherCenter.maxScans")}</Label>
-            <Input
-              type="number"
-              min="1"
-              value={maxUses}
-              onChange={(event) => setMaxUses(event.target.value)}
-              placeholder={i18n("teacherCenter.blankUnlimited")}
-            />
-          </div>
-          <div>
-            <Label>{i18n("teacherCenter.expiresAfter")}</Label>
-            <select
-              value={expiresMinutes}
-              onChange={(event) => setExpiresMinutes(event.target.value)}
-              className="flex h-9 w-full rounded-md bg-muted px-3 py-2 text-sm"
-            >
-              <option value="">{i18n("education.common.noExpiry")}</option>
-              <option value="15">{i18n("education.duration.fifteenMinutes")}</option>
-              <option value="30">{i18n("education.duration.thirtyMinutes")}</option>
-              <option value="60">{i18n("education.duration.oneHour")}</option>
-              <option value="1440">{i18n("education.duration.oneDay")}</option>
-            </select>
-          </div>
-          <div>
-            <Label>{i18n("teacherCenter.description")}</Label>
-            <Input
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              placeholder={i18n("teacherCenter.week1ClassEntry")}
-            />
+            <Label>Credits</Label>
+            <Input type="number" min="1" value={amount} onChange={(event) => setAmount(event.target.value)} />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>{i18n("common.cancel")}</Button>
-          <Button onClick={() => createCode.mutate()} disabled={createCode.isPending || tooMuch}>
-            {createCode.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {i18n("teacherCenter.generateQr")}
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button disabled={!amount || grant.isPending} onClick={() => grant.mutate()}>
+            {grant.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Confirm
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1511,126 +1116,83 @@ function CreateCodeDialog({
   );
 }
 
-function QRDialog({ code, onClose }: { code: ClassEnrollmentCode | null; onClose: () => void }) {
-  const { t: i18n } = useLanguage();
-  if (!code) return null;
-  const url = `${window.location.origin}/enroll-class/${code.code}`;
-  const copyLink = () => {
-    navigator.clipboard.writeText(url);
-    toast.success(i18n("teacherCenter.enrollmentLinkCopied"));
-  };
+function CreateClassDialog({
+  open,
+  orgId,
+  onOpenChange,
+  onCreated,
+}: {
+  open: boolean;
+  orgId: string;
+  onOpenChange: (open: boolean) => void;
+  onCreated: (cls: ClassRow) => void;
+}) {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  const [name, setName] = useState("");
+  const [creditsPerStudent, setCreditsPerStudent] = useState(String(DEFAULT_QR_CREDITS));
+  const [classPool, setClassPool] = useState(String(DEFAULT_CLASS_POOL));
+  const createClass = useMutation({
+    mutationFn: () => consumerOrgAdminApi.createClass(orgId, {
+      name: name.trim(),
+      credit_policy: "manual",
+      credit_amount: parsePositiveInt(creditsPerStudent, DEFAULT_QR_CREDITS),
+      credit_pool: Math.max(0, parseInt(classPool, 10) || 0),
+      primary_instructor_id: user?.id ?? null,
+      max_students: null,
+      term: null,
+      year: null,
+      settings: {
+        blocked_model_ids: DEFAULT_BLOCKED_MODELS,
+      },
+    } as Partial<ClassRow> & { name: string }),
+    onSuccess: ({ class: cls }) => {
+      toast.success("Class created");
+      setName("");
+      setCreditsPerStudent(String(DEFAULT_QR_CREDITS));
+      setClassPool(String(DEFAULT_CLASS_POOL));
+      qc.invalidateQueries({ queryKey: ["teacher-classes"] });
+      onCreated(cls);
+    },
+    onError: (error: any) => toast.error(friendlyError(error?.message ?? error)),
+  });
 
   return (
-    <Dialog open={!!code} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{i18n("education.common.projectThisQrForStudents")}</DialogTitle>
+          <DialogTitle>Create class</DialogTitle>
           <DialogDescription>
-            <span className="font-mono">{code.code}</span>
-            {code.max_uses ? ` - ${Math.max(code.max_uses - code.uses_count, 0)} scans left` : " - unlimited"}
-            {` - ${Number(code.credit_amount ?? 0).toLocaleString()} credits / space`}
+            Students join by QR/link and receive a class space.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col items-center gap-4 py-4">
-          <div className="rounded-lg bg-white p-4">
-            <QRCodeSVG value={url} size={240} level="M" />
+        <div className="space-y-3">
+          <div>
+            <Label>Class name</Label>
+            <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Digital Media 101" />
           </div>
-          <p className="max-w-full break-all text-center text-xs text-muted-foreground">{url}</p>
-          <Button size="sm" variant="outline" onClick={copyLink}>
-            <Copy className="h-4 w-4 mr-2" />
-            {i18n("education.common.copyLink")}
-          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label>Credits / student</Label>
+              <Input type="number" min="1" value={creditsPerStudent} onChange={(event) => setCreditsPerStudent(event.target.value)} />
+            </div>
+            <div>
+              <Label>Class pool</Label>
+              <Input type="number" min="0" value={classPool} onChange={(event) => setClassPool(event.target.value)} />
+            </div>
+          </div>
+          <div className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-500">
+            Seedance 2.0 is blocked by default because it is high-cost. Teachers can enable it later in Model access.
+          </div>
         </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button disabled={!name.trim() || createClass.isPending} onClick={() => createClass.mutate()}>
+            {createClass.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Create
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function ActivityPanel({ events }: { events: import("./useTeacherData").ActivityEvent[] }) {
-  const { t: i18n } = useLanguage();
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium">{i18n("teacherCenter.recentActivity")}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-1">
-        {events.length === 0 && (
-          <div className="text-sm text-muted-foreground py-10 text-center">
-            {i18n("teacherCenter.noActivityYet")}
-          </div>
-        )}
-        {events.map((e) => {
-          const meta = e.model_id ? getModelMeta(e.model_id) : null;
-          return (
-            <div key={e.id} className="flex items-center gap-3 py-1.5 px-2 rounded-md hover:bg-accent/40">
-              <div className="text-base">{meta?.emoji ?? "📍"}</div>
-              <div className="flex-1 min-w-0 text-sm">
-                <span className="font-medium">{e.user_display_name ?? "User"}</span>
-                <span className="text-muted-foreground"> · </span>
-                <span>
-                  {e.activity_type === "model_use" && meta && (
-                    <>{i18n("common.used_lower")}<span className="font-medium">{meta.display}</span></>
-                  )}
-                  {e.activity_type === "enrollment" && "joined the class"}
-                  {e.activity_type === "credits_granted" && (
-                    <>{i18n("common.received")}<span className="font-medium">{e.credits_used} {i18n("common.credits")}</span></>
-                  )}
-                  {e.activity_type === "credits_revoked" && (
-                    <>{i18n("common.had")}<span className="font-medium">{e.credits_used} {i18n("common.credits")}</span> {i18n("common.revoked")}</>
-                  )}
-                </span>
-              </div>
-              {e.credits_used > 0 && e.activity_type === "model_use" && (
-                <div className="text-xs text-muted-foreground tabular-nums shrink-0">
-                  -{e.credits_used} {i18n("common.credit_abbr")}</div>
-              )}
-              <div className="text-[11px] text-muted-foreground tabular-nums shrink-0 w-20 text-right">
-                {formatRelative(e.created_at)}
-              </div>
-            </div>
-          );
-        })}
-      </CardContent>
-    </Card>
-  );
-}
-
-function formatRelative(iso: string): string {
-  const d = new Date(iso);
-  const ms = Date.now() - d.getTime();
-  const min = Math.floor(ms / 60000);
-  if (min < 1) return "just now";
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  if (day < 7) return `${day}d ago`;
-  return d.toLocaleDateString();
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// Empty state (user has no classes)
-// ─────────────────────────────────────────────────────────────────────
-
-function EmptyState({ isOrgAdmin }: { isOrgAdmin: boolean }) {
-  const { t: i18n } = useLanguage();
-  return (
-    <div className="flex items-center justify-center min-h-screen p-10">
-      <div className="text-center max-w-md">
-        <BookOpen className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
-        <h2 className="text-xl font-semibold mb-2">{i18n("teacherCenter.noClassesYet2")}</h2>
-        <p className="text-sm text-muted-foreground mb-6">
-          {isOrgAdmin
-            ? "Create the first class for your organization to start managing students and credits."
-            : "You're not assigned to any classes yet. Ask an org admin to add you, or wait for an enrollment QR code."}
-        </p>
-        {isOrgAdmin && (
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            {i18n("teacherCenter.createFirstClass")}
-          </Button>
-        )}
-      </div>
-    </div>
   );
 }

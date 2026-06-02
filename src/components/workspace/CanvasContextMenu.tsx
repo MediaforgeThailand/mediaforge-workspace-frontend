@@ -67,8 +67,8 @@ const VFX_STAGE_META: Record<VfxStage, { label: string; hint: string }> = {
     hint: "Define protected areas and motion guidance before generation.",
   },
   generate: {
-    label: "4. Generate & Edit",
-    hint: "Use prepared refs/masks to create or edit final VFX imagery.",
+    label: "4. AI Edit / Render",
+    hint: "Generate the reference plate and final Wan VACE video edit.",
   },
 };
 export interface ToolItem {
@@ -119,7 +119,7 @@ const CATALOG: ToolItem[] = [
     nodeType: "__vfx_template__",
     action: "vfx-template",
     labelText: "VFX Full Setup",
-    descriptionText: "Create the full staged VFX graph: variables, input, controls, mask, track, and Qwen edit nodes.",
+    descriptionText: "Create the Mickmumpitz-style preprocess graph: source clip, frame sync, background, depth, canny, pose, track, and mask.",
     defaultLabel: "VFX Full Setup",
     section: "vfx",
     category: "vfx",
@@ -131,16 +131,16 @@ const CATALOG: ToolItem[] = [
   },
   {
     nodeType: "vfxVariableNode",
-    labelText: "VFX Variables",
-    descriptionText: "Central hub for video size, FPS, model pack names, and reusable workflow values.",
-    defaultLabel: "VFX Variables",
+    labelText: "VFX Source Setup",
+    descriptionText: "Start here: source clip, frame sync, size, FPS, and simple defaults before each VFX pass.",
+    defaultLabel: "VFX Source Setup",
     section: "vfx",
     category: "vfx",
     stage: "input",
     icon: SlidersHorizontal,
     tint: "sky",
     isNew: true,
-    keywords: ["vfx", "variable", "set", "get", "rgthree", "workflow"],
+    keywords: ["vfx", "source", "video", "sync", "fps", "workflow"],
   },
   {
     nodeType: "vfxStartFrameNode",
@@ -158,7 +158,7 @@ const CATALOG: ToolItem[] = [
   {
     nodeType: "vfxBackgroundNode",
     labelText: "VFX Background",
-    descriptionText: "Prepare grey, empty, or source background plates for later VFX generation.",
+    descriptionText: "Prepare the 01_BACKGROUND pass from the preprocess workflow.",
     defaultLabel: "VFX Background",
     section: "vfx",
     category: "vfx",
@@ -235,9 +235,9 @@ const CATALOG: ToolItem[] = [
   },
   {
     nodeType: "vfxQwenImageNode",
-    labelText: "VFX Start Image",
-    descriptionText: "Qwen first-frame design from a video frame or reference image, based on the Startimage workflow.",
-    defaultLabel: "VFX Start Image",
+    labelText: "VFX Reference Image",
+    descriptionText: "Generate or edit the start/reference frame that guides the final Wan VACE video pass.",
+    defaultLabel: "VFX Reference Image",
     section: "vfx",
     category: "vfx",
     stage: "generate",
@@ -246,74 +246,25 @@ const CATALOG: ToolItem[] = [
     isNew: true,
     initialData: {
       params: {
-        nodeName: "VFX Start Image",
-        workflow_preset: "start_image",
-        model_name: "qwen-image-edit-2511-runpod",
-        steps: 4,
-        cfg: 1,
-        denoise: 1,
-        lightning_lora: "on",
-        protect_original: "off",
-        prompt:
-          "Create a cinematic VFX start frame from the reference frame. Preserve the subject identity and camera perspective while designing the new environment.",
-      },
-    },
-    keywords: ["vfx", "qwen", "start image", "first frame", "comfy", "runpod"],
-  },
-  {
-    nodeType: "vfxQwenImageNode",
-    labelText: "VFX Mask Edit",
-    descriptionText: "Qwen masked image edit with protect-outside-mask controls for VFX plate fixes.",
-    defaultLabel: "VFX Mask Edit",
-    section: "vfx",
-    category: "vfx",
-    stage: "generate",
-    icon: Scissors,
-    tint: "amber",
-    isNew: true,
-    initialData: {
-      params: {
-        nodeName: "VFX Mask Edit",
-        workflow_preset: "masked_edit",
-        model_name: "qwen-image-edit-2511-runpod",
-        steps: 40,
-        cfg: 4,
-        denoise: 1,
-        protect_original: "on",
-        mask_expand: 4,
-        mask_feather: 12,
-        prompt:
-          "Edit only the masked area. Match the original lighting, perspective, texture, grain, and edge continuity.",
-      },
-    },
-    keywords: ["vfx", "qwen", "image edit", "mask", "inpaint", "comfy", "runpod"],
-  },
-  {
-    nodeType: "vfxQwenImageNode",
-    labelText: "VFX Plate Generator",
-    descriptionText: "Text-to-image background/reference plate generator for VFX look development.",
-    defaultLabel: "VFX Plate Generator",
-    section: "vfx",
-    category: "vfx",
-    stage: "generate",
-    icon: ImageIcon,
-    tint: "amber",
-    initialData: {
-      params: {
-        nodeName: "VFX Plate Generator",
         workflow_preset: "plate_generate",
-        model_name: "qwen-image-runpod",
+        prompt: "replace the green screen background with a cinematic warehouse interior, keep the actor framing and camera perspective",
         aspect_ratio: "16:9",
-        width: 1664,
-        height: 928,
-        steps: 20,
-        cfg: 4,
-        denoise: 1,
-        prompt:
-          "Generate a clean cinematic VFX background plate with realistic lighting, production design, and camera perspective.",
       },
     },
-    keywords: ["vfx", "qwen", "background", "plate", "reference", "comfy", "runpod"],
+    keywords: ["vfx", "qwen", "reference", "start image", "plate", "warehouse"],
+  },
+  {
+    nodeType: "vfxWanVaceNode",
+    labelText: "Wan VACE Video Edit",
+    descriptionText: "Final open-source video edit: source video + mask video + reference image into Wan VACE.",
+    defaultLabel: "Wan VACE Video Edit",
+    section: "vfx",
+    category: "vfx",
+    stage: "generate",
+    icon: Film,
+    tint: "rose",
+    isNew: true,
+    keywords: ["vfx", "wan", "vace", "video edit", "mask", "reference", "greenscreen"],
   },
   {
     nodeType: "videoGenNode",
@@ -611,7 +562,7 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
           onMouseEnter={() => setHighlight(index)}
           onClick={() => fire(item)}
           className={cn(
-            "group flex w-full items-center gap-[9px] rounded-[7px] px-[9px] py-[8px] text-left transition-colors",
+            "group flex h-[48px] w-full items-center gap-[9px] rounded-[7px] px-[9px] text-left transition-colors",
             isHighlight
               ? "bg-white/[0.11] text-zinc-50"
               : "text-[#f2f2f2] hover:bg-white/[0.075] hover:text-zinc-50",
@@ -633,17 +584,17 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
           </span>
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-center gap-[6px]">
-              <span className="truncate text-[13px] font-semibold leading-[1.15] text-inherit">
+              <span className="truncate text-[15px] font-semibold leading-[1.12] text-inherit">
                 {item.label}
               </span>
               {item.isNew ? (
-                <span className="rounded-[4px] bg-[#d7ff30]/15 px-[4px] py-[1px] text-[9px] font-bold leading-none text-[#dcff42]">
+                <span className="rounded-[4px] bg-[#d7ff30]/15 px-[4px] py-[1px] text-[10px] font-bold leading-none text-[#dcff42]">
                   NEW
                 </span>
               ) : null}
             </span>
             {item.description ? (
-              <span className="mt-[3px] block truncate text-[11px] font-medium leading-[1.25] text-zinc-500 group-hover:text-zinc-400">
+              <span className="mt-[4px] block truncate text-[12px] font-medium leading-[1.15] text-zinc-500 group-hover:text-zinc-400">
                 {item.description}
               </span>
             ) : null}
@@ -690,13 +641,13 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKeyDown}
             placeholder={t("workspace.picker.search")}
-            className="nodrag h-full min-w-0 flex-1 bg-transparent px-2 text-[14px] font-medium leading-none text-zinc-100 outline-none placeholder:text-[#777a80]"
+            className="nodrag h-full min-w-0 flex-1 bg-transparent px-2 text-[15px] font-medium leading-none text-zinc-100 outline-none placeholder:text-[#777a80]"
           />
         </label>
 
         <div className="mt-[8px] flex min-h-0 flex-1 border-t border-white/[0.07]">
           {visibleItems.length === 0 ? (
-            <div className="w-full px-1 py-8 text-center text-[14px] font-medium text-zinc-400">
+            <div className="w-full px-1 py-8 text-center text-[15px] font-medium text-zinc-400">
               {t("workspace.picker.no_match", { query })}
             </div>
           ) : (
@@ -721,10 +672,10 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
                           : "text-zinc-400 hover:bg-white/[0.07] hover:text-zinc-100",
                       )}
                     >
-                      <span className="truncate text-[11px] font-bold uppercase leading-none tracking-normal">
+                      <span className="truncate text-[13px] font-bold uppercase leading-none tracking-normal">
                         {group.label}
                       </span>
-                      <span className="ml-[8px] rounded-full bg-white/[0.07] px-[6px] py-[2px] text-[10px] font-bold leading-none text-zinc-400">
+                      <span className="ml-[8px] rounded-full bg-white/[0.07] px-[6px] py-[2px] text-[11px] font-bold leading-none text-zinc-400">
                         {group.items.length}
                       </span>
                     </button>
@@ -738,11 +689,11 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
                   <div>
                     <div className="mb-[7px] flex h-[24px] items-center justify-between px-[2px]">
                       <div className="min-w-0">
-                        <div className="truncate text-[12px] font-bold uppercase leading-none tracking-normal text-zinc-300">
+                        <div className="truncate text-[14px] font-bold uppercase leading-none tracking-normal text-zinc-300">
                           {activeGroup.label}
                         </div>
                       </div>
-                      <div className="text-[10px] font-semibold leading-none text-zinc-600">
+                      <div className="text-[11px] font-semibold leading-none text-zinc-600">
                         {activeGroup.items.length} nodes
                       </div>
                     </div>
@@ -754,10 +705,10 @@ const CanvasContextMenu = ({ state, onClose, onPick, onAction }: Props) => {
                           return (
                             <div key={stage}>
                               <div className="px-[3px] pb-[5px]">
-                                <div className="text-[11px] font-bold leading-none text-zinc-300">
+                                <div className="text-[13px] font-bold leading-none text-zinc-300">
                                   {VFX_STAGE_META[stage].label}
                                 </div>
-                                <div className="mt-[3px] truncate text-[10px] font-medium leading-none text-zinc-600">
+                                <div className="mt-[3px] truncate text-[11px] font-medium leading-none text-zinc-600">
                                   {VFX_STAGE_META[stage].hint}
                                 </div>
                               </div>

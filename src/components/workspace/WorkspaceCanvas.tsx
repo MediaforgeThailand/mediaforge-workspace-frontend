@@ -656,6 +656,7 @@ const nodeTypes = {
   vfxTrackNode: WorkspaceToolNode,
   vfxMaskNode: WorkspaceToolNode,
   vfxQwenImageNode: WorkspaceToolNode,
+  vfxWanVaceNode: WorkspaceToolNode,
   // Workspace-only.
   assetNode: AssetNode,
   elementNode: ElementNode,

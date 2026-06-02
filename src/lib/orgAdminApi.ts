@@ -40,6 +40,7 @@ async function call<T>(
 export interface ClassRow {
   id: string;
   org_id: string;
+  organization_id?: string | null;
   name: string;
   code: string;
   term: string | null;
@@ -166,6 +167,18 @@ export const consumerOrgAdminApi = {
   // Members
   listClassMembers: (classId: string) =>
     call<{ members: ClassMember[] }>("GET", `/classes/${classId}/members`),
+
+  addStudentByEmail: (classId: string, email: string, initialCredits = 0, studentCode?: string, reason?: string) =>
+    call<{ member: ClassMember; space?: unknown; new_balance: number | null }>(
+      "POST",
+      `/classes/${classId}/members`,
+      {
+        email,
+        initial_credits: initialCredits,
+        student_code: studentCode,
+        reason,
+      },
+    ),
 
   updateMember: (classId: string, userId: string,
     patch: { status?: ClassMember["status"]; student_code?: string }) =>

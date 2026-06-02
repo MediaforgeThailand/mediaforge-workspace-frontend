@@ -38,6 +38,8 @@ export interface TeacherClass {
   primary_instructor_id: string | null;
   organization_id: string;
   end_date: string | null;
+  settings: Record<string, unknown>;
+  created_at: string;
 }
 
 export interface ClassMember {
@@ -90,6 +92,7 @@ export interface ActivityEvent {
 const MAX_MANAGEABLE_CLASSES = 200;
 
 function toTeacherClass(row: ClassRow): TeacherClass {
+  const mappedRow = row as ClassRow & { organization_id?: string | null; org_id?: string | null };
   return {
     id: row.id,
     name: row.name,
@@ -100,8 +103,10 @@ function toTeacherClass(row: ClassRow): TeacherClass {
     credit_pool: row.credit_pool ?? 0,
     credit_pool_consumed: row.credit_pool_consumed ?? 0,
     primary_instructor_id: row.primary_instructor_id ?? null,
-    organization_id: row.org_id,
+    organization_id: mappedRow.org_id ?? mappedRow.organization_id ?? "",
     end_date: row.end_date ?? null,
+    settings: row.settings ?? {},
+    created_at: row.created_at,
   };
 }
 

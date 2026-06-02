@@ -20,6 +20,9 @@ interface PreviewPlayOptions {
   language?: "en" | "th";
 }
 
+const SILENT_WAV_DATA_URI =
+  "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQQAAAAAAA==";
+
 /** Best-effort extraction of the actual server error message from a
  *  Supabase FunctionsHttpError. The library's surfaced `.message` is
  *  the generic "Edge Function returned a non-2xx status code"; the
@@ -87,6 +90,36 @@ export function useVoicePreview(provider: VoicePreviewProvider) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cacheRef = useRef<Map<string, string>>(new Map());
 
+  const ensureAudio = useCallback(() => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+      audioRef.current.preload = "auto";
+      audioRef.current.addEventListener("ended", () => setPlayingId(null));
+      audioRef.current.addEventListener("error", () => setPlayingId(null));
+    }
+    return audioRef.current;
+  }, []);
+
+  const primeAudio = useCallback(async (audio: HTMLAudioElement) => {
+    if (audio.src) return;
+    const previousVolume = audio.volume;
+    const previousSrc = audio.src;
+    try {
+      audio.volume = 0;
+      audio.src = SILENT_WAV_DATA_URI;
+      await audio.play();
+      audio.pause();
+      audio.currentTime = 0;
+    } catch {
+      // Best effort only. If the browser refuses this primer, the
+      // real preview playback below will surface the normal error.
+    } finally {
+      audio.volume = previousVolume;
+      if (previousSrc) audio.src = previousSrc;
+      else audio.removeAttribute("src");
+    }
+  }, []);
+
   // Tear down the audio element on provider change / unmount so the
   // previous voice doesn't keep playing after the panel switches.
   useEffect(() => {
@@ -115,13 +148,13 @@ export function useVoicePreview(provider: VoicePreviewProvider) {
       }
 
       // Stop any other voice that's mid-play before kicking off.
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
+      const audio = ensureAudio();
+      audio.pause();
 
       const cacheKey = opts.modelId ? `${voiceId}@${opts.modelId}` : voiceId;
       let url = cacheRef.current.get(cacheKey);
       if (!url) {
+        await primeAudio(audio);
         setLoadingId(voiceId);
         try {
           const { data, error } = await supabase.functions.invoke<PreviewResponse>(
@@ -157,18 +190,11 @@ export function useVoicePreview(provider: VoicePreviewProvider) {
         }
       }
 
-      // Build / reuse the shared audio element. Reusing avoids the
-      // browser spinning up a new Web Audio context per click.
-      if (!audioRef.current) {
-        audioRef.current = new Audio();
-        audioRef.current.preload = "auto";
-        audioRef.current.addEventListener("ended", () => setPlayingId(null));
-        audioRef.current.addEventListener("error", () => setPlayingId(null));
-      }
-      audioRef.current.src = url;
+      audio.src = url;
+      audio.currentTime = 0;
       setPlayingId(voiceId);
       try {
-        await audioRef.current.play();
+        await audio.play();
       } catch (err) {
         // Autoplay block, user gesture issue, etc. — surface as a
         // playback failure so the caller can toast.
@@ -176,7 +202,7 @@ export function useVoicePreview(provider: VoicePreviewProvider) {
         throw err;
       }
     },
-    [provider, playingId, stop],
+    [ensureAudio, primeAudio, provider, playingId, stop],
   );
 
   return {

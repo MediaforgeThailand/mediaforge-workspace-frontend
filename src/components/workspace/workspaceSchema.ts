@@ -82,6 +82,7 @@ const REPLICATE_BANANA_MODELS = [] as const;
 const OPENAI_IMAGE_MODELS = ["gpt-image-2"] as const;
 const REPLICATE_OPENAI_IMAGE_MODELS = [] as const;
 const QWEN_IMAGE_MODELS = ["qwen-image-runpod", "qwen-image-edit-2511-runpod"] as const;
+const WAN_VACE_MODELS = ["wan2.1-vace-1.3b-runpod"] as const;
 const VFX_PREPROCESS_MODELS = ["vfx-preprocess-comfy"] as const;
 const ELEVENLABS_TTS_MODELS = ["elevenlabs-multilingual-v2", "elevenlabs-turbo-v2-5"] as const;
 const ELEVENLABS_DUBBING_MODEL = "elevenlabs-dubbing-voice-clone" as const;
@@ -165,9 +166,22 @@ const vfxPreprocessModelParam = (): ParamDef => ({
   group: "Workflow",
 });
 
+const vfxFrameSyncParam = (): ParamDef => ({
+  key: "frame_sync",
+  label: "Frame Sync",
+  type: "select",
+  options: ["match_source", "manual"],
+  optionLabels: {
+    match_source: "Match source + mask",
+    manual: "Manual override",
+  },
+  default: "match_source",
+  group: "Sync",
+});
+
 export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
   vfxVariableNode: {
-    displayName: "VFX Variables",
+    displayName: "VFX Source Setup",
     category: "VFX",
     accentColor: "sky",
     supportedModels: [...VFX_PREPROCESS_MODELS],
@@ -199,19 +213,19 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     ],
     params: [
       vfxPreprocessModelParam(),
+      vfxFrameSyncParam(),
       {
         key: "variable_scope",
-        label: "Preset",
+        label: "Setup Preset",
         type: "select",
-        options: ["video_setup", "control_passes", "mask_setup", "qwen_model_pack"],
+        options: ["video_setup", "control_passes", "mask_setup"],
         optionLabels: {
-          video_setup: "Video input + size",
-          control_passes: "Control passes",
-          mask_setup: "Mask + track",
-          qwen_model_pack: "Qwen model pack",
+          video_setup: "Source + sync",
+          control_passes: "Control defaults",
+          mask_setup: "Mask + track defaults",
         },
         default: "video_setup",
-        group: "Variables",
+        group: "Advanced Sync",
       },
       {
         key: "auto_wire",
@@ -220,7 +234,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         options: ["on", "off"],
         optionLabels: { on: "On", off: "Off" },
         default: "on",
-        group: "Variables",
+        group: "Advanced Sync",
       },
       {
         key: "resolution",
@@ -245,34 +259,6 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
       { key: "fps", label: "FPS", type: "slider", default: 24, min: 1, max: 60, step: 1, group: "Advanced Video" },
       { key: "frame_load_cap", label: "Frame Cap", type: "slider", default: 0, min: -1, max: 600, step: 1, group: "Advanced Video" },
       { key: "skip_first_frames", label: "Skip Frames", type: "slider", default: 0, min: 0, max: 600, step: 1, group: "Advanced Video" },
-      {
-        key: "qwen_unet",
-        label: "Qwen UNet",
-        type: "text",
-        default: "qwen/qwen-image-edit-2511-Q5_0.gguf",
-        group: "Advanced Models",
-      },
-      {
-        key: "qwen_lora",
-        label: "Qwen LoRA",
-        type: "text",
-        default: "qwen/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-fp32.safetensors",
-        group: "Advanced Models",
-      },
-      {
-        key: "qwen_clip",
-        label: "Qwen CLIP",
-        type: "text",
-        default: "qwen_2.5_vl_7b_fp8_scaled.safetensors",
-        group: "Advanced Models",
-      },
-      {
-        key: "qwen_vae",
-        label: "Qwen VAE",
-        type: "text",
-        default: "qwen_image_vae.safetensors",
-        group: "Advanced Models",
-      },
     ],
   },
   vfxStartFrameNode: {
@@ -285,6 +271,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     outputs: [{ id: "start_image", label: "START IMAGE", color: "emerald" }],
     params: [
       vfxPreprocessModelParam(),
+      vfxFrameSyncParam(),
       {
         key: "frame_index",
         label: "Frame",
@@ -341,6 +328,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     ],
     params: [
       vfxPreprocessModelParam(),
+      vfxFrameSyncParam(),
       {
         key: "background_mode",
         label: "Mode",
@@ -396,6 +384,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     ],
     params: [
       vfxPreprocessModelParam(),
+      vfxFrameSyncParam(),
       {
         key: "depth_model",
         label: "Depth Model",
@@ -426,6 +415,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     ],
     params: [
       vfxPreprocessModelParam(),
+      vfxFrameSyncParam(),
       { key: "low_threshold", label: "Low Threshold", type: "slider", default: 0.4, min: 0, max: 1, step: 0.05, group: "Edges" },
       { key: "high_threshold", label: "High Threshold", type: "slider", default: 0.8, min: 0, max: 1, step: 0.05, group: "Edges" },
       { key: "max_resolution", label: "Max Resolution", type: "slider", default: 1280, min: 512, max: 2160, step: 16, group: "Advanced Edges" },
@@ -446,6 +436,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     ],
     params: [
       vfxPreprocessModelParam(),
+      vfxFrameSyncParam(),
       {
         key: "pose_model",
         label: "Pose Model",
@@ -505,6 +496,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     ],
     params: [
       vfxPreprocessModelParam(),
+      vfxFrameSyncParam(),
       {
         key: "track_model",
         label: "Track Model",
@@ -554,6 +546,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
     ],
     params: [
       vfxPreprocessModelParam(),
+      vfxFrameSyncParam(),
       {
         key: "segment_model",
         label: "Segment Model",
@@ -568,7 +561,7 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         label: "Prompt",
         type: "text",
         default: "person",
-        placeholder: "person, actor, object, green screen...",
+        placeholder: "person, actor, object...",
         group: "Mask",
       },
       { key: "confidence_threshold", label: "Confidence", type: "slider", default: 0.35, min: 0, max: 1, step: 0.05, group: "Mask" },
@@ -578,12 +571,12 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
       { key: "max_segments", label: "Max Segments", type: "slider", default: 0, min: 0, max: 12, step: 1, group: "Advanced Mask" },
       {
         key: "invert_mask",
-        label: "Invert",
+        label: "Invert Mask",
         type: "select",
         options: ["off", "on"],
-        optionLabels: { off: "Off", on: "On" },
+        optionLabels: { off: "Keep", on: "Invert" },
         default: "off",
-        group: "Advanced Mask",
+        group: "Mask",
       },
       { key: "crf", label: "CRF", type: "slider", default: 19, min: 10, max: 35, step: 1, group: "Advanced Output" },
       { key: "mask_output_prefix", label: "Mask Prefix", type: "text", default: "AIVFX-PREPROCESS/MASK", group: "Advanced Output" },
@@ -645,8 +638,8 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         options: ["start_image", "masked_edit", "plate_generate", "raw_qwen"],
         optionLabels: {
           start_image: "Start Image - first-frame design",
-          masked_edit: "Mask Edit - protect outside mask",
-          plate_generate: "Plate Generator - new BG/ref",
+          masked_edit: "Mask Edit - masked image workflow",
+          plate_generate: "Reference Plate - image workflow",
           raw_qwen: "Raw Qwen - manual",
         },
         default: "masked_edit",
@@ -741,11 +734,11 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
       },
       {
         key: "protect_original",
-        label: "Protect Outside Mask",
+        label: "Use Mask Boundary",
         type: "select",
         options: ["on", "off"],
         optionLabels: {
-          on: "On - composite only masked area",
+          on: "On - use mask boundary",
           off: "Off - return full edit",
         },
         default: "on",
@@ -810,6 +803,115 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         placeholder: "Blank = random",
         group: "Advanced Sampling",
       },
+    ],
+  },
+  vfxWanVaceNode: {
+    displayName: "Wan VACE Video Edit",
+    category: "VFX",
+    accentColor: "rose",
+    supportedModels: [...WAN_VACE_MODELS],
+    defaultModel: "wan2.1-vace-1.3b-runpod",
+    inputs: [
+      { id: "input_video", label: "SOURCE VIDEO", color: "emerald", required: true },
+      { id: "mask_video", label: "MASK VIDEO", color: "white/30", required: true },
+      { id: "ref_image", label: "REFERENCE IMAGE", color: "blue", required: true },
+      { id: "text", label: "TEXT", color: "sky" },
+    ],
+    outputs: [{ id: "video", label: "VIDEO", color: "emerald" }],
+    params: [
+      {
+        key: "model_name",
+        label: "Model",
+        type: "select",
+        options: [...WAN_VACE_MODELS],
+        optionLabels: {
+          "wan2.1-vace-1.3b-runpod": "Wan 2.1 VACE 1.3B",
+        },
+        default: "wan2.1-vace-1.3b-runpod",
+        required: true,
+      },
+      {
+        key: "workflow_preset",
+        label: "VFX Preset",
+        type: "select",
+        options: ["source_mask_ref_edit"],
+        optionLabels: {
+          source_mask_ref_edit: "Source video + mask + ref image",
+        },
+        default: "source_mask_ref_edit",
+        group: "Workflow",
+      },
+      {
+        key: "prompt",
+        label: "Prompt",
+        type: "textarea",
+        default: "change the green screen background into a cinematic warehouse interior, preserve the actor motion, spacesuit details, camera motion, lighting continuity, and realistic shadows",
+        placeholder: "Describe the VFX edit Wan should apply inside the mask...",
+        required: true,
+        group: "Creative",
+      },
+      {
+        key: "negative_prompt",
+        label: "Negative Prompt",
+        type: "textarea",
+        default: "bad quality, blurry, distorted, flicker, inconsistent lighting, broken body, duplicated person, melted hands, warped face, text, watermark",
+        placeholder: "Artifacts to avoid...",
+        group: "Advanced Creative",
+      },
+      {
+        key: "resolution",
+        label: "Resolution",
+        type: "select",
+        options: ["480p", "720p", "custom"],
+        optionLabels: {
+          "480p": "480p - RTX 4000 Ada safe",
+          "720p": "720p - slower",
+          custom: "Custom",
+        },
+        default: "480p",
+        group: "Video",
+      },
+      { key: "width", label: "Width", type: "slider", default: 832, min: 256, max: 1280, step: 16, group: "Advanced Video" },
+      { key: "height", label: "Height", type: "slider", default: 480, min: 256, max: 720, step: 16, group: "Advanced Video" },
+      { key: "fps", label: "FPS", type: "slider", default: 16, min: 1, max: 30, step: 1, group: "Video" },
+      { key: "frame_load_cap", label: "Frame Cap", type: "slider", default: 49, min: 1, max: 121, step: 1, group: "Video" },
+      { key: "skip_first_frames", label: "Skip Frames", type: "slider", default: 0, min: 0, max: 600, step: 1, group: "Advanced Video" },
+      { key: "select_every_nth", label: "Every Nth", type: "slider", default: 1, min: 1, max: 24, step: 1, group: "Advanced Video" },
+      {
+        key: "mask_polarity",
+        label: "Mask Polarity",
+        type: "select",
+        options: ["white_edits", "black_edits"],
+        optionLabels: {
+          white_edits: "White = edit area",
+          black_edits: "Black = edit area",
+        },
+        default: "white_edits",
+        group: "Mask",
+      },
+      {
+        key: "invert_mask",
+        label: "Invert Mask",
+        type: "select",
+        options: ["off", "on"],
+        optionLabels: { off: "Off", on: "On" },
+        default: "off",
+        group: "Advanced Mask",
+      },
+      { key: "steps", label: "Steps", type: "slider", default: 20, min: 4, max: 40, step: 1, group: "Sampling" },
+      { key: "cfg", label: "CFG", type: "slider", default: 4, min: 0, max: 12, step: 0.5, group: "Sampling" },
+      { key: "shift", label: "Shift", type: "slider", default: 8, min: 0, max: 16, step: 0.5, group: "Advanced Sampling" },
+      {
+        key: "scheduler",
+        label: "Scheduler",
+        type: "select",
+        options: ["unipc"],
+        default: "unipc",
+        group: "Advanced Sampling",
+      },
+      { key: "seed", label: "Seed", type: "text", default: "", placeholder: "Blank = random", group: "Advanced Sampling" },
+      { key: "crf", label: "CRF", type: "slider", default: 19, min: 10, max: 35, step: 1, group: "Advanced Output" },
+      { key: "output_prefix", label: "Output Prefix", type: "text", default: "AIVFX-WAN/VACE", group: "Advanced Output" },
     ],
   },
 

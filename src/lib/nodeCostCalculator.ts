@@ -107,6 +107,13 @@ function modelDiscountPercent({ schemaKey, params, creditCosts }: NodeCostParams
     const apiModel = modelName || "qwen-image-edit-2511-runpod";
     return maxDiscountForRows(rowsForFeatureModels(creditCosts, "generate_qwen_image", [apiModel]));
   }
+  if (schemaKey === "vfxWanVaceNode") {
+    const apiModel = modelName || "wan2.1-vace-1.3b-runpod";
+    const resolution = String(params.resolution ?? "480p").toLowerCase();
+    return maxDiscountForRows(
+      rowsForFeatureModels(creditCosts, "generate_freepik_video", [`${apiModel}:${resolution}`, apiModel]),
+    );
+  }
   if (schemaKey === "bananaProNode" || schemaKey === "imageGenNode") {
     const apiModel = modelName || "nano-banana-pro";
     if (apiModel.startsWith("gpt-image") || apiModel.startsWith("replicate-gpt-image") || apiModel.startsWith("dall-e")) {
@@ -285,6 +292,22 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
       (r) => r.feature === "generate_freepik_image" && r.model === apiModel,
     );
     return match?.cost ?? null;
+  }
+
+  if (schemaKey === "vfxWanVaceNode") {
+    const apiModel = modelName || "wan2.1-vace-1.3b-runpod";
+    const resolution = String(params.resolution ?? "480p").toLowerCase();
+    const keys = [`${apiModel}:${resolution}`, apiModel];
+    const match = keys
+      .map((key) => creditCosts.find((r) => r.feature === "generate_freepik_video" && r.model === key))
+      .find(Boolean);
+    if (!match) return null;
+    if (match.pricing_type === "per_second") {
+      const fps = Math.max(1, Number(params.fps ?? 16) || 16);
+      const frames = Math.max(1, Number(params.frame_load_cap ?? params.num_frames ?? 49) || 49);
+      return Math.max(1, Math.ceil((match.cost * frames) / fps));
+    }
+    return match.cost;
   }
 
   // Background Removal (Freepik/Magnific; legacy Replicate alias supported)
