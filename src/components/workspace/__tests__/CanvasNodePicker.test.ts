@@ -45,4 +45,69 @@ describe("CanvasNodePicker Text node wiring", () => {
       ]),
     );
   });
+
+  it("offers the VFX source path when dragging from an uploaded video", () => {
+    const options = getPickerOptions({
+      screen: { x: 0, y: 0 },
+      flow: { x: 0, y: 0 },
+      fromNode: node("assetNode", { fieldType: "video" }),
+      fromHandleId: "default",
+      fromIsOutput: true,
+    });
+
+    expect(options).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          nodeType: "vfxVariableNode",
+          newNodeHandle: "input_video",
+        }),
+        expect.objectContaining({
+          nodeType: "vfxMaskNode",
+          newNodeHandle: "input_video",
+        }),
+        expect.objectContaining({
+          nodeType: "vfxWanVaceNode",
+          newNodeHandle: "input_video",
+        }),
+      ]),
+    );
+  });
+
+  it("offers Wan VACE mask input when dragging from a VFX mask video output", () => {
+    const options = getPickerOptions({
+      screen: { x: 0, y: 0 },
+      flow: { x: 0, y: 0 },
+      fromNode: node("vfxMaskNode"),
+      fromHandleId: "mask_video",
+      fromIsOutput: true,
+    });
+
+    expect(options).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          nodeType: "vfxWanVaceNode",
+          newNodeHandle: "mask_video",
+        }),
+      ]),
+    );
+  });
+
+  it("offers Wan VACE reference input when dragging from the Qwen VFX reference image", () => {
+    const options = getPickerOptions({
+      screen: { x: 0, y: 0 },
+      flow: { x: 0, y: 0 },
+      fromNode: node("vfxQwenImageNode"),
+      fromHandleId: "image",
+      fromIsOutput: true,
+    });
+
+    expect(options).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          nodeType: "vfxWanVaceNode",
+          newNodeHandle: "ref_image",
+        }),
+      ]),
+    );
+  });
 });
