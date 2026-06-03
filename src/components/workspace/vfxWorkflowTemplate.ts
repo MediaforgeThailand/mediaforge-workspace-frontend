@@ -166,7 +166,7 @@ export function createVfxWorkflowTemplate({
       fps: 24,
       frame_load_cap: 240,
       chunk_frames: 49,
-      mask_polarity: "black_edits",
+      mask_polarity: "white_edits",
       vace_strength: 0.35,
       steps: 20,
       cfg: 4,
