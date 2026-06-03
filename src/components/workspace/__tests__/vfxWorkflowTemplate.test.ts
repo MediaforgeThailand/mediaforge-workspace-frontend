@@ -31,7 +31,8 @@ describe("createVfxWorkflowTemplate", () => {
     });
     expect(wan?.data?.params).toMatchObject({
       workflow_preset: "source_mask_ref_edit",
-      mask_polarity: "white_edits",
+      mask_polarity: "black_edits",
+      vace_strength: 0.35,
     });
 
     expect(template.edges).toEqual(

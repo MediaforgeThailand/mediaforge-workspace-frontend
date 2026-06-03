@@ -1725,7 +1725,7 @@ function getVfxCardMeta(
       summary: "Final open-source video edit stage: sends source video, mask video, and reference image to Wan VACE.",
       artifactLabel: "Edited video",
       tone: "generate",
-      primaryParamKeys: ["model_name", "resolution", "fps", "frame_load_cap", "chunk_frames", "mask_polarity", "steps"],
+      primaryParamKeys: ["model_name", "resolution", "fps", "frame_load_cap", "chunk_frames", "mask_polarity", "vace_strength", "steps"],
     };
   }
 
@@ -1866,6 +1866,26 @@ const VFX_PARAM_HELP_BY_KEY: Record<string, VfxParamHelp> = {
     labelTh: "เฟรมต่อรอบ",
     descriptionTh: "จำนวนเฟรมที่ส่งเข้า Wan VACE ต่อหนึ่งรอบ GPU ใช้ลดโอกาส OOM โดยยัง stitch กลับเป็นวิดีโอเดียวตาม Total Frames",
     descriptionEn: "Frames processed per Wan VACE GPU pass. Lower values reduce VRAM pressure; the worker stitches chunks back into one video.",
+  },
+  mask_polarity: {
+    labelTh: "ทิศทาง Mask",
+    descriptionTh: "กำหนดว่าสีไหนคือพื้นที่ที่ Wan VACE ต้องแก้ สำหรับ mask ที่ตัวคนเป็นสีขาวและพื้นหลังเป็นสีดำ ให้ใช้ Black = edit area",
+    descriptionEn: "Defines which mask color Wan VACE edits. For a white-subject / black-background mask, use Black = edit area.",
+  },
+  vace_strength: {
+    labelTh: "แรง VACE",
+    descriptionTh: "คุมแรงที่ Wan ใช้กับ source video และ reference ค่าต่ำช่วยเปลี่ยนฉากมากขึ้น ค่าสูงช่วยยึดภาพเดิมมากขึ้น",
+    descriptionEn: "Controls how strongly Wan applies the VACE condition. Lower changes the scene more; higher preserves the source more.",
+  },
+  vace_start_percent: {
+    labelTh: "เริ่มใช้ VACE",
+    descriptionTh: "ตำแหน่งช่วง diffusion ที่เริ่มใช้ VACE ปกติใช้ 0 เพื่อให้ mask/reference คุมตั้งแต่ต้น",
+    descriptionEn: "Diffusion progress where VACE conditioning starts. Keep at 0 for normal masked video edits.",
+  },
+  vace_end_percent: {
+    labelTh: "หยุดใช้ VACE",
+    descriptionTh: "ตำแหน่งช่วง diffusion ที่หยุดใช้ VACE ปกติใช้ 1 เพื่อให้คุมจนจบ",
+    descriptionEn: "Diffusion progress where VACE conditioning ends. Keep at 1 for normal masked video edits.",
   },
   skip_first_frames: {
     labelTh: "ข้ามเฟรมแรก",

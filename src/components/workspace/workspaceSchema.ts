@@ -903,9 +903,9 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         options: ["white_edits", "black_edits"],
         optionLabels: {
           white_edits: "White = edit area",
-          black_edits: "Black = edit area",
+          black_edits: "Black = edit area (white subject)",
         },
-        default: "white_edits",
+        default: "black_edits",
         group: "Mask",
       },
       {
@@ -917,9 +917,12 @@ export const WORKSPACE_SCHEMA: Record<string, NodeApiDef> = {
         default: "off",
         group: "Advanced Mask",
       },
+      { key: "vace_strength", label: "VACE Strength", type: "slider", default: 0.35, min: 0, max: 1.2, step: 0.05, group: "Mask" },
       { key: "steps", label: "Steps", type: "slider", default: 20, min: 4, max: 40, step: 1, group: "Sampling" },
       { key: "cfg", label: "CFG", type: "slider", default: 4, min: 0, max: 12, step: 0.5, group: "Sampling" },
       { key: "shift", label: "Shift", type: "slider", default: 8, min: 0, max: 16, step: 0.5, group: "Advanced Sampling" },
+      { key: "vace_start_percent", label: "VACE Start", type: "slider", default: 0, min: 0, max: 1, step: 0.05, group: "Advanced Sampling" },
+      { key: "vace_end_percent", label: "VACE End", type: "slider", default: 1, min: 0, max: 1, step: 0.05, group: "Advanced Sampling" },
       {
         key: "scheduler",
         label: "Scheduler",

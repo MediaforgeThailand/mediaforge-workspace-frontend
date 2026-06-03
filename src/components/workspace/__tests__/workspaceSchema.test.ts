@@ -159,6 +159,10 @@ describe("getWsVisibleParams", () => {
     expect(wanSchema?.outputs).toEqual([
       expect.objectContaining({ id: "video" }),
     ]);
+    expect(wanSchema?.params.find((param) => param.key === "mask_polarity")?.default)
+      .toBe("black_edits");
+    expect(wanSchema?.params.find((param) => param.key === "vace_strength")?.default)
+      .toBe(0.35);
   });
 });
 
