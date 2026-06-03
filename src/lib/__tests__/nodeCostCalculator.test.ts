@@ -350,3 +350,21 @@ describe("calculateNodeCost — mergeAudioNode fallback chain", () => {
     ).toBe(5);
   });
 });
+
+describe("calculateNodeCost - upscaleImageNode", () => {
+  it("maps legacy upscale models to the MediaForge OpenAI enhance SKU", () => {
+    expect(
+      calculateNodeCost({
+        schemaKey: "upscaleImageNode",
+        params: {
+          model_name: "magnific-upscale-precision-v2",
+          size: "1024x1024",
+          quality: "medium",
+        },
+        creditCosts: [
+          row({ feature: "upscale_image", model: "gpt-image-2-enhance:1k:medium", cost: 93 }),
+        ],
+      }),
+    ).toBe(93);
+  });
+});

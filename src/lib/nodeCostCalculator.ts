@@ -89,7 +89,9 @@ function openAiImagePriceKeys(params: Record<string, unknown>) {
 
 function openAiEnhancePriceKeys(params: Record<string, unknown>) {
   const rawModel = String(params.model_name ?? params.model ?? "gpt-image-2-enhance").toLowerCase();
-  const model = rawModel === "gpt-image-2" ? "gpt-image-2-enhance" : rawModel;
+  const model = rawModel === "gpt-image-2" || !rawModel.startsWith("gpt-image-2-enhance")
+    ? "gpt-image-2-enhance"
+    : rawModel;
   const rawQuality = String(params.quality ?? "medium").toLowerCase();
   const quality = ["low", "medium", "high", "auto"].includes(rawQuality) ? rawQuality : "medium";
   const size = String(params.size ?? "1024x1024").toLowerCase();
@@ -559,8 +561,11 @@ export function calculateNodeCost({ schemaKey, params, creditCosts }: NodeCostPa
 
     // ── Motion models: per_second with ref_video duration ──
     if (isMotion) {
-      const motionDuration =
-        parseInt(String(params._ref_video_duration ?? params.ref_video_duration ?? params.duration ?? "5"), 10) || 5;
+      const motionDuration = parseInt(
+        String(params._ref_video_duration ?? params.ref_video_duration ?? "0"),
+        10,
+      ) || 0;
+      if (motionDuration <= 0) return null;
       const motionResolution = String(params.resolution ?? "").trim().toLowerCase();
       if (motionResolution) {
         const resolutionMatch = creditCosts.find(

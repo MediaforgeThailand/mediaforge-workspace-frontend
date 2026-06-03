@@ -36,6 +36,12 @@ export interface Generation {
    *  image" at Gemini. */
   startFrameUrl?: string;
   endFrameUrl?: string;
+  /** Handle-addressed output URLs for nodes that produce more than
+   *  one artifact at once (for example VFX Mask emits both
+   *  `mask_video` for Wan and `mask_image` for Qwen). */
+  outputs?: Record<string, string>;
+  maskVideoUrl?: string;
+  maskImageUrl?: string;
   createdAt: number;
 }
 

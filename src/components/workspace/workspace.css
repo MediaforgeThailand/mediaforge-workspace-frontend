@@ -3070,7 +3070,8 @@ body.ws-lightbox-open .react-flow__node .ws-clean-title {
 .react-flow__node-vfxPoseNode .workspace-handle,
 .react-flow__node-vfxTrackNode .workspace-handle,
 .react-flow__node-vfxMaskNode .workspace-handle,
-.react-flow__node-vfxQwenImageNode .workspace-handle {
+.react-flow__node-vfxQwenImageNode .workspace-handle,
+.react-flow__node-vfxWanVaceNode .workspace-handle {
   --port-opacity: 0.58 !important;
   --port-scale: 0.72 !important;
   pointer-events: auto;
@@ -3093,7 +3094,9 @@ body.ws-lightbox-open .react-flow__node .ws-clean-title {
 .react-flow__node-vfxMaskNode:hover .workspace-handle,
 .react-flow__node-vfxMaskNode.selected .workspace-handle,
 .react-flow__node-vfxQwenImageNode:hover .workspace-handle,
-.react-flow__node-vfxQwenImageNode.selected .workspace-handle {
+.react-flow__node-vfxQwenImageNode.selected .workspace-handle,
+.react-flow__node-vfxWanVaceNode:hover .workspace-handle,
+.react-flow__node-vfxWanVaceNode.selected .workspace-handle {
   --port-opacity: 0.9 !important;
   --port-scale: 0.88 !important;
   pointer-events: auto;

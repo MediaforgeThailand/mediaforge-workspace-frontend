@@ -124,6 +124,9 @@ import {
 } from "./workspaceSchema";
 import { cleanModelLabelMap } from "./modelDisplay";
 import {
+  captureMaskFrameFromVideoBlob,
+  createGreenScreenMaskImageBlob,
+  createGreenScreenMaskVideoBlob,
   captureVideoFrameAtSecondsBlob,
   extractAndUploadVideoFrames,
   invertMaskImageBlob,
@@ -768,6 +771,29 @@ function extractMentionNodeIds(text: string | undefined): string[] {
   return ids;
 }
 
+type WireableGeneration = {
+  url?: string;
+  text?: string;
+  type?: string;
+  startFrameUrl?: string;
+  endFrameUrl?: string;
+  outputs?: Record<string, unknown>;
+  maskVideoUrl?: string;
+  maskImageUrl?: string;
+};
+
+function generationOutputForHandle(
+  gen: WireableGeneration | null | undefined,
+  sourceHandle: string | null | undefined,
+): string | null {
+  if (!gen || !sourceHandle) return null;
+  const direct = gen.outputs?.[sourceHandle];
+  if (typeof direct === "string" && direct.length > 0) return direct;
+  if (sourceHandle === "mask_video" && gen.maskVideoUrl) return gen.maskVideoUrl;
+  if (sourceHandle === "mask_image" && gen.maskImageUrl) return gen.maskImageUrl;
+  return null;
+}
+
 /**
  * Resolve upstream edges into an `inputs` object keyed by targetHandle.
  * TextNode → string content;  AssetNode → uploaded URL.
@@ -1015,25 +1041,27 @@ function resolveInputs(nodeId: string): {
       // { id, type, url?, text?, createdAt }, latest at index 0.
       // Wire the most-recently-selected generation's URL/text into
       // the downstream node's input.
-      const generations = srcData.generations as Array<{
-        url?: string;
-        text?: string;
-        type?: string;
-        startFrameUrl?: string;
-        endFrameUrl?: string;
-      }>;
+      const generations = srcData.generations as WireableGeneration[];
       const idx =
         typeof srcData.selectedGenIndex === "number"
           ? (srcData.selectedGenIndex as number)
           : 0;
       const gen = generations[idx] ?? generations[0];
+      const handleUrl = generationOutputForHandle(gen, e.sourceHandle);
       // Frame-handle wires (output_start_frame / output_end_frame /
       // output_last_frame) on a video gen need the extracted JPEG, not
       // the raw video URL — otherwise downstream image models (Banana,
       // OpenAI) reject the request with "Unable to process input
       // image". Frames are populated by the useEffect inside
       // WorkspaceToolNode when an outgoing frame edge is present.
-      if (gen?.type === "video" && isVideoFrameImageOutputHandle(e.sourceHandle)) {
+      if (handleUrl) {
+        pushAt(key, handleUrl);
+        setMediaInputMeta(
+          key,
+          { ...gen, url: handleUrl },
+          portTypeFromHandleId(e.sourceHandle ?? "") || gen?.type,
+        );
+      } else if (gen?.type === "video" && isVideoFrameImageOutputHandle(e.sourceHandle)) {
         const frameUrl =
           e.sourceHandle === "output_start_frame"
             ? gen.startFrameUrl
@@ -1044,6 +1072,15 @@ function resolveInputs(nodeId: string): {
           );
         }
         pushAt(key, frameUrl);
+      } else if (
+        e.sourceHandle === "mask_video" ||
+        e.sourceHandle === "mask_image" ||
+        e.sourceHandle === "mask_plate_video" ||
+        e.sourceHandle === "mask_plate_image"
+      ) {
+        throw new Error(
+          `The selected upstream result does not contain ${e.sourceHandle}. Run that VFX stage again or connect the matching output port.`,
+        );
       } else {
         pushAt(key, gen?.url ?? gen?.text ?? null);
         setMediaInputMeta(
@@ -1313,6 +1350,10 @@ async function prepareLocalVfxGeneration(args: {
       type: "video",
       url: videoUrl,
       label: "Source clip",
+      outputs: {
+        input_video: videoUrl,
+        video: videoUrl,
+      },
     };
   }
 
@@ -1334,38 +1375,42 @@ async function prepareLocalVfxGeneration(args: {
       type: "image",
       url,
       label: "Start frame",
+      outputs: {
+        start_image: url,
+        image: url,
+      },
     };
   }
 
   if (args.schemaKey === "vfxMaskNode") {
     const shouldInvert = isInvertMaskEnabled(args.params.invert_mask);
     const maskImage = firstStringInput(args.inputs.mask_image);
-    if (maskImage) {
-      if (shouldInvert) {
-        const blob = await invertMaskImageBlob(maskImage);
-        const url = await uploadVfxMediaBlob({
+    const maskVideo = firstStringInput(args.inputs.mask_video);
+    if (maskVideo) {
+      let maskImageUrl = maskImage;
+      if (maskImageUrl && shouldInvert) {
+        const blob = await invertMaskImageBlob(maskImageUrl);
+        maskImageUrl = await uploadVfxMediaBlob({
           blob,
           userId: args.userId,
           nodeId: args.nodeId,
           label: "inverted-mask-image",
           extension: "png",
         });
-        return {
-          ...genBase,
-          type: "image",
-          url,
-          label: "Inverted mask image",
-        };
       }
-      return {
-        ...genBase,
-        type: "image",
-        url: maskImage,
-        label: "Provided mask image",
-      };
-    }
-    const maskVideo = firstStringInput(args.inputs.mask_video);
-    if (maskVideo) {
+      if (!maskImageUrl) {
+        const maskFrameBlob = await captureMaskFrameFromVideoBlob(maskVideo, {
+          seconds: secondsForFrame(args.params),
+          invert: shouldInvert,
+        });
+        maskImageUrl = await uploadVfxMediaBlob({
+          blob: maskFrameBlob,
+          userId: args.userId,
+          nodeId: args.nodeId,
+          label: shouldInvert ? "inverted-mask-image-from-video" : "mask-image-from-video",
+          extension: "png",
+        });
+      }
       if (shouldInvert) {
         const blob = await invertMaskVideoBlob(maskVideo, {
           fps: vfxFrameRate(args.params),
@@ -1384,6 +1429,14 @@ async function prepareLocalVfxGeneration(args: {
           type: "video",
           url,
           label: "Inverted mask video",
+          maskVideoUrl: url,
+          maskImageUrl,
+          outputs: {
+            mask_video: url,
+            mask_image: maskImageUrl,
+            video: url,
+            image: maskImageUrl,
+          },
         };
       }
       return {
@@ -1391,10 +1444,102 @@ async function prepareLocalVfxGeneration(args: {
         type: "video",
         url: maskVideo,
         label: "Provided mask video",
+        maskVideoUrl: maskVideo,
+        maskImageUrl,
+        outputs: {
+          mask_video: maskVideo,
+          mask_image: maskImageUrl,
+          video: maskVideo,
+          image: maskImageUrl,
+        },
       };
     }
+    if (maskImage) {
+      if (shouldInvert) {
+        const blob = await invertMaskImageBlob(maskImage);
+        const url = await uploadVfxMediaBlob({
+          blob,
+          userId: args.userId,
+          nodeId: args.nodeId,
+          label: "inverted-mask-image",
+          extension: "png",
+        });
+        return {
+          ...genBase,
+          type: "image",
+          url,
+          label: "Inverted mask image",
+          maskImageUrl: url,
+          outputs: {
+            mask_image: url,
+            image: url,
+          },
+        };
+      }
+      return {
+        ...genBase,
+        type: "image",
+        url: maskImage,
+        label: "Provided mask image",
+        maskImageUrl: maskImage,
+        outputs: {
+          mask_image: maskImage,
+          image: maskImage,
+        },
+      };
+    }
+
+    const maskMode = String(args.params.mask_mode ?? "green_screen_key").toLowerCase();
+    const sourceVideo = firstStringInput(args.inputs.input_video);
+    if (sourceVideo && maskMode === "green_screen_key") {
+      const maskOptions = {
+        fps: vfxFrameRate(args.params),
+        frameLoadCap: vfxFrameLoadCap(args.params),
+        greenMin: Number(args.params.green_min ?? 72),
+        dominance: Number(args.params.green_dominance ?? 1.18),
+        spillTolerance: Number(args.params.spill_tolerance ?? 18),
+        invert: shouldInvert,
+      };
+      const blob = await createGreenScreenMaskVideoBlob(sourceVideo, maskOptions);
+      const extension = mediaExtensionForBlob(blob, "webm");
+      const url = await uploadVfxMediaBlob({
+        blob,
+        userId: args.userId,
+        nodeId: args.nodeId,
+        label: shouldInvert ? "green-key-inverted-mask-video" : "green-key-mask-video",
+        extension,
+      });
+      const maskImageBlob = await createGreenScreenMaskImageBlob(sourceVideo, {
+        ...maskOptions,
+        seconds: secondsForFrame(args.params),
+      });
+      const maskImageUrl = await uploadVfxMediaBlob({
+        blob: maskImageBlob,
+        userId: args.userId,
+        nodeId: args.nodeId,
+        label: shouldInvert ? "green-key-inverted-mask-image" : "green-key-mask-image",
+        extension: "png",
+      });
+      return {
+        ...genBase,
+        type: "video",
+        url,
+        label: shouldInvert ? "Green key inverted mask video" : "Green key mask video",
+        maskVideoUrl: url,
+        maskImageUrl,
+        outputs: {
+          mask_video: url,
+          mask_image: maskImageUrl,
+          video: url,
+          image: maskImageUrl,
+        },
+      };
+    }
+
     throw new Error(
-      "Connect a prepared black/white mask image or mask video to VFX Mask. SAM/Depth/Canny GPU preprocessing is not wired to the workspace runtime yet.",
+      maskMode === "sam3"
+        ? "SAM3 GPU auto mask is configured in the canvas, but its GPU preprocess executor is not connected yet. Use Auto Green Screen Key for the current green-screen VFX flow."
+        : "Connect a prepared black/white mask image/video or switch Mask Mode to Auto Green Screen Key.",
     );
   }
 
@@ -1406,6 +1551,10 @@ async function prepareLocalVfxGeneration(args: {
         type: "image",
         url: imageUrl,
         label: "Background reference",
+        outputs: {
+          background_image: imageUrl,
+          image: imageUrl,
+        },
       };
     }
     throw new Error(
@@ -1465,11 +1614,11 @@ function getVfxCardMeta(
     return {
       stage: "03",
       stageLabel: "Matte",
-      title: fallbackTitle || "Subject Mask",
-      summary: "Build the protected subject matte that decides what must stay untouched.",
+      title: fallbackTitle || "Green Screen Mask",
+      summary: "Auto-generate the edit mask from the green-screen source or refine a provided matte.",
       artifactLabel: "Mask plate",
       tone: "matte",
-      primaryParamKeys: ["segment_prompt", "invert_mask", "confidence_threshold", "mask_expand", "mask_blur"],
+      primaryParamKeys: ["mask_mode", "green_min", "green_dominance", "spill_tolerance", "invert_mask"],
     };
   }
 
@@ -1551,10 +1700,10 @@ function getVfxCardMeta(
         stage: "09",
         stageLabel: "Reference",
         title: fallbackTitle || "Reference Image",
-      summary: "Image workflow for creating a reference frame outside the preprocess template.",
-      artifactLabel: "Reference image",
-      tone: "generate",
-      primaryParamKeys: ["model_name", "aspect_ratio", "steps"],
+        summary: "Use the first frame as a reference and generate the warehouse look that guides Wan VACE.",
+        artifactLabel: "Reference image",
+        tone: "generate",
+        primaryParamKeys: ["model_name", "workflow_preset", "steps"],
       };
     }
     return {
@@ -1576,7 +1725,7 @@ function getVfxCardMeta(
       summary: "Final open-source video edit stage: sends source video, mask video, and reference image to Wan VACE.",
       artifactLabel: "Edited video",
       tone: "generate",
-      primaryParamKeys: ["model_name", "resolution", "fps", "frame_load_cap", "mask_polarity", "steps"],
+      primaryParamKeys: ["model_name", "resolution", "fps", "frame_load_cap", "chunk_frames", "mask_polarity", "steps"],
     };
   }
 
@@ -1627,7 +1776,7 @@ function getVfxPortIds(
   if (schemaKey === "vfxQwenImageNode") {
     const preset = String(params.workflow_preset ?? "");
     if (preset === "plate_generate") {
-      return new Set(direction === "input" ? ["text"] : ["image"]);
+      return new Set(direction === "input" ? ["text", "ref_image"] : ["image"]);
     }
     if (preset === "masked_edit") {
       return new Set(direction === "input" ? ["text", "ref_image", "mask_image"] : ["image"]);
@@ -1712,6 +1861,11 @@ const VFX_PARAM_HELP_BY_KEY: Record<string, VfxParamHelp> = {
     labelTh: "จำนวนเฟรมสูงสุด",
     descriptionTh: "จำกัดจำนวนเฟรมที่โหลดหรือประมวลผล ใช้ทดสอบสั้น ๆ ก่อนรันเต็ม",
     descriptionEn: "Limits how many frames are loaded or processed for test runs.",
+  },
+  chunk_frames: {
+    labelTh: "เฟรมต่อรอบ",
+    descriptionTh: "จำนวนเฟรมที่ส่งเข้า Wan VACE ต่อหนึ่งรอบ GPU ใช้ลดโอกาส OOM โดยยัง stitch กลับเป็นวิดีโอเดียวตาม Total Frames",
+    descriptionEn: "Frames processed per Wan VACE GPU pass. Lower values reduce VRAM pressure; the worker stitches chunks back into one video.",
   },
   skip_first_frames: {
     labelTh: "ข้ามเฟรมแรก",

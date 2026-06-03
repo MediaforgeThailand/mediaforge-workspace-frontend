@@ -323,6 +323,232 @@ export async function invertMaskVideoBlob(
   }
 }
 
+function writeGreenScreenMaskPixels(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  options: {
+    greenMin?: number;
+    dominance?: number;
+    spillTolerance?: number;
+    invert?: boolean;
+  } = {},
+) {
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const pixels = imageData.data;
+  const greenMin = Math.max(0, Math.min(255, Number(options.greenMin ?? 72) || 72));
+  const dominance = Math.max(1, Math.min(3, Number(options.dominance ?? 1.18) || 1.18));
+  const spillTolerance = Math.max(0, Math.min(255, Number(options.spillTolerance ?? 18) || 18));
+  const invert = options.invert === true;
+
+  for (let i = 0; i < pixels.length; i += 4) {
+    const r = pixels[i] ?? 0;
+    const g = pixels[i + 1] ?? 0;
+    const b = pixels[i + 2] ?? 0;
+    const maxNonGreen = Math.max(r, b);
+    const isGreenScreen =
+      g >= greenMin &&
+      g >= maxNonGreen * dominance &&
+      g - maxNonGreen >= spillTolerance;
+    const maskValue = (isGreenScreen ? 255 : 0) ^ (invert ? 255 : 0);
+    pixels[i] = maskValue;
+    pixels[i + 1] = maskValue;
+    pixels[i + 2] = maskValue;
+    pixels[i + 3] = 255;
+  }
+  ctx.putImageData(imageData, 0, 0);
+}
+
+export async function captureMaskFrameFromVideoBlob(
+  sourceUrl: string,
+  options: {
+    seconds?: number;
+    invert?: boolean;
+  } = {},
+): Promise<Blob> {
+  const video = document.createElement("video");
+  video.crossOrigin = "anonymous";
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "auto";
+
+  const metadataReady = waitForVideoEvent(video, "loadedmetadata");
+  video.src = sourceUrl;
+  video.load();
+  await metadataReady;
+
+  const width = video.videoWidth || 1;
+  const height = video.videoHeight || 1;
+  const duration = Number.isFinite(video.duration) && video.duration > 0
+    ? video.duration
+    : 0;
+  const safeTime = duration > 0
+    ? Math.min(Math.max(0, duration - 0.001), Math.max(0, Number(options.seconds ?? 0) || 0))
+    : 0;
+  await seekVideo(video, safeTime);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not prepare mask frame canvas");
+
+  ctx.drawImage(video, 0, 0, width, height);
+  if (options.invert === true) {
+    invertCanvasPixels(ctx, width, height);
+  }
+
+  video.removeAttribute("src");
+  video.load();
+
+  return canvasToBlob(canvas, "image/png");
+}
+
+export async function createGreenScreenMaskImageBlob(
+  sourceUrl: string,
+  options: {
+    seconds?: number;
+    greenMin?: number;
+    dominance?: number;
+    spillTolerance?: number;
+    invert?: boolean;
+  } = {},
+): Promise<Blob> {
+  const video = document.createElement("video");
+  video.crossOrigin = "anonymous";
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "auto";
+
+  const metadataReady = waitForVideoEvent(video, "loadedmetadata");
+  video.src = sourceUrl;
+  video.load();
+  await metadataReady;
+
+  const width = video.videoWidth || 1;
+  const height = video.videoHeight || 1;
+  const duration = Number.isFinite(video.duration) && video.duration > 0
+    ? video.duration
+    : 0;
+  const safeTime = duration > 0
+    ? Math.min(Math.max(0, duration - 0.001), Math.max(0, Number(options.seconds ?? 0) || 0))
+    : 0;
+  await seekVideo(video, safeTime);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not prepare green-screen mask image canvas");
+
+  ctx.drawImage(video, 0, 0, width, height);
+  writeGreenScreenMaskPixels(ctx, width, height, options);
+
+  video.removeAttribute("src");
+  video.load();
+
+  return canvasToBlob(canvas, "image/png");
+}
+
+export async function createGreenScreenMaskVideoBlob(
+  sourceUrl: string,
+  options: {
+    fps?: number;
+    frameLoadCap?: number;
+    greenMin?: number;
+    dominance?: number;
+    spillTolerance?: number;
+    invert?: boolean;
+    onProgress?: (progress: { frame: number; totalFrames: number }) => void;
+  } = {},
+): Promise<Blob> {
+  if (typeof MediaRecorder === "undefined") {
+    throw new Error("This browser cannot encode a green-screen mask video.");
+  }
+
+  const mimeType = preferredVideoRecorderMimeType();
+  if (!mimeType) {
+    throw new Error("This browser cannot encode MP4/WebM video for green-screen masks.");
+  }
+
+  const video = document.createElement("video");
+  video.crossOrigin = "anonymous";
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "auto";
+
+  const metadataReady = waitForVideoEvent(video, "loadedmetadata");
+  video.src = sourceUrl;
+  video.load();
+  await metadataReady;
+
+  const width = video.videoWidth || 1;
+  const height = video.videoHeight || 1;
+  const duration = Number.isFinite(video.duration) && video.duration > 0
+    ? video.duration
+    : 0;
+  if (duration <= 0) {
+    throw new Error("Source video has no readable duration for green-screen masking.");
+  }
+
+  const fps = Math.max(1, Math.min(60, Math.round(Number(options.fps ?? 24) || 24)));
+  const requestedFrames = Math.max(1, Math.ceil(duration * fps));
+  const frameCap = Number(options.frameLoadCap ?? 0);
+  const totalFrames = frameCap > 0
+    ? Math.min(requestedFrames, Math.floor(frameCap))
+    : requestedFrames;
+  const frameDelayMs = Math.max(1, 1000 / fps);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not prepare green-screen mask canvas");
+
+  const stream = canvas.captureStream(0);
+  const track = stream.getVideoTracks()[0] as (MediaStreamTrack & {
+    requestFrame?: () => void;
+  }) | undefined;
+  if (!track) throw new Error("Could not capture green-screen mask video frames.");
+
+  const chunks: BlobPart[] = [];
+  const recorder = new MediaRecorder(stream, { mimeType });
+  const stopped = new Promise<Blob>((resolve, reject) => {
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunks.push(event.data);
+    };
+    recorder.onerror = () => {
+      reject(new Error("Could not encode green-screen mask video."));
+    };
+    recorder.onstop = () => {
+      resolve(new Blob(chunks, { type: mimeType }));
+    };
+  });
+
+  recorder.start();
+  try {
+    for (let frame = 0; frame < totalFrames; frame += 1) {
+      const targetTime = Math.min(Math.max(0, duration - 0.001), frame / fps);
+      await seekVideo(video, targetTime);
+      ctx.drawImage(video, 0, 0, width, height);
+      writeGreenScreenMaskPixels(ctx, width, height, options);
+      track.requestFrame?.();
+      options.onProgress?.({ frame: frame + 1, totalFrames });
+      await sleep(frameDelayMs);
+    }
+  } finally {
+    video.removeAttribute("src");
+    video.load();
+    if (recorder.state !== "inactive") recorder.stop();
+  }
+
+  try {
+    return await stopped;
+  } finally {
+    stream.getTracks().forEach((streamTrack) => streamTrack.stop());
+  }
+}
+
 export async function uploadWorkspaceMediaBlob(
   blob: Blob,
   path: string,

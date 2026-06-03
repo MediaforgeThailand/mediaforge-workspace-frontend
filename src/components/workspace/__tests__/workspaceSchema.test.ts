@@ -136,6 +136,30 @@ describe("getWsVisibleParams", () => {
       expect.arrayContaining(DEPRECATED_SEEDANCE_1_MODELS),
     );
   });
+
+  it("keeps the VFX mask-to-Wan contract video-first", () => {
+    const maskSchema = getWorkspaceSchema("vfxMaskNode");
+    const qwenSchema = getWorkspaceSchema("vfxQwenImageNode");
+    const wanSchema = getWorkspaceSchema("vfxWanVaceNode");
+
+    expect(maskSchema?.outputs.map((output) => output.id).slice(0, 2)).toEqual([
+      "mask_video",
+      "mask_image",
+    ]);
+    expect(qwenSchema?.inputs.map((input) => input.id)).toEqual(
+      expect.arrayContaining(["ref_image", "mask_image"]),
+    );
+    expect(wanSchema?.inputs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "input_video", required: true }),
+        expect.objectContaining({ id: "mask_video", required: true }),
+        expect.objectContaining({ id: "ref_image", required: true }),
+      ]),
+    );
+    expect(wanSchema?.outputs).toEqual([
+      expect.objectContaining({ id: "video" }),
+    ]);
+  });
 });
 
 describe("getWsVisibleInputs", () => {
