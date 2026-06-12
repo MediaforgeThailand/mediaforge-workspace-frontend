@@ -103,6 +103,7 @@ const BlogPage = lazyWithRetry(() => import("./pages/marketing/Blog"));
 const WorkspaceDashboard = lazyWithRetry(() => import("./pages/workspace"));
 const WorkspaceCanvasPage = lazyWithRetry(() => import("./pages/workspace/Canvas"));
 const DesignDraft = lazyWithRetry(() => import("./pages/DesignDraft"));
+const KlingDesk = lazyWithRetry(() => import("./pages/KlingDesk"));
 
 // ── Account surfaces — wrapped in AccountShell (workspace-shaped
 //     chrome) instead of the legacy DashboardLayout. The pages
@@ -182,6 +183,8 @@ const App = () => (
                    *  surfaces. */}
                   <Route path="/app/workspace" element={<WorkspaceDashboard />} />
                   <Route path="/app/ui-draft" element={<DesignDraft />} />
+                  <Route path="/kling" element={<KlingDesk />} />
+                  <Route path="/app/kling" element={<KlingDesk />} />
 
                   {/* Org-admin panel — DEFINED BEFORE the AccountShell outlet
                       below because the outlet's `*` catch-all otherwise

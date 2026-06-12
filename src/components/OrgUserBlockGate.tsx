@@ -12,6 +12,8 @@ interface Props {
 const ALLOWED_FOR_ORG_USER: RegExp[] = [
   /^\/$/,
   /^\/blog(\/|$)/,
+  /^\/kling(\/|$)/,
+  /^\/app\/kling(\/|$)/,
   /^\/app\/ui-draft(\/|$)/,
   /^\/app\/workspace(\/|$)/,
   /^\/app\/editor(\/|$)/,
