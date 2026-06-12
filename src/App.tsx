@@ -183,6 +183,8 @@ const App = () => (
                    *  surfaces. */}
                   <Route path="/app/workspace" element={<WorkspaceDashboard />} />
                   <Route path="/app/ui-draft" element={<DesignDraft />} />
+                  <Route path="/comfy" element={<KlingDesk />} />
+                  <Route path="/app/comfy" element={<KlingDesk />} />
                   <Route path="/kling" element={<KlingDesk />} />
                   <Route path="/app/kling" element={<KlingDesk />} />
 

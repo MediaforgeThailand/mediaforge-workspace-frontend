@@ -12,7 +12,9 @@ interface Props {
 const ALLOWED_FOR_ORG_USER: RegExp[] = [
   /^\/$/,
   /^\/blog(\/|$)/,
+  /^\/comfy(\/|$)/,
   /^\/kling(\/|$)/,
+  /^\/app\/comfy(\/|$)/,
   /^\/app\/kling(\/|$)/,
   /^\/app\/ui-draft(\/|$)/,
   /^\/app\/workspace(\/|$)/,
