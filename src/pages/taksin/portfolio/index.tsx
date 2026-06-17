@@ -174,14 +174,18 @@ function Section({ section }: { section: WorkSection }) {
           {section.shots.map((shot) => (
             <figure
               key={shot.src}
-              className="pf-shot pf-fade overflow-hidden rounded-2xl ring-1 ring-neutral-200 shadow-sm"
+              /* w-fit + natural-size img: the card hugs the image at its real
+                 pixel size and is never upscaled past native (the source
+                 screenshots are 538–1080px). This kills the pixelation that the
+                 1.455 ui-scale + w-full was causing on desktop. */
+              className="pf-shot pf-fade mx-auto w-fit max-w-full overflow-hidden rounded-2xl ring-1 ring-neutral-200 shadow-sm"
             >
               <img
                 src={shot.src}
                 alt={shot.caption}
                 loading="lazy"
                 decoding="async"
-                className="block w-full"
+                className="block h-auto max-w-full"
               />
               <figcaption className="border-t border-neutral-100 bg-neutral-50 px-4 py-3 font-mono text-[12px] text-neutral-500">
                 {shot.caption}
@@ -194,14 +198,17 @@ function Section({ section }: { section: WorkSection }) {
           {section.shots.map((shot) => (
             <figure
               key={shot.src}
-              className="pf-shot pf-fade break-inside-avoid overflow-hidden rounded-2xl ring-1 ring-neutral-200 shadow-sm"
+              /* Natural-size img (never upscaled): caps each creative at its real
+                 pixel width so the smaller ones don't get blown up by the column
+                 width under the 1.455 ui-scale. */
+              className="pf-shot pf-fade mx-auto w-fit max-w-full break-inside-avoid overflow-hidden rounded-2xl ring-1 ring-neutral-200 shadow-sm"
             >
               <img
                 src={shot.src}
                 alt={shot.caption}
                 loading="lazy"
                 decoding="async"
-                className="block w-full"
+                className="block h-auto max-w-full"
               />
               <figcaption className="border-t border-neutral-100 bg-neutral-50 px-4 py-3 font-mono text-[11px] text-neutral-500">
                 {shot.caption}
@@ -286,6 +293,13 @@ export default function TaksinWorks() {
                 >
                   Mediaforge
                 </a>
+                <Link
+                  to="/taksin/portfolio/showcase"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[#F4FF00] px-4 py-2 text-sm font-semibold text-black transition-transform hover:scale-105"
+                >
+                  ผลงานทีม & กราฟิก
+                  <ArrowUpRight className="h-4 w-4" />
+                </Link>
               </div>
             </Reveal>
           </div>
@@ -442,6 +456,48 @@ export default function TaksinWorks() {
                   </p>
                 </Reveal>
               </div>
+            </div>
+          </section>
+
+          {/* ── Team & client graphic work — link to companion showcase ──── */}
+          <section className="border-t border-neutral-200 bg-white">
+            <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-20">
+              <Reveal>
+                <Link
+                  to="/taksin/portfolio/showcase"
+                  className="group relative block overflow-hidden rounded-3xl bg-neutral-950 p-8 ring-1 ring-neutral-200 transition-transform hover:scale-[1.01] sm:p-12"
+                >
+                  <div
+                    className="pointer-events-none absolute inset-0 opacity-[0.18]"
+                    style={{
+                      backgroundImage:
+                        "radial-gradient(40rem 40rem at 100% 0%, rgba(244,255,0,0.45), transparent 60%)",
+                    }}
+                  />
+                  <div className="relative flex flex-wrap items-end justify-between gap-6">
+                    <div className="max-w-2xl">
+                      <div className="flex items-center gap-3 font-mono text-xs uppercase tracking-[0.25em] text-neutral-400">
+                        <span className="inline-flex h-6 items-center rounded-md bg-[#F4FF00] px-2 font-bold text-black">
+                          08
+                        </span>
+                        <span className="h-px w-8 bg-neutral-700" />
+                        <span>Team & Client Work</span>
+                      </div>
+                      <h2 className="mt-4 font-prompt text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+                        ผลงานทีม &amp; งานกราฟิกให้ลูกค้า
+                      </h2>
+                      <p className="mt-4 text-base leading-relaxed text-neutral-300">
+                        งานครีเอทีฟและกราฟิกเชิงพาณิชย์ที่ทีมของเราผลิตให้ลูกค้าจริง — อาร์ตเวิร์กโฆษณา
+                        แพ็กเกจจิ้ง สื่อ ณ จุดขาย และคอนเทนต์/วิดีโอที่สร้างด้วย AI workflow
+                      </p>
+                    </div>
+                    <span className="inline-flex items-center gap-2 rounded-full bg-[#F4FF00] px-6 py-3 text-sm font-semibold text-black transition-transform group-hover:scale-105">
+                      ดูผลงานทีม
+                      <ArrowUpRight className="h-4 w-4" />
+                    </span>
+                  </div>
+                </Link>
+              </Reveal>
             </div>
           </section>
 
