@@ -15,7 +15,10 @@ export interface ShowcaseImage {
 }
 
 export interface ShowcaseVideo {
+  /** Full-quality MP4 with audio — loaded on click (play with sound). */
   src: string;
+  /** Muted, lightweight WEBM preview that autoplays/loops on screen. */
+  preview: string;
   poster: string;
   label: string;
 }
@@ -151,8 +154,8 @@ export const showcaseSections: ShowcaseSection[] = [
     titleEn: "AI-Driven Content & Marketing Production",
     blurb: "“AI as a Drafter, Human as a Crafter” — ใช้ AI สร้างภาพและวิดีโอเป็น Asset สำหรับงานโฆษณาและการตลาด แล้วให้มนุษย์เป็นผู้เกลางานให้ตรงบริบทและกลุ่มเป้าหมาย ช่วยลดต้นทุนและเวลาในการผลิต",
     videos: [
-      { src: `${VID}/bmta-cabinet.mp4`, poster: `${POS}/bmta-cabinet.jpg`, label: "ขสมก. — วิดีโอสรุปวาระคณะรัฐมนตรี (AI Generated)" },
-      { src: `${VID}/pmu-universe-opening.mp4`, poster: `${POS}/pmu-universe-opening.jpg`, label: "PMU Universe Award 2026 — Opening Visual (AI 100%)" },
+      { src: `${VID}/bmta-cabinet.mp4`, preview: `${VID}/bmta-cabinet.webm`, poster: `${POS}/bmta-cabinet.jpg`, label: "ขสมก. — วิดีโอสรุปวาระคณะรัฐมนตรี (AI Generated)" },
+      { src: `${VID}/pmu-universe-opening.mp4`, preview: `${VID}/pmu-universe-opening.webm`, poster: `${POS}/pmu-universe-opening.jpg`, label: "PMU Universe Award 2026 — Opening Visual (AI 100%)" },
     ],
     images: [
       { src: `${P}/image73.jpg`, w: 1200, h: 675 },
@@ -213,13 +216,13 @@ export const showcaseSections: ShowcaseSection[] = [
     titleEn: "Creative Direction · AI Image / Video · Motion · Editing",
     blurb: "ผลงานคอนเซปต์และโปรเจกต์ทดลองด้วย AI-driven workflow แบบครบกระบวนการ ตั้งแต่ Creative Direction, การสร้างภาพด้วย AI, การพัฒนาเป็นวิดีโอด้วย AI Video Generation ไปจนถึงการตัดต่อ",
     videos: [
-      { src: `${VID}/dead-island.mp4`, poster: `${POS}/dead-island.jpg`, label: "Dead Island 3 — Opening Scene (AI Cinematic Concept)" },
-      { src: `${VID}/mediaforge-intro.mp4`, poster: `${POS}/mediaforge-intro.jpg`, label: "Introduction of MediaForge — AI 2D Storytelling" },
-      { src: `${VID}/storytelling-25d.mp4`, poster: `${POS}/storytelling-25d.jpg`, label: "2.5D Storytelling — Early AI Use Case" },
-      { src: `${VID}/ai-motion-action.mp4`, poster: `${POS}/ai-motion-action.jpg`, label: "AI Motion Control — Action Sequence Study" },
-      { src: `${VID}/edu-2d-animation.mp4`, poster: `${POS}/edu-2d-animation.jpg`, label: "AI for Education — 2D Animation Use Case" },
-      { src: `${VID}/hilux-travo.mp4`, poster: `${POS}/hilux-travo.jpg`, label: "Hilux Travo Overland — AI Spec Ad" },
-      { src: `${VID}/fashion-us.mp4`, poster: `${POS}/fashion-us.jpg`, label: "AI Fashion Campaign — Thai brand to US market" },
+      { src: `${VID}/dead-island.mp4`, preview: `${VID}/dead-island.webm`, poster: `${POS}/dead-island.jpg`, label: "Dead Island 3 — Opening Scene (AI Cinematic Concept)" },
+      { src: `${VID}/mediaforge-intro.mp4`, preview: `${VID}/mediaforge-intro.webm`, poster: `${POS}/mediaforge-intro.jpg`, label: "Introduction of MediaForge — AI 2D Storytelling" },
+      { src: `${VID}/storytelling-25d.mp4`, preview: `${VID}/storytelling-25d.webm`, poster: `${POS}/storytelling-25d.jpg`, label: "2.5D Storytelling — Early AI Use Case" },
+      { src: `${VID}/ai-motion-action.mp4`, preview: `${VID}/ai-motion-action.webm`, poster: `${POS}/ai-motion-action.jpg`, label: "AI Motion Control — Action Sequence Study" },
+      { src: `${VID}/edu-2d-animation.mp4`, preview: `${VID}/edu-2d-animation.webm`, poster: `${POS}/edu-2d-animation.jpg`, label: "AI for Education — 2D Animation Use Case" },
+      { src: `${VID}/hilux-travo.mp4`, preview: `${VID}/hilux-travo.webm`, poster: `${POS}/hilux-travo.jpg`, label: "Hilux Travo Overland — AI Spec Ad" },
+      { src: `${VID}/fashion-us.mp4`, preview: `${VID}/fashion-us.webm`, poster: `${POS}/fashion-us.jpg`, label: "AI Fashion Campaign — Thai brand to US market" },
     ],
     images: [
       { src: `${P}/image112.jpg`, w: 836, h: 471 },
