@@ -1,4 +1,5 @@
-import { Sparkles } from "lucide-react";
+import { Sparkles, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import { stats, resultHighlights } from "../data";
 import { Reveal, RevealItem, SectionLabel, CountUp } from "../anim";
 
@@ -39,6 +40,16 @@ export default function Results() {
               </div>
             </RevealItem>
           ))}
+        </Reveal>
+
+        <Reveal className="mt-10 flex justify-center">
+          <Link
+            to="/taksin/portfolio"
+            className="group inline-flex items-center gap-2 rounded-full bg-primary px-7 py-3 text-sm font-semibold text-primary-foreground transition-transform hover:scale-105"
+          >
+            ดูผลงานบางส่วน
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+          </Link>
         </Reveal>
       </div>
     </section>
