@@ -7,18 +7,23 @@ import { Reveal, RevealItem } from "../anim";
 import { profile, contact } from "../data";
 import {
   workSections,
+  techVideos,
   studio,
   mira,
   platform,
   type WorkSection,
+  type TechVideo,
   type VentureClip,
 } from "./works";
 
 /* ───────────────────────────────────────────────────────────────────────────
  * /taksin/portfolio — "ผลงานบางส่วน" (Selected Works)
- * A long-scroll, WHITE-background gallery of real work extracted from Taksin's
- * portfolio PDF (Ads / Data / Clinic / Campaigns / Design / Brand) plus the
- * live Mediaforge products (Studio cinematic reels + Mira AI product screens).
+ * A long-scroll, WHITE-background gallery focused on Performance & Ads + Data
+ * (real screenshots from Taksin's portfolio PDF) and a Technical · Systems
+ * block of HyperFrames motion-graphic explainers (LINE DEV, AI-in-LINE,
+ * Website, Org systems, Automation), plus the live Mediaforge products (Studio
+ * cinematic reels + Mira AI product screens). Pure graphic / branding work
+ * lives on the companion /showcase page, linked from here.
  * Light theme on purpose — the dark #F4FF00 brand accent is used as blocks and
  * markers, never as text on white.
  * ──────────────────────────────────────────────────────────────────────────*/
@@ -221,6 +226,57 @@ function Section({ section }: { section: WorkSection }) {
   );
 }
 
+/* ── One technical motion-graphic card (video + supporting text) ────────── */
+function TechCard({ v, wide = false }: { v: TechVideo; wide?: boolean }) {
+  return (
+    <figure className={wide ? "" : "h-full"}>
+      <WorkVideo src={v.src} poster={v.poster} label={v.title} fit="cover" />
+      <figcaption className="mt-3.5 px-1">
+        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+          <span className="font-bold text-neutral-900">{v.index}</span>
+          <span className="mx-2 text-neutral-300">/</span>
+          {v.titleEn}
+        </p>
+        <p className="mt-1.5 text-sm leading-relaxed text-neutral-600">{v.blurb}</p>
+      </figcaption>
+    </figure>
+  );
+}
+
+/* ── Technical / Systems section — HyperFrames motion-graphic explainers ─── */
+function TechShowcase() {
+  const [feature, ...rest] = techVideos;
+  return (
+    <section id="tech" className="mx-auto max-w-6xl scroll-mt-24 px-5 py-16 sm:px-8 sm:py-20">
+      <Reveal>
+        <PfLabel index="02">Technical · Systems · Motion</PfLabel>
+        <h2 className="mt-4 font-prompt text-3xl font-extrabold tracking-tight text-neutral-900 sm:text-4xl">
+          งานเชิงเทคนิค &amp; ระบบ
+          <span className="mt-2 block h-1 w-12 rounded-full bg-[#F4FF00]" />
+        </h2>
+        <p className="mt-4 max-w-2xl text-base leading-relaxed text-neutral-600">
+          งานสายเทคนิคที่อยู่เบื้องหลังผลลัพธ์ — ตั้งค่า LINE OA เชิงลึก / LINE DEV, นำ AI มาตอบแชตอัตโนมัติ,
+          สร้างเว็บไซต์, วางระบบองค์กร และระบบ Automation อธิบายทั้งหมดเป็น motion graphic
+        </p>
+      </Reveal>
+
+      {/* feature explainer (full width) */}
+      <Reveal className="mt-10">
+        <TechCard v={feature} wide />
+      </Reveal>
+
+      {/* remaining explainers (2-col) */}
+      <Reveal staggerChildren amount={0.1} className="mt-7 grid gap-x-6 gap-y-9 sm:grid-cols-2">
+        {rest.map((v) => (
+          <RevealItem key={v.id}>
+            <TechCard v={v} />
+          </RevealItem>
+        ))}
+      </Reveal>
+    </section>
+  );
+}
+
 export default function TaksinWorks() {
   useDocumentTitle(`ผลงานบางส่วน — ${profile.nameLatin}`);
 
@@ -273,20 +329,30 @@ export default function TaksinWorks() {
                 </span>
               </h1>
               <p className="mt-7 max-w-2xl text-lg leading-relaxed text-neutral-600">
-                ตัวอย่างงานจริงด้านการยิงแอด ดาต้า แคมเปญ ดีไซน์ และแบรนด์ พร้อมผลิตภัณฑ์ AI
+                ตัวอย่างงานจริงด้าน Performance &amp; Ads และดาต้า พร้อมงานเชิงเทคนิค/ระบบ —
+                LINE DEV, AI ตอบแชต, เว็บไซต์, ระบบองค์กร และ Automation — และผลิตภัณฑ์ AI
                 ที่สร้างในเครือ <span className="font-semibold text-neutral-900">Mediaforge</span> —
                 ทั้ง Mediaforge Studio และ Mira AI
               </p>
               <div className="mt-9 flex flex-wrap gap-2.5">
-                {workSections.map((s) => (
-                  <a
-                    key={s.id}
-                    href={`#${s.id}`}
-                    className="rounded-full bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-900 hover:text-white"
-                  >
-                    {s.title}
-                  </a>
-                ))}
+                <a
+                  href="#ads"
+                  className="rounded-full bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-900 hover:text-white"
+                >
+                  Performance &amp; Ads
+                </a>
+                <a
+                  href="#tech"
+                  className="rounded-full bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-900 hover:text-white"
+                >
+                  เทคนิค &amp; ระบบ
+                </a>
+                <a
+                  href="#client"
+                  className="rounded-full bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-900 hover:text-white"
+                >
+                  ลูกค้า &amp; พาร์ตเนอร์
+                </a>
                 <a
                   href="#ventures"
                   className="rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-neutral-700"
@@ -305,12 +371,18 @@ export default function TaksinWorks() {
           </div>
         </section>
 
-        {/* PDF-sourced sections, alternating subtle bg for separation */}
         <main>
-          {workSections.map((section, i) => (
-            <div key={section.id} className={i % 2 === 1 ? "bg-neutral-50/70" : ""}>
-              <Section section={section} />
-            </div>
+          {/* 01 — Performance & Ads / Data (real PDF screenshots) */}
+          <Section section={workSections[0]} />
+
+          {/* 02 — Technical / Systems motion graphics (the deeper engineering work) */}
+          <div className="bg-neutral-50/70">
+            <TechShowcase />
+          </div>
+
+          {/* 03+ — remaining work blocks (clients & partners) */}
+          {workSections.slice(1).map((section) => (
+            <Section key={section.id} section={section} />
           ))}
 
           {/* ── Mediaforge ventures ─────────────────────────────────────── */}
@@ -319,7 +391,7 @@ export default function TaksinWorks() {
               <Reveal>
                 <div className="flex items-center gap-3 font-mono text-xs uppercase tracking-[0.25em] text-neutral-400">
                   <span className="inline-flex h-6 items-center rounded-md bg-[#F4FF00] px-2 font-bold text-black">
-                    07
+                    04
                   </span>
                   <span className="h-px w-8 bg-neutral-700" />
                   <span>Live Products · Mediaforge</span>
@@ -478,7 +550,7 @@ export default function TaksinWorks() {
                     <div className="max-w-2xl">
                       <div className="flex items-center gap-3 font-mono text-xs uppercase tracking-[0.25em] text-neutral-400">
                         <span className="inline-flex h-6 items-center rounded-md bg-[#F4FF00] px-2 font-bold text-black">
-                          08
+                          05
                         </span>
                         <span className="h-px w-8 bg-neutral-700" />
                         <span>Team & Client Work</span>

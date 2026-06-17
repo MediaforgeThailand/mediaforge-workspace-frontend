@@ -49,81 +49,84 @@ export const workSections: WorkSection[] = [
     ],
   },
   {
-    id: "clinic",
-    index: "02",
-    title: "คลินิก & ความงาม",
-    titleEn: "Clinic & Beauty Campaigns",
-    blurb:
-      "งานครีเอทีฟและแคมเปญสายคลินิก / ความงาม — ออกแบบข้อเสนอ (offer) และครีเอทีฟที่ขับยอดทักแชตและการจอง วาง Retargeting ด้วย Facebook Pixel",
-    layout: "grid",
-    shots: [
-      { src: `${P}/clinic-01.jpg`, caption: "คลินิกความงาม — ฉีดหน้าเรียว (Meta Ads)" },
-      { src: `${P}/clinic-02.jpg`, caption: "โปรโมชันคลินิก ฿3,990" },
-      { src: `${P}/clinic-03.jpg`, caption: "ครีเอทีฟคลินิก — ข้อเสนอ & บริการ" },
-      { src: `${P}/clinic-04.jpg`, caption: "คลินิก — ทีมแพทย์ & บริการ" },
-      { src: `${P}/clinic-05.jpg`, caption: "ครีเอทีฟโฆษณาคลินิก" },
-    ],
-  },
-  {
-    id: "campaign",
-    index: "03",
-    title: "แคมเปญ & ครีเอทีฟ",
-    titleEn: "Seasonal & E-commerce Campaigns",
-    blurb:
-      "ชุดครีเอทีฟแคมเปญตามเทศกาลและอีคอมเมิร์ซ — 11.11 / 12.12 / Christmas / โปรโมชัน วางคอนเซ็ปต์ ข้อความ และดีไซน์ให้สอดคล้องกับเป้าหมายการขาย",
-    layout: "grid",
-    shots: [
-      { src: `${P}/campaign-01.jpg`, caption: "Christmas Sale — แคมเปญเทศกาล" },
-      { src: `${P}/campaign-02.jpg`, caption: "Christmas — ชุดครีเอทีฟ" },
-      { src: `${P}/campaign-03.jpg`, caption: "12.12 — Mega Campaign" },
-      { src: `${P}/campaign-04.jpg`, caption: "11.11 — Cashback Campaign" },
-      { src: `${P}/campaign-05.jpg`, caption: "แคมเปญปีใหม่ / ลดราคา" },
-      { src: `${P}/campaign-06.jpg`, caption: "โปรโมชัน — ลดสูงสุด 80%" },
-      { src: `${P}/campaign-07.jpg`, caption: "คอร์ส PDPA — ครีเอทีฟโฆษณา" },
-    ],
-  },
-  {
-    id: "design",
-    index: "04",
-    title: "ดีไซน์ & เว็บไซต์",
-    titleEn: "Design · UX/UI · Web",
-    blurb:
-      "งานออกแบบเมนู สื่อสิ่งพิมพ์ และ UX/UI เว็บไซต์ / เว็บแอป (Figma) — รวมถึงหน้าเว็บอีคอมเมิร์ซและ Landing Page",
-    layout: "grid",
-    shots: [
-      { src: `${P}/design-03.jpg`, caption: "UX/UI — เว็บไซต์ & เว็บแอป (Figma)" },
-      { src: `${P}/design-04.jpg`, caption: "Web / App Mockup" },
-      { src: `${P}/design-05.jpg`, caption: "หน้าเว็บสินค้า / อีคอมเมิร์ซ" },
-      { src: `${P}/design-06.jpg`, caption: "Landing Page — งานออกแบบ" },
-      { src: `${P}/design-01.jpg`, caption: "ออกแบบเมนู — เครื่องดื่ม / Jameson" },
-      { src: `${P}/design-02.jpg`, caption: "ออกแบบเมนูร้านอาหาร" },
-    ],
-  },
-  {
-    id: "brand",
-    index: "05",
-    title: "แบรนด์ & กราฟิก",
-    titleEn: "Branding & Graphic Direction",
-    blurb:
-      "งานวางภาพลักษณ์แบรนด์และ Graphic Brief — ตั้งแต่ร้านอาหาร / บาร์ ไปจนถึงแฟชั่นแบรนด์",
-    layout: "grid",
-    shots: [
-      { src: `${P}/brand-01.jpg`, caption: "COALS Steakhouse & Bar — Branding" },
-      { src: `${P}/brand-02.jpg`, caption: "COALS — Grand Opening Graphics" },
-      { src: `${P}/brand-03.jpg`, caption: "Graphic Brief — งานแบรนด์" },
-      { src: `${P}/brand-04.jpg`, caption: "HIMORE — แฟชั่นแบรนด์" },
-      { src: `${P}/brand-05.jpg`, caption: "HIMORE — Social / Lookbook" },
-    ],
-  },
-  {
     id: "client",
-    index: "06",
+    index: "03",
     title: "ลูกค้า & พาร์ตเนอร์",
     titleEn: "Clients & Partners",
     blurb:
       "ตัวอย่างลูกค้าและพาร์ตเนอร์ที่เคยร่วมงาน — ทั้งงานประจำและฟรีแลนซ์ ครอบคลุมเอเจนซี แบรนด์สินค้า ร้านอาหาร และองค์กร",
     layout: "stack",
     shots: [{ src: `${P}/client-01.jpg`, caption: "ลูกค้า & พาร์ตเนอร์บางส่วน" }],
+  },
+];
+
+// ── Technical / Systems motion graphics (HyperFrames explainers) ──────────
+// Five standalone motion-graphic videos that explain Taksin's deeper technical
+// work — areas that don't fit "graphic / performance ads" but show the
+// engineering & systems side. Each is a 1920×1080 / 10s loop rendered with
+// HyperFrames; copy is grounded in the CV (no invented clients or metrics).
+const TV = "/videos/taksin";
+
+export interface TechVideo {
+  id: string;
+  index: string;
+  title: string;
+  titleEn: string;
+  blurb: string;
+  src: string;
+  poster: string;
+}
+
+export const techVideos: TechVideo[] = [
+  {
+    id: "line-dev",
+    index: "01",
+    title: "LINE OA & LINE DEV",
+    titleEn: "Deep Setup · Messaging API · Webhook",
+    blurb:
+      "ตั้งค่า LINE Official Account เชิงลึกระดับนักพัฒนา ไม่ใช่แค่หน้าบ้าน — เชื่อม Messaging API & Webhook เข้าระบบหลังบ้าน พร้อมออกแบบ Rich Menu, Flex Message และ Auto-reply ตาม customer journey",
+    src: `${TV}/tech-line-dev.mp4`,
+    poster: `${TV}/tech-line-dev.jpg`,
+  },
+  {
+    id: "line-ai",
+    index: "02",
+    title: "AI ตอบแชตอัตโนมัติบน LINE",
+    titleEn: "AI Auto-Reply · LINE × LLM",
+    blurb:
+      "นำ AI มาเชื่อมกับ LINE ให้ตอบลูกค้าเองตลอด 24 ชม. — เข้าใจบริบทธุรกิจและข้อมูลสินค้า ตอบกลับทันที ลดงานแอดมินซ้ำ ๆ และส่งต่อให้ทีมเมื่อต้องคุยจริง",
+    src: `${TV}/tech-line-ai.mp4`,
+    poster: `${TV}/tech-line-ai.jpg`,
+  },
+  {
+    id: "website",
+    index: "03",
+    title: "การสร้าง Website",
+    titleEn: "Web · UX/UI · Landing · PWA",
+    blurb:
+      "ออกแบบ UX/UI ใน Figma แล้วพัฒนาเป็นเว็บไซต์และเว็บแอปที่ใช้งานจริง — รองรับทุกหน้าจอ (Responsive) ตั้งแต่ Landing Page ไปจนถึงอีคอมเมิร์ซและ PWA",
+    src: `${TV}/tech-website.mp4`,
+    poster: `${TV}/tech-website.jpg`,
+  },
+  {
+    id: "org",
+    index: "04",
+    title: "ระบบองค์กร",
+    titleEn: "Org Systems · POS · Booking · SOP",
+    blurb:
+      "วางโครงสร้างให้ทั้งองค์กรทำงานบนระบบเดียว ไม่ใช่พึ่งตัวบุคคล — ออกแบบกระบวนการและ SOP ติดตั้งระบบ POS & ระบบขาย และสร้างระบบจอง-บริการลูกค้าบน Progressive Web App",
+    src: `${TV}/tech-org.mp4`,
+    poster: `${TV}/tech-org.jpg`,
+  },
+  {
+    id: "automation",
+    index: "05",
+    title: "ระบบ Automation",
+    titleEn: "Automation · Integration · 24/7",
+    blurb:
+      "วางระบบอัตโนมัติให้งานซ้ำ ๆ ทำงานเองต่อเนื่อง — เชื่อมระบบผ่าน API & Webhook และซิงก์สต็อก-ออเดอร์ Xcommerce ↔ Shopee / Lazada / LINE พร้อมระบบแจ้งเตือนและตอบอัตโนมัติ",
+    src: `${TV}/tech-automation.mp4`,
+    poster: `${TV}/tech-automation.jpg`,
   },
 ];
 
