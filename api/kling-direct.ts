@@ -373,6 +373,8 @@ async function postKling(endpoint: string, jwt: string, payload: Record<string, 
   const taskId = String((result.data as Record<string, unknown> | undefined)?.task_id ?? "");
   if (!taskId) throw new Error("Kling API did not return a task_id.");
 
+  console.info(`[kling-direct] submitted target=${pollTarget} task_id=${taskId}`);
+
   return {
     task_id: taskId,
     poll_target: pollTarget,
@@ -409,11 +411,21 @@ async function pollKling(body: KlingSubmitBody, jwt: string) {
   const taskResult = (data.task_result ?? {}) as Record<string, unknown>;
   const videos = Array.isArray(taskResult.videos) ? taskResult.videos as Array<Record<string, unknown>> : [];
   const videoUrl = videos.length > 0 ? String(videos[0]?.url ?? "") : "";
+  const succeeded = status === "succeed" || status === "success";
+
+  console.info(
+    `[kling-direct] poll target=${pollTarget} task_id=${taskId} status=${status} has_video=${Boolean(videoUrl)}`,
+  );
+
+  if (succeeded && !videoUrl) {
+    throw new Error(`Kling task succeeded but returned no video URL. task_id=${taskId}`);
+  }
 
   return {
     status,
     status_message: statusMessage,
     video_url: videoUrl || undefined,
+    checked_at: Date.now(),
   };
 }
 

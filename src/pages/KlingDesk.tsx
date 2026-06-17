@@ -50,6 +50,8 @@ type KlingJob = {
   status: JobStatus;
   statusMessage?: string;
   videoUrl?: string;
+  checkedAt?: number;
+  checks?: number;
   createdAt: number;
   updatedAt: number;
 };
@@ -115,6 +117,14 @@ function statusTone(status: JobStatus) {
 
 function isActiveJob(job: KlingJob) {
   return !["succeed", "success", "failed", "fail", "error"].includes(job.status);
+}
+
+function formatElapsed(ms: number) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes <= 0) return `${seconds}s`;
+  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
 }
 
 function FieldLabel({ children }: { children: ReactNode }) {
@@ -244,12 +254,11 @@ export default function KlingDesk() {
     );
   }, []);
 
-  const pollJob = useCallback(
-    async (jobId: string) => {
-      const job = jobs.find((item) => item.id === jobId);
-      if (!job || !isActiveJob(job) || pollingRef.current.has(jobId)) return;
+  const pollJobRecord = useCallback(
+    async (job: KlingJob) => {
+      if (!job || !isActiveJob(job) || pollingRef.current.has(job.id)) return;
 
-      pollingRef.current.add(jobId);
+      pollingRef.current.add(job.id);
       try {
         const res = await fetch("/api/kling-direct", {
           method: "POST",
@@ -262,31 +271,43 @@ export default function KlingDesk() {
         });
         const data = await parseApiResponse(res);
         if (!res.ok || !data.ok) throw new Error(data.error || "Polling failed");
-        updateJob(jobId, {
+        updateJob(job.id, {
           status: String(data.status || "processing").toLowerCase() as JobStatus,
           statusMessage: data.status_message || "",
           videoUrl: data.video_url || job.videoUrl,
+          checkedAt: Number(data.checked_at || Date.now()),
+          checks: (job.checks || 0) + 1,
         });
       } catch (err) {
-        updateJob(jobId, {
+        updateJob(job.id, {
           status: "error",
           statusMessage: err instanceof Error ? err.message : "Polling failed",
+          checkedAt: Date.now(),
+          checks: (job.checks || 0) + 1,
         });
       } finally {
-        pollingRef.current.delete(jobId);
+        pollingRef.current.delete(job.id);
       }
     },
-    [jobs, updateJob],
+    [updateJob],
+  );
+
+  const pollJob = useCallback(
+    async (jobId: string) => {
+      const job = jobs.find((item) => item.id === jobId);
+      if (job) await pollJobRecord(job);
+    },
+    [jobs, pollJobRecord],
   );
 
   useEffect(() => {
     const active = jobs.filter(isActiveJob);
     if (active.length === 0) return;
     const timer = window.setInterval(() => {
-      active.slice(0, 4).forEach((job) => void pollJob(job.id));
-    }, 7000);
+      active.slice(0, 4).forEach((job) => void pollJobRecord(job));
+    }, 5000);
     return () => window.clearInterval(timer);
-  }, [jobs, pollJob]);
+  }, [jobs, pollJobRecord]);
 
   const addShot = () => {
     setShots((current) => [...current, { id: makeId("shot"), prompt: "", duration: 3 }].slice(0, 5));
@@ -371,6 +392,7 @@ export default function KlingDesk() {
         updatedAt: Date.now(),
       };
       setJobs((current) => [job, ...current].slice(0, 24));
+      window.setTimeout(() => void pollJobRecord(job), 1200);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Unable to submit Kling job.");
     } finally {
@@ -780,12 +802,17 @@ export default function KlingDesk() {
                         <video src={job.videoUrl} controls className="mb-2 aspect-video w-full rounded-md bg-black object-contain" />
                       ) : (
                         <div className="mb-2 grid aspect-video place-items-center rounded-md border border-dashed border-white/10 bg-black/25 text-xs text-zinc-500">
-                          {isActiveJob(job) ? "Rendering..." : "No preview"}
+                          {isActiveJob(job) ? `Rendering... ${formatElapsed(Date.now() - job.createdAt)}` : "No preview"}
                         </div>
                       )}
 
-                      {job.statusMessage && (
-                        <p className="mb-2 line-clamp-2 text-xs leading-5 text-zinc-400">{job.statusMessage}</p>
+                      {(job.statusMessage || isActiveJob(job)) && (
+                        <p className="mb-2 line-clamp-3 text-xs leading-5 text-zinc-400">
+                          {job.statusMessage ||
+                            (job.checkedAt
+                              ? `Last checked ${formatElapsed(Date.now() - job.checkedAt)} ago. Kling is still ${job.status}.`
+                              : "Waiting for first Kling status check...")}
+                        </p>
                       )}
 
                       <div className="flex flex-wrap items-center gap-1.5">
