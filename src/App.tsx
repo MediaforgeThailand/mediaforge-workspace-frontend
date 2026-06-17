@@ -95,6 +95,7 @@ function lazyWithRetry(factory: () => Promise<{ default: React.ComponentType<any
 const Auth = lazyWithRetry(() => import("./pages/Auth"));
 const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
 const BlogPage = lazyWithRetry(() => import("./pages/marketing/Blog"));
+const TaksinPortfolio = lazyWithRetry(() => import("./pages/taksin"));
 
 // ── Workspace surfaces ────────────────────────────────────────
 // Dashboard (list of spaces) lives inside DashboardLayout chrome.
@@ -158,6 +159,7 @@ const App = () => (
                 <Routes>
                   <Route path="/" element={<Navigate to="/app/workspace" replace />} />
                   <Route path="/blog" element={<BlogPage />} />
+                  <Route path="/taksin" element={<TaksinPortfolio />} />
 
                   {/* Auth + legal — public */}
                   <Route path="/auth" element={<Auth />} />
