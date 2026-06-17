@@ -22,9 +22,9 @@ export default function Nav() {
       }`}
     >
       <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
-        <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="flex items-center gap-2">
-          <img src="/mediaforge-logo.svg" alt="MediaForge" className="h-6 w-auto" />
-          <span className="font-mono text-sm text-muted-foreground">/ taksin</span>
+        <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="flex items-baseline gap-1">
+          <span className="font-prompt text-lg font-extrabold tracking-tight text-foreground">taksin</span>
+          <span className="text-lg font-extrabold leading-none text-primary">.</span>
         </button>
 
         <div className="hidden items-center gap-7 md:flex">

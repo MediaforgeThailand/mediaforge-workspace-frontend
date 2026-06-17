@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { profile } from "../data";
 import { HeroSystemMap } from "../diagrams";
@@ -65,9 +66,15 @@ export default function Hero() {
           </motion.p>
 
           <motion.div variants={item} className="mt-9 flex flex-wrap items-center gap-4">
+            <Link
+              to="/taksin/portfolio"
+              className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-transform hover:scale-105"
+            >
+              ดูผลงานบางส่วน
+            </Link>
             <button
               onClick={() => document.getElementById("pillars")?.scrollIntoView({ behavior: "smooth" })}
-              className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-transform hover:scale-105"
+              className="rounded-full px-6 py-3 text-sm font-semibold text-foreground ring-1 ring-border transition-colors hover:bg-accent"
             >
               ดูความเชี่ยวชาญ
             </button>

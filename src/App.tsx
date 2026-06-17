@@ -96,6 +96,7 @@ const Auth = lazyWithRetry(() => import("./pages/Auth"));
 const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
 const BlogPage = lazyWithRetry(() => import("./pages/marketing/Blog"));
 const TaksinPortfolio = lazyWithRetry(() => import("./pages/taksin"));
+const TaksinWorks = lazyWithRetry(() => import("./pages/taksin/portfolio"));
 
 // ── Workspace surfaces ────────────────────────────────────────
 // Dashboard (list of spaces) lives inside DashboardLayout chrome.
@@ -160,6 +161,7 @@ const App = () => (
                   <Route path="/" element={<Navigate to="/app/workspace" replace />} />
                   <Route path="/blog" element={<BlogPage />} />
                   <Route path="/taksin" element={<TaksinPortfolio />} />
+                  <Route path="/taksin/portfolio" element={<TaksinWorks />} />
 
                   {/* Auth + legal — public */}
                   <Route path="/auth" element={<Auth />} />

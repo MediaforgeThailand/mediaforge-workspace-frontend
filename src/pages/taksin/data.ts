@@ -213,7 +213,7 @@ export const stats: Stat[] = [
   { value: 6, suffix: " ปี", label: "ประสบการณ์รวม" },
   { value: 4, suffix: " ปี", label: "ระดับผู้จัดการ / ผู้นำ" },
   { value: 800, suffix: "K", prefix: "฿", label: "งบแอดสูงสุด/เดือน" },
-  { value: 3000, suffix: "+", label: "ฟอลโลเวอร์ IG ใน 5 เดือน" },
+  { value: 100, suffix: "%", prefix: "+", label: "เพิ่มยอดขายให้ธุรกิจ ภายใน 3 เดือน" },
 ];
 
 export const resultHighlights: string[] = [
