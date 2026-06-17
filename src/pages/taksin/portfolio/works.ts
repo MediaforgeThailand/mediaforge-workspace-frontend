@@ -34,7 +34,6 @@ export const workSections: WorkSection[] = [
       "บริหารงบโฆษณารวม ~600,000–800,000 บาท/เดือน บน Meta Ads และ Google Ads — วางโครงสร้างแคมเปญ ทดสอบครีเอทีฟ และอ่านผลจากแดชบอร์ดและตารางข้อมูลจริง เพื่อจัดสรรงบตามผลลัพธ์",
     layout: "stack",
     shots: [
-      { src: `${P}/ads-01.jpg`, caption: "Google Ads — แดชบอร์ดแคมเปญ & งบประมาณ" },
       { src: `${P}/ads-06.jpg`, caption: "Performance Report — Google Sheets (งบ / ยอด / ROAS)" },
       { src: `${P}/ads-04.jpg`, caption: "Google Analytics (GA4) — พฤติกรรมผู้ใช้ & คอนเวอร์ชัน" },
       { src: `${P}/ads-05.jpg`, caption: "Data Visualization — ภาพรวมผลลัพธ์แคมเปญ" },
