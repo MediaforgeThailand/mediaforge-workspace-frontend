@@ -35,8 +35,17 @@ const pfStyles = `
   }
   .pf-shot { transition: transform 0.5s cubic-bezier(0.16,1,0.3,1), box-shadow 0.5s; }
   .pf-shot:hover { transform: translateY(-4px); }
+  /* Entrance polish that never hides content: opacity stays 1, only a subtle
+     rise animates. If the animation never runs (paused/hidden tab), the image
+     is still fully visible. */
+  .pf-fade { animation: pf-rise 0.6s cubic-bezier(0.16,1,0.3,1) both; }
+  @keyframes pf-rise {
+    from { transform: translateY(14px); }
+    to   { transform: translateY(0); }
+  }
   @media (prefers-reduced-motion: reduce) {
     .pf-shot, .pf-shot:hover { transition: none; transform: none; }
+    .pf-fade { animation: none; }
   }
 `;
 
@@ -157,48 +166,49 @@ function Section({ section }: { section: WorkSection }) {
         <p className="mt-4 max-w-2xl text-base leading-relaxed text-neutral-600">{section.blurb}</p>
       </Reveal>
 
+      {/* Images render as soon as they load — never gated behind a scroll/JS
+          reveal, so they can't be trapped invisible (background tab, slow IO,
+          stale cache). A light CSS fade-in keeps the entrance polished. */}
       {isStack ? (
-        <Reveal staggerChildren amount={0.1} className="mt-10 space-y-6">
+        <div className="mt-10 space-y-6">
           {section.shots.map((shot) => (
-            <RevealItem key={shot.src}>
-              <figure className="pf-shot overflow-hidden rounded-2xl ring-1 ring-neutral-200 shadow-sm">
-                <img
-                  src={shot.src}
-                  alt={shot.caption}
-                  loading="lazy"
-                  decoding="async"
-                  className="w-full"
-                />
-                <figcaption className="border-t border-neutral-100 bg-neutral-50 px-4 py-3 font-mono text-[12px] text-neutral-500">
-                  {shot.caption}
-                </figcaption>
-              </figure>
-            </RevealItem>
+            <figure
+              key={shot.src}
+              className="pf-shot pf-fade overflow-hidden rounded-2xl ring-1 ring-neutral-200 shadow-sm"
+            >
+              <img
+                src={shot.src}
+                alt={shot.caption}
+                loading="lazy"
+                decoding="async"
+                className="block w-full"
+              />
+              <figcaption className="border-t border-neutral-100 bg-neutral-50 px-4 py-3 font-mono text-[12px] text-neutral-500">
+                {shot.caption}
+              </figcaption>
+            </figure>
           ))}
-        </Reveal>
+        </div>
       ) : (
-        <Reveal
-          staggerChildren
-          amount={0.05}
-          className="mt-10 columns-1 gap-5 sm:columns-2 lg:columns-3 [&>*]:mb-5"
-        >
+        <div className="mt-10 columns-1 gap-5 sm:columns-2 lg:columns-3 [&>*]:mb-5">
           {section.shots.map((shot) => (
-            <RevealItem key={shot.src} className="break-inside-avoid">
-              <figure className="pf-shot overflow-hidden rounded-2xl ring-1 ring-neutral-200 shadow-sm">
-                <img
-                  src={shot.src}
-                  alt={shot.caption}
-                  loading="lazy"
-                  decoding="async"
-                  className="w-full"
-                />
-                <figcaption className="border-t border-neutral-100 bg-neutral-50 px-4 py-3 font-mono text-[11px] text-neutral-500">
-                  {shot.caption}
-                </figcaption>
-              </figure>
-            </RevealItem>
+            <figure
+              key={shot.src}
+              className="pf-shot pf-fade break-inside-avoid overflow-hidden rounded-2xl ring-1 ring-neutral-200 shadow-sm"
+            >
+              <img
+                src={shot.src}
+                alt={shot.caption}
+                loading="lazy"
+                decoding="async"
+                className="block w-full"
+              />
+              <figcaption className="border-t border-neutral-100 bg-neutral-50 px-4 py-3 font-mono text-[11px] text-neutral-500">
+                {shot.caption}
+              </figcaption>
+            </figure>
           ))}
-        </Reveal>
+        </div>
       )}
     </section>
   );
