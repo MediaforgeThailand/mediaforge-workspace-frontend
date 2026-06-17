@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { MotionConfig } from "framer-motion";
-import { ArrowLeft, ArrowUpRight, Play } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Play, Volume2 } from "lucide-react";
 import useDocumentTitle from "@/hooks/useDocumentTitle";
 import { Reveal, RevealItem } from "../../anim";
 import { profile, contact } from "../../data";
@@ -50,9 +50,31 @@ const scStyles = `
   }
 `;
 
-/* ── Heavy AI video: poster until clicked, then streams local 720p mp4 ────── */
+/* ── AI hero video: a muted WEBM preview autoplays/loops while on screen;
+ *    clicking loads the full-quality MP4 and plays it WITH sound. The light
+ *    webm keeps the gallery alive without downloading every heavy mp4. ─────── */
 function ReelCard({ video }: { video: ShowcaseVideo }) {
   const [playing, setPlaying] = useState(false);
+  const previewRef = useRef<HTMLVideoElement>(null);
+
+  // Autoplay the muted preview only while visible (and not when reduced-motion
+  // is requested). Disconnected once the user opts into the full mp4.
+  useEffect(() => {
+    if (playing) return;
+    const el = previewRef.current;
+    if (!el) return;
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !reduced) el.play().catch(() => {});
+        else el.pause();
+      },
+      { threshold: 0.35 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [playing]);
+
   return (
     <div className="relative overflow-hidden rounded-2xl bg-neutral-950 ring-1 ring-neutral-200">
       {playing ? (
@@ -68,18 +90,28 @@ function ReelCard({ video }: { video: ShowcaseVideo }) {
         <button
           onClick={() => setPlaying(true)}
           className="group relative block w-full"
-          aria-label={`เล่นวิดีโอ ${video.label}`}
+          aria-label={`เล่นวิดีโอพร้อมเสียง ${video.label}`}
         >
-          <img
-            src={video.poster}
-            alt={video.label}
-            loading="lazy"
+          <video
+            ref={previewRef}
             className="aspect-video w-full object-cover"
-          />
-          <span className="absolute inset-0 flex items-center justify-center bg-black/25 transition-colors group-hover:bg-black/40">
+            poster={video.poster}
+            muted
+            loop
+            playsInline
+            preload="metadata"
+          >
+            <source src={video.preview} type="video/webm" />
+          </video>
+          {/* play-with-sound affordance (preview keeps animating underneath) */}
+          <span className="absolute inset-0 flex items-center justify-center bg-black/10 transition-colors group-hover:bg-black/30">
             <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#F4FF00] text-black shadow-lg transition-transform group-hover:scale-110">
               <Play className="h-7 w-7 translate-x-0.5 fill-black" />
             </span>
+          </span>
+          {/* hint that clicking enables sound + full quality */}
+          <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 font-mono text-[10px] tracking-wide text-white backdrop-blur">
+            <Volume2 className="h-3 w-3" /> กดเพื่อฟังเสียง
           </span>
           <span className="absolute bottom-3 left-3 right-3 truncate rounded-full bg-black/70 px-3 py-1 font-mono text-[11px] tracking-wide text-white">
             {video.label}
