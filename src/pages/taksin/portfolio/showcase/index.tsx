@@ -53,10 +53,17 @@ const scStyles = `
 /* ── AI hero video: a muted WEBM preview autoplays/loops while on screen;
  *    clicking loads the full-quality MP4 and plays it WITH sound. The light
  *    webm keeps the gallery alive without downloading every heavy mp4. ─────── */
-function ReelCard({ video }: { video: ShowcaseVideo }) {
+function ReelCard({
+  video,
+  aspect = "video",
+}: {
+  video: ShowcaseVideo;
+  aspect?: "video" | "portrait";
+}) {
   const [playing, setPlaying] = useState(false);
   const previewRef = useRef<HTMLVideoElement>(null);
   const mp4Ref = useRef<HTMLVideoElement>(null);
+  const aspectClass = aspect === "portrait" ? "aspect-[9/16]" : "aspect-video";
 
   // Autoplay the muted preview only while visible (and not when reduced-motion
   // is requested). Disconnected once the user opts into the full mp4.
@@ -99,7 +106,7 @@ function ReelCard({ video }: { video: ShowcaseVideo }) {
           keeps the heavy file off the wire until then. */}
       <video
         ref={mp4Ref}
-        className="aspect-video w-full object-cover"
+        className={`${aspectClass} w-full object-cover`}
         src={video.src}
         poster={video.poster}
         controls={playing}
@@ -175,16 +182,21 @@ function Section({ section }: { section: ShowcaseSection }) {
         <p className="mt-4 max-w-2xl text-base leading-relaxed text-neutral-600">{section.blurb}</p>
       </Reveal>
 
-      {/* Curated AI hero videos (click to play) */}
+      {/* Curated videos (click to play with sound) — vertical social clips use
+          a portrait card + a tighter column count. */}
       {section.videos.length > 0 && (
         <Reveal
           staggerChildren
           amount={0.1}
-          className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+          className={
+            section.videoAspect === "portrait"
+              ? "mt-10 grid gap-5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
+              : "mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+          }
         >
           {section.videos.map((v) => (
             <RevealItem key={v.src}>
-              <ReelCard video={v} />
+              <ReelCard video={v} aspect={section.videoAspect} />
             </RevealItem>
           ))}
         </Reveal>

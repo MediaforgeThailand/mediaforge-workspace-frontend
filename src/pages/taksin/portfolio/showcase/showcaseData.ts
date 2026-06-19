@@ -29,6 +29,9 @@ export interface ShowcaseSection {
   title: string;
   titleEn: string;
   blurb: string;
+  /** Aspect ratio for the section's video cards. "portrait" for vertical
+   *  social clips (9:16), default "video" (16:9 landscape). */
+  videoAspect?: "video" | "portrait";
   videos: ShowcaseVideo[];
   images: ShowcaseImage[];
 }
@@ -129,23 +132,23 @@ export const showcaseSections: ShowcaseSection[] = [
     index: "04",
     title: "วิดีโอคอนเทนต์",
     titleEn: "Video Content",
-    blurb: "คีย์เฟรมจากงานวิดีโอคอนเทนต์สำหรับโซเชียลและแคมเปญการตลาด — วางคอนเซปต์ จังหวะภาพ และการเล่าเรื่องให้เหมาะกับแต่ละแพลตฟอร์ม",
-    videos: [],
-    images: [
-      { src: `${P}/image58.jpg`, w: 406, h: 720 },
-      { src: `${P}/image59.png`, w: 648, h: 1152 },
-      { src: `${P}/image60.jpg`, w: 675, h: 1200 },
-      { src: `${P}/image61.jpg`, w: 675, h: 1200 },
-      { src: `${P}/image62.jpg`, w: 675, h: 1200 },
-      { src: `${P}/image63.jpg`, w: 675, h: 1200 },
-      { src: `${P}/image64.jpg`, w: 675, h: 1200 },
-      { src: `${P}/image65.jpg`, w: 675, h: 1200 },
-      { src: `${P}/image66.jpg`, w: 406, h: 720 },
-      { src: `${P}/image67.jpg`, w: 406, h: 720 },
-      { src: `${P}/image68.jpg`, w: 406, h: 720 },
-      { src: `${P}/image69.jpg`, w: 406, h: 720 },
-      { src: `${P}/image70.jpg`, w: 406, h: 720 },
+    blurb: "งานวิดีโอคอนเทนต์จริงสำหรับโซเชียลและแคมเปญการตลาดของลูกค้า — วางคอนเซปต์ จังหวะภาพ และการเล่าเรื่องให้เหมาะกับแต่ละแพลตฟอร์ม (กดที่คลิปเพื่อเล่นพร้อมเสียง)",
+    videoAspect: "portrait",
+    videos: [
+      { src: `${VID}/vc-ctstudio-intro.mp4`, preview: `${VID}/vc-ctstudio-intro.webm`, poster: `${POS}/vc-ctstudio-intro.jpg`, label: "CT Studio — วิดีโออินโทรแบรนด์" },
+      { src: `${VID}/vc-centerbeauty-clinic.mp4`, preview: `${VID}/vc-centerbeauty-clinic.webm`, poster: `${POS}/vc-centerbeauty-clinic.jpg`, label: "Center Beauty — คอนเทนต์คลินิกความงาม" },
+      { src: `${VID}/vc-centerbeauty-makeup.mp4`, preview: `${VID}/vc-centerbeauty-makeup.webm`, poster: `${POS}/vc-centerbeauty-makeup.jpg`, label: "Center Beauty — คอนเทนต์ให้ความรู้แต่งหน้า" },
+      { src: `${VID}/vc-centerbeauty-9dinliner.mp4`, preview: `${VID}/vc-centerbeauty-9dinliner.webm`, poster: `${POS}/vc-centerbeauty-9dinliner.jpg`, label: "Center Beauty — 9D Inliner คืออะไร" },
+      { src: `${VID}/vc-centerbeauty-inliner.mp4`, preview: `${VID}/vc-centerbeauty-inliner.webm`, poster: `${POS}/vc-centerbeauty-inliner.jpg`, label: "Center Beauty — ฝังสีอินไลเนอร์" },
+      { src: `${VID}/vc-centerbeauty-review.mp4`, preview: `${VID}/vc-centerbeauty-review.webm`, poster: `${POS}/vc-centerbeauty-review.jpg`, label: "Center Beauty — คอนเทนต์รีวิวบริการ" },
+      { src: `${VID}/vc-centerbeauty-browlip.mp4`, preview: `${VID}/vc-centerbeauty-browlip.webm`, poster: `${POS}/vc-centerbeauty-browlip.jpg`, label: "Center Beauty — Brow & Lip" },
+      { src: `${VID}/vc-imnuts-almondmilk.mp4`, preview: `${VID}/vc-imnuts-almondmilk.webm`, poster: `${POS}/vc-imnuts-almondmilk.jpg`, label: "I'm Nuts — Homemade Almond Milk" },
+      { src: `${VID}/vc-imnuts-berrychoc.mp4`, preview: `${VID}/vc-imnuts-berrychoc.webm`, poster: `${POS}/vc-imnuts-berrychoc.jpg`, label: "I'm Nuts — Berry Choc Dubai" },
+      { src: `${VID}/vc-imnuts-howto.mp4`, preview: `${VID}/vc-imnuts-howto.webm`, poster: `${POS}/vc-imnuts-howto.jpg`, label: "I'm Nuts — How To เมนูช็อกโกแลตสตรอว์เบอร์รี" },
+      { src: `${VID}/vc-imnuts-croissant.mp4`, preview: `${VID}/vc-imnuts-croissant.webm`, poster: `${POS}/vc-imnuts-croissant.jpg`, label: "I'm Nuts — คอนเทนต์ครัวซองต์อัลมอนด์" },
+      { src: `${VID}/vc-imnuts-croissant-strawberry.mp4`, preview: `${VID}/vc-imnuts-croissant-strawberry.webm`, poster: `${POS}/vc-imnuts-croissant-strawberry.jpg`, label: "I'm Nuts — Croissant Strawberry" },
     ],
+    images: [],
   },
   {
     id: "ai-content",
