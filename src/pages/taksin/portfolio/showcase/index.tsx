@@ -56,6 +56,7 @@ const scStyles = `
 function ReelCard({ video }: { video: ShowcaseVideo }) {
   const [playing, setPlaying] = useState(false);
   const previewRef = useRef<HTMLVideoElement>(null);
+  const mp4Ref = useRef<HTMLVideoElement>(null);
 
   // Autoplay the muted preview only while visible (and not when reduced-motion
   // is requested). Disconnected once the user opts into the full mp4.
@@ -75,26 +76,46 @@ function ReelCard({ video }: { video: ShowcaseVideo }) {
     return () => io.disconnect();
   }, [playing]);
 
+  // Play the full mp4 WITH sound. Must call play() synchronously inside the
+  // click gesture: Safari / iOS block unmuted autoplay on a freshly-shown
+  // element, so the declarative `autoPlay` attribute alone leaves the video
+  // sitting on its poster. Driving play() on a persistent <video> from the
+  // gesture is the cross-browser-reliable path.
+  const startWithSound = () => {
+    setPlaying(true);
+    previewRef.current?.pause();
+    const v = mp4Ref.current;
+    if (v) {
+      v.muted = false;
+      const p = v.play();
+      if (p) p.catch(() => {});
+    }
+  };
+
   return (
     <div className="relative overflow-hidden rounded-2xl bg-neutral-950 ring-1 ring-neutral-200">
-      {playing ? (
-        <video
-          className="aspect-video h-full w-full object-cover"
-          src={video.src}
-          poster={video.poster}
-          controls
-          autoPlay
-          playsInline
-        />
-      ) : (
+      {/* The mp4 is always in the DOM so it defines the card box (showing its
+          poster) and is ready to play the instant the user clicks. preload=none
+          keeps the heavy file off the wire until then. */}
+      <video
+        ref={mp4Ref}
+        className="aspect-video w-full object-cover"
+        src={video.src}
+        poster={video.poster}
+        controls={playing}
+        playsInline
+        preload="none"
+      />
+      {!playing && (
         <button
-          onClick={() => setPlaying(true)}
-          className="group relative block w-full"
+          onClick={startWithSound}
+          className="group absolute inset-0 block h-full w-full"
           aria-label={`เล่นวิดีโอพร้อมเสียง ${video.label}`}
         >
+          {/* muted webm preview overlays the poster and loops while visible */}
           <video
             ref={previewRef}
-            className="aspect-video w-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover"
             poster={video.poster}
             muted
             loop
